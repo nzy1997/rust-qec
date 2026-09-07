@@ -21,6 +21,47 @@ test("home leads to the installed first-circuit path", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "1. Install a native package" })).toBeVisible();
 });
 
+test("home offers three distinct primary destinations without repeating get started", async ({ page }) => {
+  await page.goto("/");
+
+  const actions = page.locator(".home-hero .actions a");
+  await expect(actions).toHaveCount(3);
+  expect(await actions.allTextContents()).toEqual([
+    "Run your first circuit",
+    "Download v0.2.1",
+    "Try Shot Lab",
+  ]);
+  expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
+    "get-started/",
+    "https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1",
+    "interactive/",
+  ]);
+
+  const destinations = await actions.evaluateAll((links) => links.map((link) => link.href));
+  expect(new Set(destinations).size).toBe(3);
+  await expect(page.locator('a[href*="get-started/"]')).toHaveCount(2);
+});
+
+test("installation starts with one copyable command and keeps manual steps optional", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (text) => { window.__copiedText = text; } },
+    });
+  });
+  await page.goto("/get-started/");
+  const installation = page.locator('section[aria-labelledby="install"]');
+  const manual = installation.locator("details");
+  await expect(manual).not.toHaveAttribute("open", "");
+  await installation.getByRole("button", { name: "Copy Shell · install v0.2.1" }).click();
+  await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
+    "curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh",
+  );
+  await expect(installation.getByRole("link", { name: "Inspect the installer" })).toHaveAttribute("href", "../install.sh");
+  await manual.locator("summary").click();
+  await expect(manual).toContainText("sha256sum -c");
+});
+
 test("copying preserves the complete circuit heredoc", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
