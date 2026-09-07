@@ -61,6 +61,54 @@ detector D2
 }
 
 #[test]
+fn declarations_and_zero_probability_errors_preserve_dimensions() {
+    let g = parse_dem("detector D8\nlogical_observable L9\nerror(0) D10 L11\n").unwrap();
+
+    assert_eq!(g.get_num_detectors(), 11);
+    assert_eq!(g.num_observables, 12);
+    assert!(g.edges.is_empty(), "unexpected edges: {:?}", g.edges);
+}
+
+#[test]
+fn extreme_declared_indices_return_errors_without_panicking() {
+    let cases = [
+        format!("logical_observable L{}\n", usize::MAX),
+        format!("error(0) D{}\n", usize::MAX),
+        format!("shift_detectors {}\ndetector D1\n", usize::MAX),
+    ];
+
+    for dem in cases {
+        let outcome = std::panic::catch_unwind(|| parse_dem(&dem));
+        assert!(outcome.is_ok(), "parser panicked for `{dem}`");
+        let error = match outcome.unwrap() {
+            Ok(_) => panic!("extreme index unexpectedly parsed: `{dem}`"),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("too large")
+                || error.contains("supported graph capacity")
+                || error.contains("overflow"),
+            "unexpected error for `{dem}`: {error}"
+        );
+        assert!(error.contains("while parsing"), "missing context: {error}");
+    }
+}
+
+#[test]
+fn invalid_probability_is_rejected_before_large_dimension_allocation() {
+    let dem = "error(1) D100000000\n";
+    let outcome = std::panic::catch_unwind(|| parse_dem(dem));
+
+    assert!(outcome.is_ok());
+    let error = match outcome.unwrap() {
+        Ok(_) => panic!("invalid probability unexpectedly parsed"),
+        Err(error) => error,
+    };
+    assert!(error.contains("finite error probabilities in the range 0 <= p < 1"));
+    assert!(error.contains("while parsing"));
+}
+
+#[test]
 fn parse_correlated_segments_from_single_error_instruction() {
     let dem = "error(0.1) D0 D1 L0 ^ D2 L1 ^ D3 D4";
     let g = parse_dem(dem).unwrap();
@@ -126,7 +174,8 @@ fn hash_inside_instruction_tag_is_not_treated_as_a_comment() {
 
 #[test]
 fn braces_in_inline_comments_do_not_change_repeat_structure() {
-    let dem = "repeat 2 { # } ignored\n    error(0.1) D0 D1 # D2\n    shift_detectors 2\n} # { ignored";
+    let dem =
+        "repeat 2 { # } ignored\n    error(0.1) D0 D1 # D2\n    shift_detectors 2\n} # { ignored";
     let g = parse_dem(dem).unwrap();
 
     assert_eq!(g.edges.len(), 2);

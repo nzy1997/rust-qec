@@ -16,6 +16,7 @@ use serde::Serialize;
 mod compiler;
 mod dataset;
 mod matching;
+#[cfg(feature = "ilp")]
 mod mle;
 
 use compiler::compile_circuit;
@@ -29,6 +30,7 @@ use matching::EdgeKind;
 #[cfg(test)]
 use matching::validate_unambiguous_parallel_edges;
 use matching::{CompiledMatching, GraphEdge};
+#[cfg(feature = "ilp")]
 use mle::CompiledMle;
 
 pub const COMMAND: &str = "decode";
@@ -45,6 +47,7 @@ const MAX_EXACT_LOSS_PATTERN_TERMS: usize = 65_536;
 const LOSS_PATTERN_HLL_PRECISION: u32 = 14;
 const LOSS_PATTERN_HLL_REGISTERS: usize = 1 << LOSS_PATTERN_HLL_PRECISION;
 
+#[cfg_attr(not(feature = "ilp"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderKind {
     EnvelopeMatching,
@@ -251,6 +254,7 @@ fn hll_estimate(registers: &[u8]) -> usize {
     estimate.round().min(usize::MAX as f64) as usize
 }
 
+#[cfg_attr(not(feature = "ilp"), allow(dead_code))]
 #[derive(Clone, Debug)]
 struct Effect {
     id: String,
@@ -265,6 +269,7 @@ struct LossEnvelope {
     candidates: Vec<Effect>,
 }
 
+#[cfg_attr(not(feature = "ilp"), allow(dead_code))]
 struct CompiledCircuit {
     loss_aware_m2d: CompiledLossAwareM2d,
     loss_flags: Vec<usize>,
@@ -285,8 +290,16 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
     let circuit = compile_circuit(&dataset, options.decoder)?;
     let mut decoder = match options.decoder {
         DecoderKind::EnvelopeMatching => DecoderState::Matching(CompiledMatching::new(&circuit)?),
+        #[cfg(feature = "ilp")]
         DecoderKind::EnvelopeMle => {
             DecoderState::Mle(CompiledMle::new(&circuit, options.shot_timeout_ms)?)
+        }
+        #[cfg(not(feature = "ilp"))]
+        DecoderKind::EnvelopeMle => {
+            return Err(DecodeFailure::new(
+                "feature_disabled",
+                "envelope-mle requires the rustqec-cli `ilp` feature",
+            ));
         }
     };
     let compile_seconds = compile_started.elapsed().as_secs_f64();
@@ -512,6 +525,7 @@ fn validate_output_paths(options: &DecodeOptions) -> Result<(), DecodeFailure> {
     Ok(())
 }
 
+#[cfg_attr(not(feature = "ilp"), allow(dead_code))]
 #[derive(Debug)]
 enum ShotFailure {
     Timeout,
@@ -521,6 +535,7 @@ enum ShotFailure {
 
 enum DecoderState {
     Matching(CompiledMatching),
+    #[cfg(feature = "ilp")]
     Mle(CompiledMle),
 }
 
@@ -532,6 +547,7 @@ impl DecoderState {
     ) -> Result<Vec<usize>, ShotFailure> {
         match self {
             Self::Matching(decoder) => decoder.decode(syndrome, losses),
+            #[cfg(feature = "ilp")]
             Self::Mle(decoder) => decoder.decode(syndrome, losses),
         }
     }
@@ -539,6 +555,7 @@ impl DecoderState {
     fn graph_builds(&self) -> usize {
         match self {
             Self::Matching(decoder) => decoder.graph_builds(),
+            #[cfg(feature = "ilp")]
             Self::Mle(_) => 0,
         }
     }
@@ -546,6 +563,7 @@ impl DecoderState {
     fn model_builds(&self) -> usize {
         match self {
             Self::Matching(_) => 0,
+            #[cfg(feature = "ilp")]
             Self::Mle(decoder) => decoder.model_builds(),
         }
     }
@@ -553,6 +571,7 @@ impl DecoderState {
     fn cache_hits(&self) -> usize {
         match self {
             Self::Matching(decoder) => decoder.cache_hits(),
+            #[cfg(feature = "ilp")]
             Self::Mle(decoder) => decoder.cache_hits(),
         }
     }
@@ -560,6 +579,7 @@ impl DecoderState {
     fn mle_detector_rows(&self) -> usize {
         match self {
             Self::Matching(_) => 0,
+            #[cfg(feature = "ilp")]
             Self::Mle(decoder) => decoder.detector_rows(),
         }
     }
@@ -594,6 +614,7 @@ pub(crate) fn write_public_bundle(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "ilp")]
     use renvelope::{
         AtomLossCase, DecodeOutcome, EdgeKind as ReferenceEdgeKind, Effect as ReferenceEffect,
         EnvelopeMatchingCase, EnvelopeMatchingEdge, EnvelopeMatchingShot, LossEdgeMap,
@@ -711,6 +732,7 @@ mod tests {
         compile_circuit(&dataset_for(circuit_text), DecoderKind::EnvelopeMle).unwrap()
     }
 
+    #[cfg(feature = "ilp")]
     fn observed(bits: &[u8]) -> Vec<usize> {
         bits.iter()
             .enumerate()
@@ -718,6 +740,7 @@ mod tests {
             .collect()
     }
 
+    #[cfg(feature = "ilp")]
     fn mask(indices: &[usize]) -> u64 {
         indices.iter().fold(0, |value, &index| value | (1 << index))
     }
@@ -738,6 +761,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn reference_effect(effect: &Effect) -> ReferenceEffect {
         ReferenceEffect {
             id: effect.id.clone(),
@@ -747,6 +771,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn reference_case(
         circuit: &CompiledCircuit,
         observed_detectors: Vec<usize>,
@@ -776,6 +801,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn reference_mle(circuit: &CompiledCircuit, syndrome: &[u8], losses: &[usize]) -> u64 {
         let case = reference_case(circuit, observed(syndrome), losses);
         match decode_reference_mle(&case).unwrap() {
@@ -784,6 +810,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn project_reference_effect(
         effect: &ReferenceEffect,
         checks: &[rstim::m2d::LossAwareDetectorCheck],
@@ -809,6 +836,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn project_reference_case(
         canonical: &AtomLossCase,
         checks: &[rstim::m2d::LossAwareDetectorCheck],
@@ -842,6 +870,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "ilp")]
     fn issue_679_native_reference_cases() -> (AtomLossCase, AtomLossCase, Vec<usize>, usize, usize)
     {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -881,6 +910,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "ilp")]
     fn issue_679_reference_fixture() -> serde_json::Value {
         let (canonical, projected, losses, detector_count, check_count) =
             issue_679_native_reference_cases();
@@ -895,6 +925,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "ilp")]
     fn reference_matching(circuit: &CompiledCircuit, shots: &[(&[u8], &[usize])]) -> Vec<u64> {
         let edge_ids: Vec<_> = (0..circuit.graph_edges.len())
             .map(|index| format!("edge-{index}"))
@@ -943,6 +974,7 @@ mod tests {
         decode_reference_matching(&case).unwrap().predictions
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn compiled_batch_matches_explicit_reference_kernels() {
         let circuit = compiled(PERSISTENT_CIRCUIT);
@@ -983,6 +1015,7 @@ mod tests {
         assert_eq!(matching.cache.len(), 2);
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn imported_measurement_rows_match_the_canonical_reference_mle() {
         let circuit = compiled(PERSISTENT_CIRCUIT);
@@ -1017,6 +1050,7 @@ mod tests {
         assert_eq!(actual, [1, 1, 1, 0]);
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn issue_679_reference_fixture_matches_the_native_compiler() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1036,6 +1070,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     #[ignore = "regenerates /tmp/issue679-reference_cases.json.zst"]
     fn regenerate_issue_679_reference_cases() {
@@ -1051,6 +1086,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn all_no_loss_reduces_to_ordinary_pauli_decoding() {
         let circuit = compiled(PERSISTENT_CIRCUIT);
@@ -1094,6 +1130,7 @@ mod tests {
         assert_eq!(matching.cache.len(), 1);
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn delayed_erasure_decoders_ignore_the_lost_measurement_placeholder() {
         let circuit = compiled(concat!(
@@ -1382,7 +1419,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let shared = root.path().join("shared");
         let mut options = DecodeOptions {
-            decoder: DecoderKind::EnvelopeMle,
+            decoder: DecoderKind::EnvelopeMatching,
             dataset: root.path().join("dataset"),
             predictions_out: shared.clone(),
             stats_out: shared,
@@ -1399,6 +1436,7 @@ mod tests {
         assert!(error.message.contains("already exists"));
     }
 
+    #[cfg(feature = "ilp")]
     #[test]
     fn stim_generated_fixture_compiles_and_matches_reference_kernels() {
         // The annotated Stim-generated conformance fixture (see

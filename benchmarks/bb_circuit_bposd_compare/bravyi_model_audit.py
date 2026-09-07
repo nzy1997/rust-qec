@@ -113,6 +113,8 @@ def _run_rust_model_audit_export(
         "-q",
         "-p",
         "rsinter",
+        "--features",
+        "rbposd-runner",
         "--bin",
         "rsinter",
         "--",

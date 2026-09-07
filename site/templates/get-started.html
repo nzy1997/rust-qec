@@ -34,7 +34,7 @@ rustqec capabilities --format json</code></pre>
 <p><strong>Success:</strong> the checksum command reports <code>OK</code> and the capability JSON includes <code>circuit.stats</code>. If a checksum fails, stop and download a fresh archive.</p>
 </details>
 <pre data-language="Shell · check installation"><code>rustqec capabilities --format json</code></pre>
-<p><strong>Success:</strong> the capability JSON includes <code>circuit.stats</code>. Both installed commands are ready for the example below.</p>
+<p><strong>Success:</strong> the capability JSON includes <code>circuit.stats</code>. The example below only needs the <code>rustqec</code> command.</p>
 </section>
 <section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Create and inspect a circuit</h2>
 {% include "partials/example-circuit.html" %}
@@ -42,19 +42,22 @@ rustqec capabilities --format json</code></pre>
 <p><strong>Expected fields in <code>result</code>:</strong> <code>instruction_count: 5</code>, <code>num_qubits: 1</code>, <code>num_measurements: 1</code>, <code>num_detectors: 1</code>, <code>num_observables: 1</code>.</p>
 </section>
 <section class="task-section" aria-labelledby="detector-output"><h2 id="detector-output">3. Sample and verify a detector event</h2>
-<pre data-language="Shell · installed CLI"><code>rstim detect --in circuit.stim --shots 1 --out_format dets
-rstim analyze_errors --in circuit.stim --out model.dem
-cat model.dem
-rstim sample_dem --in model.dem --shots 1 --out_format dets</code></pre>
-<pre data-output="true" data-language="Expected output"><code>shot D0 L0
-error(1) D0 L0
-shot D0 L0</code></pre>
-<p>The X error has probability 1. Both detector streams therefore contain D0 and logical observable L0. This small example verifies installation and the command path; it is not a numerical-performance benchmark.</p>
+<pre data-language="Shell · installed CLI"><code>rustqec circuit detect --in circuit.stim --shots 1 --out-format dets --append-observables --out events.dets
+rustqec circuit dem --in circuit.stim --out model.dem
+cat events.dets model.dem</code></pre>
+<pre data-output="true" data-language="Expected file contents"><code>shot D0 L0
+error(1) D0 L0</code></pre>
+<p>The X error has probability 1. The detector stream therefore contains D0 and logical observable L0; the DEM records the same probability-1 event. This small example verifies installation and the command path; it is not a numerical-performance benchmark.</p>
 <div class="content-links"><a href="../simulator/">Next: sample circuits</a><a href="../sampling-data/">Save training data</a><a href="../interactive/">Explore errors visually</a></div>
 </section>
 <section class="task-section" aria-labelledby="tools"><h2 id="tools">Which command should I use?</h2>
 <div class="table-wrap"><table><thead><tr><th>Tool</th><th>Role</th><th>Setup</th></tr></thead><tbody><tr><td><code>rustqec</code></td><td>Unified capability discovery, structured circuit and dataset commands</td><td>Native archive</td></tr><tr><td><code>rstim</code></td><td>Simulator, DEM and circuit rendering commands</td><td>Native archive</td></tr><tr><td><code>qec-code</code>, <code>rsinter</code>, <code>make</code> workflows</td><td>Code construction and experiment harnesses</td><td>Source checkout and workflow-specific dependencies</td></tr></tbody></table></div>
 </section>
+<section class="task-section" aria-labelledby="cargo-install"><h2 id="cargo-install">Cargo installation preparation</h2>
+<p>The crates.io release is being prepared; the package names below are not yet published. Until then, use the native installer above or install the development checkout:</p>
+<pre data-language="Shell · development checkout"><code>cargo install --locked --path rustqec-cli --root "$HOME/.local"</code></pre>
+<p>This installs <code>rustqec</code>, which runs the complete example above. The development default includes circuit and dataset tools plus envelope matching. Exact envelope MLE is opt-in with <code>--features ilp</code> and requires the native solver build prerequisites. Official native archives include both decoders. Use <code>rustqec capabilities --format json</code> to inspect your binary.</p>
+<p>For Stim-style compatibility commands, install <code>rstim</code> separately with <code>cargo install --locked --path rstim --bin rstim</code>. Internal benchmark workers are not installed by default. See the <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md">crate publishing and feature guide</a>.</p></section>
 <section class="task-section" aria-labelledby="source-build"><h2 id="source-build">Building from source</h2>
 <p>For a frozen source build, check out <code>v0.2.1</code>. Current development builds are tested with Rust 1.88.0 (MSRV) and stable on the two native targets above. Install Rust and the platform's native build dependencies before building.</p>
 <details><summary>Ubuntu 24.04 build prerequisites</summary><pre data-language="Shell · Ubuntu"><code>sudo apt-get update

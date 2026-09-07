@@ -4,10 +4,17 @@ version = "0.2.1"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/rstim"
+publish = ["crates-io"]
+include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]
 benchmark-telemetry = []
+benchmark-tools = []
 
 [dependencies]
 rand = "0.8"
@@ -23,3 +30,25 @@ toml = "0.8"
 [dev-dependencies]
 proptest = "1"
 tempfile = "3"
+
+[[bin]]
+name = "rstim"
+path = "src/main.rs"
+
+[[bin]]
+name = "rstim_compiled_steady_worker"
+path = "src/bin/rstim_compiled_steady_worker.rs"
+required-features = ["benchmark-tools"]
+
+[[bin]]
+name = "rstim_reference_build_worker"
+path = "src/bin/rstim_reference_build_worker.rs"
+required-features = ["benchmark-tools"]
+
+[[test]]
+name = "rstim_compiled_steady_worker"
+required-features = ["benchmark-tools"]
+
+[[test]]
+name = "rstim_reference_build_worker"
+required-features = ["benchmark-tools"]

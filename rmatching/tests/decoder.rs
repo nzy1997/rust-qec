@@ -1,6 +1,6 @@
 #![cfg(feature = "bench")]
 
-use rmatching::Matching;
+use rmatching::{Matching, PackedDecodeError};
 use rstim::dem::DetectorErrorModel;
 
 fn compile_matching_from_dem(dem_text: &str) -> Matching {
@@ -17,6 +17,20 @@ error(0.05) D0
 error(0.05) D2
 ";
     let _matching = compile_matching_from_dem(dem_text);
+}
+
+#[test]
+fn matching_rejects_dem_probability_one_with_non_finite_weight() {
+    for probability in ["1", "-0.1", "1.1", "NaN"] {
+        let error = match Matching::from_dem(&format!("error({probability}) D0 L0\n")) {
+            Ok(_) => panic!("probability {probability} unexpectedly compiled"),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("finite error probabilities in the range 0 <= p < 1"),
+            "unexpected error for probability {probability}: {error}"
+        );
+    }
 }
 
 #[test]
@@ -160,7 +174,7 @@ error(0.05) D1
 }
 
 #[test]
-fn matching_zero_fills_when_requested_obs_width_exceeds_dem() {
+fn matching_rejects_requested_obs_width_exceeding_graph() {
     let mut matching = compile_matching_from_dem(
         "\
 error(0.1) D0 L0
@@ -170,10 +184,16 @@ error(0.05) D0
 
     let num_dets: usize = 1;
     let requested_num_obs: usize = 9;
-    let result = matching.decode_shots_bit_packed(&[0b0000_0001], 1, num_dets, requested_num_obs);
+    let result =
+        matching.try_decode_shots_bit_packed(&[0b0000_0001], 1, num_dets, requested_num_obs);
 
-    assert_eq!(result.len(), requested_num_obs.div_ceil(8));
-    assert_eq!(result, vec![0b0000_0001, 0b0000_0000]);
+    assert_eq!(
+        result,
+        Err(PackedDecodeError::ObservableCountMismatch {
+            expected: 1,
+            actual: 9,
+        })
+    );
 }
 
 #[test]
@@ -186,8 +206,113 @@ logical_observable L8
 ",
     );
 
-    let result = matching.decode_shots_bit_packed(&[0b0000_0001], 1, 1, 9);
+    let result = matching
+        .try_decode_shots_bit_packed(&[0b0000_0001], 1, 1, 9)
+        .unwrap();
 
-    assert_eq!(result.len(), 2);
     assert_eq!(result, vec![0b0000_0001, 0b0000_0000]);
+}
+
+#[test]
+fn matching_accepts_declared_unused_detectors() {
+    let mut matching = Matching::from_dem("detector D8\n").unwrap();
+
+    let result = matching
+        .try_decode_shots_bit_packed(&[0, 0, 0, 0], 2, 9, 0)
+        .unwrap();
+
+    assert!(result.is_empty());
+}
+
+#[test]
+fn matching_zero_probability_errors_only_declare_dimensions() {
+    let mut matching = Matching::from_dem("error(0) D8 L8\n").unwrap();
+
+    let result = matching
+        .try_decode_shots_bit_packed(&[0, 0], 1, 9, 9)
+        .unwrap();
+
+    assert_eq!(result, vec![0, 0]);
+}
+
+#[test]
+fn matching_checked_decode_matches_legacy_api_for_valid_multibyte_batch() {
+    let dem = "error(0.1) D0 D8 L8\nerror(0.05) D0\nerror(0.05) D8\n";
+    let dets = [1, 1, 0, 0];
+    let mut checked = compile_matching_from_dem(dem);
+    let mut legacy = compile_matching_from_dem(dem);
+
+    let checked_result = checked.try_decode_shots_bit_packed(&dets, 2, 9, 9).unwrap();
+    let legacy_result = legacy.decode_shots_bit_packed(&dets, 2, 9, 9);
+
+    assert_eq!(checked_result, legacy_result);
+}
+
+#[test]
+fn matching_checked_decode_rejects_short_and_long_buffers() {
+    let dem = "error(0.1) D0 D8 L0\nerror(0.05) D0\nerror(0.05) D8\n";
+    let mut matching = compile_matching_from_dem(dem);
+
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[0; 3], 2, 9, 1),
+        Err(PackedDecodeError::DetectorBufferLengthMismatch {
+            expected: 4,
+            actual: 3,
+        })
+    );
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[0; 5], 2, 9, 1),
+        Err(PackedDecodeError::DetectorBufferLengthMismatch {
+            expected: 4,
+            actual: 5,
+        })
+    );
+}
+
+#[test]
+fn matching_checked_decode_rejects_graph_dimension_mismatches() {
+    let dem = "error(0.1) D0 D1 L0\nerror(0.05) D0\nerror(0.05) D1\n";
+    let mut matching = compile_matching_from_dem(dem);
+
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[0], 1, 1, 1),
+        Err(PackedDecodeError::DetectorCountMismatch {
+            expected: 2,
+            actual: 1,
+        })
+    );
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[0], 1, 2, 0),
+        Err(PackedDecodeError::ObservableCountMismatch {
+            expected: 1,
+            actual: 0,
+        })
+    );
+}
+
+#[test]
+fn matching_checked_decode_accepts_zero_sized_graph_and_batches() {
+    let mut matching = Matching::new();
+
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[], 3, 0, 0),
+        Ok(Vec::new())
+    );
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[], 0, 0, 0),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn matching_checked_decode_reports_batch_size_overflow() {
+    let mut matching = Matching::from_dem("detector D8\n").unwrap();
+
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[], usize::MAX, 9, 0),
+        Err(PackedDecodeError::BufferSizeOverflow {
+            num_shots: usize::MAX,
+            row_bytes: 2,
+        })
+    );
 }

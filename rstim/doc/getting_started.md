@@ -206,31 +206,25 @@ crate (a Rust MWPM decoder). The workflow is:
 5. Compare predictions against actual observable flips to measure the logical
    error rate.
 
-```rust
-// Pseudocode (requires rmatching crate as a dependency)
-let circuit = repetition_code_memory(5, 10, 0.01);
-let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
+The repository includes a [complete external-consumer
+project](../../examples/rust-consumer). It has its own `[workspace]`, declares
+registry versions just as a downstream application will after the first
+release, and compiles independently from the repository workspace. Its
+[executable source](../../examples/rust-consumer/src/main.rs) parses and samples
+a Bell circuit, extracts a decomposed DEM for a noisy circuit, constructs a
+mutable `rmatching::Matching`, converts detector bits to `u8`, and checks every
+observable prediction against the sampled result.
 
-// Build decoder from DEM text
-let matching = rmatching::Matching::from_dem(&dem.to_string()).unwrap();
+After the crates are released, copy that directory elsewhere and run:
 
-// Sample
-let output = sample_batch(&circuit, 1000, &mut rng).unwrap();
-
-// Decode each shot
-let mut errors = 0;
-for shot in 0..1000 {
-    let syndrome: Vec<bool> = (0..output.detections.num_major())
-        .map(|d| output.detections.get(d, shot))
-        .collect();
-    let predicted = matching.decode(&syndrome);
-    let actual = output.observable_flips.get(0, shot);
-    if predicted[0] != actual {
-        errors += 1;
-    }
-}
-println!("Logical error rate: {}/{}", errors, 1000);
+```sh
+cargo run --release
 ```
+
+Before release, maintainers test the same registry-style manifest using a
+temporary `[patch.crates-io]` mapping to locally packaged crate contents. That
+local check confirms package composition and the downstream API, but is not a
+registry availability test.
 
 Without a decoder, you can still inspect the raw sampling output:
 

@@ -86,10 +86,10 @@ impl CompiledDecoder for CompiledRmatchingDemDecoder {
         num_dets: usize,
         num_obs: usize,
     ) -> Result<Vec<u8>, String> {
-        Ok(self
-            .matching
+        self.matching
             .lock()
             .map_err(|error| error.to_string())?
-            .decode_shots_bit_packed(dets, num_shots, num_dets, num_obs))
+            .try_decode_shots_bit_packed(dets, num_shots, num_dets, num_obs)
+            .map_err(|error| error.to_string())
     }
 }

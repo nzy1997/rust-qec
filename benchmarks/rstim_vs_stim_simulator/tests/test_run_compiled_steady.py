@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import tomllib
 import unittest
 import unittest.mock
 from pathlib import Path
@@ -33,12 +34,12 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
         self.assertEqual(
             run.call_args.args[0],
-            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker", "--features", "benchmark-tools"],
         )
 
     def test_rstim_worker_returns_packed_known_answer_and_lifecycle_telemetry(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker", "--features", "benchmark-tools"],
             cwd=ROOT,
             check=False,
             capture_output=True,
@@ -53,7 +54,8 @@ class RunCompiledSteadyTest(unittest.TestCase):
             text=True,
         )
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertRegex(version.stdout.strip(), r"^rstim 0\.2\.0")
+        package = tomllib.loads((ROOT / "rstim" / "Cargo.toml").read_text())["package"]
+        self.assertEqual(version.stdout.strip(), f"rstim {package['version']}")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fixture = Path(temp_dir) / "known_answer.stim"
@@ -97,7 +99,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
     def test_rstim_worker_emits_error_frame_for_missing_input(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker", "--features", "benchmark-tools"],
             cwd=ROOT,
             check=False,
             capture_output=True,
@@ -134,7 +136,7 @@ class RunCompiledSteadyTest(unittest.TestCase):
 
     def test_rstim_worker_emits_error_frame_for_missing_required_args(self) -> None:
         build = subprocess.run(
-            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker"],
+            ["cargo", "build", "--locked", "-p", "rstim", "--bin", "rstim_compiled_steady_worker", "--features", "benchmark-tools"],
             cwd=ROOT,
             check=False,
             capture_output=True,

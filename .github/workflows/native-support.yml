@@ -100,7 +100,7 @@ jobs:
             circuit_stats_json_wraps_the_existing_rstim_result -- --exact
       - name: Run locked workspace tests
         run: |
-          "$CARGO" test --locked --workspace
+          "$CARGO" test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
       - name: Run the real one-qubit CLI workflow
         run: |
           mkdir -p native-support-evidence

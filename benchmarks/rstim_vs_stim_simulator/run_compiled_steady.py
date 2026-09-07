@@ -171,7 +171,7 @@ def build_rstim_worker(profile: str) -> list[str]:
     command = ["cargo", "build", "--locked"]
     if profile == "release":
         command.append("--release")
-    command.extend(["-p", "rstim", "--bin", "rstim_compiled_steady_worker"])
+    command.extend(["-p", "rstim", "--bin", "rstim_compiled_steady_worker", "--features", "benchmark-tools"])
     completed = subprocess.run(
         command,
         cwd=REPO_ROOT,

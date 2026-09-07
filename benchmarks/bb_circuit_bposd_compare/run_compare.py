@@ -186,6 +186,8 @@ def _run_rust_export(
             "-q",
             "-p",
             "rsinter",
+            "--features",
+            "rbposd-runner",
             "--bin",
             "rsinter",
             "--",
@@ -1119,6 +1121,8 @@ def _rust_plot_command(
             "-q",
             "-p",
             "rsinter",
+            "--features",
+            "plotting",
             "--bin",
             "rsinter",
             "--",
@@ -1176,7 +1180,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--allow-missing-python", action="store_true")
-    parser.add_argument("--rust-binary", type=Path)
+    parser.add_argument(
+        "--rust-binary",
+        type=Path,
+        help=(
+            "prebuilt rsinter with rbposd-runner enabled; plot tiers also require "
+            "the plotting feature"
+        ),
+    )
     parser.add_argument("--batch-size", type=int, default=BATCHED_DEFAULT_BATCH_SIZE)
     parser.add_argument("--wall-budget-seconds", type=float)
     args = parser.parse_args(argv)
