@@ -1229,8 +1229,7 @@ pre code {
 .page-toc p { font-weight: 700; margin: 0 0 .65rem; }
 .page-toc nav { display: flex; flex-wrap: wrap; gap: .45rem 1rem; }
 .page-toc a { text-decoration: none; }
-.start-path { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; padding: 0; list-style: none; }
-.start-path li, .doc-note { border: 1px solid var(--border); border-radius: .5rem; padding: 1.2rem; background: var(--surface); }
+.doc-note { border: 1px solid var(--border); border-radius: .5rem; padding: 1.2rem; background: var(--surface); }
 .doc-note { border-left: 3px solid var(--accent); }
 .prose { max-width: var(--reading-width); margin: auto; overflow-wrap: anywhere; }
 .prose h1 { font-size: 2.25rem; line-height: 1.2; }
@@ -1258,14 +1257,11 @@ pre { max-width: 100%; }
   .nav-links { position: relative; }
   .nav-group { position: static; }
   .nav-menu { width: min(17rem, 100%); left: 0; right: auto; }
-  .start-path { grid-template-columns: 1fr; }
   .version-strip { text-align: left; }
   .hero { padding-top: 2.25rem; padding-bottom: 2rem; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
-.start-path li a, .start-path li span { display: block; }
-.start-path li a { font-weight: 700; margin-bottom: .5rem; }
 
 .home-hero { padding-top: 2.75rem; padding-bottom: 2.5rem; }
 .home-hero h1 { font-size: clamp(2.3rem, 4.5vw, 3.5rem); }

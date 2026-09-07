@@ -23,6 +23,13 @@ class SiteBuildCheckerTest(unittest.TestCase):
             check_site_build.format_summary(results),
         )
 
+    def test_missing_installer_cannot_pass_site_checks(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        (fixture.site_root / "install.sh").unlink()
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        self.assertTrue(any(result.status == "FAIL" and "install.sh" in result.detail for result in results))
+
     def test_self_test_exercises_required_mutations(self) -> None:
         self.assertEqual(check_site_build.run_self_test(), [])
 
