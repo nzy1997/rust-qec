@@ -69,7 +69,10 @@ impl UserGraph {
         let count = observable
             .checked_add(1)
             .ok_or_else(|| format!("observable index {observable} is too large"))?;
-        self.num_observables = self.num_observables.max(count);
+        if count > self.num_observables {
+            self.num_observables = count;
+            self.mwpm = None;
+        }
         Ok(())
     }
 
@@ -88,6 +91,7 @@ impl UserGraph {
                     format!("detector index {max_detector} exceeds supported graph capacity")
                 })?;
                 self.nodes.resize_with(required_len, UserNode::default);
+                self.mwpm = None;
             }
         }
         for &observable in observables {

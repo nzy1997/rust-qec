@@ -1,5 +1,3 @@
-#![cfg(feature = "bench")]
-
 use rmatching::{Matching, PackedDecodeError};
 use rstim::dem::DetectorErrorModel;
 
@@ -315,4 +313,47 @@ fn matching_checked_decode_reports_batch_size_overflow() {
             row_bytes: 2,
         })
     );
+}
+
+#[test]
+fn packed_decode_preserves_node_indices_around_explicit_boundaries() {
+    for boundary in [0, 1, 2] {
+        let mut matching = Matching::new();
+        let detectors: Vec<_> = (0..3).filter(|&node| node != boundary).collect();
+        matching.add_edge(detectors[0], boundary, 1.0, &[0], 0.1);
+        matching.add_edge(detectors[1], boundary, 1.0, &[1], 0.1);
+        matching.set_boundary(&[boundary]);
+
+        let packed = [1 << detectors[0], 1 << detectors[1], 1 << boundary];
+        let expected = vec![1, 2, 0];
+        assert_eq!(
+            matching.try_decode_shots_bit_packed(&packed, 3, 3, 2),
+            Ok(expected.clone()),
+            "boundary node {boundary} must not renumber detector bits"
+        );
+        assert_eq!(matching.decode_shots_bit_packed(&packed, 3, 3, 2), expected);
+
+        if boundary == 2 {
+            // Trailing boundary bits can still be omitted from a syndrome.
+            assert_eq!(
+                matching.try_decode_shots_bit_packed(&packed, 3, 2, 2),
+                Ok(expected)
+            );
+        } else {
+            assert_eq!(
+                matching.try_decode_shots_bit_packed(&packed, 3, 2, 2),
+                Err(PackedDecodeError::DetectorCountMismatch {
+                    expected: 3,
+                    actual: 2,
+                })
+            );
+        }
+        assert_eq!(
+            matching.try_decode_shots_bit_packed(&packed, 3, 4, 2),
+            Err(PackedDecodeError::DetectorCountMismatch {
+                expected: detectors[1] + 1,
+                actual: 4,
+            })
+        );
+    }
 }
