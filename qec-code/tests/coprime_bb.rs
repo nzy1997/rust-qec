@@ -1,12 +1,14 @@
-use std::fs;
-use std::path::Path;
+#[cfg(feature = "cli")]
+use std::{fs, path::Path};
 
+#[cfg(feature = "cli")]
 use qec_code::css::SparseRowsMatrix;
 use qec_code::family_contract::{
     construct_css, parse_css_construction_json, verify_css_orthogonality,
     CoprimeBivariateBicycleSpec, CssFamilySpec, RequestedFamilyId,
 };
 use qec_code::QecError;
+#[cfg(feature = "cli")]
 use tempfile::tempdir;
 
 fn fixture() -> serde_json::Value {
@@ -28,6 +30,7 @@ fn fixture_rows(fixture: &serde_json::Value, name: &str) -> Vec<Vec<usize>> {
         .expect("fixture checks should be sparse rows")
 }
 
+#[cfg(feature = "cli")]
 fn write_request(path: &Path, fixture: &serde_json::Value) -> std::path::PathBuf {
     let spec = path.join("coprime-bb.json");
     fs::write(
@@ -81,24 +84,27 @@ fn coprime_bb_3_5_matches_30_4_6_fixture() {
     .unwrap();
     assert_eq!(parsed, CssFamilySpec::CoprimeBb(fixture_spec()).into());
 
-    let dir = tempdir().unwrap();
-    let spec = write_request(dir.path(), &fixture);
-    for (matrix, rows) in [("hx", expected_h_x), ("hz", expected_h_z)] {
-        let output = std::process::Command::new(env!("CARGO_BIN_EXE_qec-code"))
-            .args(["code", "css", "construct", "--spec"])
-            .arg(&spec)
-            .arg(matrix)
-            .output()
-            .expect("qec-code binary should run");
-        assert!(output.status.success());
-        assert_eq!(output.stderr, b"");
-        assert_eq!(
-            String::from_utf8(output.stdout).expect("stdout should be UTF-8"),
-            format!(
-                "{}\n",
-                SparseRowsMatrix::new(30, rows).unwrap().to_json_string()
-            )
-        );
+    #[cfg(feature = "cli")]
+    {
+        let dir = tempdir().unwrap();
+        let spec = write_request(dir.path(), &fixture);
+        for (matrix, rows) in [("hx", expected_h_x), ("hz", expected_h_z)] {
+            let output = std::process::Command::new(env!("CARGO_BIN_EXE_qec-code"))
+                .args(["code", "css", "construct", "--spec"])
+                .arg(&spec)
+                .arg(matrix)
+                .output()
+                .expect("qec-code binary should run");
+            assert!(output.status.success());
+            assert_eq!(output.stderr, b"");
+            assert_eq!(
+                String::from_utf8(output.stdout).expect("stdout should be UTF-8"),
+                format!(
+                    "{}\n",
+                    SparseRowsMatrix::new(30, rows).unwrap().to_json_string()
+                )
+            );
+        }
     }
 }
 

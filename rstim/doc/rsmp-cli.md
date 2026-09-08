@@ -14,7 +14,7 @@ intentionally lossy public bundle plus a private answer bundle.
 Pack measurement samples into an RSMP archive:
 
 ```console
-cargo run --locked -p rstim --bin rstim -- pack_samples \
+cargo run --locked -p rstim --features cli --bin rstim -- pack_samples \
   --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
   --shots 4 \
   --in rstim/tests/fixtures/rsmp/v1/compat-measurements.b8 \
@@ -32,7 +32,7 @@ from the original circuit and noiseless reference.
 Unpack measurements, detectors, and observables from an archive:
 
 ```console
-cargo run --locked -p rstim --bin rstim -- unpack_samples \
+cargo run --locked -p rstim --features cli --bin rstim -- unpack_samples \
   --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
   --in /tmp/compat.rsmp \
   --measurements_out /tmp/measurements.b8 \
@@ -53,7 +53,7 @@ Use `unpack_samples --verify_only` when a nondeveloper needs to validate an
 archive without producing result files:
 
 ```console
-cargo run --locked -p rstim --bin rstim -- unpack_samples \
+cargo run --locked -p rstim --features cli --bin rstim -- unpack_samples \
   --circuit rstim/tests/fixtures/rsmp/v1/compat.stim \
   --in rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp \
   --verify_only

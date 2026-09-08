@@ -1490,7 +1490,7 @@
           "artifacts": [],
           "commands": [
             "mkdir -p perf-artifacts",
-            "cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts"
+            "cargo run -p rstim --features cli --bin rstim -- perf ci --out-dir perf-artifacts"
           ],
           "provenance_requirements": [
             "OS",

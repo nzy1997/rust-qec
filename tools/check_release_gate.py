@@ -384,7 +384,12 @@ def collect_version_snapshot(repo: str, commit: str, policy: ReleasePolicy) -> d
     if not isinstance(members, list) or not all(isinstance(item, str) for item in members):
         raise ValueError("Cargo.toml workspace.members must be an array of strings")
     packages: dict[str, dict[str, str]] = {}
+    member_paths = set(members)
     for spec in policy.packages:
+        # The policy can grow after an immutable historical tag was created.
+        # Only fetch manifests that the tagged workspace actually declared.
+        if spec.path not in member_paths:
+            continue
         manifest_path = f"{spec.path}/Cargo.toml"
         manifest = _parse_toml(read_repository_file(repo, manifest_path, commit), manifest_path)
         package = manifest.get("package")
@@ -600,16 +605,22 @@ def evaluate_snapshot(
         raise UnavailableError("exact-commit crate version metadata is unavailable")
     expected_paths = {item.path for item in policy.packages}
     actual_paths = {item for item in members if isinstance(item, str)}
-    if actual_paths != expected_paths:
-        missing, extra = expected_paths - actual_paths, actual_paths - expected_paths
-        if missing:
-            errors.append("workspace packages missing from tagged commit: " + ", ".join(sorted(missing)))
-        if extra:
-            errors.append("workspace packages unclassified by release policy: " + ", ".join(sorted(extra)))
+    required_paths = {item.path for item in policy.packages if item.synchronized}
+    missing_required = required_paths - actual_paths
+    if missing_required:
+        errors.append(
+            "synchronized workspace packages missing from tagged commit: "
+            + ", ".join(sorted(missing_required))
+        )
+    extra = actual_paths - expected_paths
+    if extra:
+        errors.append("workspace packages unclassified by release policy: " + ", ".join(sorted(extra)))
 
     synchronized: list[tuple[str, str]] = []
     independent: list[tuple[str, str]] = []
     for spec in policy.packages:
+        if spec.path not in actual_paths:
+            continue
         package = packages.get(spec.path)
         if not isinstance(package, dict):
             errors.append(f"{spec.path}/Cargo.toml version metadata is missing")
