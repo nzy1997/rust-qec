@@ -64,6 +64,59 @@ class ReleaseGateCheckerTest(unittest.TestCase):
                 "prerelease=false\n",
             )
 
+    def series_snapshot(self, version="0.3.0"):
+        snapshot = checker.load_snapshot(FIXTURES / "valid.json")
+        snapshot["tag"] = f"v{version}"
+        for spec in self.policy.packages:
+            if spec.name in self.policy.series_packages:
+                if spec.path not in snapshot["workspace_members"]:
+                    snapshot["workspace_members"].append(spec.path)
+                snapshot["packages"][spec.path] = {"name": spec.name, "version": "0.3.0"}
+                snapshot["lock_versions"][spec.name] = ["0.3.0"]
+        return snapshot
+
+    def evaluate_series(self, snapshot):
+        return checker.evaluate_snapshot(snapshot, self.policy, self.required_checks, self.tag_policy)
+
+    def test_first_public_series_requires_all_eight_versions(self):
+        snapshot = self.series_snapshot()
+        self.assertTrue(self.evaluate_series(snapshot).passed)
+        snapshot["packages"]["rilpqec"]["version"] = "0.1.0"
+        snapshot["lock_versions"]["rilpqec"] = ["0.1.0"]
+        result = self.evaluate_series(snapshot)
+        self.assertFalse(result.passed)
+        self.assertTrue(any("series crate rilpqec" in error for error in result.errors))
+
+    def test_series_patch_does_not_require_bumping_unchanged_crates(self):
+        snapshot = self.series_snapshot("0.3.1")
+        snapshot["packages"]["rilpqec"]["version"] = "0.3.1"
+        snapshot["lock_versions"]["rilpqec"] = ["0.3.1"]
+        result = self.evaluate_series(snapshot)
+        self.assertTrue(result.passed, result.errors)
+        self.assertIn(("rstim", "0.3.0"), result.synchronized)
+        self.assertIn(("rilpqec", "0.3.1"), result.synchronized)
+
+    def test_series_rejects_empty_release_future_patch_and_missing_package(self):
+        snapshot = self.series_snapshot("0.3.1")
+        self.assertIn("no series crate has the release version 0.3.1", self.evaluate_series(snapshot).errors)
+        snapshot["packages"]["rilpqec"]["version"] = "0.3.2"
+        snapshot["lock_versions"]["rilpqec"] = ["0.3.2"]
+        self.assertTrue(any("series crate rilpqec" in error for error in self.evaluate_series(snapshot).errors))
+        snapshot = self.series_snapshot()
+        snapshot["workspace_members"].remove("qec-code")
+        self.assertFalse(self.evaluate_series(snapshot).passed)
+
+    def test_new_minor_series_must_move_together(self):
+        snapshot = self.series_snapshot("0.4.0")
+        snapshot["packages"]["rstim"]["version"] = "0.4.0"
+        snapshot["lock_versions"]["rstim"] = ["0.4.0"]
+        self.assertFalse(self.evaluate_series(snapshot).passed)
+        for spec in self.policy.packages:
+            if spec.name in self.policy.series_packages:
+                snapshot["packages"][spec.path]["version"] = "0.4.0"
+                snapshot["lock_versions"][spec.name] = ["0.4.0"]
+        self.assertTrue(self.evaluate_series(snapshot).passed)
+
     def test_successful_parent_commit_checks_are_rejected(self) -> None:
         result = self.evaluate("parent_commit_checks.json")
 

@@ -9,8 +9,18 @@ homepage.workspace = true
 readme = "README.md"
 documentation = "https://docs.rs/rbposd"
 description = "Belief-propagation and ordered-statistics decoding for binary linear codes"
-publish = false
-include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
+publish = ["crates-io"]
+include = [
+    "/src/**",
+    "/tests/**",
+    "/examples/**",
+    "/dev/**",
+    "/scripts/**",
+    "/doc/**",
+    "/README.md",
+    "/LICENSE",
+    "/Cargo.toml",
+]
 
 [dependencies]
 

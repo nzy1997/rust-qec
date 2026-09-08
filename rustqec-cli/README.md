@@ -6,7 +6,7 @@ error-correction circuits, producing datasets, and loss-aware decoding.
 Install the versioned command-line package from crates.io:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.1.0
+cargo install --locked rustqec-cli --version 0.3.0
 ```
 
 This package installs only the `rustqec` executable; dependency crates do not

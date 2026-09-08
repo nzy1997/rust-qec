@@ -9,7 +9,7 @@ homepage.workspace = true
 readme = "README.md"
 documentation = "https://docs.rs/rsinter"
 description = "Experimental parallel sampling and decoder benchmark harness for RustQEC"
-publish = false
+publish = ["crates-io"]
 include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 
 [features]
@@ -25,8 +25,8 @@ gurobi = ["ilp-runner", "rilpqec/gurobi"]
 rstim = { version = "0.3.0", path = "../rstim", features = ["codegen-css"] }
 rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
 rbposd = { version = "0.3.0", path = "../rbposd", optional = true }
-rilpqec = { version = "0.1.0", path = "../rilpqec", optional = true }
-qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", optional = true }
+rilpqec = { version = "0.3.0", path = "../rilpqec", optional = true }
+qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
 rand = "0.8"
 rayon = "1"
 clap = { version = "4", features = ["derive"] }
@@ -39,8 +39,13 @@ tempfile = "3"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
-qec-code = { version = "0.1.0", path = "../qec-code", features = ["cli"] }
+qec-code = { version = "0.3.0", path = "../qec-code", features = ["cli"] }
 
 [[bin]]
 name = "rsinter"
 path = "src/bin/rsinter.rs"
+
+[[example]]
+name = "surface_code_threshold"
+path = "examples/surface_code_threshold.rs"
+required-features = ["plotting"]

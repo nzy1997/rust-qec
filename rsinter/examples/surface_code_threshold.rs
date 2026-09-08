@@ -4,7 +4,7 @@
 /// noise. This example exists to generate a static documentation asset; it does
 /// not sample circuits or run a decoder.
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::PathBuf;
 
 use rsinter::failure::FailureKind;
 use rsinter::plot::plot_error_rate;
@@ -48,12 +48,15 @@ fn main() {
         make_stat(0.012, 7, 21, 100_000, 1_684),
     ];
 
-    let out = Path::new("rstim/doc/surface_code_threshold.svg");
+    let out = std::env::args_os()
+        .nth(1)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("surface_code_threshold.svg"));
     plot_error_rate(
         &stats,
         |s| s.metadata["p"].as_f64().unwrap(),
         |s| format!("d={}", s.metadata["d"].as_u64().unwrap()),
-        out,
+        &out,
     )
     .unwrap();
 

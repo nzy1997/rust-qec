@@ -1,5 +1,19 @@
 {
   "schema_version": 1,
-  "publish_order": ["qec-ilp-core", "qec-code", "rstim", "rmatching", "rustqec-cli"],
-  "deferred": ["rbposd", "rsinter", "rilpqec", "renvelope", "rstim-shot-web", "surface_decoder_compare_bridge", "rmatching-bench-tools"]
+  "publish_order": [
+    "qec-ilp-core",
+    "qec-code",
+    "rstim",
+    "rmatching",
+    "rbposd",
+    "rilpqec",
+    "rsinter",
+    "rustqec-cli"
+  ],
+  "deferred": [
+    "renvelope",
+    "rstim-shot-web",
+    "surface_decoder_compare_bridge",
+    "rmatching-bench-tools"
+  ]
 }

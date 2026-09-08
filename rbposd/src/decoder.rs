@@ -7,20 +7,29 @@ use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
 use crate::matrix::ParityCheckMatrix;
 use crate::osd::{
-    decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace, effective_osd_variant,
-    profile_osd_with_workspace, OsdWorkspace,
+    OsdWorkspace, decode_osd_with_workspace, diagnose_osd_candidate_search_with_workspace,
+    effective_osd_variant, profile_osd_with_workspace,
 };
 use crate::vector::{Correction, Syndrome};
 
+/// Work counters and elapsed times for one decode operation.
 #[derive(Debug, Clone, Default)]
 pub struct DecodeStats {
+    /// Seconds spent in belief propagation.
     pub bp_seconds: f64,
+    /// Seconds spent in ordered-statistics post-processing.
     pub osd_seconds: f64,
+    /// Number of decode calls represented by these statistics.
     pub decode_call_count: usize,
+    /// Total BP iterations.
     pub bp_iteration_count: usize,
+    /// Number of times OSD was used.
     pub osd_use_count: usize,
+    /// OSD candidates examined.
     pub osd_candidate_count: usize,
+    /// GF(2) solve operations.
     pub gf2_solve_count: usize,
+    /// Full GF(2) eliminations.
     pub gf2_full_elimination_count: usize,
 }
 
@@ -45,31 +54,51 @@ impl PartialEq for DecodeStats {
 
 impl Eq for DecodeStats {}
 
+/// Correction and diagnostics returned by a successful decode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodeResult {
+    /// Bit correction satisfying the requested syndrome.
     pub correction: Correction,
+    /// Whether BP itself converged.
     pub converged: bool,
+    /// BP iterations performed.
     pub bp_iterations: usize,
+    /// Whether OSD produced the final correction.
     pub used_osd: bool,
+    /// Weight of the residual syndrome after decoding.
     pub residual_syndrome_weight: usize,
+    /// Timing and work counters for this call.
     pub stats: DecodeStats,
 }
 
+/// Description of the OSD path planned for one syndrome.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OsdPathDiagnostic {
+    /// Weight of the input syndrome.
     pub syndrome_weight: usize,
+    /// Whether BP converged.
     pub bp_converged: bool,
+    /// BP iterations performed.
     pub bp_iterations: usize,
+    /// Whether the plan reaches OSD.
     pub used_osd: bool,
+    /// Residual syndrome weight after BP.
     pub residual_syndrome_weight: usize,
+    /// Stable planner name.
     pub osd_planner: &'static str,
+    /// Configured OSD order.
     pub osd_order: usize,
+    /// Number of free columns in the reduced system.
     pub free_column_count: usize,
+    /// Number of free columns eligible for multi-column candidates.
     pub candidate_search_frontier_size: usize,
+    /// Largest candidate order the planner will visit.
     pub max_candidate_order: usize,
+    /// Number of candidates the planner will visit.
     pub planned_candidate_count: u128,
 }
 
+/// Reusable belief-propagation decoder with ordered-statistics fallback.
 #[derive(Debug)]
 pub struct BpOsdDecoder {
     pcm: ParityCheckMatrix,
@@ -120,6 +149,7 @@ impl Clone for BpOsdDecoder {
 }
 
 impl BpOsdDecoder {
+    /// Construct a decoder for a matrix, channel, and algorithm configuration.
     pub fn new(
         pcm: ParityCheckMatrix,
         channel: ChannelModel,
@@ -137,6 +167,7 @@ impl BpOsdDecoder {
         })
     }
 
+    /// Decode one syndrome, reusing internal workspaces.
     pub fn decode(&self, syndrome: &Syndrome) -> Result<DecodeResult, DecodeError> {
         let effective_planner = effective_osd_variant(self.config);
         if syndrome.len() != self.pcm.num_checks() {
@@ -224,6 +255,7 @@ impl BpOsdDecoder {
         })
     }
 
+    /// Plan and report the OSD path without returning a correction.
     pub fn diagnose_osd_path(&self, syndrome: &Syndrome) -> Result<OsdPathDiagnostic, DecodeError> {
         let effective_planner = effective_osd_variant(self.config);
         if syndrome.len() != self.pcm.num_checks() {
@@ -304,6 +336,9 @@ impl BpOsdDecoder {
         })
     }
 
+    /// Profile a decode while visiting at most `osd_candidate_limit` candidates.
+    ///
+    /// This diagnostic method returns work statistics rather than a correction.
     pub fn profile_decode_with_osd_candidate_limit(
         &self,
         syndrome: &Syndrome,
