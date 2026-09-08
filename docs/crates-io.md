@@ -1,29 +1,30 @@
 # Crates.io publication and user installation
 
-This checkout prepares the **v0.3.0** first crates.io release; uploading is a
-separate step. See the [release and migration notes](releases/v0.3.0.md). The current
-v0.2.1 native archives remain available through the website installer. This
-preparation does not create, move, or publish a release tag.
+The **v0.3.0** release publishes the first eight workspace crates to crates.io.
+See the [release and migration notes](releases/v0.3.0.md). The website installer
+uses the v0.3.0 native archives; the historical v0.2.1 release and archives remain
+available from GitHub.
 
 ## One task, one installation entry
 
 The introductory workflow uses only `rustqec`: capability discovery, circuit
-stats, detector sampling, and DEM generation. From the development checkout:
+stats, detector sampling, and DEM generation. Install the published command:
 
 ```sh
-cargo install --locked --path rustqec-cli
+cargo install --locked rustqec-cli --version 0.3.0
 ```
 
 The default build includes envelope matching but not the native HiGHS solver.
 To add exact envelope MLE, install the native solver build prerequisites in the
 root README and use `--features ilp`. Official native archives deliberately build
 with ILP enabled. The binary's `capabilities --format json` output reflects its
-compiled features.
+compiled features. From a development checkout, replace the package and version
+with `--path rustqec-cli`.
 
 For existing Stim-style workflows, install the separate executable:
 
 ```sh
-cargo install --locked --path rstim --bin rstim --features cli,codegen-css,shot-viewer
+cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer
 ```
 
 Installing a library dependency never implicitly installs that library's bins.
@@ -32,10 +33,7 @@ live in the private `rmatching-bench-tools` workspace package; they are not part
 of the published `rmatching` package. Compatibility CLI bins in `rstim` and
 `qec-code` require `cli`.
 
-After registry publication, the corresponding commands will be
-`cargo install --locked rustqec-cli --version 0.3.0` and
-`cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer`.
-Until then, these registry commands cannot be used.
+From a development checkout, replace the package and version with `--path rstim`.
 
 ## Package boundaries
 
@@ -98,7 +96,8 @@ Viewer files remain in the `.crate` archive so the optional feature works after
 installation; disabling the feature prevents compiling the viewer module, not
 downloading those package files. The browser WASM adapter uses the minimal library.
 Missing solver backends return explicit errors; importing ILP model types alone
-does not compile a solver.
+does not compile a solver. Actual Gurobi runtime and license validation were not
+performed for v0.3.0.
 
 ## Development feature migration
 
@@ -135,7 +134,7 @@ so publishing its optional dependencies first is necessary even for a slim
 installation. Together these packages cover the simulation → decode → collect
 workflow; first publication is not an expansion of numerical acceptance claims.
 
-After publication, the recommended sampling/replay installation is:
+The recommended sampling/replay installation is:
 
 ```sh
 cargo install --locked rsinter --version 0.3.0 --features rbposd-runner,rmatching-runner
