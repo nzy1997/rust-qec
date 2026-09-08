@@ -1120,7 +1120,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "status": "partial",
                         "tier": "regression-gate",
                         "artifacts": [],
-                        "commands": ["cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts"],
+                        "commands": ["cargo run -p rstim --features cli --bin rstim -- perf ci --out-dir perf-artifacts"],
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": [".github/workflows/ci.yml"],
                         "claims_limit": "Regression gate evidence only.",

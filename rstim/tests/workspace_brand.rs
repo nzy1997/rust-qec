@@ -29,7 +29,7 @@ fn rustqec_is_the_workspace_brand_while_rstim_remains_the_simulator() {
 
     assert!(workspace_manifest.contains("\"rstim\""));
     assert!(simulator_manifest.contains("name = \"rstim\""));
-    assert!(readme.contains("cargo run -p rstim --bin rstim"));
+    assert!(readme.contains("cargo run -p rstim --features cli --bin rstim"));
 }
 
 #[test]

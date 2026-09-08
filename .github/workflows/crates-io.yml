@@ -29,6 +29,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: minimal-${{ matrix.package }}
+      - uses: actions/setup-python@v5
+        if: matrix.package == 'rstim'
+        with:
+          python-version: '3.12'
+      - name: Install reference simulator for cross-validation tests
+        if: matrix.package == 'rstim'
+        run: python3 -m pip install stim
       - name: Test each library without workspace feature unification
         run: cargo test --locked -p ${{ matrix.package }} --no-default-features
   package-consumer:

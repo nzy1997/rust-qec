@@ -39,10 +39,10 @@ These commands write ordinary `sparse_rows` JSON matrices.
 <!-- quantum_tanner_cli:toric_d4_commands -->
 ```bash
 mkdir -p target/qec-code-workflow
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx > target/qec-code-workflow/toric_d4_hx.json
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz > target/qec-code-workflow/toric_d4_hz.json
-cargo run -q -p qec-code -- code css-distance exact --hx target/qec-code-workflow/toric_d4_hx.json --hz target/qec-code-workflow/toric_d4_hz.json --json
-cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx > target/qec-code-workflow/toric_d4_hx.json
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz > target/qec-code-workflow/toric_d4_hz.json
+cargo run -q -p qec-code --features cli -- code css-distance exact --hx target/qec-code-workflow/toric_d4_hx.json --hz target/qec-code-workflow/toric_d4_hz.json --json
+cargo run -q -p qec-code --features cli -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
 ```
 
 The final command should return JSON with:
@@ -64,7 +64,7 @@ non-zero before emitting a valid matrix or distance result.
 
 <!-- quantum_tanner_cli:invalid_spec_command -->
 ```bash
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/invalid_non_symmetric_a.json hx
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/invalid_non_symmetric_a.json hx
 ```
 
 ## References And Licenses
