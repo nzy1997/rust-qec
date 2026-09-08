@@ -82,8 +82,8 @@ def advertised_features(text: str) -> set[str]:
         for line in section.splitlines()
         if (match := FEATURE_LINE.match(line)) is not None
     }
-    if not features:
-        raise ReadmeError("README Cargo Features section has no feature entries")
+    if not features and "This crate has no Cargo features." not in section:
+        raise ReadmeError("README Cargo Features section must list features or explicitly declare none")
     return features
 
 

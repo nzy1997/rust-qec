@@ -4,13 +4,11 @@
 
 A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWPM) decoder for quantum error correction, ported from [PyMatching](https://github.com/oscarhiggott/PyMatching).
 
-The crate is being prepared for its first crates.io release; it is not yet
-available from the registry. In this repository it is consumed through the
-workspace path. After release, an application can use:
+Add the decoder library from crates.io:
 
 ```toml
 [dependencies]
-rmatching = "0.2.1"
+rmatching = "0.3.0"
 ```
 
 ## Highlights
@@ -30,7 +28,9 @@ representation.
 
 ## Cargo Features
 
-- `bench`: enables the bundled benchmark binaries and their optional dependencies.
+This crate has no Cargo features. Repository benchmarks use the private
+`rmatching-bench-tools` workspace package, which is not part of the published
+`rmatching` package.
 
 `rmatching` has no `rsinter` feature and does not implement an `rsinter`
 `Decoder` trait. The consuming `rsinter` crate owns that integration: enable
@@ -61,7 +61,7 @@ fn main() {
 between calls. Syndromes and predictions use one `u8` per bit (`0` or `1`).
 The current observable mask supports at most 64 observables.
 For the full `rstim` → decomposed DEM → `rmatching` path, run the repository's
-[external-consumer example](../examples/rust-consumer/src/main.rs).
+[external-consumer example](https://github.com/nzy1997/rust-qec/blob/master/examples/rust-consumer/src/main.rs).
 
 ## Architecture
 
@@ -83,7 +83,7 @@ The CSV files are overwritten on each benchmark run, so treat this section as a
 point-in-time snapshot instead of a stable baseline.
 
 For the full benchmark evidence and reproduction context, see the workspace
-[`benchmark evidence showcase`](../docs/showcases/benchmark-evidence.md).
+[`benchmark evidence showcase`](https://github.com/nzy1997/rust-qec/blob/master/docs/showcases/benchmark-evidence.md).
 
 ### Minimal DEM Cases
 
@@ -104,7 +104,7 @@ For the full benchmark evidence and reproduction context, see the workspace
 
 ### Rust Test Suite
 
-The workspace [CI workflow](../.github/workflows/ci.yml) is the authoritative
+The workspace [CI workflow](https://github.com/nzy1997/rust-qec/blob/master/.github/workflows/ci.yml) is the authoritative
 check for this crate and the rest of RustQEC.
 
 Run the full Rust suite:
@@ -175,4 +175,4 @@ python3 -m unittest benchmarks.test_run_surface_dem_benchmark.RunSurfaceDemBench
 ## License
 
 Apache-2.0. This crate follows the RustQEC workspace license policy; see
-[`../LICENSE`](../LICENSE) for the full license text.
+[`LICENSE`](LICENSE) for the full license text.

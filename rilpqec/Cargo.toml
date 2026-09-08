@@ -17,6 +17,6 @@ default = []
 gurobi = ["qec-ilp-core/gurobi"]
 
 [dependencies]
-rstim = { version = "0.2.1", path = "../rstim" }
+rstim = { version = "0.3.0", path = "../rstim" }
 thiserror = "2"
 qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", features = ["highs"] }
