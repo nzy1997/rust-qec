@@ -45,7 +45,7 @@ accepted by Stim 1.15.0. Its deterministic producer is therefore pinned to the
 repository CLI:
 
 ```console
-cargo run -q -p rstim --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim
+cargo run -q -p rstim --features cli --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim
 ```
 
 The expected four-shot b8 output is `00 00 00 00`, with SHA-256
