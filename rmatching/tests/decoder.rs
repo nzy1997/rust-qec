@@ -265,6 +265,13 @@ fn matching_checked_decode_rejects_short_and_long_buffers() {
             actual: 5,
         })
     );
+    assert_eq!(
+        matching
+            .try_decode_shots_bit_packed(&[0; 3], 2, 9, 1)
+            .unwrap_err()
+            .to_string(),
+        "detector buffer length mismatch: expected 4 bytes, got 3"
+    );
 }
 
 #[test]
@@ -285,6 +292,20 @@ fn matching_checked_decode_rejects_graph_dimension_mismatches() {
             expected: 1,
             actual: 0,
         })
+    );
+    assert_eq!(
+        matching
+            .try_decode_shots_bit_packed(&[0], 1, 1, 1)
+            .unwrap_err()
+            .to_string(),
+        "detector count does not match the graph: expected 2, got 1"
+    );
+    assert_eq!(
+        matching
+            .try_decode_shots_bit_packed(&[0], 1, 2, 0)
+            .unwrap_err()
+            .to_string(),
+        "observable count does not match the graph: expected 1, got 0"
     );
 }
 
@@ -313,6 +334,43 @@ fn matching_checked_decode_reports_batch_size_overflow() {
             row_bytes: 2,
         })
     );
+}
+
+#[test]
+fn matching_checked_decode_rejects_output_overflow_without_detector_data() {
+    let mut matching = Matching::from_dem("logical_observable L8\n").unwrap();
+    let error = matching
+        .try_decode_shots_bit_packed(&[], usize::MAX, 0, 9)
+        .unwrap_err();
+
+    assert_eq!(
+        error,
+        PackedDecodeError::BufferSizeOverflow {
+            num_shots: usize::MAX,
+            row_bytes: 2,
+        }
+    );
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "packed batch size overflows usize: {} shots times 2 bytes per shot",
+            usize::MAX
+        )
+    );
+    // Rejected input leaves the decoder usable for a valid batch.
+    assert_eq!(
+        matching.try_decode_shots_bit_packed(&[], 1, 0, 9),
+        Ok(vec![0, 0])
+    );
+}
+
+#[test]
+#[should_panic(
+    expected = "invalid packed decode input: detector buffer length mismatch: expected 1 bytes, got 0"
+)]
+fn legacy_packed_decode_panics_with_the_checked_input_diagnostic() {
+    let mut matching = Matching::from_dem("error(0.1) D0 L0\n").unwrap();
+    matching.decode_shots_bit_packed(&[], 1, 1, 1);
 }
 
 #[test]

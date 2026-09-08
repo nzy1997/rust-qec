@@ -109,6 +109,26 @@ fn invalid_probability_is_rejected_before_large_dimension_allocation() {
 }
 
 #[test]
+fn detector_capacity_overflow_returns_an_error_with_instruction_context() {
+    // The node count fits usize, but exceeds Vec's isize::MAX capacity limit.
+    // This exercises capacity rejection without attempting a large allocation.
+    let detector = usize::MAX - 1;
+    let dem = format!("detector D{detector}");
+    let outcome = std::panic::catch_unwind(|| parse_dem(&dem));
+    let error = match outcome.expect("capacity overflow must not panic") {
+        Ok(_) => panic!("unsupported graph capacity was accepted"),
+        Err(error) => error,
+    };
+
+    assert_eq!(
+        error,
+        format!(
+            "detector index {detector} exceeds supported graph capacity; while parsing `{dem}`"
+        )
+    );
+}
+
+#[test]
 fn parse_correlated_segments_from_single_error_instruction() {
     let dem = "error(0.1) D0 D1 L0 ^ D2 L1 ^ D3 D4";
     let g = parse_dem(dem).unwrap();
