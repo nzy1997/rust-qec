@@ -9,6 +9,7 @@ members = [
     "rsinter",
     "rbposd",
     "rmatching",
+    "benchmarks/rmatching-tools",
     "rilpqec",
     "benchmarks/surface_decoder_compare/rust_bridge",
 ]

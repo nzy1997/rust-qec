@@ -1,4 +1,4 @@
-use rstim::cli::{
+use rstim::operations::{
     run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip_in_batches,
 };
 use rstim::decoder_dataset::{

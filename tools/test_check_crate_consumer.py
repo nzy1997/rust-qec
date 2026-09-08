@@ -50,7 +50,7 @@ class CrateConsumerCheckerTest(unittest.TestCase):
         metadata = checker.subprocess.CompletedProcess([], 0, '{"packages":[]}', "")
         completed = checker.subprocess.CompletedProcess([], 0, "looks plausible\n", "")
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(
-            checker, "run", side_effect=[metadata, completed]
+            checker, "run", side_effect=[metadata, checker.subprocess.CompletedProcess([], 0, "", ""), completed]
         ):
             root = Path(temporary)
             source = root / "examples/rust-consumer/src"
@@ -59,6 +59,12 @@ class CrateConsumerCheckerTest(unittest.TestCase):
             (source / "main.rs").write_text("fn main() {}\n", encoding="utf-8")
             with self.assertRaisesRegex(checker.ConsumerCheckError, "consumer result differs"):
                 checker.exercise_consumer(root, root / "target", {}, root / "work")
+
+    def test_minimal_consumer_rejects_transitive_native_solver(self) -> None:
+        tree = checker.subprocess.CompletedProcess([], 0, "consumer v0.0.0\nhighs-sys v1.14.2\n", "")
+        with mock.patch.object(checker, "run", return_value=tree):
+            with self.assertRaisesRegex(checker.ConsumerCheckError, "minimal consumer unexpectedly builds"):
+                checker.validate_minimal_graph(Path("Cargo.toml"), {"highs-sys"})
 
     def test_unexpected_installed_binary_is_rejected_before_quickstart(self) -> None:
         def fake_run(command: list[str], *, cwd: Path):

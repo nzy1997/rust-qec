@@ -22,15 +22,17 @@ compiled features.
 For existing Stim-style workflows, install the separate executable:
 
 ```sh
-cargo install --locked --path rstim --bin rstim
+cargo install --locked --path rstim --bin rstim --features cli,codegen-css,shot-viewer
 ```
 
 Installing a library dependency never implicitly installs that library's bins.
-Internal `rstim` worker bins require `benchmark-tools`; `rmatching` benchmark
-bins require `bench`. They are not part of a default installation.
+Internal `rstim` worker bins require `benchmark-tools`. Matching benchmark bins
+live in the private `rmatching-bench-tools` workspace package; they are not part
+of the published `rmatching` package. Compatibility CLI bins in `rstim` and
+`qec-code` require `cli`.
 
 After registry publication, the corresponding commands will be
-`cargo install --locked rustqec-cli` and `cargo install --locked rstim --bin rstim`.
+`cargo install --locked rustqec-cli` and `cargo install --locked rstim --bin rstim --features cli,codegen-css,shot-viewer`.
 Until then, these registry commands cannot be used.
 
 ## Package boundaries
@@ -44,14 +46,14 @@ batch uses this dependency order:
 4. `rmatching` — standalone MWPM library, currently 0.2.1.
 5. `rustqec-cli` — primary `rustqec` application, currently 0.1.0.
 
-`qec-code`'s ILP dependency and `rmatching`'s benchmark dependency are optional
+`qec-code`'s ILP dependency and `rstim`'s CSS generation dependency are optional
 for compilation but still form registry publication dependencies. First-batch
 packages have versioned path dependencies: local development uses the path,
 published packages resolve the specified registry version.
 
 `rbposd`, `rsinter`, `rilpqec`, and `renvelope` are deferred; their manifests use
 `publish = false` until an explicitly reviewed later batch. The WebAssembly UI
-adapter and benchmark bridge also remain unpublished. A workspace is not one
+adapter, benchmark bridge, and matching benchmark tools also remain unpublished. A workspace is not one
 registry package; consumers select the library they need or install the CLI.
 
 For a complete Rust library example, see
@@ -60,15 +62,43 @@ Cargo workspace with registry dependency declarations. The package check copies
 it outside this repository and uses unpacked local artifacts before the first
 registry versions exist; that is not proof of a registry upload.
 
+## Library feature boundaries
+
+All four published libraries default to their library interfaces. Choose optional
+capabilities explicitly:
+
+| Package | Feature | Enables |
+| --- | --- | --- |
+| `rstim` | `cli` | Compatibility command-line parsing and executable |
+| `rstim` | `codegen-css` | CSS circuit generation using `qec-code` |
+| `rstim` | `shot-viewer` | Local viewer server and embedded web resources |
+| `qec-code` | `cli` | Command-line parsing and executable |
+| `qec-code` | `distance-ilp-highs` | Exact distance with the HiGHS backend |
+| `qec-code` | `distance-ilp-gurobi` | Exact distance with the Gurobi backend |
+| `qec-ilp-core` | `highs` | Native HiGHS backend |
+| `qec-ilp-core` | `gurobi` | Separately configured Gurobi backend |
+
+`rustqec-cli` selects CSS generation explicitly and calls `rstim::operations`;
+it does not require `rstim::cli` or the viewer. Its `ilp` feature selects HiGHS.
+The native archives select `cli,codegen-css,shot-viewer` for `rstim`, retaining
+the existing complete installation experience. Library users can call shared
+operations without command-line argument parsing.
+
+Viewer files remain in the `.crate` archive so the optional feature works after
+installation; disabling the feature prevents compiling the viewer module, not
+downloading those package files. The browser WASM adapter uses the minimal library.
+Missing solver backends return explicit errors; importing ILP model types alone
+does not compile a solver.
+
 ## Development feature migration
 
 `rsinter` now defaults to its harness without optional runners or plotting.
 Choose `rbposd-runner`, `rmatching-runner`, `ilp-runner`, or `plotting`; use `full`
 for the previous complete research environment. The full CI and benchmark bridge
-explicitly enable the features they test. Run all non-proprietary features with:
+explicitly enable the features they test. Run the standard workspace suite with CLI, CSS, viewer, and HiGHS enabled with:
 
 ```sh
-cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+make test
 ```
 
 Run standalone worker tests with `cargo test -p rstim --features benchmark-tools`.
@@ -87,9 +117,10 @@ python3 tools/check_crate_consumer.py
 ```
 
 The first command checks metadata, the publication graph, installation targets,
-and package file lists. The consumer check validates actual unpacked package
-sources and an isolated CLI installation, followed by an opt-in ILP build from the same
-unpacked sources. The consumer checker therefore needs the native solver build
+and package file lists. The consumer check builds the unpacked simulator/decoder example with viewer
+assets temporarily absent and verifies model-only libraries without native solvers.
+It then validates an isolated default CLI installation, opt-in ILP compilation,
+and a separately installed full compatibility CLI serving its packaged viewer. The consumer checker therefore needs the native solver build
 prerequisites; default CLI installation itself does not. Neither command uploads a package.
 Retain source tests and compile-time fixtures/assets; exclude repository plans,
 research outputs, caches, and unrelated development tools from package files.

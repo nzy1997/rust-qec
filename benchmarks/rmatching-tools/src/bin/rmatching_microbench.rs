@@ -1,4 +1,3 @@
-#[cfg(feature = "bench")]
 mod bench {
     use rmatching::Matching;
     use serde::{Deserialize, Serialize};
@@ -122,13 +121,6 @@ mod bench {
     }
 }
 
-#[cfg(not(feature = "bench"))]
-fn main() {
-    eprintln!("Build with --features bench to use rmatching_microbench");
-    std::process::exit(1);
-}
-
-#[cfg(feature = "bench")]
 fn main() {
     use bench::process_request_json;
     use std::io::{self, Read};

@@ -1,5 +1,6 @@
 #[cfg(feature = "gurobi")]
 mod gurobi;
+#[cfg(feature = "highs")]
 mod highs;
 
 use crate::config::{BackendKind, BinaryIlpConfig};
@@ -24,7 +25,7 @@ pub fn build_binary_backend(
 ) -> Result<Box<dyn BinaryBackend>, BinaryIlpError> {
     model.validate()?;
     match config.backend.kind {
-        BackendKind::Highs => Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?)),
+        BackendKind::Highs => build_highs_backend(model, config),
         BackendKind::Auto => build_auto_backend(model, config),
         BackendKind::Gurobi => build_gurobi_backend(model, config),
     }
@@ -39,7 +40,36 @@ fn build_auto_backend(
         return Ok(Box::new(backend));
     }
 
-    Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?))
+    #[cfg(feature = "highs")]
+    {
+        return Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?));
+    }
+
+    #[cfg(not(feature = "highs"))]
+    {
+        let _ = (model, config);
+        Err(BinaryIlpError::BackendUnavailable {
+            requested: BackendKind::Auto,
+        })
+    }
+}
+
+fn build_highs_backend(
+    model: &BinaryIlpModel,
+    config: &BinaryIlpConfig,
+) -> Result<Box<dyn BinaryBackend>, BinaryIlpError> {
+    #[cfg(feature = "highs")]
+    {
+        return Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?));
+    }
+
+    #[cfg(not(feature = "highs"))]
+    {
+        let _ = (model, config);
+        Err(BinaryIlpError::BackendUnavailable {
+            requested: BackendKind::Highs,
+        })
+    }
 }
 
 fn build_gurobi_backend(

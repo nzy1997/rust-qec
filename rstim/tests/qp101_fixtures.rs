@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rstim::cli;
+use rstim::operations as cli;
 use rstim::codegen::{repetition_code_memory, surface_code};
 use rstim::executor::Executor;
 use rstim::ir::{circuit_to_string, StimInstr};

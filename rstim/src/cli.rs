@@ -4,9 +4,8 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 
+#[cfg(feature = "codegen-css")]
 use crate::codegen::css::{
     css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
     CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
@@ -19,18 +18,25 @@ use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
 #[cfg(test)]
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
-use crate::output::{
-    write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits, write_shots_ptb64,
-    write_shots_r8, OutputFormat,
-};
+use crate::output::{write_shots_dets, OutputFormat};
+#[cfg(test)]
+use crate::output::write_shots_b8;
 use crate::parser::parse_lines;
 use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
     format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
     SampleArchiveWriter,
 };
-use crate::sampler::{sample_batch, sample_batch_with_options, SampleOptions, SampleOutputMode};
 use crate::sim::bit_table::BitTable;
+
+pub use crate::operations::{
+    make_rng, run_analyze_errors_with_flags, run_detect, run_detect_with_obs,
+    run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip,
+    run_export_decoder_dataset_with_logical_flip_in_batches, run_gen, run_gen_with_params,
+    run_sample, sample_cli_options, try_merge_detections_observables, write_format,
+};
+#[cfg(test)]
+pub(crate) use crate::operations::generate_common_circuit_text;
 
 #[derive(Parser)]
 #[command(name = "rstim", version, about = "Rust stabilizer circuit simulator")]
@@ -260,6 +266,7 @@ pub enum Commands {
         seed: Option<u64>,
     },
     /// Open the interactive local-file shot viewer on loopback
+    #[cfg(feature = "shot-viewer")]
     #[command(name = "shot_viewer")]
     ShotViewer {
         #[arg(long, default_value_t = 0)]
@@ -566,6 +573,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             observables,
             out,
         }) => {
+            #[cfg(not(feature = "codegen-css"))]
+            let _ = (&hx, &hz, &basis, &schedule, &observables);
             for (name, value) in [
                 ("after_clifford_depolarization", noise),
                 (
@@ -673,6 +682,13 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 );
             }
             if code == "css" {
+                #[cfg(not(feature = "codegen-css"))]
+                return Err(
+                    "CSS generation requires rebuilding rstim with the codegen-css feature"
+                        .to_string(),
+                );
+                #[cfg(feature = "codegen-css")]
+                {
                 let mut buffer = Vec::new();
                 run_css_gen(
                     &task,
@@ -688,6 +704,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 let mut w = open_output(out.as_deref())?;
                 w.write_all(&buffer)
                     .map_err(|error| format!("write error: {error}"))
+                }
             } else {
                 let distance = distance
                     .ok_or_else(|| "distance is required for common generators".to_string())?;
@@ -915,6 +932,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             run_rsmp_zstd_frame(&r#in, &out, level)
         }
         Some(Commands::RsmpZstdInfo { out }) => run_rsmp_zstd_info(out.as_deref()),
+        #[cfg(feature = "shot-viewer")]
         Some(Commands::ShotViewer {
             port,
             no_open,
@@ -1740,94 +1758,6 @@ fn fail_pack_finish_is_injected() -> bool {
     cfg!(debug_assertions) && std::env::var_os("RSTIM_TEST_RSMP_FAIL_PACK_FINISH").is_some()
 }
 
-/// Runs decoder-dataset export through the backward-compatible X-only API.
-pub fn run_export_decoder_dataset(
-    circuit: &str,
-    shots: u64,
-    mode: &str,
-    logical_x_qubits: Option<&str>,
-    public_out: &str,
-    private_out: &str,
-    seed: Option<u64>,
-) -> Result<(), String> {
-    let logical_flip = logical_x_qubits
-        .map(|value| {
-            crate::decoder_dataset::LogicalFlip::parse(
-                crate::decoder_dataset::LogicalPauli::X,
-                value,
-            )
-        })
-        .transpose()?;
-    run_export_decoder_dataset_with_logical_flip(
-        circuit,
-        shots,
-        mode,
-        logical_flip,
-        public_out,
-        private_out,
-        seed,
-        false,
-    )
-}
-
-/// Runs decoder-dataset export with a generalized X-or-Z logical flip.
-pub fn run_export_decoder_dataset_with_logical_flip(
-    circuit: &str,
-    shots: u64,
-    mode: &str,
-    logical_flip: Option<crate::decoder_dataset::LogicalFlip>,
-    public_out: &str,
-    private_out: &str,
-    seed: Option<u64>,
-    error_trace: bool,
-) -> Result<(), String> {
-    run_export_decoder_dataset_with_logical_flip_in_batches(
-        circuit,
-        shots,
-        crate::decoder_dataset::DEFAULT_DECODER_DATASET_BATCH_SHOTS,
-        mode,
-        logical_flip,
-        public_out,
-        private_out,
-        seed,
-        error_trace,
-    )
-}
-
-/// Runs decoder-dataset export with bounded batches and an X-or-Z logical flip.
-#[allow(clippy::too_many_arguments)]
-pub fn run_export_decoder_dataset_with_logical_flip_in_batches(
-    circuit: &str,
-    shots: u64,
-    batch_shots: usize,
-    mode: &str,
-    logical_flip: Option<crate::decoder_dataset::LogicalFlip>,
-    public_out: &str,
-    private_out: &str,
-    seed: Option<u64>,
-    error_trace: bool,
-) -> Result<(), String> {
-    let circuit_text = std::fs::read_to_string(circuit)
-        .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
-    let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
-    let shots =
-        usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
-    crate::decoder_dataset::export_decoder_dataset_with_logical_flip_in_batches(
-        crate::decoder_dataset::ExportDecoderDatasetLogicalFlipConfig {
-            circuit_text,
-            shots,
-            mode,
-            logical_flip,
-            public_out: std::path::PathBuf::from(public_out),
-            private_out: std::path::PathBuf::from(private_out),
-            seed,
-            error_trace,
-        },
-        batch_shots,
-    )
-    .map(drop)
-}
-
 fn parse_cli_logical_flip(
     logical_x_qubits: Option<&str>,
     logical_z_qubits: Option<&str>,
@@ -2558,68 +2488,9 @@ fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
     BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
 }
 
-pub fn make_rng(seed: Option<u64>) -> StdRng {
-    match seed {
-        Some(s) => StdRng::seed_from_u64(s),
-        None => StdRng::from_entropy(),
-    }
-}
-
-pub fn write_format(
-    fmt: OutputFormat,
-    table: &BitTable,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    match fmt {
-        OutputFormat::Format01 => write_shots_01(table, out),
-        OutputFormat::B8 => write_shots_b8(table, out),
-        OutputFormat::R8 => write_shots_r8(table, out),
-        OutputFormat::Hits => write_shots_hits(table, out),
-        OutputFormat::Dets => return Err("use write_shots_dets for dets format".to_string()),
-        OutputFormat::Ptb64 => write_shots_ptb64(table, out),
-    }
-    .map_err(|e| format!("write error: {e}"))
-}
-
 pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable {
     try_merge_detections_observables(dets, obs)
         .expect("trusted detector/observable dimensions allocate")
-}
-
-pub fn try_merge_detections_observables(
-    dets: &BitTable,
-    obs: &BitTable,
-) -> Result<BitTable, String> {
-    let n_dets = dets.num_major();
-    let n_obs = obs.num_major();
-    let n_shots = dets.num_minor();
-    if obs.num_minor() != n_shots {
-        return Err(format!(
-            "observable shot count {} does not match detection shot count {}",
-            obs.num_minor(),
-            n_shots
-        ));
-    }
-    let merged_rows = n_dets
-        .checked_add(n_obs)
-        .ok_or_else(|| "detector and observable row count overflows".to_string())?;
-    let mut merged = BitTable::try_new(merged_rows, n_shots)
-        .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-    for row in 0..n_dets {
-        for shot in 0..n_shots {
-            if dets.get(row, shot) {
-                merged.set(row, shot, true);
-            }
-        }
-    }
-    for row in 0..n_obs {
-        for shot in 0..n_shots {
-            if obs.get(row, shot) {
-                merged.set(n_dets + row, shot, true);
-            }
-        }
-    }
-    Ok(merged)
 }
 
 pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), String> {
@@ -2663,33 +2534,7 @@ fn write_detection_outputs(
     Ok(())
 }
 
-pub fn run_gen(
-    code: &str,
-    task: &str,
-    distance: usize,
-    rounds: usize,
-    noise: f64,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
-    out.write_all(circuit_text.as_bytes())
-        .map_err(|e| format!("write error: {e}"))
-}
-
-pub fn run_gen_with_params(
-    code: &str,
-    task: &str,
-    distance: usize,
-    rounds: usize,
-    params: NoiseParams,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    let circuit_text =
-        generate_common_circuit_text_with_params(code, task, distance, rounds, params)?;
-    out.write_all(circuit_text.as_bytes())
-        .map_err(|e| format!("write error: {e}"))
-}
-
+#[cfg(feature = "codegen-css")]
 pub fn run_css_gen(
     task: &str,
     hx_path: Option<&str>,
@@ -2752,6 +2597,7 @@ pub fn run_css_gen(
         .map_err(|error| format!("write error: {error}"))
 }
 
+#[cfg(feature = "codegen-css")]
 fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
     match value {
         "x" | "X" => Ok(MemoryBasis::X),
@@ -2760,139 +2606,13 @@ fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
     }
 }
 
+#[cfg(feature = "codegen-css")]
 fn parse_css_schedule(value: &str) -> Result<CssSchedule, String> {
     match value {
         "sequential" => Ok(CssSchedule::Sequential),
         "greedy" => Ok(CssSchedule::Greedy),
         other => Err(format!("unknown CSS schedule: {other}")),
     }
-}
-
-pub(crate) fn generate_common_circuit_text(
-    code: &str,
-    task: &str,
-    distance: usize,
-    rounds: usize,
-    noise: f64,
-) -> Result<String, String> {
-    generate_common_circuit_text_with_params(
-        code,
-        task,
-        distance,
-        rounds,
-        NoiseParams::uniform(noise),
-    )
-}
-
-pub(crate) fn generate_common_circuit_text_with_params(
-    code: &str,
-    task: &str,
-    distance: usize,
-    rounds: usize,
-    params: NoiseParams,
-) -> Result<String, String> {
-    let instrs = match (code, task) {
-        ("repetition_code", "memory") => {
-            crate::codegen::repetition_code_memory_with_params(distance, rounds, params)
-        }
-        ("surface_code", "rotated_memory_x") => {
-            crate::codegen::surface_code::rotated_memory_x_with_params(distance, rounds, params)
-        }
-        ("surface_code", "rotated_memory_z") => {
-            crate::codegen::surface_code::rotated_memory_z_with_params(distance, rounds, params)
-        }
-        ("surface_code", "unrotated_memory_x") => {
-            crate::codegen::surface_code::unrotated_memory_x_with_params(distance, rounds, params)
-        }
-        ("surface_code", "unrotated_memory_z") => {
-            crate::codegen::surface_code::unrotated_memory_z_with_params(distance, rounds, params)
-        }
-        ("color_code", "memory_xyz") => {
-            crate::codegen::color_code::memory_xyz_with_params(distance, rounds, params)
-        }
-        _ => return Err(format!("unknown code/task: {code}/{task}")),
-    };
-    Ok(crate::ir::circuit_to_string(&instrs))
-}
-
-pub fn run_sample(
-    circuit_text: &str,
-    shots: usize,
-    out_format: &str,
-    seed: Option<u64>,
-    skip_reference_sample: bool,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    let fmt = OutputFormat::from_str(out_format)?;
-    let instrs = parse_lines(circuit_text)?;
-    let mut rng = make_rng(seed);
-    let options = sample_cli_options(skip_reference_sample);
-    let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
-    match fmt {
-        OutputFormat::Dets => {
-            Err("dets format not applicable to sample command; use detect".to_string())
-        }
-        _ => write_format(fmt, &result.measurements, out),
-    }
-}
-
-pub fn sample_cli_options(skip_reference_sample: bool) -> SampleOptions {
-    SampleOptions {
-        reference_sample_mode: if skip_reference_sample {
-            crate::data_path::ReferenceSampleMode::AssumeAllZero
-        } else {
-            crate::data_path::ReferenceSampleMode::SimulateNoiseless
-        },
-        output_mode: SampleOutputMode::MeasurementsOnly,
-        ..SampleOptions::default()
-    }
-}
-
-pub fn run_detect(
-    circuit_text: &str,
-    shots: usize,
-    out_format: &str,
-    seed: Option<u64>,
-    append_observables: bool,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    let fmt = OutputFormat::from_str(out_format)?;
-    let instrs = parse_lines(circuit_text)?;
-    let mut rng = make_rng(seed);
-    let result = sample_batch(&instrs, shots, &mut rng)?;
-    write_detection_outputs(
-        &result.detections,
-        &result.observable_flips,
-        fmt,
-        append_observables,
-        out,
-        None,
-    )
-}
-
-pub fn run_detect_with_obs(
-    circuit_text: &str,
-    shots: usize,
-    out_format: &str,
-    seed: Option<u64>,
-    append_observables: bool,
-    out: &mut dyn Write,
-    obs_out: &mut dyn Write,
-    obs_out_format: &str,
-) -> Result<(), String> {
-    let fmt = OutputFormat::from_str(out_format)?;
-    let obs_fmt = OutputFormat::from_str(obs_out_format)?;
-    let instrs = parse_lines(circuit_text)?;
-    let mut rng = make_rng(seed);
-    let result = sample_batch(&instrs, shots, &mut rng)?;
-    write_detection_outputs(
-        &result.detections,
-        &result.observable_flips,
-        fmt,
-        append_observables,
-        out,
-        Some((obs_out, obs_fmt)),
-    )
 }
 
 pub fn run_analyze_errors(circuit_text: &str, out: &mut dyn Write) -> Result<(), String> {
@@ -2912,29 +2632,6 @@ pub fn run_analyze_errors_with_options(
         false,
         out,
     )
-}
-
-pub fn run_analyze_errors_with_flags(
-    circuit_text: &str,
-    approximate_disjoint_errors: bool,
-    allow_gauge_detectors: bool,
-    decompose_errors: bool,
-    out: &mut dyn Write,
-) -> Result<(), String> {
-    let instrs = parse_lines(circuit_text)?;
-    let options = crate::error_analyzer::AnalyzeOptions {
-        backend: crate::error_analyzer::AnalyzeBackend::Auto,
-        approximate_disjoint_errors,
-        allow_gauge_detectors,
-    };
-    let dem = if decompose_errors {
-        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(&instrs, options)?
-    } else {
-        ErrorAnalyzer::circuit_to_dem_with_options(&instrs, options)?
-    };
-    let dem_str = dem.to_string();
-    out.write_all(dem_str.as_bytes())
-        .map_err(|e| format!("write error: {e}"))
 }
 
 fn run_export_json(

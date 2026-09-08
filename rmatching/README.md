@@ -130,7 +130,7 @@ python3 -m pip install numpy pymatching stim
 Build the benchmark binary first:
 
 ```bash
-cargo build --release --features bench --bin rmatching_microbench
+cargo build --release -p rmatching-bench-tools --bin rmatching_microbench
 ```
 
 ### Minimal DEM Benchmark Suite

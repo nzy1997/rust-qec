@@ -42,7 +42,7 @@ help:
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
-	cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+	cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
 
 check:
 	cargo check --locked --workspace
@@ -112,7 +112,7 @@ qec-code-random-window-bench-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES)
-	cargo build --locked -p qec-code
+	cargo build --locked -p qec-code --features cli
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary
 	printf '%s\n' '$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)' > $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv
@@ -122,7 +122,7 @@ qec-code-random-window-bench-full:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES)
-	cargo build --locked -p qec-code
+	cargo build --locked -p qec-code --features cli
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary
 	# CODEDISTANCE_PAPER_RESULTS_DIR controls paper baseline import source
@@ -133,7 +133,7 @@ qec-code-random-window-bench-no-target-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)
-	cargo build --locked --release -p qec-code
+	cargo build --locked --release -p qec-code --features cli
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/summary
 
@@ -141,14 +141,14 @@ qec-code-random-window-bench-no-target-multiseed-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)
-	cargo build --locked --release -p qec-code
+	cargo build --locked --release -p qec-code --features cli
 	set -e; run_status=0; python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release --seeds 7 11 17 || run_status=$$?; if [ -f $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl ]; then python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/summary --expected-seeds 7 11 17; fi; exit $$run_status
 
 qec-code-random-window-bench-no-target-ladder-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --no-target-ladder-smoke
-	cargo build --locked --release -p qec-code
+	cargo build --locked --release -p qec-code --features cli
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/summary
 

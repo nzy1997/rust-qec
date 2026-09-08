@@ -1204,10 +1204,19 @@ dependencies = [
 name = "rmatching"
 version = "0.2.1"
 dependencies = [
+ "rstim",
+]
+
+[[package]]
+name = "rmatching-bench-tools"
+version = "0.0.0"
+dependencies = [
  "rand 0.8.7",
+ "rmatching",
  "rstim",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

@@ -34,11 +34,22 @@ Enable the open-source exact ILP backend only when it is needed:
 qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
 ```
 
+The default build is a library-only build with no command-line parser or native
+solver dependency. Available opt-in features are:
+
+- `cli` exposes `qec_code::cli` and builds the `qec-code` binary;
+- `distance-ilp-highs` enables exact distance with HiGHS; and
+- `distance-ilp-gurobi` enables exact distance with Gurobi without also pulling
+  in HiGHS.
+
+Applications that previously invoked the package binary or imported
+`qec_code::cli` must add `features = ["cli"]`. Features compose, so a CLI using
+HiGHS can enable both `cli` and `distance-ilp-highs`.
+
 This crate is covered by the repository-wide
 [Apache-2.0 license](LICENSE), which is also declared in the workspace
 package metadata. Until registry publication, downstream users should pin a reviewed repository
-revision. The default build does not enable the native ILP solver; enable the
-distance features above only when needed.
+revision. Enable the distance features above only when needed.
 
 ## Deterministic regular matrices
 

@@ -1,4 +1,3 @@
-#[cfg(feature = "bench")]
 mod bench {
     use rstim::sim::bit_table::BitTable;
     use std::path::Path;
@@ -53,8 +52,14 @@ mod bench {
         let mut depth = 0usize;
         for ch in text.chars() {
             match ch {
-                '(' => { depth += 1; out.push(ch); }
-                ')' => { depth = depth.saturating_sub(1); out.push(ch); }
+                '(' => {
+                    depth += 1;
+                    out.push(ch);
+                }
+                ')' => {
+                    depth = depth.saturating_sub(1);
+                    out.push(ch);
+                }
                 ' ' | '\t' if depth > 0 => { /* skip spaces inside parens */ }
                 _ => out.push(ch),
             }
@@ -62,22 +67,23 @@ mod bench {
         out
     }
 
-    pub fn count_logical_errors(
-        predictions: &[Vec<u8>],
-        obs_flips: &BitTable,
-    ) -> usize {
+    pub fn count_logical_errors(predictions: &[Vec<u8>], obs_flips: &BitTable) -> usize {
         // obs_flips layout: major = observable index, minor = shot index.
         let num_obs = obs_flips.num_major();
         let n_shots = obs_flips.num_minor();
-        (0..predictions.len()).filter(|&shot| {
-            if shot >= n_shots { return false; }
-            let pred = &predictions[shot];
-            (0..num_obs.min(pred.len())).any(|obs| {
-                let actual = obs_flips.get(obs, shot);
-                let predicted = pred[obs] != 0;
-                actual != predicted
+        (0..predictions.len())
+            .filter(|&shot| {
+                if shot >= n_shots {
+                    return false;
+                }
+                let pred = &predictions[shot];
+                (0..num_obs.min(pred.len())).any(|obs| {
+                    let actual = obs_flips.get(obs, shot);
+                    let predicted = pred[obs] != 0;
+                    actual != predicted
+                })
             })
-        }).count()
+            .count()
     }
 
     #[cfg(test)]
@@ -108,8 +114,8 @@ mod bench {
             // Layout: major = detector, minor = shot (matches FrameSimulator output).
             // 3 detectors, 2 shots.
             let mut table = BitTable::new(3, 2);
-            table.set(0, 0, true);  // det 0 fires in shot 0
-            table.set(2, 1, true);  // det 2 fires in shot 1
+            table.set(0, 0, true); // det 0 fires in shot 0
+            table.set(2, 1, true); // det 2 fires in shot 1
             let syndromes = detections_to_syndromes(&table, 3);
             assert_eq!(syndromes.len(), 2);
             assert_eq!(syndromes[0], vec![1, 0, 0]);
@@ -132,8 +138,8 @@ mod bench {
             // 1 observable, 2 shots; shot 1 mispredicted.
             let mut obs = BitTable::new(1, 2);
             obs.set(0, 0, false);
-            obs.set(0, 1, true);  // actual flip in shot 1
-            let preds = vec![vec![0u8], vec![0u8]];  // predicted no flip for shot 1
+            obs.set(0, 1, true); // actual flip in shot 1
+            let preds = vec![vec![0u8], vec![0u8]]; // predicted no flip for shot 1
             assert_eq!(count_logical_errors(&preds, &obs), 1);
         }
 
@@ -143,7 +149,7 @@ mod bench {
             let mut obs = BitTable::new(2, 1);
             obs.set(0, 0, true);
             obs.set(1, 0, true);
-            let preds = vec![vec![0u8, 0u8]];  // both wrong
+            let preds = vec![vec![0u8, 0u8]]; // both wrong
             assert_eq!(count_logical_errors(&preds, &obs), 1);
         }
 
@@ -172,13 +178,6 @@ mod bench {
     }
 }
 
-#[cfg(not(feature = "bench"))]
-fn main() {
-    eprintln!("Build with --features bench to use rmatching_bench");
-    std::process::exit(1);
-}
-
-#[cfg(feature = "bench")]
 fn main() {
     use bench::*;
     use rmatching::Matching;
@@ -260,7 +259,5 @@ fn main() {
     let logical_error_rate = logical_errors as f64 / num_shots as f64;
     let decode_us_per_round = decode_s * 1e6 / (num_shots as f64 * d as f64);
 
-    println!(
-        "rmatching,{p},{d},{decode_us_per_round:.4},{logical_error_rate:.6}"
-    );
+    println!("rmatching,{p},{d},{decode_us_per_round:.4},{logical_error_rate:.6}");
 }

@@ -1,4 +1,4 @@
-use rstim::cli::{run_detect, run_sample, sample_cli_options};
+use rstim::operations::{run_detect, run_sample, sample_cli_options};
 use rstim::data_path::ReferenceSampleMode;
 use rstim::perf::{
     benchmark_case_by_label, run_case_measurements, PerfRunOptions, PerfSampleOutputMode,

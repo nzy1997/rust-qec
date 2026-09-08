@@ -290,7 +290,8 @@ sha256 = "87d9a6e90e0131a4aff3723dd5844c5b2e081e590d5e2a3da8fdfbd977d9181b"
 
 [[bundles.repository_inputs]]
 path = "benchmarks/rstim_vs_stim_simulator/run_paired_frame_noise.py"
-sha256 = "cfbf0dca4a337af62def2a80f12178d95106f787465e2a14ab180c69d172438f"
+# Build feature selection follows each revision; historical measurements remain unchanged.
+sha256 = "c0b12838c9ab2333d2a9c4f8bea1d9d932d7a617a5252f705b83398e7fa33b57"
 
 [[bundles.artifacts]]
 path = "artifact-sha256.json"

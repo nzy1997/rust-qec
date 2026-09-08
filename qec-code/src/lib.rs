@@ -3,6 +3,7 @@ extern crate self as qec_code;
 
 pub mod binary;
 pub mod binary_chain_complex;
+#[cfg(feature = "cli")]
 pub mod cli;
 pub mod code;
 pub mod codes;
@@ -10,7 +11,7 @@ pub mod css;
 pub mod distance;
 pub mod distance_bound;
 pub mod distance_exact;
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 pub mod distance_ilp;
 pub mod error;
 pub mod family_contract;
