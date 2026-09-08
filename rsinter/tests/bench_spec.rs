@@ -303,7 +303,7 @@ fn steane_minimal_feature_gate_fixtures_are_valid() {
 #[test]
 fn bb_compare_plot_spec_uses_paper_style_logical_rate_per_syndrome_cycle() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../benchmarks/bb_circuit_bposd_compare/plot.toml");
+        .join("tests/fixtures/bench/bb_compare_plot.toml");
     let text = std::fs::read_to_string(path).unwrap();
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
 

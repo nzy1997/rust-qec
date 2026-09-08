@@ -1894,9 +1894,7 @@ fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
 
 fn surface_compare_fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv")
+        .join("tests/fixtures/bench/surface_compare_plot_semantics.csv")
 }
 
 fn surface_compare_fixture_rows() -> Vec<BenchmarkResultRow> {

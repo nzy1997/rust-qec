@@ -36,7 +36,7 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
                 errors.append(f"{name}: internal dependency {upstream} needs a registry version")
             if upstream not in order or order.index(upstream) >= order.index(name):
                 errors.append(f"{name}: {upstream} must be published earlier (including optional dependencies)")
-    expected_bins = {"rustqec-cli": {"rustqec"}, "rstim": set(), "qec-code": set(), "rmatching": {"rmatching_cli"}}
+    expected_bins = {"rustqec-cli": {"rustqec"}, "rstim": set(), "qec-code": set(), "rmatching": {"rmatching_cli"}, "rbposd": set(), "rilpqec": set(), "rsinter": {"rsinter"}}
     for name, expected in expected_bins.items():
         if name not in members:
             continue
@@ -57,6 +57,8 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
 
 
 MINIMAL_FORBIDDEN = {
+    "rbposd": {"rstim", "clap", "qec-ilp-core", "highs", "highs-sys"},
+    "rsinter": {"rbposd", "rmatching", "rilpqec", "qec-ilp-core", "highs", "highs-sys", "plotters"},
     "rstim": {"qec-code", "qec-ilp-core", "clap", "highs", "highs-sys"},
     "qec-code": {"clap", "qec-ilp-core", "highs", "highs-sys"},
     "qec-ilp-core": {"highs", "highs-sys", "gurobi", "bindgen", "cmake"},

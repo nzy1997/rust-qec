@@ -64,7 +64,7 @@ A completed random-window run has this shape:
   },
   "provenance": {
     "tool": "qec-code",
-    "tool_version": "0.1.0",
+    "tool_version": "0.3.0",
     "method_revision": 1
   },
   "search_stats": {
