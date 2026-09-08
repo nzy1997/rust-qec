@@ -204,6 +204,7 @@ def test_rust_model_audit_export_uses_trial_free_json_audit_command(
 
     assert result == {}
     command = captured["command"]
+    assert command[command.index("--features") + 1] == "rbposd-runner"
     assert "--json-model-audit" in command
     assert "--num-trials" not in command
     assert "--json-compare-case" not in command

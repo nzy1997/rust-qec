@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::sync::Mutex;
 
 use rmatching::Matching;
@@ -23,8 +24,24 @@ impl Decoder for RmatchingDemDecoder {
             ));
         }
         validate_no_observable_only_errors(dem.instructions())?;
-        let mut matching =
-            Matching::from_dem(&dem.to_string()).map_err(|error| error.to_string())?;
+        // DEM text omits set_min_counts metadata. Declare the full shape first,
+        // before any detector shifts in the original instructions.
+        let mut dem_text = String::new();
+        let num_detectors = dem.effective_num_detectors();
+        if num_detectors > 0 {
+            writeln!(dem_text, "detector D{}", num_detectors - 1)
+                .expect("writing to a String cannot fail");
+        }
+        if dem.num_observables() > 0 {
+            writeln!(
+                dem_text,
+                "logical_observable L{}",
+                dem.num_observables() - 1
+            )
+            .expect("writing to a String cannot fail");
+        }
+        dem_text.push_str(&dem.to_string());
+        let mut matching = Matching::from_dem(&dem_text).map_err(|error| error.to_string())?;
         matching.prepare();
         Ok(Box::new(CompiledRmatchingDemDecoder {
             matching: Mutex::new(matching),
@@ -86,10 +103,10 @@ impl CompiledDecoder for CompiledRmatchingDemDecoder {
         num_dets: usize,
         num_obs: usize,
     ) -> Result<Vec<u8>, String> {
-        Ok(self
-            .matching
+        self.matching
             .lock()
             .map_err(|error| error.to_string())?
-            .decode_shots_bit_packed(dets, num_shots, num_dets, num_obs))
+            .try_decode_shots_bit_packed(dets, num_shots, num_dets, num_obs)
+            .map_err(|error| error.to_string())
     }
 }

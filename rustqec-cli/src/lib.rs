@@ -278,6 +278,7 @@ enum ErrorFormat {
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum DecodeDecoder {
     EnvelopeMatching,
+    #[cfg(feature = "ilp")]
     EnvelopeMle,
 }
 
@@ -285,9 +286,21 @@ impl From<DecodeDecoder> for decode::DecoderKind {
     fn from(value: DecodeDecoder) -> Self {
         match value {
             DecodeDecoder::EnvelopeMatching => Self::EnvelopeMatching,
+            #[cfg(feature = "ilp")]
             DecodeDecoder::EnvelopeMle => Self::EnvelopeMle,
         }
     }
+}
+
+fn available_decoders() -> Vec<&'static str> {
+    let decoders = vec!["envelope-matching"];
+    #[cfg(feature = "ilp")]
+    let decoders = {
+        let mut decoders = decoders;
+        decoders.push("envelope-mle");
+        decoders
+    };
+    decoders
 }
 
 #[derive(Debug)]
@@ -1496,7 +1509,7 @@ fn write_capabilities(
                             name: "decoder",
                             flag: "--decoder",
                             required: true,
-                            values: vec!["envelope-matching", "envelope-mle"],
+                            values: available_decoders(),
                             default: None,
                         },
                         ArgumentCapability {
@@ -1576,7 +1589,7 @@ fn write_capabilities(
                             channel: "stderr",
                         },
                     ],
-                    decoders: vec!["envelope-matching", "envelope-mle"],
+                    decoders: available_decoders(),
                     artifacts: vec![
                         ArtifactCapability {
                             name: "predictions",

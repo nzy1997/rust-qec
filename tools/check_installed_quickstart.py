@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the installed rustqec and rstim quickstart without Cargo or PATH."""
+"""Exercise the installed rustqec quickstart without Cargo or PATH."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ def run(binary: Path, *args: str, cwd: Path) -> subprocess.CompletedProcess[str]
 
 
 def validate(bin_dir: Path) -> None:
-    rustqec, rstim = bin_dir / "rustqec", bin_dir / "rstim"
-    for binary in (rustqec, rstim):
+    rustqec = bin_dir / "rustqec"
+    for binary in (rustqec,):
         if not binary.is_file() or not binary.stat().st_mode & 0o111:
             raise QuickstartError(f"missing executable: {binary}")
     with tempfile.TemporaryDirectory(prefix="installed-quickstart-") as temporary:
@@ -53,18 +53,22 @@ def validate(bin_dir: Path) -> None:
         observed_result = observed_stats.get("result", {})
         if stats.returncode or {key: observed_result.get(key) for key in EXPECTED_STATS} != EXPECTED_STATS:
             raise QuickstartError(f"stats did not match the showcase: {stats.stderr.strip() or stats.stdout.strip()}")
-        detect = run(rstim, "detect", "--shots", "1", "--out_format", "dets", "--in", str(circuit), cwd=work)
-        if detect.returncode or detect.stdout.strip() != EVENT:
+        events = work / "events.dets"
+        detect = run(rustqec, "circuit", "detect", "--shots", "1", "--out-format", "dets",
+                     "--append-observables", "--in", str(circuit), "--out", str(events), cwd=work)
+        if detect.returncode or not events.is_file() or events.read_text().strip() != EVENT:
             raise QuickstartError("detect did not produce 'shot D0 L0'")
-        analyze = run(rstim, "analyze_errors", "--in", str(circuit), "--out", str(dem), cwd=work)
-        if analyze.returncode or dem.read_text(encoding="utf-8").strip() != "error(1) D0 L0":
-            raise QuickstartError("analyze_errors did not produce 'error(1) D0 L0'")
-        sample = run(rstim, "sample_dem", "--shots", "1", "--out_format", "dets", "--in", str(dem), cwd=work)
-        if sample.returncode or sample.stdout.strip() != EVENT:
-            raise QuickstartError("sample_dem did not produce 'shot D0 L0'")
-        rejected = run(rstim, "stats", "--in", str(bad), cwd=work)
-        if rejected.returncode == 0 or "bad repeat count" not in rejected.stderr:
-            raise QuickstartError("bad repeat count was not rejected")
+        analyze = run(rustqec, "circuit", "dem", "--in", str(circuit), "--out", str(dem), cwd=work)
+        if analyze.returncode or not dem.is_file() or dem.read_text().strip() != "error(1) D0 L0":
+            raise QuickstartError("dem did not produce 'error(1) D0 L0'")
+        rejected = run(rustqec, "circuit", "stats", "--in", str(bad), "--error-format", "json", cwd=work)
+        try:
+            error = json.loads(rejected.stderr)
+        except json.JSONDecodeError:
+            error = {}
+        if rejected.returncode == 0 or error.get("error", {}).get("code") != "invalid_circuit":
+            raise QuickstartError("bad repeat count was not rejected as invalid_circuit")
+
 
 
 def main() -> int:

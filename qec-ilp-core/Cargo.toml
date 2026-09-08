@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/qec-ilp-core"
+publish = ["crates-io"]
+include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 description = "Backend-neutral binary ILP models for quantum error-correction tools"
 repository = "https://github.com/nzy1997/rust-qec"
 

@@ -1,4 +1,4 @@
-use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
 #[test]
 fn user_graph_add_edge() {
@@ -130,4 +130,32 @@ fn user_graph_get_mwpm_invalidation() {
     g.add_edge(1, 2, vec![1], 2.0, 0.2);
     // This should rebuild
     let _ = g.get_mwpm();
+}
+
+#[test]
+fn dimension_only_dem_updates_rebuild_cached_solver() {
+    for (probability, detectors, observables, expected_shape) in [
+        (0.0, vec![8], vec![], (9, 1)),
+        (0.0, vec![], vec![8], (1, 9)),
+        (0.0, vec![8], vec![8], (9, 9)),
+        (0.1, vec![], vec![8], (1, 9)),
+    ] {
+        let mut graph = UserGraph::new();
+        graph.handle_dem_instruction(0.1, &[0], vec![0]).unwrap();
+        let cached = &graph.get_mwpm().flooder.graph;
+        assert_eq!((cached.nodes.len(), cached.num_observables), (1, 1));
+
+        graph
+            .handle_dem_instruction(probability, &detectors, observables)
+            .unwrap();
+
+        assert_eq!(
+            graph.get_num_edges(),
+            1,
+            "dimension declarations add no edges"
+        );
+        let cached = &graph.get_mwpm().flooder.graph;
+        assert_eq!((cached.nodes.len(), cached.num_observables), expected_shape);
+        assert_eq!(cached.nodes[0].neighbor_observables, vec![1]);
+    }
 }

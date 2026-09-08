@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/renvelope"
+publish = false
+include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 description = "Reference decoders for explicit atom-loss Pauli envelopes (exact MLE and matching)"
 
 [dependencies]

@@ -4,6 +4,15 @@
 
 A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWPM) decoder for quantum error correction, ported from [PyMatching](https://github.com/oscarhiggott/PyMatching).
 
+The crate is being prepared for its first crates.io release; it is not yet
+available from the registry. In this repository it is consumed through the
+workspace path. After release, an application can use:
+
+```toml
+[dependencies]
+rmatching = "0.2.1"
+```
+
 ## Highlights
 
 - Full Sparse Blossom algorithm with alternating trees and blossom contraction/shattering
@@ -14,7 +23,10 @@ A Rust implementation of the Sparse Blossom minimum-weight perfect matching (MWP
 The standalone parser constructs matching edges from one- and two-detector DEM
 error components. `Matching::from_dem` returns an error for higher-degree
 hyperedges instead of silently dropping them. Decompose errors into graphlike
-components before using `rmatching`.
+components before using `rmatching`. DEM probabilities must satisfy `0 <= p < 1`;
+zero-probability components preserve dimensions but add no edges. Probability-1
+components are explicitly unsupported instead of overflowing the integer weight
+representation.
 
 ## Cargo Features
 
@@ -32,7 +44,7 @@ use rmatching::Matching;
 fn main() {
     // From a DEM string
     let mut m = Matching::from_dem("error(0.1) D0 D1 L0\nerror(0.1) D0\nerror(0.1) D1\n").unwrap();
-    let prediction = m.decode(&[1, 1]);
+    let prediction = m.decode(&[1_u8, 1]);
     assert_eq!(prediction, vec![1]);
     assert!(Matching::from_dem("error(0.1) D0 D1 D2\n").is_err());
 
@@ -41,9 +53,15 @@ fn main() {
     m.add_edge(0, 1, 2.2, &[0], 0.1);
     m.add_boundary_edge(0, 2.2, &[0], 0.1);
     m.add_boundary_edge(1, 2.2, &[], 0.1);
-    let prediction = m.decode(&[1, 0]);
+    let prediction = m.decode(&[1_u8, 0]);
 }
 ```
+
+`Matching` is mutable because it reuses solver state and allocation buffers
+between calls. Syndromes and predictions use one `u8` per bit (`0` or `1`).
+The current observable mask supports at most 64 observables.
+For the full `rstim` → decomposed DEM → `rmatching` path, run the repository's
+[external-consumer example](../examples/rust-consumer/src/main.rs).
 
 ## Architecture
 

@@ -13,6 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(feature = "ilp")]
 use renvelope::{
     AtomLossCase, DecodeOutcome, Effect as ReferenceEffect, LossEnvelope as ReferenceLossEnvelope,
     decode as decode_reference_mle,
@@ -32,6 +33,13 @@ fn rustqec() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rustqec"))
 }
 
+fn available_decoders() -> &'static [&'static str] {
+    #[cfg(feature = "ilp")]
+    return &["envelope-matching", "envelope-mle"];
+    #[cfg(not(feature = "ilp"))]
+    &["envelope-matching"]
+}
+
 fn run_decode(dataset: &Path, decoder: &str, root: &Path) -> std::process::Output {
     rustqec()
         .args([
@@ -49,6 +57,7 @@ fn run_decode(dataset: &Path, decoder: &str, root: &Path) -> std::process::Outpu
         .unwrap()
 }
 
+#[cfg(feature = "ilp")]
 fn run_decode_with_timeout(
     dataset: &Path,
     decoder: &str,
@@ -87,6 +96,7 @@ fn current_rstim_fixture(family: &str) -> PathBuf {
         .join(family)
 }
 
+#[cfg(feature = "ilp")]
 fn measurement_table(bytes: &[u8], bit_count: usize) -> rstim::sim::bit_table::BitTable {
     let mut table = rstim::sim::bit_table::BitTable::try_new(bit_count, 1).unwrap();
     for bit in 0..bit_count {
@@ -97,6 +107,7 @@ fn measurement_table(bytes: &[u8], bit_count: usize) -> rstim::sim::bit_table::B
     table
 }
 
+#[cfg(feature = "ilp")]
 fn project_reference_effect(
     effect: &ReferenceEffect,
     checks: &[rstim::m2d::LossAwareDetectorCheck],
@@ -122,6 +133,7 @@ fn project_reference_effect(
     }
 }
 
+#[cfg(feature = "ilp")]
 fn project_reference_case(
     canonical: &AtomLossCase,
     checks: &[rstim::m2d::LossAwareDetectorCheck],
@@ -155,6 +167,7 @@ fn project_reference_case(
     }
 }
 
+#[cfg(feature = "ilp")]
 fn reference_prediction(case: &AtomLossCase) -> Vec<usize> {
     match decode_reference_mle(case).unwrap() {
         DecodeOutcome::Optimal(result) => result.predicted_observables,
@@ -227,6 +240,7 @@ fn current_rstim_atom_loss_midswap_decodes_unmodified() {
     assert_current_rstim_atom_loss_decodes("midswap");
 }
 
+#[cfg(feature = "ilp")]
 #[test]
 fn current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified() {
     let dataset = current_rstim_fixture("midswap");
@@ -300,6 +314,7 @@ fn current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified() {
     );
 }
 
+#[cfg(feature = "ilp")]
 #[test]
 fn current_rstim_atom_loss_midswap_envelope_mle_uses_canonical_detectors() {
     let dataset = current_rstim_fixture("midswap_canonical_mle");
@@ -473,6 +488,7 @@ fn current_rstim_atom_loss_midswap_envelope_mle_uses_canonical_detectors() {
     );
 }
 
+#[cfg(feature = "ilp")]
 #[test]
 fn current_rstim_atom_loss_conventional_envelope_mle_rejects_candidate_explosion() {
     let dataset = current_rstim_fixture("conventional");
@@ -583,7 +599,7 @@ fn stim_generated_memory_z_decodes_end_to_end() {
     .unwrap();
     let answers = fs::read(private.join("answers.b8")).unwrap();
 
-    for decoder in ["envelope-matching", "envelope-mle"] {
+    for &decoder in available_decoders() {
         let output = run_decode(&public, decoder, root.path());
         assert!(
             output.status.success(),
@@ -731,7 +747,7 @@ fn spec_invariant_violations_are_rejected_on_the_fixture() {
     )
     .unwrap();
 
-    let output = run_decode(&dataset, "envelope-mle", root.path());
+    let output = run_decode(&dataset, "envelope-matching", root.path());
     assert!(!output.status.success());
     let value: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(value["error"]["code"], "unsupported_circuit");
