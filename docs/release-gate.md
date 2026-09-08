@@ -7,18 +7,30 @@ read-only: it never creates, edits, deletes, or uploads a GitHub resource.
 ## Version policy
 
 [`tools/release_version_policy.json`](../tools/release_version_policy.json)
-classifies every Cargo workspace member. The repository release version tracks the
-four crates already updated by `make release`:
+classifies every Cargo workspace member. Starting with v0.3.0, the repository
+release coordinates the major/minor series of eight public crates:
 
+- `qec-ilp-core`
+- `qec-code`
 - `rstim`
-- `rsinter`
-- `rbposd`
 - `rmatching`
+- `rbposd`
+- `rilpqec`
+- `rsinter`
+- `rustqec-cli`
 
-Their `[package].version` values and Cargo.lock entries must equal the version in the
-tag. The other workspace crates are explicitly independent. Their manifest versions
-must match Cargo.lock, but they do not have to equal the repository release version.
-Adding a workspace member without classifying it makes the gate fail.
+All eight start at 0.3.0. Within a major/minor series, patch releases may update
+individual crates: a v0.3.1 tag can contain `rilpqec 0.3.1` while the other crates
+remain at 0.3.0. Every public crate must share the tag's major/minor version, none
+may be ahead of the tag, and at least one must equal its version. A new major/minor
+series moves all eight together. Each repository release uses a new tag; unchanged
+crates need not be republished and individual crates may skip patch numbers.
+
+Historical tags before v0.3.0, including v0.2.1, retain the original rule:
+`rstim`, `rsinter`, `rbposd`, and `rmatching` must exactly match the tag version.
+Other workspace crates remain independent of the tag version. Under both policies,
+each workspace crate's manifest version must appear in Cargo.lock, and adding a
+workspace member without classifying it makes the gate fail.
 
 Only stable tags in canonical `vMAJOR.MINOR.PATCH` form are supported. Prerelease and
 build-metadata tags are rejected before any GitHub lookup. Supporting prereleases in
