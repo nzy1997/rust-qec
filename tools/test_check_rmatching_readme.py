@@ -117,6 +117,38 @@ class RmatchingReadmeCheckerTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing local README link target: docs/showcases/missing.md", result.stderr)
 
+    def test_fixture_accepts_explicitly_featureless_crate(self) -> None:
+        with self.temporary_fixture() as root:
+            manifest = root / "rmatching" / "Cargo.toml"
+            manifest.write_text(manifest.read_text().replace("[features]\nbench = []\n", ""))
+            readme = root / "rmatching" / "README.md"
+            readme.write_text(readme.read_text().replace(
+                "- `bench`: enables benchmark binaries.", "This crate has no Cargo features."
+            ))
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_fixture_rejects_false_featureless_claim(self) -> None:
+        with self.temporary_fixture() as root:
+            readme = root / "rmatching" / "README.md"
+            readme.write_text(readme.read_text().replace(
+                "- `bench`: enables benchmark binaries.", "This crate has no Cargo features."
+            ))
+            result = self.run_checker(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("advertised Cargo features do not match metadata: missing=bench", result.stderr)
+
+    def test_fixture_rejects_empty_feature_documentation(self) -> None:
+        with self.temporary_fixture() as root:
+            readme = root / "rmatching" / "README.md"
+            readme.write_text(readme.read_text().replace("- `bench`: enables benchmark binaries.", ""))
+            result = self.run_checker(root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must list features or explicitly declare none", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

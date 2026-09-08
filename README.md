@@ -95,7 +95,8 @@ checks these results and malformed-input rejection from a source checkout.
 
 ### Cargo and Rust library users
 
-The first crates.io release is **not published yet**. From this development
+The v0.3.0 crates.io candidate is being prepared; see the
+[release and migration notes](docs/releases/v0.3.0.md). From this development
 checkout, install the basic CLI without the ILP solver:
 
 ```sh

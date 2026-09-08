@@ -5,14 +5,12 @@ toolkit. It parses Stim-style circuits, generates common QEC memory circuits,
 samples measurements and detection events, and extracts DEMs for downstream
 decoders.
 
-The crate is being prepared for its first crates.io release; it is not yet
-available from the registry. In this repository it is consumed through the
-workspace path. After release, an application can use:
+Add the simulator library from crates.io:
 
 ```toml
 [dependencies]
 rand = "0.8"
-rstim = "0.2.1"
+rstim = "0.3.0"
 ```
 
 `rstim`'s sampling APIs accept RNGs from `rand` 0.8, so downstream crates that
@@ -45,16 +43,16 @@ Optional features are intentionally additive:
 - `benchmark-telemetry` enables internal benchmark instrumentation.
 
 For example, install the complete compatibility executable with
-`cargo install rstim --features cli,codegen-css,shot-viewer`. A smaller CLI can
-be built with only `--features cli`; unavailable optional subcommands are
-omitted or report the feature needed to enable them.
+`cargo install rstim --version 0.3.0 --features cli,codegen-css,shot-viewer`.
+A smaller CLI can be installed with only `--features cli`; unavailable optional
+subcommands are omitted or report the feature needed to enable them.
 Detector error models must be decomposed into graphlike components before
 passing them to a matching decoder that only accepts one- and two-detector
 errors.
 
 See the [getting-started guide](doc/getting_started.md), the repository's
-[complete external-consumer example](../examples/rust-consumer/src/main.rs),
-and the [rmatching decoder](../rmatching/README.md). The full API reference can
-be built locally with `cargo doc -p rstim --open`.
+[complete external-consumer example](https://github.com/nzy1997/rust-qec/blob/master/examples/rust-consumer/src/main.rs),
+and the [rmatching decoder](https://github.com/nzy1997/rust-qec/tree/master/rmatching).
+The full API reference is available on [docs.rs](https://docs.rs/rstim).
 
-Licensed under [Apache-2.0](../LICENSE).
+Licensed under [Apache-2.0](LICENSE).

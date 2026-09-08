@@ -11,7 +11,7 @@ enables crates.io publishing, an application will be able to use:
 
 ```toml
 [dependencies]
-rbposd = "0.2.1"
+rbposd = "0.3.0"
 ```
 
 ```rust

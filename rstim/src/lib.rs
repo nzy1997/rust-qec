@@ -33,6 +33,7 @@ pub mod measurement_transform;
 pub mod qp101;
 pub mod qp101_svg;
 pub mod sample_trace;
+#[cfg(feature = "cli")]
 mod detect_trace;
 pub mod perf;
 pub mod compiled;

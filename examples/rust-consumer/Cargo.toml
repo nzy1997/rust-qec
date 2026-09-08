@@ -8,5 +8,5 @@ publish = false
 
 [dependencies]
 rand = "0.8"
-rmatching = "0.2.1"
-rstim = "0.2.1"
+rmatching = "0.3.0"
+rstim = "0.3.0"
