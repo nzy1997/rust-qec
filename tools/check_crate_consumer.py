@@ -6,11 +6,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import selectors
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
+import urllib.request
 from pathlib import Path
 
 
@@ -198,6 +201,7 @@ def exercise_consumer(repo_root: Path, target_dir: Path, unpacked: dict[str, Pat
     lockfile.unlink(missing_ok=True)
     append_patches(consumer / "Cargo.toml", unpacked)
     validate_resolved_sources(consumer / "Cargo.toml", unpacked)
+    validate_minimal_graph(consumer / "Cargo.toml", {"clap", "qec-code", "qec-ilp-core", "highs", "highs-sys"})
     result = run(
         [
             "cargo",
@@ -214,6 +218,80 @@ def exercise_consumer(repo_root: Path, target_dir: Path, unpacked: dict[str, Pat
     expected = "validated Bell parity and 128/128 observable predictions"
     if result.stdout.strip() != expected:
         raise ConsumerCheckError(f"consumer result differs: {result.stdout.strip()!r}")
+
+
+def validate_minimal_graph(manifest: Path, forbidden: set[str]) -> None:
+    result = run(["cargo", "tree", "--manifest-path", str(manifest), "--edges", "normal,build",
+                  "--prefix", "none"], cwd=manifest.parent)
+    found = {line.split()[0] for line in result.stdout.splitlines() if line.split()} & forbidden
+    if found:
+        raise ConsumerCheckError(f"minimal consumer unexpectedly builds {sorted(found)}")
+
+
+def exercise_model_consumer(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
+    consumer = work / "model-consumer"
+    (consumer / "src").mkdir(parents=True)
+    manifest = consumer / "Cargo.toml"
+    dependencies = {}
+    for name in ("qec-code", "qec-ilp-core"):
+        dependencies[name] = tomllib.loads((unpacked[name] / "Cargo.toml").read_text())["package"]["version"]
+    manifest.write_text('[workspace]\n[package]\nname="minimal-model-consumer"\nversion="0.0.0"\nedition="2024"\n[dependencies]\n'
+                        + "\n".join(f'{name} = "{version}"' for name, version in dependencies.items()) + "\n")
+    append_patches(manifest, unpacked)
+    (consumer / "src/main.rs").write_text('''fn main() {
+    assert_eq!(qec_code::binary::try_binary_rank(&[vec![1, 0], vec![0, 1]]).unwrap(), 2);
+    let mut model = qec_ilp_core::BinaryIlpModel {
+        binary_vars: vec![], integer_vars: vec![], constraints: vec![], solution_binary_prefix_len: 0,
+    };
+    model.validate().unwrap();
+    model.solution_binary_prefix_len = 1;
+    assert!(model.validate().is_err());
+    println!("validated model-only libraries");
+}
+''')
+    validate_resolved_sources(manifest, unpacked)
+    validate_minimal_graph(manifest, {"clap", "highs", "highs-sys", "gurobi", "bindgen", "cmake"})
+    result = run(["cargo", "run", "--locked", "--manifest-path", str(manifest), "--target-dir", str(target_dir), "-j", "4"], cwd=consumer)
+    if result.stdout.strip() != "validated model-only libraries":
+        raise ConsumerCheckError("model-only consumer did not validate its result")
+
+
+def exercise_viewer(binary: Path, expected_html: bytes) -> None:
+    with subprocess.Popen([str(binary), "shot_viewer", "--no_open", "--serve-once"],
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
+        try:
+            with selectors.DefaultSelector() as selector:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                if not selector.select(timeout=10):
+                    raise ConsumerCheckError("installed viewer did not start within 10 seconds")
+            line = process.stdout.readline().strip()
+            prefix = "rstim shot viewer: http://127.0.0.1:"
+            if not line.startswith(prefix):
+                raise ConsumerCheckError(f"installed viewer did not announce loopback URL: {line!r}")
+            with urllib.request.urlopen(line.removeprefix("rstim shot viewer: "), timeout=10) as response:
+                if response.read() != expected_html:
+                    raise ConsumerCheckError("installed viewer served different package HTML")
+            _, stderr = process.communicate(timeout=10)
+            if process.returncode:
+                raise ConsumerCheckError(f"installed viewer failed: {stderr}")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.communicate()
+
+
+def exercise_compatibility_cli(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
+    rstim = unpacked["rstim"]
+    append_patches(rstim / "Cargo.toml", unpacked)
+    features = "cli,codegen-css,shot-viewer"
+    validate_resolved_sources(rstim / "Cargo.toml", unpacked, features=features)
+    install_root = work / "compatibility-install"
+    run(["cargo", "install", "--locked", "--path", str(rstim), "--features", features,
+         "--root", str(install_root), "--target-dir", str(target_dir), "-j", "4"], cwd=work)
+    bins = sorted(path.name for path in (install_root / "bin").iterdir() if path.is_file())
+    if bins != ["rstim"]:
+        raise ConsumerCheckError(f"compatibility install exposed unexpected binaries: {bins}")
+    exercise_viewer(install_root / "bin/rstim", (rstim / "assets/shot-viewer/index.html").read_bytes())
 
 
 def exercise_installed_cli(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
@@ -268,8 +346,17 @@ def check(repo_root: Path, target_dir: Path, policy: Path) -> None:
         snapshot = snapshot_workspace(repo_root, work / "source-workspace")
         unpacked = package_and_unpack(snapshot, target_dir, order, work / "packages")
         validate_package_contents(unpacked, repo_root)
-        exercise_consumer(repo_root, target_dir, unpacked, work)
+        # A pure library consumer must compile even without viewer files on disk.
+        assets = unpacked["rstim"] / "assets/shot-viewer"
+        backup = work / "viewer-assets"
+        shutil.move(assets, backup)
+        try:
+            exercise_consumer(repo_root, target_dir, unpacked, work)
+        finally:
+            shutil.move(backup, assets)
+        exercise_model_consumer(target_dir, unpacked, work)
         exercise_installed_cli(target_dir, unpacked, work)
+        exercise_compatibility_cli(target_dir, unpacked, work)
 
 
 def main(argv: list[str] | None = None) -> int:

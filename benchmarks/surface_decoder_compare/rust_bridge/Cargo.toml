@@ -12,7 +12,7 @@ gurobi = ["rsinter/gurobi", "rilpqec/gurobi"]
 
 [dependencies]
 rbposd = { path = "../../../rbposd" }
-qec-ilp-core = { path = "../../../qec-ilp-core" }
+qec-ilp-core = { path = "../../../qec-ilp-core", features = ["highs"] }
 rilpqec = { path = "../../../rilpqec" }
 rsinter = { path = "../../../rsinter", features = ["full"] }
 rstim = { path = "../../../rstim" }

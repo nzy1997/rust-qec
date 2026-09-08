@@ -1,13 +1,16 @@
+#[cfg(feature = "cli")]
 use std::process::{Command, Output};
 
 use qec_code::family_verifier::verify_family_manifest_text;
 
 const MANIFEST_TEXT: &str = include_str!("fixtures/family_manifest/manifest.v1.json");
 
+#[cfg(feature = "cli")]
 fn qec_code_bin() -> &'static str {
     env!("CARGO_BIN_EXE_qec-code")
 }
 
+#[cfg(feature = "cli")]
 fn run_qec_code(args: &[&str]) -> Output {
     Command::new(qec_code_bin())
         .args(args)
@@ -15,6 +18,7 @@ fn run_qec_code(args: &[&str]) -> Output {
         .expect("qec-code binary should run")
 }
 
+#[cfg(feature = "cli")]
 fn line_count(stdout: &str, prefix: &str) -> usize {
     stdout
         .lines()
@@ -22,6 +26,7 @@ fn line_count(stdout: &str, prefix: &str) -> usize {
         .count()
 }
 
+#[cfg(feature = "cli")]
 fn family_ids(stdout: &str) -> Vec<&str> {
     stdout
         .lines()
@@ -55,6 +60,7 @@ fn mutate_manifest(mutate: impl FnOnce(&mut serde_json::Value)) -> String {
 }
 
 #[test]
+#[cfg(feature = "cli")]
 fn verify_families_cli_reports_12_pass_and_2_deferred() {
     let output = run_qec_code(&["code", "css", "verify-families"]);
 

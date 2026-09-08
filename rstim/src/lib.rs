@@ -16,10 +16,13 @@ pub mod dem;
 pub mod dem_provenance;
 pub mod error_analyzer;
 pub mod showcase;
+#[cfg(feature = "shot-viewer")]
 pub mod shot_viewer;
 pub mod output;
 pub mod result_stream;
+#[cfg(feature = "cli")]
 pub mod cli;
+pub mod operations;
 pub mod stats;
 pub mod transforms;
 pub mod circuit_gen;

@@ -16,13 +16,13 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 default = []
 rbposd-runner = ["dep:rbposd"]
 rmatching-runner = ["dep:rmatching"]
-ilp-runner = ["dep:rilpqec", "dep:qec-ilp-core"]
+ilp-runner = ["dep:rilpqec", "dep:qec-ilp-core", "qec-ilp-core/highs"]
 plotting = ["dep:plotters"]
 full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
 gurobi = ["ilp-runner", "rilpqec/gurobi"]
 
 [dependencies]
-rstim = { version = "0.2.1", path = "../rstim" }
+rstim = { version = "0.2.1", path = "../rstim", features = ["codegen-css"] }
 rmatching = { version = "0.2.1", path = "../rmatching", optional = true }
 rbposd = { version = "0.2.1", path = "../rbposd", optional = true }
 rilpqec = { version = "0.1.0", path = "../rilpqec", optional = true }
@@ -39,7 +39,7 @@ tempfile = "3"
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
-qec-code = { version = "0.1.0", path = "../qec-code" }
+qec-code = { version = "0.1.0", path = "../qec-code", features = ["cli"] }
 
 [[bin]]
 name = "rsinter"

@@ -20,10 +20,11 @@ from benchmarks.minimal_cases import build_cases
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+WORKSPACE_ROOT = REPO_ROOT.parent
 RESULTS_CSV = REPO_ROOT / "benchmarks/minimal_results.csv"
 MISMATCH_JSON = REPO_ROOT / "benchmarks/minimal_mismatches.json"
-RELEASE_BINARY = REPO_ROOT / "target/release/rmatching_microbench"
-DEBUG_BINARY = REPO_ROOT / "target/debug/rmatching_microbench"
+RELEASE_BINARY = WORKSPACE_ROOT / "target/release/rmatching_microbench"
+DEBUG_BINARY = WORKSPACE_ROOT / "target/debug/rmatching_microbench"
 
 CSV_HEADER = [
     "case_name",
@@ -168,8 +169,8 @@ def run_rmatching(case, warmup_rounds: int, measure_rounds: int):
             "cargo",
             "run",
             "--quiet",
-            "--features",
-            "bench",
+            "-p",
+            "rmatching-bench-tools",
             "--bin",
             "rmatching_microbench",
         ]
@@ -181,7 +182,7 @@ def run_rmatching(case, warmup_rounds: int, measure_rounds: int):
         input=json.dumps(request),
         text=True,
         capture_output=True,
-        cwd=REPO_ROOT,
+        cwd=WORKSPACE_ROOT,
     )
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "rmatching_microbench failed")

@@ -1,10 +1,10 @@
+#[cfg(not(feature = "gurobi"))]
+use qec_ilp_core::BackendConfig;
 use qec_ilp_core::BinaryIlpError;
 use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::{
     BackendKind, BinaryIlpConfig, BinaryIlpModel, ConstraintSense, LinearConstraint, ModelVar,
 };
-#[cfg(not(feature = "gurobi"))]
-use qec_ilp_core::BackendConfig;
 
 fn simple_model() -> BinaryIlpModel {
     BinaryIlpModel {
@@ -32,6 +32,7 @@ fn simple_model() -> BinaryIlpModel {
 }
 
 #[test]
+#[cfg(feature = "highs")]
 fn auto_backend_falls_back_to_highs() {
     let mut backend = build_binary_backend(&simple_model(), &BinaryIlpConfig::default()).unwrap();
 
@@ -41,6 +42,7 @@ fn auto_backend_falls_back_to_highs() {
 }
 
 #[test]
+#[cfg(feature = "highs")]
 fn binary_backend_trait_objects_have_a_stable_debug_name() {
     let mut config = BinaryIlpConfig::default();
     config.backend.kind = BackendKind::Highs;
@@ -48,6 +50,35 @@ fn binary_backend_trait_objects_have_a_stable_debug_name() {
     let backend = build_binary_backend(&simple_model(), &config).unwrap();
 
     assert_eq!(format!("{backend:?}"), "BinaryBackend(..)");
+}
+
+#[cfg(not(any(feature = "highs", feature = "gurobi")))]
+#[test]
+fn auto_selection_reports_unavailable_without_a_backend_feature() {
+    let err = build_binary_backend(&simple_model(), &BinaryIlpConfig::default()).unwrap_err();
+
+    assert_eq!(
+        err,
+        BinaryIlpError::BackendUnavailable {
+            requested: BackendKind::Auto,
+        }
+    );
+}
+
+#[cfg(not(feature = "highs"))]
+#[test]
+fn explicit_highs_selection_reports_unavailable_without_feature() {
+    let mut config = BinaryIlpConfig::default();
+    config.backend.kind = BackendKind::Highs;
+
+    let err = build_binary_backend(&simple_model(), &config).unwrap_err();
+
+    assert_eq!(
+        err,
+        BinaryIlpError::BackendUnavailable {
+            requested: BackendKind::Highs,
+        }
+    );
 }
 
 #[cfg(not(feature = "gurobi"))]

@@ -262,7 +262,7 @@ pub enum QecError {
 
 pub type Result<T> = core::result::Result<T, QecError>;
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 impl From<qec_ilp_core::BinaryIlpError> for QecError {
     fn from(value: qec_ilp_core::BinaryIlpError) -> Self {
         match value {

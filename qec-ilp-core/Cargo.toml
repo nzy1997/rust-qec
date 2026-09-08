@@ -14,10 +14,11 @@ repository = "https://github.com/nzy1997/rust-qec"
 
 [features]
 default = []
+highs = ["dep:highs", "dep:highs-sys"]
 gurobi = ["dep:gurobi"]
 
 [dependencies]
 thiserror = "2"
-highs = "2.1.0"
-highs-sys = "1.14.2"
+highs = { version = "2.1.0", optional = true }
+highs-sys = { version = "1.14.2", optional = true }
 gurobi = { version = "0.3.4", optional = true }

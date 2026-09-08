@@ -266,6 +266,34 @@ class ReleaseGateCheckerTest(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("workspace packages unclassified by release policy: new-crate", result.errors)
 
+    def test_missing_synchronized_workspace_member_is_rejected(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "valid.json")
+        snapshot["workspace_members"].remove("rstim")
+
+        result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy
+        )
+
+        self.assertFalse(result.passed)
+        self.assertIn(
+            "synchronized workspace packages missing from tagged commit: rstim",
+            result.errors,
+        )
+
+    def test_classified_workspace_member_still_requires_manifest_metadata(self) -> None:
+        snapshot = checker.load_snapshot(FIXTURES / "valid.json")
+        snapshot["workspace_members"].append("benchmarks/rmatching-tools")
+
+        result = checker.evaluate_snapshot(
+            snapshot, self.policy, self.required_checks, self.tag_policy
+        )
+
+        self.assertFalse(result.passed)
+        self.assertIn(
+            "benchmarks/rmatching-tools/Cargo.toml version metadata is missing",
+            result.errors,
+        )
+
     def test_rejections_never_publish_or_export_success_outputs(self) -> None:
         rejected = (
             "parent_commit_checks.json",

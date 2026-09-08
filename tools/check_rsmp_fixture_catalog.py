@@ -134,7 +134,7 @@ EXPECTED_BENCHMARK_GENERATION = {
 }
 EXPECTED_GENERATION_EVIDENCE = {
     "loss_visible_measurements": {
-        "command": "cargo run -q -p rstim --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim",
+        "command": "cargo run -q -p rstim --features cli --bin rstim -- sample --shots 4 --seed 2 --out_format b8 --in rstim/tests/fixtures/rsmp/loss_visible_measurements.stim",
         "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
     },
     "surface_d11_r100": EXPECTED_BENCHMARK_GENERATION,

@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -44,7 +46,7 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
 }
 
 const CSS_DISTANCE_DOC: &str = include_str!("../doc/css_distance.md");
-const CSS_DISTANCE_DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code -- ";
+const CSS_DISTANCE_DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code --features cli -- ";
 
 #[derive(Debug)]
 struct CssDistanceDocCommand {

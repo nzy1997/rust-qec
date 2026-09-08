@@ -143,3 +143,11 @@ remains available and documents its panic conditions. The DEM importer supports
 probabilities `0 <= p < 1`; probability-1 errors require a different representation
 and are rejected explicitly. This restriction does not apply to rstim sampling
 or DEM generation, including the probability-1 installed quickstart.
+
+Library defaults now omit compatibility CLI parsing, CSS generation, the local
+viewer, and native ILP backends. Enable `rstim` features `cli`, `codegen-css`,
+and `shot-viewer` where needed; `qec-code/cli` enables its executable and
+`qec-ilp-core/highs` enables its open-source solver. Full native archives retain
+the viewer. `rmatching` benchmark binaries moved to the unpublished
+`rmatching-bench-tools` workspace member. See the
+[feature migration guide](https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md#library-feature-boundaries).

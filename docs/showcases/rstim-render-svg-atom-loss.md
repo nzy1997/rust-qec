@@ -131,13 +131,13 @@ sample-shot and highlight modes, and the negative control where
 The preview SVG committed with this page can be regenerated with:
 
 ```sh
-cargo run -q -p rstim --bin rstim -- render_svg \
+cargo run -q -p rstim --features cli --bin rstim -- render_svg \
   --sample_shot \
   --seed 7 \
   --in qp101-viz/examples/atom-loss-sample.stim \
   --out docs/showcases/assets/atom-loss-sample-seed7.svg
 
-cargo run -q -p rstim --bin rstim -- render_svg \
+cargo run -q -p rstim --features cli --bin rstim -- render_svg \
   --sample_shot \
   --seed 7 \
   --in qp101-viz/examples/surface-code-rotated-memory-x-d3-r3-atom-loss.stim \

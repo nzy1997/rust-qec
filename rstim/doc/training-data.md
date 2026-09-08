@@ -10,7 +10,7 @@ auxiliary supervision.
 From a checkout of this repository:
 
 ```sh
-cargo build --release --locked -p rstim
+cargo build --release --locked -p rstim --features cli
 export PATH="$PWD/target/release:$PATH"
 rstim --version
 ```

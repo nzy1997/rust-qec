@@ -137,7 +137,7 @@ per-case selected marginal and pair rates, tolerances, sample counts, tool
 status, stderr, and failure reasons. By default the verifier uses
 `target/release/rstim` if it already exists, otherwise `target/debug/rstim` if
 it exists, and otherwise falls back to
-`cargo run --offline --quiet -p rstim --bin rstim --`, so the documented smoke
+`cargo run --offline --quiet -p rstim --features cli --bin rstim --`, so the documented smoke
 command works in a normal checkout without needing a separate prebuild step.
 
 Run the verifier negative control:

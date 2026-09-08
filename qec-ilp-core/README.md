@@ -9,10 +9,22 @@ The first crates.io release is being prepared and is **not published yet**.
 Use a reviewed RustQEC checkout with a path dependency until publication. The
 planned registry dependency is `qec-ilp-core = "0.1.0"`.
 
-This package compiles the HiGHS native solver by default, even though its Cargo
-default feature list is empty. C/C++ build tools, CMake, and Clang/libclang are
-required. The `gurobi` feature additionally requires a working Gurobi installation
-and its runtime/license configuration. It is not enabled by the normal release.
+The default feature set contains only backend-neutral model types and validation;
+it does not compile or link a native solver. Enable a backend explicitly:
+
+```toml
+qec-ilp-core = { version = "0.1.0", features = ["highs"] }
+```
+
+- `highs` enables the open-source HiGHS adapter and its native `highs` and
+  `highs-sys` dependencies. C/C++ build tools, CMake, and Clang/libclang are
+  required.
+- `gurobi` enables only the Gurobi adapter and requires a working Gurobi
+  installation plus its runtime/license configuration.
+
+Code that previously relied on HiGHS being linked implicitly must add the
+`highs` feature. Requesting `Auto`, `Highs`, or `Gurobi` without a usable enabled
+backend returns `BinaryIlpError::BackendUnavailable`.
 
 Rust 1.88 is the minimum compiler; Ubuntu 24.04 x86_64 and macOS 15 Apple silicon
 are the tested native environments. The package's public API is pre-1.0.

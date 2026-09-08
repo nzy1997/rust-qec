@@ -8,7 +8,7 @@ gate.
 Run the full local pipeline with:
 
 ```sh
-cargo run -p rstim --bin rstim -- perf ci --out-dir /tmp/rstim-perf-artifacts
+cargo run -p rstim --features cli --bin rstim -- perf ci --out-dir /tmp/rstim-perf-artifacts
 ```
 
 This writes:
@@ -20,16 +20,16 @@ This writes:
 If the Stim binary is not on `PATH`, set `RSTIM_TEST_STIM`:
 
 ```sh
-RSTIM_TEST_STIM=/absolute/path/to/stim cargo run -p rstim --bin rstim -- perf ci --out-dir /tmp/rstim-perf-artifacts
+RSTIM_TEST_STIM=/absolute/path/to/stim cargo run -p rstim --features cli --bin rstim -- perf ci --out-dir /tmp/rstim-perf-artifacts
 ```
 
 ## Individual Steps
 
 ```sh
-cargo run -p rstim --bin rstim -- perf run --out /tmp/raw.jsonl
-cargo run -p rstim --bin rstim -- perf summarize --in /tmp/raw.jsonl --out /tmp/summary.json
-cargo run -p rstim --bin rstim -- perf gate --in /tmp/summary.json
-cargo run -p rstim --bin rstim -- perf report --in /tmp/summary.json --out /tmp/report.md
+cargo run -p rstim --features cli --bin rstim -- perf run --out /tmp/raw.jsonl
+cargo run -p rstim --features cli --bin rstim -- perf summarize --in /tmp/raw.jsonl --out /tmp/summary.json
+cargo run -p rstim --features cli --bin rstim -- perf gate --in /tmp/summary.json
+cargo run -p rstim --features cli --bin rstim -- perf report --in /tmp/summary.json --out /tmp/report.md
 ```
 
 The gate uses same-run median timing and currently enforces:
