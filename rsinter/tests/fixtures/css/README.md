@@ -10,7 +10,7 @@ cargo run -p qec-code --features cli -- code css apm_kasai:p=96 hz > rsinter/tes
 The native BP/BP-OSD baseline for these fixtures is checked by
 `rsinter/tests/apm_p96_rbposd_smoke.rs`. Future relay-BP and MIP fallback
 reproduction is tracked in
-[`docs/apm_decoder_hierarchy.md`](../../../../docs/apm_decoder_hierarchy.md).
+[`docs/apm_decoder_hierarchy.md`](https://github.com/nzy1997/rust-qec/blob/master/docs/apm_decoder_hierarchy.md).
 
 Quantum Tanner `toric_d4` fixtures are generated from
 `qec-code/tests/fixtures/quantum_tanner/toric_d4.json`, which is the

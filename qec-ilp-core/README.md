@@ -5,13 +5,13 @@ distance checks and exact decoders. Most users should start with `qec-code` or
 `rustqec-cli`; this package is useful when integrating directly with their ILP
 models.
 
-Add the model-only library with `qec-ilp-core = "0.1.0"`.
+Add the model-only library with `qec-ilp-core = "0.3.0"`.
 
 The default feature set contains only backend-neutral model types and validation;
 it does not compile or link a native solver. Enable a backend explicitly:
 
 ```toml
-qec-ilp-core = { version = "0.1.0", features = ["highs"] }
+qec-ilp-core = { version = "0.3.0", features = ["highs"] }
 ```
 
 - `highs` enables the open-source HiGHS adapter and its native `highs` and

@@ -14,7 +14,7 @@ description = "Reference decoders for explicit atom-loss Pauli envelopes (exact 
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", features = ["highs"] }
+qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", features = ["highs"] }
 rmatching = { version = "0.3.0", path = "../rmatching" }
 rstim = { version = "0.3.0", path = "../rstim" }
 serde = { version = "1", features = ["derive"] }

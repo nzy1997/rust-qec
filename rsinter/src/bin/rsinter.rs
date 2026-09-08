@@ -38,7 +38,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Decode a frozen b8 detector file against a detector error model.
+    /// Decode a detector dataset (requires a decoder runner feature).
+    ///
+    /// Requires one of: rbposd-runner, rmatching-runner, ilp-runner.
     Replay {
         #[arg(long)]
         dem: PathBuf,
@@ -60,10 +62,14 @@ enum Commands {
         )]
         shots: Option<usize>,
     },
+    /// Run or plot benchmarks (runner features; plots require plotting).
+    ///
+    /// Decoder runs require their matching runner feature; plots require plotting.
     Bench {
         #[command(subcommand)]
         command: BenchCommands,
     },
+    /// Run the built-in bivariate-bicycle memory experiment (requires rbposd-runner).
     BbCircuitBposdMemory {
         #[arg(long, default_value = "bb144")]
         code_id: String,
@@ -90,6 +96,7 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum BenchCommands {
+    /// Run a benchmark spec (decoder implementations require matching runner features).
     Run {
         #[arg(long)]
         spec: String,
@@ -111,6 +118,7 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
+    /// Plot benchmark JSONL results (requires plotting).
     Plot {
         #[arg(long)]
         spec: String,
@@ -119,6 +127,7 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
+    /// Plot legacy surface-comparison CSV input (requires plotting).
     PlotSurfaceCompareCsv {
         #[arg(long)]
         spec: String,
@@ -127,6 +136,7 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
+    /// Plot legacy BB-comparison CSV input (requires plotting).
     PlotBbCompareCsv {
         #[arg(long)]
         spec: String,

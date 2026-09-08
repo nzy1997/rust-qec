@@ -1,28 +1,49 @@
+/// Errors returned while constructing or running a decoder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodeError {
+    /// The parity-check matrix has no rows or no columns.
     EmptyMatrix,
+    /// A channel probability is non-finite or outside the open interval `(0, 1)`.
     InvalidProbability,
+    /// A sparse row contains a bit index outside the matrix.
     InvalidColumnIndex {
+        /// Invalid bit index.
         column: usize,
+        /// Matrix bit count.
         num_bits: usize,
     },
+    /// A sparse column contains a check index outside the matrix.
     InvalidRowIndex {
+        /// Invalid check index.
         row: usize,
+        /// Matrix check count.
         num_checks: usize,
     },
+    /// An input vector or sparse representation has the wrong length.
     DimensionMismatch {
+        /// Name of the invalid input.
         what: &'static str,
+        /// Required length.
         expected: usize,
+        /// Supplied length.
         actual: usize,
     },
+    /// A reduced GF(2) system cannot satisfy the target syndrome.
     SingularSystem,
+    /// Belief propagation failed to converge where convergence was required.
     BpDidNotConverge,
+    /// Ordered-statistics post-processing found no solution.
     NoOsdSolution,
+    /// Localized-statistics post-processing found no solution.
     NoLsdSolution,
+    /// A string did not name a supported OSD planner.
     UnsupportedOsdMethod {
+        /// Unsupported method name.
         method: String,
     },
+    /// The requested LSD order is not implemented.
     UnsupportedLsdOrder {
+        /// Unsupported order.
         order: usize,
     },
 }

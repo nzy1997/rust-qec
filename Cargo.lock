@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "qec-code"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "clap",
  "qec-ilp-core",
@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "qec-ilp-core"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "gurobi",
  "highs",
@@ -1193,7 +1193,7 @@ dependencies = [
 
 [[package]]
 name = "rilpqec"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "qec-ilp-core",
  "rstim",
@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "rustqec-cli"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "clap",
  "qec-ilp-core",

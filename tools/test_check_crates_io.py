@@ -55,7 +55,7 @@ class PublicationContractTest(unittest.TestCase):
         self.assertTrue(any("simulator dependency" in error for error in metadata_errors(packages, self.policy)))
 
     def test_native_solver_and_cli_dependencies_are_rejected_in_minimal_libraries(self):
-        for name, extra in [("rstim", "qec-code"), ("qec-code", "clap"), ("qec-ilp-core", "highs-sys"), ("rmatching", "rstim")]:
+        for name, extra in [("rstim", "qec-code"), ("qec-code", "clap"), ("qec-ilp-core", "highs-sys"), ("rmatching", "rstim"), ("rbposd", "rstim"), ("rsinter", "rilpqec"), ("rsinter", "plotters")]:
             with self.subTest(name=name):
                 self.assertEqual(dependency_errors(name, f"{name} v0.1.0\n"), [])
                 self.assertTrue(dependency_errors(name, f"{name} v0.1.0\n{extra} v1.0.0\n"))

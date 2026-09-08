@@ -1,0 +1,50 @@
+name = "surface_decoder_runner_modes"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd_lsd_order1"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 8
+max_errors = 8
+batch_size = 8
+lsd_method = "localized_statistics"
+lsd_order = 1
+
+[[runner]]
+name = "rbposd_product_sum_serial"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+distance = [3]
+rounds = [3]
+p = [0.002]
+max_shots = 8
+max_errors = 8
+batch_size = 8
+bp_method = "product_sum"
+schedule = "serial"
+
+[plot]
+title = "Runner modes"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["runner"]
+label_template = "{runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate"

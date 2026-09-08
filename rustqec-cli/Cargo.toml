@@ -1,6 +1,6 @@
 [package]
 name = "rustqec-cli"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
@@ -29,7 +29,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", optional = true }
+qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
 rmatching = { version = "0.3.0", path = "../rmatching" }
 rstim = { version = "0.3.0", path = "../rstim", features = ["codegen-css"] }
 serde = { version = "1", features = ["derive"] }
