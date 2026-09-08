@@ -13,17 +13,21 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]
+default = []
 benchmark-telemetry = []
-benchmark-tools = []
+benchmark-tools = ["dep:clap"]
+cli = ["dep:clap"]
+codegen-css = ["dep:qec-code"]
+shot-viewer = []
 
 [dependencies]
 rand = "0.8"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 libc = "0.2"
-qec-code = { version = "0.1.0", path = "../qec-code" }
+qec-code = { version = "0.1.0", path = "../qec-code", optional = true }
 zstd = "0.13"
 toml = "0.8"
 
@@ -34,6 +38,7 @@ tempfile = "3"
 [[bin]]
 name = "rstim"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "rstim_compiled_steady_worker"
@@ -52,3 +57,112 @@ required-features = ["benchmark-tools"]
 [[test]]
 name = "rstim_reference_build_worker"
 required-features = ["benchmark-tools"]
+
+[[test]]
+name = "cli_analyze"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_coverage"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_feature_boundaries"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_decoder_dataset"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_detect"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_export_json"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_gen"
+required-features = ["cli", "codegen-css"]
+
+[[test]]
+name = "cli_integration"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_perf"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_render_svg"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_rsmp_b8"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_rsmp_publication"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_sample"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_sample_dem"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_shot_viewer"
+required-features = ["cli", "shot-viewer"]
+
+[[test]]
+name = "cli_stats"
+required-features = ["cli"]
+
+[[test]]
+name = "cli_trace_export"
+required-features = ["cli"]
+
+[[test]]
+name = "convert"
+required-features = ["cli"]
+
+[[test]]
+name = "decoder_dataset_logical_input_metadata"
+required-features = ["cli"]
+
+[[test]]
+name = "decoder_dataset_trace"
+required-features = ["cli"]
+
+[[test]]
+name = "explain_errors"
+required-features = ["cli"]
+
+[[test]]
+name = "m2d"
+required-features = ["cli"]
+
+[[test]]
+name = "rsmp_limits_and_errors"
+required-features = ["cli"]
+
+[[test]]
+name = "rsmp_result_format_interop"
+required-features = ["cli"]
+
+[[test]]
+name = "site_gallery"
+required-features = ["cli"]
+
+[[test]]
+name = "stim_parity_showcase"
+required-features = ["cli"]
+
+
+[[test]]
+name = "css_codegen"
+required-features = ["codegen-css"]

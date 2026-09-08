@@ -338,7 +338,7 @@ fn stats_num_qubits_pauli_targets() {
 #[test]
 fn cli_run_gen_direct() {
     let mut buf = Vec::new();
-    rstim::cli::run_gen("repetition_code", "memory", 3, 2, 0.001, &mut buf).unwrap();
+    rstim::operations::run_gen("repetition_code", "memory", 3, 2, 0.001, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.contains("R "));
     assert!(s.contains("CX "));
@@ -350,7 +350,7 @@ fn cli_run_gen_direct() {
 #[test]
 fn cli_run_gen_noiseless() {
     let mut buf = Vec::new();
-    rstim::cli::run_gen("repetition_code", "memory", 3, 1, 0.0, &mut buf).unwrap();
+    rstim::operations::run_gen("repetition_code", "memory", 3, 1, 0.0, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(!s.contains("DEPOLARIZE"));
 }
@@ -358,12 +358,13 @@ fn cli_run_gen_noiseless() {
 #[test]
 fn cli_run_gen_unknown_code() {
     let mut buf = Vec::new();
-    let result = rstim::cli::run_gen("surface_code", "memory", 3, 1, 0.0, &mut buf);
+    let result = rstim::operations::run_gen("surface_code", "memory", 3, 1, 0.0, &mut buf);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("unknown code/task"));
 }
 
 #[test]
+#[cfg(feature = "cli")]
 fn cli_run_gen_via_dispatch() {
     use clap::Parser;
     let cli = rstim::cli::Cli::parse_from([

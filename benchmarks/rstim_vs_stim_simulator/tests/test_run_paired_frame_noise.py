@@ -427,6 +427,8 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
                 binary_path=root / "target/release/rstim",
             )
             revision.source_dir.mkdir()
+            (revision.source_dir / "rstim").mkdir()
+            (revision.source_dir / "rstim/Cargo.toml").write_text('[package]\nname="rstim"\nversion="0.2.1"\n')
             revision.binary_path.parent.mkdir(parents=True)
             revision.binary_path.write_text("", encoding="utf-8")
 
@@ -435,9 +437,14 @@ class RunPairedFrameNoiseTest(unittest.TestCase):
                 return_value=subprocess.CompletedProcess(["cargo"], 0),
             ) as run:
                 self.assertEqual(run_paired_frame_noise.build_revision(revision), revision.binary_path)
+                legacy_command = run.call_args.args[0]
+                with (revision.source_dir / "rstim/Cargo.toml").open("a") as manifest:
+                    manifest.write("[features]\ncli=[]\n")
+                self.assertEqual(run_paired_frame_noise.build_revision(revision), revision.binary_path)
+                self.assertEqual(run.call_args.args[0], legacy_command + ["--features", "cli"])
 
         self.assertEqual(
-            run.call_args.args[0],
+            legacy_command,
             ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"],
         )
 

@@ -10,6 +10,7 @@ import statistics
 import subprocess
 import sys
 import tarfile
+import tomllib
 import tempfile
 import time
 from dataclasses import dataclass
@@ -154,8 +155,10 @@ def materialize_revision(revision: str, *, repo_root: Path, temp_root: Path, lab
 def build_revision(revision: RevisionBuild) -> Path:
     env = dict(os.environ)
     env["CARGO_TARGET_DIR"] = str(revision.target_dir)
+    manifest = tomllib.loads((revision.source_dir / "rstim/Cargo.toml").read_text())
+    features = ["--features", "cli"] if "cli" in manifest.get("features", {}) else []
     subprocess.run(
-        ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim"],
+        ["cargo", "build", "--locked", "--release", "-p", "rstim", "--bin", "rstim", *features],
         cwd=revision.source_dir,
         env=env,
         check=True,

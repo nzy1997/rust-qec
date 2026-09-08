@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+#[cfg(feature = "cli")]
 use std::process::Command;
 
 use qec_code::QecError;
@@ -11,6 +12,7 @@ use qec_code::family_contract::{
     CssFamilySpec, RequestedFamilyId, construct_css, parse_css_construction_json,
     verify_css_orthogonality,
 };
+#[cfg(feature = "cli")]
 use tempfile::tempdir;
 
 fn workspace_root() -> PathBuf {
@@ -133,6 +135,7 @@ fn toric_3d_accepts_rectangular_periods() {
 }
 
 #[test]
+#[cfg(feature = "cli")]
 fn toric_3d_rectangular_periods_work_through_cli() {
     let dir = tempdir().unwrap();
     let spec_path = dir.path().join("toric-3d.json");

@@ -20,7 +20,7 @@
   {% include "partials/installed-example.html" %}
   <pre class="quick-command"><code>rstim detect --in circuit.stim --shots 1 --out_format dets</code></pre>
   <p><strong>Expected output:</strong> <code>shot D0 L0</code>.</p>
-  <details><summary>From a source checkout</summary><p>After <a href="../get-started/#source-build">building the workspace</a>, use the same input from the repository root:</p><pre data-language="Shell · repository root"><code>cargo run --locked -p rstim --bin rstim -- detect --in circuit.stim --shots 1 --out_format dets</code></pre></details>
+  <details><summary>From a source checkout</summary><p>After <a href="../get-started/#source-build">building the workspace</a>, use the same input from the repository root:</p><pre data-language="Shell · repository root"><code>cargo run --locked -p rstim --features cli --bin rstim -- detect --in circuit.stim --shots 1 --out_format dets</code></pre></details>
   <p class="section-copy">Use <code>stats</code> to inspect a circuit or replace <code>detect</code> with <code>sample</code> for raw measurement shots.</p>
   <div class="content-links"><a href="../sampling-data/">How to save shots for decoding and neural-network training</a></div>
 </section>

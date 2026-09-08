@@ -1,0 +1,25 @@
+[package]
+name = "rmatching-bench-tools"
+version = "0.0.0"
+edition = "2024"
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+rmatching = { path = "../../rmatching" }
+rstim = { path = "../../rstim" }
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "rmatching_bench"
+path = "src/bin/rmatching_bench.rs"
+
+[[bin]]
+name = "rmatching_microbench"
+path = "src/bin/rmatching_microbench.rs"

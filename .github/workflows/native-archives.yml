@@ -222,11 +222,15 @@ jobs:
           python3 source/tools/shot_viewer_assets.py
       - name: Build the two native CLIs from the locked source
         run: |
-          # Earlier immutable tags predate the optional ILP feature.
+          # Enable full CLI capabilities when present; immutable older tags have no such features.
           full_features=()
-          if python3 -c 'import tomllib; d=tomllib.load(open("source/rustqec-cli/Cargo.toml", "rb")); raise SystemExit(0 if "ilp" in d.get("features", {}) else 1)'; then
-            full_features=(--features rustqec-cli/ilp)
-          fi
+          for capability in rustqec-cli/ilp rstim/cli rstim/codegen-css rstim/shot-viewer; do
+            package="${capability%%/*}"
+            feature="${capability#*/}"
+            if python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1], "rb")); raise SystemExit(0 if sys.argv[2] in d.get("features", {}) else 1)' "source/$package/Cargo.toml" "$feature"; then
+              full_features+=(--features "$capability")
+            fi
+          done
           "$CARGO" build --locked --release \
             --manifest-path source/Cargo.toml \
             -p rustqec-cli --bin rustqec \

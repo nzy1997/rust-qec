@@ -12,28 +12,9 @@ publish = ["crates-io"]
 include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 description = "Rust minimum-weight perfect-matching decoder for detector-error-model workflows"
 
-[features]
-bench = ["dep:rstim", "dep:rand", "dep:serde", "dep:serde_json"]
-
-[dependencies]
-rstim = { version = "0.2.1", path = "../rstim", optional = true }
-rand = { version = "0.8", optional = true }
-serde = { version = "1", features = ["derive"], optional = true }
-serde_json = { version = "1", optional = true }
-
 [dev-dependencies]
 rstim = { version = "0.2.1", path = "../rstim" }
 
 [[bin]]
 name = "rmatching_cli"
 path = "src/bin/rmatching_cli.rs"
-
-[[bin]]
-name = "rmatching_bench"
-path = "src/bin/rmatching_bench.rs"
-required-features = ["bench"]
-
-[[bin]]
-name = "rmatching_microbench"
-path = "src/bin/rmatching_microbench.rs"
-required-features = ["bench"]

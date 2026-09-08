@@ -3,8 +3,8 @@
 APM P=96 fixtures are generated from the qec-code built-in CSS export:
 
 ```sh
-cargo run -p qec-code -- code css apm_kasai:p=96 hx > rsinter/tests/fixtures/css/apm_p96_hx.json
-cargo run -p qec-code -- code css apm_kasai:p=96 hz > rsinter/tests/fixtures/css/apm_p96_hz.json
+cargo run -p qec-code --features cli -- code css apm_kasai:p=96 hx > rsinter/tests/fixtures/css/apm_p96_hx.json
+cargo run -p qec-code --features cli -- code css apm_kasai:p=96 hz > rsinter/tests/fixtures/css/apm_p96_hz.json
 ```
 
 The native BP/BP-OSD baseline for these fixtures is checked by
@@ -18,8 +18,8 @@ qLDPC-derived known-answer fixture used by the `qec-code` quantum Tanner
 constructor tests:
 
 ```sh
-cargo run -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx > rsinter/tests/fixtures/css/quantum_tanner_toric_d4_hx.json
-cargo run -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz > rsinter/tests/fixtures/css/quantum_tanner_toric_d4_hz.json
+cargo run -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx > rsinter/tests/fixtures/css/quantum_tanner_toric_d4_hx.json
+cargo run -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz > rsinter/tests/fixtures/css/quantum_tanner_toric_d4_hz.json
 ```
 
 Reference chain:

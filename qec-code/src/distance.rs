@@ -1,7 +1,7 @@
 use crate::Pauli;
 use crate::binary::try_in_row_span;
 use crate::code::StabilizerCode;
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 use crate::distance_exact::ExactCssDistanceSolverStatus;
 use crate::distance_exact::{
     ExactCssDistanceBackend, ExactCssDistanceSolverOptions, ExactCssDistanceSolverReport,
@@ -45,18 +45,18 @@ pub fn compute_distance_with_solver_options(
         return Err(QecError::DistanceWitnessNotFound);
     }
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     {
         compute_distance_via_ilp(code, solver)
     }
 
-    #[cfg(not(feature = "distance-ilp-highs"))]
+    #[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
     {
         compute_distance_without_ilp(code, solver)
     }
 }
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 fn compute_distance_via_ilp(
     code: &StabilizerCode,
     solver: ExactCssDistanceSolverOptions,
@@ -97,7 +97,7 @@ fn compute_distance_via_ilp(
     })
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn compute_distance_without_ilp(
     code: &StabilizerCode,
     solver: ExactCssDistanceSolverOptions,
@@ -117,7 +117,7 @@ fn compute_distance_without_ilp(
     })
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn compute_distance_via_exhaustive_search(code: &StabilizerCode) -> Result<DistanceResult> {
     validate_exhaustive_search_width(code.n())?;
     for weight in 1..=code.n() {
@@ -132,7 +132,7 @@ fn compute_distance_via_exhaustive_search(code: &StabilizerCode) -> Result<Dista
     Err(QecError::DistanceWitnessNotFound)
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn validate_exhaustive_search_width(n: usize) -> Result<()> {
     let symplectic_bits = n
         .checked_mul(2)
@@ -149,7 +149,7 @@ fn validate_exhaustive_search_width(n: usize) -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn find_normalizer_witness_of_weight(
     code: &StabilizerCode,
     weight: usize,
@@ -159,7 +159,7 @@ fn find_normalizer_witness_of_weight(
     search_supports(code, &stabilizer_rows, weight, 0, &mut support)
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn search_supports(
     code: &StabilizerCode,
     stabilizer_rows: &[Vec<u8>],
@@ -187,7 +187,7 @@ fn search_supports(
     Ok(None)
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn search_pauli_assignments(
     code: &StabilizerCode,
     stabilizer_rows: &[Vec<u8>],
@@ -220,7 +220,7 @@ fn search_pauli_assignments(
     Ok(None)
 }
 
-#[cfg(not(feature = "distance-ilp-highs"))]
+#[cfg(not(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi")))]
 fn is_nontrivial_normalizer_witness(
     code: &StabilizerCode,
     stabilizer_rows: &[Vec<u8>],
@@ -245,7 +245,7 @@ fn classify_logical(pauli: &Pauli) -> LogicalClass {
     }
 }
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 fn backend_kind_to_ilp(kind: ExactCssDistanceBackend) -> qec_ilp_core::BackendKind {
     match kind {
         ExactCssDistanceBackend::Auto => qec_ilp_core::BackendKind::Auto,
@@ -254,7 +254,7 @@ fn backend_kind_to_ilp(kind: ExactCssDistanceBackend) -> qec_ilp_core::BackendKi
     }
 }
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 fn backend_kind_from_ilp(kind: qec_ilp_core::BackendKind) -> ExactCssDistanceBackend {
     match kind {
         qec_ilp_core::BackendKind::Auto => ExactCssDistanceBackend::Auto,
@@ -263,7 +263,7 @@ fn backend_kind_from_ilp(kind: qec_ilp_core::BackendKind) -> ExactCssDistanceBac
     }
 }
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 fn solver_status_from_ilp(
     status: qec_ilp_core::model::ModelSolutionStatus,
 ) -> Result<ExactCssDistanceSolverStatus> {
@@ -284,7 +284,7 @@ fn solver_status_from_ilp(
     })
 }
 
-#[cfg(feature = "distance-ilp-highs")]
+#[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
 fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Result<()> {
     if !code
         .stabilizers()
@@ -313,10 +313,10 @@ fn post_validate_distance_witness(code: &StabilizerCode, witness: &Pauli) -> Res
 mod tests {
     use super::{LogicalClass, classify_logical};
     use crate::Pauli;
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     use crate::{QecError, StabilizerCode};
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     fn single_qubit_z_stabilizer_code() -> StabilizerCode {
         StabilizerCode::from_stabilizers(1, vec![Pauli::from_xz_bits(vec![0], vec![1]).unwrap()])
             .unwrap()
@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(classify_logical(&mixed), LogicalClass::Mixed);
     }
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     #[test]
     fn post_validate_distance_witness_rejects_non_commuting_witnesses() {
         let code = single_qubit_z_stabilizer_code();
@@ -347,7 +347,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     #[test]
     fn post_validate_distance_witness_rejects_stabilizer_span_elements() {
         let code = single_qubit_z_stabilizer_code();
@@ -361,7 +361,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     #[test]
     fn post_validate_distance_witness_rejects_zero_weight_witnesses() {
         let code = StabilizerCode::from_stabilizers(1, vec![]).unwrap();
@@ -373,7 +373,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "distance-ilp-highs")]
+    #[cfg(any(feature = "distance-ilp-highs", feature = "distance-ilp-gurobi"))]
     #[test]
     fn infeasible_solver_status_is_rejected_before_reading_solution_values() {
         assert_eq!(

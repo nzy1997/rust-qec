@@ -36,11 +36,11 @@ DETECTOR rec[-1]
 OBSERVABLE_INCLUDE(0) rec[-1]
 STIM
 
-cargo run -q -p rstim -- stats --in "$workdir/pipeline.stim"
-cargo run -q -p rstim -- detect --shots 1 --out_format dets --in "$workdir/pipeline.stim"
-cargo run -q -p rstim -- analyze_errors --in "$workdir/pipeline.stim" --out "$workdir/pipeline.dem"
+cargo run -q -p rstim --features cli -- stats --in "$workdir/pipeline.stim"
+cargo run -q -p rstim --features cli -- detect --shots 1 --out_format dets --in "$workdir/pipeline.stim"
+cargo run -q -p rstim --features cli -- analyze_errors --in "$workdir/pipeline.stim" --out "$workdir/pipeline.dem"
 cat "$workdir/pipeline.dem"
-cargo run -q -p rstim -- sample_dem --shots 1 --out_format dets --in "$workdir/pipeline.dem"
+cargo run -q -p rstim --features cli -- sample_dem --shots 1 --out_format dets --in "$workdir/pipeline.dem"
 ```
 
 The documented failure case uses an invalid repeat count:
@@ -60,7 +60,7 @@ REPEAT two {
 }
 STIM
 
-cargo run -q -p rstim -- stats --in "$workdir/bad-repeat.stim"
+cargo run -q -p rstim --features cli -- stats --in "$workdir/bad-repeat.stim"
 ```
 
 ## Expected Result

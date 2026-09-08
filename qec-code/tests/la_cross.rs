@@ -1,8 +1,10 @@
+#![cfg(feature = "cli")]
+
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use qec_code::binary::try_in_row_span;
 use qec_code::QecError;
+use qec_code::binary::try_in_row_span;
 use qec_code::cli::{Cli, run};
 #[cfg(feature = "distance-ilp-highs")]
 use qec_code::css::{CssCode, SparseRowsMatrix};

@@ -200,6 +200,7 @@ fn explain_errors_empty_dem() {
 
 // --- cli.rs: run_explain_errors with dem_text (line 501) ---
 #[test]
+#[cfg(feature = "cli")]
 fn explain_errors_cli_with_dem_text() {
     use rstim::cli::run_explain_errors;
     let dem_text = "error(0.1) D0\n";
@@ -212,6 +213,7 @@ fn explain_errors_cli_with_dem_text() {
 
 // --- cli.rs: run_convert with circuit instead of bits (lines 421-422) ---
 #[test]
+#[cfg(feature = "cli")]
 fn convert_with_circuit_for_bits() {
     use rstim::cli::run_convert;
     let circuit = "M 0 1";
@@ -223,6 +225,7 @@ fn convert_with_circuit_for_bits() {
 
 // --- cli.rs: run_m2d with ptb64 input (lines 468-469) ---
 #[test]
+#[cfg(feature = "cli")]
 fn m2d_ptb64_input() {
     use rstim::cli::run_m2d;
     use rstim::output::write_shots_ptb64;

@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use clap::Parser;
 use qec_code::QecError;
 use qec_code::cli::Cli;

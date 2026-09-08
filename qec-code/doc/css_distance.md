@@ -19,7 +19,7 @@ The built-in path accepts any registered built-in CSS code ID.
 
 <!-- css_distance:random_window_builtin -->
 ```bash
-cargo run -q -p qec-code -- code css-distance random-window-upper-bound --code-id steane --iterations 500 --restarts 4 --seed 7 --target-weight 3 --json
+cargo run -q -p qec-code --features cli -- code css-distance random-window-upper-bound --code-id steane --iterations 500 --restarts 4 --seed 7 --target-weight 3 --json
 ```
 
 The command should print one JSON object to stdout and nothing to stderr.
@@ -31,13 +31,13 @@ example uses committed sparse-row fixtures.
 
 <!-- css_distance:random_window_files -->
 ```bash
-cargo run -q -p qec-code -- code css-distance random-window-upper-bound --hx qec-code/tests/fixtures/css/steane_hx.json --hz qec-code/tests/fixtures/css/steane_hz.json --iterations 500 --restarts 4 --seed 7 --target-weight 3 --json
+cargo run -q -p qec-code --features cli -- code css-distance random-window-upper-bound --hx qec-code/tests/fixtures/css/steane_hx.json --hz qec-code/tests/fixtures/css/steane_hz.json --iterations 500 --restarts 4 --seed 7 --target-weight 3 --json
 ```
 
 Use the same shape with your own files:
 
 ```bash
-cargo run -q -p qec-code -- code css-distance random-window-upper-bound --hx path/to/hx.json --hz path/to/hz.json --iterations 5000 --restarts 8 --seed 7 --target-weight 5 --json
+cargo run -q -p qec-code --features cli -- code css-distance random-window-upper-bound --hx path/to/hx.json --hz path/to/hz.json --iterations 5000 --restarts 8 --seed 7 --target-weight 5 --json
 ```
 
 ## JSON Result Fields

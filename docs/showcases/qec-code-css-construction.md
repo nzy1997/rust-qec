@@ -23,17 +23,17 @@ repository today.
 Run these commands from the repository root:
 
 ```sh
-cargo run -q -p qec-code -- code css list
-cargo run -q -p qec-code -- code css export steane hx
-cargo run -q -p qec-code -- code css export steane hz
-cargo run -q -p qec-code -- code css export bb72 hx
-cargo run -q -p qec-code -- code css export bb72 hz
-cargo run -q -p qec-code -- code css export apm_kasai:p=96 hx > /tmp/apm_p96_hx.json
-cargo run -q -p qec-code -- code css export apm_kasai:p=96 hz > /tmp/apm_p96_hz.json
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
-cargo run -q -p qec-code -- code css verify-families
-cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
-cargo run -q -p qec-code -- code css-distance exact --code-id steane --json
+cargo run -q -p qec-code --features cli -- code css list
+cargo run -q -p qec-code --features cli -- code css export steane hx
+cargo run -q -p qec-code --features cli -- code css export steane hz
+cargo run -q -p qec-code --features cli -- code css export bb72 hx
+cargo run -q -p qec-code --features cli -- code css export bb72 hz
+cargo run -q -p qec-code --features cli -- code css export apm_kasai:p=96 hx > /tmp/apm_p96_hx.json
+cargo run -q -p qec-code --features cli -- code css export apm_kasai:p=96 hz > /tmp/apm_p96_hz.json
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
+cargo run -q -p qec-code --features cli -- code css verify-families
+cargo run -q -p qec-code --features cli -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
+cargo run -q -p qec-code --features cli -- code css-distance exact --code-id steane --json
 ```
 
 ## Expected Result
@@ -62,15 +62,15 @@ catalog entry. Given an explicit spec such as
 ordinary `sparse_rows` `Hx` and `Hz` matrices with:
 
 ```sh
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
-cargo run -q -p qec-code -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hx
+cargo run -q -p qec-code --features cli -- code css quantum-tanner --spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json hz
 ```
 
 The committed `toric_d4` fixture has `num_cols` 16 and exact distance 4 through
 the direct spec path:
 
 ```sh
-cargo run -q -p qec-code -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
+cargo run -q -p qec-code --features cli -- code css-distance exact --quantum-tanner-spec qec-code/tests/fixtures/quantum_tanner/toric_d4.json --json
 ```
 
 Each export command prints a JSON object with `"format":"sparse_rows"`.
@@ -135,9 +135,9 @@ assert_eq!(result.stats.n, 9);
 Parameterized CLI usage stays on the existing export path:
 
 ```sh
-cargo run -q -p qec-code -- code css export surface_rotated:d=3 hx
-cargo run -q -p qec-code -- code css export color_666:d=5 hz
-cargo run -q -p qec-code -- code css export toric_3d:lx=3,ly=3,lz=3 hx
+cargo run -q -p qec-code --features cli -- code css export surface_rotated:d=3 hx
+cargo run -q -p qec-code --features cli -- code css export color_666:d=5 hz
+cargo run -q -p qec-code --features cli -- code css export toric_3d:lx=3,ly=3,lz=3 hx
 ```
 
 When adding a new supported fixture, update exactly one manifest entry with
