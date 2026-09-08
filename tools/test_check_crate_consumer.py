@@ -10,6 +10,27 @@ from tools import check_crate_consumer as checker
 
 
 class CrateConsumerCheckerTest(unittest.TestCase):
+    def test_replay_verifier_rejects_plausible_but_wrong_predictions_and_stats(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            predictions, stats = root / "predictions.b8", root / "stats.json"
+            correct = bytes([0, 1, 1, 0])
+            record = {"decoder": "rbposd", "num_shots": 4, "num_detectors": 1,
+                      "num_observables": 1, "prediction_bytes": 4,
+                      "predictions_sha256": hashlib.sha256(correct).hexdigest()}
+            predictions.write_bytes(correct)
+            stats.write_text(json.dumps(record))
+            checker.verify_replay_outputs(predictions, stats, "rbposd")
+            predictions.write_bytes(bytes([0, 0, 0, 0]))
+            with self.assertRaisesRegex(checker.ConsumerCheckError, "wrong observable predictions"):
+                checker.verify_replay_outputs(predictions, stats, "rbposd")
+            predictions.write_bytes(correct)
+            record["num_shots"] = 3
+            stats.write_text(json.dumps(record))
+            with self.assertRaisesRegex(checker.ConsumerCheckError, "num_shots differs"):
+                checker.verify_replay_outputs(predictions, stats, "rbposd")
+
     def test_workspace_snapshot_does_not_share_the_source_lockfile(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, mock.patch.object(
             checker,

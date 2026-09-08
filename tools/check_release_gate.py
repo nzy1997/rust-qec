@@ -62,6 +62,8 @@ class ReleasePolicy:
     prerelease_policy: str
     ci_workflow_path: str
     packages: tuple[PackageSpec, ...]
+    series_since: tuple[int, int, int] | None = None
+    series_packages: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -151,7 +153,29 @@ def load_release_policy(path: Path) -> ReleasePolicy:
         raise ValueError("release policy contains duplicate package names")
     if len({item.path for item in packages}) != len(packages):
         raise ValueError("release policy contains duplicate package paths")
-    return ReleasePolicy(tag_pattern, prerelease, workflow, tuple(packages))
+    series = value.get("series_policy")
+    since = None
+    series_names = frozenset()
+    if series is not None:
+        if not isinstance(series, dict):
+            raise ValueError("series_policy must be an object")
+        since = stable_version_tuple(series.get("since"))
+        names = series.get("packages")
+        if since is None or not isinstance(names, list) or not names:
+            raise ValueError("series_policy needs a stable since version and non-empty packages")
+        if any(not isinstance(name, str) for name in names) or len(set(names)) != len(names):
+            raise ValueError("series_policy packages must be unique names")
+        series_names = frozenset(names)
+        if not series_names <= {item.name for item in packages}:
+            raise ValueError("series_policy contains unclassified packages")
+    return ReleasePolicy(tag_pattern, prerelease, workflow, tuple(packages), since, series_names)
+
+
+def stable_version_tuple(value: object) -> tuple[int, int, int] | None:
+    if not isinstance(value, str) or not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value):
+        return None
+    major, minor, patch = value.split(".")
+    return int(major), int(minor), int(patch)
 
 
 def _actor_tuple(actor: object) -> tuple[str, int | None, str] | None:
@@ -605,7 +629,10 @@ def evaluate_snapshot(
         raise UnavailableError("exact-commit crate version metadata is unavailable")
     expected_paths = {item.path for item in policy.packages}
     actual_paths = {item for item in members if isinstance(item, str)}
-    required_paths = {item.path for item in policy.packages if item.synchronized}
+    release_tuple = stable_version_tuple(version)
+    series_active = policy.series_since is not None and release_tuple >= policy.series_since
+    required_paths = {item.path for item in policy.packages
+                      if (item.name in policy.series_packages if series_active else item.synchronized)}
     missing_required = required_paths - actual_paths
     if missing_required:
         errors.append(
@@ -629,13 +656,21 @@ def evaluate_snapshot(
         if actual_name != spec.name or not isinstance(actual_version, str):
             errors.append(f"{spec.path}/Cargo.toml does not declare expected package {spec.name}")
             continue
-        if spec.synchronized and actual_version != version:
+        if series_active and spec.name in policy.series_packages:
+            actual_tuple = stable_version_tuple(actual_version)
+            if actual_tuple is None or actual_tuple[:2] != release_tuple[:2] or actual_tuple > release_tuple:
+                errors.append(f"series crate {spec.name} is {actual_version}, expected {release_tuple[0]}.{release_tuple[1]}.0 through {version}")
+        elif not series_active and spec.synchronized and actual_version != version:
             errors.append(f"synchronized crate {spec.name} is {actual_version}, expected {version}")
         locked = lock_versions.get(spec.name)
         if not isinstance(locked, list) or actual_version not in locked:
             errors.append(f"Cargo.lock does not contain {spec.name} {actual_version}")
-        target = synchronized if spec.synchronized else independent
+        coordinated = spec.name in policy.series_packages if series_active else spec.synchronized
+        target = synchronized if coordinated else independent
         target.append((spec.name, actual_version))
+
+    if series_active and not any(actual == version for _, actual in synchronized):
+        errors.append(f"no series crate has the release version {version}")
 
     raw_rulesets = snapshot.get("rulesets")
     if not isinstance(raw_rulesets, list):
@@ -777,7 +812,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     for name, run_id in result.checks:
         print(f"CI {name} app={GITHUB_ACTIONS_APP_ID} run={run_id} commit={result.commit}")
-    print("synchronized crates: " + ", ".join(f"{name}={version}" for name, version in result.synchronized))
+    print("coordinated crates: " + ", ".join(f"{name}={version}" for name, version in result.synchronized))
     print("independent crates: " + ", ".join(f"{name}={version}" for name, version in result.independent))
     for source in result.protection_sources:
         timestamp = f" updated_at={source.updated_at}" if source.updated_at else ""

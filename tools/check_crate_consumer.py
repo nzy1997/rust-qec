@@ -32,7 +32,7 @@ def run(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
     )
     if result.returncode:
         rendered = " ".join(command)
-        detail = result.stderr.strip() or result.stdout.strip()
+        detail = "\n".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
         raise ConsumerCheckError(f"command failed ({rendered}): {detail}")
     return result
 
@@ -132,6 +132,11 @@ def extract_crate(archive: Path, destination: Path) -> None:
             if member_path.is_absolute() or ".." in member_path.parts:
                 raise ConsumerCheckError(f"unsafe archive member in {archive.name}: {member.name}")
         bundle.extractall(destination, filter="data")
+        # Tar members have stable old mtimes. Cargo may otherwise reuse tests from
+        # a previous temporary extraction, including its expired env! paths.
+        for member in bundle.getmembers():
+            if member.isfile():
+                (destination / member.name).touch()
 
 
 def validate_package_contents(unpacked: dict[str, Path], repo_root: Path) -> None:
@@ -339,6 +344,82 @@ def exercise_installed_cli(target_dir: Path, unpacked: dict[str, Path], work: Pa
          "--features", "ilp", "--target-dir", str(target_dir), "-j", "4"], cwd=work)
 
 
+def exercise_decoder_packages(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
+    # Run the shipped test/example targets with only archive contents available.
+    # Repository benchmark catalogs and .github workflows are intentionally absent.
+    for name in ("rbposd", "rilpqec", "rsinter"):
+        manifest = unpacked[name] / "Cargo.toml"
+        # rbposd has no workspace dependencies and needs no registry overrides.
+        if name != "rbposd":
+            append_patches(manifest, unpacked)
+        validate_resolved_sources(manifest, unpacked)
+        if name == "rbposd":
+            validate_minimal_graph(manifest, {"rstim", "clap", "highs", "highs-sys"})
+        elif name == "rsinter":
+            validate_minimal_graph(manifest, {"rbposd", "rmatching", "rilpqec", "highs", "highs-sys", "plotters"})
+        run(["cargo", "test", "--locked", "--all-targets", "--manifest-path", str(manifest),
+             "--target-dir", str(target_dir), "-j", "4"], cwd=work)
+        run(["cargo", "test", "--locked", "--doc", "--manifest-path", str(manifest),
+             "--target-dir", str(target_dir), "-j", "4"], cwd=work)
+    exercise_rsinter_install(target_dir, unpacked, work)
+
+
+def verify_replay_outputs(predictions: Path, stats_path: Path, decoder: str) -> None:
+    expected = bytes([0, 1, 1, 0])
+    if predictions.read_bytes() != expected:
+        raise ConsumerCheckError(f"installed {decoder} replay returned wrong observable predictions")
+    stats = json.loads(stats_path.read_text())
+    for key, value in {"decoder": decoder, "num_shots": 4, "num_detectors": 1,
+                       "num_observables": 1, "prediction_bytes": 4,
+                       "predictions_sha256": hashlib.sha256(expected).hexdigest()}.items():
+        if stats.get(key) != value:
+            raise ConsumerCheckError(f"installed replay stats {key} differs: {stats.get(key)!r}")
+
+
+def exercise_rsinter_install(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
+    package = unpacked["rsinter"]
+    install_root = work / "rsinter-install"
+    replay = work / "replay"
+    replay.mkdir()
+    (replay / "model.dem").write_text("error(0.1) D0 L0\n")
+    (replay / "dets.b8").write_bytes(bytes([0, 1, 1, 0]))
+    install = ["cargo", "install", "--locked", "--path", str(package), "--root", str(install_root),
+               "--target-dir", str(target_dir), "-j", "4"]
+    run(install, cwd=work)
+    binary = install_root / "bin/rsinter"
+    bins = sorted(path.name for path in binary.parent.iterdir() if path.is_file())
+    if bins != ["rsinter"]:
+        raise ConsumerCheckError(f"rsinter installation exposes unexpected binaries: {bins}")
+    command = [str(binary), "replay", "--dem", "model.dem", "--dets", "dets.b8",
+               "--predictions-out", "predictions.b8", "--stats-out", "stats.json", "--decoder"]
+    disabled = subprocess.run([*command, "rbposd"], cwd=replay, text=True, capture_output=True)
+    if disabled.returncode == 0 or "requires Cargo feature 'rbposd-runner'" not in disabled.stderr:
+        raise ConsumerCheckError("default rsinter install did not explain its disabled decoder")
+    features = "rbposd-runner,rmatching-runner,ilp-runner,plotting"
+    validate_resolved_sources(package / "Cargo.toml", unpacked, features=features)
+    run([*install, "--force", "--features", features], cwd=work)
+    run(["cargo", "test", "--locked", "--manifest-path", str(package / "Cargo.toml"),
+         "--features", features, "--test", "bench_specs", "--test", "bench_cli",
+         "--test", "bench_spec", "--test", "bench_plot",
+         "--target-dir", str(target_dir), "-j", "4"], cwd=work)
+    for decoder in ("rbposd", "rmatching", "rilpqec"):
+        run([*command, decoder], cwd=replay)
+        verify_replay_outputs(replay / "predictions.b8", replay / "stats.json", decoder)
+    # A non-integral shot buffer must fail and preserve previous successful output.
+    (replay / "model.dem").write_text("error(0.1) D8 L0\n")
+    (replay / "dets.b8").write_bytes(bytes([0]))
+    malformed = subprocess.run([*command, "rbposd"], cwd=replay, text=True, capture_output=True)
+    if malformed.returncode == 0 or "not divisible by row width 2" not in malformed.stderr:
+        raise ConsumerCheckError("installed replay accepted a partial detector row")
+    verify_replay_outputs(replay / "predictions.b8", replay / "stats.json", "rilpqec")
+    run(["cargo", "run", "--locked", "--manifest-path", str(package / "Cargo.toml"),
+         "--example", "surface_code_threshold", "--features", "plotting",
+         "--target-dir", str(target_dir), "-j", "4"], cwd=replay)
+    svg = replay / "surface_code_threshold.svg"
+    if not svg.is_file() or "<svg" not in svg.read_text():
+        raise ConsumerCheckError("packaged plotting example did not create its local SVG")
+
+
 def check(repo_root: Path, target_dir: Path, policy: Path) -> None:
     order = load_package_order(policy)
     with tempfile.TemporaryDirectory(prefix="crate-consumer-") as temporary:
@@ -357,6 +438,7 @@ def check(repo_root: Path, target_dir: Path, policy: Path) -> None:
         exercise_model_consumer(target_dir, unpacked, work)
         exercise_installed_cli(target_dir, unpacked, work)
         exercise_compatibility_cli(target_dir, unpacked, work)
+        exercise_decoder_packages(target_dir, unpacked, work)
 
 
 def main(argv: list[str] | None = None) -> int:

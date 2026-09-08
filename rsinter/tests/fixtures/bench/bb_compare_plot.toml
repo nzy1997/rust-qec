@@ -1,0 +1,39 @@
+name = "bb_circuit_bposd_compare"
+version = 1
+mode = "independent"
+
+[[runner]]
+name = "rbposd"
+language = "rust"
+impl_key = "rbposd"
+
+[runner.params]
+code_id = ["bb72", "bb144"]
+
+[plot]
+title = "BB Circuit rbposd comparison"
+confidence_interval_likelihood_factor = 9.0
+logical_rate_unit = "per_round"
+
+[plot.fit]
+enabled = false
+kind = "log_log"
+
+[plot.x]
+field = "params.p"
+scale = "log"
+label = "Physical Error Rate"
+
+[plot.series]
+group_by = ["params.code_id", "runner"]
+label_template = "{params.code_id} {runner}"
+
+[[plot.panel]]
+metric = "metrics.logical_error_rate"
+scale = "log"
+label = "Logical Error Rate per Syndrome Cycle"
+
+[[plot.panel]]
+metric = "metrics.run_seconds_per_shot"
+scale = "log"
+label = "Run Time Per Shot"

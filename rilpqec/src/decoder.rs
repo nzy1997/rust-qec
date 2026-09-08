@@ -30,6 +30,10 @@ impl IlpDemDecoder {
         })
     }
 
+    /// Decode shot-major, LSB-first detector bytes into equally packed observable predictions.
+    /// Widths must match the DEM. Each shot occupies `ceil(width / 8)` bytes;
+    /// unused high bits of the final detector byte are ignored.
+    /// Returns an error for invalid dimensions, buffer sizes, or infeasible syndromes.
     pub fn decode_batch_bit_packed(
         &self,
         dets: &[u8],
@@ -63,6 +67,10 @@ impl IlpDemDecoder {
 }
 
 impl CompiledIlpDemDecoder {
+    /// Decode shot-major, LSB-first detector bytes into equally packed observable predictions.
+    /// Widths must match the DEM. Each shot occupies `ceil(width / 8)` bytes;
+    /// unused high bits of the final detector byte are ignored.
+    /// Returns an error for invalid dimensions, buffer sizes, or infeasible syndromes.
     pub fn decode_batch_bit_packed(
         &mut self,
         dets: &[u8],
@@ -70,12 +78,24 @@ impl CompiledIlpDemDecoder {
         num_dets: usize,
         num_obs: usize,
     ) -> Result<Vec<u8>, IlpDecodeError> {
-        validate_input(&self.problem, dets, num_shots, num_dets, num_obs)?;
+        let output_len = validate_input(&self.problem, dets, num_shots, num_dets, num_obs)?;
         let det_bytes = num_dets.div_ceil(8);
         let obs_bytes = num_obs.div_ceil(8);
-        let mut out = vec![0u8; num_shots * obs_bytes];
+        let mut out = Vec::new();
+        out.try_reserve_exact(output_len)
+            .map_err(|_| IlpDecodeError::OutputAllocationFailed { bytes: output_len })?;
+        out.resize(output_len, 0u8);
+        if num_dets == 0 && num_obs == 0 {
+            return Ok(out);
+        }
         if self.problem.columns.is_empty() {
             for shot in 0..num_shots {
+                for (det, &forced) in self.problem.forced_syndrome.iter().enumerate() {
+                    let bit = ((dets[shot * det_bytes + det / 8] >> (det % 8)) & 1) != 0;
+                    if bit != forced {
+                        return Err(IlpDecodeError::InfeasibleSyndrome { shot });
+                    }
+                }
                 for obs in 0..num_obs {
                     if self.problem.baseline_observables[obs] {
                         out[shot * obs_bytes + (obs / 8)] |= 1 << (obs % 8);
@@ -124,7 +144,7 @@ fn validate_input(
     num_shots: usize,
     num_dets: usize,
     num_obs: usize,
-) -> Result<(), IlpDecodeError> {
+) -> Result<usize, IlpDecodeError> {
     if num_dets != problem.num_detectors {
         return Err(IlpDecodeError::DetectorWidthMismatch {
             expected: problem.num_detectors,
@@ -137,12 +157,24 @@ fn validate_input(
             actual: num_obs,
         });
     }
-    let expected_det_len = num_shots * num_dets.div_ceil(8);
+    let expected_det_len = packed_len(num_shots, num_dets, "detectors")?;
+    let output_len = packed_len(num_shots, num_obs, "observables")?;
     if dets.len() != expected_det_len {
         return Err(IlpDecodeError::PackedDetectionsLengthMismatch {
             expected: expected_det_len,
             actual: dets.len(),
         });
     }
-    Ok(())
+    Ok(output_len)
+}
+
+fn packed_len(shots: usize, bits: usize, buffer: &'static str) -> Result<usize, IlpDecodeError> {
+    shots
+        .checked_mul(bits.div_ceil(8))
+        .filter(|&bytes| bytes <= isize::MAX as usize)
+        .ok_or(IlpDecodeError::PackedBufferSizeOverflow {
+            buffer,
+            shots,
+            bits,
+        })
 }

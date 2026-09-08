@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [rstim, qec-code, qec-ilp-core, rmatching]
+        package: [rstim, qec-code, qec-ilp-core, rmatching, rbposd, rsinter, rilpqec]
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust toolchain
@@ -36,6 +36,9 @@ jobs:
       - name: Install reference simulator for cross-validation tests
         if: matrix.package == 'rstim'
         run: python3 -m pip install stim
+      - name: Install native solver build prerequisites
+        if: matrix.package == 'rilpqec'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake clang libclang-dev
       - name: Test each library without workspace feature unification
         run: cargo test --locked -p ${{ matrix.package }} --no-default-features
   package-consumer:
@@ -48,13 +51,15 @@ jobs:
       - name: Install prerequisites for the opt-in packaged solver check
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake clang libclang-dev
+          sudo apt-get install -y build-essential cmake clang libclang-dev libfontconfig1-dev
       - uses: Swatinem/rust-cache@v2
       - name: Check publication contracts
         run: |
           python3 -m unittest tools.test_check_crates_io tools.test_check_rmatching_readme tools.test_check_installed_quickstart tools.test_check_crate_consumer
           python3 tools/check_crates_io.py
-      - name: Exercise unpacked minimal libraries and both installed CLIs
+          python3 tools/check_rbposd_repo.py
+          python3 tools/check_rsinter_repo_configs.py
+      - name: Exercise eight unpacked packages, installed CLIs, and decoder replay
         run: python3 tools/check_crate_consumer.py
       - name: Preserve reviewed crate archives
         uses: actions/upload-artifact@v4
