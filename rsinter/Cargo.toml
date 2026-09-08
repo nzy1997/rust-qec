@@ -1,6 +1,6 @@
 [package]
 name = "rsinter"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
@@ -22,9 +22,9 @@ full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
 gurobi = ["ilp-runner", "rilpqec/gurobi"]
 
 [dependencies]
-rstim = { version = "0.2.1", path = "../rstim", features = ["codegen-css"] }
-rmatching = { version = "0.2.1", path = "../rmatching", optional = true }
-rbposd = { version = "0.2.1", path = "../rbposd", optional = true }
+rstim = { version = "0.3.0", path = "../rstim", features = ["codegen-css"] }
+rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
+rbposd = { version = "0.3.0", path = "../rbposd", optional = true }
 rilpqec = { version = "0.1.0", path = "../rilpqec", optional = true }
 qec-ilp-core = { version = "0.1.0", path = "../qec-ilp-core", optional = true }
 rand = "0.8"

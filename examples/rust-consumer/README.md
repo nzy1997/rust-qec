@@ -1,9 +1,13 @@
 # Packaged-crate consumer check
 
-This is an independent Rust workspace with the registry dependencies that a
-consumer will use after the first releases. Those releases are not on
-crates.io yet, so running this manifest directly is intentionally deferred
-until publication.
+This independent Rust workspace demonstrates the `rstim` 0.3.0 and `rmatching`
+0.3.0 registry APIs. Once these versions are available on crates.io, run:
+
+```sh
+cargo run --manifest-path examples/rust-consumer/Cargo.toml
+```
+
+For an unpublished release candidate, use the package check below instead.
 
 Maintainers can build the same program entirely from real `.crate` archives:
 

@@ -1,6 +1,6 @@
 [package]
 name = "rmatching"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
@@ -13,7 +13,7 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 description = "Rust minimum-weight perfect-matching decoder for detector-error-model workflows"
 
 [dev-dependencies]
-rstim = { version = "0.2.1", path = "../rstim" }
+rstim = { version = "0.3.0", path = "../rstim" }
 
 [[bin]]
 name = "rmatching_cli"

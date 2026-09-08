@@ -3,10 +3,14 @@
 The `rustqec` command-line application for inspecting and sampling quantum
 error-correction circuits, producing datasets, and loss-aware decoding.
 
-The first crates.io release is being prepared and is **not published yet**.
-From a RustQEC checkout, install with `cargo install --locked --path rustqec-cli`.
-Once published, the registry equivalent is `cargo install --locked rustqec-cli`.
-Both commands install only `rustqec`; dependency crates do not install their CLIs.
+Install the versioned command-line package from crates.io:
+
+```sh
+cargo install --locked rustqec-cli --version 0.1.0
+```
+
+This package installs only the `rustqec` executable; dependency crates do not
+install their CLIs.
 
 ## First circuit
 

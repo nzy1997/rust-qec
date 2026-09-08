@@ -9,29 +9,19 @@ analyzing quantum error-correcting codes. Its dependency-facing APIs include:
 - packed GF(2) row operations, reduced row spaces, and reusable kernel
   workspaces under `qec_code::packed_gf2`.
 
-## Dependency status
+## Installation
 
-The first crates.io release is being prepared and is **not published yet**.
-After publication, use `qec-code = "0.1.0"`. Until then, a sibling local
-checkout can use a path dependency:
+Add the library from crates.io:
 
 ```toml
 [dependencies]
-qec-code = { path = "../rust-qec/qec-code" }
-```
-
-Downstream Git-based prototypes should pin an exact repository revision instead
-of following a moving branch:
-
-```toml
-[dependencies]
-qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-commit>" }
+qec-code = "0.1.0"
 ```
 
 Enable the open-source exact ILP backend only when it is needed:
 
 ```toml
-qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
+qec-code = { version = "0.1.0", features = ["distance-ilp-highs"] }
 ```
 
 The default build is a library-only build with no command-line parser or native
@@ -48,8 +38,7 @@ HiGHS can enable both `cli` and `distance-ilp-highs`.
 
 This crate is covered by the repository-wide
 [Apache-2.0 license](LICENSE), which is also declared in the workspace
-package metadata. Until registry publication, downstream users should pin a reviewed repository
-revision. Enable the distance features above only when needed.
+package metadata. Enable the distance features above only when needed.
 
 ## Deterministic regular matrices
 
