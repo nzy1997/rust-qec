@@ -15,4 +15,5 @@ pub use midswap::{MidSwapConfig, MidSwapError, rotated_memory_z_midswap};
 pub mod color_code;
 pub use color_code::{memory_xyz, memory_xyz_with_params};
 
+#[cfg(feature = "codegen-css")]
 pub mod css;

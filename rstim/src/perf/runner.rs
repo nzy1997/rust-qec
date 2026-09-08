@@ -7,7 +7,7 @@ use std::time::Instant;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
-use crate::cli::generate_common_circuit_text;
+use crate::operations::generate_common_circuit_text;
 use crate::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
 use crate::parser::parse_lines;
 use crate::sampler::{

@@ -105,7 +105,7 @@ cargo install --locked --path rustqec-cli
 This installs `rustqec`, sufficient for the full example above. Add `--features ilp`
 for exact envelope MLE; the full native archives already include it. Stim-style
 compatibility commands remain available through
-`cargo install --locked --path rstim --bin rstim`.
+`cargo install --locked --path rstim --bin rstim --features cli,codegen-css,shot-viewer`.
 
 For Rust integration, start with the [independent consumer example](examples/rust-consumer/README.md)
 that samples a circuit and decodes it with MWPM. The [crate guide](docs/crates-io.md)
@@ -151,7 +151,7 @@ cargo build --locked -p rsinter --no-default-features --features rbposd-runner
 ```
 
 The complete test suite also invokes Stim through Python. Install it in an
-isolated environment before running `cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools`:
+isolated environment before running `make test`:
 
 ```sh
 python3 -m venv .venv
@@ -166,7 +166,7 @@ of the validated matrix.
 ```sh
 git clone https://github.com/nzy1997/rust-qec.git
 cd rust-qec
-cargo build --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
 ```
 
 Inspect a small circuit through the unified CLI:
@@ -190,13 +190,13 @@ The existing crate-specific CLIs remain available. For example, the same
 circuit can be inspected with `rstim stats`:
 
 ```sh
-printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
+printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --features cli --bin rstim -- stats
 ```
 
 Run the Rust test suite:
 
 ```sh
-cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+make test
 ```
 
 After a native-support workflow completes, validate its four jobs, compiler

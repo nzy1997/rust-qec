@@ -1,3 +1,5 @@
+#![cfg(feature = "highs")]
+
 use qec_ilp_core::backend::build_binary_backend;
 use qec_ilp_core::{
     BackendConfig, BackendKind, BinaryIlpConfig, BinaryIlpModel, ConstraintSense, LinearConstraint,

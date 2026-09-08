@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use rstim::cli;
+use rstim::operations as cli;
 use rstim::executor::Executor;
 use rstim::ir::circuit_to_string;
 use rstim::qp101::{export_qp101, export_qp101_with_sample_trace};

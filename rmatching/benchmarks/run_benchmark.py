@@ -9,7 +9,7 @@ Usage:
 
 Requirements:
     pip install stim pymatching numpy
-    cargo build --release --features bench --bin rmatching_bench
+    cargo build --release -p rmatching-bench-tools --bin rmatching_bench
 """
 
 import argparse
@@ -27,8 +27,9 @@ import stim
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+_WORKSPACE_ROOT = _REPO_ROOT.parent
 STIM_GLOB = str(_REPO_ROOT / "PyMatching/benchmarks/surface_codes/**/*.stim")
-BENCH_BINARY = str(_REPO_ROOT / "target/release/rmatching_bench")
+BENCH_BINARY = str(_WORKSPACE_ROOT / "target/release/rmatching_bench")
 RESULTS_CSV = str(_REPO_ROOT / "benchmarks/results.csv")
 CSV_HEADER = ["decoder", "p", "d", "decode_us_per_round", "logical_error_rate"]
 
@@ -118,7 +119,7 @@ def main():
     if not Path(BENCH_BINARY).exists():
         print(
             f"ERROR: {BENCH_BINARY} not found.\n"
-            "Build it with: cargo build --release --features bench --bin rmatching_bench",
+            "Build it with: cargo build --release -p rmatching-bench-tools --bin rmatching_bench",
             file=sys.stderr,
         )
         sys.exit(1)

@@ -47,7 +47,7 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
 Run the selected speed case:
 
 ```sh
-cargo run -p rstim --bin rstim -- perf run \
+cargo run -p rstim --features cli --bin rstim -- perf run \
   --case stim-style-surface-sample-d11-r100-b1024 \
   --warmup-rounds 2 \
   --measure-rounds 11 \
@@ -57,10 +57,10 @@ cargo run -p rstim --bin rstim -- perf run \
 Summarize and render the speed evidence:
 
 ```sh
-cargo run -p rstim --bin rstim -- perf summarize \
+cargo run -p rstim --features cli --bin rstim -- perf summarize \
   --in /tmp/rstim-vs-stim-speed.jsonl \
   --out /tmp/rstim-vs-stim-summary.json
-cargo run -p rstim --bin rstim -- perf report \
+cargo run -p rstim --features cli --bin rstim -- perf report \
   --in /tmp/rstim-vs-stim-summary.json \
   --out /tmp/rstim-vs-stim-report.md
 ```
@@ -227,7 +227,7 @@ Negative controls for this page:
   Limits`;
 - removing `python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness`
   must fail with `missing rstim-vs-Stim correctness command link`;
-- removing `cargo run -p rstim --bin rstim -- perf run` must fail with
+- removing `cargo run -p rstim --features cli --bin rstim -- perf run` must fail with
   `missing rstim-vs-Stim speed command link`.
 
 Run the checker self-test for the negative-control fixtures:

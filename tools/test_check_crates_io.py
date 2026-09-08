@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import unittest
 
-from tools.check_crates_io import metadata_errors
+from tools.check_crates_io import dependency_errors, metadata_errors
 
 
 class PublicationContractTest(unittest.TestCase):
@@ -46,6 +46,19 @@ class PublicationContractTest(unittest.TestCase):
         packages, rstim = self.altered("rstim")
         next(target for target in rstim["targets"] if target["name"] == "rstim_compiled_steady_worker").pop("required-features")
         self.assertTrue(any("default installation exposes" in error for error in metadata_errors(packages, self.policy)))
+
+    def test_optional_simulator_dependency_cannot_return_to_matching(self):
+        packages, matching = self.altered("rmatching")
+        dependency = copy.deepcopy(next(dep for dep in matching["dependencies"] if dep["name"] == "rstim"))
+        dependency.update(kind=None, optional=True)
+        matching["dependencies"].append(dependency)
+        self.assertTrue(any("simulator dependency" in error for error in metadata_errors(packages, self.policy)))
+
+    def test_native_solver_and_cli_dependencies_are_rejected_in_minimal_libraries(self):
+        for name, extra in [("rstim", "qec-code"), ("qec-code", "clap"), ("qec-ilp-core", "highs-sys"), ("rmatching", "rstim")]:
+            with self.subTest(name=name):
+                self.assertEqual(dependency_errors(name, f"{name} v0.1.0\n"), [])
+                self.assertTrue(dependency_errors(name, f"{name} v0.1.0\n{extra} v1.0.0\n"))
 
 
 if __name__ == "__main__":

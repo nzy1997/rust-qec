@@ -649,7 +649,7 @@ pub fn run_gen(
             after_reset_flip_probability: options.after_reset_flip_probability,
             after_clifford_loss_probability: options.after_clifford_loss_probability,
         };
-        rstim::cli::run_gen_with_params(
+        rstim::operations::run_gen_with_params(
             &options.code,
             &options.task,
             options.distance,
@@ -696,7 +696,7 @@ pub fn run_sample(
         command_error(CIRCUIT_SAMPLE_COMMAND, "invalid_circuit", message, json)
     })?;
     let mut buffer = Vec::new();
-    rstim::cli::run_sample(
+    rstim::operations::run_sample(
         &text,
         shots,
         &options.out_format,
@@ -749,7 +749,7 @@ pub fn run_detect(
     match &options.obs_out {
         Some(obs_out) => {
             let mut obs_buffer = Vec::new();
-            rstim::cli::run_detect_with_obs(
+            rstim::operations::run_detect_with_obs(
                 &text,
                 shots,
                 &options.out_format,
@@ -764,7 +764,7 @@ pub fn run_detect(
             write_artifact(CIRCUIT_DETECT_COMMAND, &obs_buffer, obs_out, json)?;
         }
         None => {
-            rstim::cli::run_detect(
+            rstim::operations::run_detect(
                 &text,
                 shots,
                 &options.out_format,
@@ -808,7 +808,7 @@ pub fn run_dem(
     let summary = rstim::stats::summarize_text(&text)
         .map_err(|message| command_error(CIRCUIT_DEM_COMMAND, "invalid_circuit", message, json))?;
     let mut buffer = Vec::new();
-    rstim::cli::run_analyze_errors_with_flags(
+    rstim::operations::run_analyze_errors_with_flags(
         &text,
         options.approximate_disjoint_errors,
         options.allow_gauge_detectors,
@@ -865,7 +865,7 @@ pub fn run_dataset_export(
     }
     .transpose()
     .map_err(|message| command_error(DATASET_EXPORT_COMMAND, "invalid_arguments", message, json))?;
-    rstim::cli::run_export_decoder_dataset_with_logical_flip(
+    rstim::operations::run_export_decoder_dataset_with_logical_flip(
         &circuit_path,
         options.shots,
         &options.mode,

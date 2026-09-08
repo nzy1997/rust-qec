@@ -1,3 +1,5 @@
+#![cfg(feature = "cli")]
+
 use std::ffi::OsString;
 use std::path::Path;
 

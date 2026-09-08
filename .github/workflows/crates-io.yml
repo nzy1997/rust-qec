@@ -15,6 +15,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  minimal-library:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [rstim, qec-code, qec-ilp-core, rmatching]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: minimal-${{ matrix.package }}
+      - name: Test each library without workspace feature unification
+        run: cargo test --locked -p ${{ matrix.package }} --no-default-features
   package-consumer:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -31,7 +47,7 @@ jobs:
         run: |
           python3 -m unittest tools.test_check_crates_io tools.test_check_installed_quickstart tools.test_check_crate_consumer
           python3 tools/check_crates_io.py
-      - name: Exercise unpacked libraries and installed default CLI
+      - name: Exercise unpacked minimal libraries and both installed CLIs
         run: python3 tools/check_crate_consumer.py
       - name: Preserve reviewed crate archives
         uses: actions/upload-artifact@v4

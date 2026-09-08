@@ -31,9 +31,23 @@ for shot in 0..8 {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-There are currently no optional features required for the public simulator
-API. The `benchmark-telemetry` and `benchmark-tools` features are for internal
-benchmark instrumentation and worker binaries.
+No optional feature is required for the simulator library API. Reusable
+file-independent command operations live in `rstim::operations`.
+
+Optional features are intentionally additive:
+
+- `cli` builds the compatibility `rstim` executable and argument parser.
+- `codegen-css` enables CSS circuit generation backed by `qec-code`.
+- `shot-viewer` embeds the browser viewer and exposes its loopback server API.
+- `benchmark-tools` builds benchmark worker binaries and only adds their
+  argument parser dependency; it does not enable the compatibility CLI, CSS
+  generation, or the viewer.
+- `benchmark-telemetry` enables internal benchmark instrumentation.
+
+For example, install the complete compatibility executable with
+`cargo install rstim --features cli,codegen-css,shot-viewer`. A smaller CLI can
+be built with only `--features cli`; unavailable optional subcommands are
+omitted or report the feature needed to enable them.
 Detector error models must be decomposed into graphlike components before
 passing them to a matching decoder that only accepts one- and two-detector
 errors.

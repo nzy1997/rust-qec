@@ -16,6 +16,7 @@
     {"name": "rustqec-cli", "path": "rustqec-cli"},
     {"name": "rstim-shot-web", "path": "rstim-shot-web"},
     {"name": "rilpqec", "path": "rilpqec"},
-    {"name": "surface_decoder_compare_bridge", "path": "benchmarks/surface_decoder_compare/rust_bridge"}
+    {"name": "surface_decoder_compare_bridge", "path": "benchmarks/surface_decoder_compare/rust_bridge"},
+    {"name": "rmatching-bench-tools", "path": "benchmarks/rmatching-tools"}
   ]
 }

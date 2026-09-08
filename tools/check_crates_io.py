@@ -36,7 +36,7 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
                 errors.append(f"{name}: internal dependency {upstream} needs a registry version")
             if upstream not in order or order.index(upstream) >= order.index(name):
                 errors.append(f"{name}: {upstream} must be published earlier (including optional dependencies)")
-    expected_bins = {"rustqec-cli": {"rustqec"}, "rstim": {"rstim"}, "rmatching": {"rmatching_cli"}}
+    expected_bins = {"rustqec-cli": {"rustqec"}, "rstim": set(), "qec-code": set(), "rmatching": {"rmatching_cli"}}
     for name, expected in expected_bins.items():
         if name not in members:
             continue
@@ -44,7 +44,30 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
                   if "bin" in target["kind"] and not target.get("required-features")}
         if actual != expected:
             errors.append(f"{name}: default installation exposes {sorted(actual)}, expected {sorted(expected)}")
+    for name in ("rstim", "qec-code"):
+        bins = [target for target in members[name]["targets"] if "bin" in target["kind"] and target["name"] == name]
+        if len(bins) != 1 or "cli" not in bins[0].get("required-features", []):
+            errors.append(f"{name}: compatibility binary must require cli")
+    matching = members["rmatching"]
+    if any(dep["name"] == "rstim" and dep["kind"] != "dev" for dep in matching["dependencies"]):
+        errors.append("rmatching: simulator dependency belongs only in tests or the private benchmark package")
+    if any("bin" in target["kind"] and target["name"] != "rmatching_cli" for target in matching["targets"]):
+        errors.append("rmatching: benchmark binaries must live outside the published package")
     return errors
+
+
+MINIMAL_FORBIDDEN = {
+    "rstim": {"qec-code", "qec-ilp-core", "clap", "highs", "highs-sys"},
+    "qec-code": {"clap", "qec-ilp-core", "highs", "highs-sys"},
+    "qec-ilp-core": {"highs", "highs-sys", "gurobi", "bindgen", "cmake"},
+    "rmatching": {"rstim", "qec-code", "qec-ilp-core", "clap", "highs", "highs-sys"},
+    "rustqec-cli": {"highs", "highs-sys", "qec-ilp-core", "renvelope"},
+}
+
+
+def dependency_errors(name: str, tree: str) -> list[str]:
+    found = {line.split()[0] for line in tree.splitlines() if line.split()} & MINIMAL_FORBIDDEN[name]
+    return [f"{name}: default dependency graph includes {sorted(found)}"] if found else []
 
 
 def command(*args: str, cwd: Path) -> str:
@@ -78,11 +101,9 @@ def check(repo: Path) -> None:
                 if f"assets/shot-viewer/{asset}" not in files:
                     errors.append(f"rstim: missing compile-time viewer asset {asset}")
         print(f"PACKAGE {name} {package['version']}: {len(files)} files")
-    tree = command("cargo", "tree", "--locked", "-p", "rustqec-cli", "--edges", "normal,build", "--prefix", "none", cwd=repo)
-    forbidden_dependencies = {"highs", "highs-sys", "qec-ilp-core", "renvelope"}
-    found = {line.split()[0] for line in tree.splitlines() if line.split()} & forbidden_dependencies
-    if found:
-        errors.append(f"default CLI dependency graph includes {sorted(found)}")
+    for name in MINIMAL_FORBIDDEN:
+        tree = command("cargo", "tree", "--locked", "-p", name, "--edges", "normal,build", "--prefix", "none", cwd=repo)
+        errors.extend(dependency_errors(name, tree))
     if errors:
         raise RuntimeError("\n".join(errors))
     print("PASS publication graph, metadata, default binaries, package files, and lightweight CLI")

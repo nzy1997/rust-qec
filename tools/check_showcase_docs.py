@@ -39,7 +39,7 @@ RSTIM_VS_STIM_COMMAND_REQUIREMENTS = (
         "missing rstim-vs-Stim correctness command link",
     ),
     (
-        "cargo run -p rstim --bin rstim -- perf run",
+        "cargo run -p rstim --features cli --bin rstim -- perf run",
         "missing rstim-vs-Stim speed command link",
     ),
 )
@@ -367,7 +367,7 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \\
   --shots 20000 \\
   --out /tmp/rstim-vs-stim-correctness.json
 
-cargo run -p rstim --bin rstim -- perf run \\
+cargo run -p rstim --features cli --bin rstim -- perf run \\
   --case stim-style-surface-sample-d11-r100-b1024 \\
   --warmup-rounds 0 \\
   --measure-rounds 1 \\
@@ -507,8 +507,8 @@ def run_self_test() -> list[str]:
             )
         rstim_vs_stim.write_text(
             RSTIM_VS_STIM_VALID_SHOWCASE.replace(
-                "cargo run -p rstim --bin rstim -- perf run",
-                "cargo run -p rstim --bin rstim -- perf missing-run",
+                "cargo run -p rstim --features cli --bin rstim -- perf run",
+                "cargo run -p rstim --features cli --bin rstim -- perf missing-run",
             ),
             encoding="utf-8",
         )

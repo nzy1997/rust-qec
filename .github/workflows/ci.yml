@@ -61,7 +61,10 @@ jobs:
           cargo test --locked -p rsinter --no-default-features --features rbposd-runner
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
-      - run: cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+      - run: cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
+      - name: Check optional code-distance backend boundaries
+        run: |
+          cargo test --locked -p qec-code --no-default-features --features distance-ilp-highs --test logical_distance --test distance_backend_features
   checked-evidence-portability:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -172,7 +175,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p perf-artifacts
-          cargo run --locked -p rstim --bin rstim -- perf ci --out-dir perf-artifacts
+          cargo run --locked -p rstim --features cli --bin rstim -- perf ci --out-dir perf-artifacts
       - name: Publish perf report
         if: always()
         run: |
@@ -219,7 +222,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
-        run: cargo llvm-cov --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
+        run: cargo llvm-cov --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
