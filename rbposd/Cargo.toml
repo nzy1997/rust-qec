@@ -4,6 +4,13 @@ version = "0.2.1"
 edition = "2024"
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+documentation = "https://docs.rs/rbposd"
+description = "Belief-propagation and ordered-statistics decoding for binary linear codes"
+publish = false
+include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 
 [dependencies]
 

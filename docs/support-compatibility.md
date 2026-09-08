@@ -126,3 +126,20 @@ The following open work remains outside this contract:
 
 These links preserve the known limitations; they do not claim that their
 historical measurements have been rerun for this release line.
+
+## Development Cargo features before the first registry release
+
+The upcoming source package defaults keep native solver dependencies optional.
+`rustqec-cli` needs `--features ilp` for `envelope-mle`; default builds advertise
+only the available decoder choices. Official native archives retain ILP support.
+`rsinter` needs explicit runner/plotting features, or `full` for the previous
+complete research setup. These changes do not alter immutable v0.2.1 archives.
+See the [crate guide](https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md) for installation and migration commands.
+
+`rmatching::Matching::try_decode_shots_bit_packed` returns a typed error for
+incorrect dimensions, buffer lengths, or batch-size overflow. It counts declared
+unused detectors/observables as part of the graph. The older infallible method
+remains available and documents its panic conditions. The DEM importer supports
+probabilities `0 <= p < 1`; probability-1 errors require a different representation
+and are rejected explicitly. This restriction does not apply to rstim sampling
+or DEM generation, including the probability-1 installed quickstart.

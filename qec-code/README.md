@@ -11,8 +11,9 @@ analyzing quantum error-correcting codes. Its dependency-facing APIs include:
 
 ## Dependency status
 
-This crate is currently developed inside the RustQEC workspace and is not
-published independently. A sibling local checkout can use a path dependency:
+The first crates.io release is being prepared and is **not published yet**.
+After publication, use `qec-code = "0.1.0"`. Until then, a sibling local
+checkout can use a path dependency:
 
 ```toml
 [dependencies]
@@ -34,9 +35,10 @@ qec-code = { git = "https://github.com/nzy1997/rust-qec.git", rev = "<reviewed-c
 ```
 
 This crate is covered by the repository-wide
-[Apache-2.0 license](../LICENSE), which is also declared in the workspace
-package metadata. The crate is not yet published independently; downstream
-users should continue to pin a reviewed repository revision.
+[Apache-2.0 license](LICENSE), which is also declared in the workspace
+package metadata. Until registry publication, downstream users should pin a reviewed repository
+revision. The default build does not enable the native ILP solver; enable the
+distance features above only when needed.
 
 ## Deterministic regular matrices
 

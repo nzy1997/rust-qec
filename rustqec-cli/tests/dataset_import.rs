@@ -7,6 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+#[cfg(feature = "ilp")]
 use rstim::decoder_dataset::{
     DecoderDatasetMode, ExportDecoderDatasetLogicalFlipConfig, LogicalFlip, LogicalPauli,
     export_decoder_dataset_with_logical_flip,
@@ -82,7 +83,7 @@ fn import_packages_third_party_payloads_and_decode_reads_them() {
         .args([
             "decode",
             "--decoder",
-            "envelope-mle",
+            "envelope-matching",
             "--dataset",
             bundle.to_str().unwrap(),
             "--out",
@@ -242,6 +243,7 @@ fn import_rejects_bad_payloads_and_unsupported_circuits_without_publishing() {
 /// An exported dataset and an imported repackaging of the same circuit and
 /// shots decode to identical predictions: the import path is a faithful
 /// interchange route, not a lossy one.
+#[cfg(feature = "ilp")]
 #[test]
 fn imported_bundle_decodes_identically_to_exported_bundle() {
     const FIXTURE: &str = include_str!("fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");

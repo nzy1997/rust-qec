@@ -48,6 +48,13 @@ fn rustqec() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rustqec"))
 }
 
+fn available_decoders() -> &'static [&'static str] {
+    #[cfg(feature = "ilp")]
+    return &["envelope-matching", "envelope-mle"];
+    #[cfg(not(feature = "ilp"))]
+    &["envelope-matching"]
+}
+
 fn sha256(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -188,7 +195,7 @@ fn run_decode(dataset: &Path, decoder: &str, root: &Path) -> std::process::Outpu
 fn both_loss_decoders_run_public_only_and_reuse_compiled_state() {
     let root = tempfile::tempdir().unwrap();
     let dataset = write_dataset(root.path(), CIRCUIT, SHOTS);
-    for decoder in ["envelope-matching", "envelope-mle"] {
+    for &decoder in available_decoders() {
         let output = run_decode(&dataset, decoder, root.path());
         assert!(
             output.status.success(),
@@ -229,7 +236,7 @@ fn real_cli_predictions_are_invariant_to_lost_measurement_placeholders() {
     // Both shots herald loss at record 0 and have the same known final value.
     // They differ only at lost value record 1 (0x09 versus 0x0b).
     let dataset = write_dataset(root.path(), PLACEHOLDER_INVARIANCE_CIRCUIT, &[0x09, 0x0b]);
-    for decoder in ["envelope-matching", "envelope-mle"] {
+    for &decoder in available_decoders() {
         let output = run_decode(&dataset, decoder, root.path());
         assert!(
             output.status.success(),
@@ -256,7 +263,7 @@ fn real_cli_predictions_are_invariant_to_lost_measurement_placeholders() {
 fn decoder_server_v3_public_bundle_decodes_without_translation() {
     let root = tempfile::tempdir().unwrap();
     let dataset = write_decoder_server_dataset(root.path(), CIRCUIT, SHOTS);
-    for decoder in ["envelope-matching", "envelope-mle"] {
+    for &decoder in available_decoders() {
         let output = run_decode(&dataset, decoder, root.path());
         assert!(
             output.status.success(),
@@ -304,7 +311,7 @@ fn decoder_server_v3_contract_mismatches_are_rejected() {
         let root = tempfile::tempdir().unwrap();
         let dataset = write_decoder_server_dataset(root.path(), CIRCUIT, SHOTS);
         rewrite_manifest(&dataset, mutate);
-        let output = run_decode(&dataset, "envelope-mle", root.path());
+        let output = run_decode(&dataset, "envelope-matching", root.path());
         assert_json_error(&output, "invalid_dataset");
         assert!(
             String::from_utf8_lossy(&output.stderr).contains(expected),
@@ -339,13 +346,13 @@ fn malformed_and_detector_mode_datasets_use_structured_errors() {
         manifest["row"]["kind"] = json!("detectors");
     });
     assert_json_error(
-        &run_decode(&dataset, "envelope-mle", root.path()),
+        &run_decode(&dataset, "envelope-matching", root.path()),
         "unsupported_dataset_mode",
     );
 
     let root = tempfile::tempdir().unwrap();
     let dataset = write_dataset(root.path(), CIRCUIT, &[0x82]);
-    let output = run_decode(&dataset, "envelope-mle", root.path());
+    let output = run_decode(&dataset, "envelope-matching", root.path());
     assert_json_error(&output, "invalid_dataset");
     assert!(String::from_utf8_lossy(&output.stderr).contains("padding"));
 }
@@ -357,7 +364,7 @@ fn missing_files_and_manifest_circuit_mismatch_are_rejected() {
         let dataset = write_dataset(root.path(), CIRCUIT, SHOTS);
         fs::remove_file(dataset.join(file)).unwrap();
         assert_json_error(
-            &run_decode(&dataset, "envelope-mle", root.path()),
+            &run_decode(&dataset, "envelope-matching", root.path()),
             "missing_dataset_file",
         );
     }
@@ -366,11 +373,12 @@ fn missing_files_and_manifest_circuit_mismatch_are_rejected() {
     let dataset = write_dataset(root.path(), CIRCUIT, SHOTS);
     rewrite_manifest(&dataset, |manifest| manifest["row"]["bits"] = json!(7));
     assert_json_error(
-        &run_decode(&dataset, "envelope-mle", root.path()),
+        &run_decode(&dataset, "envelope-matching", root.path()),
         "invalid_dataset",
     );
 }
 
+#[cfg(feature = "ilp")]
 #[test]
 fn unsupported_layout_timeout_and_infeasible_are_explicit() {
     let root = tempfile::tempdir().unwrap();
@@ -436,7 +444,7 @@ fn unsupported_gates_readouts_and_overlapping_cx_pairs_are_rejected() {
         let root = tempfile::tempdir().unwrap();
         let dataset = write_dataset(root.path(), &circuit, SHOTS);
         assert_json_error(
-            &run_decode(&dataset, "envelope-mle", root.path()),
+            &run_decode(&dataset, "envelope-matching", root.path()),
             "unsupported_circuit",
         );
     }
@@ -473,7 +481,7 @@ fn huge_repeat_is_rejected_before_flattening() {
         let repeated = CIRCUIT.replace("H 0\nH 0\n", &body);
         let root = tempfile::tempdir().unwrap();
         let dataset = write_dataset(root.path(), &repeated, SHOTS);
-        let output = run_decode(&dataset, "envelope-mle", root.path());
+        let output = run_decode(&dataset, "envelope-matching", root.path());
         assert_json_error(&output, "unsupported_circuit");
         assert!(String::from_utf8_lossy(&output.stderr).contains("REPEAT"));
     }
@@ -514,7 +522,7 @@ fn native_d3_and_d5_exports_decode_via_cli_against_private_answers() {
         .unwrap();
         let answers = fs::read(private.join("answers.b8")).unwrap();
 
-        for decoder in ["envelope-matching", "envelope-mle"] {
+        for &decoder in available_decoders() {
             let output = run_decode(&public, decoder, root.path());
             assert!(
                 output.status.success(),
@@ -570,7 +578,7 @@ fn conventional_loss_visible_rotated_memory_z_decodes_via_cli_against_private_an
     .unwrap();
     let answers = fs::read(private.join("answers.b8")).unwrap();
 
-    for decoder in ["envelope-matching", "envelope-mle"] {
+    for &decoder in available_decoders() {
         let output = run_decode(&public, decoder, root.path());
         assert!(
             output.status.success(),
@@ -603,10 +611,7 @@ fn capabilities_advertises_decode_contract() {
         .iter()
         .find(|command| command["name"] == "decode")
         .unwrap();
-    assert_eq!(
-        decode["decoders"],
-        json!(["envelope-matching", "envelope-mle"])
-    );
+    assert_eq!(decode["decoders"], json!(available_decoders()));
     assert!(
         decode["arguments"]
             .as_array()
@@ -635,4 +640,17 @@ fn capabilities_advertises_decode_contract() {
             .iter()
             .any(|error| error["code"] == "decode_error" && error["exit_code"] == 2)
     );
+}
+
+#[cfg(not(feature = "ilp"))]
+#[test]
+fn envelope_mle_is_rejected_when_ilp_support_is_not_compiled() {
+    let output = rustqec()
+        .args(["decode", "--decoder", "envelope-mle"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("invalid value 'envelope-mle'"), "{stderr}");
+    assert!(stderr.contains("envelope-matching"), "{stderr}");
 }

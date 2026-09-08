@@ -60,64 +60,56 @@ With RustQEC you can:
 
 ## Quick Start
 
-When v0.2.1 native assets are attached to its existing
-[release](https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1), install an
-archive for your platform before running the three steps below. On Ubuntu
-x86_64 use `x86_64-unknown-linux-gnu`; on Apple-silicon macOS use
-`aarch64-apple-darwin`.
+Install the prebuilt v0.2.1 CLI (Ubuntu 24.04 x86_64 or macOS 15 Apple silicon):
 
 ```sh
-set -eu
-target=x86_64-unknown-linux-gnu
-base=https://github.com/nzy1997/rust-qec/releases/download/v0.2.1
-archive="rustqec-v0.2.1-${target}.tar.gz"
-curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
-awk -v archive="$archive" '$2 == archive { count++; record = $0 } END { if (count != 1) exit 1; print record }' SHA256SUMS > "$archive.sha256"
-if command -v sha256sum >/dev/null; then
-  sha256sum -c "$archive.sha256"
-else
-  shasum -a 256 -c "$archive.sha256"
-fi
-tar -xzf "$archive"
-bin_dir="$(pwd)/${archive%.tar.gz}/bin"
+curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-1. Discover the installed CLI contract:
+The installer verifies the archive's pinned checksum. It does not require Rust
+or edit shell profiles. [Inspect the installer](https://nzy1997.github.io/rust-qec/install.sh)
+or follow the [manual download instructions](https://nzy1997.github.io/rust-qec/get-started/#install).
 
-   ```sh
-   "$bin_dir/rustqec" capabilities --format json
-   ```
+The complete introductory workflow uses only `rustqec`:
 
-2. Inspect the deterministic showcase circuit:
+```sh
+rustqec capabilities --format json
+cat > pipeline.stim <<'STIM'
+R 0
+X_ERROR(1) 0
+M 0
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]
+STIM
+rustqec circuit stats --format json --in pipeline.stim
+rustqec circuit detect --in pipeline.stim --shots 1 --out-format dets --append-observables --out events.dets
+rustqec circuit dem --in pipeline.stim --out pipeline.dem
+cat events.dets pipeline.dem
+```
 
-   ```sh
-   cat > pipeline.stim <<'STIM'
-   R 0
-   X_ERROR(1) 0
-   M 0
-   DETECTOR rec[-1]
-   OBSERVABLE_INCLUDE(0) rec[-1]
-   STIM
-   "$bin_dir/rustqec" circuit stats --format json --in pipeline.stim
-   ```
+The final two lines are `shot D0 L0` and `error(1) D0 L0`. Stats reports one
+qubit, measurement, detector, and observable, with five instructions.
+`python3 tools/check_installed_quickstart.py --bin-dir "$HOME/.local/bin"`
+checks these results and malformed-input rejection from a source checkout.
 
-   The JSON fields are `instruction_count: 5`, `num_qubits: 1`,
-   `num_measurements: 1`, `num_detectors: 1`, and `num_observables: 1`.
+### Cargo and Rust library users
 
-3. Run the deterministic detector/DEM round trip:
+The first crates.io release is **not published yet**. From this development
+checkout, install the basic CLI without the ILP solver:
 
-   ```sh
-   "$bin_dir/rstim" detect --shots 1 --out_format dets --in pipeline.stim
-   "$bin_dir/rstim" analyze_errors --in pipeline.stim --out pipeline.dem
-   cat pipeline.dem
-   "$bin_dir/rstim" sample_dem --shots 1 --out_format dets --in pipeline.dem
-   ```
+```sh
+cargo install --locked --path rustqec-cli
+```
 
-   Both detector streams are `shot D0 L0`; the DEM is `error(1) D0 L0`.
+This installs `rustqec`, sufficient for the full example above. Add `--features ilp`
+for exact envelope MLE; the full native archives already include it. Stim-style
+compatibility commands remain available through
+`cargo install --locked --path rstim --bin rstim`.
 
-For a single machine-checkable run of the same commands, use
-`python3 tools/check_installed_quickstart.py --bin-dir "$bin_dir"` from a
-source checkout. The release assets do not yet include this repository tool.
+For Rust integration, start with the [independent consumer example](examples/rust-consumer/README.md)
+that samples a circuit and decodes it with MWPM. The [crate guide](docs/crates-io.md)
+explains package boundaries, features, and the checks required before registry publication.
 
 ## Build From Source
 
@@ -150,7 +142,7 @@ rustup toolchain install 1.88.0 --profile minimal
 rustup default 1.88.0
 ```
 
-These prerequisites cover the default workspace, including the HiGHS-backed
+These prerequisites cover the full workspace feature selection, including the HiGHS-backed
 ILP crates and `rsinter` plotting. A smaller `rsinter` build avoids both HiGHS
 and plotting (as well as the other optional decoder runners):
 
@@ -159,7 +151,7 @@ cargo build --locked -p rsinter --no-default-features --features rbposd-runner
 ```
 
 The complete test suite also invokes Stim through Python. Install it in an
-isolated environment before running `cargo test --locked --workspace`:
+isolated environment before running `cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools`:
 
 ```sh
 python3 -m venv .venv
@@ -174,7 +166,7 @@ of the validated matrix.
 ```sh
 git clone https://github.com/nzy1997/rust-qec.git
 cd rust-qec
-cargo build --locked --workspace
+cargo build --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
 ```
 
 Inspect a small circuit through the unified CLI:
@@ -204,7 +196,7 @@ printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
 Run the Rust test suite:
 
 ```sh
-cargo test --locked --workspace
+cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
 ```
 
 After a native-support workflow completes, validate its four jobs, compiler

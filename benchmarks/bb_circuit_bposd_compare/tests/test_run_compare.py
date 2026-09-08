@@ -15,11 +15,27 @@ from benchmarks.bb_circuit_bposd_compare.cases import (
 )
 from benchmarks.bb_circuit_bposd_compare.run_compare import (
     _python_row,
+    _run_rust_export,
     main,
     run_diagnostic_suite,
     run_hard_replay_suite,
     run_suite,
 )
+
+
+def test_default_rust_export_command_enables_rbposd_runner(monkeypatch):
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return mock.Mock(returncode=0, stdout="{}", stderr="")
+
+    monkeypatch.setattr(
+        "benchmarks.bb_circuit_bposd_compare.run_compare.subprocess.run", fake_run
+    )
+    _run_rust_export(SMOKE_CASES[0])
+    command = captured["command"]
+    assert command[command.index("--features") + 1] == "rbposd-runner"
 from benchmarks.bb_circuit_bposd_compare.verify_diagnostic import (
     verify_rows as verify_diagnostic_rows,
 )
