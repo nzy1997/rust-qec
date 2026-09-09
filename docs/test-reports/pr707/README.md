@@ -22,7 +22,7 @@ Verified locally on 2026-09-09. These PNGs are intentional review evidence, gene
 - `python3 tools/check_site_build.py _site --repo-root .` — 8 checks passed, no warnings; validates links for subpath deployment and checked benchmark provenance.
 - `cargo test --locked -p rstim --test site_contract` — 13 passed.
 - `python3 -m unittest tools.test_build_docs_search tools.test_docs_examples tools.test_site_app_rendering tools.test_check_site_build -q` — 32 passed.
-- `npm --prefix web/shot-viewer run test:e2e` — 68 passed across Chromium and Firefox. Covers search results/empty/error cases, keyboard navigation, nested headings, code copying, output distinction, narrow-screen overflow, support tables, figure zoom/focus, Shot Lab interaction and vector export.
+- `npm --prefix web/shot-viewer run test:e2e` — 72 passed across Chromium and Firefox. Covers search results/empty/error cases, keyboard navigation, nested headings, code copying, output distinction, narrow-screen overflow, support tables, figure zoom/focus, Shot Lab interaction and vector export.
 - `npm --prefix web/shot-viewer run test:e2e -- --grep 'chapter destinations'` — 4 passed after strengthening the anchor test to require the whole heading within the viewport at 768px and 1050px.
 - `python3 tools/shot_viewer_assets.py` and `git diff --check` — passed.
 - The executable decoder test uses the exact downloadable source, confirms both predictions, and rejects malformed `1x` input with no prediction output. A browser test verifies the highlighted source matches that downloadable file.
@@ -31,6 +31,13 @@ Verified locally on 2026-09-09. These PNGs are intentional review evidence, gene
 - Independent code review found a sticky navigation offset defect; it was fixed and independently rechecked in both automated browsers. Git harm gate passed.
 
 No new numerical performance campaign was run; plot takeaways are scoped to the committed benchmark rows and checked artifacts.
+
+## Review follow-up
+
+- Replace the fixed desktop viewport deduction with the measured diagram top, updating when headers, toolbars, filters, or the viewport change. Keep document coordinates so scrolling does not resize the workspace; narrow layouts retain their stacked inspector.
+- Exclude the schema widget's replaceable headings from the page TOC. Its own schema navigation remains available.
+- Both new regression tests failed in Chromium and Firefox before the fix. The final 72-test browser suite passes, including delayed schema loading, live schema selection, extra header height, focus transitions, scrolling, viewport resizing, and mobile stacking.
+- Re-ran `make build-site`, the 32 Python tests, 13 Rust site contracts, 8 built-site checks, asset verification, and `git diff --check`. Updated the Shot Lab screenshot from the rebuilt Chromium test output.
 
 ## Screenshots
 

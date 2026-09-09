@@ -274,6 +274,61 @@ test("desktop Shot Lab shows selected event details alongside the circuit", asyn
   }
 });
 
+test("Shot Lab adapts to taller headers and viewport changes without growing on scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 1212, height: 768 });
+  await page.goto("/interactive/");
+  await expect(page.locator("#shot-canvas .noise-site").first()).toBeVisible();
+  // Reproduce extra header wrapping independently of the host's font metrics.
+  await page.locator(".shot-hero").evaluate((hero) => {
+    const top = document.querySelector(".shot-layout").getBoundingClientRect().top;
+    hero.style.paddingBottom = `${parseFloat(getComputedStyle(hero).paddingBottom) + Math.max(0, 490 - top)}px`;
+  });
+  const stage = page.locator(".shot-stage-wrap");
+  const expectFirstScreen = async () => {
+    await expect.poll(async () => {
+      const box = await stage.boundingBox();
+      return box.y + box.height + await page.evaluate(() => window.scrollY);
+    }).toBeLessThanOrEqual(page.viewportSize().height);
+  };
+  await expectFirstScreen();
+  const initialHeight = (await stage.boundingBox()).height;
+  await page.evaluate(() => window.scrollTo(0, 80));
+  await expect.poll(async () => (await stage.boundingBox()).height).toBe(initialHeight);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.getByRole("button", { name: "Focus circuit", exact: true }).click();
+  await expectFirstScreen();
+  await page.setViewportSize({ width: 1050, height: 900 });
+  await expectFirstScreen();
+  await page.getByRole("button", { name: "Exit focus", exact: true }).click();
+  await expectFirstScreen();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const diagram = await stage.boundingBox();
+  const detail = await page.locator("#shot-detail").boundingBox();
+  expect(detail.y).toBeGreaterThanOrEqual(diagram.y + diagram.height - 1);
+  expect(Math.round(diagram.height)).toBeGreaterThanOrEqual(340);
+});
+
+test("QP101 navigation excludes transient schema headings before and after loading", async ({ page }) => {
+  let releaseSchema;
+  const ready = new Promise((resolve) => { releaseSchema = resolve; });
+  await page.route("**/qp101.schema.json", async (route) => {
+    await ready;
+    await route.continue();
+  });
+  await page.goto("/qp101/");
+  const toc = page.locator(".page-toc");
+  await expect(toc).toBeVisible();
+  const initialLinks = await toc.locator("a").allTextContents();
+  releaseSchema();
+  expect(initialLinks).not.toContain("Loading schema");
+  await page.locator("#schema-browser summary").click();
+  await expect(page.locator("#schema-status")).toHaveText("Loaded");
+  await expect(page.locator("#schema-detail h3")).toHaveText("QP101 document");
+  await page.locator("#schema-nav-list").getByRole("button", { name: "Noise operation", exact: true }).click();
+  await expect(page.locator("#schema-detail h3")).toHaveText("Noise operation");
+  expect(await toc.locator("a").evaluateAll((links) => links.filter((link) => !document.getElementById(decodeURIComponent(link.hash.slice(1)))).map((link) => link.hash))).toEqual([]);
+});
+
 for (const width of [768, 1050]) {
   test(`chapter destinations clear the sticky navigation at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
