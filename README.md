@@ -60,15 +60,33 @@ With RustQEC you can:
 
 ## Quick Start
 
-Install the prebuilt v0.3.0 CLI (Ubuntu 24.04 x86_64 or macOS 15 Apple silicon):
+If Rust and Cargo are already installed, use the crates.io CLI as the default
+entry point:
+
+```sh
+cargo install --locked rustqec-cli --version 0.3.0
+```
+
+If Rust is not installed, get it from the official
+[rustup installation guide](https://www.rust-lang.org/tools/install), or run:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+The native installer is the alternative when you want a self-contained binary
+with the complete native `rustqec`/`rstim` CLI feature set, including ILP and
+the full Shot Lab viewer. It requires no Rust or source checkout:
 
 ```sh
 curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-The installer verifies the archive's pinned checksum. It does not require Rust
-or edit shell profiles. [Inspect the installer](https://nzy1997.github.io/rust-qec/install.sh)
+The native archive path is validated on Ubuntu 24.04 x86_64 and macOS 15 Apple
+silicon. Windows, Intel macOS, and other platforms are outside its supported
+matrix. The installer verifies the archive's pinned checksum and does not edit
+shell profiles. [Inspect the installer](https://nzy1997.github.io/rust-qec/install.sh)
 or follow the [manual download instructions](https://nzy1997.github.io/rust-qec/get-started/#install).
 
 The complete introductory workflow uses only `rustqec`:
@@ -89,9 +107,14 @@ cat events.dets pipeline.dem
 ```
 
 The final two lines are `shot D0 L0` and `error(1) D0 L0`. Stats reports one
-qubit, measurement, detector, and observable, with five instructions.
-`python3 tools/check_installed_quickstart.py --bin-dir "$HOME/.local/bin"`
-checks these results and malformed-input rejection from a source checkout.
+qubit, measurement, detector, and observable, with five instructions. Those
+commands verify either installation path using only the installed `rustqec`
+binary. From a source checkout, automate the same checks plus malformed-input
+rejection with:
+
+```sh
+python3 tools/check_installed_quickstart.py --bin-dir "$(dirname "$(command -v rustqec)")"
+```
 
 ### Cargo and Rust library users
 
