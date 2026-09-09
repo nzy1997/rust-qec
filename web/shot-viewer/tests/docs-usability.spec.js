@@ -13,33 +13,31 @@ async function codeToolbarFor(page, text) {
   return code.locator("xpath=preceding-sibling::div[contains(@class, 'code-toolbar')][1]");
 }
 
-test("home leads to the installed first-circuit path", async ({ page }) => {
+test("home leads to the Cargo installation path", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Run your first circuit" }).click();
-  await expect(page).toHaveURL(/\/get-started\/$/);
-  await expect(page.getByRole("heading", { name: "Your first detector event" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "1. Install a native package" })).toBeVisible();
+  await page.getByRole("link", { name: "Install with Cargo" }).click();
+  await expect(page).toHaveURL(/\/#install$/);
+  await expect(page.getByRole("heading", { name: "Choose the path that fits your machine" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cargo install" })).toBeVisible();
 });
 
-test("home offers three distinct primary destinations without repeating get started", async ({ page }) => {
+test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) => {
   await page.goto("/");
 
   const actions = page.locator(".home-hero .actions a");
-  await expect(actions).toHaveCount(3);
+  await expect(actions).toHaveCount(2);
   expect(await actions.allTextContents()).toEqual([
-    "Run your first circuit",
-    "Download v0.3.0",
+    "Install with Cargo",
     "Try Shot Lab",
   ]);
   expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
-    "get-started/",
-    "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0",
+    "#install",
     "interactive/",
   ]);
 
   const destinations = await actions.evaluateAll((links) => links.map((link) => link.href));
-  expect(new Set(destinations).size).toBe(3);
-  await expect(page.locator('a[href*="get-started/"]')).toHaveCount(2);
+  expect(new Set(destinations).size).toBe(2);
+  await expect(page.locator('a[href="#install"]')).toHaveCount(1);
 });
 
 test("installation starts with one copyable command and keeps manual steps optional", async ({ page }) => {
