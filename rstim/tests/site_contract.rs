@@ -516,6 +516,8 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
         &index,
         &[
             "id=\"install\"",
+            "Install with Cargo",
+            "href=\"#install\"",
             "cargo install --locked rustqec-cli --version 0.3.0",
             "https://www.rust-lang.org/tools/install",
             "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
@@ -530,6 +532,18 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
         ],
         "homepage installation section",
     );
+    assert!(
+        !index.contains("Download v0.3.0"),
+        "homepage hero must not promote a release download button"
+    );
+    assert!(
+        !index.contains("Run your first circuit"),
+        "homepage hero must send visitors to the default Cargo install path"
+    );
+    assert!(
+        !index.contains("only need the command line tools"),
+        "native installer copy must not undermine Cargo as the default path"
+    );
     assert_contains_all(
         &readme,
         &[
@@ -543,6 +557,20 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
         &styles,
         &[".install-grid", ".install-card", ".install-note"],
         "homepage installation styles",
+    );
+}
+
+#[test]
+fn support_tables_keep_level_labels_readable_and_scroll_on_small_screens() {
+    let styles = read_repo_file("site/static/styles.css");
+    assert_contains_all(
+        &styles,
+        &[
+            ".prose table { display: block; min-width: 42rem; overflow-x: auto; }",
+            ".prose table th:nth-child(2)",
+            ".prose table td:nth-child(2) { white-space: nowrap; }",
+        ],
+        "responsive support table styles",
     );
 }
 
