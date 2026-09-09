@@ -52,7 +52,7 @@
     <h2 id="sample-title">Generate a loss-visible circuit and inspect four shots</h2>
     <p class="section-copy">Run from the repository root. The first command creates a d=3 Mid-SWAP Z-memory circuit whose loss-visible measurements are stored as interleaved <code>flag,value</code> records.</p>
   </div>
-  <p class="doc-note">Source workflow: run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. This advanced guide uses the development CLI and a repository Python loader; start with the <a href="../get-started/">installed CLI example</a> if you are new to RustQEC.</p>
+  <p class="doc-note">Development · <strong>master</strong>. Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. This advanced guide uses the development CLI and a repository Python loader; start with the <a href="../get-started/">installed CLI example</a> if you are new to RustQEC.</p>
 <pre class="quick-command"><code>cargo run --release --locked -p rustqec-cli --bin rustqec -- \
   circuit gen \
   --code surface_code \
@@ -140,7 +140,7 @@ trace.jsonl   # realized errors, one shot/line</code></pre>
       <p>50 measurement bits become 7 bytes per shot. Eight shots therefore produce a 56-byte <code>shots.b8</code>.</p>
     </article>
   </div>
-  <pre class="quick-command"><code># Decode bit k of shot s
+  <pre class="quick-command" data-language="Python"><code># Decode bit k of shot s
 row_bytes = (bits_per_shot + 7) // 8
 bit = (raw[s * row_bytes + k // 8] >> (k % 8)) &amp; 1</code></pre>
 </section>
@@ -176,7 +176,7 @@ bit = (raw[s * row_bytes + k // 8] >> (k % 8)) &amp; 1</code></pre>
     <p class="eyebrow">Blinding contract</p>
     <h2 id="marker-title">Put the hidden logical flip before the first noise</h2>
   </div>
-  <pre class="quick-command"><code>R 1 3 5 8 10 12 15 17 19
+  <pre class="quick-command" data-language="Stim circuit"><code>R 1 3 5 8 10 12 15 17 19
 TICK[rstim:logical_flip_point]
 X_ERROR(0.002) 1 3 5 8 10 12 15 17 19</code></pre>
   <p class="section-copy">The circuit must contain exactly one top-level <code>TICK[rstim:logical_flip_point]</code>, after ideal state preparation and before every positive-probability noise instruction, including noise inside completed <code>REPEAT</code> blocks. The old comment marker is intentionally unsupported.</p>

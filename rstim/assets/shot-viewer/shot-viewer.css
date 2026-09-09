@@ -482,3 +482,34 @@ kbd {
     animation: none;
   }
 }
+
+/* Keep the selected event next to the diagram on desktop. */
+body[data-page="shot"] .reading-layout { max-width: 1600px; }
+body[data-page="shot"] main { max-width: none; padding: 0; }
+.shot-hero { padding-top: .85rem; padding-bottom: .5rem; }
+.shot-hero .hero-copy { margin-bottom: .4rem; }
+.shot-app { margin-top: .65rem; }
+@media (min-width: 1000px) {
+  .shot-layout { grid-template-columns: minmax(0, 1fr) 260px; min-height: 340px; height: clamp(340px, calc(100dvh - 410px), 660px); }
+  .shot-stage-wrap { min-height: 0; }
+  .shot-detail { border-top: 0; border-left: 1px solid #e4e7ec; overflow-y: auto; }
+  .shot-toolbar { gap: .5rem; }
+  .shot-toolbar-status { flex-basis: 100%; order: 3; }
+  .shot-toolbar-actions { margin-left: auto; }
+  body.shot-focus .shot-layout { height: calc(100dvh - 220px); min-height: 340px; }
+  body.shot-focus .shot-stage-wrap { min-height: 0; }
+}
+@media (max-width: 999px) {
+  .shot-layout { min-height: 0; }
+  .shot-stage-wrap { min-height: 340px; }
+  .shot-detail { max-height: 320px; overflow-y: auto; }
+  body.shot-focus .shot-stage-wrap { min-height: 340px; }
+}
+.shot-hero .eyebrow { display: none; }
+.shot-hero h1 { font-size: clamp(1.5rem, 2.5vw, 2rem); margin: 0 0 .35rem; }
+.shot-hero .hero-copy { max-width: none; font-size: .95rem; margin: .3rem 0; }
+.shot-hero .shot-help { font-size: .82rem; margin: .25rem 0; }
+.shot-hero .content-links { margin: .35rem 0; font-size: .9rem; }
+@media (min-width: 1000px) {
+  .shot-layout { min-height: 300px; height: clamp(300px, calc(100dvh - 450px), 660px); }
+}

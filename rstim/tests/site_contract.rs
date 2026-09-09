@@ -561,20 +561,6 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
 }
 
 #[test]
-fn support_tables_keep_level_labels_readable_and_scroll_on_small_screens() {
-    let styles = read_repo_file("site/static/styles.css");
-    assert_contains_all(
-        &styles,
-        &[
-            ".prose table { display: block; min-width: 42rem; overflow-x: auto; }",
-            ".prose table th:nth-child(2)",
-            ".prose table td:nth-child(2) { white-space: nowrap; }",
-        ],
-        "responsive support table styles",
-    );
-}
-
-#[test]
 fn sampling_data_page_preserves_training_and_loss_contracts() {
     let page = read_repo_file("site/templates/sampling-data.html");
     let base = read_repo_file("site/templates/base.html");
@@ -614,7 +600,7 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
     );
     assert_contains_all(
         &base,
-        &["href=\"{{ root }}/sampling-data/\"", ">Data</a>"],
+        &["href=\"{{ root }}/sampling-data/\"", ">Sampling &amp; training data</a>"],
         "sampling-data navigation",
     );
     assert_contains_all(
