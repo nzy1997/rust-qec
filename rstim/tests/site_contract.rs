@@ -517,7 +517,7 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
             "id=\"install\"",
             "cargo install --locked rustqec-cli --version 0.3.0",
             "https://www.rust-lang.org/tools/install",
-            "curl --proto '=https' --tlsv1.3 https://sh.rustup.rs | sh",
+            "curl --proto '=https' --tlsv1.2 https://sh.rustup.rs | sh",
             "install.sh",
             "no Rust required",
             "complete native",

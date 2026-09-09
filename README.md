@@ -71,7 +71,7 @@ If Rust is not installed, get it from the official
 [rustup installation guide](https://www.rust-lang.org/tools/install), or run:
 
 ```sh
-curl --proto '=https' --tlsv1.3 https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.2 https://sh.rustup.rs | sh
 ```
 
 The native installer is the alternative when you want a self-contained binary
@@ -107,9 +107,14 @@ cat events.dets pipeline.dem
 ```
 
 The final two lines are `shot D0 L0` and `error(1) D0 L0`. Stats reports one
-qubit, measurement, detector, and observable, with five instructions.
-`python3 tools/check_installed_quickstart.py --bin-dir "$HOME/.local/bin"`
-checks these results and malformed-input rejection from a source checkout.
+qubit, measurement, detector, and observable, with five instructions. After
+the Cargo install, verify it with:
+
+```sh
+python3 tools/check_installed_quickstart.py --bin-dir "$HOME/.cargo/bin"
+```
+
+For the native installer path, use `--bin-dir "$HOME/.local/bin"` instead.
 
 ### Cargo and Rust library users
 
