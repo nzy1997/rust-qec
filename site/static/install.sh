@@ -1,9 +1,9 @@
 #!/bin/sh
-# Install the RustQEC v0.2.1 native CLI without requiring a source checkout.
+# Install the RustQEC v0.3.0 native CLI without requiring a source checkout.
 
 set -eu
 
-VERSION=v0.2.1
+VERSION=v0.3.0
 RELEASE_BASE=https://github.com/nzy1997/rust-qec/releases/download/$VERSION
 DEFAULT_BIN_DIR=${HOME:+$HOME/.local/bin}
 
@@ -11,7 +11,7 @@ usage() {
     cat <<'EOF'
 Usage: install.sh [--bin-dir DIRECTORY]
 
-Install RustQEC v0.2.1 (`rustqec` and `rstim`) into ~/.local/bin by default.
+Install RustQEC v0.3.0 (`rustqec` and `rstim`) into ~/.local/bin by default.
 
 Supported platforms:
   Ubuntu 24.04 x86_64
@@ -67,11 +67,11 @@ main() {
     case "$(uname -s)-$(uname -m)" in
         Linux-x86_64)
             target=x86_64-unknown-linux-gnu
-            expected_sha256=7da64989fd5f04ba8a5e48bae12970187b0bba1bbd91a78860fc5b7a3f4414d9
+            expected_sha256=3ebafcd684f06478ee9d6f4fc85da61e10de4e498020b86c0e76806b67c35aff
             ;;
         Darwin-arm64|Darwin-aarch64)
             target=aarch64-apple-darwin
-            expected_sha256=603c8830093943def788079858edf59edd4e51262c714f1ae3163c0b78ab070e
+            expected_sha256=a74da165d4cd562aaa9e9cbc06d0a42bdf508e65bf283868df1dede4f0a6e8f7
             ;;
         *)
             fail "no validated native archive for $(uname -s) $(uname -m); supported: Linux x86_64 and macOS arm64"

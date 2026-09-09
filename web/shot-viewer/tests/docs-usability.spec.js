@@ -28,12 +28,12 @@ test("home offers three distinct primary destinations without repeating get star
   await expect(actions).toHaveCount(3);
   expect(await actions.allTextContents()).toEqual([
     "Run your first circuit",
-    "Download v0.2.1",
+    "Download v0.3.0",
     "Try Shot Lab",
   ]);
   expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
     "get-started/",
-    "https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1",
+    "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0",
     "interactive/",
   ]);
 
@@ -53,7 +53,7 @@ test("installation starts with one copyable command and keeps manual steps optio
   const installation = page.locator('section[aria-labelledby="install"]');
   const manual = installation.locator("details");
   await expect(manual).not.toHaveAttribute("open", "");
-  await installation.getByRole("button", { name: "Copy Shell · install v0.2.1" }).click();
+  await installation.getByRole("button", { name: "Copy Shell · install v0.3.0" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
     "curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh",
   );

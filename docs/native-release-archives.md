@@ -15,18 +15,20 @@ artifacts are attached to the Actions staging run and are not release assets.
 To stage an existing immutable tag without uploading assets, run:
 
 ```sh
-gh workflow run native-archives.yml --ref master -f tag=v0.2.1 -f publish=false
+gh workflow run native-archives.yml --ref v0.3.0 -f tag=v0.3.0 -f publish=false
 ```
 
 To build, verify, and attach new assets after reviewing the staging evidence, run:
 
 ```sh
-gh workflow run native-archives.yml --ref master -f tag=v0.2.1 -f publish=true
+gh workflow run native-archives.yml --ref v0.3.0 -f tag=v0.3.0 -f publish=true
 ```
 
-`--ref` selects the reviewed workflow and release-tooling version. The `tag`
-input independently selects the source commit used for the locked native builds
-and the rebuilt embedded Shot Lab assets. A production run accepts only an
+`--ref` selects the reviewed workflow and release-tooling version; using the
+release tag pins both tooling and source for v0.3.0. For a later release, select
+the exact tooling ref reviewed for that release. The `tag` input independently
+selects the source commit used for the locked native builds and the rebuilt
+embedded Shot Lab assets. A production run accepts only an
 annotated tag that passes the release gate, and it checks that the gate's peeled
 commit is the commit packaged in the manifest.
 
@@ -35,17 +37,17 @@ Each release publishes two `.tar.gz` archives, `SHA256SUMS`,
 for a tag from:
 
 ```text
-https://github.com/nzy1997/rust-qec/releases/download/v0.2.1/verify_release_archive.py
+https://github.com/nzy1997/rust-qec/releases/download/v0.3.0/verify_release_archive.py
 ```
 
 Run it beside the downloaded manifest and checksums before using an archive:
 
 ```sh
 python3 verify_release_archive.py \
-  --archive rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz \
+  --archive rustqec-v0.3.0-x86_64-unknown-linux-gnu.tar.gz \
   --checksums SHA256SUMS \
   --manifest release-manifest.json \
-  --expected-tag v0.2.1
+  --expected-tag v0.3.0
 ```
 
 Publication first checks the names of existing release assets and stops if any
