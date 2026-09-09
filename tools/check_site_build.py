@@ -42,6 +42,7 @@ class SiteFixture:
 PAGE_FILES = (
     "index.html",
     "get-started/index.html",
+    "docs/index.html",
     "support/index.html",
     "simulator/index.html",
     "sampling-data/index.html",
@@ -55,7 +56,7 @@ PAGE_FILES = (
     "interactive/index.html",
     "interactive/local/index.html",
 )
-JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js")
+JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js")
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
     "index.html": ("capabilities",),
@@ -113,6 +114,7 @@ REQUIRED_FILES = PAGE_FILES + JS_FILES + (
     "install.sh",
     "styles.css",
     "data/benchmark-site.json",
+    "data/docs-search.json",
     "QP101-ZY.md",
     "qp101.schema.json",
     "examples/basic.qp101.json",
@@ -1277,6 +1279,10 @@ const localRefs = [
 const copyBlocks = document.querySelectorAll("pre code");
 """,
     )
+
+    write_text(site_root / "docs/index.html", '<html><body><main><h1>Documentation</h1></main></body></html>')
+    write_text(site_root / "js/search.js", '// Local documentation search')
+    write_text(site_root / "data/docs-search.json", '[]')
 
     for page in PAGE_FILES:
         page_path = site_root / page

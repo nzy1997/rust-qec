@@ -34,11 +34,14 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
       stageTop: stage.top,
       stageBottom: stage.bottom,
       detailTop: detail.top,
+      detailLeft: detail.left,
+      stageRight: stage.right,
     };
   });
-  expect(layout.stageWidth / layout.workspaceWidth).toBeGreaterThan(0.98);
+  expect(layout.stageWidth / layout.workspaceWidth).toBeGreaterThan(0.6);
+  expect(layout.detailLeft).toBeGreaterThanOrEqual(layout.stageRight - 1);
   expect(layout.viewBottom).toBeLessThanOrEqual(layout.stageTop + 1);
-  expect(layout.detailTop).toBeGreaterThanOrEqual(layout.stageBottom - 1);
+  expect(Math.abs(layout.detailTop - layout.stageTop)).toBeLessThan(2);
   expect(await page.locator(".shot-toolbar button").evaluateAll(
     (buttons) => buttons.every((button) => getComputedStyle(button).whiteSpace === "nowrap"),
   )).toBe(true);
@@ -81,8 +84,8 @@ test("fixed gadget gallery edits downstream state and resets history on sample",
   await stage.hover();
   const transformBeforeWheel = await canvas.getAttribute("style");
   const scrollBeforeWheel = await page.evaluate(() => window.scrollY);
-  await page.mouse.wheel(0, 320);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollBeforeWheel);
+  await page.mouse.wheel(0, scrollBeforeWheel > 100 ? -100 : 100);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).not.toBe(scrollBeforeWheel);
   expect(await canvas.getAttribute("style")).toBe(transformBeforeWheel);
 
   await stage.hover();
