@@ -1180,6 +1180,7 @@ pre code {
   }
 
   .docs-grid,
+  .install-grid,
   .workspace-grid,
   .walkthrough-grid,
   .evidence-grid,
@@ -1221,7 +1222,6 @@ pre code {
   .top-nav,
   .nav-links,
   .actions,
-  .install-grid,
   .site-footer {
     flex-direction: column;
     align-items: stretch;
