@@ -95,6 +95,16 @@
     return `<ul class="result-link-list">${links}</ul>`;
   }
 
+  const figureGuides = {
+    "surface-decoder-full": "Surface-code comparison: physical error rate on the horizontal axes; logical error rate on the left and decode time per shot on the right. Read each distance and decoder separately; shaded bands show the recorded uncertainty.",
+    "bb-circuit-full": "BB72/BB144 paired decoder comparison. Read the code size and decoder labels before comparing logical error rates and timings. The reference-gap report explains why these error-budget-stopped runs are not a fixed-shot reproduction of the reference curve.",
+  };
+
+  const takeaways = {
+    "surface-decoder-full": "Recorded d=3, p=0.002 case: rmatching predicts 14 logical failures in 10,000 shots and takes 0.218 µs per shot to decode.",
+    "bb-circuit-full": "Recorded BB72, p=0.003 case: rbposd and ldpc_bposd report 216 and 217 logical failures respectively on 8,000 paired shots.",
+  };
+
   function renderImageArtifacts(item) {
     const artifacts = Array.isArray(item.artifacts) ? item.artifacts : [];
     const images = artifacts.filter(
@@ -111,8 +121,9 @@
             <img src="${ROOT}/${escapeHtml(image.path)}" alt="${escapeHtml(item.title || "Checked benchmark plot")}">
           </a>
           <figcaption class="result-plot-caption">
-            Checked figure for ${escapeHtml(item.title || "this benchmark result")}.
-            <a class="result-plot-enlarge" href="${ROOT}/${escapeHtml(image.path)}">Open the full-size figure to inspect its axes, labels, and legend.</a>
+            ${escapeHtml(figureGuides[item.id] || item.claims_limit || item.title)}
+            <a class="result-plot-enlarge" data-figure-viewer href="${ROOT}/${escapeHtml(image.path)}">Enlarge figure on this page</a>
+          <a href="${ROOT}/${escapeHtml(image.path)}" download>Download original figure</a>
           </figcaption>
         </figure>
       `,
@@ -377,9 +388,8 @@
                 <h3>${escapeHtml(item.title || item.id || "Benchmark evidence")}</h3>
               </div>
             </div>
-            ${renderEvidenceStatusSummary(family, item)}
+            ${plotHtml ? `<p class="result-takeaway">${escapeHtml(takeaways[item.id] || item.title)}</p>${plotHtml}` : ""}
             <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
-            ${renderTextList(item.caveats)}
             <details class="evidence-details evidence-reproduction">
               <summary>Reproduce this result</summary>
               <h4>Artifacts</h4>
@@ -389,13 +399,15 @@
             </details>
             <details class="evidence-details evidence-provenance">
               <summary>Full provenance and sources</summary>
+              ${renderEvidenceStatusSummary(family, item)}
+              ${renderTextList(item.caveats)}
               <h4>Provenance</h4>
               ${renderProvenance(item.provenance)}
               <h4>Sources</h4>
               ${renderSourceLinks(item.provenance_sources || family.source_docs)}
             </details>
           </div>
-          ${plotHtml ? `<div class="result-card-plot">${plotHtml}</div>` : ""}
+
         </article>
       `;
         })

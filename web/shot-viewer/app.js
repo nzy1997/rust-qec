@@ -88,12 +88,12 @@ function shellMarkup(mode) {
           </div>
           <div id="shot-popover" class="shot-popover" role="dialog" aria-label="Choose realized noise outcome" hidden></div>
         </div>
-      </div>
       <section id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
         <p class="eyebrow">Selection</p>
         <h2>Choose a noise site</h2>
         <p>Click an orange noise box in the circuit to inspect or override that event.</p>
       </section>
+      </div>
     </div>`;
 }
 

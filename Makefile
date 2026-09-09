@@ -75,6 +75,7 @@ build-site: build-shot-viewer
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
 	python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery
 	python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json
+	python3 tools/build_docs_search.py --site-root _site
 
 bench-surface-smoke:
 	cargo run --locked -p rsinter --features full --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust

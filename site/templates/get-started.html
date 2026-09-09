@@ -2,11 +2,17 @@
 {% block title %}Get started — RustQEC{% endblock title %}
 {% block hero %}<div class="hero compact-hero"><p class="eyebrow">Get started</p><h1>Your first detector event</h1><p class="hero-copy">Install the v0.3.0 CLI, run a complete circuit, and check a deterministic result. No source checkout is needed for this path.</p></div>{% endblock hero %}
 {% block main %}
-<section class="task-section" aria-labelledby="install"><h2 id="install">1. Install a native package</h2>
+<section class="task-section" aria-labelledby="install"><h2 id="install">1. Install with Cargo</h2>
+<p class="doc-note">Stable quickstart · <strong>v0.3.0</strong> · Rust and Cargo required. No repository checkout needed. <a href="https://www.rust-lang.org/tools/install">Install Rust</a> or use the <a href="#native-install">native package without Rust</a>.</p>
+<pre data-language="Shell · install v0.3.0"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre>
+<p>Cargo installs <code>rustqec</code> into <code>~/.cargo/bin</code> by default. Open a new terminal after installing Rust so this directory is on PATH. This command runs the entire tutorial below.</p>
+<pre data-language="Shell · check installation"><code>rustqec capabilities --format json</code></pre>
+<p><strong>Success:</strong> the capability JSON includes <code>circuit.stats</code>. Continue to <a href="#first-circuit">create your circuit</a>.</p>
+<details id="native-install"><summary>Alternative: install native binaries without Rust</summary>
 <p>Validated runtime environments: <strong>Ubuntu 24.04 x86_64</strong> and <strong>macOS 15 Apple silicon</strong>. Other platforms are outside the tested support matrix. Each archive contains <code>rustqec</code> and <code>rstim</code>.</p>
 <div class="content-links"><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.3.0/rustqec-v0.3.0-x86_64-unknown-linux-gnu.tar.gz">Linux x86_64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/download/v0.3.0/rustqec-v0.3.0-aarch64-apple-darwin.tar.gz">macOS arm64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Checksums and release manifest</a></div>
 <p>The installer downloads the prebuilt <code>rustqec</code> and <code>rstim</code> binaries, checks their pinned SHA-256, and installs them into <code>~/.local/bin</code>. You do not need Rust or a source checkout.</p>
-<pre data-language="Shell · install v0.3.0"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
+<pre data-language="Shell · native install"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
 <p>If <code>~/.local/bin</code> is not already in your PATH, run this once in the terminal you will use for the examples:</p>
 <pre data-language="Shell · current terminal"><code>export PATH="$HOME/.local/bin:$PATH"</code></pre>
 <p>The installer prints the installation location and any required PATH setup. It does not use <code>sudo</code> or edit your shell configuration. Use an empty working directory for the circuit files in step 2.</p>
@@ -35,6 +41,7 @@ rustqec capabilities --format json</code></pre>
 </details>
 <pre data-language="Shell · check installation"><code>rustqec capabilities --format json</code></pre>
 <p><strong>Success:</strong> the capability JSON includes <code>circuit.stats</code>. The example below only needs the <code>rustqec</code> command.</p>
+</details>
 </section>
 <section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Create and inspect a circuit</h2>
 {% include "partials/example-circuit.html" %}
@@ -48,25 +55,31 @@ cat events.dets model.dem</code></pre>
 <pre data-output="true" data-language="Expected file contents"><code>shot D0 L0
 error(1) D0 L0</code></pre>
 <p>The X error has probability 1. The detector stream therefore contains D0 and logical observable L0; the DEM records the same probability-1 event. This small example verifies installation and the command path; it is not a numerical-performance benchmark.</p>
-<div class="content-links"><a href="../simulator/">Next: sample circuits</a><a href="../sampling-data/">Save training data</a><a href="../interactive/">Explore errors visually</a></div>
+<div class="content-links"><a href="../simulator/">Next: sample circuits</a><a href="../decoding/#first-decode">Decode a detector row</a><a href="../sampling-data/">Save training data</a><a href="../interactive/">Explore errors visually</a></div>
 </section>
 <section class="task-section" aria-labelledby="tools"><h2 id="tools">Which command should I use?</h2>
 <div class="table-wrap"><table><thead><tr><th>Tool</th><th>Role</th><th>Setup</th></tr></thead><tbody><tr><td><code>rustqec</code></td><td>Unified capability discovery, structured circuit and dataset commands</td><td>Native archive or <code>cargo install --locked rustqec-cli --version 0.3.0</code></td></tr><tr><td><code>rstim</code></td><td>Simulator, DEM and circuit rendering commands</td><td>Native archive or feature-selected Cargo install</td></tr><tr><td><code>qec-code</code></td><td>Code construction and distance checks</td><td><code>cargo install --locked qec-code --version 0.3.0 --features cli</code></td></tr><tr><td><code>rsinter</code></td><td>Sampling, decoder replay, and experiment collection</td><td><code>cargo install --locked rsinter --version 0.3.0 --features rbposd-runner,rmatching-runner</code></td></tr><tr><td><code>make</code> workflows</td><td>Repository tests, benchmarks, and checked evidence</td><td>Source checkout and workflow-specific dependencies</td></tr></tbody></table></div>
 </section>
-<section class="task-section" aria-labelledby="cargo-install"><h2 id="cargo-install">Install from crates.io</h2>
-<pre data-language="Shell · lightweight rustqec"><code>cargo install --locked rustqec-cli --version 0.3.0 --root "$HOME/.local"</code></pre>
-<p>This installs <code>rustqec</code>, which runs the complete example above. The default includes circuit and dataset tools plus envelope matching, without the browser viewer or HiGHS. Exact envelope MLE is opt-in with <code>--features ilp</code> and requires the native solver build prerequisites. Official native archives include ILP and the viewer. Use <code>rustqec capabilities --format json</code> to inspect your binary.</p>
+<section class="task-section" aria-labelledby="cargo-install"><h2 id="cargo-install">Add optional CLI features</h2>
+<pre data-language="Shell · optional exact solver"><code>cargo install --locked rustqec-cli --version 0.3.0 --features ilp</code></pre>
+<p>The default install already includes circuit and dataset tools plus envelope matching. Use this optional reinstall for exact envelope MLE, after installing the <a href="#source-build">native solver build prerequisites</a>. Official native archives include ILP and the viewer. Use <code>rustqec capabilities --format json</code> to inspect your binary.</p>
 <p>For the complete Stim-style compatibility command, install <code>rstim</code> separately with <code>cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer</code>. Internal benchmark workers are not installed by default. <code>rilpqec</code> always includes HiGHS; enabling its Gurobi feature adds a separately configured backend. See the <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md">crate publishing and feature guide</a>.</p></section>
-<section class="task-section" aria-labelledby="source-build"><h2 id="source-build">Building from source</h2>
-<p>For a frozen source build, check out <code>v0.3.0</code>. Current development builds are tested with Rust 1.88.0 (MSRV) and stable on the two native targets above. Install Rust and the platform's native build dependencies before building.</p>
+<section class="task-section" aria-labelledby="source-build"><h2 id="source-build">Build the development version from source</h2>
+<p>Advanced guides labeled <strong>Development · master</strong> require this checkout. For the frozen release, use the <a href="#stable-source">v0.3.0 source instructions</a> instead. Current development builds are tested with Rust 1.88.0 (MSRV) and stable on the two native targets above. Install Rust and the platform's native build dependencies before building.</p>
 <details><summary>Ubuntu 24.04 build prerequisites</summary><pre data-language="Shell · Ubuntu"><code>sudo apt-get update
 sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv</code></pre></details>
 <details><summary>macOS 15 build prerequisites</summary><pre data-language="Shell · macOS"><code>xcode-select --install
 brew install cmake fontconfig pkg-config python</code></pre><p>Homebrew must already be installed.</p></details>
-<pre data-language="Shell · source build"><code>git clone --branch v0.3.0 --depth 1 https://github.com/nzy1997/rust-qec.git
+<pre data-language="Shell · development source"><code>git clone --branch master --depth 1 https://github.com/nzy1997/rust-qec.git
 cd rust-qec
 cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,rustqec-cli/ilp
 export PATH="$(pwd)/target/debug:$PATH"</code></pre>
+<details id="stable-source"><summary>Frozen source: v0.3.0</summary>
+<p>Use this separate checkout for release reproduction. Development-only guides require <code>master</code> above.</p>
+<pre data-language="Shell · stable source"><code>git clone --branch v0.3.0 --depth 1 https://github.com/nzy1997/rust-qec.git rust-qec-v0.3.0
+cd rust-qec-v0.3.0
+cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,rustqec-cli/ilp
+export PATH="$(pwd)/target/debug:$PATH"</code></pre></details>
 <p>You can now run the same circuit example. Benchmark workflows may additionally need Python dependencies; use the setup guide linked from each workflow. The <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">development build guide</a> describes test prerequisites.</p>
 </section>
 <section class="task-section" aria-labelledby="versions"><h2 id="versions">Version and support boundaries</h2><p>This website follows <code>master</code>; the installed quickstart above targets <strong>v0.3.0</strong>. Source links labeled development may describe later changes. Eight public crates start the 0.3 series; private workspace packages keep their own versions. The historical <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">v0.2.1 release</a> and its archives remain available. Check the release manifest or Cargo metadata when selecting a library dependency.</p><p>Atom-loss envelope decoding is beta; experimental benchmark workflows do not establish universal performance or publication readiness. Read the <a href="../support/">support and migration contract</a> and <a href="../validation/">evidence guide</a> before applying results to another circuit.</p></section>

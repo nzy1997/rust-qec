@@ -22,12 +22,13 @@
           <span>RustQEC</span>
         </a>
         <div class="nav-links">
+          <a class="nav-link" href="{{ root }}/docs/">Documentation</a>
           <a class="nav-link{% if current_nav == "start" %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
           <details class="nav-group"{% if current_nav in ["simulate", "data", "dems", "decode", "css"] %} data-current="true"{% endif %}>
             <summary>Guides</summary>
             <div class="nav-menu">
               <a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate circuits</a>
-              <a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Data</a>
+              <a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Sampling &amp; training data</a>
               <a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
               <a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decode</a>
               <a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>Construct CSS codes</a>
@@ -36,6 +37,7 @@
           <details class="nav-group"{% if current_nav in ["qp101", "protocol", "rsmp", "support"] %} data-current="true"{% endif %}>
             <summary>Reference</summary>
             <div class="nav-menu">
+              <a href="{{ root }}/docs/#reference">CLI &amp; Rust API index</a>
               <a href="{{ root }}/support/"{% if current_nav == "support" %} aria-current="page"{% endif %}>Support &amp; compatibility</a>
               <a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>Sample archives · RSMP v1</a>
               <a href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>Circuit diagrams · QP101</a>
@@ -45,9 +47,14 @@
           <a class="nav-link{% if current_nav == "evidence" %} current{% endif %}" href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Performance &amp; validation</a>
           <a class="nav-link{% if current_nav == "shot" %} current{% endif %}" href="{{ root }}/interactive/"{% if current_nav == "shot" %} aria-current="page"{% endif %}>Shot Lab</a>
         </div>
+        <form class="nav-search" role="search" action="{{ root }}/docs/">
+          <label class="visually-hidden" for="site-search">Search documentation</label>
+          <input id="site-search" name="q" type="search" placeholder="Search docs…">
+          <button type="submit">Search</button>
+        </form>
       </nav>
     </div>
-    <div class="version-strip">Development docs (master) <span aria-hidden="true">·</span> <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Release v0.3.0</a> <span aria-hidden="true">·</span> <a href="{{ root }}/support/">Support &amp; migration</a></div>
+    <div class="version-strip"><a href="{{ root }}/get-started/#source-build">Development docs · master</a> <span aria-hidden="true">·</span> <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Download release v0.3.0</a> <span aria-hidden="true">·</span> <a href="{{ root }}/support/">Support &amp; migration</a></div>
     <header class="site-header">
       {% block hero %}{% endblock hero %}
     </header>
