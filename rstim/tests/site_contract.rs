@@ -516,6 +516,8 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
         &index,
         &[
             "id=\"install\"",
+            "Install with Cargo",
+            "href=\"#install\"",
             "cargo install --locked rustqec-cli --version 0.3.0",
             "https://www.rust-lang.org/tools/install",
             "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
@@ -529,6 +531,18 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
             "Windows",
         ],
         "homepage installation section",
+    );
+    assert!(
+        !index.contains("Download v0.3.0"),
+        "homepage hero must not promote a release download button"
+    );
+    assert!(
+        !index.contains("Run your first circuit"),
+        "homepage hero must send visitors to the default Cargo install path"
+    );
+    assert!(
+        !index.contains("only need the command line tools"),
+        "native installer copy must not undermine Cargo as the default path"
     );
     assert_contains_all(
         &readme,
@@ -586,7 +600,7 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
     );
     assert_contains_all(
         &base,
-        &["href=\"{{ root }}/sampling-data/\"", ">Data</a>"],
+        &["href=\"{{ root }}/sampling-data/\"", ">Sampling &amp; training data</a>"],
         "sampling-data navigation",
     );
     assert_contains_all(

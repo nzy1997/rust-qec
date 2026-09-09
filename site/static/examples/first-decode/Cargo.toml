@@ -1,0 +1,9 @@
+[package]
+name = "qec-first-decode"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rmatching = "=0.3.0"
+
+[workspace]

@@ -28,8 +28,35 @@
       </tbody>
     </table>
   </div>
-  <p class="doc-note">Source workflow: run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
-<pre class="quick-command"><code>make surface-decoder-compare-smoke</code></pre>
+</section>
+
+
+<section class="task-section" aria-labelledby="first-decode"><h2 id="first-decode">Decode your first detector rows</h2>
+<p class="doc-note">Stable Rust API · <strong>rmatching v0.3.0</strong> · Rust and Cargo required. This standalone example needs no repository checkout, Python, or native solver.</p>
+<p>Use a graphlike model with two detectors and one logical observable. For syndrome <code>11</code>, one joint error is more likely than two independent boundary errors, so matching predicts <code>L0=1</code>. The control row <code>00</code> predicts <code>L0=0</code>.</p>
+<p>The probability-1 DEM from the installation check is not supported by rmatching. Use this separate probability-0.1 model to learn decoding; detector inputs contain no observable answers.</p>
+<h3 id="decode-project">1. Create a standalone Rust project</h3>
+<pre data-language="Shell"><code>mkdir qec-first-decode
+cd qec-first-decode
+mkdir src</code></pre>
+<p>Save as <code>Cargo.toml</code>:</p>
+<pre data-language="TOML"><code>{{ load_data(path="static/examples/first-decode/Cargo.toml", format="plain") }}</code></pre>
+<h3 id="decode-input">2. Save the model and detector rows</h3>
+<pre data-language="Shell"><code>cat &gt; model.dem &lt;&lt;'DEM'
+{{ load_data(path="static/examples/first-decode/model.dem", format="plain") }}DEM
+cat &gt; detectors.01 &lt;&lt;'SHOTS'
+{{ load_data(path="static/examples/first-decode/detectors.01", format="plain") }}SHOTS</code></pre>
+<p>Each character in <code>detectors.01</code> is a detector bit, ordered D0 then D1. These are two explicit test cases, not a sampled logical-error-rate estimate.</p>
+<h3 id="decode-code">3. Decode and inspect the prediction</h3>
+<p>Save as <code>src/main.rs</code>:</p>
+<pre data-language="Rust"><code>{{ load_data(path="static/examples/first-decode/src/main.rs", format="plain") }}</code></pre>
+<pre data-language="Shell"><code>cargo run --quiet</code></pre>
+<pre data-output="true" data-language="Expected output"><code>row 1: predicted L0=1
+row 2: predicted L0=0</code></pre>
+<p>For these constructed cases, the predicted bits match the chosen error events. With real samples, compare predictions to held-out observable flips to count logical failures; the decoder must only receive detector bits.</p>
+<h3 id="decode-own-data">4. Use your own model</h3>
+<p>Replace the DEM and input rows together. The row width must equal the model's detector count, and rmatching supports graphlike error components with at most two detectors and probabilities <code>0 ≤ p &lt; 1</code>. Adapt this example's two-bit validation to your model; do not simply truncate rows. Under atom loss, first construct <a href="../sampling-data/#loss-tensors-title">loss-aware detector inputs</a>.</p>
+<div class="content-links"><a href="../examples/first-decode/src/main.rs" download>Download Rust example</a><a href="https://docs.rs/rmatching/0.3.0/rmatching/">rmatching API</a><a href="../sampling-data/">Next: save aligned input and truth</a><a href="#benchmark-campaigns-title">Compare decoders</a></div>
 </section>
 
 <section id="benchmark-campaigns" class="task-section" aria-labelledby="benchmark-campaigns-title">
@@ -38,6 +65,7 @@
     <h2 id="benchmark-campaigns-title">Run and compare decoder cases</h2>
     <p class="section-copy"><code>rsinter</code> runs cases, merges outputs, and produces comparison plots. Smoke runs check wiring; checked full artifacts support only the recorded cases and environments.</p>
   </div>
+  <p class="doc-note">Development · <strong>master</strong>. Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
   <pre class="quick-command"><code>make surface-decoder-compare-smoke
 make bb-circuit-bposd-compare-smoke</code></pre>
   <div class="table-wrap result-table">

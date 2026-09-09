@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Documentation & search — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Documentation</p><h1>Find your next step</h1><p class="hero-copy">Start with a working example, follow a task, or look up a command, Rust API, or format.</p></div>{% endblock hero %}
+{% block main %}
+<section class="task-section" aria-labelledby="search-title">
+<h2 id="search-title">Search documentation</h2>
+<form class="docs-search" data-search-index="{{ root }}/data/docs-search.json" role="search"><label for="docs-query">Command, concept, or crate</label><div><input id="docs-query" name="q" type="search" placeholder="Try b8, rmatching, or atom loss"><button type="submit">Search</button></div></form>
+<p id="search-status" role="status">Browse the index below, or search across the documentation.</p>
+<ul id="search-results" class="search-results"></ul>
+<noscript><p>Search needs JavaScript. All documentation links below remain available.</p></noscript>
+</section>
+<section class="task-section" aria-labelledby="start"><h2 id="start">Start here</h2><ul>
+<li><a href="../get-started/">Install with Cargo and run your first detector event</a> — stable v0.3.0.</li>
+<li><a href="../get-started/#native-install">Native binaries without Rust</a> — installation alternative.</li>
+<li><a href="../get-started/#source-build">Development source setup</a> — master workflows.</li>
+<li><a href="../interactive/">Shot Lab</a> — inspect a circuit in your browser.</li>
+</ul></section>
+<section class="task-section" aria-labelledby="guides"><h2 id="guides">Task guides</h2><ol>
+<li><a href="../simulator/">Simulate circuits and sample measurements</a></li>
+<li><a href="../detector-models/">Extract detector error models (DEM)</a></li>
+<li><a href="../decoding/#first-decode">Decode detector rows with rmatching</a></li>
+<li><a href="../sampling-data/">Save sampling and training data</a></li>
+<li><a href="../css-codes/">Construct CSS codes and check distance</a></li>
+<li><a href="../qp101/">Render circuit diagrams</a></li>
+</ol></section>
+<section class="task-section" aria-labelledby="concepts"><h2 id="concepts">Concepts and formats</h2><ul>
+<li><a href="../get-started/#detector-output">Measurement, detector event, and logical observable</a></li>
+<li><a href="../sampling-data/#b8-title">b8 bit packing and row sizes</a></li>
+<li><a href="../sampling-data/#loss-tensors-title">Atom loss, value bits, and validity masks</a></li>
+<li><a href="../rsmp-v1-showcase/">RSMP v1 sample archives</a></li>
+<li><a href="../qp101/protocol/">QP101 JSON format specification</a></li>
+</ul></section>
+<section class="task-section" aria-labelledby="reference"><h2 id="reference">CLI and Rust API reference</h2>
+<p>CLI help describes the binary you installed. The API links below are pinned to v0.3.0; for development workflows, use the matching source checkout.</p>
+<div class="table-wrap"><table><thead><tr><th>Tool / crate</th><th>Purpose</th><th>Reference</th></tr></thead><tbody>
+<tr><td>rustqec</td><td>Unified circuit and dataset commands</td><td><code>rustqec --help</code>; <code>rustqec capabilities --format json</code></td></tr>
+<tr><td>rstim</td><td>Stim-style simulator, DEM, rendering</td><td><code>rstim --help</code>; <a href="https://docs.rs/rstim/0.3.0/rstim/">Rust API</a></td></tr>
+<tr><td>rmatching</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/0.3.0/rmatching/">Rust API</a>; <a href="../decoding/#first-decode">working example</a></td></tr>
+<tr><td>rbposd</td><td>BP-OSD decoding</td><td><a href="https://docs.rs/rbposd/0.3.0/rbposd/">Rust API</a></td></tr>
+<tr><td>rilpqec</td><td>ILP decoding</td><td><a href="https://docs.rs/rilpqec/0.3.0/rilpqec/">Rust API</a></td></tr>
+<tr><td>rsinter</td><td>Experiment collection and decoder replay</td><td><code>rsinter --help</code>; <a href="https://docs.rs/rsinter/0.3.0/rsinter/">Rust API</a></td></tr>
+<tr><td>qec-code</td><td>CSS matrices and distance checks</td><td><code>qec-code --help</code>; <a href="https://docs.rs/qec-code/0.3.0/qec_code/">Rust API</a></td></tr>
+<tr><td>qec-ilp-core</td><td>Shared ILP models and solver support</td><td><a href="https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/">Rust API</a></td></tr>
+</tbody></table></div></section>
+<section class="task-section" aria-labelledby="validation"><h2 id="validation">Performance, validation, and support</h2><ul>
+<li><a href="../validation/">Find benchmark evidence and reproduction instructions</a></li>
+<li><a href="../support/">Feature support and compatibility</a></li>
+<li><a href="../get-started/#versions">Stable and development version boundaries</a></li>
+</ul></section>
+{% endblock main %}
+{% block scripts %}<script src="{{ root }}/js/search.js" defer></script>{% endblock scripts %}

@@ -88,12 +88,12 @@ function shellMarkup(mode) {
           </div>
           <div id="shot-popover" class="shot-popover" role="dialog" aria-label="Choose realized noise outcome" hidden></div>
         </div>
-      </div>
       <section id="shot-detail" class="shot-panel shot-detail" aria-live="polite">
         <p class="eyebrow">Selection</p>
         <h2>Choose a noise site</h2>
         <p>Click an orange noise box in the circuit to inspect or override that event.</p>
       </section>
+      </div>
     </div>`;
 }
 
@@ -104,6 +104,7 @@ function collectUi() {
     error: find("shot-error"),
     empty: find("shot-empty"),
     workspace: find("shot-workspace"),
+    layout: root.querySelector(".shot-layout"),
     file: find("shot-file"),
     drop: find("shot-drop-target"),
     sample: find("shot-sample"),
@@ -190,7 +191,17 @@ function bindControls(state) {
       hidePopover(state);
     }
   });
+  // Observe only content above the diagram, so resizing the diagram cannot
+  // trigger a ResizeObserver feedback loop. Font loading and toolbar wrapping
+  // can change the available height without a window resize.
+  const layoutObserver = new ResizeObserver(() => {
+    updateLayout(state);
+    if (state.snapshot) fitDiagram(state, false);
+  });
+  document.querySelectorAll(".nav-shell, .version-strip, .site-header, .offline-header, .shot-toolbar, .shot-view-panel, #shot-error, #shot-loading")
+    .forEach((element) => layoutObserver.observe(element));
   window.addEventListener("resize", () => {
+    updateLayout(state);
     if (state.snapshot) fitDiagram(state, false);
   });
 }
@@ -278,6 +289,7 @@ function renderSnapshot(state, snapshot, options = {}) {
   applyFilters(state);
   updateToolbar(state);
   updateWarnings(state);
+  updateLayout(state);
   flashChanged(state);
 
   if (state.selectedEventId) {
@@ -334,6 +346,13 @@ function labelDiagramTargets(canvas, snapshot) {
   }
 }
 
+function updateLayout(state) {
+  if (state.ui.workspace.hidden) return;
+  // Document coordinates keep the workspace height stable while the page scrolls.
+  const top = Math.ceil(state.ui.layout.getBoundingClientRect().top + window.scrollY);
+  state.ui.layout.style.setProperty("--shot-layout-top", `${top}px`);
+}
+
 function toggleFocus(state) {
   setFocus(state, !document.body.classList.contains("shot-focus"));
 }
@@ -342,7 +361,8 @@ function setFocus(state, enabled) {
   document.body.classList.toggle("shot-focus", enabled);
   state.ui.focus?.setAttribute("aria-pressed", String(enabled));
   if (state.ui.focus) state.ui.focus.textContent = enabled ? "Exit focus" : "Focus circuit";
-  if (enabled) requestAnimationFrame(() => fitDiagram(state));
+  updateLayout(state);
+  requestAnimationFrame(() => fitDiagram(state));
 }
 
 function updateWarnings(state) {
