@@ -66,6 +66,7 @@ code {
 .feature-walkthroughs,
 .benchmark-evidence,
 .docs-grid,
+.install-grid,
 .qp101-section,
 .qp101-kicker {
   display: flex;
@@ -227,6 +228,42 @@ main {
 
 .docs-home {
   margin-top: 0;
+}
+
+.install-section {
+  margin-bottom: 4rem;
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.install-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.install-card .eyebrow,
+.install-card h3,
+.install-card p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.install-card pre {
+  margin: 0.35rem 0;
+}
+
+.install-card .button {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.install-note {
+  color: var(--muted);
+  font-size: 0.95rem;
 }
 
 .docs-grid,
@@ -1184,6 +1221,7 @@ pre code {
   .top-nav,
   .nav-links,
   .actions,
+  .install-grid,
   .site-footer {
     flex-direction: column;
     align-items: stretch;

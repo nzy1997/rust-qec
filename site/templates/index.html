@@ -18,6 +18,55 @@
 {% endblock hero %}
 
 {% block main %}
+<section id="install" class="install-section" aria-labelledby="install-heading">
+  <div class="section-heading">
+    <p class="eyebrow">Install v0.3.0</p>
+    <h2 id="install-heading">Choose the path that fits your machine</h2>
+    <p class="section-copy">
+      Already have Rust and Cargo? Start with the registry package. If you
+      only need the command line tools, the native archive is a self-contained
+      alternative.
+    </p>
+  </div>
+  <div class="install-grid">
+    <article class="docs-card install-card install-card-primary">
+      <p class="eyebrow">Recommended for Rust users</p>
+      <h3>Cargo install</h3>
+      <p>
+        Install the lightweight <code>rustqec</code> CLI from crates.io. It
+        covers the complete introductory circuit workflow and does not need a
+        source checkout.
+      </p>
+      <pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre>
+      <p>
+        Need Rust first? Use the official
+        <a href="https://www.rust-lang.org/tools/install">rustup installation guide</a>:
+      </p>
+      <pre data-language="Shell"><code>curl --proto '=https' --tlsv1.3 https://sh.rustup.rs | sh</code></pre>
+      <p class="install-note">
+        For exact envelope MLE, add <code>--features ilp</code>. Install
+        <code>rstim</code> separately when you need its Stim-style CLI.
+      </p>
+    </article>
+    <article class="docs-card install-card">
+      <p class="eyebrow">Alternative: no Rust required</p>
+      <h3>Native installer</h3>
+      <p>
+        The official <a href="install.sh"><code>install.sh</code></a> downloads
+        verified v0.3.0 binaries into <code>~/.local/bin</code>. It includes
+        the complete native <code>rustqec</code>/<code>rstim</code> CLI feature
+        set, including ILP and the full Shot Lab viewer.
+      </p>
+      <pre data-language="Shell"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
+      <p class="install-note">
+        Validated on Ubuntu 24.04 x86_64 and macOS 15 Apple silicon. Windows,
+        Intel macOS, and other platforms are outside the supported native
+        archive matrix.
+      </p>
+      <a class="button" href="get-started/">See checksum and manual install steps</a>
+    </article>
+  </div>
+</section>
 <section id="capabilities" class="docs-home" aria-label="What is in the box">
   <div class="section-heading">
     <p class="eyebrow">What's in the box</p>
