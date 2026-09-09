@@ -9,7 +9,8 @@
   syncNavOffset();
   if (navShell) new ResizeObserver(syncNavOffset).observe(navShell);
   const toc = document.querySelector('.page-toc');
-  const headings = [...main.querySelectorAll('h2, h3, h4')];
+  // Interactive widgets replace their headings and provide their own navigation.
+  const headings = [...main.querySelectorAll('h2, h3, h4')].filter((heading) => !heading.closest('[data-toc-skip]'));
   const tocLinks = new Map();
   if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && document.body.dataset.page !== 'shot') {
     let section;
