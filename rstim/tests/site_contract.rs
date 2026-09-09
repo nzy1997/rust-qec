@@ -507,6 +507,36 @@ fn new_documentation_routes_use_canonical_sources() {
 }
 
 #[test]
+fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
+    let index = read_repo_file("site/templates/index.html");
+    let styles = read_repo_file("site/static/styles.css");
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"install\"",
+            "cargo install --locked rustqec-cli --version 0.3.0",
+            "https://www.rust-lang.org/tools/install",
+            "curl --proto '=https' --tlsv1.3 https://sh.rustup.rs | sh",
+            "install.sh",
+            "no Rust required",
+            "complete native",
+            "including ILP",
+            "full Shot Lab viewer",
+            "Ubuntu 24.04 x86_64",
+            "macOS 15 Apple silicon",
+            "Windows",
+        ],
+        "homepage installation section",
+    );
+    assert_contains_all(
+        &styles,
+        &[".install-grid", ".install-card", ".install-note"],
+        "homepage installation styles",
+    );
+}
+
+#[test]
 fn sampling_data_page_preserves_training_and_loss_contracts() {
     let page = read_repo_file("site/templates/sampling-data.html");
     let base = read_repo_file("site/templates/base.html");
