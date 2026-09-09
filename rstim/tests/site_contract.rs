@@ -467,7 +467,7 @@ fn new_documentation_routes_use_canonical_sources() {
 
     assert_contains_all(
         &get_started,
-        &["id=\"install\"", "rustqec-v0.2.1-", "id=\"source-build\""],
+        &["id=\"install\"", "rustqec-v0.3.0-", "id=\"source-build\""],
         "versioned onboarding entry point",
     );
     assert_contains_all(

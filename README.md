@@ -22,7 +22,7 @@ python3 tools/check_site_build.py _site
 ```
 
 The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
-pins the native CLI examples to v0.2.1. `make build-site` stages the canonical
+pins the native CLI examples to v0.3.0. `make build-site` stages the canonical
 QP101 and support contracts into ignored `site/generated/` before Zola renders
 them. Edit `rstim/doc/QP101-ZY.md` or `docs/support-compatibility.md` to update
 those pages; do not edit the generated copies.
@@ -60,7 +60,7 @@ With RustQEC you can:
 
 ## Quick Start
 
-Install the prebuilt v0.2.1 CLI (Ubuntu 24.04 x86_64 or macOS 15 Apple silicon):
+Install the prebuilt v0.3.0 CLI (Ubuntu 24.04 x86_64 or macOS 15 Apple silicon):
 
 ```sh
 curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh
@@ -95,18 +95,18 @@ checks these results and malformed-input rejection from a source checkout.
 
 ### Cargo and Rust library users
 
-The v0.3.0 crates.io candidate is being prepared; see the
-[release and migration notes](docs/releases/v0.3.0.md). From this development
-checkout, install the basic CLI without the ILP solver:
+The v0.3.0 crates are available on crates.io; see the
+[release and migration notes](docs/releases/v0.3.0.md). Install the basic CLI
+without the ILP solver:
 
 ```sh
-cargo install --locked --path rustqec-cli
+cargo install --locked rustqec-cli --version 0.3.0
 ```
 
 This installs `rustqec`, sufficient for the full example above. Add `--features ilp`
-for exact envelope MLE; the full native archives already include it. Stim-style
-compatibility commands remain available through
-`cargo install --locked --path rstim --bin rstim --features cli,codegen-css,shot-viewer`.
+for exact envelope MLE; the official native archives include ILP in `rustqec`
+and the full browser viewer in `rstim`. Stim-style compatibility commands remain available through
+`cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer`.
 
 For Rust integration, start with the [independent consumer example](examples/rust-consumer/README.md)
 that samples a circuit and decodes it with MWPM. The [crate guide](docs/crates-io.md)

@@ -38,9 +38,9 @@ class StatsContractTest(unittest.TestCase):
     def test_selects_only_the_downloaded_archive_checksum(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             release = Path(temporary)
-            archive = release / "rustqec-v0.2.1-x86_64-unknown-linux-gnu.tar.gz"
+            archive = release / "rustqec-v0.3.0-x86_64-unknown-linux-gnu.tar.gz"
             archive.write_bytes(b"verified archive")
-            other = "rustqec-v0.2.1-aarch64-apple-darwin.tar.gz"
+            other = "rustqec-v0.3.0-aarch64-apple-darwin.tar.gz"
             digest = hashlib.sha256(archive.read_bytes()).hexdigest()
             (release / "SHA256SUMS").write_text(f"{digest}  {archive.name}\n{'0' * 64}  {other}\n", encoding="utf-8")
             command = "awk -v archive=\"$archive\" '$2 == archive { count++; record = $0 } END { if (count != 1) exit 1; print record }' SHA256SUMS > \"$archive.sha256\" && if command -v sha256sum >/dev/null; then sha256sum -c \"$archive.sha256\"; else shasum -a 256 -c \"$archive.sha256\"; fi"
