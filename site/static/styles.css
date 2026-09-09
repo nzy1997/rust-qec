@@ -243,6 +243,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  min-width: 0;
 }
 
 .install-card .eyebrow,
