@@ -1273,7 +1273,9 @@ pre code {
 .prose { max-width: var(--reading-width); margin: auto; overflow-wrap: anywhere; }
 .prose h1 { font-size: 2.25rem; line-height: 1.2; }
 .prose h2 { margin-top: 2.5rem; }
-.prose table { display: block; overflow-x: auto; }
+.prose table { display: block; min-width: 42rem; overflow-x: auto; }
+.prose table th:nth-child(2),
+.prose table td:nth-child(2) { white-space: nowrap; }
 .prose img { max-width: 100%; }
 pre { max-width: 100%; }
 .code-toolbar { display: flex; align-items: center; gap: .75rem; justify-content: space-between; margin-top: 1rem; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: .4rem .4rem 0 0; background: var(--surface-muted); color: var(--muted); font-size: .8rem; }
