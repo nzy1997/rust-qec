@@ -509,6 +509,7 @@ fn new_documentation_routes_use_canonical_sources() {
 #[test]
 fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
     let index = read_repo_file("site/templates/index.html");
+    let readme = read_repo_file("README.md");
     let styles = read_repo_file("site/static/styles.css");
 
     assert_contains_all(
@@ -517,7 +518,7 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
             "id=\"install\"",
             "cargo install --locked rustqec-cli --version 0.3.0",
             "https://www.rust-lang.org/tools/install",
-            "curl --proto '=https' --tlsv1.2 https://sh.rustup.rs | sh",
+            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
             "install.sh",
             "no Rust required",
             "complete native",
@@ -528,6 +529,15 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
             "Windows",
         ],
         "homepage installation section",
+    );
+    assert_contains_all(
+        &readme,
+        &[
+            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
+            "From a source checkout",
+            "$(dirname \"$(command -v rustqec)\")",
+        ],
+        "README installation section",
     );
     assert_contains_all(
         &styles,
