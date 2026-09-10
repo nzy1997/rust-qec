@@ -1,5 +1,12 @@
 # RustQEC
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/static/brand/rustqec-logo-dark.svg">
+    <img src="site/static/brand/rustqec-logo.svg" width="440" alt="RustQEC: a copper surface-code patch with four boundary checks">
+  </picture>
+</p>
+
 [![CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nzy1997/rust-qec/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rust-qec)
 
