@@ -9,6 +9,7 @@
       name="description"
       content="{% block description %}RustQEC — a quantum error correction workspace in Rust{% endblock description %}"
     >
+    <meta name="theme-color" content="#fcfaf7">
     <link rel="icon" type="image/svg+xml" href="{{ root }}/brand/rustqec-mark.svg">
     <link rel="stylesheet" href="{{ root }}/styles.css">
     {% block head %}{% endblock head %}
@@ -20,7 +21,7 @@
 
       <nav class="top-nav" aria-label="Primary">
         <a class="brand" href="{{ root }}/" aria-label="RustQEC home">
-          <img class="brand-logo" src="{{ root }}/brand/rustqec-lockup.svg" width="160" height="40" alt="RustQEC">
+          <img class="brand-logo" src="{{ root }}/brand/rustqec-lockup.svg" width="176" height="44" alt="RustQEC">
         </a>
         <details class="mobile-navigation" open>
           <summary>Menu</summary>
@@ -81,7 +82,7 @@
     </div>
 
     <footer class="site-footer">
-      <span>RustQEC — a quantum error correction workspace in Rust</span>
+      <div class="footer-brand"><a href="{{ root }}/" aria-label="RustQEC home"><img src="{{ root }}/brand/rustqec-lockup.svg" width="128" height="32" alt="RustQEC" loading="lazy"></a><span>A quantum error correction workspace in Rust</span></div>
       <div class="footer-links"><a href="{{ root }}/support/#get-help">Get help</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Release notes ↗</a><a href="https://github.com/nzy1997/rust-qec">GitHub ↗</a><a href="#top">Back to top</a></div>
     </footer>
     <script src="{{ root }}/js/docs.js" defer></script>
