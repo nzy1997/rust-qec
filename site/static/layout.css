@@ -2,9 +2,6 @@
 :root {
   --page-width: 1280px;
   --reading-width: 880px;
-  --bg: #fff;
-  --surface-muted: #f3f6f7;
-  --border: #dee5e8;
   --shadow: 0 4px 16px rgb(23 32 38 / 4%);
   --gutter: clamp(20px, 4vw, 48px);
 }
@@ -56,7 +53,7 @@ p { max-width: 76ch; }
 .docs-navigation p:first-child { margin-top: 0; }
 .docs-navigation a { display: block; padding: 5px 10px; margin-left: -10px; color: var(--muted); text-decoration: none; border-radius: 5px; }
 .docs-navigation a:hover { background: var(--surface-muted); color: var(--accent-dark); }
-.docs-navigation a[aria-current] { background: #eaf4f4; color: var(--accent-dark); font-weight: 650; }
+.docs-navigation a[aria-current] { background: var(--accent-soft); color: var(--accent-dark); font-weight: 650; }
 .breadcrumbs { display: flex; flex-wrap: wrap; gap: 10px; font-size: .8125rem; color: var(--muted); margin-bottom: 24px; }
 .breadcrumbs a { text-decoration: none; }
 .prose { max-width: none; margin: 0; }
@@ -80,27 +77,21 @@ p { max-width: 76ch; }
 pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 .copy-status { font-size: .8125rem; }
 .site-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; padding-block: 28px; border-top: 1px solid var(--border); font-size: .8125rem; }
-/* Product home: real input and output, then tasks and a single install route. */
-.home-hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: center; padding: 64px 0; }
-.home-hero h1 { font-size: clamp(2.7rem, 4.4vw, 4.25rem); max-width: 18ch; line-height: 1.05; }
-.home-hero .hero-copy { font-size: 1.125rem; max-width: 45ch; margin-top: 24px; }
+.footer-brand { display: grid; gap: 12px; }
+.footer-brand img { display: block; width: 128px; height: auto; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+/* Product home: a focused introduction, then tasks and an install route. */
+.home-hero { display: block; padding: 80px 0; }
+.home-hero h1 { font-size: clamp(2.75rem, 5.5vw, 4.5rem); max-width: 22ch; line-height: 1.08; }
+.home-hero .hero-copy { font-size: 1.25rem; max-width: none; margin-top: 24px; }
 .home-hero .actions { margin-top: 28px; }
 .hero-meta { color: var(--muted); font-size: .8125rem; margin: 20px 0 0; }
 .hero-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
 .hero-meta a { color: inherit; }
-.circuit-preview { min-width: 0; margin: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #fff; }
-.preview-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 14px 20px; font-size: .75rem; font-weight: 600; color: var(--muted); background: var(--surface-muted); }
-.circuit-preview pre { margin: 0; border: 0; border-radius: 0; padding: 24px; color: #e5eff0; }
-.preview-comment { color: #92b6bd; }
-.preview-result { display: grid; gap: 10px; padding: 20px 24px; background: #eaf4f1; color: #254d43; }
-.preview-result > span { font-size: .75rem; letter-spacing: .06em; }
-.preview-result code { font-size: 1rem; }
-.circuit-preview figcaption { padding: 18px 24px; color: var(--muted); font-size: .8125rem; }
-.circuit-preview figcaption a { display: block; margin-top: 8px; }
 .home-capabilities { border-top: 1px solid var(--border); padding: 48px 0 56px; }
 .workflow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; margin-top: 32px; }
 .workflow-grid article { min-width: 0; }
-.step-number { font-size: .8125rem; color: var(--accent); }
+.step-number { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--accent-soft); font-size: .8125rem; font-weight: 600; color: var(--accent-dark); }
 .workflow-grid h3 { margin-top: 12px; font-size: 1.375rem; }
 .workflow-grid p { color: var(--muted); font-size: .9375rem; min-height: 6.6em; }
 .workflow-grid a { display: block; padding: 4px 0; font-size: .875rem; text-decoration: none; }
@@ -121,7 +112,7 @@ body[data-page="docs"] .hero { padding-bottom: 24px; }
 .docs-search input, .docs-search button { min-height: 48px; }
 .search-results li { padding-block: 20px; }
 .search-results .search-path { font-size: .8125rem; margin: 0 0 4px; }
-mark { background: #d9eeeb; color: #123d42; border-radius: 2px; }
+mark { background: #f3d4be; color: #693019; border-radius: 2px; }
 .search-results a { text-decoration: none; }
 .search-results a:hover { text-decoration: underline; }
 .get-help { border: 1px solid var(--border); background: var(--surface-muted); padding: 24px; border-radius: 8px; margin-block: 40px; }
@@ -144,7 +135,6 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .nav-search { width: 100%; }
   .nav-search input { width: 100%; flex: 1; }
   .documentation-frame { grid-template-columns: 190px minmax(0, 1fr); gap: 32px; }
-  .home-hero { gap: 32px; }
   .workflow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
   .workflow-grid p { min-height: 3.3em; }
 }
@@ -156,8 +146,7 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .docs-navigation[open] > summary::after { content: '−'; }
   .docs-navigation:not([open]) > nav { display: none; }
   .docs-navigation nav { padding: 12px; background: var(--surface-muted); }
-  .home-hero { padding: 40px 0; gap: 32px; }
-  .home-hero h1 { font-size: 2.8rem; }
+  .home-hero { padding: 48px 0; }
   .home-support { display: block; }
   .workflow-grid { gap: 24px; }
 }
@@ -166,9 +155,8 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .nav-links { flex-direction: column; align-items: stretch; gap: 14px; }
   .version-inner { font-size: .75rem; gap: 4px 16px; }
   .version-inner > :last-child { margin-left: 0; }
-  .home-hero { grid-template-columns: 1fr; }
-  .home-hero h1 { max-width: none; font-size: 3rem; }
-  .home-hero .hero-copy { max-width: none; }
+  .home-hero h1 { max-width: none; }
+  .home-hero .hero-copy { font-size: 1.125rem; }
   .workflow-grid, .install-alternatives { grid-template-columns: 1fr; gap: 24px; }
   .workflow-grid p { min-height: 0; }
   .workflow-grid article + article { border-top: 1px solid var(--border); padding-top: 24px; }
