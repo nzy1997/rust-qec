@@ -413,6 +413,7 @@ fn qp101_browser_resources_are_preserved() {
 #[test]
 fn task_oriented_content_pages_are_linked() {
     let index = read_repo_file("site/templates/index.html");
+    let reference = read_repo_file("site/templates/docs.html");
     let simulator = read_repo_file("site/templates/simulator.html");
     let detector_models = read_repo_file("site/templates/detector-models.html");
     let decoding = read_repo_file("site/templates/decoding.html");
@@ -435,7 +436,6 @@ fn task_oriented_content_pages_are_linked() {
             "rbposd",
             "rilpqec",
             "qec-code",
-            "qec-ilp-core",
             "--bin rstim -- detect",
             "rstim analyze_errors",
             "rstim sample_dem",
@@ -443,12 +443,34 @@ fn task_oriented_content_pages_are_linked() {
         "task-oriented content site source",
     );
 
+    assert_contains_all(
+        &index,
+        &["href=\"docs/#reference\""],
+        "homepage library reference entry",
+    );
+    assert_contains_all(
+        &reference,
+        &[
+            "id=\"reference\"",
+            "https://docs.rs/rstim/0.3.0/rstim/",
+            "https://docs.rs/rmatching/0.3.0/rmatching/",
+            "https://docs.rs/rbposd/0.3.0/rbposd/",
+            "https://docs.rs/rilpqec/0.3.0/rilpqec/",
+            "https://docs.rs/rsinter/0.3.0/rsinter/",
+            "https://docs.rs/qec-code/0.3.0/qec_code/",
+            "https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/",
+        ],
+        "version-pinned library reference destinations",
+    );
+
     assert_contains_all_case_insensitive(
         &site_sources,
         &[
             "sampling",
             "detector error models",
-            "decoder families",
+            "MWPM",
+            "BP-OSD",
+            "ILP",
             "benchmark campaigns",
             "css codes",
             "distance search",
@@ -509,8 +531,9 @@ fn new_documentation_routes_use_canonical_sources() {
 #[test]
 fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
     let index = read_repo_file("site/templates/index.html");
+    let get_started = read_repo_file("site/templates/get-started.html");
     let readme = read_repo_file("README.md");
-    let styles = read_repo_file("site/static/styles.css");
+    let styles = read_repo_file("site/static/layout.css");
 
     assert_contains_all(
         &index,
@@ -519,26 +542,47 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
             "Install with Cargo",
             "href=\"#install\"",
             "cargo install --locked rustqec-cli --version 0.3.0",
+            "href=\"get-started/#native-install\"",
+            "href=\"get-started/#first-circuit\"",
+            "href=\"get-started/#cargo-install\"",
+        ],
+        "homepage installation routes",
+    );
+    assert_contains_all(
+        &get_started,
+        &[
+            "id=\"native-install\"",
+            "id=\"first-circuit\"",
+            "id=\"cargo-install\"",
             "https://www.rust-lang.org/tools/install",
-            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
             "install.sh",
-            "no Rust required",
-            "complete native",
-            "including ILP",
-            "full Shot Lab viewer",
+            "You do not need Rust or a source checkout",
+            "Official native archives include ILP and the viewer",
             "Ubuntu 24.04 x86_64",
             "macOS 15 Apple silicon",
-            "Windows",
+            "Other platforms are outside the tested support matrix",
         ],
-        "homepage installation section",
+        "linked installation instructions and native support boundary",
     );
     assert!(
         !index.contains("Download v0.3.0"),
         "homepage hero must not promote a release download button"
     );
+    let hero_actions = index
+        .split_once("class=\"actions\"")
+        .expect("homepage must provide primary actions")
+        .1
+        .split_once("</div>")
+        .expect("homepage actions must have a closing container")
+        .0;
+    assert_contains_all(
+        hero_actions,
+        &["class=\"button primary\" href=\"#install\""],
+        "homepage primary Cargo action",
+    );
     assert!(
-        !index.contains("Run your first circuit"),
-        "homepage hero must send visitors to the default Cargo install path"
+        !hero_actions.contains("get-started/#first-circuit"),
+        "homepage primary actions must not skip installation prerequisites"
     );
     assert!(
         !index.contains("only need the command line tools"),
@@ -555,7 +599,7 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
     );
     assert_contains_all(
         &styles,
-        &[".install-grid", ".install-card", ".install-note"],
+        &[".home-install", ".install-alternatives", ".install-note"],
         "homepage installation styles",
     );
 }
@@ -605,8 +649,8 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
     );
     assert_contains_all(
         &index,
-        &["href=\"sampling-data/\"", "Save decoder and training data"],
-        "sampling-data home card",
+        &["href=\"sampling-data/\"", "Sampling &amp; training data"],
+        "sampling-data homepage entry",
     );
     assert_contains_all(
         &styles,
