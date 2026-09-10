@@ -341,7 +341,10 @@ function labelDiagramTargets(canvas, snapshot) {
       node.setAttribute("tabindex", "0");
       const event = node.dataset.noiseEventId ? events.get(node.dataset.noiseEventId) : null;
       const action = event ? (event.editable ? "inspect or edit this outcome" : "inspect this outcome") : "inspect its result";
-      node.setAttribute("aria-label", `${label} ${id}. Press Enter to ${action}.`);
+      const description = event
+        ? `${event.instruction} on ${event.target_qubits.map((q) => `q${q}`).join(", ")}, outcome ${outcomeLabel(event.effective_outcome)}`
+        : id;
+      node.setAttribute("aria-label", `${label} ${description}. Press Enter to ${action}.`);
     });
   }
 }
@@ -432,13 +435,16 @@ function updateDetail(state, eventId) {
     <h2>${escapeHtml(event.instruction)}</h2>
     <dl>
       <dt>Qubits</dt><dd>${event.target_qubits.map((q) => `q${q}`).join(", ")}</dd>
-      ${probabilityRows}
-      <dt>Base</dt><dd>${outcomeLabel(event.base_outcome)}</dd>
-      <dt>Requested</dt><dd>${escapeHtml(requested)}</dd>
-      <dt>Effective</dt><dd>${outcomeLabel(event.effective_outcome)}</dd>
-      <dt>Applicable</dt><dd>${event.applicable ? "yes" : "no"}</dd>
+      <dt>Current outcome</dt><dd>${outcomeLabel(event.effective_outcome)}</dd>
     </dl>
-    <p>${event.editable ? "This existing noise outcome can be overridden for the current shot." : "This stochastic instruction is read-only in the first version."}</p>
+    <p>${event.applicable ? "Select a detector to inspect its parity. An error does not always flip a detector." : "This event does not apply to the current shot."}</p>
+    <details class="noise-details"><summary>Noise details</summary><dl>
+      ${probabilityRows}
+      <dt>Original outcome</dt><dd>${outcomeLabel(event.base_outcome)}</dd>
+      <dt>Your override</dt><dd>${escapeHtml(requested)}</dd>
+      <dt>Applies to shot</dt><dd>${event.applicable ? "yes" : "no"}</dd>
+    </dl></details>
+    <p>${event.editable ? "Click this noise site to edit its outcome. Undo restores your previous edit." : "This stochastic instruction is read-only."}</p>
   `;
 }
 
@@ -464,7 +470,13 @@ function updateResultDetail(state, kind, ids) {
   state.ui.detail.innerHTML = `
     <p class="eyebrow">${escapeHtml(kind)}</p>
     <h2>${ids.map(escapeHtml).join(", ")}</h2>
-    ${results.map((result) => `<pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>`).join("")}
+    ${results.map((result) => {
+      const bit = kind === "detector" ? result.flipped : result.bit;
+      const label = kind === "detector" ? "Detector event" : kind === "observable" ? "Observable bit" : "Measurement bit";
+      return `<dl><dt>${label}</dt><dd>${bit ? "1" : "0"}</dd></dl>
+        <p>${kind === "detector" ? (bit ? "The detector parity differs from its reference." : "The detector parity matches its reference.") : "The result for the current shot."}</p>
+        <details class="noise-details"><summary>Result details</summary><pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre></details>`;
+    }).join("")}
   `;
   revealDetail(state);
 }

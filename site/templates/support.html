@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Support and compatibility — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Support</p><h1 id="support-and-compatibility-contract">Support &amp; compatibility</h1><p class="hero-copy">Find the supported interfaces, version boundaries, and a path to help.</p></div>{% endblock hero %}
 {% block main %}<article class="prose">
 <p class="doc-note">This is the development-branch contract. For the frozen v0.3.0 source and migration notes, see the <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">release notes</a>. The historical <a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.2.1">v0.2.1 release</a> remains available. Repository tags and individual crate versions are distinct.</p>
-{{ load_data(path="generated/support-compatibility.md", format="plain") | replace(from="(../rstim/doc/QP101-ZY.md)", to="(../qp101/protocol/)") | markdown | safe }}
-</article>{% endblock main %}
+{{ load_data(path="generated/support-compatibility.md", format="plain") | replace(from="(../rstim/doc/QP101-ZY.md)", to="(../qp101/protocol/)") | replace(from="# Support and compatibility contract", to="") | markdown | safe }}
+<section class="get-help" aria-labelledby="get-help"><h2 id="get-help">Get help</h2><p>For installation problems, unexpected results, or documentation questions, use the repository issue tracker. Include your operating system, package version, the command you ran, and a minimal circuit that reproduces the problem.</p><div class="content-links"><a href="https://github.com/nzy1997/rust-qec/issues">Search existing issues ↗</a><a href="https://github.com/nzy1997/rust-qec/issues/new">Report a problem ↗</a></div><p>For CLI reports, include the relevant output from <code>rustqec capabilities --format json</code>.</p></section></article>{% endblock main %}
