@@ -38,8 +38,23 @@ Use flat fills. Keep all eight faces and the open channels between them;
 do not recenter the boundary triangles over the patch's corner tips.
 Leave at least one half-face's short side of clear space around standalone
 placements. Use the icon alone at small sizes; keep the wordmark readable
-and preserve each asset's aspect ratio. The site palette is independent of
-the logo palette.
+and preserve each asset's aspect ratio. The site extends the logo's copper palette
+with darker tones for readable links and controls:
+
+| Website role | Color |
+| --- | --- |
+| Primary action / focus ring | `#A84D24` |
+| Link / active text | `#863C20` |
+| Active background | `#F7E8DD` |
+| Page / subtle surface | `#FCFAF7` / `#F5EFE8` |
+| Body / secondary text | `#282828` / `#6B615B` |
+
+Use the original copper and pale copper for the mark; use the darker action
+color behind white button text. Scientific plot colors and success/error
+states retain their distinct meanings. The header uses the horizontal lockup
+at 176px wide and the footer a 128px lockup. Keep the home introduction
+focused on its headline without repeating the mark. The README uses the stacked logo at 200px wide with a matching
+dark-background variant, so it does not dominate the repository introduction.
 
 ## Sources and regeneration
 

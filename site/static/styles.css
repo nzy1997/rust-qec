@@ -1,15 +1,18 @@
 :root {
   color-scheme: light;
-  --bg: #f7f8fa;
+  --bg: #fcfaf7;
   --surface: #ffffff;
-  --surface-muted: #eef2f5;
-  --text: #172026;
-  --muted: #53616b;
-  --border: #d7dde2;
-  --accent: #1b6f7a;
-  --accent-dark: #10535d;
-  --code-bg: #111820;
-  --code-text: #edf4f7;
+  --surface-muted: #f5efe8;
+  --text: #282828;
+  --muted: #6b615b;
+  --border: #e5dcd3;
+  --brand-copper: #c56536;
+  --brand-pale: #e5a07b;
+  --accent-soft: #f7e8dd;
+  --accent: #a84d24;
+  --accent-dark: #863c20;
+  --code-bg: #27221f;
+  --code-text: #f4efe8;
   --shadow: 0 16px 42px rgba(23, 32, 38, 0.08);
   --page-width: 1120px;
   --reading-width: 760px;
@@ -83,8 +86,8 @@ code {
 .brand-logo {
   display: block;
   flex: none;
-  width: 10rem;
-  height: 2.5rem;
+  width: 11rem;
+  height: auto;
 }
 
 .nav-links {
@@ -351,7 +354,7 @@ main {
 
 .card-title-link {
   color: var(--text);
-  text-decoration-color: rgba(27, 111, 122, 0.45);
+  text-decoration-color: rgba(197, 101, 54, 0.45);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.18em;
 }
@@ -435,7 +438,7 @@ main {
   padding: 0.35rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fbfcfd;
+  background: #fcfaf7;
 }
 
 .evidence-policy-grid,
@@ -612,7 +615,7 @@ main {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #fcfaf7;
   padding: 0.8rem;
 }
 
@@ -651,7 +654,7 @@ section {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #fcfaf7;
 }
 
 .schema-nav-header {
@@ -812,7 +815,7 @@ section {
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fbfcfd;
+  background: #fcfaf7;
   padding: 0.9rem;
 }
 
@@ -837,7 +840,7 @@ td {
 }
 
 th {
-  background: #edf2f4;
+  background: #f5efe8;
   color: var(--muted);
   font-size: 0.82rem;
   text-transform: uppercase;
@@ -915,7 +918,7 @@ pre code {
 }
 
 .rsmp-metric.primary {
-  border-color: rgba(27, 111, 122, 0.42);
+  border-color: rgba(197, 101, 54, 0.42);
 }
 
 .rsmp-metric span,
@@ -939,8 +942,8 @@ pre code {
 }
 
 .badge.measured {
-  border-color: rgba(27, 111, 122, 0.28);
-  background: #edf7f6;
+  border-color: rgba(197, 101, 54, 0.28);
+  background: #f7e8dd;
   color: var(--accent-dark);
 }
 
@@ -1097,7 +1100,7 @@ pre code {
 
 .primary-data-card,
 .public-bundle {
-  border-color: rgba(27, 111, 122, 0.42);
+  border-color: rgba(197, 101, 54, 0.42);
 }
 
 .bundle-grid,
