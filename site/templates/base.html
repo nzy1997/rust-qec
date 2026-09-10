@@ -9,6 +9,7 @@
       name="description"
       content="{% block description %}RustQEC — a quantum error correction workspace in Rust{% endblock description %}"
     >
+    <link rel="icon" type="image/svg+xml" href="{{ root }}/brand/rustqec-mark.svg">
     <link rel="stylesheet" href="{{ root }}/styles.css">
     {% block head %}{% endblock head %}
     <link rel="stylesheet" href="{{ root }}/layout.css">
@@ -19,8 +20,7 @@
 
       <nav class="top-nav" aria-label="Primary">
         <a class="brand" href="{{ root }}/" aria-label="RustQEC home">
-          <span class="brand-mark">R</span>
-          <span>RustQEC</span>
+          <img class="brand-logo" src="{{ root }}/brand/rustqec-lockup.svg" width="160" height="40" alt="RustQEC">
         </a>
         <details class="mobile-navigation" open>
           <summary>Menu</summary>

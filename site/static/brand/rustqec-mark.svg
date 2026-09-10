@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">RustQEC</title>
+  <desc id="desc">A diamond surface-code patch with four square bulk checks and four triangular two-body boundary checks. Two copper tones distinguish the check families.</desc>
+  <!-- Approved concept 01C. Wordmark outlines: EB Garamond Medium, SIL OFL 1.1. -->
+    <polygon id="x-north" fill="#c56536" points="320,24 464,168 320,312 176,168"/>
+    <polygon id="z-east" fill="#e5a07b" points="472,176 616,320 472,464 328,320"/>
+    <polygon id="x-south" fill="#c56536" points="320,328 464,472 320,616 176,472"/>
+    <polygon id="z-west" fill="#e5a07b" points="168,176 312,320 168,464 24,320"/>
+    <polygon id="z-boundary-northwest" fill="#e5a07b" points="176,24 302,24 176,150"/>
+    <polygon id="x-boundary-northeast" fill="#c56536" points="616,176 616,302 490,176"/>
+    <polygon id="z-boundary-southeast" fill="#e5a07b" points="464,616 338,616 464,490"/>
+    <polygon id="x-boundary-southwest" fill="#c56536" points="24,464 24,338 150,464"/>
+</svg>
