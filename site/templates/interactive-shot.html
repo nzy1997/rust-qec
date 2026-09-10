@@ -12,7 +12,7 @@
   <p class="eyebrow">Interactive circuit laboratory</p>
   <h1>{% if section.extra.mode == "local" %}Open a circuit on this device{% else %}Inspect one physical-error shot{% endif %}</h1>
   <p class="hero-copy">Select an orange noise site to edit an error; select a measurement or detector to inspect its result. Focus circuit expands the workspace.</p>
-  <p class="shot-help">{% if section.extra.mode != "local" %}Four-qubit example: start with No-error shot (0/2 detectors), then edit a noise outcome and inspect the detector parities.{% endif %}</p>
+  <p class="shot-help">{% if section.extra.mode != "local" %}Try it: choose No-error shot, select YE on q1, then choose Y. D0 flips to 1; D1 stays 0. Select D0 to inspect its parity.{% endif %}</p>
   <p class="content-links">{% if section.extra.mode == "local" %}<a href="../">View the fixed example</a>{% else %}<a href="local/">Open your own local circuit</a>{% endif %}</p>
 </div>
 {% endblock hero %}

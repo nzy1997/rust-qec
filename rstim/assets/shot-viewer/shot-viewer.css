@@ -45,8 +45,8 @@
 }
 
 .shot-drop-target.is-dragging {
-  border-color: #6941c6;
-  background: #f4f3ff;
+  border-color: #1b6f7a;
+  background: #edf6f5;
 }
 
 .shot-drop-icon {
@@ -144,14 +144,14 @@
 }
 
 .shot-button-primary {
-  border-color: #6941c6;
-  background: #6941c6;
+  border-color: #1b6f7a;
+  background: #1b6f7a;
   color: #fff;
 }
 
 .shot-button-primary:hover {
-  border-color: #53389e;
-  background: #53389e;
+  border-color: #10535d;
+  background: #10535d;
 }
 
 .shot-button-quiet {
@@ -168,7 +168,7 @@
 
 .shot-badge.is-sampled {
   background: #f4ebff;
-  color: #6941c6;
+  color: #1b6f7a;
 }
 
 .shot-layout {
@@ -197,7 +197,7 @@
 }
 
 .shot-view-panel input {
-  accent-color: #6941c6;
+  accent-color: #1b6f7a;
 }
 
 .shot-view-panel .shot-help {
@@ -405,9 +405,9 @@ body.shot-focus .shot-stage-wrap {
 }
 
 .shot-outcomes button[aria-pressed="true"] {
-  border-color: #7f56d9;
+  border-color: #1b6f7a;
   background: #f4ebff;
-  color: #53389e;
+  color: #10535d;
 }
 
 .shot-restore {
@@ -442,7 +442,7 @@ kbd {
   z-index: 20;
   display: grid;
   place-items: center;
-  color: #53389e;
+  color: #10535d;
   font-weight: 750;
   background: rgb(248 250 252 / 70%);
   backdrop-filter: blur(2px);
@@ -510,3 +510,6 @@ body[data-page="shot"] main { max-width: none; padding: 0; }
 .shot-hero .hero-copy { max-width: none; font-size: .95rem; margin: .3rem 0; }
 .shot-hero .shot-help { font-size: .82rem; margin: .25rem 0; }
 .shot-hero .content-links { margin: .35rem 0; font-size: .9rem; }
+
+.noise-details { margin-top: 1rem; }
+.noise-details summary { cursor: pointer; font-weight: 600; }

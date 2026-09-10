@@ -17,8 +17,9 @@ test("home leads to the Cargo installation path", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Install with Cargo" }).click();
   await expect(page).toHaveURL(/\/#install$/);
-  await expect(page.getByRole("heading", { name: "Choose the path that fits your machine" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Cargo install" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Install the CLI", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Run your first circuit" }).click();
+  await expect(page.getByRole("heading", { name: "2. Create and inspect a circuit" })).toBeInViewport();
 });
 
 test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) => {
@@ -27,8 +28,8 @@ test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) 
   const actions = page.locator(".home-hero .actions a");
   await expect(actions).toHaveCount(2);
   expect(await actions.allTextContents()).toEqual([
-    "Install with Cargo",
-    "Try Shot Lab",
+    "Install with Cargo →",
+    "Try a circuit in your browser",
   ]);
   expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
     "#install",
@@ -38,6 +39,32 @@ test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) 
   const destinations = await actions.evaluateAll((links) => links.map((link) => link.href));
   expect(new Set(destinations).size).toBe(2);
   await expect(page.locator('a[href="#install"]')).toHaveCount(1);
+});
+
+test('home routes first-time, library, and prebuilt users to the promised instructions', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Run the tutorial' }).click();
+  await expect(page).toHaveURL(/\/get-started\/$/);
+  await expect(page.getByRole('heading', { name: '1. Install with Cargo' })).toBeVisible();
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Browse library APIs' }).click();
+  await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Install prebuilt binaries' }).click();
+  await expect(page.locator('#native-install')).toHaveAttribute('open', '');
+  await expect(page.getByRole('link', { name: 'Linux x86_64 archive' })).toBeVisible();
+  await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
+});
+
+test('home skip link reaches the product introduction and preserves its next actions', async ({ page }) => {
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#home-content')).toBeFocused();
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Install with Cargo' })).toBeFocused();
 });
 
 test("installation starts with one copyable command and keeps manual steps optional", async ({ page }) => {
@@ -106,6 +133,7 @@ test("long protocol page supplies rendered content and usable table-of-contents 
   await expect(page.getByRole("heading", { level: 1, name: /QP101-ZY: Quantum Circuit JSON Format/ })).toBeVisible();
   await expect(page.locator("main")).not.toContainText("{{ load_data");
   await expect(page.locator(".page-toc")).toBeVisible();
+  await page.locator(".toc-disclosure > summary").click();
   const anchor = page.locator('.page-toc a[href="#schema-identity"]');
   await expect(anchor).toHaveText("Schema identity");
   await anchor.click();
@@ -165,6 +193,7 @@ test("key documentation pages fit a 390px viewport without page overflow", async
   for (const path of ["/", "/docs/", "/support/", "/sampling-data/", "/get-started/", "/decoding/", "/qp101/protocol/", "/interactive/"]) {
     await page.goto(path);
     await expect.poll(() => page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }))).toEqual({ width: 390, viewport: 390 });
+    await page.locator(".mobile-navigation > summary").click();
     for (const label of ["Guides", "Reference"]) {
       const menu = page.locator(".nav-group").filter({ hasText: label });
       await menu.locator("summary").click();
@@ -188,7 +217,7 @@ test("search finds commands and concepts, preserves queries, and handles no matc
   await query.fill("atom loss");
   await expect(page.locator("#search-results")).toContainText("Sampling and training data");
   await query.fill("zz-no-such-command-707");
-  await expect(page.locator("#search-status")).toContainText("No matching pages");
+  await expect(page.locator("#search-status")).toContainText("No matching sections");
   await expect(page.locator("#search-results li")).toHaveCount(0);
   await query.fill("   ");
   await expect(page.locator("#search-status")).toContainText("Browse the index below");
@@ -203,6 +232,7 @@ test("search failure keeps the reference index usable", async ({ page }) => {
 
 test("protocol subsections have stable permalinks and active location feedback", async ({ page }) => {
   await page.goto("/qp101/protocol/");
+  await page.locator(".toc-disclosure > summary").click();
   const group = page.locator(".toc-section").filter({ has: page.locator('a[href="#operation-model"]') });
   await group.locator("summary").click();
   await group.getByRole("link", { name: "noise", exact: true }).click();
@@ -291,6 +321,7 @@ test("Shot Lab adapts to taller headers and viewport changes without growing on 
     }).toBeLessThanOrEqual(page.viewportSize().height);
   };
   await expectFirstScreen();
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const initialHeight = (await stage.boundingBox()).height;
   await page.evaluate(() => window.scrollTo(0, 80));
   await expect.poll(async () => (await stage.boundingBox()).height).toBe(initialHeight);
@@ -340,6 +371,7 @@ for (const width of [768, 1050]) {
       const nav = await page.locator(".nav-shell").boundingBox();
       return heading.y - nav.y - nav.height;
     }).toBeGreaterThanOrEqual(0);
+    await page.locator(".toc-disclosure > summary").click();
     const link = page.locator('.page-toc a[href="#first-circuit"]');
     await link.click();
     await expect(page).toHaveURL(/#first-circuit$/);
@@ -357,4 +389,79 @@ test("highlighted decoder source is the exact downloadable runnable example", as
   expect(source.ok()).toBe(true);
   await page.goto("/decoding/");
   await expect(page.locator('pre[data-language="Rust"] code')).toHaveText(await source.text(), { useInnerText: false });
+});
+
+for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
+  test(`shared layout stays aligned and navigation stays usable at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto('/');
+    await expect(page.locator('.page-toc')).toBeHidden();
+    const hero = await page.locator('.home-hero').boundingBox();
+    const capabilities = await page.locator('#capabilities').boundingBox();
+    const install = await page.locator('#install').boundingBox();
+    expect(Math.abs(hero.x - capabilities.x)).toBeLessThan(1);
+    expect(Math.abs(hero.x - install.x)).toBeLessThan(1);
+    expect(Math.abs(hero.width - install.width)).toBeLessThan(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    if (width < 1200) {
+      const toggle = page.locator('.mobile-navigation > summary');
+      await expect(toggle).toBeVisible();
+      await expect(page.locator('.nav-links')).toBeHidden();
+      await toggle.click();
+      await expect(page.locator('.nav-links')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(toggle).toBeFocused();
+      await expect(page.locator('.nav-links')).toBeHidden();
+    } else {
+      const brand = await page.locator('.brand').boundingBox();
+      const search = await page.locator('.nav-search').boundingBox();
+      expect(Math.abs(brand.y + brand.height / 2 - search.y - search.height / 2)).toBeLessThan(2);
+    }
+    for (const path of ['/get-started/', '/support/']) {
+      await page.goto(path);
+      const title = await page.locator('.hero h1').boundingBox();
+      const main = await page.locator('main').boundingBox();
+      expect(Math.abs(title.x - main.x)).toBeLessThan(1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      await expect(page.locator('.toc-disclosure')).not.toHaveAttribute('open', '');
+    }
+  });
+}
+
+test('atom loss search ranks explanations above measurements and links to the section', async ({ page }) => {
+  await page.goto('/docs/?q=atom+loss');
+  const first = page.locator('#search-results li').first();
+  await expect(first).toContainText('Atom-loss support boundary');
+  await expect(first.locator('mark').first()).toBeVisible();
+  await expect(first.locator('a')).toHaveAttribute('href', /support\/#atom-loss-support-boundary$/);
+  await first.locator('a').click();
+  await expect(page.locator('#atom-loss-support-boundary')).toBeInViewport();
+});
+
+for (const [query, destination] of [
+  ['CSS distance', 'css-codes/#distance-search-title'],
+  ['QP101 noise', 'qp101/protocol/#noise'],
+]) {
+  test(`search combines page context and section content for ${query}`, async ({ page }) => {
+    await page.goto(`/docs/?q=${encodeURIComponent(query)}`);
+    const result = page.locator(`#search-results a[href$="${destination}"]`);
+    await expect(result).toBeVisible();
+    await result.click();
+    await expect(page.locator(`#${destination.split('#')[1]}`)).toBeInViewport();
+  });
+}
+
+test('Shot Lab guided edit has a readable label and the promised detector result', async ({ page }) => {
+  await page.goto('/interactive/');
+  await page.getByRole('button', { name: 'No-error shot', exact: true }).click();
+  const noise = page.getByRole('button', { name: /^Noise site Y_ERROR on q1, outcome I\./ });
+  await noise.click();
+  await page.locator('#shot-popover').getByRole('button', { name: 'Y', exact: true }).click();
+  await expect(page.locator('#shot-summary')).toContainText('1/2 detectors');
+  await expect(page.locator('#shot-detail')).toContainText('Current outcome');
+  await expect(page.locator('#shot-detail .noise-details')).not.toHaveAttribute('open', '');
+  await page.getByRole('button', { name: /^Detector d0\./ }).click();
+  await expect(page.locator('#shot-detail')).toContainText('1');
+  await page.getByRole('button', { name: 'No-error shot', exact: true }).click();
+  await expect(page.locator('#shot-summary')).toContainText('0/2 detectors');
 });

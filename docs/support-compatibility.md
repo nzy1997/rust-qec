@@ -1,6 +1,7 @@
 # Support and compatibility contract
 
-This page describes the support boundary for the current RustQEC release line.
+This document tracks the development branch. The installed quickstart and
+version-pinned API examples target v0.3.0; use that release's notes for its frozen support boundary.
 It is a contract for using the shipped interfaces, not a claim that every
 research component, circuit dialect, decoder, or benchmark result is ready for
 publication-scale use.
@@ -127,9 +128,11 @@ The following open work remains outside this contract:
 These links preserve the known limitations; they do not claim that their
 historical measurements have been rerun for this release line.
 
-## Development Cargo features before the first registry release
+<span id="development-cargo-features-before-the-first-registry-release"></span>
 
-The upcoming source package defaults keep native solver dependencies optional.
+## Cargo features in the 0.3 release line
+
+The 0.3 source package defaults keep native solver dependencies optional.
 `rustqec-cli` needs `--features ilp` for `envelope-mle`; default builds advertise
 only the available decoder choices. Official native archives retain ILP support.
 `rsinter` needs explicit runner/plotting features, or `full` for the previous
