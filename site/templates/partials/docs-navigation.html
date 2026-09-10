@@ -1,0 +1,20 @@
+<details class="docs-navigation" open>
+<summary>Browse documentation</summary>
+<nav aria-label="Documentation sections">
+<p>Start</p>
+<a href="{{ root }}/docs/"{% if current_nav == "docs" %} aria-current="page"{% endif %}>Overview &amp; search</a>
+<a href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Installation &amp; first circuit</a>
+<p>Guides</p>
+<a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS codes &amp; distance</a>
+<a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Circuit simulation</a>
+<a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
+<a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decoding</a>
+<a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Sampling &amp; training data</a>
+<a href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>Circuit diagrams</a>
+<p>Reference</p>
+<a href="{{ root }}/docs/#reference">CLI &amp; Rust APIs</a>
+<a href="{{ root }}/qp101/protocol/"{% if current_nav == "protocol" %} aria-current="page"{% endif %}>QP101 format</a>
+<a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP sample archives</a>
+<a href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Performance &amp; validation</a>
+<a href="{{ root }}/support/"{% if current_nav == "support" %} aria-current="page"{% endif %}>Support &amp; compatibility</a>
+</nav></details>

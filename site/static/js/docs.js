@@ -12,7 +12,7 @@
   // Interactive widgets replace their headings and provide their own navigation.
   const headings = [...main.querySelectorAll('h2, h3, h4')].filter((heading) => !heading.closest('[data-toc-skip]'));
   const tocLinks = new Map();
-  if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && document.body.dataset.page !== 'shot') {
+  if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && !['home', 'shot'].includes(document.body.dataset.page)) {
     let section;
     let children;
     headings.forEach((heading) => {
@@ -52,6 +52,7 @@
       heading.append(permalink);
     });
     toc.hidden = false;
+    toc.querySelector('.toc-disclosure').open = false;
     document.querySelector('.reading-layout').classList.add('has-toc');
     let pending = false;
     function updateCurrent() {
@@ -64,8 +65,6 @@
       for (const [heading, link] of tocLinks) {
         if (heading === current) {
           link.setAttribute('aria-current', 'location');
-          const details = link.closest('details');
-          if (details) details.open = true;
         } else link.removeAttribute('aria-current');
       }
     }
@@ -75,12 +74,18 @@
     updateCurrent();
   }
   // The initial fragment may precede generated heading IDs and measured navigation.
-  requestAnimationFrame(() => {
+  function revealFragment() {
     try {
       const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-      if (target) target.scrollIntoView();
+      if (!target) return;
+      for (let node = target; node; node = node.parentElement) {
+        if (node.tagName === 'DETAILS') node.open = true;
+      }
+      target.scrollIntoView();
     } catch { /* An invalid URL escape has no matching heading. */ }
-  });
+  }
+  requestAnimationFrame(revealFragment);
+  window.addEventListener('hashchange', () => requestAnimationFrame(revealFragment));
   function languageFor(pre, code) {
     if (pre.dataset.language) return pre.dataset.language;
     const lang = code.className.match(/language-([\w-]+)/)?.[1] || pre.dataset.lang;
@@ -180,6 +185,23 @@
     figureDialog.showModal();
     figureDialog.querySelector('[data-close]').focus();
     figureDialog.addEventListener('close', () => trigger.focus({ preventScroll: true }), { once: true });
+  });
+  const mobile = document.querySelector('.mobile-navigation');
+  const docsNavigation = document.querySelector('.docs-navigation');
+  const desktopNavigation = matchMedia('(min-width: 1200px)');
+  const desktopSidebar = matchMedia('(min-width: 900px)');
+  const syncMenus = () => {
+    if (mobile) mobile.open = desktopNavigation.matches;
+    if (docsNavigation) docsNavigation.open = desktopSidebar.matches;
+  };
+  syncMenus();
+  desktopNavigation.addEventListener('change', syncMenus);
+  desktopSidebar.addEventListener('change', syncMenus);
+  mobile?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !event.target.closest('.nav-group') && !desktopNavigation.matches) {
+      mobile.open = false;
+      mobile.querySelector('summary').focus();
+    }
   });
   const groups = [...document.querySelectorAll('.nav-group')];
   groups.forEach((group) => {

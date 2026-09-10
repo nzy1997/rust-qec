@@ -1,135 +1,45 @@
 {% extends "base.html" %}
-
-{% block title %}RustQEC — a quantum error correction workspace in Rust{% endblock title %}
-{% block description %}RustQEC brings together the rstim simulator and CLI, MWPM/BP-OSD/ILP decoders, and a parallel benchmark harness in one Rust workspace.{% endblock description %}
-
+{% block title %}RustQEC — quantum error correction in Rust{% endblock title %}
+{% block description %}Define codes, simulate circuits, compare decoders, and inspect results in one workspace. Quantum error correction in Rust.{% endblock description %}
 {% block hero %}
 <div class="hero home-hero">
-  <p class="eyebrow">RustQEC workspace</p>
-  <h1>Quantum error correction, from circuit to decoder</h1>
-  <p class="hero-copy">
-    RustQEC brings together the <code>rstim</code> simulator and CLI, MWPM,
-    BP-OSD, and ILP decoders, and a parallel benchmark harness in one Cargo
-    workspace. Start with Cargo, or choose the self-contained native CLI when
-    you do not have Rust installed.
-  </p>
-  <div class="actions"><a class="button primary" href="#install">Install with Cargo</a><a class="button" href="interactive/">Try Shot Lab</a></div>
-  <p class="section-copy">Native packages: Ubuntu 24.04 x86_64 and macOS 15 Apple silicon. <a href="support/">Check feature support and compatibility.</a></p>
+  <div class="home-intro" id="home-content" tabindex="-1">
+    <h1>Quantum error correction in Rust.</h1>
+    <p class="hero-copy">Define codes, simulate circuits, compare decoders, and inspect results in one workspace.</p>
+    <div class="actions"><a class="button primary" href="#install">Install with Cargo <span aria-hidden="true">→</span></a><a class="button" href="interactive/">Try a circuit in your browser</a></div>
+    <p class="hero-meta"><a href="docs/#reference">Rust APIs</a><span aria-hidden="true">·</span><a href="get-started/#tools">Command line tools</a><span aria-hidden="true">·</span><a href="interactive/">Browser viewer · no installation</a></p>
+  </div>
+  <figure class="circuit-preview" aria-label="Deterministic first-circuit example">
+    <div class="preview-bar"><span>EXAMPLE CIRCUIT</span><span>Stim format</span></div>
+    <pre><code><span class="preview-comment"># Reset, apply an error, measure</span>
+R 0
+X_ERROR(1) 0
+M 0
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]</code></pre>
+    <div class="preview-result"><span>EXPECTED OUTPUT</span><code>shot <strong>D0 L0</strong></code></div>
+    <figcaption>The X error always occurs: detector D0 fires and observable L0 flips. The 0 in each label is its index, not its value. <a href="get-started/">Run the tutorial →</a></figcaption>
+  </figure>
 </div>
 {% endblock hero %}
-
 {% block main %}
-<section id="install" class="install-section" aria-labelledby="install-heading">
-  <div class="section-heading">
-    <p class="eyebrow">Install v0.3.0</p>
-    <h2 id="install-heading">Choose the path that fits your machine</h2>
-    <p class="section-copy">
-      Already have Rust and Cargo? Start with the registry package. If you
-      do not have Rust, the native archive provides the complete native
-      feature set without a Rust toolchain.
-    </p>
-  </div>
-  <div class="install-grid">
-    <article class="docs-card install-card install-card-primary">
-      <p class="eyebrow">Recommended for Rust users</p>
-      <h3>Cargo install</h3>
-      <p>
-        Install the lightweight <code>rustqec</code> CLI from crates.io. It
-        covers the complete introductory circuit workflow and does not need a
-        source checkout.
-      </p>
-      <pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre>
-    <p><a href="get-started/#first-circuit">Installed? Run your first detector event →</a></p>
-      <p>
-        Need Rust first? Use the official
-        <a href="https://www.rust-lang.org/tools/install">rustup installation guide</a>:
-      </p>
-      <pre data-language="Shell"><code>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></pre>
-      <p class="install-note">
-        For exact envelope MLE, add <code>--features ilp</code>. Install
-        <code>rstim</code> separately when you need its Stim-style CLI.
-      </p>
-    </article>
-    <article class="docs-card install-card">
-      <p class="eyebrow">Alternative: no Rust required</p>
-      <h3>Native installer</h3>
-      <p>
-        The official <a href="install.sh"><code>install.sh</code></a> downloads
-        verified v0.3.0 binaries into <code>~/.local/bin</code>. It includes
-        the complete native <code>rustqec</code>/<code>rstim</code> CLI feature
-        set, including ILP and the full Shot Lab viewer.
-      </p>
-      <pre data-language="Shell"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
-      <p class="install-note">
-        Validated on Ubuntu 24.04 x86_64 and macOS 15 Apple silicon. Windows,
-        Intel macOS, and other platforms are outside the supported native
-        archive matrix.
-      </p>
-      <a class="button" href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Review checksums and release files</a>
-    </article>
+<section id="capabilities" class="home-capabilities" aria-labelledby="capabilities-title">
+  <div class="section-heading"><h2 id="capabilities-title">Tools for each stage of your experiment</h2></div>
+  <div class="workflow-grid">
+    <article><span class="step-number">01</span><h3>Define codes</h3><p>Construct CSS parity-check matrices, validate your code, and check its distance.</p><div class="workflow-links"><a href="css-codes/">Construct CSS codes →</a><a href="css-codes/#distance-search-title">Distance searches →</a></div></article>
+    <article><span class="step-number">02</span><h3>Simulate circuits</h3><p>Sample measurements from a Stim-format circuit, extract a detector error model, and save your data.</p><div class="workflow-links"><a href="simulator/">Circuit simulation →</a><a href="detector-models/">Detector error models →</a><a href="sampling-data/">Sampling &amp; training data →</a><a href="rsmp-v1-showcase/">Sample archives →</a></div></article>
+    <article><span class="step-number">03</span><h3>Compare decoders</h3><p>Run MWPM, BP-OSD, or ILP and compare decoding time and logical error rates on your cases.</p><div class="workflow-links"><a href="decoding/">Choose a decoder →</a><a href="decoding/#benchmark-campaigns-title">Run a comparison →</a></div></article>
+    <article><span class="step-number">04</span><h3>Inspect results</h3><p>Explore physical errors and detector outcomes, then export circuit figures as SVG or PDF.</p><div class="workflow-links"><a href="interactive/">Explore a shot →</a><a href="qp101/">Circuit diagrams →</a></div></article>
   </div>
 </section>
-<section id="capabilities" class="docs-home" aria-label="What is in the box">
-  <div class="section-heading">
-    <p class="eyebrow">What's in the box</p>
-    <h2>One workspace, the whole decoder-experiment loop</h2>
-    <p class="section-copy">
-      Simulate circuits, extract detector error models, decode with three
-      decoder families, and benchmark the results — without leaving the
-      workspace.
-    </p>
-  </div>
-  <div class="docs-grid">
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="simulator/">Simulate and sample circuits</a></h3>
-      <p>
-        Parse Stim-format circuits, inspect structure with
-        <code>rstim stats</code>, and sample measurement or detector shots.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="sampling-data/">Save decoder and training data</a></h3>
-      <p>
-        Choose raw shots or aligned public/private bundles, understand
-        <code>b8</code>, and preserve atom loss as a separate model input.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="detector-models/">Extract detector error models</a></h3>
-      <p>
-        Derive DEMs with <code>rstim analyze_errors</code> and sample them
-        directly with <code>rstim sample_dem</code>.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="decoding/">Decode with three decoder families</a></h3>
-      <p>
-        MWPM (<code>rmatching</code>), BP-OSD (<code>rbposd</code>), and ILP
-        (<code>rilpqec</code>) decoders share one workspace and harness.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="rsmp-v1-showcase/">Archive decoder sample results</a></h3>
-      <p>
-        RSMP v1 stores every measurement result in a circuit-bound archive,
-        then recovers measurements, detectors, and observables with the
-        original circuit.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="qp101/">Render circuit diagrams</a></h3>
-      <p>
-        Render SVG diagrams with <code>rstim render_svg</code>, including
-        seeded atom-loss sample-shot overlays, and export QP101 JSON.
-      </p>
-    </article>
-    <article class="docs-card">
-      <h3><a class="card-title-link" href="css-codes/">Construct CSS codes</a></h3>
-      <p>
-        Build CSS code matrices with <code>qec-code</code> and run exact or
-        randomized distance checks backed by <code>qec-ilp-core</code>.
-      </p>
-    </article>
+<section id="install" class="install-section home-install" aria-labelledby="install-heading">
+  <div class="section-heading"><p class="eyebrow">Stable release · v0.3.0</p><h2 id="install-heading">Install the CLI</h2><p class="section-copy">Install with Rust and Cargo, then follow the quickstart to run your first circuit. No source checkout is needed for this tutorial.</p></div>
+  <div class="install-command"><pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre><p class="install-note">Installs the <code>rustqec</code> command for circuit and dataset tasks.</p><a class="button primary" href="get-started/#first-circuit">Run your first circuit →</a></div>
+  <div class="install-alternatives">
+    <div><h3>No Rust installed?</h3><p>Download prebuilt command-line tools without a Rust toolchain.</p><a href="get-started/#native-install">Install prebuilt binaries →</a></div>
+    <div><h3>Use the Rust libraries</h3><p>Add the crates you need to your own Rust project.</p><a href="docs/#reference">Browse library APIs →</a></div>
+    <div><h3>Extend the CLI</h3><p>Enable optional features for additional solvers and tools.</p><a href="get-started/#cargo-install">CLI features &amp; setup →</a></div>
   </div>
 </section>
+<section class="home-support" aria-label="Validation and support"><div><h2>Supported features &amp; benchmark results</h2><p>Explore feature support and version compatibility, or inspect benchmark results with their conditions and reproduction steps.</p></div><div class="content-links"><a href="support/">Support &amp; compatibility →</a><a href="validation/">Performance &amp; validation →</a></div></section>
 {% endblock main %}
