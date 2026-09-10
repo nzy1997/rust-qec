@@ -43,9 +43,9 @@ test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) 
 
 test('home routes first-time, library, and prebuilt users to the promised instructions', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Run the tutorial' }).click();
-  await expect(page).toHaveURL(/\/get-started\/$/);
-  await expect(page.getByRole('heading', { name: '1. Install with Cargo' })).toBeVisible();
+  await page.getByRole('link', { name: 'Create your first circuit' }).click();
+  await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
+  await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
   await page.goto('/');
   await page.getByRole('link', { name: 'Browse library APIs' }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();

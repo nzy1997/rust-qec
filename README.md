@@ -3,7 +3,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="site/static/brand/rustqec-logo-dark.svg">
-    <img src="site/static/brand/rustqec-logo.svg" width="440" alt="RustQEC: a copper surface-code patch with four boundary checks">
+    <img src="site/static/brand/rustqec-logo.svg" width="200" alt="RustQEC: a copper surface-code patch with four boundary checks">
   </picture>
 </p>
 
