@@ -1355,3 +1355,10 @@ pre[data-output="true"] { background: #edf6f2; color: #183f32; border: 1px solid
   .page-toc nav { display: block; }
   .page-toc .toc-section { margin: .5rem 0; }
 }
+
+/* Atom-loss evidence: full-width figures with accessible captions and raw data. */
+.loss-result-figure { margin: 1.5rem 0 1rem; }
+.loss-result-figure a { display: block; border: 1px solid var(--border); border-radius: .5rem; background: #fff; overflow: hidden; }
+.loss-result-figure img { display: block; width: 100%; height: auto; }
+.loss-result-figure figcaption { margin-top: .7rem; color: var(--muted); font-size: .9rem; line-height: 1.55; }
+.loss-evidence-downloads { margin-top: 1.5rem; }

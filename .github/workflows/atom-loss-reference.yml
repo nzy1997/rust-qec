@@ -1,0 +1,31 @@
+name: Atom-loss correctness reference
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'benchmarks/atom_loss/**'
+      - 'rustqec-cli/src/decode/**'
+      - 'rustqec-cli/src/decode.rs'
+      - 'rustqec-cli/examples/export_matching_benchmark.rs'
+      - 'rustqec-cli/Cargo.toml'
+      - 'rstim/src/**'
+      - 'site/static/data/atom-loss/**'
+      - '.github/workflows/atom-loss-reference.yml'
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r benchmarks/atom_loss/requirements.txt
+      - run: cargo build --release --locked -p rustqec-cli --features benchmark-tools --bin rustqec --example export_matching_benchmark
+      - run: python -m unittest benchmarks.atom_loss.test_reference
+      - run: python -m benchmarks.atom_loss.correctness --binary target/release/rustqec --out drafts/ci-atom-loss/correctness.json
+      - run: python -m benchmarks.atom_loss.decoder_reference --out drafts/ci-atom-loss/decoder-correctness.json
+      - run: python -m benchmarks.atom_loss.verify
