@@ -1,4 +1,4 @@
-"""Render three publication figures directly from recorded runs, never fitted data."""
+"""Render publication figures directly from recorded runs, never fitted data."""
 import argparse
 import csv
 import json
@@ -48,8 +48,8 @@ def render(out):
     ax.set(yscale='log',xlabel='Code distance d (rounds = d)',ylabel='Samples / second',xticks=[3,5,7],
            title='Loss-visible sampling and b8 packing')
     ax.grid(axis='y',which='major');ax.legend(loc='best',frameon=False,fontsize=10)
-    fig.get_layout_engine().set(rect=(0,0.07,1,1))
-    fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 · median and full range of 3 runs",ha='center',fontsize=9,color='#605b56')
+    fig.get_layout_engine().set(rect=(0,0.13,1,1))
+    fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 · median and range of 3 runs\nUnoptimized Stim-based correctness reference; NOT native Stim performance.",ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'sampling-throughput')
     displayed_cases=[c for c in decoding if c['distance'] in (3,5)]
     fig,axes=plt.subplots(1,2,figsize=(11.2,4.7),sharey=True,layout='constrained')
@@ -134,13 +134,40 @@ def render(out):
         ax.annotate(timing_label, (median,p), xytext=(-8,9) if name=='envelope-mle' else (8,3),
                     textcoords='offset points', ha='right' if name=='envelope-mle' else 'left',
                     fontsize=9, color=color)
-    ax.set(xscale='log',xlabel='Amortized compile + decode time (µs / shot)',ylabel='Logical failure probability / experiment',
-           title=f"Accuracy and time on the same {tradeoff['shots']:,} shots",ylim=(0,None))
+    ax.set(xscale='log',xlabel='Amortized workflow time (µs / shot)',ylabel='Logical failure probability / experiment',
+           title=f"Accuracy and workflow time on the same {tradeoff['shots']:,} shots",ylim=(0,None))
     ax.grid(axis='y');ax.legend(loc='best',frameon=False,fontsize=10)
-    fig.get_layout_engine().set(rect=(0,.12,1,1))
-    fig.text(.5,.035,f"Mid-SWAP d = 3, rounds = 2 · pPauli = 0.001 · pLoss = 0.003\n95% Wilson intervals; timing median and range of 3 cold-cache runs",ha='center',fontsize=9,color='#605b56')
+    fig.get_layout_engine().set(rect=(0,.17,1,1))
+    fig.text(.5,.035,f"Mid-SWAP d = 3, rounds = 2 · pPauli = 0.001 · pLoss = 0.003\n95% Wilson intervals; timing median and range of 3 cold-cache runs\nIncludes graph construction and data preparation; NOT a matching-kernel comparison.",ha='center',fontsize=9,color='#605b56')
     if failed: fig.text(.5,.005,'; '.join(failed),ha='center',fontsize=8,color='#9c392a')
     emit(fig,out,'accuracy-time')
+    # Means of stage durations add exactly to the mean workflow total. Do not
+    # describe native aggregate decode time as an isolated matching kernel.
+    stages=[('compile_seconds','Shared compiler','#aaa29a'),
+            ('transform_seconds','Public-row transform','#d8cbb8'),
+            ('preprocess_seconds','Array / group / select','#c89464'),
+            ('graph_build_seconds','Python graph construction','#b95428'),
+            ('matching_seconds','decode_batch call','#386b80'),
+            ('output_seconds','Output reorder','#76998e'),
+            ('adapter_overhead_seconds','Bookkeeping / timers','#dadfdb')]
+    fig,ax=plt.subplots(figsize=(9.4,4.4),layout='constrained')
+    for row,name in enumerate(['pymatching-fixed','pymatching-envelope']):
+        result=tradeoff['decoders'][name];left=0.
+        for key,label,color in stages:
+            value=np.mean([r[key] for r in result['runs']])/result['shots']*1e6
+            ax.barh(row,value,left=left,color=color,label=label if row==0 else None,height=.45)
+            left+=value
+        graph_share=np.mean([r['graph_build_seconds'] for r in result['runs']])/np.mean([r['decode_seconds'] for r in result['runs']])
+        ax.text(left+.08,row,f'{left:.2f} µs / shot',va='center',fontsize=10)
+        ax.text(0,row+.31,f"{result['runs'][0]['graph_builds']} graph(s); construction = {graph_share:.0%} of Python adapter time",fontsize=9,color='#605b56')
+    ax.set(yticks=[0,1],yticklabels=['PyMatching fixed','PyMatching + envelope'],
+           xlabel='Amortized workflow time (µs / shot)',title='Where the Python batch adapter spends time',ylim=(1.65,-.55))
+    ax.set_xlim(0,max(np.mean(r['total_seconds'])/r['shots']*1e6 for n,r in tradeoff['decoders'].items() if n in ['pymatching-fixed','pymatching-envelope'])*1.23)
+    ax.grid(axis='x');ax.set_axisbelow(True)
+    fig.legend(loc='lower center',bbox_to_anchor=(.5,.10),ncol=3,frameon=False,fontsize=9)
+    fig.get_layout_engine().set(rect=(0,.31,1,1))
+    fig.text(.5,.015,'Same 5,000 shots · d = 3, rounds = 2 · additive means of 3 instrumented runs\nPython adapter only; decode_batch includes its API boundary, not an isolated kernel. Startup / JSON / scoring excluded.',ha='center',fontsize=9,color='#605b56')
+    emit(fig,out,'adapter-stages')
     with (out/'summary.csv').open('w') as f:
         writer=csv.DictWriter(f,lineterminator='\n',fieldnames=['experiment','distance','rounds','loss_probability','decoder','status','shots','errors','logical_error_rate','ci95_low','ci95_high','median_microseconds_per_shot'])
         writer.writeheader()

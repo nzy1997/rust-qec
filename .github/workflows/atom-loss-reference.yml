@@ -7,8 +7,14 @@ on:
       - 'rustqec-cli/src/decode/**'
       - 'rustqec-cli/src/decode.rs'
       - 'rustqec-cli/examples/export_matching_benchmark.rs'
+      - 'rustqec-cli/examples/export_decoder_oracle.rs'
+      - 'rustqec-cli/src/lib.rs'
       - 'rustqec-cli/Cargo.toml'
       - 'rstim/src/**'
+      - 'renvelope/src/**'
+      - 'rmatching/src/**'
+      - 'qec-ilp-core/src/**'
+      - 'Cargo.lock'
       - 'site/static/data/atom-loss/**'
       - '.github/workflows/atom-loss-reference.yml'
 permissions:
@@ -16,6 +22,11 @@ permissions:
 jobs:
   reference:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -24,8 +35,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r benchmarks/atom_loss/requirements.txt
-      - run: cargo build --release --locked -p rustqec-cli --features benchmark-tools --bin rustqec --example export_matching_benchmark
+      - run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec --example export_matching_benchmark --example export_decoder_oracle
       - run: python -m unittest benchmarks.atom_loss.test_reference
       - run: python -m benchmarks.atom_loss.correctness --binary target/release/rustqec --out drafts/ci-atom-loss/correctness.json
       - run: python -m benchmarks.atom_loss.decoder_reference --out drafts/ci-atom-loss/decoder-correctness.json
+      - run: python -m benchmarks.atom_loss.chain_reference --out drafts/ci-atom-loss/chain-correctness.json
       - run: python -m benchmarks.atom_loss.verify

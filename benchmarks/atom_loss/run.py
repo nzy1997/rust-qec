@@ -124,15 +124,29 @@ def python_decode(graph, conditioned, batch=True):
     groups = {}
     for row, losses in enumerate(graph['losses']):
         groups.setdefault(tuple(losses) if conditioned else (), []).append(row)
+    preprocessing = time.perf_counter()-started
+    graph_seconds = matching_seconds = output_seconds = 0.
     for losses, indices in groups.items():
+        stage = time.perf_counter()
         matching = build_matching(graph, losses)
+        graph_seconds += time.perf_counter()-stage
+        stage = time.perf_counter()
         rows = syndromes[indices]
         if np.any(rows[:, matching.num_detectors:]):
             raise ValueError('Unreachable fired detector')
+        preprocessing += time.perf_counter()-stage
+        stage = time.perf_counter()
         values = matching.decode_batch(rows[:, :matching.num_detectors])
+        matching_seconds += time.perf_counter()-stage
+        stage = time.perf_counter()
         if values.shape[1]:
             predictions[indices] = values[:, 0]
-    return predictions, {'decode_seconds': time.perf_counter()-started,
+        output_seconds += time.perf_counter()-stage
+    elapsed = time.perf_counter()-started
+    return predictions, {'decode_seconds': elapsed,
+                         'preprocess_seconds': preprocessing, 'graph_build_seconds': graph_seconds,
+                         'matching_seconds': matching_seconds, 'output_seconds': output_seconds,
+                         'adapter_overhead_seconds': elapsed-preprocessing-graph_seconds-matching_seconds-output_seconds,
                          'graph_builds': len(groups), 'batch_calls': len(groups),
                          'execution': 'batch grouped by loss pattern' if conditioned else 'batch fixed graph'}
 
@@ -295,13 +309,14 @@ def main():
                   'os':platform.platform(),'cpu':cpu_model(),
                   'python':sys.version,'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','matplotlib']},
                   'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),
-                  'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,sampler]},
+                  'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,sampler,exporter.parent/'export_decoder_oracle']},
                   'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},
                   'timing':'Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Each repetition remeasures compilation and transformation. Excludes process startup and scoring; native decode includes buffered reads and output packing/flush, exporter transformation includes public row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.',
-                  'sources':{str(p.relative_to(ROOT)):digest(p) for p in [*sorted((ROOT/'benchmarks/atom_loss').glob('*.py')), ROOT/'Cargo.lock', ROOT/'rustqec-cli/src/decode/benchmark.rs', ROOT/'rstim/examples/atom_loss_sampling_benchmark.rs']}}
+                  'sources':{str(p.relative_to(ROOT)):digest(p) for p in [*sorted((ROOT/'benchmarks/atom_loss').glob('*.py')), *sorted((ROOT/'benchmarks/atom_loss/fixtures').glob('*.stim')), ROOT/'Cargo.lock', ROOT/'rustqec-cli/src/decode/benchmark.rs', ROOT/'rstim/examples/atom_loss_sampling_benchmark.rs']}}
     save(out/f'provenance-{args.stage}.json', provenance)
     snapshot_files = list(provenance['sources']) + ['rustqec-cli/Cargo.toml', 'rustqec-cli/src/lib.rs',
-                     'rustqec-cli/src/decode.rs', 'rustqec-cli/examples/export_matching_benchmark.rs']
+                     'rustqec-cli/src/decode.rs', 'rustqec-cli/examples/export_matching_benchmark.rs',
+                     'rustqec-cli/examples/export_decoder_oracle.rs']
     save(out/'source-snapshot.json', {'base_commit':provenance['source_commit'],
          'description':'Exact benchmark sources at run time; overlay on base_commit.',
          'files':{name:(ROOT/name).read_text() for name in snapshot_files}})
@@ -313,7 +328,11 @@ def main():
         decoder_result = decoder_reference_run(binary, exporter)
         save(out/'decoder-correctness.json', decoder_result)
         assert decoder_result['status'] == 'PASS'
-        print('sampling and decoding correctness PASS', flush=True)
+        from .chain_reference import run as chain_reference_run
+        chain_result = chain_reference_run(binary, exporter)
+        save(out/'chain-correctness.json', chain_result)
+        assert chain_result['status'] == 'PASS'
+        print('sampling, matching and real-circuit chain correctness PASS', flush=True)
     if args.stage in ['all','sampling']:
         results = []
         for distance in [3,5,7]:

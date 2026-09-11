@@ -46,3 +46,7 @@ zstd = "0.13"
 [[example]]
 name = "export_matching_benchmark"
 required-features = ["benchmark-tools"]
+
+[[example]]
+name = "export_decoder_oracle"
+required-features = ["benchmark-tools"]

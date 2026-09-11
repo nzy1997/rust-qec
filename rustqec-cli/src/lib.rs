@@ -9,7 +9,7 @@ use serde::Serialize;
 mod decode;
 #[cfg(feature = "benchmark-tools")]
 #[doc(hidden)]
-pub use decode::benchmark::export_matching_dataset;
+pub use decode::benchmark::{export_decoder_oracle_dataset, export_matching_dataset};
 mod pipeline;
 
 pub const SCHEMA_VERSION: &str = "rustqec.cli.v1";

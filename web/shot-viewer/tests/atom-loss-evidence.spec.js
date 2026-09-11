@@ -18,6 +18,13 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   await full.scrollIntoViewIfNeeded();
   await expect.poll(() => full.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(page.locator('.loss-full-figure figcaption')).toContainText('0.000599');
+  const stages = page.locator('.loss-stage-figure img');
+  await stages.scrollIntoViewIfNeeded();
+  await expect.poll(() => stages.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.loss-stage-figure figcaption')).toContainText('not establish a matching-kernel');
+  const chain = await (await page.request.get('/data/atom-loss/chain-correctness.json')).json();
+  expect(chain.status).toBe('PASS');
+  expect(chain.compiler_output_mutations_rejected).toEqual({ pauli_weight: true, loss_candidate: true });
   await page.locator('.loss-evidence-downloads summary').click();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();

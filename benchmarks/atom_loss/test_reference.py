@@ -5,7 +5,8 @@ import numpy as np
 from . import reference
 from .verify import require_complete_sweep
 from .run import ROOT, build_matching, logical_x, score, wilson, measure_python, python_decode
-from . import decoder_reference
+from . import decoder_reference, chain_reference, correctness, noise_controls
+import itertools
 
 
 class ReferenceTests(unittest.TestCase):
@@ -77,13 +78,42 @@ class ReferenceTests(unittest.TestCase):
             graph['syndromes'].append(syndrome)
             graph['losses'].append([i for i,f in enumerate(flags) if f])
         for conditioned in [False,True]:
-            batch,_=python_decode(graph,conditioned)
+            batch,timing=python_decode(graph,conditioned)
+            phases=[timing[k] for k in ['preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
+            self.assertGreaterEqual(min(phases),0)
+            self.assertAlmostEqual(sum(phases),timing['decode_seconds'])
             loop,_=python_decode(graph,conditioned,batch=False)
             np.testing.assert_array_equal(batch,loop)
         graph['syndromes'][0].append(1)
         for row in graph['syndromes'][1:]: row.append(0)
         with self.assertRaisesRegex(ValueError,'Unreachable'):
             python_decode(graph,False)
+
+    def test_deleted_two_qubit_channel_fails_same_acceptance(self):
+        original=correctness.rust_rows
+        def defective(binary,text,shots,seed,work):
+            text='\n'.join(line for line in text.splitlines() if not line.startswith('DEPOLARIZE2('))
+            return original(binary,text,shots,seed,work)
+        with patch('benchmarks.atom_loss.correctness.rust_rows',side_effect=defective):
+            report=correctness.run(ROOT/'target/release/rustqec')
+        self.assertEqual(report['status'],'FAIL')
+        analytic=report['analytic_noise_controls']
+        case=next(r for r in analytic['cases'] if r['case']=='DEPOLARIZE2_alive')
+        self.assertEqual(case['status'],'FAIL')
+        self.assertEqual(case['rust_probability'],0.)
+        self.assertAlmostEqual(case['expected_probability'],8*.17/15)
+
+    def test_exact_parity_costs_match_exhaustive_fault_choices(self):
+        terms=[(1,1.1),(2,.3),(3,.4),(5,.7),(1,.2)]
+        expected=np.full(8,np.inf)
+        for choices in itertools.product([0,1],repeat=len(terms)):
+            mask=0; cost=0.
+            for choose,(effect,weight) in zip(choices,terms):
+                if choose: mask^=effect; cost+=weight
+            expected[mask]=min(expected[mask],cost)
+        np.testing.assert_allclose(chain_reference.costs(terms,3),expected)
+        self.assertEqual(chain_reference.allowed(np.array([0.,1.,0.,1.]),1,1),{0,1})
+        with self.assertRaises(ValueError): chain_reference.allowed(np.array([np.inf,np.inf]),0,0)
 
     def test_incomplete_comparison_cannot_be_published_as_a_curve(self):
         cases=[{'distance':d,'loss_probability':p,'decoders':{name:{'status':'ok'} for name in
