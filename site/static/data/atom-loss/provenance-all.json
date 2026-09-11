@@ -1,0 +1,44 @@
+{
+  "started_utc": "2026-09-11T05:22:34.551783+00:00",
+  "command": [
+    "/Users/nzy/rcode/rstim/benchmarks/atom_loss/run.py",
+    "--stage",
+    "all",
+    "--work",
+    "drafts/atom-loss-benchmark-v3"
+  ],
+  "source_commit": "e1c0b17f43b8d33206f5cb6459119374d2483bf4",
+  "working_tree_dirty": true,
+  "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M4",
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "dependencies": {
+    "stim": "1.16.0",
+    "numpy": "2.4.6",
+    "pymatching": "2.4.0",
+    "matplotlib": "3.10.9"
+  },
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "binaries": {
+    "target/release/rustqec": "b3d026ac0e1ef4ced334233e0a7db944e4086d035a7854121a51fdd0b2d49bb9",
+    "target/release/examples/export_matching_benchmark": "fb921d2e5a83b76ce19602e82de320400b0eb7a609156c96412c9c435616f6e0",
+    "target/release/examples/atom_loss_sampling_benchmark": "ff3455dd20ada6806505e64cf8929fcb6e080d8d0eadd7315da3d7c9343da6f6"
+  },
+  "environment": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "RAYON_NUM_THREADS": "1"
+  },
+  "timing": "Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Excludes process startup, disk I/O and scoring; Rust decode stats may include buffered row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.",
+  "sources": {
+    "benchmarks/atom_loss/correctness.py": "9a7f0235f9ed9c24a42e43b6cd11ee85ad5bb3423d96c18cd3291acb0a4425c6",
+    "benchmarks/atom_loss/decoder_reference.py": "eff4a39be4428b2faafe5281a2a25a84a73b689406af6c301dba179b3c27de8f",
+    "benchmarks/atom_loss/plot.py": "b1f4fdd94eef6b4d8108eeb997664dbff4637d50e1f00c48409ec96c123e6166",
+    "benchmarks/atom_loss/reference.py": "cbb5ca0f64661193d2143175f9024519447b3b0b76f1f628e666cc46951fc5ab",
+    "benchmarks/atom_loss/run.py": "fe4ee78535eba16e1df26b3c3bfa9c89cf904abdcd5c11aa5c5c718d962069f8",
+    "benchmarks/atom_loss/test_reference.py": "12de00b5f87d4c136b56ac498a319f8685fb6546f9dfcccba544e527cde2b2ea",
+    "Cargo.lock": "b11a14e3ea3f148c0795fe764385ac239627b26d50b138b3eb4c25fc348b1b12",
+    "rustqec-cli/src/decode/benchmark.rs": "7e409770375aaa71e11045c76a94c51d8dc6cd302ac58528969947a017b848d5",
+    "rstim/examples/atom_loss_sampling_benchmark.rs": "5eb0e6aa158ac203fa0d37992ec31df81ac2b4e97534c9ddda08828ac14334f8"
+  }
+}

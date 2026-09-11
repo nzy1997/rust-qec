@@ -16,9 +16,10 @@ async function codeToolbarFor(page, text) {
 test("home leads to the Cargo installation path", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Install with Cargo" }).click();
-  await expect(page).toHaveURL(/\/#install$/);
-  await expect(page.getByRole("heading", { name: "Install the CLI", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Run your first circuit" }).click();
+  await expect(page).toHaveURL(/\/get-started\/#install$/);
+  await expect(page.locator("h2#install")).toBeInViewport();
+  await expect(page.locator("h2#install")).toContainText("1. Install with Cargo");
+  await page.getByRole("link", { name: "create your circuit", exact: true }).click();
   await expect(page.getByRole("heading", { name: "2. Create and inspect a circuit" })).toBeInViewport();
 });
 
@@ -32,13 +33,13 @@ test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) 
     "Try a circuit in your browser",
   ]);
   expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
-    "#install",
+    "get-started/#install",
     "interactive/",
   ]);
 
   const destinations = await actions.evaluateAll((links) => links.map((link) => link.href));
   expect(new Set(destinations).size).toBe(2);
-  await expect(page.locator('a[href="#install"]')).toHaveCount(1);
+  await expect(page.locator('a[href="#install"]')).toHaveCount(0);
 });
 
 test('home routes first-time, library, and prebuilt users to the promised instructions', async ({ page }) => {
@@ -47,13 +48,30 @@ test('home routes first-time, library, and prebuilt users to the promised instru
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
   await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
   await page.goto('/');
-  await page.getByRole('link', { name: 'Browse library APIs' }).click();
+  await page.getByRole('link', { name: 'Rust APIs', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
   await page.goto('/');
-  await page.getByRole('link', { name: 'Install prebuilt binaries' }).click();
+  await page.getByRole('link', { name: 'Install with Cargo' }).click();
+  await page.getByRole('link', { name: 'native package without Rust', exact: true }).click();
   await expect(page.locator('#native-install')).toHaveAttribute('open', '');
   await expect(page.getByRole('link', { name: 'Linux x86_64 archive' })).toBeVisible();
   await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
+});
+
+test('home atom-loss feature has one destination with the complete walkthrough', async ({ page }) => {
+  await page.goto('/');
+  const feature = page.getByRole('region', { name: 'From atom-loss circuits to loss-aware decoding' });
+  await expect(feature.getByRole('listitem')).toHaveCount(3);
+  await expect(feature.getByRole('link')).toHaveCount(1);
+  await expect(feature.getByRole('link')).toHaveAttribute('href', 'atom-loss/');
+  await feature.getByRole('link').click();
+  await expect(page).toHaveURL(/\/atom-loss\/$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('From atom loss to logical predictions');
+  await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
+  await expect(page.locator('[data-output]')).toContainText('Logical errors: 0 / 64');
+  await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Atom loss');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
 test('home skip link reaches the product introduction and preserves its next actions', async ({ page }) => {
@@ -79,7 +97,7 @@ test("installation starts with one copyable command and keeps manual steps optio
   const native = installation.locator("#native-install");
   const manual = native.locator("details");
   await expect(manual).not.toHaveAttribute("open", "");
-  await installation.getByRole("button", { name: "Copy Shell · install v0.3.0" }).click();
+  await installation.getByRole("button", { name: "Copy Shell · install" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
     "cargo install --locked rustqec-cli --version 0.3.0",
   );
@@ -398,10 +416,10 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
     await expect(page.locator('.page-toc')).toBeHidden();
     const hero = await page.locator('.home-hero').boundingBox();
     const capabilities = await page.locator('#capabilities').boundingBox();
-    const install = await page.locator('#install').boundingBox();
+    const feature = await page.locator('#atom-loss').boundingBox();
     expect(Math.abs(hero.x - capabilities.x)).toBeLessThan(1);
-    expect(Math.abs(hero.x - install.x)).toBeLessThan(1);
-    expect(Math.abs(hero.width - install.width)).toBeLessThan(1);
+    expect(Math.abs(hero.x - feature.x)).toBeLessThan(1);
+    expect(Math.abs(hero.width - feature.width)).toBeLessThan(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if (width < 1200) {
       const toggle = page.locator('.mobile-navigation > summary');
@@ -428,14 +446,15 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
   });
 }
 
-test('atom loss search ranks explanations above measurements and links to the section', async ({ page }) => {
+test('atom loss search leads to its dedicated walkthrough and retains the support reference', async ({ page }) => {
   await page.goto('/docs/?q=atom+loss');
   const first = page.locator('#search-results li').first();
-  await expect(first).toContainText('Atom-loss support boundary');
+  await expect(first).toContainText('Construct a circuit with atom loss');
   await expect(first.locator('mark').first()).toBeVisible();
-  await expect(first.locator('a')).toHaveAttribute('href', /support\/#atom-loss-support-boundary$/);
+  await expect(first.locator('a')).toHaveAttribute('href', /atom-loss\/#model-loss$/);
+  await expect(page.locator('#search-results a[href$="support/#atom-loss-support-boundary"]')).toBeVisible();
   await first.locator('a').click();
-  await expect(page.locator('#atom-loss-support-boundary')).toBeInViewport();
+  await expect(page.locator('#model-loss')).toBeInViewport();
 });
 
 for (const [query, destination] of [

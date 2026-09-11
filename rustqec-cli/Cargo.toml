@@ -13,6 +13,7 @@ publish = ["crates-io"]
 include = [
     "/src/**",
     "/tests/**",
+    "/examples/**",
     "/README.md",
     "/LICENSE",
     "/Cargo.toml",
@@ -21,6 +22,7 @@ include = [
 
 [features]
 default = []
+benchmark-tools = []
 ilp = ["dep:qec-ilp-core", "qec-ilp-core/highs"]
 
 [[bin]]
@@ -40,3 +42,11 @@ tempfile = "3"
 [dev-dependencies]
 renvelope = { path = "../renvelope" }
 zstd = "0.13"
+
+[[example]]
+name = "export_matching_benchmark"
+required-features = ["benchmark-tools"]
+
+[[example]]
+name = "export_decoder_oracle"
+required-features = ["benchmark-tools"]

@@ -1,0 +1,310 @@
+{
+  "status": "PASS",
+  "analytic_noise_controls": {
+    "status": "PASS",
+    "method": "analytic single-bit/parity probabilities; one-sample bounds; live, absent, reset-restored and pre-loss controls",
+    "familywise_alpha_bound": 5e-07,
+    "cases": [
+      {
+        "case": "X_ERROR_alive",
+        "channel": "X_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1678466796875,
+        "reference_probability": 0.17181396484375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "X_ERROR_lost",
+        "channel": "X_ERROR",
+        "expected_probability": 0.0,
+        "rust_probability": 0.0,
+        "reference_probability": 0.0,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "X_ERROR_restored",
+        "channel": "X_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1693115234375,
+        "reference_probability": 0.17169189453125,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Y_ERROR_alive",
+        "channel": "Y_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1678466796875,
+        "reference_probability": 0.17181396484375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Y_ERROR_lost",
+        "channel": "Y_ERROR",
+        "expected_probability": 0.0,
+        "rust_probability": 0.0,
+        "reference_probability": 0.0,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Y_ERROR_restored",
+        "channel": "Y_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1693115234375,
+        "reference_probability": 0.17169189453125,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Z_ERROR_alive",
+        "channel": "Z_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1678466796875,
+        "reference_probability": 0.17181396484375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Z_ERROR_lost",
+        "channel": "Z_ERROR",
+        "expected_probability": 0.0,
+        "rust_probability": 0.0,
+        "reference_probability": 0.0,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "Z_ERROR_restored",
+        "channel": "Z_ERROR",
+        "expected_probability": 0.17,
+        "rust_probability": 0.1693115234375,
+        "reference_probability": 0.17169189453125,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE1_alive",
+        "channel": "DEPOLARIZE1",
+        "expected_probability": 0.11333333333333334,
+        "rust_probability": 0.1143798828125,
+        "reference_probability": 0.113861083984375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE1_lost",
+        "channel": "DEPOLARIZE1",
+        "expected_probability": 0.0,
+        "rust_probability": 0.0,
+        "reference_probability": 0.0,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE1_restored",
+        "channel": "DEPOLARIZE1",
+        "expected_probability": 0.11333333333333334,
+        "rust_probability": 0.113372802734375,
+        "reference_probability": 0.115570068359375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE2_alive",
+        "channel": "DEPOLARIZE2",
+        "expected_probability": 0.09066666666666667,
+        "rust_probability": 0.089996337890625,
+        "reference_probability": 0.0902099609375,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE2_lost",
+        "channel": "DEPOLARIZE2",
+        "expected_probability": 0.0,
+        "rust_probability": 0.0,
+        "reference_probability": 0.0,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE2_restored",
+        "channel": "DEPOLARIZE2",
+        "expected_probability": 0.09066666666666667,
+        "rust_probability": 0.091644287109375,
+        "reference_probability": 0.0916748046875,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      },
+      {
+        "case": "DEPOLARIZE2_before_loss",
+        "channel": "DEPOLARIZE2",
+        "expected_probability": 0.09066666666666667,
+        "rust_probability": 0.089263916015625,
+        "reference_probability": 0.09295654296875,
+        "shots_per_sampler": 32768,
+        "tolerance": 0.016877324068605606,
+        "status": "PASS"
+      }
+    ],
+    "channel_deletion_mutations": {
+      "X_ERROR": {
+        "rejected": true,
+        "failed_cases": [
+          "X_ERROR_alive",
+          "X_ERROR_restored"
+        ]
+      },
+      "Y_ERROR": {
+        "rejected": true,
+        "failed_cases": [
+          "Y_ERROR_alive",
+          "Y_ERROR_restored"
+        ]
+      },
+      "Z_ERROR": {
+        "rejected": true,
+        "failed_cases": [
+          "Z_ERROR_alive",
+          "Z_ERROR_restored"
+        ]
+      },
+      "DEPOLARIZE1": {
+        "rejected": true,
+        "failed_cases": [
+          "DEPOLARIZE1_alive",
+          "DEPOLARIZE1_restored"
+        ]
+      },
+      "DEPOLARIZE2": {
+        "rejected": true,
+        "failed_cases": [
+          "DEPOLARIZE2_alive",
+          "DEPOLARIZE2_restored",
+          "DEPOLARIZE2_before_loss"
+        ]
+      }
+    }
+  },
+  "method": "independent Stim circuit lowering; joint output distributions and hand-computed controls",
+  "familywise_alpha_bound": 1e-06,
+  "negative_skipped_gate_mutation_rejected": true,
+  "unsupported_reference_operation_rejected": true,
+  "cases": [
+    {
+      "case": "lost_control_skips_cx",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "lost_target_skips_cx",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "reset_restores_wire",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "readout_reset_restores_wire",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "bell_partner_marginal",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.00567626953125,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "loss_at_two_times",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.003082275390625,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "two_losses",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.00518798828125,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "pauli_and_loss",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0015869140625,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "persistent_loss_multiple_gates",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.0015869140625,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "repeat_delayed_readout",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.00640869140625,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "ordinary_lost_measurement",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.003204345703125,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    },
+    {
+      "case": "no_loss_bell",
+      "shots_per_sampler": 32768,
+      "max_bin_difference": 0.001556396484375,
+      "tolerance": 0.037089831887497926,
+      "known_answer_pass": true,
+      "status": "PASS"
+    }
+  ]
+}

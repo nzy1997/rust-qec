@@ -1,5 +1,6 @@
 """Canonical contracts must refresh on every build, without modifying their source."""
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from tools.prepare_site_docs import prepare
@@ -9,6 +10,12 @@ class PrepareSiteDocsTests(unittest.TestCase):
     def test_stages_and_refreshes_both_contracts(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            (root / 'site').mkdir()
+            (root / 'site/versions.json').write_text(json.dumps({
+                'default': 'master', 'versions': [
+                    {'id': 'master', 'label': 'Development · master', 'ref': 'master', 'path': ''}
+                ]
+            }))
             pairs = [('rstim/doc/QP101-ZY.md', 'qp101-protocol.md'),
                      ('docs/support-compatibility.md', 'support-compatibility.md')]
             for source, _ in pairs:
@@ -16,6 +23,8 @@ class PrepareSiteDocsTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('# Original\nUnicode: 量子\n')
             prepare(root)
+            version = json.loads((root / 'site/generated/docs-version.json').read_text())
+            self.assertEqual(version['id'], 'master')
             for source, target in pairs:
                 self.assertEqual((root / source).read_bytes(), (root / 'site/generated' / target).read_bytes())
                 (root / source).write_text('# Revised\n')

@@ -42,6 +42,7 @@ class SiteFixture:
 PAGE_FILES = (
     "index.html",
     "get-started/index.html",
+    "atom-loss/index.html",
     "docs/index.html",
     "support/index.html",
     "simulator/index.html",
@@ -59,6 +60,7 @@ PAGE_FILES = (
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js")
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
+    "atom-loss/index.html": ("loss-information", "model-loss", "sample-loss", "decode-loss", "check-predictions", "supported-circuits"),
     "index.html": ("capabilities",),
     "get-started/index.html": (
         "install",
@@ -322,7 +324,10 @@ def check_pages(
         if missing_scripts:
             problems.append(f"{page}: missing required scripts: {', '.join(missing_scripts)}")
 
-        for path in sorted(collect_local_string_paths(text)):
+        # Tutorial code references files produced on the reader's machine, not
+        # deployed assets. Actual href/src attributes remain checked above.
+        runtime_html = re.sub(r"<(pre|code)\b[^>]*>.*?</\1>", "", text, flags=re.S | re.I)
+        for path in sorted(collect_local_string_paths(runtime_html)):
             if path.startswith("/"):
                 problems.append(f"{page}: root-absolute reference breaks subpath deploy: {path}")
                 continue
@@ -1283,6 +1288,8 @@ const copyBlocks = document.querySelectorAll("pre code");
     write_text(site_root / "docs/index.html", '<html><body><main><h1>Documentation</h1></main></body></html>')
     write_text(site_root / "js/search.js", '// Local documentation search')
     write_text(site_root / "data/docs-search.json", '[]')
+
+    write_text(site_root / "atom-loss/index.html", '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS["atom-loss/index.html"]) + '</main></body></html>')
 
     for page in PAGE_FILES:
         page_path = site_root / page
