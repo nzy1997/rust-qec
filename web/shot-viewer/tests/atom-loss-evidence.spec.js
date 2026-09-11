@@ -13,6 +13,11 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain('<svg');
   }
+  await page.locator('.loss-full-sweep summary').click();
+  const full = page.locator('.loss-full-figure img');
+  await full.scrollIntoViewIfNeeded();
+  await expect.poll(() => full.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.loss-full-figure figcaption')).toContainText('0.000599');
   await page.locator('.loss-evidence-downloads summary').click();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();

@@ -14,7 +14,8 @@ def publish(out):
     shutil.copyfile(ROOT/'benchmarks/atom_loss/README.md',out/'methodology.md')
     files=['correctness.json','decoder-correctness.json','sampling.json','decoding.json','tradeoff.json',
            'provenance-all.json','methodology.md','summary.csv','source-snapshot.json']
-    files += [f'{name}.{ext}' for name in ['sampling-throughput','logical-error-rate','accuracy-time'] for ext in ['svg','png']]
+    files += [name for name in ['provenance-timing.json','source-snapshot-timing.json'] if (out/name).exists()]
+    files += [f'{name}.{ext}' for name in ['sampling-throughput','logical-error-rate','logical-error-rate-full','accuracy-time'] for ext in ['svg','png']]
     save(out/'bundle.json',{'completed_utc':datetime.now(timezone.utc).isoformat(),
                            'sha256':{name:hashlib.sha256((out/name).read_bytes()).hexdigest() for name in files}})
 

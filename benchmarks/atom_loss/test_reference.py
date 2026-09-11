@@ -4,7 +4,8 @@ from unittest.mock import patch
 import numpy as np
 from . import reference
 from .verify import require_complete_sweep
-from .run import logical_x, score, wilson, measure_python
+from .run import ROOT, build_matching, logical_x, score, wilson, measure_python, python_decode
+from . import decoder_reference
 
 
 class ReferenceTests(unittest.TestCase):
@@ -37,13 +38,52 @@ class ReferenceTests(unittest.TestCase):
     def test_backend_failure_preserves_timings_without_partial_accuracy(self):
         successful = (np.array([0,1], dtype=np.uint8), {'decode_seconds':.1})
         with patch('benchmarks.atom_loss.run.python_decode', side_effect=[successful, ValueError('unreachable syndrome')]):
-            result = measure_python({'compile_seconds':.01,'transform_seconds':.01}, True, np.array([0,1]), 3)
+            result = measure_python(lambda rep: {'compile_seconds':.01,'transform_seconds':.01}, True, np.array([0,1]), 3)
         self.assertEqual(result['status'], 'failed')
         self.assertEqual(len(result['runs']), 1)
         self.assertIn('unreachable syndrome', result['error'])
         self.assertNotIn('logical_error_rate', result)
         self.assertNotIn('errors', result)
         self.assertNotIn('total_seconds', result)
+
+    def test_each_repetition_remeasures_common_stages(self):
+        calls=[]
+        def export(rep):
+            calls.append(rep)
+            return {'compile_seconds':rep+1.,'transform_seconds':rep+.5}
+        successful=(np.array([0,1],dtype=np.uint8),{'decode_seconds':.1})
+        with patch('benchmarks.atom_loss.run.python_decode', side_effect=lambda *a, **kw: (successful[0],successful[1].copy())):
+            result=measure_python(export,False,np.array([0,1]),3)
+        self.assertEqual(calls,[0,1,2])
+        np.testing.assert_allclose(result['total_seconds'],[1.6,3.6,5.6])
+
+    def test_actual_ignore_conditioning_mutation_fails_oracle(self):
+        with patch('benchmarks.atom_loss.decoder_reference.build_matching', side_effect=lambda graph, losses: build_matching(graph,[])):
+            result=decoder_reference.run(ROOT/'target/release/rustqec',ROOT/'target/release/examples/export_matching_benchmark')
+        self.assertEqual(result['status'],'FAIL')
+        five=result['cases'][1]
+        self.assertEqual(five['rejected_rows']['native'],[])
+        self.assertIn(21,five['rejected_rows']['pymatching'])
+        self.assertEqual(decoder_reference.oracle(21,False,5)[0],{0})
+        self.assertEqual(decoder_reference.oracle(21,True,5)[0],{1})
+
+    def test_batch_matches_loop_and_preserves_interleaved_shot_order(self):
+        graph={'edges':[{'u':0,'v':None,'observables':[0],'weight':1.,'loss_factor':.5},
+                        {'u':0,'v':1,'observables':[],'weight':1.,'loss_factor':.5},
+                        {'u':1,'v':None,'observables':[],'weight':1.,'loss_factor':.5}],
+               'loss_edges':[[0],[1],[2]],'mean_weight':1.,'syndromes':[],'losses':[]}
+        for raw in range(64):
+            _,syndrome,flags=decoder_reference.oracle(raw)
+            graph['syndromes'].append(syndrome)
+            graph['losses'].append([i for i,f in enumerate(flags) if f])
+        for conditioned in [False,True]:
+            batch,_=python_decode(graph,conditioned)
+            loop,_=python_decode(graph,conditioned,batch=False)
+            np.testing.assert_array_equal(batch,loop)
+        graph['syndromes'][0].append(1)
+        for row in graph['syndromes'][1:]: row.append(0)
+        with self.assertRaisesRegex(ValueError,'Unreachable'):
+            python_decode(graph,False)
 
     def test_incomplete_comparison_cannot_be_published_as_a_curve(self):
         cases=[{'distance':d,'loss_probability':p,'decoders':{name:{'status':'ok'} for name in

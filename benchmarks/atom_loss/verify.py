@@ -26,6 +26,12 @@ def verify(root):
     for name in ['correctness.json','decoder-correctness.json']:
         data=json.loads((root/name).read_text())
         if data['status']!='PASS': raise ValueError(f'Correctness failed: {name}')
+    oracle=json.loads((root/'decoder-correctness.json').read_text())
+    assert [c['rows_checked'] for c in oracle['cases']]==[64,1024]
+    for c in oracle['cases']:
+        assert not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']
+        assert 0 in c['flipped_prediction_rejected_rows']
+    assert 21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']
     sampling=json.loads((root/'sampling.json').read_text())
     assert [c['distance'] for c in sampling]==[3,5,7]
     for c in sampling:
@@ -37,7 +43,8 @@ def verify(root):
     decoding=json.loads((root/'decoding.json').read_text())
     require_complete_sweep(decoding)
     tradeoff=json.loads((root/'tradeoff.json').read_text())
-    assert set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope'}
+    assert set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop'}
+    assert tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']
     for c in decoding+[tradeoff]:
         assert c['shots']==5000 and c['decoders'] and 'export_failure' not in c
         native=c['decoders']['envelope-matching']
@@ -48,7 +55,11 @@ def verify(root):
                 assert r['wilson_95'][0]<=r['logical_error_rate']<=r['wilson_95'][1]
                 assert r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3
                 assert min(r['total_seconds'])>0
-                for run in r['runs']:
+                for rep,(run,total) in enumerate(zip(r['runs'],r['total_seconds'])):
+                    if name.startswith('pymatching'):
+                        assert run['export_repetition']==rep
+                        assert total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']
+                        if not name.endswith('-loop'): assert run['batch_calls']>0
                     if 'stats' in run:
                         assert run['stats']['attempted_shot_count']==r['shots']
                         assert run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0
