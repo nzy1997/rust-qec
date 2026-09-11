@@ -1,0 +1,2882 @@
+[
+  {
+    "distance": 3,
+    "rounds": 3,
+    "loss_probability": 0.0001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,8,15",
+    "dataset_id": "2965949791f309cab757a91ff46d52f57f438e044ffbef7a2e7396d52e08a00e",
+    "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+    "public_rows_sha256": "26df1eea2529cdc3bbddde95561d066d43fd6fa9db905fc31f532b2b5007c4f1",
+    "answers_sha256": "d0e2e9ebba0a543912829e48a6305459637facdb7fa291a2a5cc5f13312d1e09",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.013439917005598545,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001502916,
+              "decode_seconds": 0.0066935,
+              "distinct_loss_patterns": 32,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4968,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 32,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.01321383286267519,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001632291,
+              "decode_seconds": 0.006756833,
+              "distinct_loss_patterns": 32,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4968,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 32,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.012936624931171536,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001559917,
+              "decode_seconds": 0.006794542,
+              "distinct_loss_patterns": 32,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4968,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 32,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "376692a396cf282d0440d1c23196f2969bcfa4a1543902f2f48d148308d91eae",
+        "total_seconds": [
+          0.008196416,
+          0.008389124,
+          0.008354459
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.016089499928057194,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.01630349992774427,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.01662812498398125,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "376692a396cf282d0440d1c23196f2969bcfa4a1543902f2f48d148308d91eae",
+        "total_seconds": [
+          0.022666415928057196,
+          0.02288041592774427,
+          0.023205040983981254
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.028528249822556973,
+            "graph_builds": 32,
+            "cache_hits": 4968
+          },
+          {
+            "decode_seconds": 0.027764208149164915,
+            "graph_builds": 32,
+            "cache_hits": 4968
+          },
+          {
+            "decode_seconds": 0.02835787506774068,
+            "graph_builds": 32,
+            "cache_hits": 4968
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "376692a396cf282d0440d1c23196f2969bcfa4a1543902f2f48d148308d91eae",
+        "total_seconds": [
+          0.035105165822556975,
+          0.03434112414916492,
+          0.03493479106774068
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.001503833,
+      "transform_seconds": 0.005073083,
+      "num_observables": 1,
+      "edges": 552,
+      "detectors": 24,
+      "loss_patterns": 32
+    }
+  },
+  {
+    "distance": 3,
+    "rounds": 3,
+    "loss_probability": 0.0003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,8,15",
+    "dataset_id": "7f1863085a8ac92714e0c9340634a9ce3516d526a91aa81bba37d7b093d21b84",
+    "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+    "public_rows_sha256": "651a78c872251475aa6006860b710b0e6598f67518644471a0295398b671e4e4",
+    "answers_sha256": "1a5946abbfbc78250dd7e81bb5672d88c998faf557e9bb54c81430332ae4e664",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.013938792049884796,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001718625,
+              "decode_seconds": 0.007113958,
+              "distinct_loss_patterns": 40,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4960,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 40,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.013852667063474655,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001574666,
+              "decode_seconds": 0.007140459,
+              "distinct_loss_patterns": 40,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4960,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 40,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.013538667000830173,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001562667,
+              "decode_seconds": 0.007141167,
+              "distinct_loss_patterns": 40,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4960,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 40,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "10ed2b9b087723fa205a2319e0243447bc9a46dcc6def1ab13509d3cc9e40e08",
+        "total_seconds": [
+          0.008832583,
+          0.008715125,
+          0.008703834
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.01626945799216628,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.015756665961816907,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.015809749951586127,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 2,
+        "shots": 5000,
+        "logical_error_rate": 0.0004,
+        "wilson_95": [
+          0.00010970128207763504,
+          0.0014573865014234437
+        ],
+        "prediction_sha256": "92419d1166c1814f62d779c29a1462c4d8776db5af1e017235f629837d5f63ee",
+        "total_seconds": [
+          0.02302933299216628,
+          0.022516540961816905,
+          0.022569624951586126
+        ],
+        "disagreements_with_native": 1,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 1
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.03074445785023272,
+            "graph_builds": 40,
+            "cache_hits": 4960
+          },
+          {
+            "decode_seconds": 0.030395542038604617,
+            "graph_builds": 40,
+            "cache_hits": 4960
+          },
+          {
+            "decode_seconds": 0.030351958004757762,
+            "graph_builds": 40,
+            "cache_hits": 4960
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "10ed2b9b087723fa205a2319e0243447bc9a46dcc6def1ab13509d3cc9e40e08",
+        "total_seconds": [
+          0.03750433285023272,
+          0.037155417038604616,
+          0.03711183300475776
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.001629625,
+      "transform_seconds": 0.00513025,
+      "num_observables": 1,
+      "edges": 552,
+      "detectors": 24,
+      "loss_patterns": 40
+    }
+  },
+  {
+    "distance": 3,
+    "rounds": 3,
+    "loss_probability": 0.001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,8,15",
+    "dataset_id": "01b29082d035444055166e09a87aa47ebfa9621458ee598307053172c4088f48",
+    "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+    "public_rows_sha256": "80ca9c89b99b221f95f38405a140c34ee22598af1368de92c61d1bea35622d70",
+    "answers_sha256": "fcc361999ea31898f6dd61d2ce6c7cc971906751dee7de1bfc623b8cc13b4ec9",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.015857875114306808,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001626375,
+              "decode_seconds": 0.00902025,
+              "distinct_loss_patterns": 84,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4916,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 84,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.015356624964624643,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001561166,
+              "decode_seconds": 0.008737375,
+              "distinct_loss_patterns": 84,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4916,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 84,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.015395707916468382,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001514,
+              "decode_seconds": 0.00896925,
+              "distinct_loss_patterns": 84,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4916,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 84,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 5,
+        "shots": 5000,
+        "logical_error_rate": 0.001,
+        "wilson_95": [
+          0.00042721349110879964,
+          0.002338953050058211
+        ],
+        "prediction_sha256": "d4111e925a503f03b9e54bf6927e641e7829c23c0768cc505b1a894e7845f81f",
+        "total_seconds": [
+          0.010646625,
+          0.010298541,
+          0.01048325
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.016408541006967425,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.016029667109251022,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.01622783299535513,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 12,
+        "shots": 5000,
+        "logical_error_rate": 0.0024,
+        "wilson_95": [
+          0.0013734655564128324,
+          0.004190551419308018
+        ],
+        "prediction_sha256": "18a7a9a0bb98bfc19af4d03dcac314227483e4e314e811de85e054970ef9824b",
+        "total_seconds": [
+          0.023249458006967427,
+          0.022870584109251024,
+          0.02306874999535513
+        ],
+        "disagreements_with_native": 7,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 7
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.04916699999012053,
+            "graph_builds": 84,
+            "cache_hits": 4916
+          },
+          {
+            "decode_seconds": 0.04697870905511081,
+            "graph_builds": 84,
+            "cache_hits": 4916
+          },
+          {
+            "decode_seconds": 0.04700712487101555,
+            "graph_builds": 84,
+            "cache_hits": 4916
+          }
+        ],
+        "errors": 5,
+        "shots": 5000,
+        "logical_error_rate": 0.001,
+        "wilson_95": [
+          0.00042721349110879964,
+          0.002338953050058211
+        ],
+        "prediction_sha256": "d4111e925a503f03b9e54bf6927e641e7829c23c0768cc505b1a894e7845f81f",
+        "total_seconds": [
+          0.05600791699012053,
+          0.053819626055110814,
+          0.05384804187101555
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.001528833,
+      "transform_seconds": 0.005312084,
+      "num_observables": 1,
+      "edges": 552,
+      "detectors": 24,
+      "loss_patterns": 84
+    }
+  },
+  {
+    "distance": 3,
+    "rounds": 3,
+    "loss_probability": 0.003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,8,15",
+    "dataset_id": "29646ce05618bea316bb84db9eecb143131e14334e60f58f0ebd36db9b5eee38",
+    "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+    "public_rows_sha256": "5bf2e1faab43f6dc80cf24942555a2d175214696d427679a41e8ad672a4edbd9",
+    "answers_sha256": "3b591c345bf1839528af4dc60d3af05c992b9d2d7c3b53f40ab182fef0423de6",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.026538917096331716,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001595208,
+              "decode_seconds": 0.018200333,
+              "distinct_loss_patterns": 349,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4651,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 349,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.025877665961161256,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001524083,
+              "decode_seconds": 0.018098875,
+              "distinct_loss_patterns": 349,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4651,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 349,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.026288041844964027,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001524167,
+              "decode_seconds": 0.0180095,
+              "distinct_loss_patterns": 349,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4651,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 349,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 16,
+        "shots": 5000,
+        "logical_error_rate": 0.0032,
+        "wilson_95": [
+          0.0019707278219023715,
+          0.0051920608307063874
+        ],
+        "prediction_sha256": "ed8a2e75eb88829901e6c5cd4929824ae063c70c64d5a6e1195fd45dee242382",
+        "total_seconds": [
+          0.019795541,
+          0.019622958,
+          0.019533667
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.016761999810114503,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.016524916049093008,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.016426041955128312,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 31,
+        "shots": 5000,
+        "logical_error_rate": 0.0062,
+        "wilson_95": [
+          0.0043713883985244135,
+          0.008786794042414002
+        ],
+        "prediction_sha256": "9227c14fa285581af92172202445ebd8f972bcee95facf15e707ec4820cfe6fb",
+        "total_seconds": [
+          0.024018999810114502,
+          0.023781916049093008,
+          0.02368304195512831
+        ],
+        "disagreements_with_native": 19,
+        "paired_native_only_wrong": 2,
+        "paired_python_only_wrong": 17
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.14602720807306468,
+            "graph_builds": 349,
+            "cache_hits": 4651
+          },
+          {
+            "decode_seconds": 0.14516395912505686,
+            "graph_builds": 349,
+            "cache_hits": 4651
+          },
+          {
+            "decode_seconds": 0.14627112494781613,
+            "graph_builds": 349,
+            "cache_hits": 4651
+          }
+        ],
+        "errors": 16,
+        "shots": 5000,
+        "logical_error_rate": 0.0032,
+        "wilson_95": [
+          0.0019707278219023715,
+          0.0051920608307063874
+        ],
+        "prediction_sha256": "ed8a2e75eb88829901e6c5cd4929824ae063c70c64d5a6e1195fd45dee242382",
+        "total_seconds": [
+          0.1532842080730647,
+          0.15242095912505688,
+          0.15352812494781615
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.0016605,
+      "transform_seconds": 0.0055965,
+      "num_observables": 1,
+      "edges": 552,
+      "detectors": 24,
+      "loss_patterns": 349
+    }
+  },
+  {
+    "distance": 3,
+    "rounds": 3,
+    "loss_probability": 0.01,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,8,15",
+    "dataset_id": "a97a3d5e5bffbfb6226c8eebbd9f4ba92b6194c098ce6f65c3f67aa3ecec9497",
+    "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+    "public_rows_sha256": "0c1d0336411c12fe733a4f616a0a7b6bf08602b2677b6c3ead85eed81d5df17e",
+    "answers_sha256": "f38f7e56a5a2ba08c0fe5f53e168d8910b15e521ddf887b9c2bfa5d869772d47",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.0741280410438776,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001530458,
+              "decode_seconds": 0.0627475,
+              "distinct_loss_patterns": 1493,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3373,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1627,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.07469695899635553,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001579292,
+              "decode_seconds": 0.063018667,
+              "distinct_loss_patterns": 1493,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3373,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1627,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.0741246659308672,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.001550667,
+              "decode_seconds": 0.062986458,
+              "distinct_loss_patterns": 1493,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3373,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 1017,
+              "primitive_symptom_terms": 1508,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1627,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 121,
+        "shots": 5000,
+        "logical_error_rate": 0.0242,
+        "wilson_95": [
+          0.02029184139202983,
+          0.028838703778886532
+        ],
+        "prediction_sha256": "b694c2362c90bb33b227d8e535b301a48aef987045f3d933f56cc284989d67ed",
+        "total_seconds": [
+          0.064277958,
+          0.064597959,
+          0.064537125
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.018384667113423347,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.017854417208582163,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.01776087493635714,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 245,
+        "shots": 5000,
+        "logical_error_rate": 0.049,
+        "wilson_95": [
+          0.04335507170094735,
+          0.055337395453494184
+        ],
+        "prediction_sha256": "cf9a00bd836dd9562ae9372e3ca0e33dd48b60cb9fea741560cb429f12c96cc0",
+        "total_seconds": [
+          0.02675366711342335,
+          0.026223417208582164,
+          0.026129874936357142
+        ],
+        "disagreements_with_native": 154,
+        "paired_native_only_wrong": 15,
+        "paired_python_only_wrong": 139
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.6217855841387063,
+            "graph_builds": 1627,
+            "cache_hits": 3373
+          },
+          {
+            "decode_seconds": 0.6286074160598218,
+            "graph_builds": 1627,
+            "cache_hits": 3373
+          },
+          {
+            "decode_seconds": 0.6278454589191824,
+            "graph_builds": 1627,
+            "cache_hits": 3373
+          }
+        ],
+        "errors": 120,
+        "shots": 5000,
+        "logical_error_rate": 0.024,
+        "wilson_95": [
+          0.020109114739861697,
+          0.02862173751183269
+        ],
+        "prediction_sha256": "606505173421e37ffb3be877260e698b2e7c6e3d8e8ae446396bf767bfd0edd3",
+        "total_seconds": [
+          0.6301545841387063,
+          0.6369764160598218,
+          0.6362144589191824
+        ],
+        "disagreements_with_native": 1,
+        "paired_native_only_wrong": 1,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.00173375,
+      "transform_seconds": 0.00663525,
+      "num_observables": 1,
+      "edges": 552,
+      "detectors": 24,
+      "loss_patterns": 1493
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "loss_probability": 0.0001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,12,23,34,45",
+    "dataset_id": "698ec295e22bc2fcb6a60270bdcb6c095bc16889b9de5073429b7fde79b5a9eb",
+    "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+    "public_rows_sha256": "e6dd56732005a1ea419d46ddd051d7eee145b42042c772ec0a9dc8b7cf5800ff",
+    "answers_sha256": "fa5fea30d2ce75028324eb251d5dd13447099595aa5cd9a3fcceb1bf1943b55e",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.06755049992352724,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.00791075,
+              "decode_seconds": 0.047805958,
+              "distinct_loss_patterns": 142,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4858,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 142,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.06601674994453788,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.00793125,
+              "decode_seconds": 0.047765667,
+              "distinct_loss_patterns": 142,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4858,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 142,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.06528187496587634,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007902959,
+              "decode_seconds": 0.047170959,
+              "distinct_loss_patterns": 142,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4858,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 142,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "fa5fea30d2ce75028324eb251d5dd13447099595aa5cd9a3fcceb1bf1943b55e",
+        "total_seconds": [
+          0.055716708000000004,
+          0.055696917,
+          0.055073918
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.01959020784124732,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.019398291129618883,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.019328958122059703,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "fa5fea30d2ce75028324eb251d5dd13447099595aa5cd9a3fcceb1bf1943b55e",
+        "total_seconds": [
+          0.04778004184124732,
+          0.04758812512961888,
+          0.0475187921220597
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.35229912493377924,
+            "graph_builds": 142,
+            "cache_hits": 4858
+          },
+          {
+            "decode_seconds": 0.35039666714146733,
+            "graph_builds": 142,
+            "cache_hits": 4858
+          },
+          {
+            "decode_seconds": 0.34992199996486306,
+            "graph_builds": 142,
+            "cache_hits": 4858
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "fa5fea30d2ce75028324eb251d5dd13447099595aa5cd9a3fcceb1bf1943b55e",
+        "total_seconds": [
+          0.3804889589337792,
+          0.3785865011414673,
+          0.37811183396486303
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.007526375,
+      "transform_seconds": 0.020663459,
+      "num_observables": 1,
+      "edges": 3620,
+      "detectors": 120,
+      "loss_patterns": 142
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "loss_probability": 0.0003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,12,23,34,45",
+    "dataset_id": "69d6a83c78ea230302c0ae46f24144b3516e9173346c629dcd8e08e842fd0011",
+    "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+    "public_rows_sha256": "9f90e2068315babdbef568908c31fdad1a5f460558d998f385bd0372eaff83a2",
+    "answers_sha256": "2c740819f9c2e6ed208bc014a9ead17555d6560780fff7de39b7458441458a19",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.09401608281768858,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.00785025,
+              "decode_seconds": 0.071944084,
+              "distinct_loss_patterns": 279,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4721,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 279,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.09374470799230039,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007901,
+              "decode_seconds": 0.07287375,
+              "distinct_loss_patterns": 279,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4721,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 279,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.09708945802412927,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007669125,
+              "decode_seconds": 0.075350333,
+              "distinct_loss_patterns": 279,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4721,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 279,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "8143b927049decacb45351010648f3e537142a8853b420c3217f88ba22fa0f3d",
+        "total_seconds": [
+          0.07979433400000001,
+          0.08077475,
+          0.083019458
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.01983999996446073,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.019714249996468425,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.01947670802474022,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "8143b927049decacb45351010648f3e537142a8853b420c3217f88ba22fa0f3d",
+        "total_seconds": [
+          0.04856712496446073,
+          0.048441374996468424,
+          0.04820383302474022
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.6784345000050962,
+            "graph_builds": 279,
+            "cache_hits": 4721
+          },
+          {
+            "decode_seconds": 0.6743836251553148,
+            "graph_builds": 279,
+            "cache_hits": 4721
+          },
+          {
+            "decode_seconds": 0.6782899161335081,
+            "graph_builds": 279,
+            "cache_hits": 4721
+          }
+        ],
+        "errors": 1,
+        "shots": 5000,
+        "logical_error_rate": 0.0002,
+        "wilson_95": [
+          3.530578343936526e-05,
+          0.0011320890808397363
+        ],
+        "prediction_sha256": "8143b927049decacb45351010648f3e537142a8853b420c3217f88ba22fa0f3d",
+        "total_seconds": [
+          0.7071616250050962,
+          0.7031107501553148,
+          0.707017041133508
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.007948084,
+      "transform_seconds": 0.020779041,
+      "num_observables": 1,
+      "edges": 3620,
+      "detectors": 120,
+      "loss_patterns": 279
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "loss_probability": 0.001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,12,23,34,45",
+    "dataset_id": "9afaccf2da37514aab058c97e78ead12238cf7da9dd2f1b212ecda450bfe6f16",
+    "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+    "public_rows_sha256": "89f09dc3cc1d729c92ced85ba782c600b19eca86a7a8606d47cd6548f13e8d5d",
+    "answers_sha256": "ef763ea8ea2b26bc6d970aaacbcc7acb817d9de0a90d653d297c5f5e7f53987e",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.26960437512025237,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007974208,
+              "decode_seconds": 0.220872791,
+              "distinct_loss_patterns": 1082,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3892,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1108,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.2685475409962237,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007824042,
+              "decode_seconds": 0.219678542,
+              "distinct_loss_patterns": 1082,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3892,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1108,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.26630804198794067,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.00784375,
+              "decode_seconds": 0.218694667,
+              "distinct_loss_patterns": 1082,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3892,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1108,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 3,
+        "shots": 5000,
+        "logical_error_rate": 0.0006,
+        "wilson_95": [
+          0.00020407465419434642,
+          0.001762706048528709
+        ],
+        "prediction_sha256": "9aa3b098f466f70ae2a86bb4c4ea0225cc5b07d40a8220d75fce952c53d32a97",
+        "total_seconds": [
+          0.22884699900000002,
+          0.227502584,
+          0.22653841700000002
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.020913582993671298,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.02057662489823997,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.020638749934732914,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 4,
+        "shots": 5000,
+        "logical_error_rate": 0.0008,
+        "wilson_95": [
+          0.00031114697610156263,
+          0.0020553266458434704
+        ],
+        "prediction_sha256": "e5cad90debf4c1e79774cca96647307fc412ed1d2c110b46d6f0cccd2e6c2ee1",
+        "total_seconds": [
+          0.0506339579936713,
+          0.05029699989823997,
+          0.050359124934732914
+        ],
+        "disagreements_with_native": 1,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 1
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 2.6805075409356505,
+            "graph_builds": 1101,
+            "cache_hits": 3899
+          },
+          {
+            "decode_seconds": 2.63386420882307,
+            "graph_builds": 1101,
+            "cache_hits": 3899
+          },
+          {
+            "decode_seconds": 2.6571644998621196,
+            "graph_builds": 1101,
+            "cache_hits": 3899
+          }
+        ],
+        "errors": 3,
+        "shots": 5000,
+        "logical_error_rate": 0.0006,
+        "wilson_95": [
+          0.00020407465419434642,
+          0.001762706048528709
+        ],
+        "prediction_sha256": "9aa3b098f466f70ae2a86bb4c4ea0225cc5b07d40a8220d75fce952c53d32a97",
+        "total_seconds": [
+          2.7102279159356506,
+          2.66358458382307,
+          2.6868848748621197
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.007660458,
+      "transform_seconds": 0.022059917,
+      "num_observables": 1,
+      "edges": 3620,
+      "detectors": 120,
+      "loss_patterns": 1082
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "loss_probability": 0.003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,12,23,34,45",
+    "dataset_id": "ff6b0b8fc76909984d4c1e69119182bc4ef086594412b253843a4ef6d0f87d4e",
+    "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+    "public_rows_sha256": "69f38767fe1c57aede55d45a7acc76a4c1cad5a3bc0a9ff4b4c87d91ed59fc62",
+    "answers_sha256": "a5036bb58692ea7f4416317cb2e27de9211489ef48707c3ddd68c261d4cd6268",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.7397132501937449,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.0078545,
+              "decode_seconds": 0.689346167,
+              "distinct_loss_patterns": 3550,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 1155,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 3845,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.7418981250375509,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007768208,
+              "decode_seconds": 0.690697958,
+              "distinct_loss_patterns": 3550,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 1155,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 3845,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.7413425839040428,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.008032375,
+              "decode_seconds": 0.68892075,
+              "distinct_loss_patterns": 3550,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 1155,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 3845,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 6,
+        "shots": 5000,
+        "logical_error_rate": 0.0012,
+        "wilson_95": [
+          0.0005500831677591556,
+          0.002615776292629832
+        ],
+        "prediction_sha256": "e80a12c7e5312986c7490a8e9fc8c955d3ef12b5c15f83aab9458f39ac858818",
+        "total_seconds": [
+          0.6972006669999999,
+          0.698466166,
+          0.696953125
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.02372904191724956,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.022985249990597367,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.024017666932195425,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 17,
+        "shots": 5000,
+        "logical_error_rate": 0.0034,
+        "wilson_95": [
+          0.0021239367958294426,
+          0.0054385447760012945
+        ],
+        "prediction_sha256": "cd0965f8c5fec64c0a61a56ea0e6750cf2beeef56c27c5fcf18dada2ece3eaff",
+        "total_seconds": [
+          0.055411249917249564,
+          0.05466745799059737,
+          0.05569987493219543
+        ],
+        "disagreements_with_native": 13,
+        "paired_native_only_wrong": 1,
+        "paired_python_only_wrong": 12
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 9.192285917000845,
+            "graph_builds": 3843,
+            "cache_hits": 1157
+          },
+          {
+            "decode_seconds": 9.207855832995847,
+            "graph_builds": 3843,
+            "cache_hits": 1157
+          },
+          {
+            "decode_seconds": 9.193466375116259,
+            "graph_builds": 3843,
+            "cache_hits": 1157
+          }
+        ],
+        "errors": 6,
+        "shots": 5000,
+        "logical_error_rate": 0.0012,
+        "wilson_95": [
+          0.0005500831677591556,
+          0.002615776292629832
+        ],
+        "prediction_sha256": "e80a12c7e5312986c7490a8e9fc8c955d3ef12b5c15f83aab9458f39ac858818",
+        "total_seconds": [
+          9.223968125000845,
+          9.239538040995846,
+          9.225148583116258
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.007889916,
+      "transform_seconds": 0.023792292,
+      "num_observables": 1,
+      "edges": 3620,
+      "detectors": 120,
+      "loss_patterns": 3550
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "loss_probability": 0.01,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,12,23,34,45",
+    "dataset_id": "3d704a831d27c0c75c6226c7ecfd372eeb6a6e5764787c9a9f8e75229654bb24",
+    "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+    "public_rows_sha256": "8deb4b3a2428a467fb55be92afb2dcf93fbcd1102f65f215a46f5a6e6304ad59",
+    "answers_sha256": "d5d5ff0d709c3b6e96bfc5efeb0b65fd33ef2ed558db4a82c0e26c29a77eee56",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 1.0509429587982595,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.00768575,
+              "decode_seconds": 1.00331325,
+              "distinct_loss_patterns": 4944,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 1.0162429581396282,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007841375,
+              "decode_seconds": 0.968843917,
+              "distinct_loss_patterns": 4944,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 1.0374022088944912,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.007739292,
+              "decode_seconds": 0.992013,
+              "distinct_loss_patterns": 4944,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 5265,
+              "primitive_symptom_terms": 9228,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 39,
+        "shots": 5000,
+        "logical_error_rate": 0.0078,
+        "wilson_95": [
+          0.005711256209150136,
+          0.010644469585564097
+        ],
+        "prediction_sha256": "521040a2070fde7f604cbca621dd9f0cdce1f71ead77eede16c4335bd215d959",
+        "total_seconds": [
+          1.010999,
+          0.9766852920000001,
+          0.999752292
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.03614012477919459,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.03558904188685119,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.03534120786935091,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 260,
+        "shots": 5000,
+        "logical_error_rate": 0.052,
+        "wilson_95": [
+          0.04618252452365877,
+          0.058505336419112416
+        ],
+        "prediction_sha256": "30b61f2c4e93a05d4d1a22933c9c639489c4f36b5ab9bbc884a3e76fddac13ac",
+        "total_seconds": [
+          0.07414895777919459,
+          0.07359787488685118,
+          0.0733500408693509
+        ],
+        "disagreements_with_native": 239,
+        "paired_native_only_wrong": 9,
+        "paired_python_only_wrong": 230
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 12.356279208092019,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          },
+          {
+            "decode_seconds": 11.736737750004977,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          },
+          {
+            "decode_seconds": 11.867254457902163,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          }
+        ],
+        "errors": 39,
+        "shots": 5000,
+        "logical_error_rate": 0.0078,
+        "wilson_95": [
+          0.005711256209150136,
+          0.010644469585564097
+        ],
+        "prediction_sha256": "521040a2070fde7f604cbca621dd9f0cdce1f71ead77eede16c4335bd215d959",
+        "total_seconds": [
+          12.394288041092018,
+          11.774746583004976,
+          11.905263290902163
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.007862958,
+      "transform_seconds": 0.030145875,
+      "num_observables": 1,
+      "edges": 3620,
+      "detectors": 120,
+      "loss_patterns": 5000
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "loss_probability": 0.0001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,16,31,46,61,76,91",
+    "dataset_id": "feb57770eb0759d8744e418992cac206bfc4412b4f5bca771e1056cef39a0129",
+    "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+    "public_rows_sha256": "b029ed5dbc77f98981b2236b8dd2f2aaa22c4a7af251ae8f991e5bf4283ea2ce",
+    "answers_sha256": "4a44dfd3778dda348bc9e2da8f1f02729fc7138321e7a0f76d5f2defebe352b7",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.3958910000510514,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022348166,
+              "decode_seconds": 0.335842334,
+              "distinct_loss_patterns": 455,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4459,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 541,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.4139410830102861,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.03271975,
+              "decode_seconds": 0.341936833,
+              "distinct_loss_patterns": 455,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4459,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 541,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.3877483338583261,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022366792,
+              "decode_seconds": 0.328738167,
+              "distinct_loss_patterns": 455,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 4459,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 541,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "4a44dfd3778dda348bc9e2da8f1f02729fc7138321e7a0f76d5f2defebe352b7",
+        "total_seconds": [
+          0.3581905,
+          0.374656583,
+          0.35110495900000005
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.02714125020429492,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.02636333298869431,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.026258583180606365,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "4a44dfd3778dda348bc9e2da8f1f02729fc7138321e7a0f76d5f2defebe352b7",
+        "total_seconds": [
+          0.11092020820429492,
+          0.11014229098869431,
+          0.11003754118060637
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 3.252781166927889,
+            "graph_builds": 455,
+            "cache_hits": 4545
+          },
+          {
+            "decode_seconds": 3.2616462919395417,
+            "graph_builds": 455,
+            "cache_hits": 4545
+          },
+          {
+            "decode_seconds": 3.2518715830519795,
+            "graph_builds": 455,
+            "cache_hits": 4545
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "4a44dfd3778dda348bc9e2da8f1f02729fc7138321e7a0f76d5f2defebe352b7",
+        "total_seconds": [
+          3.336560124927889,
+          3.3454252499395416,
+          3.3356505410519794
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.023630583,
+      "transform_seconds": 0.060148375,
+      "num_observables": 1,
+      "edges": 11008,
+      "detectors": 336,
+      "loss_patterns": 455
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "loss_probability": 0.0003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,16,31,46,61,76,91",
+    "dataset_id": "9159bfa40ee156cf89356f78c0596411b0982fdb9b0f4d66225e1d35bd8a8b57",
+    "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+    "public_rows_sha256": "30805302055b24bf970c0bb285576fa444db02978c6650dcd6d1467ca57c0a84",
+    "answers_sha256": "c2fe3e42842d959c8196157294de753251a7f97b2a7109249a1863567d76e17e",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.9228012920357287,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022326542,
+              "decode_seconds": 0.860122709,
+              "distinct_loss_patterns": 1100,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3345,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1655,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.9186115828342736,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022773084,
+              "decode_seconds": 0.85754425,
+              "distinct_loss_patterns": 1100,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3345,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1655,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 0.9140540410298854,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022470708,
+              "decode_seconds": 0.853045542,
+              "distinct_loss_patterns": 1100,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 3345,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 1655,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "c2fe3e42842d959c8196157294de753251a7f97b2a7109249a1863567d76e17e",
+        "total_seconds": [
+          0.8824492509999999,
+          0.880317334,
+          0.87551625
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.02850116603076458,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.029108916176483035,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.027403749991208315,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "c2fe3e42842d959c8196157294de753251a7f97b2a7109249a1863567d76e17e",
+        "total_seconds": [
+          0.11056545703076458,
+          0.11117320717648303,
+          0.10946804099120831
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 8.016662749927491,
+            "graph_builds": 1112,
+            "cache_hits": 3888
+          },
+          {
+            "decode_seconds": 8.019843958085403,
+            "graph_builds": 1112,
+            "cache_hits": 3888
+          },
+          {
+            "decode_seconds": 8.102114000124857,
+            "graph_builds": 1112,
+            "cache_hits": 3888
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "c2fe3e42842d959c8196157294de753251a7f97b2a7109249a1863567d76e17e",
+        "total_seconds": [
+          8.098727040927491,
+          8.101908249085403,
+          8.184178291124857
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.022779125,
+      "transform_seconds": 0.059285166,
+      "num_observables": 1,
+      "edges": 11008,
+      "detectors": 336,
+      "loss_patterns": 1100
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "loss_probability": 0.001,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,16,31,46,61,76,91",
+    "dataset_id": "f0254cb52264487aef2f72893690ec976e37f94451c08b8c3021f4c57e8e630b",
+    "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+    "public_rows_sha256": "1db341f59d3f8833d993a7de27c1e0d4729a06e93f279b1cfbab0fc85164d511",
+    "answers_sha256": "56e05e83765ab397067f5dbccdb343819e0cbbdd39160543222bbb76b40b63c8",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.2856297499965876,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022971958,
+              "decode_seconds": 2.214861083,
+              "distinct_loss_patterns": 3671,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 714,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 4286,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.2956149589736015,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.023108,
+              "decode_seconds": 2.223838334,
+              "distinct_loss_patterns": 3671,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 714,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 4286,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.4380453748162836,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.023892042,
+              "decode_seconds": 2.362921583,
+              "distinct_loss_patterns": 3671,
+              "distinct_loss_patterns_exact": true,
+              "cache_hits": 714,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 4286,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "56e05e83765ab397067f5dbccdb343819e0cbbdd39160543222bbb76b40b63c8",
+        "total_seconds": [
+          2.237833041,
+          2.246946334,
+          2.386813625
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.03190370788797736,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.029792417073622346,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.03008554084226489,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "56e05e83765ab397067f5dbccdb343819e0cbbdd39160543222bbb76b40b63c8",
+        "total_seconds": [
+          0.11849004088797736,
+          0.11637875007362235,
+          0.11667187384226489
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 28.494651082903147,
+            "graph_builds": 4011,
+            "cache_hits": 989
+          },
+          {
+            "decode_seconds": 28.45021341694519,
+            "graph_builds": 4011,
+            "cache_hits": 989
+          },
+          {
+            "decode_seconds": 28.573666957905516,
+            "graph_builds": 4011,
+            "cache_hits": 989
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "56e05e83765ab397067f5dbccdb343819e0cbbdd39160543222bbb76b40b63c8",
+        "total_seconds": [
+          28.581237415903146,
+          28.53679974994519,
+          28.660253290905516
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.023126875,
+      "transform_seconds": 0.063459458,
+      "num_observables": 1,
+      "edges": 11008,
+      "detectors": 336,
+      "loss_patterns": 3671
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "loss_probability": 0.003,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,16,31,46,61,76,91",
+    "dataset_id": "517fe37f40bc4fe75674818f33f4cf82ccc850449200be99015e40c2cf6e4782",
+    "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+    "public_rows_sha256": "0752448a333e506ad86dd4b896d61430c6eb12d33ad20e18555619f0eeacb15e",
+    "answers_sha256": "4d91a2032618191b25b07a4d20bc627c0081abd697a40b93a09522b54eec3e92",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.664768457878381,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022198042,
+              "decode_seconds": 2.600944416,
+              "distinct_loss_patterns": 4999,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.68166433298029,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022408417,
+              "decode_seconds": 2.616738083,
+              "distinct_loss_patterns": 4999,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 2.675121541833505,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.02285075,
+              "decode_seconds": 2.61062575,
+              "distinct_loss_patterns": 4999,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "4d91a2032618191b25b07a4d20bc627c0081abd697a40b93a09522b54eec3e92",
+        "total_seconds": [
+          2.623142458,
+          2.6391465,
+          2.6334765
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.03975662519223988,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.03830420901067555,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.03850600006990135,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 3,
+        "shots": 5000,
+        "logical_error_rate": 0.0006,
+        "wilson_95": [
+          0.00020407465419434642,
+          0.001762706048528709
+        ],
+        "prediction_sha256": "b2167072cff259481dbeebef18af3b3c68f252a3056014d457430fb961e790e7",
+        "total_seconds": [
+          0.12911879219223987,
+          0.12766637601067554,
+          0.12786816706990134
+        ],
+        "disagreements_with_native": 3,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 3
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 35.71001104195602,
+            "graph_builds": 4997,
+            "cache_hits": 3
+          },
+          {
+            "decode_seconds": 35.14850533311255,
+            "graph_builds": 4997,
+            "cache_hits": 3
+          },
+          {
+            "decode_seconds": 34.872069417033345,
+            "graph_builds": 4997,
+            "cache_hits": 3
+          }
+        ],
+        "errors": 0,
+        "shots": 5000,
+        "logical_error_rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.0007677019450571244
+        ],
+        "prediction_sha256": "4d91a2032618191b25b07a4d20bc627c0081abd697a40b93a09522b54eec3e92",
+        "total_seconds": [
+          35.79937320895602,
+          35.23786750011255,
+          34.96143158403334
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.0222285,
+      "transform_seconds": 0.067133667,
+      "num_observables": 1,
+      "edges": 11008,
+      "detectors": 336,
+      "loss_patterns": 4993
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "loss_probability": 0.01,
+    "pauli_probability": 0.001,
+    "shots": 5000,
+    "seed": 20260911,
+    "logical_x_support": "1,16,31,46,61,76,91",
+    "dataset_id": "bf326d05d011cb98a30415e4fb85951c7c8cb5973027483372098dc63ce316de",
+    "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+    "public_rows_sha256": "480632f1c784c7c8b0bf86d33fc74cf74275afd5a75edd30b6bd4f783a13ec50",
+    "answers_sha256": "78b459d96db93e100fde1b62bc3ae4e21f5baa24f27dc439ed2e95427bce99b6",
+    "decoders": {
+      "envelope-matching": {
+        "status": "ok",
+        "runs": [
+          {
+            "status": "ok",
+            "process_wall_seconds": 3.0390387908555567,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.021991375,
+              "decode_seconds": 2.975239209,
+              "distinct_loss_patterns": 5000,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 3.0389352079946548,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.022990625,
+              "decode_seconds": 2.973095417,
+              "distinct_loss_patterns": 5000,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          },
+          {
+            "status": "ok",
+            "process_wall_seconds": 3.042477957904339,
+            "exit_code": 0,
+            "stats": {
+              "schema_version": "rustqec.decode-stats.v1",
+              "decoder": "envelope-matching",
+              "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+              "shot_count": 5000,
+              "attempted_shot_count": 5000,
+              "compile_seconds": 0.021849333,
+              "decode_seconds": 2.979983959,
+              "distinct_loss_patterns": 5000,
+              "distinct_loss_patterns_exact": false,
+              "cache_hits": 0,
+              "timeout_count": 0,
+              "infeasible_shot_count": 0,
+              "circuit_compilations": 1,
+              "primitive_probe_count": 15057,
+              "primitive_symptom_terms": 28252,
+              "loss_envelope_candidate_count": 0,
+              "matching_graph_builds": 5000,
+              "mle_model_builds": 0,
+              "mle_detector_rows": 0
+            }
+          }
+        ],
+        "errors": 23,
+        "shots": 5000,
+        "logical_error_rate": 0.0046,
+        "wilson_95": [
+          0.003067252025343836,
+          0.0068933870618187645
+        ],
+        "prediction_sha256": "0939bdc396c4c0200c0480ac65992a89330655a04d37166ea6910563522121cc",
+        "total_seconds": [
+          2.997230584,
+          2.996086042,
+          3.001833292
+        ]
+      },
+      "pymatching-fixed": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 0.08478612499311566,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.0834668749012053,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          },
+          {
+            "decode_seconds": 0.08361729211173952,
+            "graph_builds": 1,
+            "cache_hits": 4999
+          }
+        ],
+        "errors": 296,
+        "shots": 5000,
+        "logical_error_rate": 0.0592,
+        "wilson_95": [
+          0.05299073527956573,
+          0.06608607075519665
+        ],
+        "prediction_sha256": "06949c15c524141cad32ebb77abc4400f77b5d80e3a9de6f7de93b4de3e42438",
+        "total_seconds": [
+          0.19068558399311566,
+          0.1893663339012053,
+          0.18951675111173952
+        ],
+        "disagreements_with_native": 281,
+        "paired_native_only_wrong": 4,
+        "paired_python_only_wrong": 277
+      },
+      "pymatching-envelope": {
+        "status": "ok",
+        "runs": [
+          {
+            "decode_seconds": 35.50917691597715,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          },
+          {
+            "decode_seconds": 35.7655734999571,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          },
+          {
+            "decode_seconds": 36.0144735830836,
+            "graph_builds": 5000,
+            "cache_hits": 0
+          }
+        ],
+        "errors": 23,
+        "shots": 5000,
+        "logical_error_rate": 0.0046,
+        "wilson_95": [
+          0.003067252025343836,
+          0.0068933870618187645
+        ],
+        "prediction_sha256": "0939bdc396c4c0200c0480ac65992a89330655a04d37166ea6910563522121cc",
+        "total_seconds": [
+          35.61507637497715,
+          35.8714729589571,
+          36.1203730420836
+        ],
+        "disagreements_with_native": 0,
+        "paired_native_only_wrong": 0,
+        "paired_python_only_wrong": 0
+      }
+    },
+    "graph": {
+      "source": "public dataset only; graph/compiler shared with RustQEC",
+      "compile_seconds": 0.022073875,
+      "transform_seconds": 0.083825584,
+      "num_observables": 1,
+      "edges": 11008,
+      "detectors": 336,
+      "loss_patterns": 5000
+    }
+  }
+]

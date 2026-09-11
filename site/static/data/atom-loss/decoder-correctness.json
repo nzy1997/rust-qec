@@ -1,0 +1,599 @@
+{
+  "status": "PASS",
+  "method": "hand-derived repetition parity graph; enumerate all 8 correction masks for every one of 64 flag/value rows; allow exact ties",
+  "scope": "matching graph objective and public row/loss transformation; not optimal physical logical-class likelihood and not an independent general envelope compiler",
+  "hand_derived_graph_pass": true,
+  "loss_mapping_pass": true,
+  "loss_conditioning_changes_optimal_set": true,
+  "flipped_known_answer_rejected": true,
+  "rows": [
+    {
+      "packed_row": 0,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 1,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 2,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 3,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 4,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 5,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 6,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 7,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 8,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 9,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 10,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 11,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 12,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 13,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 14,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 15,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 16,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 17,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 18,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 19,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 20,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 21,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 22,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 23,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 24,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 25,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 26,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 27,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 28,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 29,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 30,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 31,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 32,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 33,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 34,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 35,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 36,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 37,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 38,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 39,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 40,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 41,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 42,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 43,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 44,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 45,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 46,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 47,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 48,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 49,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 50,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 51,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 52,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 53,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 54,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 55,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 56,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 57,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 58,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 59,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 60,
+      "native": 1,
+      "pymatching": 1,
+      "acceptable_minimum_weight_logicals": [
+        0,
+        1
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 61,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 62,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    },
+    {
+      "packed_row": 63,
+      "native": 0,
+      "pymatching": 0,
+      "acceptable_minimum_weight_logicals": [
+        0
+      ],
+      "status": "PASS"
+    }
+  ]
+}

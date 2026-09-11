@@ -13,6 +13,7 @@
   <h2 id="loss-information">Keep the loss information through the experiment</h2>
   <p>An atom can disappear before it is measured. The remaining record must describe both whether the atom was lost and the measured value when it survived. Treating a lost value as an ordinary 0 or 1 can create misleading detector parities.</p>
   <p>RustQEC carries loss flags alongside measurement values and exposes them to its loss-aware decoders. This tutorial uses a distance-3, two-round Mid-SWAP Z-memory circuit: the same circuit and sampled dataset continue through every step below.</p>
+  <p>For measured evidence, see the <a href="#atom-loss-results">correctness checks and benchmark results</a> below.</p>
   <p class="doc-note">You need <code>rustqec</code> on PATH and Python 3 for the final result check. The default CLI includes envelope matching; this example does not require the optional ILP solver. Run the commands in order in a fresh working directory.</p>
   <details><summary>Install the CLI</summary><pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre><p>Without Rust, use the <a href="../get-started/#native-install">native installer</a>.</p></details>
 </section>
@@ -76,6 +77,51 @@ PY</code></pre>
 Loss patterns: 10
 Logical errors: 0 / 64</code></pre>
   <p>This small seeded example checks that the workflow is connected, including multiple loss patterns. Zero failures in 64 shots is not evidence of a zero logical error rate. Estimating performance requires larger experiments, uncertainty estimates, and stated circuit and noise conditions.</p>
+</section>
+<section class="task-section atom-loss-evidence" aria-labelledby="atom-loss-results">
+  <h2 id="atom-loss-results">Correctness and measured performance</h2>
+  <p>These experiments exercise loss-visible Mid-SWAP circuits and the public-input decoding workflow above. They measure a defined workload; they do not establish a loss threshold or support for arbitrary circuits.</p>
+  <h3 id="loss-correctness">Start with independent correctness controls</h3>
+  <p>A separate Python reference samples persistent loss histories and lowers them to ordinary <a href="https://github.com/quantumlib/Stim">Stim</a> circuits. It removes gates touching absent atoms, preserves surviving-wire statistics, and restores a wire only on reset. It does not call RustQEC's sampler or loss compiler.</p>
+  <ul>
+    <li><strong>Sampling:</strong> 12 small circuits, 32,768 shots per implementation per circuit, checked against complete joint output distributions. Four deterministic cases also have hand-computed answers. A deliberately incorrect skipped-gate rule is detected.</li>
+    <li><strong>Decoding:</strong> a hand-derived three-wire parity graph, all 64 flag/value rows, and exhaustive enumeration of all eight correction masks. Both matching backends must return a minimum-weight logical answer; exact ties are allowed. Lost-value placeholders and the loss-to-edge mapping are checked explicitly.</li>
+  </ul>
+  <p class="doc-note">These controls validate the stated sampling subset and a small matching objective. They do not prove the general envelope compiler correct or make minimum-weight decoding Bayes-optimal for the physical loss model.</p>
+  <p><a href="../data/atom-loss/correctness.json">Sampling check report</a> · <a href="../data/atom-loss/decoder-correctness.json">Exhaustive decoding check report</a></p>
+
+  <p class="doc-note">Select any figure to open the full-size SVG. The downloadable CSV contains the exact values behind the plots.</p>
+  <h3 id="loss-sampling-throughput">1. Sampling loss-visible records</h3>
+  <figure class="loss-result-figure">
+    <a href="../data/atom-loss/sampling-throughput.svg" aria-label="Open the sampling throughput figure at full size"><img src="../data/atom-loss/sampling-throughput.svg" alt="Measured sampling and b8 packing throughput at code distances 3, 5, and 7, comparing RustQEC with the independent Stim-based reference." loading="lazy" width="900" height="480"></a>
+    <figcaption>Rounds equal distance; 256 shots per batch; Pauli probability 0.001 and loss probability 0.003 at each configured opportunity. Points show the median of three runs; bars show their full range.</figcaption>
+  </figure>
+  <p>The Stim curve includes Python loss-history grouping and conditional circuit construction. It shows the cost of the correctness reference, <strong>not native Stim performance</strong>. Both curves include loss flags, value bits and b8 packing; neither substitutes a measurement-only fast path.</p>
+
+  <h3 id="loss-logical-error-rate">2. Logical failures as loss increases</h3>
+  <figure class="loss-result-figure">
+    <a href="../data/atom-loss/logical-error-rate.svg" aria-label="Open the logical error rate figure at full size"><img src="../data/atom-loss/logical-error-rate.svg" alt="Logical failure rates on logarithmic axes at distances 3 and 5, omitting zero-failure points, with 95 percent Wilson intervals for RustQEC envelope matching, PyMatching with the same envelope weights, and fixed-weight PyMatching." loading="lazy" width="1120" height="410"></a>
+    <figcaption>5,000 shared blinded shots per point, rounds = distance, Pauli probability 0.001. Operation and pre-measurement loss use the same plotted probability. Both axes use logarithmic scales. Error bars are pointwise 95% Wilson intervals. This figure shows d = 3 and d = 5 only and omits zero-failure points. The complete d = 3, 5, 7 results, including zero failures and their interval bounds, remain in the downloadable data. Rates refer to an entire memory experiment.</figcaption>
+  </figure>
+  <p>The PyMatching envelope adapter uses the same compiled graph, canonical syndromes and loss-conditioned weights as RustQEC. Fixed-weight PyMatching is an ablation: it removes loss-conditioned edge weights while retaining the same canonical syndromes. It therefore tests the value of this weighting rule, rather than removing every use of loss information.</p>
+  <p>Overlapping intervals do not establish an accuracy ranking. Distances use different experiment durations, and these points are insufficient for a threshold estimate.</p>
+
+  <h3 id="loss-accuracy-time">3. Accuracy and time on the same inputs</h3>
+  <figure class="loss-result-figure">
+    <a href="../data/atom-loss/accuracy-time.svg" aria-label="Open the accuracy versus time figure at full size"><img src="../data/atom-loss/accuracy-time.svg" alt="Logical failure probability versus amortized compilation and decoding time for the same 5,000 distance-3, two-round Mid-SWAP shots." loading="lazy" width="900" height="510"></a>
+    <figcaption>Distance 3, two rounds, Pauli probability 0.001, loss probability 0.003. Vertical bars are 95% Wilson intervals; horizontal bars span three cold-cache timing runs. Envelope MLE has a 500 ms per-shot limit; an incomplete run receives no accuracy point.</figcaption>
+  </figure>
+  <p>Time includes common circuit compilation, public-row transformation, loss conditioning, graph or model construction, and decoding. Startup and scoring are excluded. The Python adapter excludes JSON transport, while Rust's decode timer can include buffered row reads. These are amortized workflow measurements, not isolated kernel benchmarks or online tail latency.</p>
+  <details class="loss-evidence-downloads"><summary>Method, raw measurements and reproducibility</summary>
+    <p>Recorded on the hardware listed in the provenance file, using pinned Stim and PyMatching packages and a release Rust build. Benchmark processes run serially without explicit CPU affinity. All seeds, dataset hashes, error counts, timing repetitions, backend disagreements and failures are retained.</p>
+    <ul>
+      <li><a href="../data/atom-loss/methodology.md">Full method and reproduction commands</a></li>
+      <li><a href="../data/atom-loss/summary.csv" download>Download result table (CSV)</a></li>
+      <li><a href="../data/atom-loss/provenance-all.json">Hardware, dependencies and source hashes</a> · <a href="../data/atom-loss/source-snapshot.json">Exact benchmark source snapshot</a> · <a href="../data/atom-loss/bundle.json">Artifact checksums</a></li>
+      <li><a href="../data/atom-loss/sampling.json">Raw sampling repetitions</a> · <a href="../data/atom-loss/decoding.json">Raw loss sweep</a> · <a href="../data/atom-loss/tradeoff.json">Raw accuracy/time runs</a></li>
+    </ul>
+    <p>No failed run is scored from its successful prefix. The three-wire oracle is independent; the PyMatching benchmark adapter shares RustQEC's general compiler. This initial suite does not compare against QEC-Playground or a paper implementation of delayed-erasure decoding.</p>
+  </details>
 </section>
 <section class="task-section" aria-labelledby="supported-circuits">
   <h2 id="supported-circuits">Supported circuits and next experiments</h2>

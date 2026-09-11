@@ -1,0 +1,158 @@
+[
+  {
+    "distance": 3,
+    "rounds": 3,
+    "shots": 256,
+    "pauli_probability": 0.001,
+    "loss_probability": 0.003,
+    "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+    "rust": {
+      "backend": "RustQEC auto sampler; loss-visible records",
+      "parse_seconds": 0.00017725,
+      "records": [
+        {
+          "bytes": 2304,
+          "packing_seconds": 2.209e-06,
+          "sample_seconds": 0.008069833
+        },
+        {
+          "bytes": 2304,
+          "packing_seconds": 4.458e-06,
+          "sample_seconds": 0.008740334
+        },
+        {
+          "bytes": 2304,
+          "packing_seconds": 1.875e-06,
+          "sample_seconds": 0.008166042
+        }
+      ],
+      "shots": 256,
+      "warmups": 2
+    },
+    "reference": {
+      "backend": "Python per-history lowering + Stim (correctness reference)",
+      "warmups": 1,
+      "records": [
+        {
+          "sample_seconds": 0.01577991689555347,
+          "packing_seconds": 7.00005330145359e-06,
+          "bytes": 2304
+        },
+        {
+          "sample_seconds": 0.017323500011116266,
+          "packing_seconds": 4.458008334040642e-06,
+          "bytes": 2304
+        },
+        {
+          "sample_seconds": 0.015762082999572158,
+          "packing_seconds": 9.290874004364014e-06,
+          "bytes": 2304
+        }
+      ]
+    }
+  },
+  {
+    "distance": 5,
+    "rounds": 5,
+    "shots": 256,
+    "pauli_probability": 0.001,
+    "loss_probability": 0.003,
+    "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+    "rust": {
+      "backend": "RustQEC auto sampler; loss-visible records",
+      "parse_seconds": 0.000338375,
+      "records": [
+        {
+          "bytes": 9472,
+          "packing_seconds": 4.458e-06,
+          "sample_seconds": 0.058977375
+        },
+        {
+          "bytes": 9472,
+          "packing_seconds": 4.292e-06,
+          "sample_seconds": 0.057651917
+        },
+        {
+          "bytes": 9472,
+          "packing_seconds": 6.292e-06,
+          "sample_seconds": 0.057834416
+        }
+      ],
+      "shots": 256,
+      "warmups": 2
+    },
+    "reference": {
+      "backend": "Python per-history lowering + Stim (correctness reference)",
+      "warmups": 1,
+      "records": [
+        {
+          "sample_seconds": 0.18505137506872416,
+          "packing_seconds": 6.624963134527206e-06,
+          "bytes": 9472
+        },
+        {
+          "sample_seconds": 0.1836921670474112,
+          "packing_seconds": 6.542075425386429e-06,
+          "bytes": 9472
+        },
+        {
+          "sample_seconds": 0.17870637495070696,
+          "packing_seconds": 7.00005330145359e-06,
+          "bytes": 9472
+        }
+      ]
+    }
+  },
+  {
+    "distance": 7,
+    "rounds": 7,
+    "shots": 256,
+    "pauli_probability": 0.001,
+    "loss_probability": 0.003,
+    "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+    "rust": {
+      "backend": "RustQEC auto sampler; loss-visible records",
+      "parse_seconds": 0.000904667,
+      "records": [
+        {
+          "bytes": 24832,
+          "packing_seconds": 7.334e-06,
+          "sample_seconds": 0.266714292
+        },
+        {
+          "bytes": 24832,
+          "packing_seconds": 6.625e-06,
+          "sample_seconds": 0.267249542
+        },
+        {
+          "bytes": 24832,
+          "packing_seconds": 7.167e-06,
+          "sample_seconds": 0.267427917
+        }
+      ],
+      "shots": 256,
+      "warmups": 2
+    },
+    "reference": {
+      "backend": "Python per-history lowering + Stim (correctness reference)",
+      "warmups": 1,
+      "records": [
+        {
+          "sample_seconds": 0.6049760421738029,
+          "packing_seconds": 1.0584015399217606e-05,
+          "bytes": 24832
+        },
+        {
+          "sample_seconds": 0.612684833118692,
+          "packing_seconds": 1.1375173926353455e-05,
+          "bytes": 24832
+        },
+        {
+          "sample_seconds": 0.6087704999372363,
+          "packing_seconds": 1.637497916817665e-05,
+          "bytes": 24832
+        }
+      ]
+    }
+  }
+]

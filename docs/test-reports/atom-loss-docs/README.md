@@ -7,6 +7,7 @@ single atom-loss destination and the complete dedicated walkthrough.
 - [Homepage](home.png)
 - [Atom-loss guide](guide.png)
 - [Atom-loss guide on mobile](guide-mobile.png)
+- [Benchmark results after logarithmic-axis and display-range adjustments](results.png)
 
 The tutorial command test builds the workspace CLI and runs the exact four
 command blocks from the page in a temporary directory. The seeded example
@@ -27,3 +28,9 @@ python3 tools/check_site_build.py _site
 python3 -m unittest tools.test_atom_loss_guide tools.test_site_versions
 npm --prefix web/shot-viewer run test:e2e
 ```
+
+The results capture shows the final d = 3 / d = 5 logarithmic loss-sweep
+figure. Zero-failure points are omitted from this display; each panel uses
+its visible x range with equal fractional margins. The full d = 3, 5, 7
+measurements remain in `site/static/data/atom-loss/`, alongside sampling
+throughput, accuracy/time, correctness reports, and reproducibility metadata.

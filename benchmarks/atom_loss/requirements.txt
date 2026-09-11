@@ -1,0 +1,4 @@
+stim==1.16.0
+numpy==2.4.6
+pymatching==2.4.0
+matplotlib==3.10.9
