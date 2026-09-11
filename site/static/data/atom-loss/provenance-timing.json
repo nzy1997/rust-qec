@@ -1,5 +1,5 @@
 {
-  "started_utc": "2026-09-11T06:33:39.619249+00:00",
+  "started_utc": "2026-09-11T08:07:17.367607+00:00",
   "command": [
     "/Users/nzy/rcode/rstim/benchmarks/atom_loss/remeasure.py",
     "--corpora",
@@ -7,11 +7,11 @@
     "--baseline",
     "site/static/data/atom-loss",
     "--work",
-    "drafts/atom-loss-fix-runs",
+    "drafts/atom-loss-round3-runs",
     "--out",
-    "drafts/atom-loss-fix-results"
+    "drafts/atom-loss-round3-results"
   ],
-  "source_commit": "de24ccb00fba20a0c758356f894defd3632147ab",
+  "source_commit": "bb6ffa90c5569ba0d0da31aa2605d37553c2975c",
   "working_tree_dirty": true,
   "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
   "cpu": "Apple M4",
@@ -23,19 +23,27 @@
     "matplotlib": "3.10.9"
   },
   "binaries": {
-    "target/release/rustqec": "b3d026ac0e1ef4ced334233e0a7db944e4086d035a7854121a51fdd0b2d49bb9",
-    "target/release/examples/export_matching_benchmark": "fb921d2e5a83b76ce19602e82de320400b0eb7a609156c96412c9c435616f6e0"
+    "target/release/rustqec": "c7d7d0f6bca2f5d17a80dbc61d462fda7d948e5778a1848482a9c6569b2f1e81",
+    "target/release/examples/export_matching_benchmark": "c22fab12797f70318cc8cdbab974700fc41e4b1075540a38c495d3fcd3fbef57",
+    "target/release/examples/export_decoder_oracle": "866ad70a7f22b4abf4c449cee9d5e8e882e2c8e68cec33057a8f03dfc9edccd9"
   },
   "sources": {
-    "benchmarks/atom_loss/correctness.py": "9a7f0235f9ed9c24a42e43b6cd11ee85ad5bb3423d96c18cd3291acb0a4425c6",
+    "benchmarks/atom_loss/chain_reference.py": "fc54a3e8e7aa0c62059a3fe287422c1ce529c4e053c24e266ff951032d3db1e5",
+    "benchmarks/atom_loss/correctness.py": "7bd0d7418e4e4c9fa7f01ad23664f89d973d2ac05930ef348e6f45ef160f87fb",
     "benchmarks/atom_loss/decoder_reference.py": "b4c2b89d7b684a5456396748ec7149c452e4ffc151b56691af443542313ee1c3",
-    "benchmarks/atom_loss/plot.py": "7b63ac61ba163506c07d09e030de916e11c40352eebe757a30e41be288faa0b7",
-    "benchmarks/atom_loss/publish.py": "b70e158736688dbca3544146056ac8d30b5908f655f5f57c677f6fba337229da",
+    "benchmarks/atom_loss/noise_controls.py": "6afaece2395a11c142d87f192b85fc5b29f2887ce74e9d5cbc4644d96a51b6b5",
+    "benchmarks/atom_loss/plot.py": "5d396e7ee5695e6b7f0ffed2654daf69034e6d6d634181dc411fc2268e646e64",
+    "benchmarks/atom_loss/publish.py": "6c8a285ffe2ca5e92047c07d5e6349e0fbdfe5d1d9e5feed66f5032996b72f05",
     "benchmarks/atom_loss/reference.py": "cbb5ca0f64661193d2143175f9024519447b3b0b76f1f628e666cc46951fc5ab",
-    "benchmarks/atom_loss/remeasure.py": "dbd1ad8ae85b804dca9e410fc2ce142077828f09866c35a369e08361034df3a6",
-    "benchmarks/atom_loss/run.py": "5555344a204c6d12092b7d12ee1296e4fcf50dfbc1baa4bf4eceec94f9afcfa3",
-    "benchmarks/atom_loss/test_reference.py": "b095572b64a73b0ea3a99d73a5ddb0d0e810b91e600c74d0168a8c477e92fa8a",
-    "benchmarks/atom_loss/verify.py": "b64a56d7ea31dd251b66e732122c332c7bcab92b9ade903b6a53344afaea6e9e"
+    "benchmarks/atom_loss/remeasure.py": "762b1b27678592290ac04aff939829ae3bca7ef80a43bc1635a754784983d046",
+    "benchmarks/atom_loss/run.py": "7fc9625f253068033ebe299acff3d9865a629317c8fb4b56345264ae26315b68",
+    "benchmarks/atom_loss/test_reference.py": "5037c101e7809ac8fe4350329904863da5c6a83fcc3d5ccdaf9153bc27547f3e",
+    "benchmarks/atom_loss/verify.py": "ef1913710dfe98629427d9b937d48556b821d201287f72c7e43cf30c4f85a867",
+    "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+    "rustqec-cli/Cargo.toml": "d759265af7493ce0dbe51e2621bd51d4f5ad90f9ead6067e8da9860064df9f9e",
+    "rustqec-cli/src/lib.rs": "cb785010faec939e487dc3a66e3ec58678ddd41f0b4de5fff17c8fc4aad98d49",
+    "rustqec-cli/src/decode/benchmark.rs": "2b2efdff6677589a80923ccf408414b5f60670b39277a6af66e346d2da19e6d8",
+    "rustqec-cli/examples/export_decoder_oracle.rs": "5695bf068f3129052ebd32f05da136bba55ebfc70efc703f31da5b15ad541b40"
   },
   "environment": {
     "OMP_NUM_THREADS": "1",
@@ -43,8 +51,8 @@
     "RAYON_NUM_THREADS": "1"
   },
   "baseline_sha256": {
-    "decoding.json": "0b169c511755e98c1836c04e528c3ec7d4226c6d76dc361d24c6f4d7d71da1c7",
-    "tradeoff.json": "7abf27005f93e1e5353138d93d4f1550da4ee8ff24e4351a32fbe25c7983e772"
+    "decoding.json": "f1be1cff77f04e726989e357932755e52d807770e08aa425b8bce838cff5fc55",
+    "tradeoff.json": "3aad60d5bdfc8aec879664eae986f816471dc0079e9acc432c9b39c11d3a4577"
   },
   "timing": "Serial processes, three cold decoder runs, no CPU affinity. Each Python repetition freshly exports and times compilation and public-row transformation, then times array conversion, grouping, graph construction, decode_batch and output reordering. Native totals sum fresh compile and decode stats including buffered reads and packing/flush. Export transformation includes input reads; JSON transport/loading, process startup and scoring excluded. Fixed Python loop retained as API control; batch and loop predictions must match.",
   "sampling": "Unchanged; provenance-all.json and source-snapshot.json describe the original sampling run."

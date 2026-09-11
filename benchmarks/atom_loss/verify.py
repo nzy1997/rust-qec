@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 
 
@@ -23,9 +24,25 @@ def verify(root):
         path=root/name
         if path.parent != root or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
             raise ValueError(f'Artifact integrity mismatch: {name}')
-    for name in ['correctness.json','decoder-correctness.json']:
+    for name in ['correctness.json','decoder-correctness.json','chain-correctness.json']:
         data=json.loads((root/name).read_text())
         if data['status']!='PASS': raise ValueError(f'Correctness failed: {name}')
+    sampler=json.loads((root/'correctness.json').read_text())
+    analytic=sampler['analytic_noise_controls']
+    assert analytic['status']=='PASS' and len(analytic['cases'])==16
+    assert all(c['status']=='PASS' for c in analytic['cases'])
+    assert set(analytic['channel_deletion_mutations'])=={'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2'}
+    assert all(c['rejected'] and c['failed_cases'] for c in analytic['channel_deletion_mutations'].values())
+    chain=json.loads((root/'chain-correctness.json').read_text())
+    assert (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)
+    assert chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4
+    assert chain['independent_effects_candidates_and_m2d_pass']
+    assert all(chain['compiler_output_mutations_rejected'].values())
+    assert set(chain['backends'])=={'envelope-matching','envelope-mle'}
+    for result in chain['backends'].values():
+        assert not result['rejected_rows'] and result['unique_optimum_rows']>0
+        assert all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])
+    assert hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']
     oracle=json.loads((root/'decoder-correctness.json').read_text())
     assert [c['rows_checked'] for c in oracle['cases']]==[64,1024]
     for c in oracle['cases']:
@@ -59,7 +76,10 @@ def verify(root):
                     if name.startswith('pymatching'):
                         assert run['export_repetition']==rep
                         assert total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']
-                        if not name.endswith('-loop'): assert run['batch_calls']>0
+                        if not name.endswith('-loop'):
+                            assert run['batch_calls']>0
+                            phases=[run[k] for k in ['preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
+                            assert min(phases)>=0 and math.isclose(sum(phases),run['decode_seconds'],rel_tol=1e-9)
                     if 'stats' in run:
                         assert run['stats']['attempted_shot_count']==r['shots']
                         assert run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0

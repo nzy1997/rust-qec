@@ -16,7 +16,7 @@
       "runs": [
         {
           "status": "ok",
-          "process_wall_seconds": 0.014854458859190345,
+          "process_wall_seconds": 0.023430374916642904,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -24,8 +24,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.001045541,
-            "decode_seconds": 0.007767208,
+            "compile_seconds": 0.002248167,
+            "decode_seconds": 0.008069583,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -42,7 +42,7 @@
         },
         {
           "status": "ok",
-          "process_wall_seconds": 0.014493291964754462,
+          "process_wall_seconds": 0.015230916906148195,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -50,8 +50,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.00102675,
-            "decode_seconds": 0.007794709,
+            "compile_seconds": 0.001013167,
+            "decode_seconds": 0.008147041,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -68,7 +68,7 @@
         },
         {
           "status": "ok",
-          "process_wall_seconds": 0.014767624903470278,
+          "process_wall_seconds": 0.01502420799806714,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -76,8 +76,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.0009945,
-            "decode_seconds": 0.0078675,
+            "compile_seconds": 0.000994125,
+            "decode_seconds": 0.007982667,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -102,9 +102,9 @@
       ],
       "prediction_sha256": "e3e7c085eb01cbce2dcce437779c72a0bc88880dc670591ad4134ad7e47d4f4b",
       "total_seconds": [
-        0.008812749,
-        0.008821459,
-        0.008862
+        0.01031775,
+        0.009160208000000001,
+        0.008976792
       ]
     },
     "envelope-mle": {
@@ -112,7 +112,7 @@
       "runs": [
         {
           "status": "ok",
-          "process_wall_seconds": 11.16473550000228,
+          "process_wall_seconds": 11.301487084012479,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -120,8 +120,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.002578667,
-            "decode_seconds": 11.153759291,
+            "compile_seconds": 0.00256975,
+            "decode_seconds": 11.291146042,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -138,7 +138,7 @@
         },
         {
           "status": "ok",
-          "process_wall_seconds": 11.767914208117872,
+          "process_wall_seconds": 11.302581707946956,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -146,8 +146,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.002729042,
-            "decode_seconds": 11.756270209,
+            "compile_seconds": 0.00255525,
+            "decode_seconds": 11.291118791,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -164,7 +164,7 @@
         },
         {
           "status": "ok",
-          "process_wall_seconds": 11.756422707810998,
+          "process_wall_seconds": 11.260961708147079,
           "exit_code": 0,
           "stats": {
             "schema_version": "rustqec.decode-stats.v1",
@@ -172,8 +172,8 @@
             "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
             "shot_count": 5000,
             "attempted_shot_count": 5000,
-            "compile_seconds": 0.002773667,
-            "decode_seconds": 11.74483175,
+            "compile_seconds": 0.002588833,
+            "decode_seconds": 11.249719708,
             "distinct_loss_patterns": 193,
             "distinct_loss_patterns_exact": true,
             "cache_hits": 4807,
@@ -198,39 +198,54 @@
       ],
       "prediction_sha256": "78bb63422e980bad63c17dede75ec4cb21e2591a812ee16fc6a8258ff253beb3",
       "total_seconds": [
-        11.156337958,
-        11.758999251,
-        11.747605416999999
+        11.293715791999999,
+        11.293674041000001,
+        11.252308541000001
       ]
     },
     "pymatching-fixed": {
       "status": "ok",
       "runs": [
         {
-          "decode_seconds": 0.0024198750033974648,
+          "decode_seconds": 0.0023329579271376133,
+          "preprocess_seconds": 0.0016706660389900208,
+          "graph_build_seconds": 0.0002137911505997181,
+          "matching_seconds": 0.00036137504503130913,
+          "output_seconds": 8.533289656043053e-05,
+          "adapter_overhead_seconds": 1.7927959561347961e-06,
           "graph_builds": 1,
           "batch_calls": 1,
           "execution": "batch fixed graph",
-          "compile_seconds": 0.001557583,
-          "transform_seconds": 0.003942167,
+          "compile_seconds": 0.000965459,
+          "transform_seconds": 0.003858375,
           "export_repetition": 0
         },
         {
-          "decode_seconds": 0.0024447080213576555,
+          "decode_seconds": 0.002539499895647168,
+          "preprocess_seconds": 0.0018092500977218151,
+          "graph_build_seconds": 0.00028287479653954506,
+          "matching_seconds": 0.0003631669096648693,
+          "output_seconds": 8.116685785353184e-05,
+          "adapter_overhead_seconds": 3.041233867406845e-06,
           "graph_builds": 1,
           "batch_calls": 1,
           "execution": "batch fixed graph",
-          "compile_seconds": 0.00113475,
-          "transform_seconds": 0.004309709,
+          "compile_seconds": 0.000979125,
+          "transform_seconds": 0.003845333,
           "export_repetition": 1
         },
         {
-          "decode_seconds": 0.003088915953412652,
+          "decode_seconds": 0.0024337079375982285,
+          "preprocess_seconds": 0.0016793739050626755,
+          "graph_build_seconds": 0.00019995891489088535,
+          "matching_seconds": 0.0004558749496936798,
+          "output_seconds": 9.679095819592476e-05,
+          "adapter_overhead_seconds": 1.709209755063057e-06,
           "graph_builds": 1,
           "batch_calls": 1,
           "execution": "batch fixed graph",
-          "compile_seconds": 0.001029792,
-          "transform_seconds": 0.004168709,
+          "compile_seconds": 0.001005708,
+          "transform_seconds": 0.003836375,
           "export_repetition": 2
         }
       ],
@@ -243,9 +258,9 @@
       ],
       "prediction_sha256": "24d1b0118bd6dfca5b2c225af3431ac85d83d2e1af0ee231924605b18eb5da1c",
       "total_seconds": [
-        0.007919625003397464,
-        0.007889167021357656,
-        0.008287416953412651
+        0.007156791927137613,
+        0.007363957895647168,
+        0.007275790937598228
       ],
       "disagreements_with_native": 13,
       "paired_native_only_wrong": 0,
@@ -255,30 +270,45 @@
       "status": "ok",
       "runs": [
         {
-          "decode_seconds": 0.035804750164970756,
+          "decode_seconds": 0.03514070902019739,
+          "preprocess_seconds": 0.0025091315619647503,
+          "graph_build_seconds": 0.029818587005138397,
+          "matching_seconds": 0.002567082177847624,
+          "output_seconds": 0.0001939656212925911,
+          "adapter_overhead_seconds": 5.194265395402908e-05,
           "graph_builds": 193,
           "batch_calls": 193,
           "execution": "batch grouped by loss pattern",
-          "compile_seconds": 0.001080375,
-          "transform_seconds": 0.00404675,
+          "compile_seconds": 0.000983083,
+          "transform_seconds": 0.00382325,
           "export_repetition": 0
         },
         {
-          "decode_seconds": 0.03676820802502334,
+          "decode_seconds": 0.03529258305206895,
+          "preprocess_seconds": 0.0024694872554391623,
+          "graph_build_seconds": 0.029992666095495224,
+          "matching_seconds": 0.0025821675080806017,
+          "output_seconds": 0.00019525038078427315,
+          "adapter_overhead_seconds": 5.301181226968765e-05,
           "graph_builds": 193,
           "batch_calls": 193,
           "execution": "batch grouped by loss pattern",
-          "compile_seconds": 0.001140209,
-          "transform_seconds": 0.004075042,
+          "compile_seconds": 0.000975083,
+          "transform_seconds": 0.003851292,
           "export_repetition": 1
         },
         {
-          "decode_seconds": 0.036715124966576695,
+          "decode_seconds": 0.03515404090285301,
+          "preprocess_seconds": 0.0024534494150429964,
+          "graph_build_seconds": 0.029919332824647427,
+          "matching_seconds": 0.0025264958385378122,
+          "output_seconds": 0.00019920873455703259,
+          "adapter_overhead_seconds": 5.5554090067744255e-05,
           "graph_builds": 193,
           "batch_calls": 193,
           "execution": "batch grouped by loss pattern",
-          "compile_seconds": 0.001057333,
-          "transform_seconds": 0.004441666,
+          "compile_seconds": 0.0009965,
+          "transform_seconds": 0.003850292,
           "export_repetition": 2
         }
       ],
@@ -291,9 +321,9 @@
       ],
       "prediction_sha256": "e3e7c085eb01cbce2dcce437779c72a0bc88880dc670591ad4134ad7e47d4f4b",
       "total_seconds": [
-        0.04093187516497075,
-        0.041983459025023345,
-        0.04221412396657669
+        0.03994704202019739,
+        0.04011895805206895,
+        0.040000832902853015
       ],
       "disagreements_with_native": 0,
       "paired_native_only_wrong": 0,
@@ -303,27 +333,27 @@
       "status": "ok",
       "runs": [
         {
-          "decode_seconds": 0.018644165946170688,
+          "decode_seconds": 0.017490416998043656,
           "graph_builds": 1,
           "cache_hits": 4999,
-          "compile_seconds": 0.001458,
-          "transform_seconds": 0.004069583,
+          "compile_seconds": 0.00097175,
+          "transform_seconds": 0.003820875,
           "export_repetition": 0
         },
         {
-          "decode_seconds": 0.018719624960795045,
+          "decode_seconds": 0.018092749873176217,
           "graph_builds": 1,
           "cache_hits": 4999,
-          "compile_seconds": 0.001283125,
-          "transform_seconds": 0.004020375,
+          "compile_seconds": 0.001011583,
+          "transform_seconds": 0.00383425,
           "export_repetition": 1
         },
         {
-          "decode_seconds": 0.01861650007776916,
+          "decode_seconds": 0.01847233297303319,
           "graph_builds": 1,
           "cache_hits": 4999,
-          "compile_seconds": 0.001025708,
-          "transform_seconds": 0.003835708,
+          "compile_seconds": 0.001008541,
+          "transform_seconds": 0.004224708,
           "export_repetition": 2
         }
       ],
@@ -336,9 +366,9 @@
       ],
       "prediction_sha256": "24d1b0118bd6dfca5b2c225af3431ac85d83d2e1af0ee231924605b18eb5da1c",
       "total_seconds": [
-        0.024171748946170687,
-        0.024023124960795044,
-        0.02347791607776916
+        0.022283041998043658,
+        0.022938582873176218,
+        0.02370558197303319
       ],
       "disagreements_with_native": 13,
       "paired_native_only_wrong": 0,
@@ -347,8 +377,8 @@
   },
   "graph": {
     "source": "public dataset only; graph/compiler shared with RustQEC",
-    "compile_seconds": 0.00103775,
-    "transform_seconds": 0.003821417,
+    "compile_seconds": 0.000997125,
+    "transform_seconds": 0.003931458,
     "num_observables": 1,
     "edges": 244,
     "detectors": 16,

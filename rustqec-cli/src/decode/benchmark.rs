@@ -54,3 +54,16 @@ pub fn export_matching_dataset(path: &Path) -> Result<serde_json::Value, DecodeF
         "num_observables":matching.num_observables,"syndromes":syndromes,"losses":losses,
         "compile_seconds":compile_seconds,"transform_seconds":transform_seconds}))
 }
+
+/// Public-input model inspection for an independently constructed finite oracle.
+/// Validate its physical model independently before testing its MLE representation.
+pub fn export_decoder_oracle_dataset(path: &Path) -> Result<serde_json::Value, DecodeFailure> {
+    let dataset = read_dataset(path)?;
+    let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMle)?;
+    let effect =
+        |e: &Effect| json!({"detectors":e.detectors,"observables":e.observables,"weight":e.weight});
+    Ok(json!({
+        "independent_effects":circuit.independent_effects.iter().map(effect).collect::<Vec<_>>(),
+        "loss_candidates":circuit.envelopes.iter().map(|e| e.candidates.iter().map(effect).collect::<Vec<_>>()).collect::<Vec<_>>()
+    }))
+}

@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import numpy as np
-from . import reference
+from . import reference, noise_controls
 
 CASES = {
     'lost_control_skips_cx': 'R 0 1\nX 0\nLOSS(1) 0\nCX 0 1\nML 0 1',
@@ -51,7 +51,7 @@ def run(binary, shots=32768):
     records = []
     # Union bound for every bin in every two-sample small-circuit comparison.
     bins = 64 * len(CASES)
-    tolerance = 2 * math.sqrt(math.log(4 * bins / 1e-6) / (2 * shots))
+    tolerance = 2 * math.sqrt(math.log(4 * bins / 5e-7) / (2 * shots))
     with tempfile.TemporaryDirectory(prefix='loss-correctness-') as tmp:
         for name, text in CASES.items():
             observed = rust_rows(binary, text, shots, 173, Path(tmp))
@@ -70,7 +70,9 @@ def run(binary, shots=32768):
             rejected = False
         except ValueError:
             rejected = True
-    return {'status': 'PASS' if all(r['status'] == 'PASS' for r in records) and negative and rejected else 'FAIL',
+    analytic = noise_controls.run(binary, rust_rows, shots)
+    return {'status': 'PASS' if all(r['status'] == 'PASS' for r in records) and negative and rejected and analytic['status']=='PASS' else 'FAIL',
+            'analytic_noise_controls': analytic,
             'method': 'independent Stim circuit lowering; joint output distributions and hand-computed controls',
             'familywise_alpha_bound': 1e-6, 'negative_skipped_gate_mutation_rejected': bool(negative),
             'unsupported_reference_operation_rejected': rejected, 'cases': records}

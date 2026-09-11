@@ -1,0 +1,44 @@
+{
+  "status": "PASS",
+  "fixture_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+  "distance": 3,
+  "rounds": 2,
+  "detectors": 16,
+  "rows": 1504,
+  "physical_fault_traces": 5996,
+  "patterns": 4,
+  "stim_pauli_probes": 897,
+  "independent_effects": 139,
+  "independent_graph_edges": 265,
+  "independent_effects_candidates_and_m2d_pass": true,
+  "compiler_output_mutations_rejected": {
+    "pauli_weight": true,
+    "loss_candidate": true
+  },
+  "native_graph_edges": 244,
+  "backends": {
+    "envelope-matching": {
+      "rejected_rows": [],
+      "unique_optimum_rows": 1504,
+      "predicted_ones": 338,
+      "constant_zero_rejected": true,
+      "constant_one_rejected": true,
+      "flipped_prediction_rejected": true,
+      "placeholder_invariance": true,
+      "prediction_sha256": "6679f3125d9262bc5e245e4f216f607314035c5ec59502d9e60fae9f914014d7"
+    },
+    "envelope-mle": {
+      "rejected_rows": [],
+      "unique_optimum_rows": 1496,
+      "predicted_ones": 406,
+      "constant_zero_rejected": true,
+      "constant_one_rejected": true,
+      "flipped_prediction_rejected": true,
+      "placeholder_invariance": true,
+      "prediction_sha256": "19b36e3cf174bf52746ecfc21db59d4e492dab7b0041422419c55dbf0e8fbffe"
+    }
+  },
+  "method": "Stim-derived DEM and Pauli fault propagation; exact min-plus enumeration of detector/logical states; external persistent-loss measurement records",
+  "mle_objective": "minimum-weight fault configuration in an independently distribution-validated native DEM representation; zero-cost loss-envelope choices",
+  "scope": "finite Mid-SWAP fixture and declared envelope model, including MLE; not proof of arbitrary compiler inputs or physical logical-class Bayes optimality"
+}
