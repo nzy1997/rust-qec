@@ -7,7 +7,7 @@ single atom-loss destination and the complete dedicated walkthrough.
 - [Homepage](home.png)
 - [Atom-loss guide](guide.png)
 - [Atom-loss guide on mobile](guide-mobile.png)
-- [Benchmark results after logarithmic-axis and display-range adjustments](results.png)
+- [Benchmark results after batch-adapter and timing corrections](results.png)
 
 The tutorial command test builds the workspace CLI and runs the exact four
 command blocks from the page in a temporary directory. The seeded example
@@ -32,5 +32,10 @@ npm --prefix web/shot-viewer run test:e2e
 The results capture shows the final d = 3 / d = 5 logarithmic loss-sweep
 figure. Zero-failure points are omitted from this display; each panel uses
 its visible x range with equal fractional margins. The full d = 3, 5, 7
-measurements remain in `site/static/data/atom-loss/`, alongside sampling
+measurements also appear in an expandable full-sweep figure with exact one-sided
+95% upper limits at zero-event points. Raw data remain in `site/static/data/atom-loss/`, alongside sampling
 throughput, accuracy/time, correctness reports, and reproducibility metadata.
+
+The updated accuracy/time figure includes both fixed-weight batch and loop APIs.
+All 16 original corpora and backend prediction hashes are unchanged. The decoder
+oracle now checks 1,088 rows and rejects an actual ignore-conditioning mutation.

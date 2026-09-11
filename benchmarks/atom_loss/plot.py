@@ -11,8 +11,9 @@ from .verify import require_complete_sweep
 
 STYLE = {
     'envelope-matching': ('RustQEC envelope', '#b95428','o','-'),
-    'pymatching-envelope': ('PyMatching + envelope', '#386b80','s','--'),
-    'pymatching-fixed': ('PyMatching, fixed weights', '#797471','^',':'),
+    'pymatching-envelope': ('PyMatching + envelope (batch)', '#386b80','s','--'),
+    'pymatching-fixed': ('PyMatching, fixed (batch)', '#797471','^',':'),
+    'pymatching-fixed-loop': ('PyMatching, fixed (loop)', '#a99374','x',':'),
     'envelope-mle': ('RustQEC envelope MLE', '#754c91','D','-'),
 }
 plt.rcParams.update({'font.family':'DejaVu Sans','font.size':11,'axes.titlesize':13,
@@ -91,6 +92,34 @@ def render(out):
     fig.get_layout_engine().set(rect=(0,.07,1,.80))
     fig.text(.5,.01,f"{decoding[0]['shots']:,} shared shots / point · pPauli = 0.001 · 95% Wilson intervals · no threshold fit\nDisplay: d = 3, 5 only; zero-failure points omitted. Full data retained in CSV.",ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'logical-error-rate')
+    # All distances and opportunities remain visible; zero observations are limits.
+    fig,axes=plt.subplots(1,3,figsize=(12.4,4.8),sharey=True,layout='constrained')
+    for ax,distance in zip(axes,[3,5,7]):
+        cases=sorted([c for c in decoding if c['distance']==distance],key=lambda c:c['loss_probability'])
+        for name in ['envelope-matching','pymatching-envelope','pymatching-fixed']:
+            label,color,marker,line=STYLE[name]
+            xs=[c['loss_probability'] for c in cases]
+            rates=[c['decoders'][name]['logical_error_rate'] if c['decoders'][name]['errors'] else np.nan for c in cases]
+            ax.plot(xs,rates,label=label,color=color,marker=marker,ls=line,markersize=4)
+            for c in cases:
+                r=c['decoders'][name]; x=c['loss_probability']
+                if r['errors']:
+                    p=r['logical_error_rate'];lo,hi=r['wilson_95']
+                    ax.errorbar(x,p,yerr=[[p-lo],[hi-p]],color=color,capsize=2)
+                else:
+                    upper=-np.expm1(np.log(.05)/r['shots'])
+                    ax.errorbar(x,upper,yerr=upper*.3,uplims=True,color=color,marker=marker,markersize=4)
+        ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',
+               xlabel='Loss probability per opportunity',xlim=(.00008,.0125))
+        ax.set_xticks([.0001,.001,.01],labels=['$10^{-4}$','$10^{-3}$','$10^{-2}$'])
+        ax.grid(axis='y')
+    axes[0].set_ylabel('Logical failure probability / upper limit')
+    handles,labels=axes[0].get_legend_handles_labels()
+    fig.legend(handles,labels,loc='upper center',ncol=3,frameon=False,fontsize=9)
+    fig.get_layout_engine().set(rect=(0,.10,1,.86))
+    fig.text(.5,.015,'All 15 settings · 5,000 shared shots / point · nonzero: 95% Wilson intervals\nDown arrows: zero failures, one-sided exact 95% upper limit (not an estimated failure rate). Coincident limits overlap.',
+             ha='center',fontsize=9,color='#605b56')
+    emit(fig,out,'logical-error-rate-full')
     fig,ax=plt.subplots(figsize=(8.4,4.8),layout='constrained')
     failed=[]
     for i,(name,result) in enumerate(tradeoff['decoders'].items()):
@@ -101,6 +130,10 @@ def render(out):
         median=np.median(times);p=result['logical_error_rate'];lo,hi=result['wilson_95']
         ax.errorbar(median,p,xerr=[[median-times.min()],[times.max()-median]],yerr=[[p-lo],[hi-p]],
                     color=color,marker=marker,markersize=8,capsize=4,ls='none',label=label)
+        timing_label = f'{median:.2f} µs' if median < 10 else f'{median:,.0f} µs'
+        ax.annotate(timing_label, (median,p), xytext=(-8,9) if name=='envelope-mle' else (8,3),
+                    textcoords='offset points', ha='right' if name=='envelope-mle' else 'left',
+                    fontsize=9, color=color)
     ax.set(xscale='log',xlabel='Amortized compile + decode time (µs / shot)',ylabel='Logical failure probability / experiment',
            title=f"Accuracy and time on the same {tradeoff['shots']:,} shots",ylim=(0,None))
     ax.grid(axis='y');ax.legend(loc='best',frameon=False,fontsize=10)

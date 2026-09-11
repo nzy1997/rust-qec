@@ -89,13 +89,13 @@ def build_matching(graph, losses):
     return matching
 
 
-def python_decode(graph, conditioned):
+def python_decode_loop(graph, conditioned):
     # Identical shot order and at most 1024 FIFO cached patterns. RustQEC also
     # enforces a work budget; its actual builds/hits are retained for comparison.
+    started = time.perf_counter()
     syndromes = np.asarray(graph['syndromes'], dtype=np.uint8)
     predictions = np.zeros(len(syndromes), dtype=np.uint8)
     cache, builds, hits = OrderedDict(), 0, 0
-    started = time.perf_counter()
     for row, (syndrome, loss) in enumerate(zip(syndromes, graph['losses'], strict=True)):
         key = tuple(loss) if conditioned else ()
         if key not in cache:
@@ -111,6 +111,36 @@ def python_decode(graph, conditioned):
         value = matching.decode(syndrome[:matching.num_detectors])
         predictions[row] = value[0] if len(value) else 0
     return predictions, {'decode_seconds': time.perf_counter()-started, 'graph_builds': builds, 'cache_hits': hits}
+
+
+def python_decode(graph, conditioned, batch=True):
+    if not batch:
+        return python_decode_loop(graph, conditioned)
+    started = time.perf_counter()
+    syndromes = np.asarray(graph['syndromes'], dtype=np.uint8)
+    if len(syndromes) != len(graph['losses']):
+        raise ValueError('Incomplete loss rows')
+    predictions = np.zeros(len(syndromes), dtype=np.uint8)
+    groups = {}
+    for row, losses in enumerate(graph['losses']):
+        groups.setdefault(tuple(losses) if conditioned else (), []).append(row)
+    for losses, indices in groups.items():
+        matching = build_matching(graph, losses)
+        rows = syndromes[indices]
+        if np.any(rows[:, matching.num_detectors:]):
+            raise ValueError('Unreachable fired detector')
+        values = matching.decode_batch(rows[:, :matching.num_detectors])
+        if values.shape[1]:
+            predictions[indices] = values[:, 0]
+    return predictions, {'decode_seconds': time.perf_counter()-started,
+                         'graph_builds': len(groups), 'batch_calls': len(groups),
+                         'execution': 'batch grouped by loss pattern' if conditioned else 'batch fixed graph'}
+
+
+def export_graph(exporter, work, repetition):
+    path = work/f'graph-{repetition}.json'
+    checked([exporter, work/'public', path])
+    return json.loads(path.read_text())
 
 
 def native_decode(binary, work, decoder, repetition):
@@ -131,14 +161,16 @@ def native_decode(binary, work, decoder, repetition):
     return np.frombuffer(predictions.read_bytes(), dtype=np.uint8), record
 
 
-def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, repeats, include_mle=False):
+def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, repeats, include_mle=False, reuse=False):
     work.mkdir(parents=True, exist_ok=True)
     circuit = work/'circuit.stim'
-    generate(binary, circuit, distance, rounds, loss)
+    if not reuse:
+        generate(binary, circuit, distance, rounds, loss)
+        support = logical_x(circuit.read_text(), distance)
+        checked([binary, 'dataset', 'export', '--circuit', circuit, '--shots', shots, '--seed', seed,
+                 '--mode', 'measurements_blinded', '--logical-x-qubits', support,
+                 '--public-out', work/'public', '--private-out', work/'private'])
     support = logical_x(circuit.read_text(), distance)
-    checked([binary, 'dataset', 'export', '--circuit', circuit, '--shots', shots, '--seed', seed,
-             '--mode', 'measurements_blinded', '--logical-x-qubits', support,
-             '--public-out', work/'public', '--private-out', work/'private'])
     public = json.loads((work/'public/manifest.json').read_text())
     private = json.loads((work/'private/manifest.json').read_text())
     assert public['dataset_id'] == private['dataset_id'] and public['circuit']['observables'] == 1
@@ -175,21 +207,31 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
                 native_predictions = final
         case['decoders'][decoder] = entry
     for name, conditioned in [('pymatching-fixed', False), ('pymatching-envelope', True)]:
-        case['decoders'][name] = measure_python(graph, conditioned, answers, repeats, native_predictions)
+        case['decoders'][name] = measure_python(lambda rep: export_graph(exporter, work, f'{name}-{rep}'),
+                                                   conditioned, answers, repeats, native_predictions)
+    if include_mle:
+        case['decoders']['pymatching-fixed-loop'] = measure_python(
+            lambda rep: export_graph(exporter, work, f'loop-{rep}'), False, answers, repeats, native_predictions, batch=False)
+        batch_result, loop_result = [case['decoders'][key] for key in ['pymatching-fixed','pymatching-fixed-loop']]
+        if batch_result['status'] == loop_result['status'] == 'ok':
+            assert batch_result['prediction_sha256'] == loop_result['prediction_sha256']
     return case
 
 
-def measure_python(graph, conditioned, answers, repeats, native_predictions=None):
+def measure_python(graph_factory, conditioned, answers, repeats, native_predictions=None, batch=True):
     timings, final = [], None
     try:
-        for _ in range(repeats):
-            predicted, timing = python_decode(graph, conditioned)
+        for rep in range(repeats):
+            graph = graph_factory(rep)
+            predicted, timing = python_decode(graph, conditioned, batch=batch)
+            timing.update(compile_seconds=graph['compile_seconds'], transform_seconds=graph['transform_seconds'],
+                          export_repetition=rep)
             if final is not None and not np.array_equal(predicted, final):
                 raise ValueError('PyMatching predictions changed between repetitions')
             final = predicted
             timings.append(timing)
         entry = {'status':'ok', 'runs':timings, **score(final, answers)}
-        entry['total_seconds'] = [graph['compile_seconds']+graph['transform_seconds']+r['decode_seconds'] for r in timings]
+        entry['total_seconds'] = [r['compile_seconds']+r['transform_seconds']+r['decode_seconds'] for r in timings]
         if native_predictions is not None:
             entry['disagreements_with_native'] = int(np.count_nonzero(final != native_predictions))
             native_wrong, py_wrong = native_predictions != answers, final != answers
@@ -255,7 +297,7 @@ def main():
                   'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),
                   'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,sampler]},
                   'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},
-                  'timing':'Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Excludes process startup, disk I/O and scoring; Rust decode stats may include buffered row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.',
+                  'timing':'Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Each repetition remeasures compilation and transformation. Excludes process startup and scoring; native decode includes buffered reads and output packing/flush, exporter transformation includes public row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.',
                   'sources':{str(p.relative_to(ROOT)):digest(p) for p in [*sorted((ROOT/'benchmarks/atom_loss').glob('*.py')), ROOT/'Cargo.lock', ROOT/'rustqec-cli/src/decode/benchmark.rs', ROOT/'rstim/examples/atom_loss_sampling_benchmark.rs']}}
     save(out/f'provenance-{args.stage}.json', provenance)
     snapshot_files = list(provenance['sources']) + ['rustqec-cli/Cargo.toml', 'rustqec-cli/src/lib.rs',

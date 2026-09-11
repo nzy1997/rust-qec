@@ -39,6 +39,23 @@ public corpus at each decoding point; their private answer key is used only afte
 decoding. A shared seed does **not** imply identical random samples between Stim
 and RustQEC: the sampler check compares distributions, not row equality.
 
+The review-fix decoding run reuses all 16 original corpora and verifies their
+circuit, public-row and private-answer hashes before timing. Every existing
+backend's prediction hash must remain unchanged. `provenance-timing.json` and
+`source-snapshot-timing.json` describe this new decoding/oracle run; original
+sampling evidence keeps its original provenance. To repeat only decoding with
+retained corpora (the work directory must not exist):
+
+```sh
+drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.remeasure \
+  --corpora drafts/atom-loss-reproduction \
+  --baseline site/static/data/atom-loss \
+  --work drafts/atom-loss-retimed --out drafts/atom-loss-retimed-results
+```
+
+The retiming output contains decoding results and its provenance; combine it
+with the unchanged sampling evidence before publishing a complete bundle.
+
 ## Correctness reference
 
 `reference.py` independently parses the supported circuit subset, samples loss
@@ -65,16 +82,22 @@ semantics must fail a known answer; an unsupported operation must be rejected.
 These statistical checks cannot prove equality or validate arbitrarily rare
 fault probabilities.
 
-`decoder_reference.py` independently specifies a three-wire parity-check graph,
-its base weights log(9), and the loss-conditioned weights. It checks the exported
-graph against those hand-derived values, enumerates all eight correction masks
-for all 64 possible flag/value input rows, and checks native and PyMatching
-predictions against the full set of minimum-weight answers (including ties).
-This covers public-row canonicalization, loss-edge mapping and the matching
-objective. It does **not** independently validate the general loss-envelope
-compiler or claim Bayes-optimal logical-class decoding. It also tests altered
-lost-value placeholders. Removing loss conditioning must change the oracle's
-optimal-answer set, and a deliberately flipped known answer must be rejected.
+`decoder_reference.py` independently specifies three- and five-wire parity-check
+graphs, their base weights log(9), and loss-conditioned weights. It checks the
+exported graphs and loss-to-edge mapping against hand-derived values, enumerates
+all correction masks for all 64 + 1,024 flag/value rows, and checks native and
+PyMatching predictions against the full set of minimum-weight answers (including
+ties). Altering lost-value placeholders must leave predictions unchanged.
+
+The five-wire witness has two compatible corrections, 11100 and 00011. With the
+first three wires lost, fixed costs 3 versus 2 uniquely prefer logical 0;
+conditioned costs 1.5 versus 2 uniquely prefer logical 1. An actual PyMatching
+adapter that ignores conditioning is run through the same acceptance rule and
+must fail this witness. A deliberately flipped native prediction must also fail.
+A regression additionally substitutes the broken adapter for the healthy one
+and requires the overall correctness report to fail. This covers the matching
+objective and public-row transformation, not the general loss-envelope compiler
+or Bayes-optimal logical-class decoding.
 
 ## Three experiments
 
@@ -95,10 +118,16 @@ optimal-answer set, and a deliberately flipped known answer must be rejected.
 3. **Accuracy / time:** d = 3, rounds = 2, Pauli 0.001, loss 0.003, 5,000 shared
    shots, seed 20260912. Add envelope MLE with a 500 ms per-shot timeout. Plot
    logical failure probability against amortized compilation + decoding time,
-   with fresh decoder caches in each of three repetitions. Include conditioning
-   and graph construction; exclude startup and scoring. PyMatching includes the
-   measured common Rust compiler and public-row transformation time, but excludes
-   JSON transport/loading. Rust's decode timer may include buffered row reads.
+   with fresh decoder caches in each of three repetitions. The main PyMatching
+   comparators use `decode_batch`; fixed-weight per-shot calls are also retained
+   as an API control and must produce identical predictions to the batch path.
+   Each repetition reruns and remeasures the common Rust compiler and public-row
+   transformation. Python decode time includes array conversion, loss-pattern
+   grouping, graph construction, batched decoding and reordering predictions.
+   Startup, scoring and JSON transport/loading are excluded. Native decode time
+   includes buffered public-row reads and output packing/flush; the exporter's
+   transformation stage also includes public-row reads. These I/O boundaries
+   differ, so this is not a fully identical end-to-end process comparison.
    These are adapter/workflow timings, not isolated matching-kernel timings or
    online p99 latency. Do not infer a universal backend speed ranking.
 
@@ -112,7 +141,11 @@ Logical error bars are pointwise 95% Wilson intervals. The loss sweep uses
 logarithmic axes. Its display is restricted to d = 3 and d = 5, with zero-failure
 points omitted and no lines joining across those gaps. The full d = 3, 5, 7
 sweep, including zero failures and their nonzero Wilson upper bounds, remains
-in the raw JSON and summary CSV. Display omissions do not change scoring. Timing ranges are observed min/max, not confidence intervals.
+in the raw JSON and summary CSV. An additional full-sweep figure shows all 15
+settings: zero-event points use downward arrows at the exact one-sided 95%
+binomial upper bound `1 - 0.05**(1/N)` (about 0.000599 for N = 5,000), not a
+positive measured rate. Nonzero points retain Wilson intervals. Display
+omissions do not change scoring. Timing ranges are observed min/max, not confidence intervals.
 The curves report failure per entire memory experiment; rounds vary with distance.
 There is no threshold fit, accuracy ranking by overlapping intervals, or
 extrapolation to other circuits or larger distances.
@@ -128,8 +161,13 @@ Parallel edges are permitted only with identical logical labels by the native
 compiler. PyMatching keeps the smallest parallel weight, preserving this
 nonnegative minimum-weight objective rather than combining independent errors.
 
-Both adapters cache at most 1,024 loss patterns FIFO. Rust also enforces a work
-budget; actual graph builds and cache hits are recorded. Backend integer weight
+The native adapter caches at most 1,024 patterns FIFO and enforces a work budget.
+The batch Python adapter groups all shots by visible loss pattern, builds one
+graph per group, calls the official `decode_batch` interface and restores input
+order. Grouping and reordering costs are included; this offline batch policy
+requires retaining the batch and differs from the native streaming cache policy.
+Only the per-shot Python API control uses the 1,024-entry FIFO cache. Graph builds,
+batch calls and available cache statistics are recorded. Backend integer weight
 quantization and tie choices can produce prediction differences. The run retains
 prediction disagreements and paired native-only / Python-only failure counts;
 matching predictions are not assumed identical.
@@ -146,7 +184,8 @@ Primary implementation sources:
 
 - [Stim gates](https://github.com/quantumlib/Stim/blob/main/doc/gates.md#HERALDED_ERASE):
   heralded erasure alone is not persistent absent-wire evolution.
-- [PyMatching](https://github.com/oscarhiggott/PyMatching): matching backend;
+- [PyMatching batch decoding](https://pymatching.readthedocs.io/en/stable/#decoding-stim-circuits):
+  official `decode_batch` interface for reducing per-shot Python overhead;
   the pinned package version is in `requirements.txt` and the run provenance.
 - `rstim/src/codegen/midswap.rs`, `rstim/src/executor.rs`,
   `rustqec-cli/src/decode/compiler.rs`, `rustqec-cli/src/decode/matching.rs`:

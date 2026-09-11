@@ -1,20 +1,24 @@
 {
-  "completed_utc": "2026-09-11T06:06:50.557156+00:00",
+  "completed_utc": "2026-09-11T06:43:22.698057+00:00",
   "sha256": {
     "correctness.json": "ef1c5b86e591969b38b9feb1611f10ed6357c4c8e5a91406d1dacee19b3b1610",
-    "decoder-correctness.json": "2d2ae21f3fbd27a660c8bbe64118d717efa307696bc6826e5dbd74eb143545fa",
+    "decoder-correctness.json": "828aecb8f821cada09d84f94009075e01d7fb53d036b5fbd04ab0d25a8b808e0",
     "sampling.json": "2808f6780a704a5ba4d9390223bf9c64105db47a9cd1178631fa6e0fe854f28b",
-    "decoding.json": "0b169c511755e98c1836c04e528c3ec7d4226c6d76dc361d24c6f4d7d71da1c7",
-    "tradeoff.json": "7abf27005f93e1e5353138d93d4f1550da4ee8ff24e4351a32fbe25c7983e772",
+    "decoding.json": "f1be1cff77f04e726989e357932755e52d807770e08aa425b8bce838cff5fc55",
+    "tradeoff.json": "3aad60d5bdfc8aec879664eae986f816471dc0079e9acc432c9b39c11d3a4577",
     "provenance-all.json": "ef6af7037b0fe7a05a58b5d814eea2a24c46a5ba475ae98b2e8bdc996a3c84f0",
-    "methodology.md": "56e49e845de1e3b10934ab862998de91f1fbd83473568f9faa6775302b646553",
-    "summary.csv": "05e015fb8f55c547b01cf2535aff5cc8f90fa0c492153eb00ee676588ba064ab",
+    "methodology.md": "23c60034896912ec1da3de7f9e2c911f41d88a903ddf87b6acae5a4a43e69559",
+    "summary.csv": "1246b8c3f93df8d2175dd2b14e57efd5185cf8cb5b42328b11242d42b2569027",
     "source-snapshot.json": "13e772912f02c6c7137c9edbbce04ee4c7a101f12719a5face8eb708a1b76bed",
-    "sampling-throughput.svg": "e53906daaeaac2d38bbadb7a9e7cad6f8e4f8334d7b5841525ba64d630c3be96",
+    "provenance-timing.json": "93cc95b9bba834728cb4d389f9802121f3f9f0561ca13eb2cb1b24f5c8cca618",
+    "source-snapshot-timing.json": "ef09edddd76f44fab0f69779110ebe0f80b7d8719cc51444af6114abcc9042cc",
+    "sampling-throughput.svg": "585c4ac6d45a950b1009027d34b7c377088ba8630745be3b6ab2dd347a654301",
     "sampling-throughput.png": "7eb84b77711824aa92d570b8aae4b1fe9b5dec20abda61ff649b7ea390dbd8cd",
-    "logical-error-rate.svg": "d0b703edafcf837dce7e3658d7e0d332c44ea8d17f5ec2d798c05891cd4f150f",
-    "logical-error-rate.png": "429f9314880b0d7bd1491efffc5ba751be7132b1cd42aa0c92edf60eae844ebd",
-    "accuracy-time.svg": "ba48e3a878398fdf2ea3622c0d7c3681da5448a586df9c51e7abacced81b0a70",
-    "accuracy-time.png": "8bf08bb6c823672994a4a04d6ac8e63eb6847e75bd67578306140c918c506d95"
+    "logical-error-rate.svg": "ea9cc8b98ff168e6db727ba0a26abe273700d190ad96c1db8dd4cf3b906c7b23",
+    "logical-error-rate.png": "1dbd9e109ff90d7917bea6737053ffb6def57b213afb1c19708a893a654679e2",
+    "logical-error-rate-full.svg": "31985b80726adaa9e43fa4eca1148b7aa0d20c513170c14e23b56a5b86f4cf1a",
+    "logical-error-rate-full.png": "4fb7f56cc576e92b171e6176f2375e35aaae89e246ab5238551c31ad5a01ea7d",
+    "accuracy-time.svg": "eb297bdc226d46a0d6baaf6d49baf2528394545c415895352e88860f0bbb3b5e",
+    "accuracy-time.png": "b909df0d37ab4a63a245fab7cd261d66959834b5fb604b0d129d1b11a334add5"
   }
 }

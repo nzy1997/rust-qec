@@ -1,0 +1,51 @@
+{
+  "started_utc": "2026-09-11T06:33:39.619249+00:00",
+  "command": [
+    "/Users/nzy/rcode/rstim/benchmarks/atom_loss/remeasure.py",
+    "--corpora",
+    "drafts/atom-loss-benchmark-v3",
+    "--baseline",
+    "site/static/data/atom-loss",
+    "--work",
+    "drafts/atom-loss-fix-runs",
+    "--out",
+    "drafts/atom-loss-fix-results"
+  ],
+  "source_commit": "de24ccb00fba20a0c758356f894defd3632147ab",
+  "working_tree_dirty": true,
+  "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "cpu": "Apple M4",
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
+  "dependencies": {
+    "stim": "1.16.0",
+    "numpy": "2.4.6",
+    "pymatching": "2.4.0",
+    "matplotlib": "3.10.9"
+  },
+  "binaries": {
+    "target/release/rustqec": "b3d026ac0e1ef4ced334233e0a7db944e4086d035a7854121a51fdd0b2d49bb9",
+    "target/release/examples/export_matching_benchmark": "fb921d2e5a83b76ce19602e82de320400b0eb7a609156c96412c9c435616f6e0"
+  },
+  "sources": {
+    "benchmarks/atom_loss/correctness.py": "9a7f0235f9ed9c24a42e43b6cd11ee85ad5bb3423d96c18cd3291acb0a4425c6",
+    "benchmarks/atom_loss/decoder_reference.py": "b4c2b89d7b684a5456396748ec7149c452e4ffc151b56691af443542313ee1c3",
+    "benchmarks/atom_loss/plot.py": "7b63ac61ba163506c07d09e030de916e11c40352eebe757a30e41be288faa0b7",
+    "benchmarks/atom_loss/publish.py": "b70e158736688dbca3544146056ac8d30b5908f655f5f57c677f6fba337229da",
+    "benchmarks/atom_loss/reference.py": "cbb5ca0f64661193d2143175f9024519447b3b0b76f1f628e666cc46951fc5ab",
+    "benchmarks/atom_loss/remeasure.py": "dbd1ad8ae85b804dca9e410fc2ce142077828f09866c35a369e08361034df3a6",
+    "benchmarks/atom_loss/run.py": "5555344a204c6d12092b7d12ee1296e4fcf50dfbc1baa4bf4eceec94f9afcfa3",
+    "benchmarks/atom_loss/test_reference.py": "b095572b64a73b0ea3a99d73a5ddb0d0e810b91e600c74d0168a8c477e92fa8a",
+    "benchmarks/atom_loss/verify.py": "b64a56d7ea31dd251b66e732122c332c7bcab92b9ade903b6a53344afaea6e9e"
+  },
+  "environment": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "RAYON_NUM_THREADS": "1"
+  },
+  "baseline_sha256": {
+    "decoding.json": "0b169c511755e98c1836c04e528c3ec7d4226c6d76dc361d24c6f4d7d71da1c7",
+    "tradeoff.json": "7abf27005f93e1e5353138d93d4f1550da4ee8ff24e4351a32fbe25c7983e772"
+  },
+  "timing": "Serial processes, three cold decoder runs, no CPU affinity. Each Python repetition freshly exports and times compilation and public-row transformation, then times array conversion, grouping, graph construction, decode_batch and output reordering. Native totals sum fresh compile and decode stats including buffered reads and packing/flush. Export transformation includes input reads; JSON transport/loading, process startup and scoring excluded. Fixed Python loop retained as API control; batch and loop predictions must match.",
+  "sampling": "Unchanged; provenance-all.json and source-snapshot.json describe the original sampling run."
+}
