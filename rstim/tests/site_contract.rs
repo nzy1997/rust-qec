@@ -322,7 +322,8 @@ fn pages_workflow_builds_benchmarked_site() {
             "run: make build-site",
             "run: python3 tools/check_site_build.py _site",
             "actions/upload-pages-artifact@v3",
-            "path: _site",
+            "python3 tools/site_versions.py build --site-root _site --output _pages",
+            "path: _pages",
             "actions/deploy-pages@v4",
         ],
         "Pages deployment workflow",
@@ -529,7 +530,7 @@ fn new_documentation_routes_use_canonical_sources() {
 }
 
 #[test]
-fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
+fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     let index = read_repo_file("site/templates/index.html");
     let get_started = read_repo_file("site/templates/get-started.html");
     let readme = read_repo_file("README.md");
@@ -538,15 +539,15 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
     assert_contains_all(
         &index,
         &[
-            "id=\"install\"",
+            "id=\"atom-loss\"",
             "Install with Cargo",
-            "href=\"#install\"",
-            "cargo install --locked rustqec-cli --version 0.3.0",
-            "href=\"get-started/#native-install\"",
+            "href=\"get-started/#install\"",
+            "From atom-loss circuits to loss-aware decoding",
+            "href=\"atom-loss/\"",
             "href=\"get-started/#first-circuit\"",
-            "href=\"get-started/#cargo-install\"",
+            "Envelope decoding · Beta",
         ],
-        "homepage installation routes",
+        "homepage atom-loss feature and installation routes",
     );
     assert_contains_all(
         &get_started,
@@ -577,7 +578,7 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
         .0;
     assert_contains_all(
         hero_actions,
-        &["class=\"button primary\" href=\"#install\""],
+        &["class=\"button primary\" href=\"get-started/#install\""],
         "homepage primary Cargo action",
     );
     assert!(
@@ -599,8 +600,8 @@ fn homepage_install_section_prioritizes_cargo_and_documents_native_fallback() {
     );
     assert_contains_all(
         &styles,
-        &[".home-install", ".install-alternatives", ".install-note"],
-        "homepage installation styles",
+        &[".home-atom-loss", ".loss-workflow", ".loss-workflow-actions"],
+        "homepage atom-loss feature styles",
     );
 }
 

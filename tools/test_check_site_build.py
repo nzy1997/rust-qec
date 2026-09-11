@@ -11,6 +11,20 @@ RSTIM_DEM_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem
 
 
 class SiteBuildCheckerTest(unittest.TestCase):
+    def test_tutorial_paths_are_not_assets_but_runtime_references_are_checked(self) -> None:
+        fixture = check_site_build.make_fixture_site()
+        self.addCleanup(fixture.cleanup)
+        page = fixture.site_root / "atom-loss/index.html"
+        original = page.read_text()
+        example = "<pre><code>Path('data/private/answers.b8')</code></pre>"
+        page.write_text(original.replace('</main>', example + '</main>'))
+        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+        self.assertFalse(any(result.status == 'FAIL' for result in results), check_site_build.format_summary(results))
+        for reference in ["<script>fetch('data/private/answers.b8')</script>", '<a href="data/private/answers.b8">Download</a>']:
+            page.write_text(original.replace('</main>', example + reference + '</main>'))
+            results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
+            self.assertTrue(any(result.status == 'FAIL' and 'data/private/answers.b8' in result.detail for result in results))
+
     def test_valid_site_does_not_require_benchmark_campaign_route(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)

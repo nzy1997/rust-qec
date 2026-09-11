@@ -32,7 +32,7 @@
 
 
 <section class="task-section" aria-labelledby="first-decode"><h2 id="first-decode">Decode your first detector rows</h2>
-<p class="doc-note">Stable Rust API · <strong>rmatching v0.3.0</strong> · Rust and Cargo required. This standalone example needs no repository checkout, Python, or native solver.</p>
+<p class="doc-note">Rust and Cargo required. The example pins its dependency in <code>Cargo.toml</code>. This standalone example needs no repository checkout, Python, or native solver.</p>
 <p>Use a graphlike model with two detectors and one logical observable. For syndrome <code>11</code>, one joint error is more likely than two independent boundary errors, so matching predicts <code>L0=1</code>. The control row <code>00</code> predicts <code>L0=0</code>.</p>
 <p>The probability-1 DEM from the installation check is not supported by rmatching. Use this separate probability-0.1 model to learn decoding; detector inputs contain no observable answers.</p>
 <h3 id="decode-project">1. Create a standalone Rust project</h3>
@@ -65,7 +65,7 @@ row 2: predicted L0=0</code></pre>
     <h2 id="benchmark-campaigns-title">Run and compare decoder cases</h2>
     <p class="section-copy"><code>rsinter</code> runs cases, merges outputs, and produces comparison plots. Smoke runs check wiring; checked full artifacts support only the recorded cases and environments.</p>
   </div>
-  <p class="doc-note">Development · <strong>master</strong>. Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
+  <p class="doc-note">Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
   <pre class="quick-command"><code>make surface-decoder-compare-smoke
 make bb-circuit-bposd-compare-smoke</code></pre>
   <div class="table-wrap result-table">

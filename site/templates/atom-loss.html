@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Atom loss — RustQEC{% endblock title %}
+{% block description %}Model atom loss, sample loss-visible records, decode with envelope matching, and check logical predictions in one RustQEC walkthrough.{% endblock description %}
+{% block hero %}
+<div class="hero compact-hero">
+  <p class="eyebrow">Atom loss</p>
+  <h1>From atom loss to logical predictions</h1>
+  <p class="hero-copy">Follow one experiment from a noisy Mid-SWAP circuit to loss-visible samples, envelope decoding, and a check against the known answers.</p>
+</div>
+{% endblock hero %}
+{% block main %}
+<section class="task-section" aria-labelledby="loss-information">
+  <h2 id="loss-information">Keep the loss information through the experiment</h2>
+  <p>An atom can disappear before it is measured. The remaining record must describe both whether the atom was lost and the measured value when it survived. Treating a lost value as an ordinary 0 or 1 can create misleading detector parities.</p>
+  <p>RustQEC carries loss flags alongside measurement values and exposes them to its loss-aware decoders. This tutorial uses a distance-3, two-round Mid-SWAP Z-memory circuit: the same circuit and sampled dataset continue through every step below.</p>
+  <p class="doc-note">You need <code>rustqec</code> on PATH and Python 3 for the final result check. The default CLI includes envelope matching; this example does not require the optional ILP solver. Run the commands in order in a fresh working directory.</p>
+  <details><summary>Install the CLI</summary><pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre><p>Without Rust, use the <a href="../get-started/#native-install">native installer</a>.</p></details>
+</section>
+<section class="task-section" aria-labelledby="model-loss">
+  <h2 id="model-loss">1. Construct a circuit with atom loss</h2>
+  <p>Set Pauli noise and atom-loss probabilities separately. The Mid-SWAP generator produces loss-visible measurements, whose records contain interleaved <code>loss_flag,value_bit</code> pairs.</p>
+  <pre data-language="Shell" data-atom-loss-step="model"><code>rustqec circuit gen \
+  --code surface_code --task rotated_memory_z_midswap \
+  --distance 3 --rounds 2 --noise 0.002 \
+  --operation-loss-probability 0.002 \
+  --measurement-loss-probability 0.003 \
+  --out circuit.stim</code></pre>
+  <p><strong>Output:</strong> <code>circuit.stim</code>, including the loss-visible measurements and the logical observable that will be predicted.</p>
+</section>
+<section class="task-section" aria-labelledby="sample-loss">
+  <h2 id="sample-loss">2. Sample public inputs and private answers</h2>
+  <p>Export 64 shots in <code>measurements_blinded</code> mode. This preserves the measurement records, including loss flags, while keeping the answer key separate. The logical-X support <code>1,8,15</code> belongs to this specific generated circuit; it must be recomputed for a different layout.</p>
+  <pre data-language="Shell" data-atom-loss-step="sample"><code>mkdir -p data
+rustqec dataset export \
+  --circuit circuit.stim --shots 64 --seed 7 \
+  --mode measurements_blinded --logical-x-qubits 1,8,15 \
+  --public-out data/public --private-out data/private</code></pre>
+  <div class="table-wrap"><table class="atom-loss-bundles"><thead><tr><th>Bundle</th><th>Contents</th><th>Used by</th></tr></thead><tbody>
+    <tr><td><code>data/public/</code></td><td>Circuit, manifest, and packed measurement rows in <code>shots.b8</code></td><td>The decoder</td></tr>
+    <tr><td><code>data/private/</code></td><td>Manifest, physical logical-error targets in <code>answers.b8</code>, and hidden logical-input bits in <code>masks.b8</code></td><td>The experiment owner when scoring</td></tr>
+  </tbody></table></div>
+  <p>The two manifests share a <code>dataset_id</code>. Keep the private bundle out of decoder inputs. Under a set loss flag, the accompanying value bit is a placeholder; changing that placeholder must not change the decoder's prediction.</p>
+</section>
+<section class="task-section" aria-labelledby="decode-loss">
+  <h2 id="decode-loss">3. Decode the sampled records</h2>
+  <p>Pass only the public bundle to envelope matching. The decoder uses the circuit and loss-visible rows to predict logical outcomes; it does not read the private answers or masks.</p>
+  <pre data-language="Shell" data-atom-loss-step="decode"><code>rustqec decode --decoder envelope-matching \
+  --dataset data/public \
+  --out predictions.b8 --stats-out decode-stats.json</code></pre>
+  <p><strong>Outputs:</strong> <code>predictions.b8</code> contains one logical prediction per shot. <code>decode-stats.json</code> records decoded shots, distinct loss patterns, compilation and decoding time, and failures. For this one-observable example, each packed prediction occupies one byte.</p>
+  <details><summary>Matching or exact MLE?</summary><p>Envelope matching is included in the default CLI. Exact <code>envelope-mle</code> is available with the <code>ilp</code> feature or the official native archive. It solves a different optimization problem and can take longer. Each decoder has circuit acceptance limits; enabling a solver does not make every loss circuit supported.</p></details>
+</section>
+<section class="task-section" aria-labelledby="check-predictions">
+  <h2 id="check-predictions">4. Check the logical predictions</h2>
+  <p>As the experiment owner, compare predictions with the private physical logical-error targets. The hidden logical-input masks are already accounted for in those targets; do not apply them a second time.</p>
+  <pre data-language="Shell" data-atom-loss-step="check"><code>python3 - &lt;&lt;'PY'
+import json
+from pathlib import Path
+
+public = json.loads(Path('data/public/manifest.json').read_text())
+private = json.loads(Path('data/private/manifest.json').read_text())
+stats = json.loads(Path('decode-stats.json').read_text())
+predictions = Path('predictions.b8').read_bytes()
+answers = Path('data/private/answers.b8').read_bytes()
+assert public['dataset_id'] == private['dataset_id'], 'Mismatched datasets'
+assert public['circuit']['observables'] == 1, 'This check expects one observable'
+assert len(predictions) == len(answers) == public['shots'] == stats['shot_count'], 'Incomplete rows'
+assert all(bit in (0, 1) for bit in predictions + answers), 'Invalid padding bits'
+errors = sum(predicted != answer for predicted, answer in zip(predictions, answers))
+print(f"Decoded shots: {stats['shot_count']}")
+print(f"Loss patterns: {stats['distinct_loss_patterns']}")
+print(f"Logical errors: {errors} / {public['shots']}")
+PY</code></pre>
+  <p><strong>Checked output for the commands above:</strong></p>
+  <pre data-output="true" data-language="Expected output"><code>Decoded shots: 64
+Loss patterns: 10
+Logical errors: 0 / 64</code></pre>
+  <p>This small seeded example checks that the workflow is connected, including multiple loss patterns. Zero failures in 64 shots is not evidence of a zero logical error rate. Estimating performance requires larger experiments, uncertainty estimates, and stated circuit and noise conditions.</p>
+</section>
+<section class="task-section" aria-labelledby="supported-circuits">
+  <h2 id="supported-circuits">Supported circuits and next experiments</h2>
+  <p><strong>Envelope decoding is beta.</strong> This walkthrough demonstrates one generated Mid-SWAP case. It does not establish support for arbitrary circuits, loss rates, or circuit sizes. The compiler can reject inputs outside its acceptance rules with <code>unsupported_circuit</code>; a rejection is not a logical prediction.</p>
+  <p>When changing the circuit, update its logical-X support and regenerate both bundles together. Keep any failed or incomplete decoding run separate from a successful logical-error-rate result.</p>
+  <p>The repository also includes a pinned d=5, r=15 Mid-SWAP MLE control and an excluded conventional circuit that must fail before producing prediction or statistics files. See the <a href="../support/#atom-loss-support-boundary">support contract and regression commands</a> for these separate controls.</p>
+  <details><summary>Further reading</summary><ul>
+    <li><a href="../sampling-data/">Data formats, training tensors, and optional error traces</a></li>
+    <li><a href="../qp101/">Inspect loss-visible circuits with circuit diagrams</a></li>
+    <li><a href="../validation/">How to interpret benchmark evidence</a></li>
+  </ul></details>
+</section>
+{% endblock main %}

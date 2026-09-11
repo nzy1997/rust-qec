@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -55,10 +57,15 @@ jobs:
       - name: Test interactive shot viewer
         run: npm --prefix web/shot-viewer run test:e2e
 
+      - name: Build registered documentation versions
+        run: |
+          python3 -m unittest tools.test_site_versions
+          python3 tools/site_versions.py build --site-root _site --output _pages
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: _pages
 
   deploy:
     environment:
