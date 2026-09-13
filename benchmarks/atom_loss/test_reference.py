@@ -12,7 +12,7 @@ import numpy as np
 from . import reference
 from .verify import require_complete_sweep, verify
 from .run import ROOT, build_matching, logical_x, score, wilson, measure_python, python_decode
-from . import decoder_reference, chain_reference, correctness, noise_controls
+from . import decoder_reference, chain_reference, correctness, noise_controls, channel_probes
 import itertools
 
 
@@ -35,7 +35,7 @@ class ReferenceTests(unittest.TestCase):
         np.testing.assert_array_equal(rows,np.tile([1,0,1,1,0,0],(16,1)))
 
     def test_unsupported_operations_and_noise_fail(self):
-        for circuit in ['R 0\nS 0\nM 0','R 0\nML(0.1) 0','REPEAT 2 {\nR 0']:
+        for circuit in ['R 0\nT 0\nM 0','R 0\nML(0.1) 0','REPEAT 2 {\nR 0']:
             with self.assertRaises(ValueError): reference.sample(circuit,4)
 
     def test_incomplete_scoring_cannot_report_success(self):
@@ -144,7 +144,7 @@ class ReferenceTests(unittest.TestCase):
                 reseal('tradeoff.json')
                 with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, 'native|Native'):
                     verify(root)
-            for name in ['accuracy-time.svg', 'source-snapshot-timing.json', 'shot-data-v1.zip']:
+            for name in ['accuracy-time.svg', 'source-snapshot-timing.json', 'shot-data-v1.zip', 'timing-sweep.svg', 'sampling-reference-cost.svg', 'provenance-correctness.json']:
                 reset()
                 manifest = json.loads((root/'bundle.json').read_text())
                 del manifest['sha256'][name]
@@ -166,6 +166,22 @@ class ReferenceTests(unittest.TestCase):
             (root/'source-snapshot-timing.json').write_text(json.dumps(snapshot))
             reseal('source-snapshot-timing.json')
             with self.assertRaisesRegex(ValueError, 'Source snapshot mismatch'):
+                verify(root)
+
+    def test_timing_table_corruption_is_rejected_after_resealing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'bundle'
+            shutil.copytree(ROOT/'site/static/data/atom-loss',root)
+            path = root/'timing-sweep.csv'
+            lines = path.read_text().splitlines()
+            cells = lines[1].split(',')
+            cells[5] = str(float(cells[5])/100)
+            lines[1] = ','.join(cells)
+            path.write_text('\n'.join(lines)+'\n')
+            manifest = json.loads((root/'bundle.json').read_text())
+            manifest['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            (root/'bundle.json').write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, 'Timing sweep CSV'):
                 verify(root)
 
     def test_archive_rejects_resealed_wrong_predictions_and_missing_rows(self):
@@ -190,6 +206,35 @@ class ReferenceTests(unittest.TestCase):
                     for name, data in payload.items(): archive.writestr(name, data)
                 with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, 'rescore mismatch|Incomplete'):
                     rescore(target)
+
+    def test_bell_readout_resolves_every_two_qubit_pauli(self):
+        # Hand-derived Bell syndromes, phase bit then bit-flip bit, per wire.
+        syndromes = {'I':[0,0], 'X':[0,1], 'Y':[1,1], 'Z':[1,0]}
+        with tempfile.TemporaryDirectory() as tmp:
+            for first, second in itertools.product('IXYZ', repeat=2):
+                text = channel_probes.bell_text(f'{first} 0\n{second} 1'.replace('I 0\n','').replace('I 1',''), 2)
+                expected = np.tile(syndromes[first]+syndromes[second], (16,1))
+                with self.subTest(pauli=first+second):
+                    np.testing.assert_array_equal(reference.sample(text,16), expected)
+                    np.testing.assert_array_equal(correctness.rust_rows(ROOT/'target/release/rustqec', text,16,7,Path(tmp)), expected)
+
+    def test_ix_only_channel_fails_overall_sampling_report(self):
+        original = correctness.rust_rows
+        def defective(binary,text,shots,seed,work):
+            return original(binary, channel_probes.replace_channel(text,'DEPOLARIZE2_ix_only'), shots,seed,work)
+        with patch('benchmarks.atom_loss.correctness.rust_rows', side_effect=defective):
+            report = correctness.run(ROOT/'target/release/rustqec')
+        self.assertEqual(report['status'], 'FAIL')
+        probes = report['analytic_noise_controls']['distribution_probes']
+        self.assertEqual(probes['status'], 'FAIL')
+        product = next(c for c in probes['cases'] if c['case']=='DEPOLARIZE2_product_ZZ')
+        self.assertEqual(product['status'], 'FAIL')
+        self.assertEqual(product['rust']['marginals'][0], 0.)
+        self.assertAlmostEqual(product['expected_marginals'][0],8*.17/15)
+        # The old single parity signature agreed; the first marginal exposes it.
+        bell = next(c for c in probes['cases'] if c['case']=='DEPOLARIZE2_bell_p0.6')
+        self.assertEqual(bell['status'], 'FAIL')
+        self.assertEqual(len(bell['expected_joint']),16)
 
     def test_deleted_two_qubit_channel_fails_same_acceptance(self):
         original=correctness.rust_rows

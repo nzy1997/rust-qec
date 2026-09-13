@@ -13,6 +13,23 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain('<svg');
   }
+  const mainSampling = await (await page.request.get('/data/atom-loss/sampling-throughput.svg')).text();
+  expect(mainSampling).toContain('RustQEC loss-visible sampling');
+  expect(mainSampling).not.toContain('Stim');
+  await page.locator('.loss-reference-cost summary').click();
+  const reference = page.locator('.loss-reference-figure img');
+  await reference.scrollIntoViewIfNeeded();
+  await expect.poll(() => reference.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.loss-reference-figure figcaption')).toContainText('no speedup ratio');
+  const timing = page.locator('.loss-timing-figure img');
+  await timing.scrollIntoViewIfNeeded();
+  await expect.poll(() => timing.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.locator('.loss-timing-figure figcaption')).toContainText('178.66 and 144.01');
+  const timingCsv = await (await page.request.get('/data/atom-loss/timing-sweep.csv')).text();
+  expect(timingCsv.trim().split('\n')).toHaveLength(136);
+  const samplingCheck = await (await page.request.get('/data/atom-loss/correctness.json')).json();
+  expect(samplingCheck.analytic_noise_controls.distribution_probes.cases).toHaveLength(26);
+  expect(samplingCheck.analytic_noise_controls.distribution_probes.channel_replacement_mutations.DEPOLARIZE2_ix_only.rejected).toBe(true);
   await page.locator('.loss-full-sweep summary').click();
   const full = page.locator('.loss-full-figure img');
   await full.scrollIntoViewIfNeeded();

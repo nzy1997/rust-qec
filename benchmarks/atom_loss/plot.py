@@ -8,6 +8,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .verify import require_complete_sweep
+from .artifacts import timing_rows
 
 STYLE = {
     'envelope-matching': ('RustQEC envelope', '#b95428','o','-'),
@@ -36,21 +37,28 @@ def render(out):
     decoding=json.loads((out/'decoding.json').read_text())
     require_complete_sweep(decoding)
     tradeoff=json.loads((out/'tradeoff.json').read_text())
-    fig,ax=plt.subplots(figsize=(8.4,4.4),layout='constrained')
-    for key,label,color,marker in [('rust','RustQEC (loss-visible records)','#b95428','o'),
-                                    ('reference','Stim reference + Python loss lowering','#386b80','s')]:
+    # Absolute Rust throughput is the main result. The deliberately unoptimized
+    # reference has a separate cost figure, without a backend speedup ratio.
+    for key, name in [('rust','sampling-throughput'), ('reference','sampling-reference-cost')]:
+        fig,ax=plt.subplots(figsize=(8.4,4.4),layout='constrained')
         x,y,lower,upper=[],[],[],[]
         for case in sampling:
-            rates=np.array([case['shots']/(r['sample_seconds']+r['packing_seconds']) for r in case[key]['records']])
-            median=np.median(rates)
-            x.append(case['distance']);y.append(median);lower.append(median-rates.min());upper.append(rates.max()-median)
-        ax.errorbar(x,y,yerr=[lower,upper],label=label,color=color,marker=marker,capsize=4,lw=1.8)
-    ax.set(yscale='log',xlabel='Code distance d (rounds = d)',ylabel='Samples / second',xticks=[3,5,7],
-           title='Loss-visible sampling and b8 packing')
-    ax.grid(axis='y',which='major');ax.legend(loc='best',frameon=False,fontsize=10)
-    fig.get_layout_engine().set(rect=(0,0.13,1,1))
-    fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 · median and range of 3 runs\nUnoptimized Stim-based correctness reference; NOT native Stim performance.",ha='center',fontsize=9,color='#605b56')
-    emit(fig,out,'sampling-throughput')
+            durations=np.array([r['sample_seconds']+r['packing_seconds'] for r in case[key]['records']])
+            values=case['shots']/durations if key=='rust' else durations*1000
+            median=np.median(values)
+            x.append(case['distance']);y.append(median);lower.append(median-values.min());upper.append(values.max()-median)
+        color='#b95428' if key=='rust' else '#386b80'
+        ax.errorbar(x,y,yerr=[lower,upper],color=color,marker='o',capsize=4,lw=1.8)
+        ax.set(yscale='log',xlabel='Code distance d (rounds = d)',
+               ylabel='Samples / second' if key=='rust' else 'Reference cost (ms / batch)',xticks=[3,5,7],
+               title='RustQEC loss-visible sampling and b8 packing' if key=='rust' else 'Unoptimized correctness-reference cost')
+        ax.grid(axis='y',which='major')
+        fig.get_layout_engine().set(rect=(0,0.15,1,1))
+        boundary=('Rust parsing excluded; sampler preparation and b8 packing included.' if key=='rust' else
+                  'Includes Python parsing, history lowering, Stim compilation and b8 packing.\nNOT native Stim performance; no competitive backend speed comparison.')
+        fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 · median and range of 3 runs\n{boundary}",
+                 ha='center',fontsize=9,color='#605b56')
+        emit(fig,out,name)
     displayed_cases=[c for c in decoding if c['distance'] in (3,5)]
     fig,axes=plt.subplots(1,2,figsize=(11.2,4.7),sharey=True,layout='constrained')
     for ax,distance in zip(axes,[3,5]):
@@ -120,6 +128,38 @@ def render(out):
     fig.text(.5,.015,'All 15 settings · 5,000 shared shots / point · nonzero: 95% Wilson intervals\nDown arrows: zero failures, one-sided exact 95% upper limit (not an estimated failure rate). Coincident limits overlap.',
              ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'logical-error-rate-full')
+    fig,axes=plt.subplots(1,3,figsize=(12.4,4.8),layout='constrained')
+    for ax,distance in zip(axes,[3,5,7]):
+        cases=sorted([c for c in decoding if c['distance']==distance],key=lambda c:c['loss_probability'])
+        for name in ['envelope-matching','pymatching-envelope','pymatching-fixed']:
+            label,color,marker,line=STYLE[name]
+            xs,ys,lower,upper=[],[],[],[]
+            for case in cases:
+                result=case['decoders'][name]
+                times=np.array(result['total_seconds'])/result['shots']*1e6
+                median=np.median(times)
+                xs.append(case['loss_probability']);ys.append(median)
+                lower.append(median-times.min());upper.append(times.max()-median)
+            ax.errorbar(xs,ys,yerr=[lower,upper],label=label,color=color,marker=marker,ls=line,capsize=3,markersize=4)
+        ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',
+               xlabel='Loss probability per opportunity',ylabel='Workflow time (µs / shot)',xlim=(.00008,.0125))
+        ax.set_xticks([.0001,.0003,.001,.003,.01],labels=['$10^{-4}$','$3\\cdot10^{-4}$','$10^{-3}$','$3\\cdot10^{-3}$','$10^{-2}$'])
+        ax.tick_params(axis='x',labelsize=8)
+        ax.grid(axis='y')
+    handles,labels=axes[0].get_legend_handles_labels()
+    fig.legend(handles,labels,loc='upper center',ncol=3,frameon=False,fontsize=9)
+    fig.get_layout_engine().set(rect=(0,.20,1,.63))
+    fig.text(.5,.01,'All 15 settings · 5,000 shared shots / setting · medians and observed ranges of 3 runs\n'
+             'Panel y-ranges differ. Native streaming cache vs Python offline groups; preparation and I/O boundaries differ.\n'
+             'Adapter/workflow costs, NOT matching-kernel rankings. Timing repetitions reuse the same shots.',
+             ha='center',fontsize=9,color='#605b56')
+    emit(fig,out,'timing-sweep')
+    with (out/'timing-sweep.csv').open('w') as f:
+        writer=csv.DictWriter(f,lineterminator='\n',fieldnames=[
+            'distance','rounds','loss_probability','decoder','repetition','microseconds_per_shot',
+            'input_loss_patterns','graph_builds','cache_hits','policy'])
+        writer.writeheader()
+        writer.writerows(timing_rows(decoding))
     fig,ax=plt.subplots(figsize=(8.4,4.8),layout='constrained')
     failed=[]
     for i,(name,result) in enumerate(tradeoff['decoders'].items()):

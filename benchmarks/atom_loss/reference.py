@@ -101,7 +101,7 @@ def lower(ops, events, *, skip_lost_gates=True):
                 if not skip_lost_gates or not lost.intersection(pair):
                     emit('CX' if name in {'CNOT', 'ZCX'} else name, pair, args)
             continue
-        if name in {'H', 'X', 'Y', 'Z', 'X_ERROR', 'Y_ERROR', 'Z_ERROR', 'DEPOLARIZE1'}:
+        if name in {'H', 'S', 'S_DAG', 'X', 'Y', 'Z', 'X_ERROR', 'Y_ERROR', 'Z_ERROR', 'DEPOLARIZE1'}:
             for target in targets:
                 q = int(target)
                 if q not in lost:
