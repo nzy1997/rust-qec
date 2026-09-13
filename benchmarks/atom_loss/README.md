@@ -101,7 +101,7 @@ have hand-computed deterministic answers. A conservative Hoeffding union bound
 covers all histogram bins at alpha <= 5e-7. Another 5e-7 is allocated to
 the analytic channel checks below: 4e-7 for the original 16 events and 1e-7 for
 all joint bins and marginals of the 26 distribution probes (combined healthy-check
-bound <= 1e-6). Removing skipped-gate
+bound <= 1e-6 before the low-probability checks below). Removing skipped-gate
 semantics must fail a known answer; an unsupported operation must be rejected.
 These statistical checks cannot prove equality or validate arbitrarily rare
 fault probabilities.
@@ -136,6 +136,43 @@ X-only or Z-only single-qubit depolarization. An IX-only regression requires
 the **overall** sampling report to fail using the same acceptance criteria.
 This is finite statistical evidence for the specified stochastic Pauli channels,
 not a proof for arbitrary noise channels or arbitrarily small probability biases.
+
+`low_probability.py` adds fifteen **unamplified** probes: each of the five Pauli
+channels at p = 0.001 and LOSS at 0.0001, 0.0003, 0.001, 0.003 and 0.01.
+The five half-rate primitive LOSS probabilities used at two-qubit operations
+are included too, down to 0.00005. Each uses at least 262,144 shots per
+implementation (520,000 at p = 0.00005). Exact equal-tail binomial count
+intervals cover joint bins, individual marginals and nonidentity events, with
+Bonferroni allocation over both implementations (family alpha <= 1e-7).
+This avoids applying a high-probability absolute tolerance to rare events.
+The smallest LOSS probability has about 26 expected events; zero events are
+outside its acceptance interval. These probes resolve channel deletion, not
+arbitrarily small relative biases or every possible low-rate Pauli component.
+
+The same module independently checks the actual d=3, rounds=2 Mid-SWAP fixture
+(pPauli=0.001, pLoss=0.003) through `dataset export --mode measurements_blinded`,
+using 65,536 shots per implementation. It prepares the two logical inputs in
+Stim using the native export's private input masks; it never reads private
+answers or uses the envelope compiler. Within each input stratum, 50 measurement
+bits (including loss flags), 16 detector parities, the observable and 15 adjacent
+detector joints are compared. Another 16 detector marginals conditioned on no
+visible loss separate the Pauli signal from loss-induced syndromes. The 196
+preselected two-sample Fisher tests use Bonferroni alpha <= 1e-7. This is a
+finite set of marginal/joint checks, not the full 50-bit joint distribution.
+
+Three actual input mutations delete only low-rate Pauli noise, only low-rate
+LOSS, or both (`0 < p < 0.01`). Every affected analytic probe must reject its
+mutation; the real export-path comparison must independently reject all three.
+The real fixture loses 12, 19 or 31 instructions respectively. A separate
+regression corrupts only the exporter, leaving ordinary circuit sampling intact.
+The combined healthy sampling-check familywise bound is <= 1.2e-6. These larger
+correctness samples are separate from the 5,000-shot accuracy benchmark and do
+not increase its statistical sample size.
+
+`summary.csv` is regenerated from raw counts and phase times: every field,
+all 50 rows and the exact header are checked, including rate, Wilson interval
+and median workflow time. Missing, duplicate or extra rows and resealed changes
+to any field must fail. Wilson intervals in the source JSON are also recomputed.
 
 The updated correctness report is linked to `provenance-correctness.json` and
 `source-snapshot-correctness.json`. Sampling and decoder timing records, their

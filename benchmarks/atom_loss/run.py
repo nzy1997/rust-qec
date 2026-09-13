@@ -14,7 +14,7 @@ import time
 import numpy as np
 import pymatching
 from scipy.sparse import csc_matrix
-from .artifacts import native_total
+from .artifacts import native_total, wilson
 from . import correctness, reference
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -58,14 +58,6 @@ def logical_x(text, distance):
     if len(support) != distance:
         raise ValueError('Unexpected initial data layout')
     return ','.join(map(str, support))
-
-
-def wilson(errors, shots):
-    z = 1.959963984540054
-    p = errors / shots
-    center = (p + z*z/(2*shots))/(1+z*z/shots)
-    delta = z*np.sqrt(p*(1-p)/shots+z*z/(4*shots*shots))/(1+z*z/shots)
-    return [max(0., float(center-delta)), min(1., float(center+delta))]
 
 
 def score(predictions, answers):

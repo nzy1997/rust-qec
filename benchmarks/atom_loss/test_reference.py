@@ -1,6 +1,8 @@
 """Semantic controls for the benchmark/reference harness, without timing assertions."""
 import unittest
 import hashlib
+import csv
+import io
 import json
 from pathlib import Path
 import shutil
@@ -12,7 +14,7 @@ import numpy as np
 from . import reference
 from .verify import require_complete_sweep, verify
 from .run import ROOT, build_matching, logical_x, score, wilson, measure_python, python_decode
-from . import decoder_reference, chain_reference, correctness, noise_controls, channel_probes
+from . import decoder_reference, chain_reference, correctness, noise_controls, channel_probes, low_probability
 import itertools
 
 
@@ -183,6 +185,61 @@ class ReferenceTests(unittest.TestCase):
             (root/'bundle.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, 'Timing sweep CSV'):
                 verify(root)
+
+    def test_summary_fields_and_completeness_reject_resealed_corruption(self):
+        source = ROOT/'site/static/data/atom-loss'
+        with (source/'summary.csv').open() as stream:
+            reader = csv.DictReader(stream)
+            fields, original = reader.fieldnames, list(reader)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'bundle'
+            shutil.copytree(source,root)
+            for defect in fields + ['missing','duplicate','extra','header']:
+                rows = [row.copy() for row in original]
+                header = fields[:]
+                if defect == 'missing': rows.pop()
+                elif defect == 'duplicate': rows[1] = rows[0].copy()
+                elif defect == 'extra': rows.append(rows[0].copy())
+                elif defect == 'header': header[0] = 'wrong_experiment'
+                elif defect == 'errors': rows[0][defect] = '4999'
+                elif defect == 'median_microseconds_per_shot': rows[0][defect] = '0.000001'
+                else: rows[0][defect] = 'wrong'
+                stream = io.StringIO()
+                writer = csv.DictWriter(stream,fieldnames=header,extrasaction='ignore')
+                writer.writeheader(); writer.writerows(rows)
+                path = root/'summary.csv'
+                path.write_text(stream.getvalue())
+                manifest = json.loads((root/'bundle.json').read_text())
+                manifest['sha256']['summary.csv'] = hashlib.sha256(path.read_bytes()).hexdigest()
+                (root/'bundle.json').write_text(json.dumps(manifest))
+                with self.subTest(defect=defect), self.assertRaisesRegex(ValueError,'Summary CSV'):
+                    verify(root)
+
+    def test_low_probability_cutoff_fails_overall_sampling_report(self):
+        original = correctness.rust_rows
+        affected = []
+        def defective(binary,text,shots,seed,work):
+            changed,count = low_probability.remove_low_noise(text,'both')
+            affected.append(count)
+            return original(binary,changed,shots,seed,work)
+        with patch('benchmarks.atom_loss.correctness.rust_rows',side_effect=defective):
+            report = correctness.run(ROOT/'target/release/rustqec')
+        self.assertGreater(sum(affected),0)
+        self.assertEqual(report['status'],'FAIL')
+        self.assertEqual(report['low_probability_controls']['analytic']['status'],'FAIL')
+        rejected = {r['case'] for r in report['low_probability_controls']['analytic']['cases'] if r['status']=='FAIL'}
+        self.assertEqual(rejected,{'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2',
+                                  *[f'LOSS_{p}' for p in low_probability.LOSS_RATES if p < .01]})
+
+    def test_export_only_low_pauli_cutoff_is_detected_independently(self):
+        # Ordinary circuit sample can be correct while the benchmark export path
+        # drops noise. Ensure the real-circuit reference catches that alone.
+        def defective(binary,text,shots,seed,work):
+            changed,_ = low_probability.remove_low_noise(text,'pauli')
+            return low_probability.export_rows(binary,changed,shots,seed,work)
+        report = low_probability.real_circuit(ROOT/'target/release/rustqec',65536,exporter=defective)
+        self.assertEqual(report['status'],'FAIL')
+        self.assertTrue(any('/no_visible_loss/' in e for e in report['comparison']['failed_events']))
 
     def test_archive_rejects_resealed_wrong_predictions_and_missing_rows(self):
         from .shot_data import rescore, ARCHIVE

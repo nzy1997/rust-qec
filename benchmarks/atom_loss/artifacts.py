@@ -1,6 +1,7 @@
 """Shared publication contract and authoritative native timing boundary."""
 import math
 import json
+import statistics
 
 REQUIRED_FILES = frozenset([
     'chain-correctness.json', 'midswap_d3_r2.stim', 'correctness.json',
@@ -52,3 +53,36 @@ def timing_rows(decoding):
                     'graph_builds':stats['matching_graph_builds'] if native else stats['graph_builds'],
                     'cache_hits':stats['cache_hits'] if native else '',
                     'policy':'FIFO/work-budget streaming' if native else 'offline batch groups'}
+
+
+SUMMARY_FIELDS = ['experiment','distance','rounds','loss_probability','decoder','status',
+                  'shots','errors','logical_error_rate','ci95_low','ci95_high',
+                  'median_microseconds_per_shot']
+
+
+def wilson(errors, shots):
+    z = 1.959963984540054
+    p = errors / shots
+    center = (p + z*z/(2*shots))/(1+z*z/shots)
+    delta = z*math.sqrt(p*(1-p)/shots+z*z/(4*shots*shots))/(1+z*z/shots)
+    return [max(0., center-delta), min(1., center+delta)]
+
+
+def summary_rows(decoding, tradeoff):
+    """Derive downloads from counts and raw phase timings, not cached summaries."""
+    for experiment, cases in [('loss_sweep', decoding), ('accuracy_time', [tradeoff])]:
+        for case in cases:
+            for name, result in case['decoders'].items():
+                row = dict.fromkeys(SUMMARY_FIELDS, '')
+                row.update({k:case[k] for k in ['distance','rounds','loss_probability','shots']})
+                row.update(experiment=experiment, decoder=name, status=result['status'])
+                if result['status'] == 'ok':
+                    shots, errors = result['shots'], result['errors']
+                    if shots != case['shots'] or not 0 <= errors <= shots:
+                        raise ValueError('Invalid summary counts')
+                    lo, hi = wilson(errors, shots)
+                    times = [sum(run[k] for k in ['compile_seconds','transform_seconds','decode_seconds'])
+                             if name.startswith('pymatching') else native_total(run) for run in result['runs']]
+                    row.update(errors=errors, logical_error_rate=errors/shots, ci95_low=lo, ci95_high=hi,
+                               median_microseconds_per_shot=statistics.median(times)/shots*1e6)
+                yield row

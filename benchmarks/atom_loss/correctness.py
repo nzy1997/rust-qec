@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import numpy as np
-from . import reference, noise_controls
+from . import reference, noise_controls, low_probability
 
 CASES = {
     'lost_control_skips_cx': 'R 0 1\nX 0\nLOSS(1) 0\nCX 0 1\nML 0 1',
@@ -71,10 +71,11 @@ def run(binary, shots=32768):
         except ValueError:
             rejected = True
     analytic = noise_controls.run(binary, rust_rows, shots)
-    return {'status': 'PASS' if all(r['status'] == 'PASS' for r in records) and negative and rejected and analytic['status']=='PASS' else 'FAIL',
+    low = low_probability.run(binary, rust_rows, shots)
+    return {'low_probability_controls': low, 'status': 'PASS' if all(r['status'] == 'PASS' for r in records) and negative and rejected and analytic['status']=='PASS' and low['status']=='PASS' else 'FAIL',
             'analytic_noise_controls': analytic,
             'method': 'independent Stim circuit lowering; joint output distributions and hand-computed controls',
-            'familywise_alpha_bound': 1e-6, 'negative_skipped_gate_mutation_rejected': bool(negative),
+            'familywise_alpha_bound': 1.2e-6, 'negative_skipped_gate_mutation_rejected': bool(negative),
             'unsupported_reference_operation_rejected': rejected, 'cases': records}
 
 
