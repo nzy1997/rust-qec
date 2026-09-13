@@ -13,6 +13,8 @@ import sys
 import time
 import numpy as np
 import pymatching
+from scipy.sparse import csc_matrix
+from .artifacts import native_total
 from . import correctness, reference
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -75,24 +77,46 @@ def score(predictions, answers):
             'prediction_sha256': hashlib.sha256(predictions.tobytes()).hexdigest()}
 
 
-def build_matching(graph, losses):
-    active = {i for loss in losses for i in graph['loss_edges'][loss]}
-    scale = max(1., *(edge['weight'] for edge in graph['edges']))
-    matching = pymatching.Matching()
-    for i, edge in enumerate(graph['edges']):
-        weight = (edge['loss_factor']*graph['mean_weight'] if i in active else edge['weight']) / scale
-        kwargs = {'weight': weight, 'fault_ids': set(edge['observables']), 'merge_strategy': 'smallest-weight'}
-        if edge['v'] is None:
-            matching.add_boundary_edge(edge['u'], **kwargs)
-        else:
-            matching.add_edge(edge['u'], edge['v'], **kwargs)
-    return matching
+def prepare_matching(graph):
+    """Build the invariant sparse topology once per measured adapter invocation."""
+    edges = graph['edges']
+    detectors, columns, observables, fault_columns = [], [], [], []
+    for column, edge in enumerate(edges):
+        for detector in (edge['u'], edge['v']):
+            if detector is not None:
+                detectors.append(detector)
+                columns.append(column)
+        for observable in edge['observables']:
+            observables.append(observable)
+            fault_columns.append(column)
+    # Match the edge API's detector extent, so out-of-graph fired bits still fail.
+    count = max(detectors, default=-1) + 1
+    fault_count = graph.get('num_observables', max(observables, default=-1) + 1)
+    checks = csc_matrix((np.ones(len(detectors), dtype=np.uint8), (detectors, columns)),
+                        shape=(count, len(edges)))
+    faults = csc_matrix((np.ones(len(observables), dtype=np.uint8), (observables, fault_columns)),
+                        shape=(fault_count, len(edges)))
+    scale = max(1., max((edge['weight'] for edge in edges), default=0.))
+    base = np.array([edge['weight']/scale for edge in edges])
+    conditioned = np.array([edge['loss_factor']*graph['mean_weight']/scale for edge in edges])
+    return checks, faults, base, conditioned
+
+
+def build_matching(graph, losses, prepared=None):
+    checks, faults, base, conditioned = prepare_matching(graph) if prepared is None else prepared
+    active = list({i for loss in losses for i in graph['loss_edges'][loss]})
+    weights = base.copy()
+    weights[active] = conditioned[active]
+    return pymatching.Matching.from_check_matrix(
+        checks, weights=weights, faults_matrix=faults,
+        merge_strategy='smallest-weight', use_virtual_boundary_node=True)
 
 
 def python_decode_loop(graph, conditioned):
     # Identical shot order and at most 1024 FIFO cached patterns. RustQEC also
     # enforces a work budget; its actual builds/hits are retained for comparison.
     started = time.perf_counter()
+    prepared = prepare_matching(graph)
     syndromes = np.asarray(graph['syndromes'], dtype=np.uint8)
     predictions = np.zeros(len(syndromes), dtype=np.uint8)
     cache, builds, hits = OrderedDict(), 0, 0
@@ -101,7 +125,7 @@ def python_decode_loop(graph, conditioned):
         if key not in cache:
             if len(cache) == 1024:
                 cache.popitem(last=False)
-            cache[key] = build_matching(graph, key)
+            cache[key] = build_matching(graph, key, prepared)
             builds += 1
         else:
             hits += 1
@@ -117,6 +141,8 @@ def python_decode(graph, conditioned, batch=True):
     if not batch:
         return python_decode_loop(graph, conditioned)
     started = time.perf_counter()
+    prepared = prepare_matching(graph)
+    topology_seconds = time.perf_counter()-started
     syndromes = np.asarray(graph['syndromes'], dtype=np.uint8)
     if len(syndromes) != len(graph['losses']):
         raise ValueError('Incomplete loss rows')
@@ -124,11 +150,11 @@ def python_decode(graph, conditioned, batch=True):
     groups = {}
     for row, losses in enumerate(graph['losses']):
         groups.setdefault(tuple(losses) if conditioned else (), []).append(row)
-    preprocessing = time.perf_counter()-started
+    preprocessing = time.perf_counter()-started-topology_seconds
     graph_seconds = matching_seconds = output_seconds = 0.
     for losses, indices in groups.items():
         stage = time.perf_counter()
-        matching = build_matching(graph, losses)
+        matching = build_matching(graph, losses, prepared)
         graph_seconds += time.perf_counter()-stage
         stage = time.perf_counter()
         rows = syndromes[indices]
@@ -144,10 +170,11 @@ def python_decode(graph, conditioned, batch=True):
         output_seconds += time.perf_counter()-stage
     elapsed = time.perf_counter()-started
     return predictions, {'decode_seconds': elapsed,
-                         'preprocess_seconds': preprocessing, 'graph_build_seconds': graph_seconds,
+                         'topology_seconds': topology_seconds, 'preprocess_seconds': preprocessing, 'graph_build_seconds': graph_seconds,
                          'matching_seconds': matching_seconds, 'output_seconds': output_seconds,
-                         'adapter_overhead_seconds': elapsed-preprocessing-graph_seconds-matching_seconds-output_seconds,
+                         'adapter_overhead_seconds': elapsed-topology_seconds-preprocessing-graph_seconds-matching_seconds-output_seconds,
                          'graph_builds': len(groups), 'batch_calls': len(groups),
+                         'graph_api': 'from_check_matrix',
                          'execution': 'batch grouped by loss pattern' if conditioned else 'batch fixed graph'}
 
 
@@ -202,48 +229,70 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
     case['graph'] = {k: graph[k] for k in ['source','compile_seconds','transform_seconds','num_observables']}
     case['graph'].update(edges=len(graph['edges']), detectors=public['circuit']['detectors'],
                          loss_patterns=len(set(map(tuple, graph['losses']))))
-    native_predictions = None
-    for decoder in ['envelope-matching'] + (['envelope-mle'] if include_mle else []):
-        timings, final = [], None
-        for rep in range(repeats):
-            predicted, record = native_decode(binary, work, decoder, rep)
-            timings.append(record)
-            if predicted is None:
-                break
-            if final is not None and not np.array_equal(predicted, final):
-                raise ValueError('Native predictions changed between timing repetitions')
-            final = predicted
-        entry = {'status': 'ok' if all(t['status'] == 'ok' for t in timings) else 'failed', 'runs': timings}
-        if entry['status'] == 'ok':
-            entry.update(score(final, answers))
-            entry['total_seconds'] = [r['stats']['compile_seconds']+r['stats']['decode_seconds'] for r in timings]
-            if decoder == 'envelope-matching':
-                native_predictions = final
-        case['decoders'][decoder] = entry
-    for name, conditioned in [('pymatching-fixed', False), ('pymatching-envelope', True)]:
-        case['decoders'][name] = measure_python(lambda rep: export_graph(exporter, work, f'{name}-{rep}'),
-                                                   conditioned, answers, repeats, native_predictions)
+    names = ['envelope-matching', 'pymatching-fixed', 'pymatching-envelope']
     if include_mle:
-        case['decoders']['pymatching-fixed-loop'] = measure_python(
-            lambda rep: export_graph(exporter, work, f'loop-{rep}'), False, answers, repeats, native_predictions, batch=False)
+        names += ['envelope-mle', 'pymatching-fixed-loop']
+    entries = {name: [] for name in names}
+    case['timing_order'] = []
+    for rep in range(repeats):
+        order = names[rep % len(names):] + names[:rep % len(names)]
+        case['timing_order'].append(order)
+        for name in order:
+            if name.startswith('pymatching'):
+                entry = measure_python(
+                    lambda _: export_graph(exporter, work, f'{name}-{rep}'),
+                    name == 'pymatching-envelope', answers, 1,
+                    batch=not name.endswith('-loop'), repetition_offset=rep,
+                    prediction_path=work/f'{name}-{rep}.b8')
+            else:
+                predicted, record = native_decode(binary, work, name, rep)
+                entry = {'status': record['status'], 'runs': [record]}
+                if predicted is not None:
+                    entry.update(score(predicted, answers))
+                    entry['total_seconds'] = [native_total(record)]
+            entries[name].append(entry)
+    for name, repetitions in entries.items():
+        runs = [run for entry in repetitions for run in entry['runs']]
+        if any(entry['status'] != 'ok' for entry in repetitions):
+            case['decoders'][name] = {'status': 'failed', 'runs': runs,
+                                     'error': 'Incomplete repetition; no prefix accuracy'}
+            continue
+        if len({entry['prediction_sha256'] for entry in repetitions}) != 1:
+            raise ValueError(f'{name} predictions changed between timing repetitions')
+        case['decoders'][name] = {**repetitions[0], 'runs': runs,
+            'total_seconds': [entry['total_seconds'][0] for entry in repetitions]}
+    native = case['decoders']['envelope-matching']
+    if native['status'] == 'ok':
+        native_predictions = np.frombuffer((work/'envelope-matching-0.b8').read_bytes(), dtype=np.uint8)
+        for name, entry in case['decoders'].items():
+            if not name.startswith('pymatching') or entry['status'] != 'ok':
+                continue
+            predicted = np.frombuffer((work/f'{name}-0.b8').read_bytes(), dtype=np.uint8)
+            native_wrong, py_wrong = native_predictions != answers, predicted != answers
+            entry.update(disagreements_with_native=int(np.count_nonzero(predicted != native_predictions)),
+                         paired_native_only_wrong=int(np.count_nonzero(native_wrong & ~py_wrong)),
+                         paired_python_only_wrong=int(np.count_nonzero(~native_wrong & py_wrong)))
+    if include_mle:
         batch_result, loop_result = [case['decoders'][key] for key in ['pymatching-fixed','pymatching-fixed-loop']]
         if batch_result['status'] == loop_result['status'] == 'ok':
             assert batch_result['prediction_sha256'] == loop_result['prediction_sha256']
     return case
 
 
-def measure_python(graph_factory, conditioned, answers, repeats, native_predictions=None, batch=True):
+def measure_python(graph_factory, conditioned, answers, repeats, native_predictions=None, batch=True, repetition_offset=0, prediction_path=None):
     timings, final = [], None
     try:
         for rep in range(repeats):
             graph = graph_factory(rep)
             predicted, timing = python_decode(graph, conditioned, batch=batch)
             timing.update(compile_seconds=graph['compile_seconds'], transform_seconds=graph['transform_seconds'],
-                          export_repetition=rep)
+                          export_repetition=rep+repetition_offset)
             if final is not None and not np.array_equal(predicted, final):
                 raise ValueError('PyMatching predictions changed between repetitions')
             final = predicted
             timings.append(timing)
+        if prediction_path is not None:
+            prediction_path.write_bytes(final.tobytes())
         entry = {'status':'ok', 'runs':timings, **score(final, answers)}
         entry['total_seconds'] = [r['compile_seconds']+r['transform_seconds']+r['decode_seconds'] for r in timings]
         if native_predictions is not None:
@@ -307,7 +356,7 @@ def main():
                   'source_commit':subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
                   'working_tree_dirty': bool(subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], text=True).strip()),
                   'os':platform.platform(),'cpu':cpu_model(),
-                  'python':sys.version,'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','matplotlib']},
+                  'python':sys.version,'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','scipy','matplotlib']},
                   'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),
                   'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,sampler,exporter.parent/'export_decoder_oracle']},
                   'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},

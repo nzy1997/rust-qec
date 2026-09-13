@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from .artifacts import required_files, TIMING_FILES, native_total
 
 
 def require_complete_sweep(cases):
@@ -20,10 +21,26 @@ def require_complete_sweep(cases):
 
 def verify(root):
     manifest=json.loads((root/'bundle.json').read_text())
+    listed = set(manifest['sha256'])
+    required = required_files(root)
+    if listed & TIMING_FILES:
+        required = required | TIMING_FILES
+    missing = required - listed
+    if missing:
+        raise ValueError(f'Missing required artifact checksums: {sorted(missing)}')
     for name,expected in manifest['sha256'].items():
         path=root/name
         if path.parent != root or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
             raise ValueError(f'Artifact integrity mismatch: {name}')
+    for provenance, snapshot in [('provenance-all.json', 'source-snapshot.json')] + (
+            [('provenance-timing.json', 'source-snapshot-timing.json')] if listed & TIMING_FILES else []):
+        record = json.loads((root/provenance).read_text())
+        source = json.loads((root/snapshot).read_text())
+        if source['base_commit'] != record['source_commit']:
+            raise ValueError('Source snapshot base differs from provenance')
+        for name, expected in record['sources'].items():
+            if name not in source['files'] or hashlib.sha256(source['files'][name].encode()).hexdigest() != expected:
+                raise ValueError(f'Source snapshot mismatch: {name}')
     for name in ['correctness.json','decoder-correctness.json','chain-correctness.json']:
         data=json.loads((root/name).read_text())
         if data['status']!='PASS': raise ValueError(f'Correctness failed: {name}')
@@ -78,9 +95,12 @@ def verify(root):
                         assert total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']
                         if not name.endswith('-loop'):
                             assert run['batch_calls']>0
-                            phases=[run[k] for k in ['preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
+                            phases=[run[k] for k in ['topology_seconds','preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
                             assert min(phases)>=0 and math.isclose(sum(phases),run['decode_seconds'],rel_tol=1e-9)
-                    if 'stats' in run:
+                    else:
+                        expected = native_total(run)
+                        if not math.isfinite(total) or not math.isclose(total, expected, rel_tol=1e-12, abs_tol=0.):
+                            raise ValueError(f'Native total differs from compile + decode: {name}')
                         assert run['stats']['attempted_shot_count']==r['shots']
                         assert run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0
                 if 'paired_native_only_wrong' in r:
@@ -89,6 +109,8 @@ def verify(root):
                     assert a+b==r['disagreements_with_native']
             else:
                 assert 'logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r
+    from .shot_data import rescore, ARCHIVE
+    rescore(root/ARCHIVE, root)
     return 'PASS'
 
 

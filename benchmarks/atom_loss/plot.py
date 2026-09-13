@@ -131,20 +131,22 @@ def render(out):
         ax.errorbar(median,p,xerr=[[median-times.min()],[times.max()-median]],yerr=[[p-lo],[hi-p]],
                     color=color,marker=marker,markersize=8,capsize=4,ls='none',label=label)
         timing_label = f'{median:.2f} µs' if median < 10 else f'{median:,.0f} µs'
-        ax.annotate(timing_label, (median,p), xytext=(-8,9) if name=='envelope-mle' else (8,3),
+        offset = (-8,9) if name=='envelope-mle' else ((8,-15) if name=='envelope-matching' else (8,3))
+        ax.annotate(timing_label, (median,p), xytext=offset,
                     textcoords='offset points', ha='right' if name=='envelope-mle' else 'left',
                     fontsize=9, color=color)
     ax.set(xscale='log',xlabel='Amortized workflow time (µs / shot)',ylabel='Logical failure probability / experiment',
            title=f"Accuracy and workflow time on the same {tradeoff['shots']:,} shots",ylim=(0,None))
     ax.grid(axis='y');ax.legend(loc='best',frameon=False,fontsize=10)
     fig.get_layout_engine().set(rect=(0,.17,1,1))
-    fig.text(.5,.035,f"Mid-SWAP d = 3, rounds = 2 · pPauli = 0.001 · pLoss = 0.003\n95% Wilson intervals; timing median and range of 3 cold-cache runs\nIncludes graph construction and data preparation; NOT a matching-kernel comparison.",ha='center',fontsize=9,color='#605b56')
+    fig.text(.5,.035,f"Mid-SWAP d = 3, rounds = 2 · pPauli = 0.001 · pLoss = 0.003\n95% Wilson intervals; timing median and range of 3 cold-cache runs\nBulk graph construction + topology preparation included; NOT a matching-kernel comparison.",ha='center',fontsize=9,color='#605b56')
     if failed: fig.text(.5,.005,'; '.join(failed),ha='center',fontsize=8,color='#9c392a')
     emit(fig,out,'accuracy-time')
     # Means of stage durations add exactly to the mean workflow total. Do not
     # describe native aggregate decode time as an isolated matching kernel.
     stages=[('compile_seconds','Shared compiler','#aaa29a'),
             ('transform_seconds','Public-row transform','#d8cbb8'),
+            ('topology_seconds','Sparse topology / weights','#9d855c'),
             ('preprocess_seconds','Array / group / select','#c89464'),
             ('graph_build_seconds','Python graph construction','#b95428'),
             ('matching_seconds','decode_batch call','#386b80'),
@@ -166,7 +168,7 @@ def render(out):
     ax.grid(axis='x');ax.set_axisbelow(True)
     fig.legend(loc='lower center',bbox_to_anchor=(.5,.10),ncol=3,frameon=False,fontsize=9)
     fig.get_layout_engine().set(rect=(0,.31,1,1))
-    fig.text(.5,.015,'Same 5,000 shots · d = 3, rounds = 2 · additive means of 3 instrumented runs\nPython adapter only; decode_batch includes its API boundary, not an isolated kernel. Startup / JSON / scoring excluded.',ha='center',fontsize=9,color='#605b56')
+    fig.text(.5,.015,'Same 5,000 shots · d = 3, rounds = 2 · additive means of 3 instrumented runs\nfrom_check_matrix + decode_batch; topology rebuilt each run. Startup / JSON / scoring excluded.',ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'adapter-stages')
     with (out/'summary.csv').open('w') as f:
         writer=csv.DictWriter(f,lineterminator='\n',fieldnames=['experiment','distance','rounds','loss_probability','decoder','status','shots','errors','logical_error_rate','ci95_low','ci95_high','median_microseconds_per_shot'])
