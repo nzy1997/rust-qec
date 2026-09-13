@@ -5,25 +5,7 @@ from pathlib import Path
 import numpy as np
 from . import reference, channel_probes
 
-P = .17
-
-
-def cases():
-    # Observed event is a value bit, except DEPOLARIZE2 where it is Z parity.
-    for name, probability, basis in [('X_ERROR',P,''),('Y_ERROR',P,''),
-                                     ('Z_ERROR',P,'H 0\n'),('DEPOLARIZE1',2*P/3,''),
-                                     ('DEPOLARIZE2',8*P/15,'')]:
-        target='0 1' if name=='DEPOLARIZE2' else '0'
-        noise=f'{name}({P}) {target}\n'
-        for state in ['alive','lost','restored']:
-            before='LOSS(1) 0\n' if state!='alive' else ''
-            if state=='restored': before+='R 0\n'
-            text='R 0 1\n'+before+basis+noise+basis+'ML 0 1'
-            # For a lost wire inspect the surviving wire: noise touching loss must skip.
-            columns=[3] if state=='lost' else ([1,3] if name=='DEPOLARIZE2' else [1])
-            yield f'{name}_{state}',text,columns,0. if state=='lost' else probability,name
-    # Nonzero channel before loss must still affect its surviving partner.
-    yield 'DEPOLARIZE2_before_loss','R 0 1\nDEPOLARIZE2(0.17) 0 1\nLOSS(1) 0\nML 0 1',[3],8*P/15,'DEPOLARIZE2'
+from .probe_specs import noise_specs as cases
 
 
 def evaluate(binary, sampler, shots=32768):

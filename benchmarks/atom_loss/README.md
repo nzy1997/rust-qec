@@ -71,8 +71,9 @@ python3 rescore.py rescore shot-data-v1.zip
 ```
 
 Expected: `PASS: 16 corpora; 150 prediction files rescored`. No third-party
-Python packages or native binaries are needed. The checker verifies completeness,
-corpus/prediction hashes, failure rates and paired disagreements. Repository
+Python packages or native binaries are needed. The checker verifies completeness, public/private schema and row formats,
+corpus/prediction hashes, scoring answers derived independently from measurement
+observable parity XOR input mask, failure rates and paired disagreements. Repository
 verification additionally requires the archived results to match the public JSON.
 Checksums detect inconsistency, not authenticity against rewriting all evidence;
 use the Git commit for the versioned source of the bundle.
@@ -152,8 +153,9 @@ arbitrarily small relative biases or every possible low-rate Pauli component.
 The same module independently checks the actual d=3, rounds=2 Mid-SWAP fixture
 (pPauli=0.001, pLoss=0.003) through `dataset export --mode measurements_blinded`,
 using 65,536 shots per implementation. It prepares the two logical inputs in
-Stim using the native export's private input masks; it never reads private
-answers or uses the envelope compiler. Within each input stratum, 50 measurement
+Stim using the native export's private input masks; it does not use the envelope compiler. A separate deterministic check reads
+the private answers and verifies every one against observable parity XOR input
+mask; private answers still never enter either decoder. Within each input stratum, 50 measurement
 bits (including loss flags), 16 detector parities, the observable and 15 adjacent
 detector joints are compared. Another 16 detector marginals conditioned on no
 visible loss separate the Pauli signal from loss-induced syndromes. The 196
@@ -225,6 +227,35 @@ arbitrary compiler inputs correct nor establishes physical logical-class Bayes
 optimality. The feature-gated model exporter reads public inputs only and is
 separate from the timed matching exporter.
 
+## Evidence contract
+
+The verifier treats raw observations as evidence and recomputes derived fields;
+a checksum or stored PASS is not an authority for internal consistency.
+
+| Artifact | Required observations and relationships |
+| --- | --- |
+| Public/private corpus | Version, mode, shot count, row width/stride/bit order, circuit measurement/detector/observable counts, exact byte lengths, zero padding, file hashes and recomputed dataset identity agree. Masks and answers contain exactly one binary value per shot. |
+| Scoring key | Independently parse observable record indices, calculate parity from each public measurement row, and XOR its private input mask. Every resulting bit equals the scoring answer, both during real export checks and standalone archive rescoring. |
+| Small-circuit report | Complete Rust/reference histogram counts cover every shot; recompute joint delta, declared tolerance and deterministic known answers. |
+| Analytic/distribution reports | Complete named cases and both backends; expected probabilities come from hand-derived probe specifications. Marginals, event rates and tolerances agree with observations and verdicts. |
+| Low-probability reports | Both backends have complete joint counts. Marginal/nonidentity counts follow from that joint histogram. Recompute exact binomial intervals from probability and sample size. |
+| Real-circuit report | All 196 preselected events and consistent stratum sizes are present. Recompute Fisher p-values from raw counts, the Bonferroni threshold and the verdict; scoring-key coverage equals the full shot count. |
+| Summary/timing tables | Every field and row matches underlying counts and phase timings; Wilson intervals and totals are recomputed. |
+
+The report verifier uses a separate standard-library implementation of binomial
+quantiles (normalized PMF recurrence) and Fisher tests (hypergeometric sums).
+SciPy produces the original statistics; tests compare the independent formulas.
+Floating-point comparisons allow numerical roundoff, but acceptance is decided
+from recomputed statistics. The standalone download remains Python 3.10+ with
+no external dependencies. Its updated script is included in the shot archive;
+original corpus, predictions and raw benchmark timing JSON remain unchanged.
+
+Regression matrices delete fields and observations, corrupt formats, truncate
+packed data, alter padding, flip one/all answers and masks with coherent file
+checksums, and change derived values/verdicts. Actual exporter answer corruption
+must fail the independent check. These are consistency checks, not authenticity
+against someone deliberately replacing every source and all evidence together.
+
 ## Three experiments
 
 1. **Sampling throughput:** Mid-SWAP d = 3, 5, 7, rounds = d, Pauli probability
@@ -275,8 +306,9 @@ separate from the timed matching exporter.
    These are adapter/workflow timings, not isolated matching-kernel timings or
    online p99 latency. Do not infer a universal backend speed ranking.
 
-“Loss probability” means probability **per generated loss opportunity**; both
-operation loss and pre-measurement loss receive that value. It is not the total
+The horizontal coordinate pLoss is the **configured loss parameter**, passed
+to both operation loss and pre-measurement loss. Single-qubit and measurement
+opportunities use pLoss; each target of a two-qubit operation uses pLoss/2. It is not the total
 probability that a wire is lost during an experiment. The exact generated circuit
 hash, initial logical-X support derived from its coordinates, public-row hash,
 private-answer hash and dataset ID are retained at every decoding point.

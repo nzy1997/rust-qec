@@ -4,7 +4,6 @@ import csv
 import hashlib
 import json
 import math
-import itertools
 from pathlib import Path
 from .artifacts import required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows, summary_rows, SUMMARY_FIELDS, wilson
 
@@ -50,50 +49,10 @@ def verify(root):
         data=json.loads((root/name).read_text())
         if data['status']!='PASS': raise ValueError(f'Correctness failed: {name}')
     sampler=json.loads((root/'correctness.json').read_text())
-    analytic=sampler['analytic_noise_controls']
-    assert analytic['status']=='PASS' and len(analytic['cases'])==16
-    assert all(c['status']=='PASS' for c in analytic['cases'])
-    assert set(analytic['channel_deletion_mutations'])=={'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2'}
-    assert all(c['rejected'] and c['failed_cases'] for c in analytic['channel_deletion_mutations'].values())
-    distribution = analytic['distribution_probes']
-    expected_names = {f'DEPOLARIZE{n}_bell_p{p}' for n in [1,2] for p in [0.,.17,.6,1.]}
-    expected_names |= {'DEPOLARIZE2_product_' + ''.join(b) for b in itertools.product('XYZ', repeat=2)}
-    expected_names |= {f'DEPOLARIZE2_{state}_{q}' for state in ['lost','restored','before_loss'] for q in [0,1]}
-    expected_names |= {f'DEPOLARIZE1_product_{b}' for b in 'XYZ'}
-    if (distribution['status'] != 'PASS' or len(distribution['cases']) != len(expected_names)
-            or {c['case'] for c in distribution['cases']} != expected_names
-            or any(c['status'] != 'PASS' for c in distribution['cases'])):
-        raise ValueError('Incomplete or failed Pauli channel distribution probes')
-    replacements = distribution['channel_replacement_mutations']
-    if (set(replacements) != {'DEPOLARIZE2_ix_only','DEPOLARIZE2_xi_only','DEPOLARIZE2_independent_x',
-                              'DEPOLARIZE1_x_only','DEPOLARIZE1_z_only'}
-            or not all(m['rejected'] and m['failed_cases'] for m in replacements.values())):
-        raise ValueError('Missing or escaped wrong-channel mutation')
-    low = sampler['low_probability_controls']
-    if low['status'] != 'PASS' or low['familywise_alpha_bound'] != 2e-7:
-        raise ValueError('Missing or failed low-probability sampling controls')
-    unit = low['analytic']
-    required_probes = {'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2'} | {
-        f'LOSS_{p}' for p in [.00005,.0001,.00015,.0003,.0005,.001,.0015,.003,.005,.01]}
-    if (unit['status'] != 'PASS' or len(unit['cases']) != 15
-            or {c['case'] for c in unit['cases']} != required_probes
-            or any(c['status']!='PASS' or c['shots_per_sampler']<262144 for c in unit['cases'])):
-        raise ValueError('Incomplete low-probability analytic coverage')
-    for case in unit['cases']:
-        for counts in case['counts'].values():
-            if len(counts)!=len(case['accepted_counts']) or any(not lo<=k<=hi for k,(lo,hi) in zip(counts,case['accepted_counts'])):
-                raise ValueError('Low-probability counts outside acceptance')
-    actual = low['real_circuit']
-    if (actual['status']!='PASS' or actual['shots_per_sampler']<65536 or actual['mode']!='measurements_blinded'
-            or actual['fixture_sha256']!=hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()
-            or actual['comparison']['failed_events'] or len(actual['comparison']['events'])!=196):
-        raise ValueError('Incomplete real-circuit sampling check')
-    if any(e['pvalue']<actual['comparison']['threshold'] for e in actual['comparison']['events']):
-        raise ValueError('Real-circuit distribution rejected')
-    for report in [unit,actual]:
-        mutations = report['low_probability_deletion_mutations']
-        if set(mutations)!={'pauli','loss','both'} or not all(m['rejected'] and m.get('failed_cases',m.get('failed_events')) for m in mutations.values()):
-            raise ValueError('Low-probability mutation escaped')
+    from .report_contract import verify_sampler
+    verify_sampler(sampler)
+    if sampler['low_probability_controls']['real_circuit']['fixture_sha256']!=hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest():
+        raise ValueError('Real-circuit sampling fixture mismatch')
     chain=json.loads((root/'chain-correctness.json').read_text())
     assert (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)
     assert chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4
@@ -110,16 +69,34 @@ def verify(root):
         assert not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']
         assert 0 in c['flipped_prediction_rejected_rows']
     assert 21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']
+    def duration(value, *, positive=False):
+        if type(value) not in [int,float] or not math.isfinite(value) or (value<=0 if positive else value<0):
+            raise ValueError('Invalid finite phase duration')
     sampling=json.loads((root/'sampling.json').read_text())
     assert [c['distance'] for c in sampling]==[3,5,7]
     for c in sampling:
+        if (c['shots']!=256 or c['rounds']!=c['distance'] or c['pauli_probability']!=.001 or c['loss_probability']!=.003
+                or c['rust']['shots']!=c['shots'] or c['rust']['warmups']!=2 or c['reference']['warmups']!=1):
+            raise ValueError('Sampling workload metadata mismatch')
+        duration(c['rust']['parse_seconds'])
         for backend in ['rust','reference']:
             assert len(c[backend]['records'])==3
             for r in c[backend]['records']:
-                assert r['sample_seconds']>0 and r['packing_seconds']>=0 and r['bytes']>0
+                duration(r['sample_seconds'],positive=True);duration(r['packing_seconds'])
+                assert type(r['bytes']) is int and r['bytes']>0
         assert c['rust']['records'][0]['bytes']==c['reference']['records'][0]['bytes']
     decoding=json.loads((root/'decoding.json').read_text())
     require_complete_sweep(decoding)
+    import zipfile
+    from .shot_data import circuit_layout, ARCHIVE
+    with zipfile.ZipFile(root/ARCHIVE) as archive:
+        for case in sampling:
+            d=case['distance'];circuit=archive.read(f'd{d}-p0.003/public/circuit.stim')
+            if hashlib.sha256(circuit).hexdigest()!=case['circuit_sha256']:
+                raise ValueError('Sampling circuit differs from corresponding archived sweep circuit')
+            expected_bytes=((circuit_layout(circuit.decode())[0]+7)//8)*case['shots']
+            if any(r['bytes']!=expected_bytes for backend in ['rust','reference'] for r in case[backend]['records']):
+                raise ValueError('Sampling byte count differs from circuit layout and shots')
     tradeoff=json.loads((root/'tradeoff.json').read_text())
     assert set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop'}
     assert tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']
@@ -128,13 +105,14 @@ def verify(root):
         native=c['decoders']['envelope-matching']
         for name,r in c['decoders'].items():
             if r['status']=='ok':
-                assert r['shots']==c['shots'] and 0<=r['errors']<=r['shots']
+                assert type(r['shots']) is int and type(r['errors']) is int and r['shots']==c['shots'] and 0<=r['errors']<=r['shots']
                 assert r['logical_error_rate']==r['errors']/r['shots']
                 assert r['wilson_95']==wilson(r['errors'],r['shots'])
                 assert r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3
-                assert min(r['total_seconds'])>0
+                for value in r['total_seconds']:duration(value,positive=True)
                 for rep,(run,total) in enumerate(zip(r['runs'],r['total_seconds'])):
                     if name.startswith('pymatching'):
+                        for key in ['compile_seconds','transform_seconds','decode_seconds']:duration(run[key])
                         assert run['export_repetition']==rep
                         assert total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']
                         if not name.endswith('-loop'):

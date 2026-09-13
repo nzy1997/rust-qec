@@ -69,3 +69,13 @@ Pauli-only, loss-only and combined low-probability deletions must fail both
 analytic and real-circuit checks. The screenshot includes this scope, while
 performance figures and benchmark sample sizes remain unchanged. Summary CSV
 regressions cover every field, headers and missing/duplicate/extra rows.
+
+The answer/manifest revision independently derives every scoring key from the
+measurement observable and input mask. The download's standalone checker now
+validates row formats, lengths, padding, metadata and this scoring relation.
+Correctness reports retain histogram counts; a standard-library verifier
+recomputes reported statistics and decisions. The updated figures label pLoss
+as a configuration parameter and document the two-qubit target half rate.
+Validation: 28 benchmark tests, eight site checks, and both Chromium/Firefox
+browser cases passed. Original corpus, predictions and timing records are
+unchanged; only the archive's checker and index were updated.

@@ -56,7 +56,7 @@ def render(out):
         fig.get_layout_engine().set(rect=(0,0.15,1,1))
         boundary=('Rust parsing excluded; sampler preparation and b8 packing included.' if key=='rust' else
                   'Includes Python parsing, history lowering, Stim compilation and b8 packing.\nNOT native Stim performance; no competitive backend speed comparison.')
-        fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 · median and range of 3 runs\n{boundary}",
+        fig.text(.5,.015,f"{sampling[0]['shots']} shots / batch · pPauli = 0.001 · pLoss = 0.003 (two-qubit targets: pLoss/2) · median and range of 3 runs\n{boundary}",
                  ha='center',fontsize=9,color='#605b56')
         emit(fig,out,name)
     displayed_cases=[c for c in decoding if c['distance'] in (3,5)]
@@ -77,7 +77,7 @@ def render(out):
                     ys.append(result['logical_error_rate'])
                     lower.append(ys[-1]-result['wilson_95'][0]);upper.append(result['wilson_95'][1]-ys[-1])
             ax.errorbar(xs,ys,yerr=[lower,upper],label=label,color=color,marker=marker,ls=line,lw=1.5,markersize=4,capsize=2)
-        ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',xlabel='Loss probability per opportunity')
+        ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',xlabel='Configured loss parameter pLoss')
         ax.grid(axis='y')
         visible_x=sorted({c['loss_probability'] for c in cases
                           if any(r['status']=='ok' and r['errors']>0 for r in c['decoders'].values())})
@@ -118,7 +118,7 @@ def render(out):
                     upper=-np.expm1(np.log(.05)/r['shots'])
                     ax.errorbar(x,upper,yerr=upper*.3,uplims=True,color=color,marker=marker,markersize=4)
         ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',
-               xlabel='Loss probability per opportunity',xlim=(.00008,.0125))
+               xlabel='Configured loss parameter pLoss',xlim=(.00008,.0125))
         ax.set_xticks([.0001,.001,.01],labels=['$10^{-4}$','$10^{-3}$','$10^{-2}$'])
         ax.grid(axis='y')
     axes[0].set_ylabel('Logical failure probability / upper limit')
@@ -142,7 +142,7 @@ def render(out):
                 lower.append(median-times.min());upper.append(times.max()-median)
             ax.errorbar(xs,ys,yerr=[lower,upper],label=label,color=color,marker=marker,ls=line,capsize=3,markersize=4)
         ax.set(xscale='log',yscale='log',title=f'd = {distance}, rounds = {distance}',
-               xlabel='Loss probability per opportunity',ylabel='Workflow time (µs / shot)',xlim=(.00008,.0125))
+               xlabel='Configured loss parameter pLoss',ylabel='Workflow time (µs / shot)',xlim=(.00008,.0125))
         ax.set_xticks([.0001,.0003,.001,.003,.01],labels=['$10^{-4}$','$3\\cdot10^{-4}$','$10^{-3}$','$3\\cdot10^{-3}$','$10^{-2}$'])
         ax.tick_params(axis='x',labelsize=8)
         ax.grid(axis='y')

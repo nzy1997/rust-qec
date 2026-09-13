@@ -15,11 +15,11 @@ import tempfile
 import numpy as np
 from scipy.stats import binom, fisher_exact
 from . import reference, channel_probes
+from .shot_data import validate_dataset
 
 ALPHA = 1e-7  # Each of the analytic and real-circuit families.
-CONFIGURED_LOSS_RATES = [.0001, .0003, .001, .003, .01]
-# Mid-SWAP splits a two-qubit operation loss rate between its two targets.
-LOSS_RATES = sorted({p for rate in CONFIGURED_LOSS_RATES for p in [rate, rate/2]})
+from .probe_specs import LOSS_RATES, low_specs as specifications
+
 MUTATIONS = ('pauli', 'loss', 'both')
 FIXTURE = Path(__file__).parent/'fixtures/midswap_d3_r2.stim'
 
@@ -38,22 +38,6 @@ def remove_low_noise(text, kind):
     return '\n'.join(lines), removed
 
 
-def specifications():
-    probes = []
-    for channel in ['X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2']:
-        wires = 2 if channel == 'DEPOLARIZE2' else 1
-        size = 4**wires
-        expected = [0.]*size
-        expected[0] = .999
-        if channel.startswith('DEPOLARIZE'):
-            expected[1:] = [.001/(size-1)]*(size-1)
-        else:
-            expected[{'Z_ERROR':1,'X_ERROR':2,'Y_ERROR':3}[channel]] = .001
-        text = channel_probes.bell_text(f'{channel}(0.001) ' + ' '.join(map(str,range(wires))), wires)
-        probes.append((channel, text, list(range(2*wires)), expected))
-    for p in LOSS_RATES:
-        probes.append((f'LOSS_{p}', f'R 0\nLOSS({p}) 0\nML 0', [0], [1-p,p]))
-    return probes
 
 
 def event_counts(rows, columns):
@@ -164,6 +148,7 @@ def real_circuit(binary, shots, exporter=export_rows):
         work=Path(tmp)
         (work/'healthy').mkdir()
         observed,masks=exporter(binary,text,shots,179,work/'healthy')
+        checked_answers=validate_dataset(lambda name:(work/'healthy'/name).read_bytes())
         independent=np.empty_like(observed)
         marker='TICK[rstim:logical_flip_point]'
         assert text.count(marker)==1
@@ -177,6 +162,7 @@ def real_circuit(binary, shots, exporter=export_rows):
             changed,removed=remove_low_noise(text,kind)
             (work/kind).mkdir()
             bad,bad_masks=exporter(binary,changed,shots,179,work/kind)
+            validate_dataset(lambda name:(work/kind/name).read_bytes())
             # Mask RNG stream is independent of physical sampling.
             if not np.array_equal(masks,bad_masks):
                 raise ValueError('Input mask stream changed across physical-noise mutation')
@@ -185,6 +171,7 @@ def real_circuit(binary, shots, exporter=export_rows):
                                 failed_events=result['failed_events'])
     return dict(status='PASS' if healthy['status']=='PASS' and all(c['rejected'] for c in controls.values()) else 'FAIL',
                 fixture_sha256=hashlib.sha256(text.encode()).hexdigest(),shots_per_sampler=shots,
+                scoring_key_check={'status':'PASS','checked_shots':len(checked_answers)},
                 familywise_alpha_bound=ALPHA,mode='measurements_blinded',pauli_probability=.001,loss_probability=.003,
                 method='Independent Stim lowering, logical-input strata, exact Fisher tests with Bonferroni correction',
                 comparison=healthy,low_probability_deletion_mutations=controls)

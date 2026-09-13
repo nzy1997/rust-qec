@@ -15,57 +15,7 @@ from . import reference
 ALPHA = 1e-7
 
 
-def bell_text(noise, wires):
-    data = list(range(wires))
-    pairs = ' '.join(f'{q} {q+wires}' for q in data)
-    return '\n'.join(['R ' + ' '.join(map(str, range(2*wires))),
-                      'H ' + ' '.join(map(str, data)), 'CX ' + pairs, noise,
-                      'CX ' + pairs, 'H ' + ' '.join(map(str, data)),
-                      'M ' + pairs])
-
-
-def basis_ops(bases, inverse=False):
-    lines = []
-    for q, basis in enumerate(bases):
-        if basis == 'X': lines.append(f'H {q}')
-        elif basis == 'Y':
-            lines.extend([f'S_DAG {q}', f'H {q}'] if inverse else [f'H {q}', f'S {q}'])
-    return '\n'.join(lines)
-
-
-def specifications():
-    probes = []
-    def add(name, text, columns, expected, channel):
-        probes.append(dict(name=name, text=text, columns=columns, expected=expected, channel=channel))
-    for wires in [1, 2]:
-        channel = f'DEPOLARIZE{wires}'
-        for p in [0., .17, .6, 1.]:
-            noise = f'{channel}({p}) ' + ' '.join(map(str, range(wires)))
-            size = 4**wires
-            add(f'{channel}_bell_p{p}', bell_text(noise, wires), list(range(2*wires)),
-                [1-p] + [p/(size-1)]*(size-1), channel)
-    p = .17
-    for bases in itertools.product('XYZ', repeat=2):
-        text = '\n'.join(['R 0 1', basis_ops(bases), f'DEPOLARIZE2({p}) 0 1',
-                          basis_ops(bases, inverse=True), 'M 0 1'])
-        add('DEPOLARIZE2_product_' + ''.join(bases), text, [0,1],
-            [1-4*p/5] + [4*p/15]*3, 'DEPOLARIZE2')
-    # Both loss directions, restoration, and noise before loss. Only surviving
-    # bits are scored after loss; placeholders are not physical outcomes.
-    for q in [0, 1]:
-        for state in ['lost', 'restored', 'before_loss']:
-            noise = f'DEPOLARIZE2({p}) 0 1'
-            loss = f'LOSS(1) {q}'
-            body = [noise, loss] if state == 'before_loss' else [loss] + ([f'R {q}'] if state == 'restored' else []) + [noise]
-            columns = [0,1] if state == 'restored' else [1-q]
-            expected = [1-4*p/5] + [4*p/15]*3 if state == 'restored' else (
-                [1.,0.] if state == 'lost' else [1-8*p/15,8*p/15])
-            add(f'DEPOLARIZE2_{state}_{q}', '\n'.join(['R 0 1', *body, 'M 0 1']), columns, expected, 'DEPOLARIZE2')
-    for basis in 'XYZ':
-        text = '\n'.join(['R 0', basis_ops(basis), f'DEPOLARIZE1({p}) 0',
-                          basis_ops(basis, inverse=True), 'M 0'])
-        add(f'DEPOLARIZE1_product_{basis}', text, [0], [1-2*p/3,2*p/3], 'DEPOLARIZE1')
-    return probes
+from .probe_specs import bell_text, basis_ops, distribution_specs as specifications
 
 
 def observed_probabilities(rows, columns):
