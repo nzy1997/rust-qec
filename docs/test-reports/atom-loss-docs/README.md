@@ -62,3 +62,10 @@ separate supplement. All 15 timing settings appear in a new workflow figure,
 with 135 timing/cache records downloadable as CSV. Browser tests exercise both
 new figures and the distribution-probe report. Timing records and the shot
 archive are unchanged.
+
+The low-probability revision adds 15 primitive-rate controls (including two-qubit
+half rates down to 0.00005) and a separate 65,536-shot blinded-export comparison.
+Pauli-only, loss-only and combined low-probability deletions must fail both
+analytic and real-circuit checks. The screenshot includes this scope, while
+performance figures and benchmark sample sizes remain unchanged. Summary CSV
+regressions cover every field, headers and missing/duplicate/extra rows.

@@ -1,4 +1,2825 @@
 {
+  "low_probability_controls": {
+    "status": "PASS",
+    "analytic": {
+      "status": "PASS",
+      "familywise_alpha_bound": 1e-07,
+      "method": "Exact binomial equal-tail count intervals; joint bins, marginals, nonidentity",
+      "cases": [
+        {
+          "case": "X_ERROR",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            0.0,
+            0.001,
+            0.0,
+            0.0,
+            0.001,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261863,
+              0,
+              281,
+              0,
+              0,
+              281,
+              281
+            ],
+            "reference": [
+              261880,
+              0,
+              264,
+              0,
+              0,
+              264,
+              264
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "Y_ERROR",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            0.0,
+            0.0,
+            0.001,
+            0.001,
+            0.001,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261863,
+              0,
+              0,
+              281,
+              281,
+              281,
+              281
+            ],
+            "reference": [
+              261880,
+              0,
+              0,
+              264,
+              264,
+              264,
+              264
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "Z_ERROR",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            0.001,
+            0.0,
+            0.0,
+            0.001,
+            0.0,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261863,
+              281,
+              0,
+              0,
+              281,
+              0,
+              281
+            ],
+            "reference": [
+              261880,
+              264,
+              0,
+              0,
+              264,
+              0,
+              264
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "DEPOLARIZE1",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            0.0003333333333333333,
+            0.0003333333333333333,
+            0.0003333333333333333,
+            0.0006666666666666666,
+            0.0006666666666666666,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              36,
+              151
+            ],
+            [
+              36,
+              151
+            ],
+            [
+              36,
+              151
+            ],
+            [
+              99,
+              263
+            ],
+            [
+              99,
+              263
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261885,
+              90,
+              92,
+              77,
+              167,
+              169,
+              259
+            ],
+            "reference": [
+              261880,
+              86,
+              85,
+              93,
+              179,
+              178,
+              264
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "DEPOLARIZE2",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            6.666666666666667e-05,
+            0.0005333333333333334,
+            0.0005333333333333334,
+            0.0005333333333333334,
+            0.0005333333333333334,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              0,
+              49
+            ],
+            [
+              73,
+              219
+            ],
+            [
+              73,
+              219
+            ],
+            [
+              73,
+              219
+            ],
+            [
+              73,
+              219
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261890,
+              6,
+              21,
+              16,
+              16,
+              18,
+              13,
+              16,
+              20,
+              18,
+              17,
+              22,
+              18,
+              18,
+              16,
+              19,
+              133,
+              140,
+              134,
+              148,
+              254
+            ],
+            "reference": [
+              261880,
+              17,
+              21,
+              17,
+              12,
+              16,
+              16,
+              19,
+              17,
+              32,
+              15,
+              11,
+              15,
+              17,
+              19,
+              20,
+              149,
+              138,
+              134,
+              146,
+              264
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_5e-05",
+          "primitive_probability": 5e-05,
+          "shots_per_sampler": 520000,
+          "expected_probabilities": [
+            0.99995,
+            5e-05,
+            5e-05,
+            4.999999999999449e-05
+          ],
+          "accepted_counts": [
+            [
+              519937,
+              519998
+            ],
+            [
+              2,
+              63
+            ],
+            [
+              2,
+              63
+            ],
+            [
+              2,
+              63
+            ]
+          ],
+          "counts": {
+            "rust": [
+              519968,
+              32,
+              32,
+              32
+            ],
+            "reference": [
+              519981,
+              19,
+              19,
+              19
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.0001",
+          "primitive_probability": 0.0001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.9999,
+            0.0001,
+            0.0001,
+            9.999999999998899e-05
+          ],
+          "accepted_counts": [
+            [
+              262080,
+              262142
+            ],
+            [
+              2,
+              64
+            ],
+            [
+              2,
+              64
+            ],
+            [
+              2,
+              64
+            ]
+          ],
+          "counts": {
+            "rust": [
+              262109,
+              35,
+              35,
+              35
+            ],
+            "reference": [
+              262124,
+              20,
+              20,
+              20
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.00015",
+          "primitive_probability": 0.00015,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.99985,
+            0.00015,
+            0.00015,
+            0.00014999999999998348
+          ],
+          "accepted_counts": [
+            [
+              262060,
+              262137
+            ],
+            [
+              7,
+              84
+            ],
+            [
+              7,
+              84
+            ],
+            [
+              7,
+              84
+            ]
+          ],
+          "counts": {
+            "rust": [
+              262099,
+              45,
+              45,
+              45
+            ],
+            "reference": [
+              262115,
+              29,
+              29,
+              29
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.0003",
+          "primitive_probability": 0.0003,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.9997,
+            0.0003,
+            0.0003,
+            0.00029999999999996696
+          ],
+          "accepted_counts": [
+            [
+              262004,
+              262114
+            ],
+            [
+              30,
+              140
+            ],
+            [
+              30,
+              140
+            ],
+            [
+              30,
+              140
+            ]
+          ],
+          "counts": {
+            "rust": [
+              262049,
+              95,
+              95,
+              95
+            ],
+            "reference": [
+              262082,
+              62,
+              62,
+              62
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.0005",
+          "primitive_probability": 0.0005,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.9995,
+            0.0005,
+            0.0005,
+            0.0004999999999999449
+          ],
+          "accepted_counts": [
+            [
+              261936,
+              262077
+            ],
+            [
+              67,
+              208
+            ],
+            [
+              67,
+              208
+            ],
+            [
+              67,
+              208
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261996,
+              148,
+              148,
+              148
+            ],
+            "reference": [
+              262041,
+              103,
+              103,
+              103
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.001",
+          "primitive_probability": 0.001,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.999,
+            0.001,
+            0.001,
+            0.0010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              261775,
+              261976
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ],
+            [
+              168,
+              369
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261852,
+              292,
+              292,
+              292
+            ],
+            "reference": [
+              261910,
+              234,
+              234,
+              234
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.0015",
+          "primitive_probability": 0.0015,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.9985,
+            0.0015,
+            0.0015,
+            0.0014999999999999458
+          ],
+          "accepted_counts": [
+            [
+              261622,
+              261867
+            ],
+            [
+              277,
+              522
+            ],
+            [
+              277,
+              522
+            ],
+            [
+              277,
+              522
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261720,
+              424,
+              424,
+              424
+            ],
+            "reference": [
+              261782,
+              362,
+              362,
+              362
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.003",
+          "primitive_probability": 0.003,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.997,
+            0.003,
+            0.003,
+            0.0030000000000000027
+          ],
+          "accepted_counts": [
+            [
+              261178,
+              261525
+            ],
+            [
+              619,
+              966
+            ],
+            [
+              619,
+              966
+            ],
+            [
+              619,
+              966
+            ]
+          ],
+          "counts": {
+            "rust": [
+              261350,
+              794,
+              794,
+              794
+            ],
+            "reference": [
+              261392,
+              752,
+              752,
+              752
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.005",
+          "primitive_probability": 0.005,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.995,
+            0.005,
+            0.005,
+            0.0050000000000000044
+          ],
+          "accepted_counts": [
+            [
+              260603,
+              261051
+            ],
+            [
+              1093,
+              1541
+            ],
+            [
+              1093,
+              1541
+            ],
+            [
+              1093,
+              1541
+            ]
+          ],
+          "counts": {
+            "rust": [
+              260860,
+              1284,
+              1284,
+              1284
+            ],
+            "reference": [
+              260893,
+              1251,
+              1251,
+              1251
+            ]
+          },
+          "status": "PASS"
+        },
+        {
+          "case": "LOSS_0.01",
+          "primitive_probability": 0.01,
+          "shots_per_sampler": 262144,
+          "expected_probabilities": [
+            0.99,
+            0.01,
+            0.01,
+            0.010000000000000009
+          ],
+          "accepted_counts": [
+            [
+              259201,
+              259832
+            ],
+            [
+              2312,
+              2943
+            ],
+            [
+              2312,
+              2943
+            ],
+            [
+              2312,
+              2943
+            ]
+          ],
+          "counts": {
+            "rust": [
+              259596,
+              2548,
+              2548,
+              2548
+            ],
+            "reference": [
+              259550,
+              2594,
+              2594,
+              2594
+            ]
+          },
+          "status": "PASS"
+        }
+      ],
+      "low_probability_deletion_mutations": {
+        "pauli": {
+          "rejected": true,
+          "failed_cases": [
+            "X_ERROR",
+            "Y_ERROR",
+            "Z_ERROR",
+            "DEPOLARIZE1",
+            "DEPOLARIZE2"
+          ]
+        },
+        "loss": {
+          "rejected": true,
+          "failed_cases": [
+            "LOSS_5e-05",
+            "LOSS_0.0001",
+            "LOSS_0.00015",
+            "LOSS_0.0003",
+            "LOSS_0.0005",
+            "LOSS_0.001",
+            "LOSS_0.0015",
+            "LOSS_0.003",
+            "LOSS_0.005"
+          ]
+        },
+        "both": {
+          "rejected": true,
+          "failed_cases": [
+            "X_ERROR",
+            "Y_ERROR",
+            "Z_ERROR",
+            "DEPOLARIZE1",
+            "DEPOLARIZE2",
+            "LOSS_5e-05",
+            "LOSS_0.0001",
+            "LOSS_0.00015",
+            "LOSS_0.0003",
+            "LOSS_0.0005",
+            "LOSS_0.001",
+            "LOSS_0.0015",
+            "LOSS_0.003",
+            "LOSS_0.005"
+          ]
+        }
+      }
+    },
+    "real_circuit": {
+      "status": "PASS",
+      "fixture_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+      "shots_per_sampler": 65536,
+      "familywise_alpha_bound": 1e-07,
+      "mode": "measurements_blinded",
+      "pauli_probability": 0.001,
+      "loss_probability": 0.003,
+      "method": "Independent Stim lowering, logical-input strata, exact Fisher tests with Bonferroni correction",
+      "comparison": {
+        "status": "PASS",
+        "threshold": 5.10204081632653e-10,
+        "failed_events": [],
+        "events": [
+          {
+            "event": "input_0/all/measurement_0",
+            "rust_events": 380,
+            "reference_events": 406,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.36966539236888524
+          },
+          {
+            "event": "input_0/all/measurement_1",
+            "rust_events": 16587,
+            "reference_events": 16464,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.34041127704505225
+          },
+          {
+            "event": "input_0/all/measurement_2",
+            "rust_events": 385,
+            "reference_events": 397,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6923312153807628
+          },
+          {
+            "event": "input_0/all/measurement_3",
+            "rust_events": 924,
+            "reference_events": 917,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8872071084174683
+          },
+          {
+            "event": "input_0/all/measurement_4",
+            "rust_events": 497,
+            "reference_events": 507,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.7747109994649551
+          },
+          {
+            "event": "input_0/all/measurement_5",
+            "rust_events": 16638,
+            "reference_events": 16586,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6902196581283446
+          },
+          {
+            "event": "input_0/all/measurement_6",
+            "rust_events": 279,
+            "reference_events": 251,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.23893683726178577
+          },
+          {
+            "event": "input_0/all/measurement_7",
+            "rust_events": 316,
+            "reference_events": 277,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.11690463070051858
+          },
+          {
+            "event": "input_0/all/measurement_8",
+            "rust_events": 280,
+            "reference_events": 306,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.299548799111284
+          },
+          {
+            "event": "input_0/all/measurement_9",
+            "rust_events": 604,
+            "reference_events": 669,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.07003059367270856
+          },
+          {
+            "event": "input_0/all/measurement_10",
+            "rust_events": 512,
+            "reference_events": 475,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.24823171518251053
+          },
+          {
+            "event": "input_0/all/measurement_11",
+            "rust_events": 16763,
+            "reference_events": 16518,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.056536059615568186
+          },
+          {
+            "event": "input_0/all/measurement_12",
+            "rust_events": 395,
+            "reference_events": 392,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.9428270936803764
+          },
+          {
+            "event": "input_0/all/measurement_13",
+            "rust_events": 708,
+            "reference_events": 682,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.49792367360698403
+          },
+          {
+            "event": "input_0/all/measurement_14",
+            "rust_events": 479,
+            "reference_events": 485,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.871129469342677
+          },
+          {
+            "event": "input_0/all/measurement_15",
+            "rust_events": 16663,
+            "reference_events": 16528,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.2950185842148061
+          },
+          {
+            "event": "input_0/all/measurement_16",
+            "rust_events": 505,
+            "reference_events": 457,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.12682022727572767
+          },
+          {
+            "event": "input_0/all/measurement_17",
+            "rust_events": 16682,
+            "reference_events": 16521,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.21116592142220678
+          },
+          {
+            "event": "input_0/all/measurement_18",
+            "rust_events": 531,
+            "reference_events": 545,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.689464304722529
+          },
+          {
+            "event": "input_0/all/measurement_19",
+            "rust_events": 1610,
+            "reference_events": 1631,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.7186009086627035
+          },
+          {
+            "event": "input_0/all/measurement_20",
+            "rust_events": 576,
+            "reference_events": 608,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.36326467689080716
+          },
+          {
+            "event": "input_0/all/measurement_21",
+            "rust_events": 16636,
+            "reference_events": 16611,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8512230483578641
+          },
+          {
+            "event": "input_0/all/measurement_22",
+            "rust_events": 299,
+            "reference_events": 304,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8700257040349351
+          },
+          {
+            "event": "input_0/all/measurement_23",
+            "rust_events": 915,
+            "reference_events": 901,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.7570429500149071
+          },
+          {
+            "event": "input_0/all/measurement_24",
+            "rust_events": 416,
+            "reference_events": 439,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.4488630957868861
+          },
+          {
+            "event": "input_0/all/measurement_25",
+            "rust_events": 703,
+            "reference_events": 726,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.5562572977106715
+          },
+          {
+            "event": "input_0/all/measurement_26",
+            "rust_events": 827,
+            "reference_events": 723,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.008084265748259264
+          },
+          {
+            "event": "input_0/all/measurement_27",
+            "rust_events": 16917,
+            "reference_events": 16665,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.04976723903824425
+          },
+          {
+            "event": "input_0/all/measurement_28",
+            "rust_events": 538,
+            "reference_events": 467,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.026019291383583946
+          },
+          {
+            "event": "input_0/all/measurement_29",
+            "rust_events": 1687,
+            "reference_events": 1560,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.023307925513952582
+          },
+          {
+            "event": "input_0/all/measurement_30",
+            "rust_events": 514,
+            "reference_events": 481,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.30665556445889275
+          },
+          {
+            "event": "input_0/all/measurement_31",
+            "rust_events": 16701,
+            "reference_events": 16555,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.2571427667531014
+          },
+          {
+            "event": "input_0/all/measurement_32",
+            "rust_events": 467,
+            "reference_events": 516,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.12289035768782573
+          },
+          {
+            "event": "input_0/all/measurement_33",
+            "rust_events": 16671,
+            "reference_events": 16729,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6559680077202839
+          },
+          {
+            "event": "input_0/all/measurement_34",
+            "rust_events": 325,
+            "reference_events": 359,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.2046131090110667
+          },
+          {
+            "event": "input_0/all/measurement_35",
+            "rust_events": 16500,
+            "reference_events": 16530,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8207229963013969
+          },
+          {
+            "event": "input_0/all/measurement_36",
+            "rust_events": 399,
+            "reference_events": 380,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.5165022085550482
+          },
+          {
+            "event": "input_0/all/measurement_37",
+            "rust_events": 16710,
+            "reference_events": 16443,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.037644970514610826
+          },
+          {
+            "event": "input_0/all/measurement_38",
+            "rust_events": 346,
+            "reference_events": 343,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.9389506945165284
+          },
+          {
+            "event": "input_0/all/measurement_39",
+            "rust_events": 16509,
+            "reference_events": 16563,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6787542835480609
+          },
+          {
+            "event": "input_0/all/measurement_40",
+            "rust_events": 468,
+            "reference_events": 465,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.947423477993072
+          },
+          {
+            "event": "input_0/all/measurement_41",
+            "rust_events": 16603,
+            "reference_events": 16526,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.5525749586913324
+          },
+          {
+            "event": "input_0/all/measurement_42",
+            "rust_events": 329,
+            "reference_events": 325,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.9061590057200186
+          },
+          {
+            "event": "input_0/all/measurement_43",
+            "rust_events": 16574,
+            "reference_events": 16344,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.07354323210657486
+          },
+          {
+            "event": "input_0/all/measurement_44",
+            "rust_events": 485,
+            "reference_events": 529,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.17350555065455583
+          },
+          {
+            "event": "input_0/all/measurement_45",
+            "rust_events": 16630,
+            "reference_events": 16641,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.9377086544586927
+          },
+          {
+            "event": "input_0/all/measurement_46",
+            "rust_events": 463,
+            "reference_events": 489,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.4143950749529055
+          },
+          {
+            "event": "input_0/all/measurement_47",
+            "rust_events": 16525,
+            "reference_events": 16474,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6960094414156287
+          },
+          {
+            "event": "input_0/all/measurement_48",
+            "rust_events": 415,
+            "reference_events": 428,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6774437150358207
+          },
+          {
+            "event": "input_0/all/measurement_49",
+            "rust_events": 16501,
+            "reference_events": 16591,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.4867502681666923
+          },
+          {
+            "event": "input_0/all/detector_0",
+            "rust_events": 924,
+            "reference_events": 917,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8872071084174683
+          },
+          {
+            "event": "input_0/all/detector_1",
+            "rust_events": 316,
+            "reference_events": 277,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.11690463070051858
+          },
+          {
+            "event": "input_0/all/detector_2",
+            "rust_events": 604,
+            "reference_events": 669,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.07003059367270856
+          },
+          {
+            "event": "input_0/all/detector_3",
+            "rust_events": 708,
+            "reference_events": 682,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.49792367360698403
+          },
+          {
+            "event": "input_0/all/detector_4",
+            "rust_events": 1099,
+            "reference_events": 1157,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.22197234900878987
+          },
+          {
+            "event": "input_0/all/detector_5",
+            "rust_events": 1572,
+            "reference_events": 1580,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8983138748407048
+          },
+          {
+            "event": "input_0/all/detector_6",
+            "rust_events": 1696,
+            "reference_events": 1633,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.2700422253146606
+          },
+          {
+            "event": "input_0/all/detector_7",
+            "rust_events": 1187,
+            "reference_events": 1142,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.3532097098401592
+          },
+          {
+            "event": "input_0/all/detector_8",
+            "rust_events": 689,
+            "reference_events": 699,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.807106900388088
+          },
+          {
+            "event": "input_0/all/detector_9",
+            "rust_events": 1318,
+            "reference_events": 1335,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.7511562087957009
+          },
+          {
+            "event": "input_0/all/detector_10",
+            "rust_events": 1803,
+            "reference_events": 1714,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.12715283881006495
+          },
+          {
+            "event": "input_0/all/detector_11",
+            "rust_events": 662,
+            "reference_events": 621,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.2593858507381226
+          },
+          {
+            "event": "input_0/all/detector_12",
+            "rust_events": 1555,
+            "reference_events": 1505,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.36428116730222293
+          },
+          {
+            "event": "input_0/all/detector_13",
+            "rust_events": 871,
+            "reference_events": 882,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8087088596019304
+          },
+          {
+            "event": "input_0/all/detector_14",
+            "rust_events": 866,
+            "reference_events": 866,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_0/all/detector_15",
+            "rust_events": 1632,
+            "reference_events": 1593,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.492562374652409
+          },
+          {
+            "event": "input_0/all/observable",
+            "rust_events": 1275,
+            "reference_events": 1252,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.655362229491408
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_0",
+            "rust_events": 8,
+            "reference_events": 6,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.790504957359193
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_1",
+            "rust_events": 5,
+            "reference_events": 5,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_2",
+            "rust_events": 16,
+            "reference_events": 12,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.5715051267338654
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_3",
+            "rust_events": 17,
+            "reference_events": 33,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.03277306937409532
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_4",
+            "rust_events": 266,
+            "reference_events": 270,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8964920309062946
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_5",
+            "rust_events": 321,
+            "reference_events": 315,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8421002526560333
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_6",
+            "rust_events": 260,
+            "reference_events": 232,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.22172617203527636
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_7",
+            "rust_events": 21,
+            "reference_events": 20,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_8",
+            "rust_events": 181,
+            "reference_events": 163,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.3581167615729489
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_9",
+            "rust_events": 294,
+            "reference_events": 288,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.8351076224191768
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_10",
+            "rust_events": 168,
+            "reference_events": 135,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.06520879966904015
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_11",
+            "rust_events": 34,
+            "reference_events": 30,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.7078438971913514
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_12",
+            "rust_events": 29,
+            "reference_events": 44,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.10045431223728983
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_13",
+            "rust_events": 19,
+            "reference_events": 15,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 0.6074973304396908
+          },
+          {
+            "event": "input_0/all/adjacent_detector_joint_14",
+            "rust_events": 38,
+            "reference_events": 38,
+            "rust_shots": 32755,
+            "reference_shots": 32755,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_0",
+            "rust_events": 132,
+            "reference_events": 120,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.44888365128705704
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_1",
+            "rust_events": 31,
+            "reference_events": 15,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.01840342146259671
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_2",
+            "rust_events": 83,
+            "reference_events": 80,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.81431723793903
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_3",
+            "rust_events": 80,
+            "reference_events": 81,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_4",
+            "rust_events": 194,
+            "reference_events": 228,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.10663235984152938
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_5",
+            "rust_events": 185,
+            "reference_events": 178,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.7123798003612494
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_6",
+            "rust_events": 284,
+            "reference_events": 288,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.8996380935864896
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_7",
+            "rust_events": 147,
+            "reference_events": 151,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.8616755843975745
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_8",
+            "rust_events": 47,
+            "reference_events": 54,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.5503179786361634
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_9",
+            "rust_events": 206,
+            "reference_events": 199,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.7269224624032099
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_10",
+            "rust_events": 236,
+            "reference_events": 251,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.5238988110434764
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_11",
+            "rust_events": 92,
+            "reference_events": 90,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.8821412628175689
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_12",
+            "rust_events": 143,
+            "reference_events": 122,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.19599071807748805
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_13",
+            "rust_events": 28,
+            "reference_events": 24,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.5823910857384869
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_14",
+            "rust_events": 66,
+            "reference_events": 86,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.12245814468472495
+          },
+          {
+            "event": "input_0/no_visible_loss/detector_15",
+            "rust_events": 86,
+            "reference_events": 92,
+            "rust_shots": 23238,
+            "reference_shots": 23306,
+            "pvalue": 0.7074659559165016
+          },
+          {
+            "event": "input_1/all/measurement_0",
+            "rust_events": 384,
+            "reference_events": 390,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.8565455895965642
+          },
+          {
+            "event": "input_1/all/measurement_1",
+            "rust_events": 16452,
+            "reference_events": 16526,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.568535809191543
+          },
+          {
+            "event": "input_1/all/measurement_2",
+            "rust_events": 379,
+            "reference_events": 370,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.768781931431928
+          },
+          {
+            "event": "input_1/all/measurement_3",
+            "rust_events": 890,
+            "reference_events": 892,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.9808394012299603
+          },
+          {
+            "event": "input_1/all/measurement_4",
+            "rust_events": 479,
+            "reference_events": 512,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.30569915125443403
+          },
+          {
+            "event": "input_1/all/measurement_5",
+            "rust_events": 16669,
+            "reference_events": 16423,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.05564884234782385
+          },
+          {
+            "event": "input_1/all/measurement_6",
+            "rust_events": 309,
+            "reference_events": 277,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.19827654187927188
+          },
+          {
+            "event": "input_1/all/measurement_7",
+            "rust_events": 340,
+            "reference_events": 308,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.22097683417986627
+          },
+          {
+            "event": "input_1/all/measurement_8",
+            "rust_events": 313,
+            "reference_events": 297,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5417783929875937
+          },
+          {
+            "event": "input_1/all/measurement_9",
+            "rust_events": 720,
+            "reference_events": 696,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5366373478477485
+          },
+          {
+            "event": "input_1/all/measurement_10",
+            "rust_events": 510,
+            "reference_events": 467,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.17576271607680738
+          },
+          {
+            "event": "input_1/all/measurement_11",
+            "rust_events": 16566,
+            "reference_events": 16693,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.32497569724987074
+          },
+          {
+            "event": "input_1/all/measurement_12",
+            "rust_events": 390,
+            "reference_events": 410,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.49913568732668295
+          },
+          {
+            "event": "input_1/all/measurement_13",
+            "rust_events": 694,
+            "reference_events": 736,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.27296960394683256
+          },
+          {
+            "event": "input_1/all/measurement_14",
+            "rust_events": 509,
+            "reference_events": 512,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.949702866597771
+          },
+          {
+            "event": "input_1/all/measurement_15",
+            "rust_events": 16619,
+            "reference_events": 16791,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.18157546858994084
+          },
+          {
+            "event": "input_1/all/measurement_16",
+            "rust_events": 501,
+            "reference_events": 519,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5916476407769755
+          },
+          {
+            "event": "input_1/all/measurement_17",
+            "rust_events": 16501,
+            "reference_events": 16616,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.3732001904099534
+          },
+          {
+            "event": "input_1/all/measurement_18",
+            "rust_events": 497,
+            "reference_events": 529,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.32932999425738996
+          },
+          {
+            "event": "input_1/all/measurement_19",
+            "rust_events": 1547,
+            "reference_events": 1709,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.0037939697049259066
+          },
+          {
+            "event": "input_1/all/measurement_20",
+            "rust_events": 584,
+            "reference_events": 607,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5200131087791254
+          },
+          {
+            "event": "input_1/all/measurement_21",
+            "rust_events": 16709,
+            "reference_events": 16507,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.11638201564892897
+          },
+          {
+            "event": "input_1/all/measurement_22",
+            "rust_events": 305,
+            "reference_events": 294,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6814967277055958
+          },
+          {
+            "event": "input_1/all/measurement_23",
+            "rust_events": 941,
+            "reference_events": 933,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.8696868598497617
+          },
+          {
+            "event": "input_1/all/measurement_24",
+            "rust_events": 455,
+            "reference_events": 353,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.00034421364811979585
+          },
+          {
+            "event": "input_1/all/measurement_25",
+            "rust_events": 832,
+            "reference_events": 721,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.0047137401443159465
+          },
+          {
+            "event": "input_1/all/measurement_26",
+            "rust_events": 730,
+            "reference_events": 802,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.0663926494994152
+          },
+          {
+            "event": "input_1/all/measurement_27",
+            "rust_events": 16706,
+            "reference_events": 16836,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.3135100157407085
+          },
+          {
+            "event": "input_1/all/measurement_28",
+            "rust_events": 538,
+            "reference_events": 567,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.39560779886991276
+          },
+          {
+            "event": "input_1/all/measurement_29",
+            "rust_events": 1622,
+            "reference_events": 1726,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.06762972964767182
+          },
+          {
+            "event": "input_1/all/measurement_30",
+            "rust_events": 484,
+            "reference_events": 509,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.44282870258129164
+          },
+          {
+            "event": "input_1/all/measurement_31",
+            "rust_events": 16592,
+            "reference_events": 16789,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.12571861905999526
+          },
+          {
+            "event": "input_1/all/measurement_32",
+            "rust_events": 471,
+            "reference_events": 512,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.19860225192197054
+          },
+          {
+            "event": "input_1/all/measurement_33",
+            "rust_events": 16692,
+            "reference_events": 16614,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5474937840587505
+          },
+          {
+            "event": "input_1/all/measurement_34",
+            "rust_events": 307,
+            "reference_events": 334,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.3020703140044525
+          },
+          {
+            "event": "input_1/all/measurement_35",
+            "rust_events": 16510,
+            "reference_events": 16491,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.8881858657058472
+          },
+          {
+            "event": "input_1/all/measurement_36",
+            "rust_events": 421,
+            "reference_events": 382,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.17721132344140939
+          },
+          {
+            "event": "input_1/all/measurement_37",
+            "rust_events": 16666,
+            "reference_events": 16698,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.808642639714998
+          },
+          {
+            "event": "input_1/all/measurement_38",
+            "rust_events": 316,
+            "reference_events": 378,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.01985407770143766
+          },
+          {
+            "event": "input_1/all/measurement_39",
+            "rust_events": 16643,
+            "reference_events": 16592,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6961043280507739
+          },
+          {
+            "event": "input_1/all/measurement_40",
+            "rust_events": 462,
+            "reference_events": 488,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.41391413253283993
+          },
+          {
+            "event": "input_1/all/measurement_41",
+            "rust_events": 16681,
+            "reference_events": 16566,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.3731770009838847
+          },
+          {
+            "event": "input_1/all/measurement_42",
+            "rust_events": 367,
+            "reference_events": 365,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.9703534430182701
+          },
+          {
+            "event": "input_1/all/measurement_43",
+            "rust_events": 16554,
+            "reference_events": 16605,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6961128247850459
+          },
+          {
+            "event": "input_1/all/measurement_44",
+            "rust_events": 520,
+            "reference_events": 487,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.30951376779970846
+          },
+          {
+            "event": "input_1/all/measurement_45",
+            "rust_events": 16759,
+            "reference_events": 16651,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.4031969243693634
+          },
+          {
+            "event": "input_1/all/measurement_46",
+            "rust_events": 524,
+            "reference_events": 508,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6379122798729234
+          },
+          {
+            "event": "input_1/all/measurement_47",
+            "rust_events": 16545,
+            "reference_events": 16696,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.24129401304537204
+          },
+          {
+            "event": "input_1/all/measurement_48",
+            "rust_events": 412,
+            "reference_events": 376,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.20967536868495668
+          },
+          {
+            "event": "input_1/all/measurement_49",
+            "rust_events": 16579,
+            "reference_events": 16812,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.0699152001684553
+          },
+          {
+            "event": "input_1/all/detector_0",
+            "rust_events": 890,
+            "reference_events": 892,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.9808394012299603
+          },
+          {
+            "event": "input_1/all/detector_1",
+            "rust_events": 340,
+            "reference_events": 308,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.22097683417986627
+          },
+          {
+            "event": "input_1/all/detector_2",
+            "rust_events": 720,
+            "reference_events": 696,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5366373478477485
+          },
+          {
+            "event": "input_1/all/detector_3",
+            "rust_events": 694,
+            "reference_events": 736,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.27296960394683256
+          },
+          {
+            "event": "input_1/all/detector_4",
+            "rust_events": 1125,
+            "reference_events": 1140,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.7646542686498772
+          },
+          {
+            "event": "input_1/all/detector_5",
+            "rust_events": 1369,
+            "reference_events": 1455,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.10201020095357104
+          },
+          {
+            "event": "input_1/all/detector_6",
+            "rust_events": 1664,
+            "reference_events": 1718,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.3493699968310627
+          },
+          {
+            "event": "input_1/all/detector_7",
+            "rust_events": 1245,
+            "reference_events": 1187,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.23883843280354372
+          },
+          {
+            "event": "input_1/all/detector_8",
+            "rust_events": 780,
+            "reference_events": 633,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 8.502535394334256e-05
+          },
+          {
+            "event": "input_1/all/detector_9",
+            "rust_events": 1374,
+            "reference_events": 1293,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.11372543211124676
+          },
+          {
+            "event": "input_1/all/detector_10",
+            "rust_events": 1772,
+            "reference_events": 1868,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.10517144752760745
+          },
+          {
+            "event": "input_1/all/detector_11",
+            "rust_events": 649,
+            "reference_events": 666,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6558192041208676
+          },
+          {
+            "event": "input_1/all/detector_12",
+            "rust_events": 1473,
+            "reference_events": 1520,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.38940733320807136
+          },
+          {
+            "event": "input_1/all/detector_13",
+            "rust_events": 955,
+            "reference_events": 892,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.1433380865808104
+          },
+          {
+            "event": "input_1/all/detector_14",
+            "rust_events": 908,
+            "reference_events": 812,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.020245128037794036
+          },
+          {
+            "event": "input_1/all/detector_15",
+            "rust_events": 1659,
+            "reference_events": 1635,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.6809270475568763
+          },
+          {
+            "event": "input_1/all/observable",
+            "rust_events": 31494,
+            "reference_events": 31493,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_0",
+            "rust_events": 9,
+            "reference_events": 13,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5233965022903542
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_1",
+            "rust_events": 7,
+            "reference_events": 9,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.8035954178252104
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_2",
+            "rust_events": 19,
+            "reference_events": 18,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_3",
+            "rust_events": 17,
+            "reference_events": 28,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.13502254028141508
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_4",
+            "rust_events": 246,
+            "reference_events": 249,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.9281126166672252
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_5",
+            "rust_events": 276,
+            "reference_events": 326,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.044733722363218924
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_6",
+            "rust_events": 288,
+            "reference_events": 251,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.11938012609608838
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_7",
+            "rust_events": 28,
+            "reference_events": 28,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 1.0
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_8",
+            "rust_events": 200,
+            "reference_events": 151,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.0101014564541312
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_9",
+            "rust_events": 293,
+            "reference_events": 295,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.9669612940082297
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_10",
+            "rust_events": 144,
+            "reference_events": 138,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.7654681007750571
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_11",
+            "rust_events": 26,
+            "reference_events": 33,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.43478522103573003
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_12",
+            "rust_events": 46,
+            "reference_events": 40,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.5897907234255206
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_13",
+            "rust_events": 20,
+            "reference_events": 23,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.7607149860837239
+          },
+          {
+            "event": "input_1/all/adjacent_detector_joint_14",
+            "rust_events": 56,
+            "reference_events": 44,
+            "rust_shots": 32781,
+            "reference_shots": 32781,
+            "pvalue": 0.2708867894662261
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_0",
+            "rust_events": 135,
+            "reference_events": 115,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.2281838567615314
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_1",
+            "rust_events": 27,
+            "reference_events": 22,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.5679695143418553
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_2",
+            "rust_events": 80,
+            "reference_events": 75,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.7477081200224323
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_3",
+            "rust_events": 80,
+            "reference_events": 89,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.4891348976410054
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_4",
+            "rust_events": 235,
+            "reference_events": 207,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.19687859952383083
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_5",
+            "rust_events": 181,
+            "reference_events": 188,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.7147643836632331
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_6",
+            "rust_events": 320,
+            "reference_events": 300,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.4424293006633219
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_7",
+            "rust_events": 162,
+            "reference_events": 143,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.30111096328973674
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_8",
+            "rust_events": 51,
+            "reference_events": 41,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.3476682900440041
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_9",
+            "rust_events": 233,
+            "reference_events": 208,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.25083598133732543
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_10",
+            "rust_events": 261,
+            "reference_events": 267,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.7929797903010183
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_11",
+            "rust_events": 97,
+            "reference_events": 98,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.942933522193192
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_12",
+            "rust_events": 137,
+            "reference_events": 103,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.032498391487441665
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_13",
+            "rust_events": 25,
+            "reference_events": 18,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.36015693225787615
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_14",
+            "rust_events": 87,
+            "reference_events": 65,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.08766126348063538
+          },
+          {
+            "event": "input_1/no_visible_loss/detector_15",
+            "rust_events": 70,
+            "reference_events": 81,
+            "rust_shots": 23233,
+            "reference_shots": 23209,
+            "pvalue": 0.37131885842435886
+          }
+        ]
+      },
+      "low_probability_deletion_mutations": {
+        "pauli": {
+          "rejected": true,
+          "removed_instructions": 12,
+          "failed_events": [
+            "input_0/all/measurement_19",
+            "input_0/all/detector_4",
+            "input_0/no_visible_loss/detector_0",
+            "input_0/no_visible_loss/detector_2",
+            "input_0/no_visible_loss/detector_3",
+            "input_0/no_visible_loss/detector_4",
+            "input_0/no_visible_loss/detector_5",
+            "input_0/no_visible_loss/detector_6",
+            "input_0/no_visible_loss/detector_7",
+            "input_0/no_visible_loss/detector_8",
+            "input_0/no_visible_loss/detector_9",
+            "input_0/no_visible_loss/detector_10",
+            "input_0/no_visible_loss/detector_11",
+            "input_0/no_visible_loss/detector_12",
+            "input_0/no_visible_loss/detector_14",
+            "input_0/no_visible_loss/detector_15",
+            "input_1/all/measurement_19",
+            "input_1/all/measurement_29",
+            "input_1/all/detector_4",
+            "input_1/all/detector_6",
+            "input_1/all/detector_10",
+            "input_1/no_visible_loss/detector_0",
+            "input_1/no_visible_loss/detector_2",
+            "input_1/no_visible_loss/detector_3",
+            "input_1/no_visible_loss/detector_4",
+            "input_1/no_visible_loss/detector_5",
+            "input_1/no_visible_loss/detector_6",
+            "input_1/no_visible_loss/detector_7",
+            "input_1/no_visible_loss/detector_8",
+            "input_1/no_visible_loss/detector_9",
+            "input_1/no_visible_loss/detector_10",
+            "input_1/no_visible_loss/detector_11",
+            "input_1/no_visible_loss/detector_12",
+            "input_1/no_visible_loss/detector_14",
+            "input_1/no_visible_loss/detector_15"
+          ]
+        },
+        "loss": {
+          "rejected": true,
+          "removed_instructions": 19,
+          "failed_events": [
+            "input_0/all/measurement_0",
+            "input_0/all/measurement_2",
+            "input_0/all/measurement_3",
+            "input_0/all/measurement_4",
+            "input_0/all/measurement_6",
+            "input_0/all/measurement_7",
+            "input_0/all/measurement_8",
+            "input_0/all/measurement_9",
+            "input_0/all/measurement_10",
+            "input_0/all/measurement_12",
+            "input_0/all/measurement_13",
+            "input_0/all/measurement_14",
+            "input_0/all/measurement_16",
+            "input_0/all/measurement_18",
+            "input_0/all/measurement_19",
+            "input_0/all/measurement_20",
+            "input_0/all/measurement_22",
+            "input_0/all/measurement_23",
+            "input_0/all/measurement_24",
+            "input_0/all/measurement_25",
+            "input_0/all/measurement_26",
+            "input_0/all/measurement_28",
+            "input_0/all/measurement_29",
+            "input_0/all/measurement_30",
+            "input_0/all/measurement_32",
+            "input_0/all/measurement_34",
+            "input_0/all/measurement_36",
+            "input_0/all/measurement_38",
+            "input_0/all/measurement_40",
+            "input_0/all/measurement_42",
+            "input_0/all/measurement_44",
+            "input_0/all/measurement_46",
+            "input_0/all/measurement_48",
+            "input_0/all/detector_0",
+            "input_0/all/detector_1",
+            "input_0/all/detector_2",
+            "input_0/all/detector_3",
+            "input_0/all/detector_4",
+            "input_0/all/detector_5",
+            "input_0/all/detector_6",
+            "input_0/all/detector_7",
+            "input_0/all/detector_8",
+            "input_0/all/detector_9",
+            "input_0/all/detector_10",
+            "input_0/all/detector_11",
+            "input_0/all/detector_12",
+            "input_0/all/detector_13",
+            "input_0/all/detector_14",
+            "input_0/all/detector_15",
+            "input_0/all/observable",
+            "input_0/all/adjacent_detector_joint_4",
+            "input_0/all/adjacent_detector_joint_5",
+            "input_0/all/adjacent_detector_joint_6",
+            "input_0/all/adjacent_detector_joint_8",
+            "input_0/all/adjacent_detector_joint_9",
+            "input_0/all/adjacent_detector_joint_10",
+            "input_0/all/adjacent_detector_joint_12",
+            "input_0/all/adjacent_detector_joint_14",
+            "input_1/all/measurement_0",
+            "input_1/all/measurement_2",
+            "input_1/all/measurement_3",
+            "input_1/all/measurement_4",
+            "input_1/all/measurement_6",
+            "input_1/all/measurement_7",
+            "input_1/all/measurement_8",
+            "input_1/all/measurement_9",
+            "input_1/all/measurement_10",
+            "input_1/all/measurement_12",
+            "input_1/all/measurement_13",
+            "input_1/all/measurement_14",
+            "input_1/all/measurement_16",
+            "input_1/all/measurement_18",
+            "input_1/all/measurement_19",
+            "input_1/all/measurement_20",
+            "input_1/all/measurement_22",
+            "input_1/all/measurement_23",
+            "input_1/all/measurement_24",
+            "input_1/all/measurement_25",
+            "input_1/all/measurement_26",
+            "input_1/all/measurement_28",
+            "input_1/all/measurement_29",
+            "input_1/all/measurement_30",
+            "input_1/all/measurement_32",
+            "input_1/all/measurement_34",
+            "input_1/all/measurement_36",
+            "input_1/all/measurement_38",
+            "input_1/all/measurement_40",
+            "input_1/all/measurement_42",
+            "input_1/all/measurement_44",
+            "input_1/all/measurement_46",
+            "input_1/all/measurement_48",
+            "input_1/all/detector_0",
+            "input_1/all/detector_1",
+            "input_1/all/detector_2",
+            "input_1/all/detector_3",
+            "input_1/all/detector_4",
+            "input_1/all/detector_5",
+            "input_1/all/detector_6",
+            "input_1/all/detector_7",
+            "input_1/all/detector_8",
+            "input_1/all/detector_9",
+            "input_1/all/detector_10",
+            "input_1/all/detector_11",
+            "input_1/all/detector_12",
+            "input_1/all/detector_13",
+            "input_1/all/detector_14",
+            "input_1/all/detector_15",
+            "input_1/all/observable",
+            "input_1/all/adjacent_detector_joint_4",
+            "input_1/all/adjacent_detector_joint_5",
+            "input_1/all/adjacent_detector_joint_6",
+            "input_1/all/adjacent_detector_joint_8",
+            "input_1/all/adjacent_detector_joint_9",
+            "input_1/all/adjacent_detector_joint_10",
+            "input_1/all/adjacent_detector_joint_12",
+            "input_1/all/adjacent_detector_joint_14"
+          ]
+        },
+        "both": {
+          "rejected": true,
+          "removed_instructions": 31,
+          "failed_events": [
+            "input_0/all/measurement_0",
+            "input_0/all/measurement_2",
+            "input_0/all/measurement_3",
+            "input_0/all/measurement_4",
+            "input_0/all/measurement_6",
+            "input_0/all/measurement_7",
+            "input_0/all/measurement_8",
+            "input_0/all/measurement_9",
+            "input_0/all/measurement_10",
+            "input_0/all/measurement_12",
+            "input_0/all/measurement_13",
+            "input_0/all/measurement_14",
+            "input_0/all/measurement_16",
+            "input_0/all/measurement_18",
+            "input_0/all/measurement_19",
+            "input_0/all/measurement_20",
+            "input_0/all/measurement_22",
+            "input_0/all/measurement_23",
+            "input_0/all/measurement_24",
+            "input_0/all/measurement_25",
+            "input_0/all/measurement_26",
+            "input_0/all/measurement_28",
+            "input_0/all/measurement_29",
+            "input_0/all/measurement_30",
+            "input_0/all/measurement_32",
+            "input_0/all/measurement_34",
+            "input_0/all/measurement_36",
+            "input_0/all/measurement_38",
+            "input_0/all/measurement_40",
+            "input_0/all/measurement_42",
+            "input_0/all/measurement_44",
+            "input_0/all/measurement_46",
+            "input_0/all/measurement_48",
+            "input_0/all/detector_0",
+            "input_0/all/detector_1",
+            "input_0/all/detector_2",
+            "input_0/all/detector_3",
+            "input_0/all/detector_4",
+            "input_0/all/detector_5",
+            "input_0/all/detector_6",
+            "input_0/all/detector_7",
+            "input_0/all/detector_8",
+            "input_0/all/detector_9",
+            "input_0/all/detector_10",
+            "input_0/all/detector_11",
+            "input_0/all/detector_12",
+            "input_0/all/detector_13",
+            "input_0/all/detector_14",
+            "input_0/all/detector_15",
+            "input_0/all/observable",
+            "input_0/all/adjacent_detector_joint_3",
+            "input_0/all/adjacent_detector_joint_4",
+            "input_0/all/adjacent_detector_joint_5",
+            "input_0/all/adjacent_detector_joint_6",
+            "input_0/all/adjacent_detector_joint_8",
+            "input_0/all/adjacent_detector_joint_9",
+            "input_0/all/adjacent_detector_joint_10",
+            "input_0/all/adjacent_detector_joint_12",
+            "input_0/all/adjacent_detector_joint_14",
+            "input_0/no_visible_loss/detector_0",
+            "input_0/no_visible_loss/detector_2",
+            "input_0/no_visible_loss/detector_3",
+            "input_0/no_visible_loss/detector_4",
+            "input_0/no_visible_loss/detector_5",
+            "input_0/no_visible_loss/detector_6",
+            "input_0/no_visible_loss/detector_7",
+            "input_0/no_visible_loss/detector_8",
+            "input_0/no_visible_loss/detector_9",
+            "input_0/no_visible_loss/detector_10",
+            "input_0/no_visible_loss/detector_11",
+            "input_0/no_visible_loss/detector_12",
+            "input_0/no_visible_loss/detector_14",
+            "input_0/no_visible_loss/detector_15",
+            "input_1/all/measurement_0",
+            "input_1/all/measurement_2",
+            "input_1/all/measurement_3",
+            "input_1/all/measurement_4",
+            "input_1/all/measurement_6",
+            "input_1/all/measurement_7",
+            "input_1/all/measurement_8",
+            "input_1/all/measurement_9",
+            "input_1/all/measurement_10",
+            "input_1/all/measurement_12",
+            "input_1/all/measurement_13",
+            "input_1/all/measurement_14",
+            "input_1/all/measurement_16",
+            "input_1/all/measurement_18",
+            "input_1/all/measurement_19",
+            "input_1/all/measurement_20",
+            "input_1/all/measurement_22",
+            "input_1/all/measurement_23",
+            "input_1/all/measurement_24",
+            "input_1/all/measurement_25",
+            "input_1/all/measurement_26",
+            "input_1/all/measurement_28",
+            "input_1/all/measurement_29",
+            "input_1/all/measurement_30",
+            "input_1/all/measurement_32",
+            "input_1/all/measurement_34",
+            "input_1/all/measurement_36",
+            "input_1/all/measurement_38",
+            "input_1/all/measurement_40",
+            "input_1/all/measurement_42",
+            "input_1/all/measurement_44",
+            "input_1/all/measurement_46",
+            "input_1/all/measurement_48",
+            "input_1/all/detector_0",
+            "input_1/all/detector_1",
+            "input_1/all/detector_2",
+            "input_1/all/detector_3",
+            "input_1/all/detector_4",
+            "input_1/all/detector_5",
+            "input_1/all/detector_6",
+            "input_1/all/detector_7",
+            "input_1/all/detector_8",
+            "input_1/all/detector_9",
+            "input_1/all/detector_10",
+            "input_1/all/detector_11",
+            "input_1/all/detector_12",
+            "input_1/all/detector_13",
+            "input_1/all/detector_14",
+            "input_1/all/detector_15",
+            "input_1/all/observable",
+            "input_1/all/adjacent_detector_joint_4",
+            "input_1/all/adjacent_detector_joint_5",
+            "input_1/all/adjacent_detector_joint_6",
+            "input_1/all/adjacent_detector_joint_8",
+            "input_1/all/adjacent_detector_joint_9",
+            "input_1/all/adjacent_detector_joint_10",
+            "input_1/all/adjacent_detector_joint_11",
+            "input_1/all/adjacent_detector_joint_12",
+            "input_1/all/adjacent_detector_joint_14",
+            "input_1/no_visible_loss/detector_0",
+            "input_1/no_visible_loss/detector_2",
+            "input_1/no_visible_loss/detector_3",
+            "input_1/no_visible_loss/detector_4",
+            "input_1/no_visible_loss/detector_5",
+            "input_1/no_visible_loss/detector_6",
+            "input_1/no_visible_loss/detector_7",
+            "input_1/no_visible_loss/detector_8",
+            "input_1/no_visible_loss/detector_9",
+            "input_1/no_visible_loss/detector_10",
+            "input_1/no_visible_loss/detector_11",
+            "input_1/no_visible_loss/detector_12",
+            "input_1/no_visible_loss/detector_14",
+            "input_1/no_visible_loss/detector_15"
+          ]
+        }
+      }
+    },
+    "familywise_alpha_bound": 2e-07
+  },
   "status": "PASS",
   "analytic_noise_controls": {
     "distribution_probes": {
@@ -1463,7 +4284,7 @@
     }
   },
   "method": "independent Stim circuit lowering; joint output distributions and hand-computed controls",
-  "familywise_alpha_bound": 1e-06,
+  "familywise_alpha_bound": 1.2e-06,
   "negative_skipped_gate_mutation_rejected": true,
   "unsupported_reference_operation_rejected": true,
   "cases": [

@@ -210,19 +210,11 @@ def render(out):
     fig.get_layout_engine().set(rect=(0,.31,1,1))
     fig.text(.5,.015,'Same 5,000 shots · d = 3, rounds = 2 · additive means of 3 instrumented runs\nfrom_check_matrix + decode_batch; topology rebuilt each run. Startup / JSON / scoring excluded.',ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'adapter-stages')
+    from .artifacts import summary_rows, SUMMARY_FIELDS
     with (out/'summary.csv').open('w') as f:
-        writer=csv.DictWriter(f,lineterminator='\n',fieldnames=['experiment','distance','rounds','loss_probability','decoder','status','shots','errors','logical_error_rate','ci95_low','ci95_high','median_microseconds_per_shot'])
+        writer=csv.DictWriter(f,lineterminator='\n',fieldnames=SUMMARY_FIELDS)
         writer.writeheader()
-        for experiment,cases in [('loss_sweep',decoding),('accuracy_time',[tradeoff])]:
-            for case in cases:
-                for name,result in case['decoders'].items():
-                    row={k:case[k] for k in ['distance','rounds','loss_probability','shots']}
-                    row.update(experiment=experiment,decoder=name,status=result['status'])
-                    if result['status']=='ok':
-                        row.update(errors=result['errors'],logical_error_rate=result['logical_error_rate'],
-                                   ci95_low=result['wilson_95'][0],ci95_high=result['wilson_95'][1],
-                                   median_microseconds_per_shot=np.median(result['total_seconds'])/result['shots']*1e6)
-                    writer.writerow(row)
+        writer.writerows(summary_rows(decoding, tradeoff))
 
 
 if __name__=='__main__':

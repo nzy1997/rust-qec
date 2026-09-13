@@ -6,7 +6,7 @@ import json
 import math
 import itertools
 from pathlib import Path
-from .artifacts import required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows
+from .artifacts import required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows, summary_rows, SUMMARY_FIELDS, wilson
 
 
 def require_complete_sweep(cases):
@@ -69,6 +69,31 @@ def verify(root):
                               'DEPOLARIZE1_x_only','DEPOLARIZE1_z_only'}
             or not all(m['rejected'] and m['failed_cases'] for m in replacements.values())):
         raise ValueError('Missing or escaped wrong-channel mutation')
+    low = sampler['low_probability_controls']
+    if low['status'] != 'PASS' or low['familywise_alpha_bound'] != 2e-7:
+        raise ValueError('Missing or failed low-probability sampling controls')
+    unit = low['analytic']
+    required_probes = {'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2'} | {
+        f'LOSS_{p}' for p in [.00005,.0001,.00015,.0003,.0005,.001,.0015,.003,.005,.01]}
+    if (unit['status'] != 'PASS' or len(unit['cases']) != 15
+            or {c['case'] for c in unit['cases']} != required_probes
+            or any(c['status']!='PASS' or c['shots_per_sampler']<262144 for c in unit['cases'])):
+        raise ValueError('Incomplete low-probability analytic coverage')
+    for case in unit['cases']:
+        for counts in case['counts'].values():
+            if len(counts)!=len(case['accepted_counts']) or any(not lo<=k<=hi for k,(lo,hi) in zip(counts,case['accepted_counts'])):
+                raise ValueError('Low-probability counts outside acceptance')
+    actual = low['real_circuit']
+    if (actual['status']!='PASS' or actual['shots_per_sampler']<65536 or actual['mode']!='measurements_blinded'
+            or actual['fixture_sha256']!=hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()
+            or actual['comparison']['failed_events'] or len(actual['comparison']['events'])!=196):
+        raise ValueError('Incomplete real-circuit sampling check')
+    if any(e['pvalue']<actual['comparison']['threshold'] for e in actual['comparison']['events']):
+        raise ValueError('Real-circuit distribution rejected')
+    for report in [unit,actual]:
+        mutations = report['low_probability_deletion_mutations']
+        if set(mutations)!={'pauli','loss','both'} or not all(m['rejected'] and m.get('failed_cases',m.get('failed_events')) for m in mutations.values()):
+            raise ValueError('Low-probability mutation escaped')
     chain=json.loads((root/'chain-correctness.json').read_text())
     assert (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)
     assert chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4
@@ -105,7 +130,7 @@ def verify(root):
             if r['status']=='ok':
                 assert r['shots']==c['shots'] and 0<=r['errors']<=r['shots']
                 assert r['logical_error_rate']==r['errors']/r['shots']
-                assert r['wilson_95'][0]<=r['logical_error_rate']<=r['wilson_95'][1]
+                assert r['wilson_95']==wilson(r['errors'],r['shots'])
                 assert r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3
                 assert min(r['total_seconds'])>0
                 for rep,(run,total) in enumerate(zip(r['runs'],r['total_seconds'])):
@@ -133,6 +158,13 @@ def verify(root):
     expected = [{key:str(value) for key,value in row.items()} for row in timing_rows(decoding)]
     if rows != expected or len(rows) != 135:
         raise ValueError('Timing sweep CSV differs from complete raw repetitions')
+    with (root/'summary.csv').open() as stream:
+        reader = csv.DictReader(stream)
+        rows = list(reader)
+        fields = reader.fieldnames
+    expected = [{key:str(value) for key,value in row.items()} for row in summary_rows(decoding,tradeoff)]
+    if fields != SUMMARY_FIELDS or rows != expected or len(rows) != 50:
+        raise ValueError('Summary CSV differs from complete raw counts and phase timings')
     from .shot_data import rescore, ARCHIVE
     rescore(root/ARCHIVE, root)
     return 'PASS'
