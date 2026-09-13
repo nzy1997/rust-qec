@@ -1,0 +1,57 @@
+{
+  "started_utc": "2026-09-13T08:24:51.006969+00:00",
+  "command": [
+    "/Users/nzy/rcode/rstim/benchmarks/atom_loss/run.py",
+    "--stage",
+    "correctness",
+    "--out",
+    "drafts/round5-correctness",
+    "--work",
+    "drafts/round5-correctness-work"
+  ],
+  "source_commit": "93dddbe5d63f311a562175a5ff303eeb50c4ccb0",
+  "working_tree_dirty": true,
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "cpu": "Apple M4",
+  "python": "3.12.13 (main, Mar  3 2026, 15:35:03) [Clang 21.1.4 ]",
+  "dependencies": {
+    "stim": "1.16.0",
+    "numpy": "2.4.6",
+    "pymatching": "2.4.0",
+    "scipy": "1.18.1",
+    "matplotlib": "3.10.9"
+  },
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "binaries": {
+    "target/release/rustqec": "c7d7d0f6bca2f5d17a80dbc61d462fda7d948e5778a1848482a9c6569b2f1e81",
+    "target/release/examples/export_matching_benchmark": "c22fab12797f70318cc8cdbab974700fc41e4b1075540a38c495d3fcd3fbef57",
+    "target/release/examples/atom_loss_sampling_benchmark": "ff3455dd20ada6806505e64cf8929fcb6e080d8d0eadd7315da3d7c9343da6f6",
+    "target/release/examples/export_decoder_oracle": "866ad70a7f22b4abf4c449cee9d5e8e882e2c8e68cec33057a8f03dfc9edccd9"
+  },
+  "environment": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "RAYON_NUM_THREADS": "1"
+  },
+  "timing": "Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Each repetition remeasures compilation and transformation. Excludes process startup and scoring; native decode includes buffered reads and output packing/flush, exporter transformation includes public row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.",
+  "sources": {
+    "benchmarks/atom_loss/artifacts.py": "355cf3f4875e6d63ee09c51fb2fc34b0ccebaa6253d2c4f6909c5dde7d09cf82",
+    "benchmarks/atom_loss/chain_reference.py": "fc54a3e8e7aa0c62059a3fe287422c1ce529c4e053c24e266ff951032d3db1e5",
+    "benchmarks/atom_loss/channel_probes.py": "297c1581ce0752f8959c38f3b691769dcc69b5f1f87faa74c486322661581fef",
+    "benchmarks/atom_loss/correctness.py": "d6c36dfefb7ef3ab34ec9e014858c1211cfe31d484f45b7fc5e353283d345369",
+    "benchmarks/atom_loss/decoder_reference.py": "b4c2b89d7b684a5456396748ec7149c452e4ffc151b56691af443542313ee1c3",
+    "benchmarks/atom_loss/noise_controls.py": "0dce0c66d7a531c9134c591377fff92f181249919c591a4ddbe1096ce81703e1",
+    "benchmarks/atom_loss/plot.py": "f18e2f4fb875b79f9509f196d3300ffb2f8478940353df95b0ecc8962245f371",
+    "benchmarks/atom_loss/publish.py": "6bbd91050f221e806909618c56a6a9edf7a3bccbb9d72531fd57eacf7e887859",
+    "benchmarks/atom_loss/reference.py": "5466f849afa6fe5bcb398a425248defe03af6f06e722da90f3c268e98bb06396",
+    "benchmarks/atom_loss/remeasure.py": "e5224dd58da2c842c11750a2427304bb2f286043da63b99ce40f85c490724ea9",
+    "benchmarks/atom_loss/run.py": "6366939ebd2b48abdb69239abfe0a2d7851787bd67b812c8cdb6aa7f4f77713c",
+    "benchmarks/atom_loss/shot_data.py": "b4a49b9027890a9922f112b152cf634b9c9b43e146ae29b2d7173e052fcd9a2a",
+    "benchmarks/atom_loss/test_reference.py": "a9b96053c89961895f15ce9d9f1fd802e8fcc9cf85e79a76cef280133d8080d3",
+    "benchmarks/atom_loss/verify.py": "c9ae8f83b222f5709517cf48cb274df8e1096761277dbc9bf57e7e7928522acf",
+    "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+    "Cargo.lock": "b11a14e3ea3f148c0795fe764385ac239627b26d50b138b3eb4c25fc348b1b12",
+    "rustqec-cli/src/decode/benchmark.rs": "2b2efdff6677589a80923ccf408414b5f60670b39277a6af66e346d2da19e6d8",
+    "rstim/examples/atom_loss_sampling_benchmark.rs": "c690f089db927f07e288d3694f8f989ff3b30ad80e1645a79a8a94fdc45f8cf1"
+  }
+}

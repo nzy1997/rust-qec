@@ -3,7 +3,7 @@ import math
 import tempfile
 from pathlib import Path
 import numpy as np
-from . import reference
+from . import reference, channel_probes
 
 P = .17
 
@@ -29,7 +29,7 @@ def cases():
 def evaluate(binary, sampler, shots=32768):
     specifications=list(cases())
     # One-sample two-sided Hoeffding bound, unioned over BOTH samplers and all events.
-    tolerance=math.sqrt(math.log(4*len(specifications)/5e-7)/(2*shots))
+    tolerance=math.sqrt(math.log(4*len(specifications)/4e-7)/(2*shots))
     records=[]
     with tempfile.TemporaryDirectory(prefix='analytic-noise-') as tmp:
         for name,text,columns,expected,channel in specifications:
@@ -55,6 +55,7 @@ def run(binary, sampler, shots=32768):
         # Execute the same acceptance test with a real defective native input.
         failed=[r['case'] for r in evaluate(binary,defective,shots) if r['status']=='FAIL']
         mutations[channel]={'rejected':bool(failed),'failed_cases':failed}
-    return {'status':'PASS' if all(r['status']=='PASS' for r in records) and all(m['rejected'] for m in mutations.values()) else 'FAIL',
+    distributions = channel_probes.run(binary, sampler, shots)
+    return {'distribution_probes':distributions, 'status':'PASS' if all(r['status']=='PASS' for r in records) and all(m['rejected'] for m in mutations.values()) and distributions['status']=='PASS' else 'FAIL',
             'method':'analytic single-bit/parity probabilities; one-sample bounds; live, absent, reset-restored and pre-loss controls',
             'familywise_alpha_bound':5e-7,'cases':records,'channel_deletion_mutations':mutations}

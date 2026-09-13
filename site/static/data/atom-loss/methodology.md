@@ -90,7 +90,7 @@ This Python implementation is deliberately simple and is **not** an optimized
 Stim atom-loss implementation.
 
 Supported operations: Z-basis reset and measurement (including inverted and
-loss-visible measurement), H/X/Y/Z, CX/CZ, one/two-qubit depolarization and Pauli
+loss-visible measurement), H/S/S_DAG/X/Y/Z, CX/CZ, one/two-qubit depolarization and Pauli
 errors, LOSS and nested REPEAT. Sampling ignores coordinate/detector annotations.
 Unsupported operations and inline measurement noise raise an error. This is not
 a reference for every circuit accepted by RustQEC.
@@ -99,7 +99,9 @@ a reference for every circuit accepted by RustQEC.
 circuits, with 32,768 shots per implementation per case. Four circuits additionally
 have hand-computed deterministic answers. A conservative Hoeffding union bound
 covers all histogram bins at alpha <= 5e-7. Another 5e-7 is allocated to
-the analytic channel checks below (combined healthy-check bound <= 1e-6). Removing skipped-gate
+the analytic channel checks below: 4e-7 for the original 16 events and 1e-7 for
+all joint bins and marginals of the 26 distribution probes (combined healthy-check
+bound <= 1e-6). Removing skipped-gate
 semantics must fail a known answer; an unsupported operation must be rejected.
 These statistical checks cannot prove equality or validate arbitrarily rare
 fault probabilities.
@@ -113,6 +115,31 @@ probabilities; zero-probability controls require exactly zero events. The same
 acceptance checks are actually rerun with each of the five native-input channels
 deleted. All five mutations must fail. A regression deletes DEPOLARIZE2 from
 all native inputs and requires the **overall** correctness report to fail.
+
+`channel_probes.py` adds 26 analytic distribution probes. Bell preparation and
+inverse Bell readout resolve all four single-qubit and all sixteen two-qubit
+Pauli labels, including identity, at p = 0, 0.17, 0.6 and 1. Nonidentity bins
+have probability p/3 or p/15. Higher-noise probes make an omitted component
+resolvable at the chosen sample size; the check does not rely solely on p=0.17.
+Nine X/Y/Z product-basis combinations check complete two-bit distributions and
+both individual marginals. For a two-qubit product eigenstate, the ideal-outcome
+probability is 1-4p/5 and each of the other three outcomes has probability 4p/15;
+each bit flips with probability 8p/15. Both loss directions, reset restoration,
+noise before loss and single-qubit X/Y/Z probes are also covered.
+
+Each probe uses 32,768 samples per implementation, with one-sample Hoeffding
+bounds unioned over every joint bin and marginal for both implementations.
+Zero/one probabilities must hold exactly. Tests resolve each deterministic
+Pauli label against hand-derived Bell syndromes. Five actual replacement
+mutations must fail: IX-only, XI-only, independent X errors on both wires, and
+X-only or Z-only single-qubit depolarization. An IX-only regression requires
+the **overall** sampling report to fail using the same acceptance criteria.
+This is finite statistical evidence for the specified stochastic Pauli channels,
+not a proof for arbitrary noise channels or arbitrarily small probability biases.
+
+The updated correctness report is linked to `provenance-correctness.json` and
+`source-snapshot-correctness.json`. Sampling and decoder timing records, their
+historical provenance, and the archived corpora/predictions remain unchanged.
 
 `decoder_reference.py` independently specifies three- and five-wire parity-check
 graphs, their base weights log(9), and loss-conditioned weights. It checks the
@@ -169,14 +196,23 @@ separate from the timed matching exporter.
    Rust parses once; auto-sampler preparation is timed on each call. The Python
    reference includes parsing, grouping and per-history Stim compilation.
    Imports, process startup and file I/O are excluded. Rust uses two warmups;
-   the Python reference uses one. Plot three-run median and full range. This
-   measures the cost of the correctness reference, **not native Stim performance**.
+   the Python reference uses one. The main figure shows Rust absolute throughput with a three-run median and
+   full range. A separate supplementary figure shows reference milliseconds per
+   batch. The reference is unoptimized, with different parsing boundaries; it is
+   **not native Stim performance** and no backend speedup ratio is inferred.
 2. **Loss sweep:** d = 3, 5, 7, rounds = d; Pauli probability 0.001; each loss
    probability in 0.0001, 0.0003, 0.001, 0.003, 0.01. Each point uses 5,000 shared
    blinded shots with seed 20260911. Compare native envelope matching, PyMatching
    with the same envelope-conditioned graph, and PyMatching with fixed base
    weights. The last is a loss-conditioning ablation: it still receives the same
    canonical syndromes, so it does not remove every use of loss flags.
+   `timing-sweep.svg` also shows all 15 settings, with three-run medians/ranges,
+   individual panel log y-ranges and no omitted timing points. `timing-sweep.csv`
+   exposes all 135 decoder repetitions, exact input-pattern counts, graph builds,
+   and native cache hits (blank for offline Python groups). Native streaming and
+   Python offline policies differ. At d=7, pLoss=.0003, native/Python envelope
+   medians are 178.66/144.01 µs/shot; at .001 they are 440.25/431.79. These include
+   rank reversals and close medians, not a universal or isolated-kernel ranking.
 3. **Accuracy / time:** d = 3, rounds = 2, Pauli 0.001, loss 0.003, 5,000 shared
    shots, seed 20260912. Add envelope MLE with a 500 ms per-shot timeout. Plot
    logical failure probability against amortized compilation + decoding time,
@@ -218,6 +254,12 @@ binomial upper bound `1 - 0.05**(1/N)` (about 0.000599 for N = 5,000), not a
 positive measured rate. Nonzero points retain Wilson intervals. Display
 omissions do not change scoring. Timing ranges are observed min/max, not confidence intervals.
 The curves report failure per entire memory experiment; rounds vary with distance.
+Timing repeats reuse one corpus; they do not turn 5,000 shots into 15,000
+independent accuracy samples. Many low-loss points have only 0–5 failures and
+cannot resolve small differences. At the d=3 two-round tradeoff point, conditioned
+versus fixed weights have 0 conditioned-only and 13 fixed-only failures; this
+paired evidence supports improvement at that setting only. MLE's 1/5,000 has
+large relative uncertainty and remains tied to its fault-configuration objective.
 There is no threshold fit, accuracy ranking by overlapping intervals, or
 extrapolation to other circuits or larger distances.
 

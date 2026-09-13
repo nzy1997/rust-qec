@@ -66,7 +66,7 @@ def run(binary, shots=32768):
         negative = not np.all(bad == KNOWN['lost_control_skips_cx'])
         # Unsupported operations must fail explicitly, rather than silently disappear.
         try:
-            reference.sample('R 0\nS 0\nM 0', 4)
+            reference.sample('R 0\nT 0\nM 0', 4)
             rejected = False
         except ValueError:
             rejected = True

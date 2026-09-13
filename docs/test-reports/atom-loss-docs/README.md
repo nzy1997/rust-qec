@@ -53,3 +53,12 @@ in each run. The downloadable 1.5 MB shot archive contains all 16 corpora and
 150 predictions; the standalone standard-library rescorer verifies every result.
 Regression controls reject resealed native timing corruption, missing required
 checksums/provenance, changed source snapshots, and altered or omitted predictions.
+
+The 2026-09-13 channel-coverage revision adds Bell Pauli-component probes,
+X/Y/Z joint/marginal checks, both loss directions and actual wrong-channel
+mutations. The original IX-only reproduction now fails the overall report.
+The main sampling figure shows absolute Rust throughput; reference cost is a
+separate supplement. All 15 timing settings appear in a new workflow figure,
+with 135 timing/cache records downloadable as CSV. Browser tests exercise both
+new figures and the distribution-probe report. Timing records and the shot
+archive are unchanged.

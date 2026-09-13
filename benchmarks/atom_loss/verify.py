@@ -1,10 +1,12 @@
 """Check the published evidence bundle; incomplete runs cannot become accuracy points."""
 import argparse
+import csv
 import hashlib
 import json
 import math
+import itertools
 from pathlib import Path
-from .artifacts import required_files, TIMING_FILES, native_total
+from .artifacts import required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows
 
 
 def require_complete_sweep(cases):
@@ -25,6 +27,8 @@ def verify(root):
     required = required_files(root)
     if listed & TIMING_FILES:
         required = required | TIMING_FILES
+    if listed & CORRECTNESS_FILES:
+        required = required | CORRECTNESS_FILES
     missing = required - listed
     if missing:
         raise ValueError(f'Missing required artifact checksums: {sorted(missing)}')
@@ -33,7 +37,8 @@ def verify(root):
         if path.parent != root or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
             raise ValueError(f'Artifact integrity mismatch: {name}')
     for provenance, snapshot in [('provenance-all.json', 'source-snapshot.json')] + (
-            [('provenance-timing.json', 'source-snapshot-timing.json')] if listed & TIMING_FILES else []):
+            [('provenance-timing.json', 'source-snapshot-timing.json')] if listed & TIMING_FILES else []) + (
+            [('provenance-correctness.json', 'source-snapshot-correctness.json')] if listed & CORRECTNESS_FILES else []):
         record = json.loads((root/provenance).read_text())
         source = json.loads((root/snapshot).read_text())
         if source['base_commit'] != record['source_commit']:
@@ -50,6 +55,20 @@ def verify(root):
     assert all(c['status']=='PASS' for c in analytic['cases'])
     assert set(analytic['channel_deletion_mutations'])=={'X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2'}
     assert all(c['rejected'] and c['failed_cases'] for c in analytic['channel_deletion_mutations'].values())
+    distribution = analytic['distribution_probes']
+    expected_names = {f'DEPOLARIZE{n}_bell_p{p}' for n in [1,2] for p in [0.,.17,.6,1.]}
+    expected_names |= {'DEPOLARIZE2_product_' + ''.join(b) for b in itertools.product('XYZ', repeat=2)}
+    expected_names |= {f'DEPOLARIZE2_{state}_{q}' for state in ['lost','restored','before_loss'] for q in [0,1]}
+    expected_names |= {f'DEPOLARIZE1_product_{b}' for b in 'XYZ'}
+    if (distribution['status'] != 'PASS' or len(distribution['cases']) != len(expected_names)
+            or {c['case'] for c in distribution['cases']} != expected_names
+            or any(c['status'] != 'PASS' for c in distribution['cases'])):
+        raise ValueError('Incomplete or failed Pauli channel distribution probes')
+    replacements = distribution['channel_replacement_mutations']
+    if (set(replacements) != {'DEPOLARIZE2_ix_only','DEPOLARIZE2_xi_only','DEPOLARIZE2_independent_x',
+                              'DEPOLARIZE1_x_only','DEPOLARIZE1_z_only'}
+            or not all(m['rejected'] and m['failed_cases'] for m in replacements.values())):
+        raise ValueError('Missing or escaped wrong-channel mutation')
     chain=json.loads((root/'chain-correctness.json').read_text())
     assert (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)
     assert chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4
@@ -109,6 +128,11 @@ def verify(root):
                     assert a+b==r['disagreements_with_native']
             else:
                 assert 'logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r
+    with (root/'timing-sweep.csv').open() as stream:
+        rows = list(csv.DictReader(stream))
+    expected = [{key:str(value) for key,value in row.items()} for row in timing_rows(decoding)]
+    if rows != expected or len(rows) != 135:
+        raise ValueError('Timing sweep CSV differs from complete raw repetitions')
     from .shot_data import rescore, ARCHIVE
     rescore(root/ARCHIVE, root)
     return 'PASS'
