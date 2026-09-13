@@ -46,3 +46,10 @@ The latest capture includes analytic channel-deletion controls and a finite real
 Mid-SWAP chain check covering matching and MLE. A supplementary Python phase
 chart separates graph construction from decode_batch calls. The sampling and
 accuracy/time SVGs state their comparison limits directly inside the figure.
+
+The results capture was refreshed on 2026-09-13 after bulk PyMatching graph
+construction and rotated-order retiming. Sparse topology preparation is included
+in each run. The downloadable 1.5 MB shot archive contains all 16 corpora and
+150 predictions; the standalone standard-library rescorer verifies every result.
+Regression controls reject resealed native timing corruption, missing required
+checksums/provenance, changed source snapshots, and altered or omitted predictions.

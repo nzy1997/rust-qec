@@ -1,9 +1,16 @@
 """Semantic controls for the benchmark/reference harness, without timing assertions."""
 import unittest
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import tempfile
+import zipfile
+import pymatching
 from unittest.mock import patch
 import numpy as np
 from . import reference
-from .verify import require_complete_sweep
+from .verify import require_complete_sweep, verify
 from .run import ROOT, build_matching, logical_x, score, wilson, measure_python, python_decode
 from . import decoder_reference, chain_reference, correctness, noise_controls
 import itertools
@@ -79,7 +86,7 @@ class ReferenceTests(unittest.TestCase):
             graph['losses'].append([i for i,f in enumerate(flags) if f])
         for conditioned in [False,True]:
             batch,timing=python_decode(graph,conditioned)
-            phases=[timing[k] for k in ['preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
+            phases=[timing[k] for k in ['topology_seconds','preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
             self.assertGreaterEqual(min(phases),0)
             self.assertAlmostEqual(sum(phases),timing['decode_seconds'])
             loop,_=python_decode(graph,conditioned,batch=False)
@@ -88,6 +95,101 @@ class ReferenceTests(unittest.TestCase):
         for row in graph['syndromes'][1:]: row.append(0)
         with self.assertRaisesRegex(ValueError,'Unreachable'):
             python_decode(graph,False)
+
+    def test_bulk_graph_preserves_parallel_boundary_weights_and_predictions(self):
+        # Parallel edges have identical logical labels, as required by the compiler.
+        # Conditioning changes which parallel edge survives smallest-weight merge.
+        graph = {'edges': [
+            {'u':0,'v':None,'observables':[0],'weight':4.,'loss_factor':.25},
+            {'u':0,'v':None,'observables':[0],'weight':2.,'loss_factor':.5},
+            {'u':0,'v':1,'observables':[],'weight':3.,'loss_factor':.25},
+            {'u':0,'v':1,'observables':[],'weight':1.,'loss_factor':.5},
+            {'u':1,'v':None,'observables':[],'weight':2.,'loss_factor':.5}],
+            'mean_weight':2.4, 'num_observables':1,
+            'loss_edges': [[0,2], [1,3], [4]], 'syndromes':[[0,0]], 'losses':[[]]}
+        for mask in range(8):
+            losses = [i for i in range(3) if mask & (1 << i)]
+            active = {i for loss in losses for i in graph['loss_edges'][loss]}
+            legacy = pymatching.Matching()
+            for i, edge in enumerate(graph['edges']):
+                weight = (edge['loss_factor']*graph['mean_weight'] if i in active else edge['weight'])/4.
+                kwargs = dict(weight=weight, fault_ids=set(edge['observables']), merge_strategy='smallest-weight')
+                if edge['v'] is None: legacy.add_boundary_edge(edge['u'], **kwargs)
+                else: legacy.add_edge(edge['u'], edge['v'], **kwargs)
+            bulk = build_matching(graph, losses)
+            self.assertEqual(bulk.edges(), legacy.edges())
+            rows = np.array(list(itertools.product([0,1], repeat=2)), dtype=np.uint8)
+            np.testing.assert_array_equal(bulk.decode_batch(rows), legacy.decode_batch(rows))
+
+    def test_bundle_rejects_resealed_native_time_and_missing_checksums(self):
+        source = ROOT/'site/static/data/atom-loss'
+        self.assertEqual(verify(source), 'PASS')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'bundle'
+            def reset():
+                shutil.copytree(source, root, dirs_exist_ok=True)
+            def reseal(name):
+                manifest = json.loads((root/'bundle.json').read_text())
+                manifest['sha256'][name] = hashlib.sha256((root/name).read_bytes()).hexdigest()
+                (root/'bundle.json').write_text(json.dumps(manifest))
+            for defect in ['total', 'missing_stats', 'negative', 'nan', 'failed']:
+                reset()
+                data = json.loads((root/'tradeoff.json').read_text())
+                native = data['decoders']['envelope-matching']
+                if defect == 'total': native['total_seconds'] = [v/100 for v in native['total_seconds']]
+                elif defect == 'missing_stats': del native['runs'][0]['stats']
+                elif defect in ['negative','nan']: native['runs'][0]['stats']['compile_seconds'] = -1. if defect == 'negative' else float('nan')
+                else: native['runs'][0]['exit_code'] = 1
+                (root/'tradeoff.json').write_text(json.dumps(data))
+                reseal('tradeoff.json')
+                with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, 'native|Native'):
+                    verify(root)
+            for name in ['accuracy-time.svg', 'source-snapshot-timing.json', 'shot-data-v1.zip']:
+                reset()
+                manifest = json.loads((root/'bundle.json').read_text())
+                del manifest['sha256'][name]
+                (root/name).write_text('replaced but unlisted')
+                (root/'bundle.json').write_text(json.dumps(manifest))
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Missing required'):
+                    verify(root)
+            reset()
+            manifest = json.loads((root/'bundle.json').read_text())
+            for name in ['provenance-timing.json', 'source-snapshot-timing.json']:
+                del manifest['sha256'][name]
+                (root/name).unlink()
+            (root/'bundle.json').write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError, 'Missing required'):
+                verify(root)
+            reset()
+            snapshot = json.loads((root/'source-snapshot-timing.json').read_text())
+            snapshot['files'][next(iter(snapshot['files']))] += '# changed'
+            (root/'source-snapshot-timing.json').write_text(json.dumps(snapshot))
+            reseal('source-snapshot-timing.json')
+            with self.assertRaisesRegex(ValueError, 'Source snapshot mismatch'):
+                verify(root)
+
+    def test_archive_rejects_resealed_wrong_predictions_and_missing_rows(self):
+        from .shot_data import rescore, ARCHIVE
+        source = ROOT/'site/static/data/atom-loss'/ARCHIVE
+        with zipfile.ZipFile(source) as archive:
+            original = {name:archive.read(name) for name in archive.namelist()}
+        member = 'tradeoff/envelope-matching-0.b8'
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)/ARCHIVE
+            for defect in ['prediction', 'missing']:
+                payload = original.copy()
+                index = json.loads(payload['index.json'])
+                if defect == 'prediction':
+                    rows = bytearray(payload[member]); rows[0] ^= 1
+                    payload[member] = bytes(rows)
+                    index['sha256'][member] = hashlib.sha256(rows).hexdigest()
+                else:
+                    del payload[member]; del index['sha256'][member]
+                payload['index.json'] = json.dumps(index).encode()
+                with zipfile.ZipFile(target, 'w') as archive:
+                    for name, data in payload.items(): archive.writestr(name, data)
+                with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, 'rescore mismatch|Incomplete'):
+                    rescore(target)
 
     def test_deleted_two_qubit_channel_fails_same_acceptance(self):
         original=correctness.rust_rows

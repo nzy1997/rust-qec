@@ -21,6 +21,8 @@ export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1
 drafts/atom-loss-venv/bin/python -m unittest benchmarks.atom_loss.test_reference
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.run \
   --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
+drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.shot_data pack \
+  --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.publish \
   --out drafts/atom-loss-results
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.verify drafts/atom-loss-results
@@ -52,7 +54,28 @@ drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.remeasure \
 ```
 
 The retiming output contains decoding results and its provenance; combine it
-with the unchanged sampling evidence before publishing a complete bundle.
+with the unchanged sampling evidence before publishing a complete bundle. Pack
+`shot-data-v1.zip` from the new work directory after copying the retimed results.
+
+### Download and rescore without building Rust
+
+`shot-data-v1.zip` contains all 16 synthetic corpora, public/private manifests,
+circuits, scoring keys and **all 150 prediction files** (three repetitions of
+every backend), plus the decoding/tradeoff result JSON, per-file hashes and a
+standalone `rescore.py`. The private keys are published for auditing, but are
+never supplied to either decoder during measurement. After downloading the ZIP,
+extract `rescore.py` and run with any Python 3.10+ installation:
+
+```sh
+python3 rescore.py rescore shot-data-v1.zip
+```
+
+Expected: `PASS: 16 corpora; 150 prediction files rescored`. No third-party
+Python packages or native binaries are needed. The checker verifies completeness,
+corpus/prediction hashes, failure rates and paired disagreements. Repository
+verification additionally requires the archived results to match the public JSON.
+Checksums detect inconsistency, not authenticity against rewriting all evidence;
+use the Git commit for the versioned source of the bundle.
 
 ## Correctness reference
 
@@ -158,16 +181,19 @@ separate from the timed matching exporter.
    shots, seed 20260912. Add envelope MLE with a 500 ms per-shot timeout. Plot
    logical failure probability against amortized compilation + decoding time,
    with fresh decoder caches in each of three repetitions. The main PyMatching
-   comparators use `decode_batch`; fixed-weight per-shot calls are also retained
+   comparators use `from_check_matrix` and `decode_batch`; fixed-weight per-shot calls are also retained
    as an API control and must produce identical predictions to the batch path.
-   Each repetition reruns and remeasures the common Rust compiler and public-row
-   transformation. Python decode time includes array conversion, loss-pattern
+   Backend order rotates each repetition, with serial execution and no concurrent
+   build/test workload. Each repetition reruns and remeasures the common Rust compiler and public-row
+   transformation. Python decode time includes sparse topology/weight preparation
+   once per invocation, array conversion, loss-pattern
    grouping, graph construction, batched decoding and reordering predictions.
    Startup, scoring and JSON transport/loading are excluded. Native decode time
    includes buffered public-row reads and output packing/flush; the exporter's
    transformation stage also includes public-row reads. These I/O boundaries
    differ, so this is not a fully identical end-to-end process comparison.
-   Each batch repetition also records array/group/selection, graph construction,
+   Each batch repetition separately records sparse topology/weight preparation,
+   array/group/selection, bulk graph construction,
    decode_batch API calls, output reordering, and remaining adapter/timer overhead.
    The supplementary stage chart uses additive means of these phases plus the
    shared compiler/transform stages. Its graph-construction percentage uses
@@ -208,8 +234,12 @@ nonnegative minimum-weight objective rather than combining independent errors.
 
 The native adapter caches at most 1,024 patterns FIFO and enforces a work budget.
 The batch Python adapter groups all shots by visible loss pattern, builds one
-graph per group, calls the official `decode_batch` interface and restores input
-order. Grouping and reordering costs are included; this offline batch policy
+graph per group with the official `from_check_matrix` interface, calls `decode_batch` and restores input
+order. The sparse check/fault matrices and base/conditioned weight arrays are
+prepared once inside each measured invocation; each pattern copies and conditions
+its weights. Parallel edges use `smallest-weight` and boundary edges use a virtual
+boundary node. No topology preparation is amortized across timing repetitions.
+Grouping and reordering costs are included; this offline batch policy
 requires retaining the batch and differs from the native streaming cache policy.
 Only the per-shot Python API control uses the 1,024-entry FIFO cache. Graph builds,
 batch calls and available cache statistics are recorded. Backend integer weight
@@ -231,6 +261,8 @@ Primary implementation sources:
   heralded erasure alone is not persistent absent-wire evolution.
 - [Stim DEPOLARIZE2 definition](https://github.com/quantumlib/Stim/blob/main/doc/gates.md#the-depolarize2-instruction):
   each of the 15 nonidentity Pauli pairs has probability p/15; eight flip Z parity.
+- [PyMatching bulk graph construction](https://pymatching.readthedocs.io/en/stable/api.html#pymatching.Matching.from_check_matrix):
+  sparse parity-check and fault matrices with explicit weights and edge merge policy.
 - [PyMatching batch decoding](https://pymatching.readthedocs.io/en/stable/#decoding-stim-circuits):
   official `decode_batch` interface for reducing per-shot Python overhead;
   the pinned package version is in `requirements.txt` and the run provenance.

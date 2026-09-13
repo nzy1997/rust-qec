@@ -32,12 +32,12 @@ def main():
     save(args.out/'provenance-timing.json', {
         'started_utc':datetime.now(timezone.utc).isoformat(),'command':sys.argv,'source_commit':base,
         'working_tree_dirty':True,'os':platform.platform(),'cpu':cpu_model(),'python':sys.version,
-        'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','matplotlib']},
+        'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','scipy','matplotlib']},
         'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,exporter.parent/'export_decoder_oracle']},
         'sources':{str(p.relative_to(ROOT)):digest(p) for p in source_paths},
         'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},
         'baseline_sha256':{name:digest(args.baseline/name) for name in ['decoding.json','tradeoff.json']},
-        'timing':'Serial processes, three cold decoder runs, no CPU affinity. Each Python repetition freshly exports and times compilation and public-row transformation, then times array conversion, grouping, graph construction, decode_batch and output reordering. Native totals sum fresh compile and decode stats including buffered reads and packing/flush. Export transformation includes input reads; JSON transport/loading, process startup and scoring excluded. Fixed Python loop retained as API control; batch and loop predictions must match.',
+        'timing':'Serial processes, three cold decoder runs, rotated backend order per repetition, no CPU affinity. Each Python repetition freshly exports and times compilation and public-row transformation, then times sparse-matrix preparation, array conversion, grouping, from_check_matrix construction, decode_batch and output reordering. Native totals sum fresh compile and decode stats including buffered reads and packing/flush. Export transformation includes input reads; JSON transport/loading, process startup and scoring excluded. Fixed Python loop retained as API control; batch and loop predictions must match.',
         'sampling':'Unchanged; provenance-all.json and source-snapshot.json describe the original sampling run.'})
     result = check_decoder(binary, exporter)
     assert result['status']=='PASS'

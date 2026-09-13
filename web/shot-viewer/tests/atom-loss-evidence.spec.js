@@ -29,6 +29,9 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();
   expect((await downloadPromise).suggestedFilename()).toBe('summary.csv');
+  const archiveDownload = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download all 16 corpora and 150 prediction files (ZIP)' }).click();
+  expect((await archiveDownload).suggestedFilename()).toBe('shot-data-v1.zip');
   const data = await (await page.request.get('/data/atom-loss/decoding.json')).json();
   expect(data).toHaveLength(15);
   expect(data.every(row => row.shots === 5000)).toBe(true);
