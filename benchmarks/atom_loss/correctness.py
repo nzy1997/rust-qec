@@ -9,26 +9,7 @@ import tempfile
 import numpy as np
 from . import reference, noise_controls, low_probability
 
-CASES = {
-    'lost_control_skips_cx': 'R 0 1\nX 0\nLOSS(1) 0\nCX 0 1\nML 0 1',
-    'lost_target_skips_cx': 'R 0 1\nH 0\nLOSS(1) 1\nCX 0 1\nH 0\nML 0 1',
-    'reset_restores_wire': 'R 0 1\nLOSS(1) 0\nR 0\nX 0\nCX 0 1\nML 0 1',
-    'readout_reset_restores_wire': 'R 0\nLOSS(1) 0\nMRL 0\nML 0',
-    'bell_partner_marginal': 'R 0 1\nH 0\nCX 0 1\nLOSS(1) 0\nML 0 1',
-    'loss_at_two_times': 'R 0 1\nH 0\nLOSS(0.2) 0\nCX 0 1\nLOSS(0.3) 1\nML 0 1',
-    'two_losses': 'R 0 1\nLOSS(0.3) 0 1\nCX 0 1\nML 0 1',
-    'pauli_and_loss': 'R 0 1\nH 0\nCX 0 1\nDEPOLARIZE2(0.17) 0 1\nLOSS(0.2) 0\nX_ERROR(0.11) 1\nML 0 1',
-    'persistent_loss_multiple_gates': 'R 0 1 2\nX 0\nLOSS(0.4) 0\nCX 0 1\nCX 0 2\nML 0 1 2',
-    'repeat_delayed_readout': 'R 0 1\nREPEAT 3 {\nH 0\nCX 0 1\nLOSS(0.1) 0\n}\nML 0 1',
-    'ordinary_lost_measurement': 'R 0 1\nX 0\nLOSS(0.4) 0\nCX 0 1\nM 0 1',
-    'no_loss_bell': 'R 0 1\nH 0\nCX 0 1\nLOSS(0) 0\nM 0 1',
-}
-KNOWN = {
-    'lost_control_skips_cx': [1, 1, 0, 0],
-    'lost_target_skips_cx': [0, 0, 1, 1],
-    'reset_restores_wire': [0, 1, 0, 1],
-    'readout_reset_restores_wire': [1, 1, 0, 0],
-}
+from .probe_specs import CASES, KNOWN
 
 
 def rust_rows(binary, text, shots, seed, work):
@@ -58,7 +39,7 @@ def run(binary, shots=32768):
             independent = reference.sample(text, shots, 827)
             delta = float(np.max(np.abs(histogram(observed) - histogram(independent))))
             known_ok = name not in KNOWN or (np.all(observed == KNOWN[name]) and np.all(independent == KNOWN[name]))
-            records.append({'case': name, 'shots_per_sampler': shots, 'max_bin_difference': delta,
+            records.append({'histogram_counts':{key:np.rint(histogram(rows)*shots).astype(int).tolist() for key,rows in [('rust',observed),('reference',independent)]}, 'case': name, 'shots_per_sampler': shots, 'max_bin_difference': delta,
                             'tolerance': tolerance, 'known_answer_pass': bool(known_ok),
                             'status': 'PASS' if delta <= tolerance and known_ok else 'FAIL'})
         text = CASES['lost_control_skips_cx']

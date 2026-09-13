@@ -16,6 +16,7 @@ import pymatching
 from scipy.sparse import csc_matrix
 from .artifacts import native_total, wilson
 from . import correctness, reference
+from .shot_data import validate_dataset
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -207,7 +208,7 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
     public = json.loads((work/'public/manifest.json').read_text())
     private = json.loads((work/'private/manifest.json').read_text())
     assert public['dataset_id'] == private['dataset_id'] and public['circuit']['observables'] == 1
-    answers = np.frombuffer((work/'private/answers.b8').read_bytes(), dtype=np.uint8)
+    answers = np.frombuffer(validate_dataset(lambda name:(work/name).read_bytes()), dtype=np.uint8)
     assert len(answers) == shots
     case = {'distance': distance, 'rounds': rounds, 'loss_probability': loss, 'pauli_probability': .001,
             'shots': shots, 'seed': seed, 'logical_x_support': support, 'dataset_id': public['dataset_id'],

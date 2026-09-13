@@ -241,6 +241,116 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(report['status'],'FAIL')
         self.assertTrue(any('/no_visible_loss/' in e for e in report['comparison']['failed_events']))
 
+    def test_dataset_contract_checks_shape_identity_and_scoring_relation(self):
+        from .shot_data import validate_dataset
+        with zipfile.ZipFile(ROOT/'site/static/data/atom-loss/shot-data-v1.zip') as archive:
+            original={name.removeprefix('tradeoff/'):archive.read(name) for name in archive.namelist() if name.startswith('tradeoff/')}
+        self.assertEqual(validate_dataset(original.__getitem__),original['private/answers.b8'])
+        # One matrix covers missing fields, inconsistent metadata, invalid packed
+        # data and coherent-checksum corruption of the actual scoring relation.
+        metadata=[('public/manifest.json',path,value) for path,value in [
+            (['schema_version'],2),(['mode'],'detectors'),(['shots'],4999),(['dataset_id'],'0'*64),
+            (['row','bits'],1),(['row','bytes_per_shot'],1),(['row','bit_order'],'msb_first'),
+            (['circuit','detectors'],1),(['circuit','observables'],2),(['circuit','sha256'],'0'*64),
+            (['shots_file','file'],'other.b8'),(['shots_file','sha256'],'0'*64)]]
+        metadata += [('private/manifest.json',path,value) for path,value in [
+            (['masks_file','bits'],True),(['masks_file','bytes_per_shot'],2),(['shots'],4999),
+            (['generation','seed'],-1),(['generation','batch_shots'],0)]]
+        for member,path,value in metadata:
+            for delete in [False,True]:
+                payload=original.copy();manifest=json.loads(payload[member]);target=manifest
+                for key in path[:-1]:target=target[key]
+                if delete:del target[path[-1]]
+                else:target[path[-1]]=value
+                payload[member]=json.dumps(manifest).encode()
+                with self.subTest(path=path,delete=delete),self.assertRaises((KeyError,ValueError)):
+                    validate_dataset(payload.__getitem__)
+        for defect in ['answer_one','answer_all','wrong_observable','mask','empty_mask','invalid_mask','truncated_rows','padding']:
+            payload=original.copy();member='private/answers.b8'
+            if defect=='answer_one':payload[member]=bytes([payload[member][0]^1])+payload[member][1:]
+            elif defect=='answer_all':payload[member]=bytes(v^1 for v in payload[member])
+            elif defect=='wrong_observable':payload[member]=payload['private/masks.b8']
+            elif defect in ['mask','empty_mask','invalid_mask']:
+                member='private/masks.b8'
+                payload[member]=b'' if defect=='empty_mask' else bytes([2 if defect=='invalid_mask' else payload[member][0]^1])+payload[member][1:]
+            else:
+                member='public/shots.b8'
+                if defect=='truncated_rows':payload[member]=payload[member][:-1]
+                else:
+                    rows=bytearray(payload[member]);rows[6]|=128;payload[member]=bytes(rows)
+            # Reseal the private checksum so rejection exercises semantics too.
+            if member.startswith('private/'):
+                manifest=json.loads(payload['private/manifest.json'])
+                manifest['answers_file' if 'answers' in member else 'masks_file']['sha256']=hashlib.sha256(payload[member]).hexdigest()
+                payload['private/manifest.json']=json.dumps(manifest).encode()
+            with self.subTest(defect=defect),self.assertRaises(ValueError):
+                validate_dataset(payload.__getitem__)
+
+    def test_actual_export_with_flipped_answers_fails_independent_check(self):
+        def broken(binary,text,shots,seed,work):
+            rows,masks=low_probability.export_rows(binary,text,shots,seed,work)
+            path=work/'private/answers.b8';path.write_bytes(bytes(v^1 for v in path.read_bytes()))
+            meta=work/'private/manifest.json';manifest=json.loads(meta.read_text())
+            manifest['answers_file']['sha256']=hashlib.sha256(path.read_bytes()).hexdigest();meta.write_text(json.dumps(manifest))
+            return rows,masks
+        with self.assertRaisesRegex(ValueError,'scoring answer'):
+            low_probability.real_circuit(ROOT/'target/release/rustqec',65536,exporter=broken)
+
+    def test_resealed_incomplete_or_contradictory_reports_are_rejected(self):
+        source=ROOT/'site/static/data/atom-loss'
+        original=json.loads((source/'correctness.json').read_text())
+        mutations=[
+            (['cases',0,'max_bin_difference'],1.),
+            (['cases',0,'tolerance'],1.),
+            (['cases',0,'known_answer_pass'],False),
+            (['cases',0,'histogram_counts'],{}),
+            (['cases'],original['cases'][:-1]),
+            (['analytic_noise_controls','cases',0,'rust_probability'],1.),
+            (['analytic_noise_controls','distribution_probes','cases',0,'rust','marginals'],[]),
+            (['low_probability_controls','analytic','cases',0,'counts'],{}),
+            (['low_probability_controls','analytic','cases',0,'accepted_counts'],[[0,262144]]*7),
+            (['low_probability_controls','analytic','cases',0,'expected_probabilities'],[1.]),
+            (['low_probability_controls','real_circuit','comparison','events',0,'rust_events'],999999),
+            (['low_probability_controls','real_circuit','comparison','events',0,'rust_events'],original['low_probability_controls']['real_circuit']['comparison']['events'][0]['rust_shots']),
+            (['low_probability_controls','real_circuit','comparison','events',0,'pvalue'],.123456),
+            (['low_probability_controls','real_circuit','comparison','events',0,'pvalue'],-1.),
+            (['low_probability_controls','real_circuit','comparison','threshold'],1.),
+            (['low_probability_controls','real_circuit','scoring_key_check','checked_shots'],1),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'bundle';shutil.copytree(source,root)
+            for path,value in mutations:
+                report=json.loads(json.dumps(original));target=report
+                for key in path[:-1]:target=target[key]
+                target[path[-1]]=value
+                (root/'correctness.json').write_text(json.dumps(report))
+                manifest=json.loads((root/'bundle.json').read_text())
+                manifest['sha256']['correctness.json']=hashlib.sha256((root/'correctness.json').read_bytes()).hexdigest()
+                (root/'bundle.json').write_text(json.dumps(manifest))
+                with self.subTest(path=path),self.assertRaises((KeyError,ValueError)):
+                    verify(root)
+
+    def test_sampling_count_cannot_change_throughput_after_resealing(self):
+        source=ROOT/'site/static/data/atom-loss'
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'bundle';shutil.copytree(source,root)
+            data=json.loads((root/'sampling.json').read_text());data[0]['shots']*=100
+            (root/'sampling.json').write_text(json.dumps(data))
+            manifest=json.loads((root/'bundle.json').read_text())
+            manifest['sha256']['sampling.json']=hashlib.sha256((root/'sampling.json').read_bytes()).hexdigest()
+            (root/'bundle.json').write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(ValueError,'Sampling workload'):verify(root)
+
+    def test_stdlib_statistics_match_independent_reference(self):
+        from scipy.stats import binom, fisher_exact
+        from .report_contract import binomial_interval,fisher_pvalue
+        for n,p in [(262144,.001/15),(520000,.00005),(262144,.01),(262144,.999),(128,0.),(128,1.)]:
+            tail=1e-10
+            self.assertEqual(binomial_interval(n,p,tail),[int(binom.ppf(tail,n,p)),int(binom.ppf(1-tail,n,p))])
+        for a,n,b,m in [(0,100,0,100),(0,100,100,100),(13,5000,0,5000),(500,1000,493,1001),(19,32000,310,33536)]:
+            expected=fisher_exact([[a,n-a],[b,m-b]]).pvalue
+            self.assertAlmostEqual(fisher_pvalue(a,n,b,m),expected,delta=2e-8)
+
     def test_archive_rejects_resealed_wrong_predictions_and_missing_rows(self):
         from .shot_data import rescore, ARCHIVE
         source = ROOT/'site/static/data/atom-loss'/ARCHIVE
