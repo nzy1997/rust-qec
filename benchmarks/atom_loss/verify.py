@@ -78,8 +78,6 @@ def verify(root):
             if any(r['bytes']!=expected_bytes for backend in ['rust','reference'] for r in case[backend]['records']):
                 raise ValueError('Sampling byte count differs from circuit layout and shots')
     tradeoff=json.loads((root/'tradeoff.json').read_text())
-    from .workload_contract import verify_workloads
-    verify_workloads(root)
     require((set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}), "verify: set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}")
     require((tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']), "verify: tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']")
     for c in decoding+[tradeoff]:
@@ -124,6 +122,8 @@ def verify(root):
                     require((a+b==r['disagreements_with_native']), "verify: a+b==r['disagreements_with_native']")
             else:
                 require(('logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r), "verify: 'logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r")
+    from .workload_contract import verify_workloads
+    verify_workloads(root)
     with (root/'timing-sweep.csv').open() as stream:
         rows = list(csv.DictReader(stream))
     expected = [{key:str(value) for key,value in row.items()} for row in timing_rows(decoding)]

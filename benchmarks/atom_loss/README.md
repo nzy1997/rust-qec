@@ -139,6 +139,13 @@ observable parity XOR input mask, failure rates and paired disagreements. Reposi
 verification additionally requires the archived results to match the public JSON.
 Checksums detect inconsistency, not authenticity against rewriting all evidence;
 use the Git commit for the versioned source of the bundle.
+The standalone tool requires the fixed 16 settings, four sweep comparators and
+six tradeoff comparators, three complete repetitions and all 198 prediction files. It rejects
+omitted comparisons or paired fields, stale Wilson intervals, incorrect workload
+metadata and non-integer count fields, even when the ZIP index is resealed and
+Python optimization is enabled. It validates scoring evidence; historical timing
+and build/source provenance require the full repository verifier.
+
 
 ## Correctness reference
 
