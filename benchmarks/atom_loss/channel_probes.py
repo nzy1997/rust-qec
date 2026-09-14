@@ -88,8 +88,10 @@ def run(binary, sampler, shots=32768):
     for name in MUTATIONS:
         def defective(binary, text, shots, seed, work):
             return sampler(binary, replace_channel(text, name), shots, seed, work)
-        failed = [r['case'] for r in evaluate(binary, defective, shots) if r['status'] == 'FAIL']
-        mutations[name] = {'rejected':bool(failed), 'failed_cases':failed}
+        observations = evaluate(binary, defective, shots)
+        failed = [r['case'] for r in observations if r['status'] == 'FAIL']
+        mutations[name] = {'rejected':bool(failed), 'failed_cases':failed,
+                           'observations':observations}
     return {'status':'PASS' if all(r['status']=='PASS' for r in records) and all(m['rejected'] for m in mutations.values()) else 'FAIL',
             'method':'Bell Pauli-component readout; X/Y/Z product-basis joints and marginals; both loss directions',
             'familywise_alpha_bound':ALPHA, 'cases':records, 'channel_replacement_mutations':mutations}
