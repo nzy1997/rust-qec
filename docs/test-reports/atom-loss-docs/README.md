@@ -186,3 +186,40 @@ combinations covering 345 archived predictions, both verifier modes, eight site
 checks, and Chromium/Firefox browser checks passed. Each initial agent finding
 was retested with its original reproduction; final independent verdicts are
 retained in the audit directories against the regenerated artifact commit.
+
+## 2026-09-14: figures bound to validated data
+
+Source commit `fc91ba8796c9f662737b9342b8a9d452de4063ce` adds presentation
+verification after the numerical and source checks. All eight SVGs must match
+a deterministic redraw in full, and all eight PNGs must match its decoded
+pixels and metadata after complete loading. PNG chunk CRCs are checked too.
+The downloaded methodology must equal the source-bound README. Plotting uses
+pinned dependencies, bundled DejaVu fonts and FreeType 2.6.1, reset styles,
+fixed SVG IDs and no generated timestamps. macOS ARM and Linux x86-64 redrew
+identical SVG contents and PNG pixels/metadata with this environment.
+
+Regressions reject a fabricated SVG, changed PNG pixels, swapped figures and
+altered methodology after their checksums are coherently updated. Both normal
+and optimized Python must reject these mutations. Independent review additionally
+found trailing PNG EXIF orientation/text and invalid IDAT CRC cases; both were
+fixed and the original probes were rerun successfully. The reviewer found no
+unresolved material issue in this focused presentation-integrity scope. These
+checks establish data-to-presentation consistency, not universal experimental
+correctness or protection against rewriting the source and its checks together.
+
+All evidence was regenerated from the clean source with 742 bound inputs and
+five fresh binaries. All 64 public sample/mask/answer sets and all 345 predictions
+remain byte-identical to the previous revision; timings were freshly measured.
+The page now explicitly states the incomplete balance of three timing rotations
+and the finite d=3/two-round/four-history independent physical oracle. The
+fixed-weight ablation and workflow-only performance interpretation remain.
+
+Local validation completed:
+
+- `python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract`: 50 tests passed (`drafts/round11-tests.log`).
+- All 64 corpora regenerated; 213 current-decoder/corpus combinations matched all 345 prediction files (`drafts/round11-sample-replay.log`, `drafts/round11-decoder-replay.log`).
+- Ordinary and `python -O` bundle checks passed; the original resealed SVG attack failed specifically at figure comparison (`drafts/round11-final-verify.log`, `drafts/round11-original-repro.log`).
+- Eight site checks and Chromium/Firefox browser tests passed. The results capture was refreshed and mobile overflow checked (`drafts/round11-site.log`, `drafts/round11-browser.log`, `drafts/round11-capture.log`).
+- Independent final bundle review passed normal/optimized verification and all six figure tests (`drafts/round11-agent-audit/REPORT.md`).
+
+These are local checks; hosted CI runs on the subsequent pushed artifact commit.
