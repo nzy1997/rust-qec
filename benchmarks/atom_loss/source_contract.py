@@ -27,6 +27,8 @@ BUILD_ENV_KEYS = ('PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'RUSTUP_HOME',
 NETWORK_ENV_KEYS = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
                     'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
                     'SSL_CERT_FILE', 'SSL_CERT_DIR')
+CAPTURE_DEPENDENCIES = ('stim', 'numpy', 'pymatching', 'scipy', 'matplotlib')
+THREAD_ENVIRONMENT = {'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1', 'RAYON_NUM_THREADS': '1'}
 
 
 def verify_local_cargo_config(repo):
@@ -55,8 +57,7 @@ def build_environment(repo, cargo_home):
     if cargo_home.exists():
         raise ValueError('Use a fresh isolated Cargo home')
     env = {key: os.environ[key] for key in BUILD_ENV_KEYS + NETWORK_ENV_KEYS if key in os.environ}
-    env.update(CARGO_HOME=str(cargo_home.resolve()), LANG='C', LC_ALL='C',
-               OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', RAYON_NUM_THREADS='1')
+    env.update(CARGO_HOME=str(cargo_home.resolve()), LANG='C', LC_ALL='C', **THREAD_ENVIRONMENT)
     return env
 
 
@@ -165,8 +166,8 @@ def capture(out, stage, extra=None):
               'input_digest': binding['input_digest'], 'started_utc': datetime.now(timezone.utc).isoformat(),
               'command': sys.argv, 'os': platform.platform(), 'cpu': cpu_model(), 'python': sys.version,
               'rustc': binding['rustc'], 'binaries': binaries,
-              'dependencies': {p: importlib.metadata.version(p) for p in ['stim', 'numpy', 'pymatching', 'scipy', 'matplotlib']},
-              'environment': {k: os.environ.get(k) for k in ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'RAYON_NUM_THREADS']},
+              'dependencies': {p: importlib.metadata.version(p) for p in CAPTURE_DEPENDENCIES},
+              'environment': {k: os.environ.get(k) for k in THREAD_ENVIRONMENT},
               'sources': {name: hashlib.sha256(data.encode()).hexdigest() for name, data in sources.items()}}
     record.update(extra or {})
     save(out/('provenance-'+stage+'.json'), record)
@@ -176,7 +177,7 @@ def verify_bundle_source(out, repo=ROOT):
     binding = json.loads((out/'source-manifest.json').read_text())
     commit = verify_source(binding, repo)
     env = binding.get('build_environment', {})
-    fixed = {'LANG': 'C', 'LC_ALL': 'C', 'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1', 'RAYON_NUM_THREADS': '1'}
+    fixed = {'LANG': 'C', 'LC_ALL': 'C', **THREAD_ENVIRONMENT}
     if (not {'PATH', 'HOME', 'CARGO_HOME'}.issubset(env)
             or set(env) - (set(BUILD_ENV_KEYS) | set(fixed) | {'CARGO_HOME'})
             or any(not isinstance(value, str) or not value for value in env.values())
@@ -184,11 +185,36 @@ def verify_bundle_source(out, repo=ROOT):
         raise ValueError('Invalid effective build environment')
     if set(binding['binaries']) != set(BINARIES) or any(len(h) != 64 for h in binding['binaries'].values()):
         raise ValueError('Incomplete clean-build binary manifest')
+    if not isinstance(binding.get('rustc'), str) or not binding['rustc'].strip():
+        raise ValueError('Missing recorded build compiler')
+    dependencies = {}
+    for line in (repo/'benchmarks/atom_loss/requirements.txt').read_text().splitlines():
+        package, separator, version = line.strip().partition('==')
+        if package in CAPTURE_DEPENDENCIES:
+            if not separator or not version.strip() or package in dependencies:
+                raise ValueError('Invalid pinned provenance dependency: '+package)
+            dependencies[package] = version
+    if set(dependencies) != set(CAPTURE_DEPENDENCIES):
+        raise ValueError('Missing pinned provenance dependency')
+    runtime = None
     for path in sorted(out.glob('provenance-*.json')):
         record = json.loads(path.read_text())
         if (record['source_commit'] != commit or record.get('working_tree_dirty') is not False
                 or record.get('input_digest') != binding['input_digest'] or record['binaries'] != binding['binaries']):
             raise ValueError('Stage provenance differs from clean build: '+path.name)
+        if record.get('dependencies') != dependencies:
+            raise ValueError('Stage dependencies differ from pinned requirements: '+path.name)
+        if record.get('rustc') != binding['rustc']:
+            raise ValueError('Stage compiler differs from clean build: '+path.name)
+        if record.get('environment') != THREAD_ENVIRONMENT:
+            raise ValueError('Stage threading environment differs from fixed run contract: '+path.name)
+        host = {key: record.get(key) for key in ['cpu', 'os', 'python']}
+        if any(not isinstance(value, str) or not value.strip() for value in host.values()):
+            raise ValueError('Missing recorded stage runtime: '+path.name)
+        # Compare the stages of this historical run, never the verifier's host.
+        if runtime is not None and host != runtime:
+            raise ValueError('Stage runtime differs within the recorded run: '+path.name)
+        runtime = host
         suffix = '' if path.stem == 'provenance-all' else path.stem.removeprefix('provenance')
         snapshot = json.loads((out/('source-snapshot'+suffix+'.json')).read_text())
         expected = {name: (repo/name).read_text() for name in binding['inputs']

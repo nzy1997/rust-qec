@@ -42,7 +42,7 @@ def bundle(path, wires):
     save(path/'manifest.json',manifest)
 
 
-def oracle(raw, conditioned=True, wires=3):
+def oracle_costs(raw, conditioned=True, wires=3):
     flags=[(raw>>(2*q))&1 for q in range(wires)]
     values=[1 if flags[q] else (raw>>(2*q+1))&1 for q in range(wires)]
     syndrome=[a^b for a,b in zip(values,values[1:])]
@@ -51,8 +51,13 @@ def oracle(raw, conditioned=True, wires=3):
     for correction in itertools.product([0,1],repeat=wires):
         if [a^b for a,b in zip(correction,correction[1:])]==syndrome:
             candidates.append((sum(w*x for w,x in zip(weights,correction)),correction[0]))
-    minimum=min(cost for cost,_ in candidates)
-    return {logical for cost,logical in candidates if abs(cost-minimum)<1e-9},syndrome,flags
+    return [min(cost for cost,logical in candidates if logical==i) for i in (0,1)],syndrome,flags
+
+
+def oracle(raw, conditioned=True, wires=3):
+    costs,syndrome,flags=oracle_costs(raw,conditioned,wires)
+    minimum=min(costs)
+    return {logical for logical,cost in enumerate(costs) if abs(cost-minimum)<1e-9},syndrome,flags
 
 
 def rejected_rows(predictions, allowed):
@@ -101,12 +106,15 @@ def check_case(binary, exporter, work, wires):
     passed=not any(failures.values()) and placeholder_ok and 0 in flipped and (wires!=5 or bool(ignored))
     return {'wires':wires,'rows_checked':len(allowed),'status':'PASS' if passed else 'FAIL',
             'hand_derived_graph_pass':True,'loss_mapping_pass':True,'placeholder_invariance_pass':placeholder_ok,
+            'graph':{key:graph[key] for key in ['edges','loss_edges','mean_weight','syndromes','losses']},
+            'raw_predictions':{'native':native,'pymatching':python,'ignored_conditioning':broken,'flipped_native':mutated},
             'rejected_rows':failures,'ignored_conditioning_rejected_rows':ignored,
             'flipped_prediction_rejected_rows':flipped,
             'strict_witness':None if witness is None else {'packed_row':witness,'fixed_optimum':[0],
                  'conditioned_optimum':[1],'fixed_decoder_prediction':broken[witness],
                  'native_prediction':native[witness],'pymatching_prediction':python[witness],
-                 'fixed_costs':[3,2],'conditioned_costs':[1.5,2]}}
+                 'logical_order':[0,1], 'fixed_costs':oracle_costs(witness,False,wires)[0],
+                 'conditioned_costs':oracle_costs(witness,True,wires)[0]}}
 
 
 def run(binary, exporter):
@@ -126,5 +134,9 @@ if __name__=='__main__':
     p.add_argument('--binary',type=Path,default=Path('target/release/rustqec'))
     p.add_argument('--exporter',type=Path,default=Path('target/release/examples/export_matching_benchmark'))
     p.add_argument('--out',type=Path,default=Path('site/static/data/atom-loss/decoder-correctness.json'))
+    p.add_argument('--compare',type=Path,help='Validate published observations against the same hand-derived oracle')
     a=p.parse_args();result=run(a.binary.resolve(),a.exporter.resolve());save(a.out,result)
+    if a.compare is not None:
+        from .decoder_contract import compare_reports
+        compare_reports(result,json.loads(a.compare.read_text()))
     print(result['status']);raise SystemExit(result['status']!='PASS')
