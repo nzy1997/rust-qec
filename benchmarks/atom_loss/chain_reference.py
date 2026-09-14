@@ -187,6 +187,66 @@ def validate_model(model, effects, candidates, count):
         raise ValueError('Independent loss candidate mismatch')
 
 
+GRAPH_BACKENDS = ('pymatching-envelope', 'envelope-matching-offline')
+GRAPH_MUTATIONS = ('empty_edges', 'empty_loss_mapping', 'relative_weights')
+
+
+def graph_predictions(graph, backend, exporter, work):
+    """Execute the same public-graph adapters as the timing experiment."""
+    if backend == 'pymatching-envelope':
+        from .run import python_decode
+        predictions, _ = python_decode(graph, True)
+        values = predictions.tolist()
+    elif backend == 'envelope-matching-offline':
+        path = work/'adapter-graph.json'
+        out = work/'adapter-predictions.b8'
+        save(path, graph)
+        subprocess.run([exporter.parent/'offline_matching_benchmark', path, out,
+                        work/'adapter-stats.json'], check=True, capture_output=True, timeout=120)
+        values = list(out.read_bytes())
+    else:
+        raise ValueError('Unknown graph adapter: '+backend)
+    require(len(values) == len(graph['syndromes']) and all(type(v) is int and v in (0,1) for v in values),
+            'Incomplete or invalid graph-adapter predictions')
+    return values
+
+
+def corrupt_graph(graph, mutation):
+    defective = copy.deepcopy(graph)
+    if mutation == 'empty_edges':
+        defective['edges'] = []
+        defective['loss_edges'] = [[] for _ in graph['loss_edges']]
+        defective['mean_weight'] = 0.
+    elif mutation == 'empty_loss_mapping':
+        defective['loss_edges'] = [[] for _ in graph['loss_edges']]
+    elif mutation == 'relative_weights':
+        # Change all logically labelled edges by a fixed factor, not a searched
+        # single edge or a harmless uniform rescaling of the entire objective.
+        for edge in defective['edges']:
+            if edge['observables']:
+                edge['weight'] *= 1e-6
+        defective['mean_weight'] = sum(e['weight'] for e in defective['edges']) / len(defective['edges'])
+    else:
+        raise ValueError('Unknown graph mutation: '+mutation)
+    return defective
+
+
+def prediction_record(predictions, choices):
+    require(len(predictions) == len(choices) and all(type(v) is int and v in (0,1) for v in predictions),
+            'Incomplete or invalid oracle predictions')
+    rejected = [i for i,(value,answers) in enumerate(zip(predictions,choices,strict=True)) if value not in answers]
+    singleton = [i for i,a in enumerate(choices) if len(a)==1]
+    require(bool(singleton), 'Oracle has no unique optimum witness')
+    mutated = predictions.copy(); mutated[singleton[0]] ^= 1
+    return {'predictions': predictions, 'checked_rows': len(choices), 'rejected_rows': rejected,
+            'unique_optimum_rows': len(singleton), 'predicted_ones': sum(predictions),
+            'constant_zero_rejected': any(0 not in a for a in choices),
+            'constant_one_rejected': any(1 not in a for a in choices),
+            'flipped_prediction_rejected': mutated[singleton[0]] not in choices[singleton[0]],
+            'placeholder_invariance': predictions[:len(choices)//2] == predictions[len(choices)//2:],
+            'prediction_sha256': hashlib.sha256(bytes(predictions)).hexdigest()}
+
+
 def run(binary,exporter):
     text=FIXTURE.read_text()
     circuit,probes,effects,edges,candidates,loss_edges,probe_count=independent_model(text)
@@ -279,21 +339,33 @@ def run(binary,exporter):
             subprocess.run([binary,'decode','--decoder',backend,'--dataset',work/'public','--out',out,
                             '--stats-out',work/(backend+'.json')],check=True,capture_output=True,timeout=120)
             predictions=list(out.read_bytes())
-            rejected=[i for i,(value,choices) in enumerate(zip(predictions,expected[backend],strict=True)) if value not in choices]
-            singleton=[i for i,a in enumerate(expected[backend]) if len(a)==1]
-            mutated=predictions.copy();mutated[singleton[0]]^=1
-            mutation=[i for i,(value,choices) in enumerate(zip(mutated,expected[backend])) if value not in choices]
-            results[backend]={'rejected_rows':rejected,'unique_optimum_rows':len(singleton),'predicted_ones':sum(predictions),
-                              'constant_zero_rejected':any(0 not in a for a in expected[backend]),
-                              'constant_one_rejected':any(1 not in a for a in expected[backend]),
-                              'flipped_prediction_rejected':singleton[0] in mutation,
-                              'placeholder_invariance':predictions[:len(rows)//2]==predictions[len(rows)//2:],
-                              'prediction_sha256':hashlib.sha256(out.read_bytes()).hexdigest()}
-    passed=all(mutations.values()) and all(not r['rejected_rows'] and r['flipped_prediction_rejected'] and r['placeholder_invariance'] and r['constant_zero_rejected'] and r['constant_one_rejected'] for r in results.values())
+            results[backend] = prediction_record(predictions, expected[backend])
+        for backend in GRAPH_BACKENDS:
+            predictions = graph_predictions(graph, backend, exporter, work)
+            results[backend] = prediction_record(predictions, expected['envelope-matching'])
+        graph_controls = {}
+        for mutation in GRAPH_MUTATIONS:
+            graph_controls[mutation] = {}
+            for backend in GRAPH_BACKENDS:
+                try:
+                    predictions = graph_predictions(corrupt_graph(graph, mutation), backend, exporter, work)
+                    rejected = [i for i,(v,a) in enumerate(zip(predictions,expected['envelope-matching'],strict=True)) if v not in a]
+                    control = {'outcome': 'oracle_rejected' if rejected else 'accepted',
+                               'predictions': predictions, 'rejected_rows': rejected}
+                except (ValueError, subprocess.CalledProcessError):
+                    # Empty topology may be rejected by the adapter itself. The
+                    # valid topology/weight mutants must produce wrong answers.
+                    control = {'outcome': 'decoder_error', 'predictions': None, 'rejected_rows': []}
+                graph_controls[mutation][backend] = control
+    controls_pass = all(c['outcome']=='oracle_rejected' or (m=='empty_edges' and c['outcome']=='decoder_error')
+                        for m,backends in graph_controls.items() for c in backends.values())
+    passed=controls_pass and all(mutations.values()) and all(not r['rejected_rows'] and r['flipped_prediction_rejected'] and r['placeholder_invariance'] and r['constant_zero_rejected'] and r['constant_one_rejected'] for r in results.values())
     return {'status':'PASS' if passed else 'FAIL','fixture_sha256':digest(FIXTURE),'distance':3,'rounds':2,
             'detectors':count,'rows':len(rows),'physical_fault_traces':fault_traces,'patterns':len(cache),'stim_pauli_probes':probe_count,
             'independent_effects':len(effects),'independent_graph_edges':len(edges),
             'independent_effects_candidates_and_m2d_pass':True,'compiler_output_mutations_rejected':mutations,'native_graph_edges':len(graph['edges']),'backends':results,
+            'allowed_answers': {name:[sorted(a) for a in choices] for name,choices in expected.items()},
+            'graph_adapter_controls': graph_controls,
             'method':'Stim-derived DEM and Pauli fault propagation; exact min-plus enumeration of detector/logical states; external persistent-loss measurement records',
             'mle_objective':'minimum-weight fault configuration in an independently distribution-validated native DEM representation; zero-cost loss-envelope choices',
             'scope':'finite Mid-SWAP fixture and declared envelope model, including MLE; not proof of arbitrary compiler inputs or physical logical-class Bayes optimality'}
@@ -301,5 +373,10 @@ def run(binary,exporter):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=Path('drafts/midswap-oracle.json'))
-    a=p.parse_args();r=run(ROOT/'target/release/rustqec',ROOT/'target/release/examples/export_matching_benchmark');save(a.out,r);print(r['status'])
+    p.add_argument('--compare', type=Path, help='Revalidate published observations against the freshly recomputed oracle')
+    a=p.parse_args();r=run(ROOT/'target/release/rustqec',ROOT/'target/release/examples/export_matching_benchmark');save(a.out,r)
+    if a.compare is not None:
+        from .chain_contract import compare_reports
+        compare_reports(r, json.loads(a.compare.read_text()))
+    print(r['status'])
     raise SystemExit(r['status']!='PASS')

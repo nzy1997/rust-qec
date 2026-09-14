@@ -259,8 +259,22 @@ Pauli distribution (coalescing identical effects), candidate sets and row
 transformation must match. Altered compiler weights and missing candidates must
 be rejected. Exact min-plus dynamic programming over all 131,072 detector/logical
 parity states checks matching predictions against the independently constructed
-graph. Constant-zero, constant-one and flipped predictions must fail; changing
-lost-value placeholders must not change either backend's output.
+graph. All 1,504 rows run through native streaming matching, native MLE, and
+both actual exported-graph batch adapters (PyMatching and native offline). Each
+output is scored against the independent allowed answers, rather than agreement
+with another backend. Constant-zero, constant-one and flipped predictions must
+fail; changing lost-value placeholders must not change any backend's output.
+
+Both batch adapters also execute three deliberately corrupted exports: empty
+edges, empty loss-to-edge mappings, and all observable-labelled edge weights
+multiplied by 1e-6 with the mean recomputed. Empty topology may cause an explicit
+decoder error; the other mutations must complete and produce oracle-rejected
+answers. The report retains row-level allowed answers, predictions and rejection
+indices. The verifier recomputes their summaries and requires every backend and
+negative control; CI reruns the full chain, compares its independently recomputed
+oracle definitions with the published artifact, and revalidates both sets of
+observations. Different choices among equally optimal logical answers are allowed. These checks cover this finite fixture and four
+loss histories, not arbitrary graph exports or all combinations of loss flags.
 
 For MLE, different equivalent Bernoulli decompositions can have different
 most-likely **fault configurations**. After independently validating its physical
