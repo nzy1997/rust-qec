@@ -46,6 +46,14 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   await expect(page.locator('.loss-stage-figure figcaption')).toContainText('not establish a matching-kernel');
   const chain = await (await page.request.get('/data/atom-loss/chain-correctness.json')).json();
   expect(chain.status).toBe('PASS');
+  for (const backend of ['pymatching-envelope', 'envelope-matching-offline']) {
+    expect(chain.backends[backend].checked_rows).toBe(1504);
+    expect(chain.backends[backend].rejected_rows).toEqual([]);
+    for (const mutation of ['empty_loss_mapping', 'relative_weights']) {
+      expect(chain.graph_adapter_controls[mutation][backend].outcome).toBe('oracle_rejected');
+      expect(chain.graph_adapter_controls[mutation][backend].rejected_rows.length).toBeGreaterThan(0);
+    }
+  }
   expect(chain.compiler_output_mutations_rejected).toEqual({ pauli_weight: true, loss_candidate: true });
   await page.locator('.loss-evidence-downloads summary').click();
   const sourceLink = page.getByRole('link', { name: 'Source and build manifest' });

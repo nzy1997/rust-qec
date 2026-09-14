@@ -43,14 +43,8 @@ def verify(root):
     if sampler['low_probability_controls']['real_circuit']['fixture_sha256']!=hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest():
         raise ValueError('Real-circuit sampling fixture mismatch')
     chain=json.loads((root/'chain-correctness.json').read_text())
-    require(((chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)), "verify: (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)")
-    require((chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4), "verify: chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4")
-    require((chain['independent_effects_candidates_and_m2d_pass']), "verify: chain['independent_effects_candidates_and_m2d_pass']")
-    require((all(chain['compiler_output_mutations_rejected'].values())), "verify: all(chain['compiler_output_mutations_rejected'].values())")
-    require((set(chain['backends'])=={'envelope-matching','envelope-mle'}), "verify: set(chain['backends'])=={'envelope-matching','envelope-mle'}")
-    for result in chain['backends'].values():
-        require((not result['rejected_rows'] and result['unique_optimum_rows']>0), "verify: not result['rejected_rows'] and result['unique_optimum_rows']>0")
-        require((all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])), "verify: all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])")
+    from .chain_contract import verify_chain
+    verify_chain(chain)
     require((hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']), "verify: hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']")
     oracle=json.loads((root/'decoder-correctness.json').read_text())
     require(([c['rows_checked'] for c in oracle['cases']]==[64,1024]), "verify: [c['rows_checked'] for c in oracle['cases']]==[64,1024]")
