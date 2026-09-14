@@ -25,21 +25,9 @@ def pack(work,out):
 
 
 def capture_sources(out):
-    import subprocess,sys,platform,os,hashlib,importlib.metadata
-    from datetime import datetime,timezone
-    from .run import cpu_model
-    paths=sorted((ROOT/'benchmarks/atom_loss').glob('*.py'))+[ROOT/'Cargo.lock',ROOT/'rustqec-cli/examples/offline_matching_benchmark.rs']
-    sources={str(p.relative_to(ROOT)):p.read_text() for p in paths}
-    base=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
-    save(out/'source-snapshot-seeds.json',{'base_commit':base,'files':sources})
-    save(out/'provenance-seeds.json',{'source_commit':base,'started_utc':datetime.now(timezone.utc).isoformat(),
-        'command':sys.argv,'working_tree_dirty':bool(subprocess.check_output(['git','status','--porcelain'],text=True)),
-        'sources':{k:hashlib.sha256(v.encode()).hexdigest() for k,v in sources.items()},
-        'binaries':{p:digest(ROOT/p) for p in ['target/release/rustqec','target/release/examples/export_matching_benchmark']},
-        'python':sys.version,'os':platform.platform(),'cpu':cpu_model(),
-        'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','scipy']},
-        'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},
-        'seeds':SEEDS,'shots_per_seed':5000,'timing':'Accuracy only; no timing inference.'})
+    from .source_contract import capture
+    capture(out, 'seeds', {'seeds': SEEDS, 'shots_per_seed': 5000,
+                           'timing': 'Accuracy only; no timing inference.'})
 
 
 def run(work,out):

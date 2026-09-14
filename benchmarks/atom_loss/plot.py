@@ -14,8 +14,8 @@ STYLE = {
     'envelope-matching-offline': ('RustQEC offline batch', '#247554','v','-.'),
     'envelope-matching': ('RustQEC streaming', '#b95428','o','-'),
     'pymatching-envelope': ('PyMatching + envelope (batch)', '#386b80','s','--'),
-    'pymatching-fixed': ('PyMatching, fixed (batch)', '#797471','^',':'),
-    'pymatching-fixed-loop': ('PyMatching, fixed (loop)', '#a99374','x',':'),
+    'pymatching-fixed': ('PyMatching, fixed weights (batch)', '#797471','^',':'),
+    'pymatching-fixed-loop': ('PyMatching, fixed weights (loop)', '#a99374','x',':'),
     'envelope-mle': ('RustQEC envelope MLE', '#754c91','D','-'),
 }
 plt.rcParams.update({'font.family':'DejaVu Sans','font.size':11,'axes.titlesize':13,
@@ -226,7 +226,7 @@ def render(out):
         graph_share=np.mean([r['graph_build_seconds'] for r in result['runs']])/np.mean([r['decode_seconds'] for r in result['runs']])
         ax.text(left+.08,row,f'{left:.2f} µs / shot',va='center',fontsize=10)
         ax.text(0,row+.31,f"{result['runs'][0]['graph_builds']} graph(s); construction = {graph_share:.0%} of Python adapter time",fontsize=9,color='#605b56')
-    ax.set(yticks=[0,1],yticklabels=['PyMatching fixed','PyMatching + envelope'],
+    ax.set(yticks=[0,1],yticklabels=['PyMatching fixed weights','PyMatching + envelope'],
            xlabel='Amortized workflow time (µs / shot)',title='Where the Python batch adapter spends time',ylim=(1.65,-.55))
     ax.set_xlim(0,max(np.mean(r['total_seconds'])/r['shots']*1e6 for n,r in tradeoff['decoders'].items() if n in ['pymatching-fixed','pymatching-envelope'])*1.23)
     ax.grid(axis='x');ax.set_axisbelow(True)

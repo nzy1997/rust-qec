@@ -11,6 +11,8 @@ from .run import ROOT, save
 
 
 def publish(out):
+    from .source_contract import verify_bundle_source
+    verify_bundle_source(out)
     render(out)
     shutil.copyfile(ROOT/'benchmarks/atom_loss/README.md',out/'methodology.md')
     shutil.copyfile(ROOT/'benchmarks/atom_loss/fixtures/midswap_d3_r2.stim',out/'midswap_d3_r2.stim')

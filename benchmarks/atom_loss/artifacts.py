@@ -4,7 +4,7 @@ import json
 import statistics
 
 REQUIRED_FILES = frozenset([
-    'chain-correctness.json', 'midswap_d3_r2.stim', 'correctness.json',
+    'source-manifest.json', 'chain-correctness.json', 'midswap_d3_r2.stim', 'correctness.json',
     'decoder-correctness.json', 'sampling.json', 'decoding.json', 'tradeoff.json',
     'provenance-all.json', 'methodology.md', 'summary.csv', 'source-snapshot.json',
     'shot-data-v1.zip', 'timing-sweep.csv', 'accuracy-seeds.json', 'accuracy-seeds.zip',
@@ -16,6 +16,7 @@ TIMING_FILES = frozenset(['provenance-timing.json', 'source-snapshot-timing.json
 
 
 CORRECTNESS_FILES = frozenset(['provenance-correctness.json', 'source-snapshot-correctness.json'])
+REQUIRED_FILES = REQUIRED_FILES | TIMING_FILES | CORRECTNESS_FILES
 
 
 def required_files(root):

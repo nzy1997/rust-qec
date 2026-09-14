@@ -158,6 +158,8 @@ def verify(root):
     rescore(root/ARCHIVE, root)
     from .shot_data import rescore_seeds
     rescore_seeds(root/'accuracy-seeds.zip',root)
+    from .source_contract import verify_bundle_source
+    verify_bundle_source(root)
     return 'PASS'
 
 
