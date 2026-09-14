@@ -47,11 +47,8 @@ def verify(root):
     verify_chain(chain)
     require((hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']), "verify: hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']")
     oracle=json.loads((root/'decoder-correctness.json').read_text())
-    require(([c['rows_checked'] for c in oracle['cases']]==[64,1024]), "verify: [c['rows_checked'] for c in oracle['cases']]==[64,1024]")
-    for c in oracle['cases']:
-        require((not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']), "verify: not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']")
-        require((0 in c['flipped_prediction_rejected_rows']), "verify: 0 in c['flipped_prediction_rejected_rows']")
-    require((21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']), "verify: 21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']")
+    from .decoder_contract import verify_decoder
+    verify_decoder(oracle)
     def duration(value, *, positive=False):
         if type(value) not in [int,float] or not math.isfinite(value) or (value<=0 if positive else value<0):
             raise ValueError('Invalid finite phase duration')

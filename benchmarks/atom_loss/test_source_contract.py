@@ -1,5 +1,6 @@
 """Adversarial source-binding and actual decoder replay regression tests."""
 import copy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -22,6 +23,8 @@ class SourceContractTests(unittest.TestCase):
         self.write('decoder/src/lib.rs', '// measured decoder\n')
         self.write('decoder/build.rs', '// measured build\n')
         self.write('benchmarks/atom_loss/run.py', '# measured harness\n')
+        self.write('benchmarks/atom_loss/requirements.txt',
+                   (ROOT/'benchmarks/atom_loss/requirements.txt').read_text())
         self.commit()
         self.record = clean_source(self.repo)
 
@@ -80,6 +83,94 @@ class SourceContractTests(unittest.TestCase):
             result = subprocess.run([sys.executable, *flags, '-c', program, str(record_path), str(self.repo)], capture_output=True, text=True, cwd=ROOT)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Current source/build inputs differ', result.stderr)
+
+    def runtime_bundle(self):
+        """A committed source fixture with internally consistent historical metadata."""
+        from .source_contract import BINARIES, CAPTURE_DEPENDENCIES, THREAD_ENVIRONMENT
+        out = self.repo/'evidence'; out.mkdir()
+        binding = copy.deepcopy(self.record)
+        binding.update(binaries={name:'a'*64 for name in BINARIES},
+                       rustc='recorded historical rustc, not the verifier compiler',
+                       build_environment={'PATH':'/recorded/bin', 'HOME':'/recorded/home',
+                           'CARGO_HOME':'/recorded/cargo', 'LANG':'C', 'LC_ALL':'C', **THREAD_ENVIRONMENT})
+        requirements = dict(line.split('==') for line in
+                            (self.repo/'benchmarks/atom_loss/requirements.txt').read_text().splitlines()
+                            if line and not line.startswith('#'))
+        sources = {name:(self.repo/name).read_text() for name in binding['inputs']
+                   if name.startswith('benchmarks/atom_loss/')}
+        stage = {'source_commit':binding['source_commit'], 'working_tree_dirty':False,
+                 'input_digest':binding['input_digest'], 'binaries':binding['binaries'],
+                 'rustc':binding['rustc'], 'dependencies':{p:requirements[p] for p in CAPTURE_DEPENDENCIES},
+                 'environment':dict(THREAD_ENVIRONMENT), 'cpu':'Recorded historical CPU',
+                 'os':'Recorded historical OS', 'python':'Recorded historical Python',
+                 'sources':{name:hashlib.sha256(text.encode()).hexdigest() for name,text in sources.items()}}
+        (out/'source-manifest.json').write_text(json.dumps(binding))
+        for suffix in ['all','seeds']:
+            (out/f'provenance-{suffix}.json').write_text(json.dumps(stage))
+            snapshot = 'source-snapshot.json' if suffix=='all' else 'source-snapshot-seeds.json'
+            (out/snapshot).write_text(json.dumps({'base_commit':binding['source_commit'], 'files':sources}))
+        return out, binding, stage
+
+    def test_runtime_provenance_contract_in_normal_and_optimized_python(self):
+        out, binding, stage = self.runtime_bundle()
+        program = ('from pathlib import Path; import sys; '
+                   'from benchmarks.atom_loss.source_contract import verify_bundle_source; '
+                   'print(verify_bundle_source(Path(sys.argv[1]), Path(sys.argv[2])))')
+        def verify(flags):
+            return subprocess.run([sys.executable,*flags,'-c',program,str(out),str(self.repo)],
+                                  capture_output=True,text=True,cwd=ROOT)
+        defects = {
+            'dependency_version': (lambda r:r['dependencies'].update(pymatching='999.0.0'), 'dependencies'),
+            'missing_dependency': (lambda r:r['dependencies'].pop('stim'), 'dependencies'),
+            'extra_dependency': (lambda r:r['dependencies'].update(unrecorded='1.0'), 'dependencies'),
+            'compiler': (lambda r:r.update(rustc='contradicts manifest'), 'compiler'),
+            'missing_compiler': (lambda r:r.pop('rustc'), 'compiler'),
+            'cpu': (lambda r:r.update(cpu='different CPU'), 'runtime'),
+            'os': (lambda r:r.update(os='different OS'), 'runtime'),
+            'python': (lambda r:r.update(python='different Python'), 'runtime'),
+            'missing_cpu': (lambda r:r.pop('cpu'), 'runtime'),
+            'non_string_os': (lambda r:r.update(os=123), 'runtime'),
+            'empty_python': (lambda r:r.update(python='  '), 'runtime'),
+            'thread_count': (lambda r:r['environment'].update(OMP_NUM_THREADS='999'), 'threading'),
+            'numeric_thread_count': (lambda r:r['environment'].update(OPENBLAS_NUM_THREADS=1), 'threading'),
+            'missing_thread_count': (lambda r:r['environment'].pop('RAYON_NUM_THREADS'), 'threading'),
+            'extra_thread_setting': (lambda r:r['environment'].update(UNKNOWN_THREADS='1'), 'threading'),
+        }
+        for flags in [[],['-O']]:
+            # A different but internally consistent historical host is accepted.
+            result = verify(flags)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout.strip(),binding['source_commit'])
+            for name,(mutate,error) in defects.items():
+                with self.subTest(flags=flags,defect=name):
+                    changed=copy.deepcopy(stage);mutate(changed)
+                    (out/'provenance-seeds.json').write_text(json.dumps(changed))
+                    result=verify(flags)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn('ValueError',result.stderr)
+                    self.assertIn(error,result.stderr)
+            (out/'provenance-seeds.json').write_text(json.dumps(stage))
+            # Agreement between stages cannot override requirements/build/thread pins.
+            for name in ['dependency_version','compiler','thread_count']:
+                with self.subTest(flags=flags,all_stages=name):
+                    changed=copy.deepcopy(stage);mutate,error=defects[name];mutate(changed)
+                    for suffix in ['all','seeds']:
+                        (out/f'provenance-{suffix}.json').write_text(json.dumps(changed))
+                    result=verify(flags)
+                    self.assertNotEqual(result.returncode,0)
+                    self.assertIn(error,result.stderr)
+            for suffix in ['all','seeds']:
+                (out/f'provenance-{suffix}.json').write_text(json.dumps(stage))
+
+    def test_runtime_provenance_requires_a_recorded_build_compiler(self):
+        from .source_contract import verify_bundle_source
+        out, binding, _ = self.runtime_bundle()
+        for value in [None, '', '  ', 123]:
+            with self.subTest(value=value):
+                binding['rustc']=value
+                (out/'source-manifest.json').write_text(json.dumps(binding))
+                with self.assertRaisesRegex(ValueError,'recorded build compiler'):
+                    verify_bundle_source(out,self.repo)
 
 
 class DecoderReplayTests(unittest.TestCase):
