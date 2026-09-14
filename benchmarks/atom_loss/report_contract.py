@@ -54,9 +54,9 @@ def checked_rates(actual, expected, tolerance):
     return all(abs(a-p)<=tolerance and (p not in [0,1] or a==p) for a,p in zip(actual,expected))
 
 
-def verdict(record, passed):
+def verdict(record, passed, *, allow_failure=False):
     require(record['status']==('PASS' if passed else 'FAIL'),'verdict contradicts observations')
-    require(passed,'failed sampling observation')
+    require(passed or allow_failure,'failed sampling observation')
 
 
 @lru_cache(maxsize=128)
@@ -99,6 +99,77 @@ def fisher_pvalue(a,n,b,m):
                            if (value:=logp(k))<=observed+1e-8))
 
 
+
+def verify_noise_cases(records):
+    specs=list(noise_specs());noise=named(records,[s[0] for s in specs])
+    for name,text,columns,expected,channel in specs:
+        case=noise[name];n=integer(case['shots_per_sampler'],32768)
+        require(case['channel']==channel,'wrong channel')
+        tolerance=math.sqrt(math.log(4*len(specs)/4e-7)/(2*n))
+        close(case['expected_probability'],expected);close(case['tolerance'],tolerance)
+        rates=[case[k] for k in ['rust_probability','reference_probability']]
+        for p in rates:probabilities([p,1-p],2,n)
+        verdict(case,checked_rates(rates,[expected]*2,tolerance),allow_failure=True)
+    return [name for name,case in noise.items() if case['status']=='FAIL']
+
+def verify_distribution_cases(records):
+    specs=distribution_specs();records=named(records,[s['name'] for s in specs])
+    events=sum(len(s['expected'])+len(s['columns']) for s in specs)
+    for spec in specs:
+        case=records[spec['name']];n=integer(case['shots_per_sampler'],32768)
+        expected=spec['expected'];bits=len(spec['columns']);marg=marginal(expected,bits)
+        require(case['channel']==spec['channel'] and case['expected_joint']==expected and case['expected_marginals']==marg,'wrong distribution specification')
+        tolerance=math.sqrt(math.log(4*events/1e-7)/(2*n));close(case['tolerance'],tolerance)
+        passed=True
+        for backend in ['rust','reference']:
+            obs=case[backend];joint=probabilities(obs['joint'],len(expected),n)
+            require(len(obs['marginals'])==bits,'missing marginal')
+            for a,b in zip(obs['marginals'],marginal(joint,bits)):close(a,b)
+            passed &= checked_rates(joint,expected,tolerance) and checked_rates(obs['marginals'],marg,tolerance)
+        verdict(case,passed,allow_failure=True)
+    return [name for name,case in records.items() if case['status']=='FAIL']
+
+def verify_low_cases(records):
+    specs=low_specs();records=named(records,[s[0] for s in specs]);events=sum(len(p)+len(cols)+1 for _,_,cols,p in specs)
+    for name,text,columns,expected in specs:
+        case=records[name];primitive=.001 if not name.startswith('LOSS') else float(name[5:])
+        n=integer(case['shots_per_sampler'],max(262144,math.ceil(26/primitive)) if name.startswith('LOSS') else 262144)
+        close(case['primitive_probability'],primitive)
+        ps=expected+marginal(expected,len(columns))+[1-expected[0]]
+        require(case['expected_probabilities']==ps,'wrong low-rate probabilities')
+        intervals=[binomial_interval(n,p,1e-7/(4*events)) for p in ps]
+        require(case['accepted_counts']==intervals,'wrong low-rate acceptance interval')
+        require(set(case['counts'])=={'rust','reference'},'missing low-rate backend')
+        passed=True
+        for values in case['counts'].values():
+            values=counts(values,len(ps),n);joint=values[:len(expected)]
+            require(sum(joint)==n,'low-rate histogram incomplete')
+            require(values[len(expected):-1]==marginal(joint,len(columns)) and values[-1]==n-joint[0],'low-rate derived counts inconsistent')
+            passed &= all(lo<=k<=hi for k,(lo,hi) in zip(values,intervals))
+        verdict(case,passed)
+
+
+def verify_real_comparison(comparison,n):
+    all_names=[f'measurement_{i}' for i in range(50)]+[f'detector_{i}' for i in range(16)]+['observable']+[f'adjacent_detector_joint_{i}' for i in range(15)]
+    expected_names={f'input_{mask}/{group}/{event}' for mask in [0,1] for group,names in [('all',all_names),('no_visible_loss',[f'detector_{i}' for i in range(16)])] for event in names}
+    rows=comparison['events'];require(len(rows)==len(expected_names) and {e['event'] for e in rows}==expected_names,'incomplete real-circuit events')
+    threshold=1e-7/len(rows);close(comparison['threshold'],threshold,tolerance=1e-16)
+    totals={};failed=[]
+    for e in rows:
+        a,native,b,ref=[integer(e[k]) for k in ['rust_events','rust_shots','reference_events','reference_shots']]
+        require(native>0 and ref>0 and a<=native and b<=ref,'invalid Fisher counts')
+        mask,group,_=e['event'].split('/');key=(mask,group)
+        require(totals.setdefault(key,(native,ref))==(native,ref),'inconsistent stratum denominators')
+        p=fisher_pvalue(a,native,b,ref)
+        close(e['pvalue'],p,tolerance=2e-8)
+        if p<threshold:failed.append(e['event'])
+    for backend in [0,1]:
+        require(sum(totals[(f'input_{m}','all')][backend] for m in [0,1])==n,'missing logical-input shots')
+        require(all(totals[(f'input_{m}','no_visible_loss')][backend]<=totals[(f'input_{m}','all')][backend] for m in [0,1]),'invalid conditioned denominator')
+    require(comparison['failed_events']==failed,'stale Fisher verdict')
+    verdict(comparison,not failed,allow_failure=True)
+    return failed
+
 def verify_sampler(report):
     close(report['familywise_alpha_bound'],1.2e-6)
     require(report['negative_skipped_gate_mutation_rejected'] is True and
@@ -119,88 +190,110 @@ def verify_sampler(report):
         close(case['max_bin_difference'],delta);close(case['tolerance'],tolerance)
         require(case['known_answer_pass'] is known,'known answer verdict mismatch')
         verdict(case,delta<=tolerance and known)
-    analytic=report['analytic_noise_controls'];specs=list(noise_specs());noise=named(analytic['cases'],[s[0] for s in specs])
-    close(analytic['familywise_alpha_bound'],5e-7)
-    for name,text,columns,expected,channel in specs:
-        case=noise[name];n=integer(case['shots_per_sampler'],32768)
-        require(case['channel']==channel,'wrong channel')
-        tolerance=math.sqrt(math.log(4*len(specs)/4e-7)/(2*n))
-        close(case['expected_probability'],expected);close(case['tolerance'],tolerance)
-        rates=[case[k] for k in ['rust_probability','reference_probability']]
-        for p in rates:probabilities([p,1-p],2,n)
-        verdict(case,checked_rates(rates,[expected]*2,tolerance))
-    distribution=analytic['distribution_probes'];specs=distribution_specs()
-    records=named(distribution['cases'],[s['name'] for s in specs])
-    events=sum(len(s['expected'])+len(s['columns']) for s in specs)
-    close(distribution['familywise_alpha_bound'],1e-7)
-    for spec in specs:
-        case=records[spec['name']];n=integer(case['shots_per_sampler'],32768)
-        expected=spec['expected'];bits=len(spec['columns']);marg=marginal(expected,bits)
-        require(case['channel']==spec['channel'] and case['expected_joint']==expected and case['expected_marginals']==marg,'wrong distribution specification')
-        tolerance=math.sqrt(math.log(4*events/1e-7)/(2*n));close(case['tolerance'],tolerance)
-        passed=True
-        for backend in ['rust','reference']:
-            obs=case[backend];joint=probabilities(obs['joint'],len(expected),n)
-            require(len(obs['marginals'])==bits,'missing marginal')
-            for a,b in zip(obs['marginals'],marginal(joint,bits)):close(a,b)
-            passed &= checked_rates(joint,expected,tolerance) and checked_rates(obs['marginals'],marg,tolerance)
-        verdict(case,passed)
-    low=report['low_probability_controls'];unit=low['analytic'];specs=low_specs()
-    records=named(unit['cases'],[s[0] for s in specs]);events=sum(len(p)+len(cols)+1 for _,_,cols,p in specs)
+    analytic=report['analytic_noise_controls'];distribution=analytic['distribution_probes']
+    low=report['low_probability_controls'];unit=low['analytic']
+    close(analytic['familywise_alpha_bound'],5e-7);close(distribution['familywise_alpha_bound'],1e-7)
     close(low['familywise_alpha_bound'],2e-7);close(unit['familywise_alpha_bound'],1e-7)
-    for name,text,columns,expected in specs:
-        case=records[name];primitive=.001 if not name.startswith('LOSS') else float(name[5:])
-        n=integer(case['shots_per_sampler'],max(262144,math.ceil(26/primitive)) if name.startswith('LOSS') else 262144)
-        close(case['primitive_probability'],primitive)
-        ps=expected+marginal(expected,len(columns))+[1-expected[0]]
-        require(case['expected_probabilities']==ps,'wrong low-rate probabilities')
-        intervals=[binomial_interval(n,p,1e-7/(4*events)) for p in ps]
-        require(case['accepted_counts']==intervals,'wrong low-rate acceptance interval')
-        require(set(case['counts'])=={'rust','reference'},'missing low-rate backend')
-        passed=True
-        for values in case['counts'].values():
-            values=counts(values,len(ps),n);joint=values[:len(expected)]
-            require(sum(joint)==n,'low-rate histogram incomplete')
-            require(values[len(expected):-1]==marginal(joint,len(columns)) and values[-1]==n-joint[0],'low-rate derived counts inconsistent')
-            passed &= all(lo<=k<=hi for k,(lo,hi) in zip(values,intervals))
-        verdict(case,passed)
+    require(not verify_noise_cases(analytic['cases']),'failed analytic noise observation')
+    require(not verify_distribution_cases(distribution['cases']),'failed channel distribution observation')
+    verify_low_cases(unit['cases'])
     actual=low['real_circuit'];n=integer(actual['shots_per_sampler'],65536)
     require(actual['mode']=='measurements_blinded' and actual['pauli_probability']==.001 and actual['loss_probability']==.003,'wrong real-circuit configuration')
     require(actual['scoring_key_check']=={'status':'PASS','checked_shots':n},'missing scoring key check')
     close(actual['familywise_alpha_bound'],1e-7)
-    comparison=actual['comparison']
-    all_names=[f'measurement_{i}' for i in range(50)]+[f'detector_{i}' for i in range(16)]+['observable']+[f'adjacent_detector_joint_{i}' for i in range(15)]
-    expected_names={f'input_{mask}/{group}/{event}' for mask in [0,1] for group,names in [('all',all_names),('no_visible_loss',[f'detector_{i}' for i in range(16)])] for event in names}
-    rows=comparison['events'];require(len(rows)==len(expected_names) and {e['event'] for e in rows}==expected_names,'incomplete real-circuit events')
-    threshold=1e-7/len(rows);close(comparison['threshold'],threshold,tolerance=1e-16)
-    totals={};failed=[]
-    for e in rows:
-        a,native,b,ref=[integer(e[k]) for k in ['rust_events','rust_shots','reference_events','reference_shots']]
-        require(native>0 and ref>0 and a<=native and b<=ref,'invalid Fisher counts')
-        mask,group,_=e['event'].split('/');key=(mask,group)
-        require(totals.setdefault(key,(native,ref))==(native,ref),'inconsistent stratum denominators')
-        p=fisher_pvalue(a,native,b,ref)
-        close(e['pvalue'],p,tolerance=2e-8)
-        if p<threshold:failed.append(e['event'])
-    for backend in [0,1]:
-        require(sum(totals[(f'input_{m}','all')][backend] for m in [0,1])==n,'missing logical-input shots')
-        require(all(totals[(f'input_{m}','no_visible_loss')][backend]<=totals[(f'input_{m}','all')][backend] for m in [0,1]),'invalid conditioned denominator')
-    require(comparison['failed_events']==failed,'stale Fisher verdict')
-    verdict(comparison,not failed)
+    require(not verify_real_comparison(actual['comparison'],n),'failed real-circuit sampling observation')
     # Top-level PASS cannot override any rejected/missing constituent observation.
     for r in [actual,unit,low,distribution,analytic,report]:verdict(r,True)
 
-    def mutations(records, expected, valid_cases, field='failed_cases'):
-        require(set(records)==set(expected),'missing mutation family')
-        for record in records.values():
-            failures=record[field]
-            require(record['rejected'] is True and isinstance(failures,list) and bool(failures)
-                    and len(set(failures))==len(failures) and set(failures)<=set(valid_cases),'missing or invalid mutation witness')
+    verify_mutations(analytic,distribution,unit,actual)
+
+
+def mutation_family(records, names):
+    require(type(records) is dict and set(records)==set(names),'missing mutation family')
+    return records
+
+
+def mutation_summary(record, failures, field='failed_cases'):
+    require(record.get('rejected') is True and bool(failures),'mutation was not rejected')
+    require(record.get(field)==failures,'mutation summary contradicts observations')
+
+
+def low_mutation_count(text,kind):
+    # Read the fixed probe/fixture definition independently of the input mutator.
+    import re
+    count=0
+    for line in text.splitlines():
+        match=re.match(r'^\s*(X_ERROR|Y_ERROR|Z_ERROR|DEPOLARIZE1|DEPOLARIZE2|LOSS)\(([^)]+)\)',line)
+        if match and 0<float(match[2])<.01 and (kind=='both' or (match[1]=='LOSS')==(kind=='loss')):
+            count+=1
+    return count
+
+
+def low_counts_pass(values,case,columns,expected):
+    n=case['shots_per_sampler'];values=counts(values,len(case['expected_probabilities']),n)
+    joint=values[:len(expected)]
+    require(sum(joint)==n,'mutation histogram incomplete')
+    require(values[len(expected):-1]==marginal(joint,len(columns)) and values[-1]==n-joint[0],
+            'mutation derived counts inconsistent')
+    return all(lo<=k<=hi for k,(lo,hi) in zip(values,case['accepted_counts']))
+
+
+def verify_mutations(analytic,distribution,unit,actual):
     channels=['X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2']
-    mutations(analytic['channel_deletion_mutations'],channels,[s[0] for s in noise_specs()])
-    mutations(distribution['channel_replacement_mutations'],
-              ['DEPOLARIZE2_ix_only','DEPOLARIZE2_xi_only','DEPOLARIZE2_independent_x','DEPOLARIZE1_x_only','DEPOLARIZE1_z_only'],
-              [s['name'] for s in distribution_specs()])
-    mutations(unit['low_probability_deletion_mutations'],['pauli','loss','both'],[s[0] for s in low_specs()])
-    mutations(actual['low_probability_deletion_mutations'],['pauli','loss','both'],expected_names,'failed_events')
-    for record in actual['low_probability_deletion_mutations'].values():integer(record['removed_instructions'],1)
+    noise=mutation_family(analytic['channel_deletion_mutations'],channels)
+    healthy={r['case']:r for r in analytic['cases']}
+    for channel,record in noise.items():
+        observations=record.get('observations')
+        failures=verify_noise_cases(observations)
+        for observed in observations:
+            base=healthy[observed['case']]
+            require(observed['shots_per_sampler']==base['shots_per_sampler'] and
+                    observed['reference_probability']==base['reference_probability'],
+                    'mutation changed independent noise reference')
+            if observed['channel']!=channel:
+                require(observed==base,'noise deletion changed an unrelated probe')
+        mutation_summary(record,failures)
+
+    replacements=['DEPOLARIZE2_ix_only','DEPOLARIZE2_xi_only','DEPOLARIZE2_independent_x',
+                  'DEPOLARIZE1_x_only','DEPOLARIZE1_z_only']
+    records=mutation_family(distribution['channel_replacement_mutations'],replacements)
+    healthy={r['case']:r for r in distribution['cases']}
+    for name,record in records.items():
+        observations=record.get('observations')
+        failures=verify_distribution_cases(observations)
+        for observed in observations:
+            base=healthy[observed['case']]
+            require(observed['shots_per_sampler']==base['shots_per_sampler'] and observed['reference']==base['reference'],
+                    'mutation changed independent distribution reference')
+            if observed['channel']!=name.split('_',1)[0]:
+                require(observed==base,'channel replacement changed an unrelated probe')
+        mutation_summary(record,failures)
+
+    low=mutation_family(unit['low_probability_deletion_mutations'],['pauli','loss','both'])
+    healthy={r['case']:r for r in unit['cases']}
+    for kind,record in low.items():
+        affected={name:(columns,expected,removed) for name,text,columns,expected in low_specs()
+                  if (removed:=low_mutation_count(text,kind))}
+        observations=named(record.get('observations'),affected)
+        failures=[]
+        for name,(columns,expected,removed) in affected.items():
+            observed=observations[name]
+            require(integer(observed['removed_instructions'],1)==removed,'wrong probe mutation instruction count')
+            if not low_counts_pass(observed['counts'],healthy[name],columns,expected):failures.append(name)
+        # These powered probes require every affected case to detect deletion.
+        require(set(failures)==set(affected),'low-rate mutation escaped an affected probe')
+        mutation_summary(record,failures)
+
+    from pathlib import Path
+    text=(Path(__file__).parent/'fixtures/midswap_d3_r2.stim').read_text()
+    records=mutation_family(actual['low_probability_deletion_mutations'],['pauli','loss','both'])
+    reference={e['event']:(e['reference_events'],e['reference_shots']) for e in actual['comparison']['events']}
+    for kind,record in records.items():
+        require(integer(record['removed_instructions'],1)==low_mutation_count(text,kind),
+                'wrong real-circuit mutation instruction count')
+        comparison=record.get('comparison')
+        require(type(comparison) is dict,'missing real-circuit mutation observations')
+        failures=verify_real_comparison(comparison,actual['shots_per_sampler'])
+        require(all((e['reference_events'],e['reference_shots'])==reference[e['event']] for e in comparison['events']),
+                'mutation changed independent real-circuit reference')
+        mutation_summary(record,failures,'failed_events')

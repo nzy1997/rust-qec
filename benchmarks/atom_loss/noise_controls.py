@@ -35,8 +35,10 @@ def run(binary, sampler, shots=32768):
             altered='\n'.join(line for line in text.splitlines() if not line.startswith(channel+'('))
             return sampler(binary,altered,shots,seed,work)
         # Execute the same acceptance test with a real defective native input.
-        failed=[r['case'] for r in evaluate(binary,defective,shots) if r['status']=='FAIL']
-        mutations[channel]={'rejected':bool(failed),'failed_cases':failed}
+        observations=evaluate(binary,defective,shots)
+        failed=[r['case'] for r in observations if r['status']=='FAIL']
+        mutations[channel]={'rejected':bool(failed),'failed_cases':failed,
+                            'observations':observations}
     distributions = channel_probes.run(binary, sampler, shots)
     return {'distribution_probes':distributions, 'status':'PASS' if all(r['status']=='PASS' for r in records) and all(m['rejected'] for m in mutations.values()) and distributions['status']=='PASS' else 'FAIL',
             'method':'analytic single-bit/parity probabilities; one-sample bounds; live, absent, reset-restored and pre-loss controls',

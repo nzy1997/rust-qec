@@ -57,6 +57,8 @@ def analytic(binary, sampler, shots):
     events = sum(len(expected)+len(columns)+1 for _,_,columns,expected in probes)
     tail = ALPHA/(4*events)  # two tails, two healthy implementations
     records, mutations = [], {k:[] for k in MUTATIONS}
+    affected = {kind:{name for name,text,_,_ in probes if remove_low_noise(text,kind)[1]}
+                for kind in MUTATIONS}
     with tempfile.TemporaryDirectory(prefix='low-noise-') as tmp:
         for name,text,columns,expected in probes:
             count = max(shots, math.ceil(26/float(name[5:]))) if name.startswith('LOSS') else shots
@@ -78,10 +80,15 @@ def analytic(binary, sampler, shots):
                 if not removed:
                     continue
                 counts = event_counts(sampler(binary,changed,count,991,Path(tmp)),columns)
-                if np.any((counts < bounds[:,0]) | (counts > bounds[:,1])):
-                    mutations[kind].append(name)
-    expected_failures = {'pauli':5,'loss':9,'both':14}
-    controls = {k:dict(rejected=len(v)==expected_failures[k],failed_cases=v) for k,v in mutations.items()}
+                mutations[kind].append(dict(case=name, counts=counts.tolist(),
+                                            removed_instructions=removed))
+    intervals = {r['case']:r['accepted_counts'] for r in records}
+    controls = {}
+    for kind,observations in mutations.items():
+        failed = [r['case'] for r in observations
+                  if any(k<lo or k>hi for k,(lo,hi) in zip(r['counts'],intervals[r['case']],strict=True))]
+        controls[kind] = dict(rejected=bool(affected[kind]) and set(failed)==affected[kind],
+                              failed_cases=failed, observations=observations)
     return dict(status='PASS' if all(r['status']=='PASS' for r in records) and all(m['rejected'] for m in controls.values()) else 'FAIL',
                 familywise_alpha_bound=ALPHA,method='Exact binomial equal-tail count intervals; joint bins, marginals, nonidentity',
                 cases=records,low_probability_deletion_mutations=controls)
@@ -169,7 +176,7 @@ def real_circuit(binary, shots, exporter=export_rows):
                 raise ValueError('Input mask stream changed across physical-noise mutation')
             result=compare_real(text,bad,independent,masks)
             controls[kind]=dict(rejected=removed>0 and result['status']=='FAIL',removed_instructions=removed,
-                                failed_events=result['failed_events'])
+                                failed_events=result['failed_events'],comparison=result)
     return dict(status='PASS' if healthy['status']=='PASS' and all(c['rejected'] for c in controls.values()) else 'FAIL',
                 fixture_sha256=hashlib.sha256(text.encode()).hexdigest(),shots_per_sampler=shots,
                 scoring_key_check={'status':'PASS','checked_shots':len(checked_answers)},

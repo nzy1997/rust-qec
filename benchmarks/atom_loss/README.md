@@ -228,6 +228,15 @@ all 66 rows and the exact header are checked, including rate, Wilson interval
 and median workflow time. Missing, duplicate or extra rows and resealed changes
 to any field must fail. Wilson intervals in the source JSON are also recomputed.
 
+All executed noise deletion/replacement controls retain their measured negative
+observations, including the real-circuit Fisher event counts. The independent
+report checker recomputes their decisions and failure lists, checks unchanged
+reference observations, and verifies the instruction counts and complete affected
+probe inventory. Low-probability controls must reject every affected probe;
+`LOSS_0.01` is outside the deletion range and cannot substitute for one. Changing
+a failure summary or reusing healthy counts as negative evidence fails verification
+even after checksums are resealed and with optimized Python.
+
 The updated correctness report is linked to `provenance-correctness.json` and
 `source-snapshot-correctness.json`. All sampling, correctness, decoding and seed records are regenerated from the same clean source commit. The fixed workload configurations and declared seeds are retained; timings are newly measured.
 
