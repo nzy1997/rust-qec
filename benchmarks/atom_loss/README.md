@@ -63,6 +63,20 @@ versions, CPU, OS, threading environment and timing boundaries are recorded.
 `bundle.json` seals all required artifacts with SHA-256; source binding is an
 additional check, not inferred from those checksums.
 
+The full verifier then redraws all eight charts from the validated JSON in a
+fresh temporary directory, using the source-bound renderer. Every SVG must match
+in full; fixed IDs and omitted timestamps make its output deterministic. Every
+PNG must match in decoded pixels, dimensions, mode and metadata (compression
+bytes alone may differ). No perceptual tolerance or skipped platform check is
+used. The renderer resets ambient plotting styles, uses bundled DejaVu fonts,
+and requires the pinned plotting dependency stack and the wheel's bundled
+FreeType 2.6.1. A rendering-environment mismatch fails explicitly; it is not
+accepted as evidence equivalence. Published `methodology.md` must also equal this
+source-bound README. Replaced SVGs, changed PNG pixels, accidentally swapped
+figures and altered methodology must fail even after their checksums are updated,
+in both normal and optimized Python. The standalone archive rescorer remains a
+stdlib-only numerical check; it does not validate website figures.
+
 CI fetches S, builds the current code and regenerates public samples/private keys
 for all 64 corpora. `decoder_replay` separately re-decodes every backend/corpus
 combination (213 combinations, covering all 345 archived prediction files), with
@@ -80,7 +94,10 @@ Neither Git hashes nor CI provide protection against an author deliberately
 rewriting both the experiment and its checks; the source contract remains
 reviewable code.
 
-The recorded measurements use serial processes without explicit CPU affinity.
+The recorded measurements use serial processes on one machine without explicit
+CPU affinity. The three cyclic timing rotations do not completely balance all
+backend order positions. Small differences are not evidence of a stable ranking;
+timing repeats reuse each corpus and do not increase its accuracy sample size.
 Both decoders receive the same public corpus at each point, with scoring keys
 used only afterward. A shared seed does not imply row-identical samples between
 Stim and RustQEC; independent sampler checks compare distributions.
@@ -251,7 +268,9 @@ Thus the MLE objective check uses a **validated native representation**, not an
 independently chosen Stim fault decomposition. This is compositional evidence
 for this finite fixture and the stated envelope objective; it neither proves
 arbitrary compiler inputs correct nor establishes physical logical-class Bayes
-optimality. The feature-gated model exporter reads public inputs only and is
+optimality. This independent physical oracle covers d=3, two rounds and four loss
+histories; replay agreement on d=5/7 and multiple losses is not independent proof
+of those broader physical models. The feature-gated model exporter reads public inputs only and is
 separate from the timed matching exporter.
 
 ## Evidence contract

@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from .verify import require_complete_sweep
+from .artifacts import require_complete_sweep
 from .artifacts import timing_rows
 
 STYLE = {
@@ -18,22 +18,35 @@ STYLE = {
     'pymatching-fixed-loop': ('PyMatching, fixed weights (loop)', '#a99374','x',':'),
     'envelope-mle': ('RustQEC envelope MLE', '#754c91','D','-'),
 }
-plt.rcParams.update({'font.family':'DejaVu Sans','font.size':11,'axes.titlesize':13,
+RENDER_STYLE = {'font.family':'DejaVu Sans','font.size':11,'axes.titlesize':13,
                      'axes.labelsize':11,'axes.spines.top':False,'axes.spines.right':False,
                      'axes.edgecolor':'#a5a19c','axes.labelcolor':'#292522','text.color':'#292522',
                      'xtick.color':'#605b56','ytick.color':'#605b56','grid.color':'#e5e0da',
-                     'svg.fonttype':'path','savefig.facecolor':'white'})
+                     'svg.fonttype':'path','svg.hashsalt':'rustqec-atom-loss-v1',
+                     'font.sans-serif':['DejaVu Sans'], 'savefig.facecolor':'white'}
 
 
 def emit(fig, out, name):
     for ext in ['svg','png']:
-        fig.savefig(out/f'{name}.{ext}',dpi=180,bbox_inches='tight',metadata={'Creator':'RustQEC atom-loss benchmark'} if ext=='svg' else {})
+        fig.savefig(out/f'{name}.{ext}',dpi=180,bbox_inches='tight',metadata={'Creator':'RustQEC atom-loss benchmark','Date':None} if ext=='svg' else {})
     svg=out/f'{name}.svg'
     svg.write_text('\n'.join(line.rstrip() for line in svg.read_text().splitlines())+'\n')
     plt.close(fig)
 
 
 def render(out):
+    # Reset ambient matplotlibrc/previous figures and use bundled font files.
+    # The wheel's FreeType renderer is checked, rather than accepting fuzzy images.
+    from .figure_contract import require_renderer
+    from matplotlib import font_manager
+    require_renderer()
+    for font in sorted((Path(matplotlib.get_data_path())/'fonts/ttf').glob('DejaVuSans*.ttf')):
+        font_manager.fontManager.addfont(str(font))
+    with matplotlib.rc_context(rc={**matplotlib.rcParamsDefault, **RENDER_STYLE}):
+        _render(out)
+
+
+def _render(out):
     seed_report=json.loads((out/'accuracy-seeds.json').read_text())
     fig,axes=plt.subplots(1,3,figsize=(12.4,5.2),layout='constrained')
     for ax,distance in zip(axes,[3,5,7]):

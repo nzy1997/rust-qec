@@ -3,15 +3,18 @@ import math
 import json
 import statistics
 
+FIGURE_NAMES = ('accuracy-seeds', 'sampling-throughput', 'logical-error-rate',
+                'logical-error-rate-full', 'accuracy-time', 'adapter-stages',
+                'sampling-reference-cost', 'timing-sweep')
+FIGURE_INPUTS = ('accuracy-seeds.json', 'sampling.json', 'decoding.json', 'tradeoff.json')
+
 REQUIRED_FILES = frozenset([
     'source-manifest.json', 'chain-correctness.json', 'midswap_d3_r2.stim', 'correctness.json',
     'decoder-correctness.json', 'sampling.json', 'decoding.json', 'tradeoff.json',
     'provenance-all.json', 'methodology.md', 'summary.csv', 'source-snapshot.json',
     'shot-data-v1.zip', 'timing-sweep.csv', 'accuracy-seeds.json', 'accuracy-seeds.zip',
-    'accuracy-seeds.png', 'accuracy-seeds.svg', 'provenance-seeds.json', 'source-snapshot-seeds.json',
-] + [f'{name}.{ext}' for name in [
-    'sampling-throughput', 'logical-error-rate', 'logical-error-rate-full',
-    'accuracy-time', 'adapter-stages', 'sampling-reference-cost', 'timing-sweep'] for ext in ['svg', 'png']])
+    'provenance-seeds.json', 'source-snapshot-seeds.json',
+] + [f'{name}.{ext}' for name in FIGURE_NAMES for ext in ['svg', 'png']])
 TIMING_FILES = frozenset(['provenance-timing.json', 'source-snapshot-timing.json'])
 
 
@@ -88,3 +91,15 @@ def summary_rows(decoding, tradeoff):
                     row.update(errors=errors, logical_error_rate=errors/shots, ci95_low=lo, ci95_high=hi,
                                median_microseconds_per_shot=statistics.median(times)/shots*1e6)
                 yield row
+
+
+def require_complete_sweep(cases):
+    expected={(d,p) for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]}
+    if len(cases)!=15 or {(c['distance'],c['loss_probability']) for c in cases}!=expected:
+        raise ValueError('Loss sweep is incomplete; keep raw failures and do not publish a partial curve')
+    for case in cases:
+        decoders=case.get('decoders',{})
+        if set(decoders)!={'envelope-matching','pymatching-fixed','pymatching-envelope','envelope-matching-offline'}:
+            raise ValueError('Missing loss-sweep comparator')
+        if any(r.get('status')!='ok' for r in decoders.values()):
+            raise ValueError('Loss sweep includes failed runs; retain raw records without publishing a partial curve')
