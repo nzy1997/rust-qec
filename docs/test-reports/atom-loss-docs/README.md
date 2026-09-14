@@ -230,3 +230,43 @@ Local validation completed:
 - Independent final bundle review passed normal/optimized verification and all seven figure tests (`drafts/round11-agent-audit/REPORT.md`).
 
 These are local checks; hosted CI runs on the subsequent pushed artifact commit.
+
+
+## Exported-graph physical oracle closure (2026-09-14)
+
+Clean source `f32221e41489cc8dc7b2a283c5f6960178d1f7b0` binds 744 build/source
+inputs. All evidence was regenerated with five fresh binaries from a clean
+checkout. The 64 public sample/mask/answer sets and all 345 prediction files
+remain byte-identical to the previous evidence; workflow timings were measured
+again.
+
+The real d=3/two-round Mid-SWAP chain now runs all 1,504 witness rows through
+native streaming matching, native MLE, actual PyMatching batch, and native
+offline batch. Every prediction is scored against the independently constructed
+allowed answers. Empty exported edges fail through both batch consumers;
+empty loss mappings produce 74 rejected rows per adapter; observable-labelled
+weights scaled by 1e-6 with the mean recomputed produce 308 rejected rows each.
+The report retains raw predictions and allowed answers. Its standard-library
+contract recomputes summaries and requires all backends and controls. CI reruns
+the chain, requires unchanged oracle definitions and revalidates observations;
+alternative equally optimal predictions remain valid.
+
+The original empty-graph bypass now raises `Unreachable fired detector`.
+A focused subagent re-review found no unresolved material issue in this scope.
+Five coherently resealed report attacks (missing adapter, missing control,
+wrong summary, invalid decoder-error outcome and truncated predictions) all
+failed specifically at the chain contract in normal and optimized Python.
+See the local audit at `drafts/round13-final-review.md`.
+
+Completed local checks:
+
+- All 62 tests passed: `python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract benchmarks.atom_loss.test_chain_reference` (`drafts/round13-tests.log`).
+
+- Both sample archives regenerated: all 64 corpora passed (`drafts/round13-sample-replay.log`).
+- Current decoder replay passed 213 backend/corpus combinations covering all 345 predictions (`drafts/round13-decoder-replay.log`).
+- Full bundle checks passed normally and with `python -O`; fresh chain comparison passed (`drafts/round13-verify.log`).
+- All eight figures matched Linux/macOS redraws; eight site checks and both Chromium/Firefox evidence tests passed. Desktop capture and mobile overflow checks passed (`drafts/round13-linux-render.log`, `drafts/round13-site.log`, `drafts/round13-browser.log`, `drafts/round13-capture.log`).
+
+The 1,504 oracle witnesses include placeholder pairs and are not additional IID
+accuracy samples. Coverage remains this fixture and four loss histories; this
+change does not establish general compiler correctness or a kernel-speed ranking.
