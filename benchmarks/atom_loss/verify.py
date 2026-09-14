@@ -102,6 +102,7 @@ def verify(root):
     require((set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}), "verify: set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}")
     require((tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']), "verify: tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']")
     for c in decoding+[tradeoff]:
+        require(c.get('pauli_probability') == .001, 'Declared Pauli probability differs from fixed workload')
         require((c['shots']==5000 and c['decoders'] and 'export_failure' not in c), "verify: c['shots']==5000 and c['decoders'] and 'export_failure' not in c")
         require(c['seed']==(20260912 if c is tradeoff else 20260911), 'Predeclared original seed')
         native=c['decoders']['envelope-matching']
