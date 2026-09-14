@@ -111,3 +111,47 @@ Commands and logs used locally:
 - `python -m benchmarks.atom_loss.verify` and `python -O -m benchmarks.atom_loss.verify`.
 - `make -o build-shot-viewer build-site` and `python3 tools/check_site_build.py _site`.
 - `npx playwright test tests/atom-loss-evidence.spec.js --workers 2` — both browser projects.
+
+## 2026-09-14: clean source binding and current-decoder replay
+
+The complete benchmark was regenerated from clean source commit
+`b61d92575d10686fcc8ad298329e3bd266876a3b` in an isolated detached worktree.
+The new manifest inventories all 740 production/harness/build inputs and all
+five freshly built binaries. Sampling, correctness, all original timing cases
+and all 48 independent-seed cases now refer to this same clean source.
+All 345 predictions and all 64 public sample/mask/answer sets match the previous
+release of the experiment byte for byte; timing values are freshly measured.
+
+The artifact commit follows the source commit. CI verifies equal source/build
+input trees rather than requiring an artifact to contain its own commit hash.
+Keep the measured source commit in history when merging this PR (use a merge
+commit, not a squash/rebase that removes its ancestor relationship). Any later
+change to the bound inputs requires new evidence; a successful prediction
+replay alone does not validate historical timing.
+
+Current-decoder replay covers 213 backend/corpus combinations and compares all
+345 archived prediction files, scores and recorded paired discordances. The
+negative control executes the real native decoder behind a wrapper that flips
+one prediction, leaving the archive untouched; replay rejects it. Other controls
+reject changed decoder/build inputs, omitted inventory entries, dirty or newly
+added inputs, and optimized-Python bypass attempts.
+
+The page exposes the source/build manifest alongside the provenance downloads.
+Fixed-weight PyMatching is explicitly a weight-conditioning ablation, retaining
+the shared canonical syndromes and graph. Sampling remains absolute Rust
+throughput, with unoptimized reference cost confined to the supplement.
+
+Local reproduction and validation logs:
+
+- `python -m benchmarks.atom_loss.evidence_run ...` — `drafts/round9-generation.log`.
+- `python -m benchmarks.atom_loss.decoder_replay --root drafts/round9-results` — `drafts/round9-decoder-replay.log`.
+- `python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract` — `drafts/round9-tests.log`.
+- Both sample replay commands — `drafts/round9-sample-replay.log`.
+- Ordinary and optimized verifier, then site and Chromium/Firefox checks.
+
+Validation completed locally: 39 reference/source/replay regression tests, all
+64 sample regenerations, all 213 current-decoder combinations, normal and
+optimized bundle verification, both standalone archives under `python -I -S`,
+eight site checks and both Chromium/Firefox cases passed. Desktop/mobile
+captures were refreshed; the mobile viewport has no horizontal overflow.
+These are local results; hosted CI must run on the pushed artifact commit.

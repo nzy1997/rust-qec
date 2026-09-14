@@ -48,6 +48,14 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   expect(chain.status).toBe('PASS');
   expect(chain.compiler_output_mutations_rejected).toEqual({ pauli_weight: true, loss_candidate: true });
   await page.locator('.loss-evidence-downloads summary').click();
+  const sourceLink = page.getByRole('link', { name: 'Source and build manifest' });
+  const sourceResponse = await page.request.get(new URL(await sourceLink.getAttribute('href'), page.url()).href);
+  expect(sourceResponse.ok()).toBe(true);
+  const source = await sourceResponse.json();
+  const provenance = await (await page.request.get('/data/atom-loss/provenance-all.json')).json();
+  expect(source.working_tree_dirty).toBe(false);
+  expect(provenance.source_commit).toBe(source.source_commit);
+  expect(source.inputs['rustqec-cli/src/decode.rs']).toBeDefined();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();
   expect((await downloadPromise).suggestedFilename()).toBe('summary.csv');

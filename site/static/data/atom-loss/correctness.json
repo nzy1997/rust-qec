@@ -4892,6 +4892,5 @@
       "known_answer_pass": true,
       "status": "PASS"
     }
-  ],
-  "provenance_file": "provenance-correctness.json"
+  ]
 }

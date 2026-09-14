@@ -1,14 +1,26 @@
 {
-  "started_utc": "2026-09-13T16:36:24.633536+00:00",
+  "source_commit": "b61d92575d10686fcc8ad298329e3bd266876a3b",
+  "working_tree_dirty": false,
+  "input_digest": "5f7b31f99639038dcdc034a55ddfa7d633bda81866963b1fc280a429df491dee",
+  "started_utc": "2026-09-14T02:05:22.772062+00:00",
   "command": [
-    "drafts/pr712-audit-venv/bin/python",
-    "drafts/run_round8_seeds.py"
+    "/Users/nzy/rcode/rstim/drafts/round9-source/benchmarks/atom_loss/accuracy_seeds.py",
+    "--work",
+    "/Users/nzy/rcode/rstim/drafts/round9-runs/seeds",
+    "--out",
+    "/Users/nzy/rcode/rstim/drafts/round9-results"
   ],
-  "source_commit": "2ef437acdf582141f53eae4cb0e615a0f4255346",
-  "working_tree_dirty": true,
   "os": "macOS-26.6.2-arm64-arm-64bit",
   "cpu": "Apple M4",
   "python": "3.12.13 (main, Mar  3 2026, 15:35:03) [Clang 21.1.4 ]",
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)\nbinary: rustc\ncommit-hash: 01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf\ncommit-date: 2026-02-11\nhost: aarch64-apple-darwin\nrelease: 1.93.1\nLLVM version: 21.1.8\n",
+  "binaries": {
+    "target/release/rustqec": "61664c2d739c2903258c850ec3916a4122cedd6bcad1952fc842d693d4d8cc6c",
+    "target/release/examples/export_matching_benchmark": "70aafc222b3e7b180c00715806285547875a22470b8be805084c70350eea5cc1",
+    "target/release/examples/export_decoder_oracle": "866ad70a7f22b4abf4c449cee9d5e8e882e2c8e68cec33057a8f03dfc9edccd9",
+    "target/release/examples/offline_matching_benchmark": "5273758629307eff8a6b7bd115ba867216350aa5f882393496b2f312acd85bc3",
+    "target/release/examples/atom_loss_sampling_benchmark": "eb4a65b5813533da082dd98599f6adc8a9e73ca8fb115a9144aec3c4a1e5452c"
+  },
   "dependencies": {
     "stim": "1.16.0",
     "numpy": "2.4.6",
@@ -16,60 +28,44 @@
     "scipy": "1.18.1",
     "matplotlib": "3.10.9"
   },
-  "binaries": {
-    "target/release/rustqec": "c7d7d0f6bca2f5d17a80dbc61d462fda7d948e5778a1848482a9c6569b2f1e81",
-    "target/release/examples/export_matching_benchmark": "c22fab12797f70318cc8cdbab974700fc41e4b1075540a38c495d3fcd3fbef57",
-    "target/release/examples/export_decoder_oracle": "866ad70a7f22b4abf4c449cee9d5e8e882e2c8e68cec33057a8f03dfc9edccd9",
-    "target/release/examples/offline_matching_benchmark": "5273758629307eff8a6b7bd115ba867216350aa5f882393496b2f312acd85bc3"
-  },
-  "sources": {
-    "benchmarks/atom_loss/accuracy_seeds.py": "924f319fc48aabf2ef929667a61c4cbaad4614a3e3bf439a0132b1fc3e31ea77",
-    "benchmarks/atom_loss/artifacts.py": "918d12aea62008ced1df6b77b93fa4c6cf5cf688b3f0d4defb0ad7ace6b3adf1",
-    "benchmarks/atom_loss/chain_reference.py": "d7b427690eeb0f84afccb81100516b0cab82abab1d1dda8a139a3b1546a1d756",
-    "benchmarks/atom_loss/channel_probes.py": "8ac16ac860f09adb8707f1e272ee2d796a12b9b90f8b1683cf4d0a14cde02a7f",
-    "benchmarks/atom_loss/correctness.py": "ba240becde07e5a0f86992ad9ae7b45d8207915e2c6a7a23905bfa33bc38603c",
-    "benchmarks/atom_loss/decoder_reference.py": "106abe43cf0245c75ba9420c6f2915e604456bc56feb810fb24bd3b37cd487c4",
-    "benchmarks/atom_loss/low_probability.py": "c24587a1fa4ce509da2a9a1c5d23d47d30061c7165ca1f596538667c22a88376",
-    "benchmarks/atom_loss/noise_controls.py": "3f02ae909dad3fd3205265d47995d2613368fd99cb88efdf0188840dc03bbc92",
-    "benchmarks/atom_loss/plot.py": "a95e15f13153a86d0041a428fc13aa3c8f4467d57ba08f3e855b3616bece5b55",
-    "benchmarks/atom_loss/probe_specs.py": "e0670a655d47975d5f2ba4f26a036f0908f5440ae81bb7792803807ccd10ad2c",
-    "benchmarks/atom_loss/publish.py": "6bbd91050f221e806909618c56a6a9edf7a3bccbb9d72531fd57eacf7e887859",
-    "benchmarks/atom_loss/reference.py": "5466f849afa6fe5bcb398a425248defe03af6f06e722da90f3c268e98bb06396",
-    "benchmarks/atom_loss/remeasure.py": "4776d820760fb895376801ee2ad7f5d27e3f6e46325dc96d0e6e6ca67b92b94b",
-    "benchmarks/atom_loss/replay.py": "0975c1ce787f955c4b32749efe360b8833dc2a68ffc5c3583e070c20cafe11c5",
-    "benchmarks/atom_loss/report_contract.py": "42d34ef6b971e56a91a148fa4ccf7be8fc4d8d1ab28dc96c6609e80d44d5843e",
-    "benchmarks/atom_loss/run.py": "9c146dea9f413a9d68705dfcb02bc62fb000fb5655966cca5fbf6227ee81a354",
-    "benchmarks/atom_loss/shot_data.py": "a9e4185df7ce890884e8f57617cde267811b90adbf6bb9bdac9acb2e46a52a4f",
-    "benchmarks/atom_loss/test_reference.py": "d4939fc1f964771fee1c8cbfb7ad7cba9926f63c40793dbbe040c0aea267a737",
-    "benchmarks/atom_loss/verify.py": "c6c6156bc2a26f0803d729d8e34af93f31cd962ec74f634413fab1ccc1588f9a",
-    "rustqec-cli/examples/offline_matching_benchmark.rs": "31f5fd000cc85efaf274b637b92f5a30d82477bb766698c9edb9a69a414f8362",
-    "drafts/run_round8_seeds.py": "2e5d416f4eda7d730698acc855a0d30aec407cb515ed91f467831d4e91e4afed"
-  },
   "environment": {
     "OMP_NUM_THREADS": "1",
     "OPENBLAS_NUM_THREADS": "1",
     "RAYON_NUM_THREADS": "1"
   },
-  "baseline_sha256": {
-    "decoding.json": "cd6e54bd25ea056d30dd759f82898339a76cddbe25fd2dcd39a393eb5bca3cdf",
-    "tradeoff.json": "029eeaca61b6f81b61d0b5062cd3998e76d8298e965c9692f9cfc6fff5b759f3"
+  "sources": {
+    "benchmarks/atom_loss/README.md": "461b48220f10df1052bb4063caef726ec429b5f2547beabde82ea88951de306a",
+    "benchmarks/atom_loss/accuracy_seeds.py": "7399f9eac368047faeac9a55f1d727ae1d28658373de32dea1ab8a1a1dccdab4",
+    "benchmarks/atom_loss/artifacts.py": "dcd26e2a20b363026518561d3d083173e30b5161e52958c511342bd6ee1e2908",
+    "benchmarks/atom_loss/chain_reference.py": "d7b427690eeb0f84afccb81100516b0cab82abab1d1dda8a139a3b1546a1d756",
+    "benchmarks/atom_loss/channel_probes.py": "8ac16ac860f09adb8707f1e272ee2d796a12b9b90f8b1683cf4d0a14cde02a7f",
+    "benchmarks/atom_loss/correctness.py": "ba240becde07e5a0f86992ad9ae7b45d8207915e2c6a7a23905bfa33bc38603c",
+    "benchmarks/atom_loss/decoder_reference.py": "106abe43cf0245c75ba9420c6f2915e604456bc56feb810fb24bd3b37cd487c4",
+    "benchmarks/atom_loss/decoder_replay.py": "da9c52e6111b5ee8206d6e7f4fa34a19d64d2f501ce55e631b4bf7d2751273d0",
+    "benchmarks/atom_loss/evidence_run.py": "6b2bd2514f38115660e01ae60f94c98025d52aebfcd8e5fba48750ad89f2e9ec",
+    "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+    "benchmarks/atom_loss/low_probability.py": "c24587a1fa4ce509da2a9a1c5d23d47d30061c7165ca1f596538667c22a88376",
+    "benchmarks/atom_loss/noise_controls.py": "3f02ae909dad3fd3205265d47995d2613368fd99cb88efdf0188840dc03bbc92",
+    "benchmarks/atom_loss/plot.py": "8df22ca12759e9fd81953eecbd8ec25a8da47f9de104d321b35ea2e15538b88e",
+    "benchmarks/atom_loss/probe_specs.py": "e0670a655d47975d5f2ba4f26a036f0908f5440ae81bb7792803807ccd10ad2c",
+    "benchmarks/atom_loss/publish.py": "fc0b2b1bdd92f1aea7466c5c93392b1f9a13a4ce0139f5a0ce396f536db1df39",
+    "benchmarks/atom_loss/reference.py": "5466f849afa6fe5bcb398a425248defe03af6f06e722da90f3c268e98bb06396",
+    "benchmarks/atom_loss/remeasure.py": "8129e53c63833e89e704d0bed685991166468db39def9cfc2747ff09f7e3b91a",
+    "benchmarks/atom_loss/replay.py": "bb5dc2511c8c7740aeb1689593b164545033ec23f5f1775b38e5ec2f24288d11",
+    "benchmarks/atom_loss/report_contract.py": "42d34ef6b971e56a91a148fa4ccf7be8fc4d8d1ab28dc96c6609e80d44d5843e",
+    "benchmarks/atom_loss/requirements.txt": "059c36f23860767120e4bf2ec7a271d374aa903a557fa320f5a02f334d2770f8",
+    "benchmarks/atom_loss/run.py": "1a6d02571437b6b785d421db135fa11253601471c77a9e8064a336a81eedd51b",
+    "benchmarks/atom_loss/shot_data.py": "ea23ad43d3f2c604fafbfe4c5dce0404ad7b777d6a6b64bf952d8088b63f2107",
+    "benchmarks/atom_loss/source_contract.py": "380c4734117f2b319a7eabbb706d414f6330e1b7fccbe9838de633d2d9ea73a6",
+    "benchmarks/atom_loss/test_reference.py": "239bd4f8f9996a1344bb7f8a71a53ea9949bc2e867fd16a4655bee5dc969c330",
+    "benchmarks/atom_loss/test_source_contract.py": "122a523d2f2f30d4c69383a9936611c3bb956b6dc1ba6d5b35b73c0335d0d8e8",
+    "benchmarks/atom_loss/verify.py": "7ac856c67d98d536b408d569fc3cb61979c9972a62e4a31219c1a760fc861505"
   },
-  "timing": "Accuracy only, three predeclared seeds; no timing inference.",
-  "sampling": "Unchanged; provenance-all.json and source-snapshot.json describe the original sampling run.",
   "seeds": [
     2026091401,
     2026091402,
     2026091403
   ],
   "shots_per_seed": 5000,
-  "equivalent_reproduction_command": [
-    "python",
-    "-m",
-    "benchmarks.atom_loss.accuracy_seeds",
-    "--work",
-    "drafts/round8-seeds",
-    "--out",
-    "drafts/round8-results"
-  ],
-  "execution_note": "The captured wrapper records metadata then calls accuracy_seeds.run; it does not alter samples, predictions or scores."
+  "timing": "Accuracy only; no timing inference."
 }
