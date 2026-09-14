@@ -270,3 +270,44 @@ Completed local checks:
 The 1,504 oracle witnesses include placeholder pairs and are not additional IID
 accuracy samples. Coverage remains this fixture and four loss histories; this
 change does not establish general compiler correctness or a kernel-speed ranking.
+
+
+### Deterministic witness follow-up
+
+The first hosted run at `557caad51` passed the 62 tests but exposed a portability
+error in the new fresh-report comparison: seeded Stim sampling can produce
+different records under macOS polyfill and Linux SSE2. Each platform passed its
+own oracle, while the row-indexed answer arrays differed. The cross-platform
+probe reproduced the old measurement/syndrome mismatch.
+
+Clean source `0594f8f6e8d6889025f6fb0db3290a12df158808` replaces those stochastic
+correctness witnesses with one canonical `reference_sample()` per physical
+fault circuit. It produces 2,998 traces and 752 rows after deduplication and
+placeholder pairing, with measurement SHA-256
+`f179f618bd3a18bcab28565103c4717c0111d3ae3a534d326200698e8d118cea`.
+This supersedes the earlier 1,504-row witness report; these rows remain finite
+correctness probes, never IID accuracy samples. Four backends pass; empty loss
+mappings are rejected on 54 rows by each batch adapter, and corrupted relative
+weights on 186. Empty graphs raise a PyMatching error or produce 110 rejected
+offline predictions. The full report comparison remains strict about oracle
+definitions, now including witness generation and measurement-row hash.
+
+A Linux x86-64 Python/Stim process independently reconstructed the same rows,
+syndromes and allowed-answer sets using captured native graph/model inputs from
+macOS. Both reports passed and their definitions matched exactly; this local
+probe does not substitute for running a Linux native binary in hosted CI.
+All evidence was again regenerated from 744 clean bound inputs and five fresh
+binaries. All 64 sample/mask/answer sets and all 345 predictions remain byte
+identical to the prior revision; only workflow times were remeasured.
+
+The deterministic final bundle passed ordinary/optimized verification and fresh
+chain comparison (`drafts/round14-verify.log`). All eight Linux/macOS figure
+comparisons, eight site checks and both browser tests passed. A final independent
+subagent review accepted the published report against both portability probes
+and the fresh local report, and repeated all ten coherently resealed report
+attacks with the intended rejection (`drafts/round14-final-review.md`). No
+unresolved material issue remained within this exported-graph oracle scope.
+
+All 62 tests passed again after the deterministic-witness change
+(`drafts/round14-tests.log`, 236.403 seconds). Hosted CI on the pushed artifact
+commit must complete the final Linux native build and all archived-corpus replays.
