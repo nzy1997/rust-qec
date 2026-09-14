@@ -15,12 +15,32 @@ from PIL.PngImagePlugin import PngInfo
 import matplotlib.pyplot as plt
 
 from .artifacts import FIGURE_INPUTS, FIGURE_NAMES
-from .figure_contract import compare_figures, verify_presentation
+from .figure_contract import compare_figures, same_svg, verify_presentation
 from .plot import render
 from .source_contract import ROOT
 
 
 class FigureTests(unittest.TestCase):
+    def test_svg_roundoff_is_absolute_and_limited_to_path_coordinates(self):
+        expected = (b'<svg viewBox="0 0 100 100"><text>1.0</text><path '
+                    b'd="M 1 2 L 1000000000 4" style="fill: red" transform="scale(1)"/></svg>')
+        self.assertTrue(same_svg(expected.replace(b'M 1 ', b'M 1.000001 '), expected))
+        self.assertTrue(same_svg(expected.replace(b'M 1 ', b'M 0.999999 '), expected))
+        for old, new in [(b'M 1 ', b'M 1.000002 '),
+                         (b'1000000000 4', b'1000000000.000002 4'),
+                         (b'M 1 2 L', b'M 1 2 3 L'), (b' L ', b' M '),
+                         (b'100 100', b'100 100.000001'), (b'>1.0<', b'>1.000001<'),
+                         (b'scale(1)', b'scale(1.000001)'), (b'red', b'blue'),
+                         (b'<path d=', b'<path id="other" d=')]:
+            with self.subTest(change=new):
+                self.assertFalse(same_svg(expected.replace(old, new), expected))
+        glyph = expected.replace(b'<path d=', b'<path id="glyph" d=')
+        self.assertFalse(same_svg(glyph.replace(b'M 1 ', b'M 1.000001 '), glyph))
+        relative = expected.replace(b'M 1 ', b'm 1 ')
+        self.assertFalse(same_svg(relative.replace(b'm 1 ', b'm 1.000001 '), relative))
+        arc = b'<svg><path d="M 0 0 A 1 1 0 0 1 2 2"/></svg>'
+        self.assertFalse(same_svg(arc.replace(b'0 0 1 2', b'0 0 1.000001 2'), arc))
+
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
