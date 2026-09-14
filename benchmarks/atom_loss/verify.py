@@ -1,4 +1,5 @@
 """Check the published evidence bundle; incomplete runs cannot become accuracy points."""
+from .shot_data import require
 import argparse
 import csv
 import hashlib
@@ -14,7 +15,7 @@ def require_complete_sweep(cases):
         raise ValueError('Loss sweep is incomplete; keep raw failures and do not publish a partial curve')
     for case in cases:
         decoders=case.get('decoders',{})
-        if set(decoders)!={'envelope-matching','pymatching-fixed','pymatching-envelope'}:
+        if set(decoders)!={'envelope-matching','pymatching-fixed','pymatching-envelope','envelope-matching-offline'}:
             raise ValueError('Missing loss-sweep comparator')
         if any(r.get('status')!='ok' for r in decoders.values()):
             raise ValueError('Loss sweep includes failed runs; retain raw records without publishing a partial curve')
@@ -35,7 +36,7 @@ def verify(root):
         path=root/name
         if path.parent != root or hashlib.sha256(path.read_bytes()).hexdigest()!=expected:
             raise ValueError(f'Artifact integrity mismatch: {name}')
-    for provenance, snapshot in [('provenance-all.json', 'source-snapshot.json')] + (
+    for provenance, snapshot in [('provenance-all.json', 'source-snapshot.json'),('provenance-seeds.json','source-snapshot-seeds.json')] + (
             [('provenance-timing.json', 'source-snapshot-timing.json')] if listed & TIMING_FILES else []) + (
             [('provenance-correctness.json', 'source-snapshot-correctness.json')] if listed & CORRECTNESS_FILES else []):
         record = json.loads((root/provenance).read_text())
@@ -54,37 +55,37 @@ def verify(root):
     if sampler['low_probability_controls']['real_circuit']['fixture_sha256']!=hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest():
         raise ValueError('Real-circuit sampling fixture mismatch')
     chain=json.loads((root/'chain-correctness.json').read_text())
-    assert (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)
-    assert chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4
-    assert chain['independent_effects_candidates_and_m2d_pass']
-    assert all(chain['compiler_output_mutations_rejected'].values())
-    assert set(chain['backends'])=={'envelope-matching','envelope-mle'}
+    require(((chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)), "verify: (chain['distance'],chain['rounds'],chain['detectors'])==(3,2,16)")
+    require((chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4), "verify: chain['physical_fault_traces']==5996 and chain['rows']>0 and chain['patterns']==4")
+    require((chain['independent_effects_candidates_and_m2d_pass']), "verify: chain['independent_effects_candidates_and_m2d_pass']")
+    require((all(chain['compiler_output_mutations_rejected'].values())), "verify: all(chain['compiler_output_mutations_rejected'].values())")
+    require((set(chain['backends'])=={'envelope-matching','envelope-mle'}), "verify: set(chain['backends'])=={'envelope-matching','envelope-mle'}")
     for result in chain['backends'].values():
-        assert not result['rejected_rows'] and result['unique_optimum_rows']>0
-        assert all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])
-    assert hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']
+        require((not result['rejected_rows'] and result['unique_optimum_rows']>0), "verify: not result['rejected_rows'] and result['unique_optimum_rows']>0")
+        require((all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])), "verify: all(result[k] for k in ['constant_zero_rejected','constant_one_rejected','flipped_prediction_rejected','placeholder_invariance'])")
+    require((hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']), "verify: hashlib.sha256((root/'midswap_d3_r2.stim').read_bytes()).hexdigest()==chain['fixture_sha256']")
     oracle=json.loads((root/'decoder-correctness.json').read_text())
-    assert [c['rows_checked'] for c in oracle['cases']]==[64,1024]
+    require(([c['rows_checked'] for c in oracle['cases']]==[64,1024]), "verify: [c['rows_checked'] for c in oracle['cases']]==[64,1024]")
     for c in oracle['cases']:
-        assert not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']
-        assert 0 in c['flipped_prediction_rejected_rows']
-    assert 21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']
+        require((not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']), "verify: not any(c['rejected_rows'].values()) and c['placeholder_invariance_pass']")
+        require((0 in c['flipped_prediction_rejected_rows']), "verify: 0 in c['flipped_prediction_rejected_rows']")
+    require((21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']), "verify: 21 in oracle['cases'][1]['ignored_conditioning_rejected_rows']")
     def duration(value, *, positive=False):
         if type(value) not in [int,float] or not math.isfinite(value) or (value<=0 if positive else value<0):
             raise ValueError('Invalid finite phase duration')
     sampling=json.loads((root/'sampling.json').read_text())
-    assert [c['distance'] for c in sampling]==[3,5,7]
+    require(([c['distance'] for c in sampling]==[3,5,7]), "verify: [c['distance'] for c in sampling]==[3,5,7]")
     for c in sampling:
         if (c['shots']!=256 or c['rounds']!=c['distance'] or c['pauli_probability']!=.001 or c['loss_probability']!=.003
                 or c['rust']['shots']!=c['shots'] or c['rust']['warmups']!=2 or c['reference']['warmups']!=1):
             raise ValueError('Sampling workload metadata mismatch')
         duration(c['rust']['parse_seconds'])
         for backend in ['rust','reference']:
-            assert len(c[backend]['records'])==3
+            require((len(c[backend]['records'])==3), "verify: len(c[backend]['records'])==3")
             for r in c[backend]['records']:
                 duration(r['sample_seconds'],positive=True);duration(r['packing_seconds'])
-                assert type(r['bytes']) is int and r['bytes']>0
-        assert c['rust']['records'][0]['bytes']==c['reference']['records'][0]['bytes']
+                require((type(r['bytes']) is int and r['bytes']>0), "verify: type(r['bytes']) is int and r['bytes']>0")
+        require((c['rust']['records'][0]['bytes']==c['reference']['records'][0]['bytes']), "verify: c['rust']['records'][0]['bytes']==c['reference']['records'][0]['bytes']")
     decoding=json.loads((root/'decoding.json').read_text())
     require_complete_sweep(decoding)
     import zipfile
@@ -98,53 +99,65 @@ def verify(root):
             if any(r['bytes']!=expected_bytes for backend in ['rust','reference'] for r in case[backend]['records']):
                 raise ValueError('Sampling byte count differs from circuit layout and shots')
     tradeoff=json.loads((root/'tradeoff.json').read_text())
-    assert set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop'}
-    assert tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']
+    require((set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}), "verify: set(tradeoff['decoders'])=={'envelope-matching','envelope-mle','pymatching-fixed','pymatching-envelope','pymatching-fixed-loop','envelope-matching-offline'}")
+    require((tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']), "verify: tradeoff['decoders']['pymatching-fixed']['prediction_sha256']==tradeoff['decoders']['pymatching-fixed-loop']['prediction_sha256']")
     for c in decoding+[tradeoff]:
-        assert c['shots']==5000 and c['decoders'] and 'export_failure' not in c
+        require((c['shots']==5000 and c['decoders'] and 'export_failure' not in c), "verify: c['shots']==5000 and c['decoders'] and 'export_failure' not in c")
+        require(c['seed']==(20260912 if c is tradeoff else 20260911), 'Predeclared original seed')
         native=c['decoders']['envelope-matching']
+        require(c['decoders']['envelope-matching-offline']['prediction_sha256']==native['prediction_sha256'],'Offline predictions')
         for name,r in c['decoders'].items():
             if r['status']=='ok':
-                assert type(r['shots']) is int and type(r['errors']) is int and r['shots']==c['shots'] and 0<=r['errors']<=r['shots']
-                assert r['logical_error_rate']==r['errors']/r['shots']
-                assert r['wilson_95']==wilson(r['errors'],r['shots'])
-                assert r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3
+                require((type(r['shots']) is int and type(r['errors']) is int and r['shots']==c['shots'] and 0<=r['errors']<=r['shots']), "verify: type(r['shots']) is int and type(r['errors']) is int and r['shots']==c['shots'] and 0<=r['errors']<=r['shots']")
+                require((r['logical_error_rate']==r['errors']/r['shots']), "verify: r['logical_error_rate']==r['errors']/r['shots']")
+                require((r['wilson_95']==wilson(r['errors'],r['shots'])), "verify: r['wilson_95']==wilson(r['errors'],r['shots'])")
+                require((r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3), "verify: r['wilson_95'][1]>0 and len(r['runs'])==len(r['total_seconds'])==3")
                 for value in r['total_seconds']:duration(value,positive=True)
                 for rep,(run,total) in enumerate(zip(r['runs'],r['total_seconds'])):
                     if name.startswith('pymatching'):
                         for key in ['compile_seconds','transform_seconds','decode_seconds']:duration(run[key])
-                        assert run['export_repetition']==rep
-                        assert total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']
+                        duration(run['write_seconds'])
+                        require((run['export_repetition']==rep), "verify: run['export_repetition']==rep")
+                        require((total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']), "verify: total==run['compile_seconds']+run['transform_seconds']+run['decode_seconds']")
                         if not name.endswith('-loop'):
-                            assert run['batch_calls']>0
+                            require((run['batch_calls']>0), "verify: run['batch_calls']>0")
                             phases=[run[k] for k in ['topology_seconds','preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']]
-                            assert min(phases)>=0 and math.isclose(sum(phases),run['decode_seconds'],rel_tol=1e-9)
+                            require((min(phases)>=0 and math.isclose(sum(phases),run['decode_seconds'],rel_tol=1e-9)), "verify: min(phases)>=0 and math.isclose(sum(phases),run['decode_seconds'],rel_tol=1e-9)")
                     else:
+                        if name == 'envelope-matching-offline':
+                            batch=run['batch']
+                            for key in ['graph_build_seconds','matching_seconds','write_seconds','batch_overhead_seconds']:
+                                duration(batch[key])
+                            require(math.isclose(sum(batch[k] for k in ['graph_build_seconds','matching_seconds','write_seconds','batch_overhead_seconds']),batch['decode_seconds'],rel_tol=1e-9),'Offline phases')
+                            require(run['stats']['decode_seconds']==run['transform_seconds']+batch['decode_seconds'],'Offline total')
+                            require(batch['graph_builds']==c['graph']['loss_patterns'],'Offline graph count')
                         expected = native_total(run)
                         if not math.isfinite(total) or not math.isclose(total, expected, rel_tol=1e-12, abs_tol=0.):
                             raise ValueError(f'Native total differs from compile + decode: {name}')
-                        assert run['stats']['attempted_shot_count']==r['shots']
-                        assert run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0
+                        require((run['stats']['attempted_shot_count']==r['shots']), "verify: run['stats']['attempted_shot_count']==r['shots']")
+                        require((run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0), "verify: run['stats']['timeout_count']==run['stats']['infeasible_shot_count']==0")
                 if 'paired_native_only_wrong' in r:
                     a,b=r['paired_native_only_wrong'],r['paired_python_only_wrong']
-                    assert r['errors']-native['errors']==b-a
-                    assert a+b==r['disagreements_with_native']
+                    require((r['errors']-native['errors']==b-a), "verify: r['errors']-native['errors']==b-a")
+                    require((a+b==r['disagreements_with_native']), "verify: a+b==r['disagreements_with_native']")
             else:
-                assert 'logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r
+                require(('logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r), "verify: 'logical_error_rate' not in r and 'errors' not in r and 'total_seconds' not in r")
     with (root/'timing-sweep.csv').open() as stream:
         rows = list(csv.DictReader(stream))
     expected = [{key:str(value) for key,value in row.items()} for row in timing_rows(decoding)]
-    if rows != expected or len(rows) != 135:
+    if rows != expected or len(rows) != 180:
         raise ValueError('Timing sweep CSV differs from complete raw repetitions')
     with (root/'summary.csv').open() as stream:
         reader = csv.DictReader(stream)
         rows = list(reader)
         fields = reader.fieldnames
     expected = [{key:str(value) for key,value in row.items()} for row in summary_rows(decoding,tradeoff)]
-    if fields != SUMMARY_FIELDS or rows != expected or len(rows) != 50:
+    if fields != SUMMARY_FIELDS or rows != expected or len(rows) != 66:
         raise ValueError('Summary CSV differs from complete raw counts and phase timings')
     from .shot_data import rescore, ARCHIVE
     rescore(root/ARCHIVE, root)
+    from .shot_data import rescore_seeds
+    rescore_seeds(root/'accuracy-seeds.zip',root)
     return 'PASS'
 
 

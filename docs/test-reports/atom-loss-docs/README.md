@@ -79,3 +79,35 @@ as a configuration parameter and document the two-qubit target half rate.
 Validation: 28 benchmark tests, eight site checks, and both Chromium/Firefox
 browser cases passed. Original corpus, predictions and timing records are
 unchanged; only the archive's checker and index were updated.
+
+## 2026-09-14: origin, policy and independent-seed checks
+
+The current screenshot includes the native offline batch comparator and a
+separate paired-accuracy figure for three predeclared new seeds. Both offline
+adapters include prediction write/flush; native streaming is labelled as a
+separate policy. Timing values were freshly measured on all original corpora.
+All 150 existing prediction hashes stayed unchanged; the original-corpus archive
+now includes 48 additional offline-native predictions (198 total).
+
+The independent Python checker reconstructs seeded masks, including per-batch
+shuffling. A coherently rewritten mask/answer pair that forces perfect decoder
+accuracy is rejected. Explicit evidence exceptions remain active under Python
+optimization. A new archive contains 48 independent-seed corpora and 147
+predictions, with per-seed results and conservative paired difference intervals.
+All 64 original/new corpora were regenerated and their public shots, masks and
+answers matched byte for byte.
+
+Validation: 33 benchmark tests passed; normal and `python -O` artifact checks
+passed; both archives rescore under `python -I -S`; all eight site checks and
+Chromium/Firefox browser tests passed. Mobile overflow on the new seed figure
+was fixed using the existing responsive figure styles. The long results capture
+hides sticky navigation only while taking the screenshot; mobile tests keep it.
+
+Commands and logs used locally:
+
+- `python -m unittest benchmarks.atom_loss.test_reference` — `drafts/round8-tests.log`.
+- `python -m benchmarks.atom_loss.remeasure ...` — `drafts/round8-remeasure.log`.
+- `python -m benchmarks.atom_loss.replay` (both archives) — `drafts/round8-replay.log`, `drafts/round8-seed-replay.log`.
+- `python -m benchmarks.atom_loss.verify` and `python -O -m benchmarks.atom_loss.verify`.
+- `make -o build-shot-viewer build-site` and `python3 tools/check_site_build.py _site`.
+- `npx playwright test tests/atom-loss-evidence.spec.js --workers 2` — both browser projects.

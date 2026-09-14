@@ -1,4 +1,5 @@
 """Reproducible, bounded Mid-SWAP sampling and public-input decoder experiments."""
+from .shot_data import require
 import argparse
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -195,6 +196,25 @@ def native_decode(binary, work, decoder, repetition):
     return np.frombuffer(predictions.read_bytes(), dtype=np.uint8), record
 
 
+def measure_offline(exporter, work, rep, answers):
+    name='envelope-matching-offline'
+    graph=export_graph(exporter,work,f'{name}-{rep}')
+    predictions=work/f'{name}-{rep}.b8';stats=work/f'{name}-{rep}.json'
+    result,wall=command([exporter.parent/'offline_matching_benchmark',
+                        work/f'graph-{name}-{rep}.json',predictions,stats])
+    if result.returncode:
+        return {'status':'failed','runs':[{'exit_code':result.returncode,'error':result.stderr}]}
+    batch=json.loads(stats.read_text())
+    record={'status':'ok','exit_code':0,'process_wall_seconds':wall,'batch':batch,
+        'transform_seconds':graph['transform_seconds'],
+        'stats':{'compile_seconds':graph['compile_seconds'],
+                 'decode_seconds':graph['transform_seconds']+batch['decode_seconds'],
+                 'attempted_shot_count':batch['shots'],'timeout_count':0,'infeasible_shot_count':0,
+                 'matching_graph_builds':batch['graph_builds'],'cache_hits':0}}
+    predicted=np.frombuffer(predictions.read_bytes(),dtype=np.uint8)
+    return {'status':'ok','runs':[record],'total_seconds':[native_total(record)],**score(predicted,answers)}
+
+
 def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, repeats, include_mle=False, reuse=False):
     work.mkdir(parents=True, exist_ok=True)
     circuit = work/'circuit.stim'
@@ -207,9 +227,9 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
     support = logical_x(circuit.read_text(), distance)
     public = json.loads((work/'public/manifest.json').read_text())
     private = json.loads((work/'private/manifest.json').read_text())
-    assert public['dataset_id'] == private['dataset_id'] and public['circuit']['observables'] == 1
+    require((public['dataset_id'] == private['dataset_id'] and public['circuit']['observables'] == 1), "run: public['dataset_id'] == private['dataset_id'] and public['circuit']['observables'] == 1")
     answers = np.frombuffer(validate_dataset(lambda name:(work/name).read_bytes()), dtype=np.uint8)
-    assert len(answers) == shots
+    require((len(answers) == shots), 'run: len(answers) == shots')
     case = {'distance': distance, 'rounds': rounds, 'loss_probability': loss, 'pauli_probability': .001,
             'shots': shots, 'seed': seed, 'logical_x_support': support, 'dataset_id': public['dataset_id'],
             'circuit_sha256': digest(circuit), 'public_rows_sha256': digest(work/'public/shots.b8'),
@@ -222,7 +242,7 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
     case['graph'] = {k: graph[k] for k in ['source','compile_seconds','transform_seconds','num_observables']}
     case['graph'].update(edges=len(graph['edges']), detectors=public['circuit']['detectors'],
                          loss_patterns=len(set(map(tuple, graph['losses']))))
-    names = ['envelope-matching', 'pymatching-fixed', 'pymatching-envelope']
+    names = ['envelope-matching', 'pymatching-fixed', 'pymatching-envelope', 'envelope-matching-offline']
     if include_mle:
         names += ['envelope-mle', 'pymatching-fixed-loop']
     entries = {name: [] for name in names}
@@ -231,7 +251,9 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
         order = names[rep % len(names):] + names[:rep % len(names)]
         case['timing_order'].append(order)
         for name in order:
-            if name.startswith('pymatching'):
+            if name == 'envelope-matching-offline':
+                entry = measure_offline(exporter, work, rep, answers)
+            elif name.startswith('pymatching'):
                 entry = measure_python(
                     lambda _: export_graph(exporter, work, f'{name}-{rep}'),
                     name == 'pymatching-envelope', answers, 1,
@@ -255,6 +277,8 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
         case['decoders'][name] = {**repetitions[0], 'runs': runs,
             'total_seconds': [entry['total_seconds'][0] for entry in repetitions]}
     native = case['decoders']['envelope-matching']
+    offline = case['decoders']['envelope-matching-offline']
+    require(offline['status']=='ok' and native['status']=='ok' and offline['prediction_sha256']==native['prediction_sha256'], 'Offline/streaming predictions differ')
     if native['status'] == 'ok':
         native_predictions = np.frombuffer((work/'envelope-matching-0.b8').read_bytes(), dtype=np.uint8)
         for name, entry in case['decoders'].items():
@@ -268,7 +292,7 @@ def decoder_case(binary, exporter, work, distance, rounds, loss, shots, seed, re
     if include_mle:
         batch_result, loop_result = [case['decoders'][key] for key in ['pymatching-fixed','pymatching-fixed-loop']]
         if batch_result['status'] == loop_result['status'] == 'ok':
-            assert batch_result['prediction_sha256'] == loop_result['prediction_sha256']
+            require((batch_result['prediction_sha256'] == loop_result['prediction_sha256']), "run: batch_result['prediction_sha256'] == loop_result['prediction_sha256']")
     return case
 
 
@@ -283,9 +307,16 @@ def measure_python(graph_factory, conditioned, answers, repeats, native_predicti
             if final is not None and not np.array_equal(predicted, final):
                 raise ValueError('PyMatching predictions changed between repetitions')
             final = predicted
+            if prediction_path is not None:
+                write_started = time.perf_counter()
+                with prediction_path.open('wb') as stream:
+                    stream.write(predicted.tobytes())
+                    stream.flush()
+                timing['write_seconds'] = time.perf_counter()-write_started
+                timing['decode_seconds'] += timing['write_seconds']
+                if 'output_seconds' in timing:
+                    timing['output_seconds'] += timing['write_seconds']
             timings.append(timing)
-        if prediction_path is not None:
-            prediction_path.write_bytes(final.tobytes())
         entry = {'status':'ok', 'runs':timings, **score(final, answers)}
         entry['total_seconds'] = [r['compile_seconds']+r['transform_seconds']+r['decode_seconds'] for r in timings]
         if native_predictions is not None:
@@ -365,15 +396,15 @@ def main():
     if args.stage in ['all','correctness']:
         result = correctness.run(binary)
         save(out/'correctness.json', result)
-        assert result['status'] == 'PASS'
+        require((result['status'] == 'PASS'), "run: result['status'] == 'PASS'")
         from .decoder_reference import run as decoder_reference_run
         decoder_result = decoder_reference_run(binary, exporter)
         save(out/'decoder-correctness.json', decoder_result)
-        assert decoder_result['status'] == 'PASS'
+        require((decoder_result['status'] == 'PASS'), "run: decoder_result['status'] == 'PASS'")
         from .chain_reference import run as chain_reference_run
         chain_result = chain_reference_run(binary, exporter)
         save(out/'chain-correctness.json', chain_result)
-        assert chain_result['status'] == 'PASS'
+        require((chain_result['status'] == 'PASS'), "run: chain_result['status'] == 'PASS'")
         print('sampling, matching and real-circuit chain correctness PASS', flush=True)
     if args.stage in ['all','sampling']:
         results = []

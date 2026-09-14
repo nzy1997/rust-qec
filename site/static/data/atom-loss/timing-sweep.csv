@@ -1,136 +1,181 @@
 distance,rounds,loss_probability,decoder,repetition,microseconds_per_shot,input_loss_patterns,graph_builds,cache_hits,policy
-3,3,0.0001,envelope-matching,0,1.690525,32,32,4968,FIFO/work-budget streaming
-3,3,0.0001,envelope-matching,1,1.7096668,32,32,4968,FIFO/work-budget streaming
-3,3,0.0001,envelope-matching,2,1.7144418000000001,32,32,4968,FIFO/work-budget streaming
-3,3,0.0001,pymatching-fixed,0,1.9348418126689673,32,1,,offline batch groups
-3,3,0.0001,pymatching-fixed,1,1.9150166042327879,32,1,,offline batch groups
-3,3,0.0001,pymatching-fixed,2,1.934316593382168,32,1,,offline batch groups
-3,3,0.0001,pymatching-envelope,0,2.253283409196997,32,32,,offline batch groups
-3,3,0.0001,pymatching-envelope,1,2.2797998441151144,32,32,,offline batch groups
-3,3,0.0001,pymatching-envelope,2,2.2538000126161815,32,32,,offline batch groups
-3,3,0.0003,envelope-matching,0,1.7710082,40,40,4960,FIFO/work-budget streaming
-3,3,0.0003,envelope-matching,1,1.7921500000000001,40,40,4960,FIFO/work-budget streaming
-3,3,0.0003,envelope-matching,2,1.7821331999999999,40,40,4960,FIFO/work-budget streaming
-3,3,0.0003,pymatching-fixed,0,1.9527167690047265,40,1,,offline batch groups
-3,3,0.0003,pymatching-fixed,1,1.939250023708606,40,1,,offline batch groups
-3,3,0.0003,pymatching-fixed,2,1.9865251660393954,40,1,,offline batch groups
-3,3,0.0003,pymatching-envelope,0,2.3817416037908554,40,40,,offline batch groups
-3,3,0.0003,pymatching-envelope,1,2.4310168183701517,40,40,,offline batch groups
-3,3,0.0003,pymatching-envelope,2,2.3583083886304137,40,40,,offline batch groups
-3,3,0.001,envelope-matching,0,2.1050416,84,84,4916,FIFO/work-budget streaming
-3,3,0.001,envelope-matching,1,2.1236166,84,84,4916,FIFO/work-budget streaming
-3,3,0.001,envelope-matching,2,2.0658917999999997,84,84,4916,FIFO/work-budget streaming
-3,3,0.001,pymatching-fixed,0,1.9700998004636523,84,1,,offline batch groups
-3,3,0.001,pymatching-fixed,1,1.9813252069856644,84,1,,offline batch groups
-3,3,0.001,pymatching-fixed,2,1.9732415662003278,84,1,,offline batch groups
-3,3,0.001,pymatching-envelope,0,2.9072168009477135,84,84,,offline batch groups
-3,3,0.001,pymatching-envelope,1,2.9284333987870457,84,84,,offline batch groups
-3,3,0.001,pymatching-envelope,2,2.9112584257155656,84,84,,offline batch groups
-3,3,0.003,envelope-matching,0,3.9944165999999997,349,349,4651,FIFO/work-budget streaming
-3,3,0.003,envelope-matching,1,4.0042501999999995,349,349,4651,FIFO/work-budget streaming
-3,3,0.003,envelope-matching,2,4.3440498000000005,349,349,4651,FIFO/work-budget streaming
-3,3,0.003,pymatching-fixed,0,2.1480333731838703,349,1,,offline batch groups
-3,3,0.003,pymatching-fixed,1,2.143649976068735,349,1,,offline batch groups
-3,3,0.003,pymatching-fixed,2,2.172824798837709,349,1,,offline batch groups
-3,3,0.003,pymatching-envelope,0,5.869750029683113,349,349,,offline batch groups
-3,3,0.003,pymatching-envelope,1,5.868658229459596,349,349,,offline batch groups
-3,3,0.003,pymatching-envelope,2,5.935816802984476,349,349,,offline batch groups
-3,3,0.01,envelope-matching,0,12.951350000000001,1493,1627,3373,FIFO/work-budget streaming
-3,3,0.01,envelope-matching,1,12.794233399999998,1493,1627,3373,FIFO/work-budget streaming
-3,3,0.01,envelope-matching,2,12.8894668,1493,1627,3373,FIFO/work-budget streaming
-3,3,0.01,pymatching-fixed,0,2.574933157929778,1493,1,,offline batch groups
-3,3,0.01,pymatching-fixed,1,2.583950019293165,1493,1,,offline batch groups
-3,3,0.01,pymatching-fixed,2,2.6295417729454518,1493,1,,offline batch groups
-3,3,0.01,pymatching-envelope,0,19.227666603332757,1493,1493,,offline batch groups
-3,3,0.01,pymatching-envelope,1,19.08059159770992,1493,1493,,offline batch groups
-3,3,0.01,pymatching-envelope,2,19.081075027064347,1493,1493,,offline batch groups
-5,5,0.0001,envelope-matching,0,11.2904166,142,142,4858,FIFO/work-budget streaming
-5,5,0.0001,envelope-matching,1,11.212358199999999,142,142,4858,FIFO/work-budget streaming
-5,5,0.0001,envelope-matching,2,11.1835584,142,142,4858,FIFO/work-budget streaming
-5,5,0.0001,pymatching-fixed,0,8.15717478106234,142,1,,offline batch groups
-5,5,0.0001,pymatching-fixed,1,7.947816829035545,142,1,,offline batch groups
-5,5,0.0001,pymatching-fixed,2,8.079866407428456,142,1,,offline batch groups
-5,5,0.0001,pymatching-envelope,0,13.715991608165837,142,142,,offline batch groups
-5,5,0.0001,pymatching-envelope,1,13.599058197144936,142,142,,offline batch groups
-5,5,0.0001,pymatching-envelope,2,13.71642482088461,142,142,,offline batch groups
-5,5,0.0003,envelope-matching,0,16.035925000000002,279,279,4721,FIFO/work-budget streaming
-5,5,0.0003,envelope-matching,1,16.0491168,279,279,4721,FIFO/work-budget streaming
-5,5,0.0003,envelope-matching,2,16.031724999999998,279,279,4721,FIFO/work-budget streaming
-5,5,0.0003,pymatching-fixed,0,7.998741819123292,279,1,,offline batch groups
-5,5,0.0003,pymatching-fixed,1,7.912574799624491,279,1,,offline batch groups
-5,5,0.0003,pymatching-fixed,2,8.23949982620306,279,1,,offline batch groups
-5,5,0.0003,pymatching-envelope,0,19.10107502276473,279,279,,offline batch groups
-5,5,0.0003,pymatching-envelope,1,18.977783402625587,279,279,,offline batch groups
-5,5,0.0003,pymatching-envelope,2,19.008208220245574,279,279,,offline batch groups
-5,5,0.001,envelope-matching,0,45.2146084,1082,1108,3892,FIFO/work-budget streaming
-5,5,0.001,envelope-matching,1,44.7101166,1082,1108,3892,FIFO/work-budget streaming
-5,5,0.001,envelope-matching,2,44.8632584,1082,1108,3892,FIFO/work-budget streaming
-5,5,0.001,pymatching-fixed,0,8.70648337253716,1082,1,,offline batch groups
-5,5,0.001,pymatching-fixed,1,8.208324780989956,1082,1,,offline batch groups
-5,5,0.001,pymatching-fixed,2,8.24744161297083,1082,1,,offline batch groups
-5,5,0.001,pymatching-envelope,0,50.71444979211304,1082,1082,,offline batch groups
-5,5,0.001,pymatching-envelope,1,50.69640001470957,1082,1082,,offline batch groups
-5,5,0.001,pymatching-envelope,2,51.00590001138025,1082,1082,,offline batch groups
-5,5,0.003,envelope-matching,0,137.2410416,3550,3845,1155,FIFO/work-budget streaming
-5,5,0.003,envelope-matching,1,135.9037584,3550,3845,1155,FIFO/work-budget streaming
-5,5,0.003,envelope-matching,2,137.3361832,3550,3845,1155,FIFO/work-budget streaming
-5,5,0.003,pymatching-fixed,0,9.23074139282446,3550,1,,offline batch groups
-5,5,0.003,pymatching-fixed,1,9.211967027017069,3550,1,,offline batch groups
-5,5,0.003,pymatching-fixed,2,9.249233375877141,3550,1,,offline batch groups
-5,5,0.003,pymatching-envelope,0,150.0144582123718,3550,3550,,offline batch groups
-5,5,0.003,pymatching-envelope,1,155.6331751681464,3550,3550,,offline batch groups
-5,5,0.003,pymatching-envelope,2,153.26885818338096,3550,3550,,offline batch groups
-5,5,0.01,envelope-matching,0,196.8237834,5000,5000,0,FIFO/work-budget streaming
-5,5,0.01,envelope-matching,1,195.6775332,5000,5000,0,FIFO/work-budget streaming
-5,5,0.01,envelope-matching,2,197.4636248,5000,5000,0,FIFO/work-budget streaming
-5,5,0.01,pymatching-fixed,0,12.919674976867437,5000,1,,offline batch groups
-5,5,0.01,pymatching-fixed,1,12.7756833872046,5000,1,,offline batch groups
-5,5,0.01,pymatching-fixed,2,12.933274992699289,5000,1,,offline batch groups
-5,5,0.01,pymatching-envelope,0,233.7794166051724,5000,5000,,offline batch groups
-5,5,0.01,pymatching-envelope,1,234.77437518348952,5000,5000,,offline batch groups
-5,5,0.01,pymatching-envelope,2,233.31115841347662,5000,5000,,offline batch groups
-7,7,0.0001,envelope-matching,0,70.94380000000001,455,541,4459,FIFO/work-budget streaming
-7,7,0.0001,envelope-matching,1,70.94833340000001,455,541,4459,FIFO/work-budget streaming
-7,7,0.0001,envelope-matching,2,70.45234160000001,455,541,4459,FIFO/work-budget streaming
-7,7,0.0001,pymatching-fixed,0,22.278050026291606,455,1,,offline batch groups
-7,7,0.0001,pymatching-fixed,1,22.310308378111053,455,1,,offline batch groups
-7,7,0.0001,pymatching-fixed,2,22.41776639526017,455,1,,offline batch groups
-7,7,0.0001,pymatching-envelope,0,71.82948339429795,455,455,,offline batch groups
-7,7,0.0001,pymatching-envelope,1,72.45578341061771,455,455,,offline batch groups
-7,7,0.0001,pymatching-envelope,2,72.24040021433704,455,455,,offline batch groups
-7,7,0.0003,envelope-matching,0,178.6603168,1100,1655,3345,FIFO/work-budget streaming
-7,7,0.0003,envelope-matching,1,178.63856660000002,1100,1655,3345,FIFO/work-budget streaming
-7,7,0.0003,envelope-matching,2,179.5442918,1100,1655,3345,FIFO/work-budget streaming
-7,7,0.0003,pymatching-fixed,0,22.779625011338926,1100,1,,offline batch groups
-7,7,0.0003,pymatching-fixed,1,22.361575026006367,1100,1,,offline batch groups
-7,7,0.0003,pymatching-fixed,2,22.419383394777775,1100,1,,offline batch groups
-7,7,0.0003,pymatching-envelope,0,141.6721000028512,1100,1100,,offline batch groups
-7,7,0.0003,pymatching-envelope,1,144.0089751711147,1100,1100,,offline batch groups
-7,7,0.0003,pymatching-envelope,2,145.4970334361911,1100,1100,,offline batch groups
-7,7,0.001,envelope-matching,0,440.25480819999996,3671,4286,714,FIFO/work-budget streaming
-7,7,0.001,envelope-matching,1,445.2499834,3671,4286,714,FIFO/work-budget streaming
-7,7,0.001,envelope-matching,2,439.54839179999993,3671,4286,714,FIFO/work-budget streaming
-7,7,0.001,pymatching-fixed,0,23.921274981448054,3671,1,,offline batch groups
-7,7,0.001,pymatching-fixed,1,25.040683374252914,3671,1,,offline batch groups
-7,7,0.001,pymatching-fixed,2,23.62021662988577,3671,1,,offline batch groups
-7,7,0.001,pymatching-envelope,0,433.0533418240713,3671,3671,,offline batch groups
-7,7,0.001,pymatching-envelope,1,429.54460000588,3671,3671,,offline batch groups
-7,7,0.001,pymatching-envelope,2,431.7940500357377,3671,3671,,offline batch groups
-7,7,0.003,envelope-matching,0,529.0793666000001,4993,5000,0,FIFO/work-budget streaming
-7,7,0.003,envelope-matching,1,527.0866166,4993,5000,0,FIFO/work-budget streaming
-7,7,0.003,envelope-matching,2,532.4168918,4993,5000,0,FIFO/work-budget streaming
-7,7,0.003,pymatching-fixed,0,26.107600018623472,4993,1,,offline batch groups
-7,7,0.003,pymatching-fixed,1,26.185975009691717,4993,1,,offline batch groups
-7,7,0.003,pymatching-fixed,2,26.016708383865883,4993,1,,offline batch groups
-7,7,0.003,pymatching-envelope,0,587.2339168288606,4993,4993,,offline batch groups
-7,7,0.003,pymatching-envelope,1,589.5110332117974,4993,4993,,offline batch groups
-7,7,0.003,pymatching-envelope,2,585.7117166346945,4993,4993,,offline batch groups
-7,7,0.01,envelope-matching,0,611.9699084,5000,5000,0,FIFO/work-budget streaming
-7,7,0.01,envelope-matching,1,605.9626499999999,5000,5000,0,FIFO/work-budget streaming
-7,7,0.01,envelope-matching,2,602.6574832,5000,5000,0,FIFO/work-budget streaming
-7,7,0.01,pymatching-fixed,0,38.435816628639174,5000,1,,offline batch groups
-7,7,0.01,pymatching-fixed,1,37.9595001799294,5000,1,,offline batch groups
-7,7,0.01,pymatching-fixed,2,38.3350415712893,5000,1,,offline batch groups
-7,7,0.01,pymatching-envelope,0,670.514100013615,5000,5000,,offline batch groups
-7,7,0.01,pymatching-envelope,1,669.0202999988863,5000,5000,,offline batch groups
-7,7,0.01,pymatching-envelope,2,667.7215584341607,5000,5000,,offline batch groups
+3,3,0.0001,envelope-matching,0,1.7903334,32,32,4968,FIFO/work-budget streaming
+3,3,0.0001,envelope-matching,1,1.7190666,32,32,4968,FIFO/work-budget streaming
+3,3,0.0001,envelope-matching,2,1.7631084,32,32,4968,FIFO/work-budget streaming
+3,3,0.0001,pymatching-fixed,0,2.2024918294974807,32,1,,offline batch groups
+3,3,0.0001,pymatching-fixed,1,2.04660841665864,32,1,,offline batch groups
+3,3,0.0001,pymatching-fixed,2,2.03899182508204,32,1,,offline batch groups
+3,3,0.0001,pymatching-envelope,0,2.3191834042387485,32,32,,offline batch groups
+3,3,0.0001,pymatching-envelope,1,2.3045830331448798,32,32,,offline batch groups
+3,3,0.0001,pymatching-envelope,2,2.492983203332758,32,32,,offline batch groups
+3,3,0.0001,envelope-matching-offline,0,1.7079502000000004,32,32,,offline batch groups
+3,3,0.0001,envelope-matching-offline,1,1.7117416,32,32,,offline batch groups
+3,3,0.0001,envelope-matching-offline,2,1.7161248000000002,32,32,,offline batch groups
+3,3,0.0003,envelope-matching,0,1.7207416,40,40,4960,FIFO/work-budget streaming
+3,3,0.0003,envelope-matching,1,1.9217751999999997,40,40,4960,FIFO/work-budget streaming
+3,3,0.0003,envelope-matching,2,1.8040251999999999,40,40,4960,FIFO/work-budget streaming
+3,3,0.0003,pymatching-fixed,0,2.094950046219563,40,1,,offline batch groups
+3,3,0.0003,pymatching-fixed,1,2.1109831805054426,40,1,,offline batch groups
+3,3,0.0003,pymatching-fixed,2,2.1643081826150414,40,1,,offline batch groups
+3,3,0.0003,pymatching-envelope,0,2.431233400957918,40,40,,offline batch groups
+3,3,0.0003,pymatching-envelope,1,2.370741594964266,40,40,,offline batch groups
+3,3,0.0003,pymatching-envelope,2,2.755883363497257,40,40,,offline batch groups
+3,3,0.0003,envelope-matching-offline,0,1.7126082,40,40,,offline batch groups
+3,3,0.0003,envelope-matching-offline,1,1.7740002000000001,40,40,,offline batch groups
+3,3,0.0003,envelope-matching-offline,2,1.6773415999999999,40,40,,offline batch groups
+3,3,0.001,envelope-matching,0,2.0710334,84,84,4916,FIFO/work-budget streaming
+3,3,0.001,envelope-matching,1,2.269325,84,84,4916,FIFO/work-budget streaming
+3,3,0.001,envelope-matching,2,2.2204083999999997,84,84,4916,FIFO/work-budget streaming
+3,3,0.001,pymatching-fixed,0,2.0942915750294926,84,1,,offline batch groups
+3,3,0.001,pymatching-fixed,1,2.0429166053950785,84,1,,offline batch groups
+3,3,0.001,pymatching-fixed,2,2.0377413879935027,84,1,,offline batch groups
+3,3,0.001,pymatching-envelope,0,2.9347336075621127,84,84,,offline batch groups
+3,3,0.001,pymatching-envelope,1,2.952766592517495,84,84,,offline batch groups
+3,3,0.001,pymatching-envelope,2,3.2408499776482578,84,84,,offline batch groups
+3,3,0.001,envelope-matching-offline,0,1.9509083999999999,84,84,,offline batch groups
+3,3,0.001,envelope-matching-offline,1,1.8760165999999998,84,84,,offline batch groups
+3,3,0.001,envelope-matching-offline,2,2.1153582,84,84,,offline batch groups
+3,3,0.003,envelope-matching,0,4.176799999999999,349,349,4651,FIFO/work-budget streaming
+3,3,0.003,envelope-matching,1,4.0538416,349,349,4651,FIFO/work-budget streaming
+3,3,0.003,envelope-matching,2,3.9858916000000004,349,349,4651,FIFO/work-budget streaming
+3,3,0.003,pymatching-fixed,0,2.2636248502267122,349,1,,offline batch groups
+3,3,0.003,pymatching-fixed,1,2.1456911932532075,349,1,,offline batch groups
+3,3,0.003,pymatching-fixed,2,2.250900006929898,349,1,,offline batch groups
+3,3,0.003,pymatching-envelope,0,6.449383355138565,349,349,,offline batch groups
+3,3,0.003,pymatching-envelope,1,6.207541779839993,349,349,,offline batch groups
+3,3,0.003,pymatching-envelope,2,6.253174824918579,349,349,,offline batch groups
+3,3,0.003,envelope-matching-offline,0,3.1691667999999997,349,349,,offline batch groups
+3,3,0.003,envelope-matching-offline,1,3.0685082,349,349,,offline batch groups
+3,3,0.003,envelope-matching-offline,2,3.0331084,349,349,,offline batch groups
+3,3,0.01,envelope-matching,0,14.116666600000004,1493,1627,3373,FIFO/work-budget streaming
+3,3,0.01,envelope-matching,1,13.298200199999998,1493,1627,3373,FIFO/work-budget streaming
+3,3,0.01,envelope-matching,2,13.312841599999999,1493,1627,3373,FIFO/work-budget streaming
+3,3,0.01,pymatching-fixed,0,2.624392018465924,1493,1,,offline batch groups
+3,3,0.01,pymatching-fixed,1,2.609258406587577,1493,1,,offline batch groups
+3,3,0.01,pymatching-fixed,2,2.812041603860259,1493,1,,offline batch groups
+3,3,0.01,pymatching-envelope,0,19.6548254217561,1493,1493,,offline batch groups
+3,3,0.01,pymatching-envelope,1,19.84916674260881,1493,1493,,offline batch groups
+3,3,0.01,pymatching-envelope,2,20.61665880094812,1493,1493,,offline batch groups
+3,3,0.01,envelope-matching-offline,0,8.0431,1493,1493,,offline batch groups
+3,3,0.01,envelope-matching-offline,1,7.9620999999999995,1493,1493,,offline batch groups
+3,3,0.01,envelope-matching-offline,2,8.159558200000001,1493,1493,,offline batch groups
+5,5,0.0001,envelope-matching,0,11.7919334,142,142,4858,FIFO/work-budget streaming
+5,5,0.0001,envelope-matching,1,11.5145,142,142,4858,FIFO/work-budget streaming
+5,5,0.0001,envelope-matching,2,11.4297834,142,142,4858,FIFO/work-budget streaming
+5,5,0.0001,pymatching-fixed,0,8.509016591306663,142,1,,offline batch groups
+5,5,0.0001,pymatching-fixed,1,8.104808382368088,142,1,,offline batch groups
+5,5,0.0001,pymatching-fixed,2,8.472933393792175,142,1,,offline batch groups
+5,5,0.0001,pymatching-envelope,0,14.589208408268428,142,142,,offline batch groups
+5,5,0.0001,pymatching-envelope,1,14.220691381583023,142,142,,offline batch groups
+5,5,0.0001,pymatching-envelope,2,14.347208195388315,142,142,,offline batch groups
+5,5,0.0001,envelope-matching-offline,0,9.69725,142,142,,offline batch groups
+5,5,0.0001,envelope-matching-offline,1,9.5254332,142,142,,offline batch groups
+5,5,0.0001,envelope-matching-offline,2,9.798283199999998,142,142,,offline batch groups
+5,5,0.0003,envelope-matching,0,16.4984,279,279,4721,FIFO/work-budget streaming
+5,5,0.0003,envelope-matching,1,16.469383399999998,279,279,4721,FIFO/work-budget streaming
+5,5,0.0003,envelope-matching,2,16.3592084,279,279,4721,FIFO/work-budget streaming
+5,5,0.0003,pymatching-fixed,0,8.257249986576175,279,1,,offline batch groups
+5,5,0.0003,pymatching-fixed,1,8.45800021267917,279,1,,offline batch groups
+5,5,0.0003,pymatching-fixed,2,8.30026637770958,279,1,,offline batch groups
+5,5,0.0003,pymatching-envelope,0,20.670658230802417,279,279,,offline batch groups
+5,5,0.0003,pymatching-envelope,1,21.278433220258353,279,279,,offline batch groups
+5,5,0.0003,pymatching-envelope,2,19.89585837323029,279,279,,offline batch groups
+5,5,0.0003,envelope-matching-offline,0,13.218116799999997,279,279,,offline batch groups
+5,5,0.0003,envelope-matching-offline,1,12.748949999999997,279,279,,offline batch groups
+5,5,0.0003,envelope-matching-offline,2,13.416391599999999,279,279,,offline batch groups
+5,5,0.001,envelope-matching,0,47.946441799999995,1082,1108,3892,FIFO/work-budget streaming
+5,5,0.001,envelope-matching,1,49.33795859999999,1082,1108,3892,FIFO/work-budget streaming
+5,5,0.001,envelope-matching,2,48.05855,1082,1108,3892,FIFO/work-budget streaming
+5,5,0.001,pymatching-fixed,0,8.705899804059076,1082,1,,offline batch groups
+5,5,0.001,pymatching-fixed,1,8.669150000836588,1082,1,,offline batch groups
+5,5,0.001,pymatching-fixed,2,8.830066645310593,1082,1,,offline batch groups
+5,5,0.001,pymatching-envelope,0,57.40036678615127,1082,1082,,offline batch groups
+5,5,0.001,pymatching-envelope,1,56.5813918080002,1082,1082,,offline batch groups
+5,5,0.001,pymatching-envelope,2,54.35684162704051,1082,1082,,offline batch groups
+5,5,0.001,envelope-matching-offline,0,31.5648668,1082,1082,,offline batch groups
+5,5,0.001,envelope-matching-offline,1,33.1442834,1082,1082,,offline batch groups
+5,5,0.001,envelope-matching-offline,2,31.613116799999993,1082,1082,,offline batch groups
+5,5,0.003,envelope-matching,0,145.17854179999998,3550,3845,1155,FIFO/work-budget streaming
+5,5,0.003,envelope-matching,1,145.7146916,3550,3845,1155,FIFO/work-budget streaming
+5,5,0.003,envelope-matching,2,148.41921659999997,3550,3845,1155,FIFO/work-budget streaming
+5,5,0.003,pymatching-fixed,0,9.666633383398842,3550,1,,offline batch groups
+5,5,0.003,pymatching-fixed,1,9.866224790754915,3550,1,,offline batch groups
+5,5,0.003,pymatching-fixed,2,10.773850016675256,3550,1,,offline batch groups
+5,5,0.003,pymatching-envelope,0,163.71662501911223,3550,3550,,offline batch groups
+5,5,0.003,pymatching-envelope,1,164.12249181141684,3550,3550,,offline batch groups
+5,5,0.003,pymatching-envelope,2,169.2549913718415,3550,3550,,offline batch groups
+5,5,0.003,envelope-matching-offline,0,90.16688320000002,3550,3550,,offline batch groups
+5,5,0.003,envelope-matching-offline,1,86.8339498,3550,3550,,offline batch groups
+5,5,0.003,envelope-matching-offline,2,86.6069748,3550,3550,,offline batch groups
+5,5,0.01,envelope-matching,0,200.53530840000002,5000,5000,0,FIFO/work-budget streaming
+5,5,0.01,envelope-matching,1,213.15640820000002,5000,5000,0,FIFO/work-budget streaming
+5,5,0.01,envelope-matching,2,209.5561,5000,5000,0,FIFO/work-budget streaming
+5,5,0.01,pymatching-fixed,0,13.424249986256026,5000,1,,offline batch groups
+5,5,0.01,pymatching-fixed,1,13.090333385736608,5000,1,,offline batch groups
+5,5,0.01,pymatching-fixed,2,13.51236654403336,5000,1,,offline batch groups
+5,5,0.01,pymatching-envelope,0,250.76652500408673,5000,5000,,offline batch groups
+5,5,0.01,pymatching-envelope,1,259.54618299157534,5000,5000,,offline batch groups
+5,5,0.01,pymatching-envelope,2,297.26795018641224,5000,5000,,offline batch groups
+5,5,0.01,envelope-matching-offline,0,130.2191248,5000,5000,,offline batch groups
+5,5,0.01,envelope-matching-offline,1,131.237725,5000,5000,,offline batch groups
+5,5,0.01,envelope-matching-offline,2,156.6249,5000,5000,,offline batch groups
+7,7,0.0001,envelope-matching,0,101.3181666,455,541,4459,FIFO/work-budget streaming
+7,7,0.0001,envelope-matching,1,75.27082500000002,455,541,4459,FIFO/work-budget streaming
+7,7,0.0001,envelope-matching,2,74.5410834,455,541,4459,FIFO/work-budget streaming
+7,7,0.0001,pymatching-fixed,0,24.225891367438845,455,1,,offline batch groups
+7,7,0.0001,pymatching-fixed,1,23.121166817728543,455,1,,offline batch groups
+7,7,0.0001,pymatching-fixed,2,22.42689957167037,455,1,,offline batch groups
+7,7,0.0001,pymatching-envelope,0,78.39834163400145,455,455,,offline batch groups
+7,7,0.0001,pymatching-envelope,1,75.55450816112459,455,455,,offline batch groups
+7,7,0.0001,pymatching-envelope,2,109.96959136931639,455,455,,offline batch groups
+7,7,0.0001,envelope-matching-offline,0,60.916225,455,455,,offline batch groups
+7,7,0.0001,envelope-matching-offline,1,52.6579252,455,455,,offline batch groups
+7,7,0.0001,envelope-matching-offline,2,50.152758399999996,455,455,,offline batch groups
+7,7,0.0003,envelope-matching,0,187.51624979999997,1100,1655,3345,FIFO/work-budget streaming
+7,7,0.0003,envelope-matching,1,187.5702916,1100,1655,3345,FIFO/work-budget streaming
+7,7,0.0003,envelope-matching,2,203.8737916,1100,1655,3345,FIFO/work-budget streaming
+7,7,0.0003,pymatching-fixed,0,24.258233171277382,1100,1,,offline batch groups
+7,7,0.0003,pymatching-fixed,1,24.174833416080475,1100,1,,offline batch groups
+7,7,0.0003,pymatching-fixed,2,23.495549998138213,1100,1,,offline batch groups
+7,7,0.0003,pymatching-envelope,0,174.59715839848093,1100,1100,,offline batch groups
+7,7,0.0003,pymatching-envelope,1,161.3548001767465,1100,1100,,offline batch groups
+7,7,0.0003,pymatching-envelope,2,154.94224164398312,1100,1100,,offline batch groups
+7,7,0.0003,envelope-matching-offline,0,93.9198086,1100,1100,,offline batch groups
+7,7,0.0003,envelope-matching-offline,1,93.806625,1100,1100,,offline batch groups
+7,7,0.0003,envelope-matching-offline,2,91.5861414,1100,1100,,offline batch groups
+7,7,0.001,envelope-matching,0,453.7948668,3671,4286,714,FIFO/work-budget streaming
+7,7,0.001,envelope-matching,1,497.7656084,3671,4286,714,FIFO/work-budget streaming
+7,7,0.001,envelope-matching,2,453.903375,3671,4286,714,FIFO/work-budget streaming
+7,7,0.001,pymatching-fixed,0,24.131000034299493,3671,1,,offline batch groups
+7,7,0.001,pymatching-fixed,1,24.418483627192902,3671,1,,offline batch groups
+7,7,0.001,pymatching-fixed,2,24.211924961870054,3671,1,,offline batch groups
+7,7,0.001,pymatching-envelope,0,451.5547998654455,3671,3671,,offline batch groups
+7,7,0.001,pymatching-envelope,1,558.3024083777913,3671,3671,,offline batch groups
+7,7,0.001,pymatching-envelope,2,550.6546249860526,3671,3671,,offline batch groups
+7,7,0.001,envelope-matching-offline,0,282.5341584,3671,3671,,offline batch groups
+7,7,0.001,envelope-matching-offline,1,270.63936679999995,3671,3671,,offline batch groups
+7,7,0.001,envelope-matching-offline,2,259.04050820000003,3671,3671,,offline batch groups
+7,7,0.003,envelope-matching,0,554.438,4993,5000,0,FIFO/work-budget streaming
+7,7,0.003,envelope-matching,1,572.5707916000001,4993,5000,0,FIFO/work-budget streaming
+7,7,0.003,envelope-matching,2,573.0274750000001,4993,5000,0,FIFO/work-budget streaming
+7,7,0.003,pymatching-fixed,0,27.550266978416705,4993,1,,offline batch groups
+7,7,0.003,pymatching-fixed,1,26.898416377399638,4993,1,,offline batch groups
+7,7,0.003,pymatching-fixed,2,27.86098341239095,4993,1,,offline batch groups
+7,7,0.003,pymatching-envelope,0,622.299024999129,4993,4993,,offline batch groups
+7,7,0.003,pymatching-envelope,1,635.3080497771531,4993,4993,,offline batch groups
+7,7,0.003,pymatching-envelope,2,628.3874835834274,4993,4993,,offline batch groups
+7,7,0.003,envelope-matching-offline,0,355.0830666,4993,4993,,offline batch groups
+7,7,0.003,envelope-matching-offline,1,373.24393339999995,4993,4993,,offline batch groups
+7,7,0.003,envelope-matching-offline,2,357.06392519999997,4993,4993,,offline batch groups
+7,7,0.01,envelope-matching,0,674.7457417999999,5000,5000,0,FIFO/work-budget streaming
+7,7,0.01,envelope-matching,1,623.8735416000001,5000,5000,0,FIFO/work-budget streaming
+7,7,0.01,envelope-matching,2,679.7064416000001,5000,5000,0,FIFO/work-budget streaming
+7,7,0.01,pymatching-fixed,0,39.55054157963396,5000,1,,offline batch groups
+7,7,0.01,pymatching-fixed,1,48.574991623994705,5000,1,,offline batch groups
+7,7,0.01,pymatching-fixed,2,40.79377484025783,5000,1,,offline batch groups
+7,7,0.01,pymatching-envelope,0,708.4858749814459,5000,5000,,offline batch groups
+7,7,0.01,pymatching-envelope,1,752.8153917654574,5000,5000,,offline batch groups
+7,7,0.01,pymatching-envelope,2,699.0501833836603,5000,5000,,offline batch groups
+7,7,0.01,envelope-matching-offline,0,380.88703340000006,5000,5000,,offline batch groups
+7,7,0.01,envelope-matching-offline,1,382.3476668,5000,5000,,offline batch groups
+7,7,0.01,envelope-matching-offline,2,408.54258340000007,5000,5000,,offline batch groups
