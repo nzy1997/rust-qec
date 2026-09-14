@@ -94,26 +94,42 @@ Logical errors: 0 / 64</code></pre>
 
   <p class="doc-note">Select any figure to open the full-size SVG. The downloadable CSV contains the exact values behind the plots.</p>
   <h3 id="loss-sampling-throughput">1. Sampling loss-visible records</h3>
-  <figure class="loss-result-figure">
-    <a href="../data/atom-loss/sampling-throughput.svg" aria-label="Open the sampling throughput figure at full size"><img src="../data/atom-loss/sampling-throughput.svg" alt="Measured sampling and b8 packing throughput for RustQEC at code distances 3, 5, and 7." loading="lazy" width="900" height="480"></a>
-    <figcaption>Rounds equal distance; 256 shots per batch; Pauli probability 0.001 and configured loss parameter pLoss = 0.003; two-qubit targets use pLoss/2. Points show the median of three runs; bars show their full range. Rust parsing is excluded; sampler preparation and loss-visible b8 packing are included.</figcaption>
-  </figure>
-  <details class="loss-reference-cost"><summary>Supplement: cost of the unoptimized correctness reference</summary>
-    <figure class="loss-reference-figure">
-      <a href="../data/atom-loss/sampling-reference-cost.svg" aria-label="Open the correctness-reference cost figure at full size"><img src="../data/atom-loss/sampling-reference-cost.svg" alt="Milliseconds per 256-shot batch for the unoptimized Python and Stim correctness reference at distances 3, 5 and 7." loading="lazy" width="840" height="440"></a>
-      <figcaption>The reference includes Python parsing, loss-history grouping, per-history circuit construction and Stim compilation, plus loss flags, value bits and b8 packing. Its parsing boundary differs from the Rust measurement. This is the cost of the correctness reference, not native Stim performance or a competitive backend comparison; no speedup ratio is inferred.</figcaption>
-    </figure>
-  </details>
+  <aside class="doc-note loss-sampling-caveat" aria-labelledby="sampling-comparison-scope">
+    <strong id="sampling-comparison-scope">Python reference is unoptimized; timing boundaries differ.</strong>
+    <p>The Python + Stim reference includes parsing, loss-history grouping, circuit construction and Stim compilation for each history. Rust parsing is excluded; sampler preparation and b8 packing are included. The table compares these recorded workflow costs. It does not measure native Stim performance or establish a backend speedup.</p>
+  </aside>
+  {% set sampling = load_data(path="static/data/atom-loss/sampling.json") %}
+  <div class="table-wrap loss-sampling-table-wrap">
+    <table class="loss-sampling-table">
+      <caption>Time per {{ sampling[0].shots }}-shot batch, in milliseconds. Median (min–max) of three runs.</caption>
+      <thead><tr><th scope="col">Distance<br>(rounds = d)</th><th scope="col">RustQEC</th><th scope="col">Python + Stim<br>correctness reference</th></tr></thead>
+      <tbody>
+      {% for case in sampling | sort(attribute="distance") %}
+        <tr><th scope="row">d = {{ case.distance }}</th>
+        {% for backend in ["rust", "reference"] %}
+          {% set runs = case[backend].records %}
+          {% set first = (runs[0].sample_seconds + runs[0].packing_seconds) * 1000 %}
+          {% set second = (runs[1].sample_seconds + runs[1].packing_seconds) * 1000 %}
+          {% set third = (runs[2].sample_seconds + runs[2].packing_seconds) * 1000 %}
+          {% set elapsed = [first, second, third] | sort %}
+          <td data-backend="{{ backend }}">{{ elapsed[1] | round(precision=2) }}<span class="loss-time-range">({{ elapsed[0] | round(precision=2) }}–{{ elapsed[2] | round(precision=2) }})</span></td>
+        {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="loss-sampling-context">Pauli probability {{ sampling[0].pauli_probability }}; configured pLoss = {{ sampling[0].loss_probability }} (two-qubit targets: pLoss/2). Both produce loss-visible records and pack b8. Rust uses two warmups; the reference uses one. Imports, process startup and file I/O are excluded. <a href="../data/atom-loss/sampling.json">All sampling measurements</a>.</p>
 
   <h3 id="loss-logical-error-rate">2. Logical failures as loss increases</h3>
-  <figure class="loss-result-figure">
-    <a href="../data/atom-loss/logical-error-rate.svg" aria-label="Open the logical error rate figure at full size"><img src="../data/atom-loss/logical-error-rate.svg" alt="Logical failure rates on logarithmic axes at distances 3 and 5, omitting zero-failure points, with 95 percent Wilson intervals for RustQEC envelope matching, PyMatching with the same envelope weights, and fixed-weight PyMatching." loading="lazy" width="1120" height="410"></a>
-    <figcaption>5,000 shared blinded shots per point, rounds = distance, Pauli probability 0.001. Operation and pre-measurement loss use the same plotted probability. Both axes use logarithmic scales. Error bars are pointwise 95% Wilson intervals. This figure shows d = 3 and d = 5 only and omits zero-failure points. The complete d = 3, 5, 7 results, including zero failures and their interval bounds, are available in the expandable full figure below and the downloadable data. Rates refer to an entire memory experiment.</figcaption>
+  <figure class="loss-result-figure loss-full-figure">
+    <a href="../data/atom-loss/logical-error-rate-full.svg" aria-label="Open the complete loss sweep at full size"><img src="../data/atom-loss/logical-error-rate-full.svg" alt="All fifteen loss-sweep settings at distances 3, 5 and 7; downward arrows mark one-sided 95 percent upper limits where no failures were observed." loading="lazy" width="1240" height="480"></a>
+    <figcaption>All d = 3, 5, 7 settings; 5,000 shared blinded shots per point, rounds = distance, Pauli probability 0.001. Operation and pre-measurement loss use the same plotted probability. Rates refer to an entire memory experiment. Zero observed failures do not imply zero failure probability: downward arrows mark exact one-sided 95% binomial upper limits, approximately 0.000599 for 5,000 shots. They are limits, not measured rates; coincident limits overlap. Nonzero observations retain pointwise 95% Wilson intervals.</figcaption>
   </figure>
-  <details class="loss-full-sweep"><summary>Full sweep: d = 3, 5, 7, including zero-event upper limits</summary>
-    <figure class="loss-full-figure">
-      <a href="../data/atom-loss/logical-error-rate-full.svg" aria-label="Open the complete loss sweep at full size"><img src="../data/atom-loss/logical-error-rate-full.svg" alt="All fifteen loss-sweep settings at distances 3, 5 and 7; downward arrows mark one-sided 95 percent upper limits where no failures were observed." loading="lazy" width="1240" height="480"></a>
-      <figcaption>Zero observed failures do not imply zero failure probability. Downward arrows mark exact one-sided 95% binomial upper limits: approximately 0.000599 for 5,000 shots. They are limits, not measured rates; coincident limits overlap. Nonzero observations retain 95% Wilson intervals.</figcaption>
+  <details class="loss-detail-sweep"><summary>Detail: nonzero failure rates at d = 3 and d = 5</summary>
+    <figure class="loss-detail-figure">
+      <a href="../data/atom-loss/logical-error-rate.svg" aria-label="Open the nonzero failure-rate detail at full size"><img src="../data/atom-loss/logical-error-rate.svg" alt="Detail of nonzero logical failure rates on logarithmic axes at distances 3 and 5, with 95 percent Wilson intervals for RustQEC envelope matching, PyMatching with the same envelope weights, and fixed-weight PyMatching." loading="lazy" width="1120" height="410"></a>
+      <figcaption>A closer view of the nonzero d = 3 and d = 5 observations from the complete sweep above, with logarithmic axes and pointwise 95% Wilson intervals. This detail omits d = 7 and zero-failure points; it adds no samples.</figcaption>
     </figure>
   </details>
   <p>The PyMatching envelope adapter uses the same compiled graph, canonical syndromes and loss-conditioned weights as RustQEC. Fixed-weight PyMatching is an ablation: it removes loss-conditioned edge weights while retaining the same canonical syndromes. It therefore tests the value of this weighting rule, rather than removing every use of loss information.</p>
@@ -129,6 +145,7 @@ Logical errors: 0 / 64</code></pre>
   <p>These three timing repetitions reuse one 5,000-shot corpus; they are not 15,000 independent accuracy samples. On this setting, conditioning versus fixed weights has 0 conditioned-only failures and 13 fixed-only failures. That paired observation supports improvement here, not across every setting. MLE's 1 failure in 5,000 shots has substantial relative uncertainty and concerns its declared fault-configuration objective.</p>
   <h4 id="loss-seed-accuracy">Accuracy differences across three new seeds</h4>
   <p>Three seeds were fixed before sampling, with 5,000 shots each at every setting. This separate experiment adds 15,000 independent shots per setting; timing repeats do not increase its sample size. Each seed's results remain available.</p>
+  <p>With identical envelope weights, RustQEC and PyMatching have the same total failure count at every setting across these three seeds. In the 15,000-shot tradeoff setting, each has 35 failures, compared with 61 for fixed-weight PyMatching. The paired evidence supports the benefit of loss-conditioned weights at this setting; it does not establish an accuracy advantage of the Rust backend.</p>
   <figure class="loss-seed-figure">
     <a href="../data/atom-loss/accuracy-seeds.svg"><img src="../data/atom-loss/accuracy-seeds.svg" alt="Paired failure-rate differences across three new seeds, with conservative pointwise 95 percent intervals" loading="lazy" width="1240" height="520"></a>
     <figcaption>Native minus comparator failure rate: negative values favor native. Bars bound both paired discordant probabilities with Clopper–Pearson intervals and Bonferroni correction. Intervals are pointwise, not simultaneous across the sweep. This supports statements about these settings, not a universal ranking.</figcaption>

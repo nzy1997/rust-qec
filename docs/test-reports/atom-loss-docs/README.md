@@ -371,3 +371,42 @@ scoped to this workload and evidence contract: it does not authenticate past
 wall-clock time or prove arbitrary-circuit physical correctness. Existing
 single-machine, incomplete timing rotation, low-event-count, shared compiler
 and finite independent physical-oracle limits remain explicitly disclosed.
+
+### Complete sweep as the default figure
+
+The results page now displays the full d=3/5/7 sweep, including zero-event
+upper limits, by default. The nonzero d=3/5 crop is an optional detail. The
+additional-seed explanation explicitly attributes the observed tradeoff benefit
+to conditioned weights: native and PyMatching envelope each have 35 failures,
+versus 61 for fixed weights in 15,000 shots; their pooled totals match at all
+16 settings. These statements were checked against `accuracy-seeds.json`.
+
+This is a presentation-only change; no measured source or evidence file was
+edited. Eight site checks and both Chromium/Firefox evidence tests passed,
+including default full-figure visibility, optional detail expansion and mobile
+overflow. The desktop capture was refreshed and the default full figure was
+visually inspected (`drafts/round19-main-figure.png`).
+
+### Sampling cost table and explicit matching legends
+
+The sampling chart is replaced on the page by a table of milliseconds per
+256-shot batch: median and min/max of the three recorded sample-plus-packing
+runs for each backend at d=3/5/7. The template computes cells from
+`sampling.json`; both browser tests independently recompute all six cells.
+A highlighted note above the table states that the Python + Stim correctness
+reference is unoptimized and includes parsing, loss-history grouping, circuit
+construction and per-history Stim compilation, while Rust parsing is excluded.
+The table does not claim native Stim performance or a backend speedup.
+
+The accuracy/time figure now names both native entries explicitly as
+“RustQEC envelope matching (streaming)” and “RustQEC envelope matching (batch)”.
+The original separate sampling plots remain downloadable evidence artifacts.
+
+Because the plot and methodology are bound source inputs, all evidence was
+regenerated from clean source `41fad414a` with 750 inputs and fresh binaries.
+All 537 binary archive entries, including the 64 corpora and 345 predictions,
+remain byte-identical to the preceding run. Workflow times were remeasured.
+Ordinary and optimized full verification, all eight Linux/macOS figure
+comparisons, eight site checks and both browser tests passed. Desktop/mobile
+captures were refreshed, including inspection of the warning, table and legend.
+Logs and focused screenshots are in `drafts/round20-*`.

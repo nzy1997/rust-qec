@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test('atom-loss evidence exposes three real figures and downloadable measurements', async ({ page }) => {
+test('atom-loss evidence exposes sampling costs, figures and downloadable measurements', async ({ page }) => {
   await page.goto('/atom-loss/#atom-loss-results');
   const figures = page.locator('.loss-result-figure');
-  await expect(figures).toHaveCount(3);
+  await expect(figures).toHaveCount(2);
   for (const figure of await figures.all()) {
     await figure.scrollIntoViewIfNeeded();
     await expect.poll(() => figure.locator('img').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -13,14 +13,28 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain('<svg');
   }
-  const mainSampling = await (await page.request.get('/data/atom-loss/sampling-throughput.svg')).text();
-  expect(mainSampling).toContain('RustQEC loss-visible sampling');
-  expect(mainSampling).not.toContain('Stim');
-  await page.locator('.loss-reference-cost summary').click();
-  const reference = page.locator('.loss-reference-figure img');
-  await reference.scrollIntoViewIfNeeded();
-  await expect.poll(() => reference.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
-  await expect(page.locator('.loss-reference-figure figcaption')).toContainText('no speedup ratio');
+  const caveat = page.locator('.loss-sampling-caveat');
+  await expect(caveat).toContainText('Python reference is unoptimized; timing boundaries differ.');
+  await expect(caveat).toContainText('Rust parsing is excluded');
+  await expect(caveat).toContainText('does not measure native Stim performance');
+  const table = page.locator('.loss-sampling-table');
+  await table.scrollIntoViewIfNeeded();
+  await expect(table).toBeVisible();
+  await expect(table.locator('caption')).toContainText('256-shot batch, in milliseconds');
+  const sampling = await (await page.request.get('/data/atom-loss/sampling.json')).json();
+  await expect(table.locator('tbody tr')).toHaveCount(sampling.length);
+  const rounded = value => String(Math.round(value * 100) / 100);
+  for (const sample of sampling) {
+    const row = table.locator('tbody tr').filter({ hasText: `d = ${sample.distance}` });
+    for (const backend of ['rust', 'reference']) {
+      const times = sample[backend].records.map(run => (run.sample_seconds + run.packing_seconds) * 1000).sort((a, b) => a - b);
+      expect(times).toHaveLength(3);
+      await expect(row.locator(`[data-backend="${backend}"]`)).toHaveText(`${rounded(times[1])}(${rounded(times[0])}–${rounded(times[2])})`);
+    }
+  }
+  const accuracyTime = await (await page.request.get('/data/atom-loss/accuracy-time.svg')).text();
+  expect(accuracyTime).toContain('RustQEC envelope matching (streaming)');
+  expect(accuracyTime).toContain('RustQEC envelope matching (batch)');
   const timing = page.locator('.loss-timing-figure img');
   await timing.scrollIntoViewIfNeeded();
   await expect.poll(() => timing.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -35,11 +49,17 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   const samplingCheck = await (await page.request.get('/data/atom-loss/correctness.json')).json();
   expect(samplingCheck.analytic_noise_controls.distribution_probes.cases).toHaveLength(26);
   expect(samplingCheck.analytic_noise_controls.distribution_probes.channel_replacement_mutations.DEPOLARIZE2_ix_only.rejected).toBe(true);
-  await page.locator('.loss-full-sweep summary').click();
   const full = page.locator('.loss-full-figure img');
   await full.scrollIntoViewIfNeeded();
   await expect.poll(() => full.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(page.locator('.loss-full-figure figcaption')).toContainText('0.000599');
+  await expect(full).toHaveAttribute('src', '../data/atom-loss/logical-error-rate-full.svg');
+  await expect(full).toBeVisible();
+  const detail = page.locator('.loss-detail-figure img');
+  await expect(detail).not.toBeVisible();
+  await page.locator('.loss-detail-sweep summary').click();
+  await expect(detail).toBeVisible();
+  await expect.poll(() => detail.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   const stages = page.locator('.loss-stage-figure img');
   await stages.scrollIntoViewIfNeeded();
   await expect.poll(() => stages.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
