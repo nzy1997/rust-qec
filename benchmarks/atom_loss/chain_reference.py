@@ -4,6 +4,7 @@ Stim constructs independent noise distributions and loss candidate sets. Native
 compiler outputs must pass those checks before their representation-dependent
 MLE fault-configuration objective is evaluated by exact dynamic programming.
 """
+from .shot_data import require
 import argparse
 import copy
 from collections import defaultdict
@@ -65,7 +66,7 @@ def mask_of(targets, detectors):
 def independent_model(text):
     circuit,probes=normalized(text)
     count=circuit.num_detectors
-    assert count==16 and circuit.num_observables==1
+    require((count==16 and circuit.num_observables==1), 'chain_reference: count==16 and circuit.num_observables==1')
     coords=circuit.get_detector_coordinates()
     dem=circuit.detector_error_model(decompose_errors=True).flattened()
     effects=[];edges=[]
@@ -82,7 +83,7 @@ def independent_model(text):
         for component in components:
             ds=sorted(t.val for t in component if t.is_relative_detector_id())
             if not ds: continue
-            assert len(ds)<=2
+            require((len(ds)<=2), 'chain_reference: len(ds)<=2')
             factor=.25 if len(ds)==2 and coords[ds[0]][:2]==coords[ds[1]][:2] else .5
             edges.append({'mask':mask_of(component,count),'ds':tuple(ds),'weight':weight,'factor':factor})
     # Determine disconnected detector sectors without relying on Rust labels.
@@ -100,7 +101,7 @@ def independent_model(text):
             injected.append(pauli+'_ERROR',[q],.125)
             injected += circuit[site:].without_noise()
             terms=[i for i in injected.detector_error_model().flattened() if i.type=='error']
-            assert len(terms)<=1
+            require((len(terms)<=1), 'chain_reference: len(terms)<=1')
             memo[key]=mask_of(terms[0].targets_copy(),count) if terms else 0
         return memo[key]
     candidates=[];loss_edges=[]
@@ -114,7 +115,7 @@ def independent_model(text):
                 primitive.update(choices)
                 states={a^b for a in states for b in choices}
             union.update(states)
-        assert union
+        require((union), 'chain_reference: union')
         candidates.append(sorted(union))
         mapped=set()
         for fault in primitive:
@@ -124,11 +125,11 @@ def independent_model(text):
             selected=[]; recovered=0
             for ds in sectors.values():
                 matching=[i for i,e in enumerate(edges) if e['ds']==tuple(ds)]
-                assert matching, f'Unrepresented independent primitive {fault}'
-                assert len({edges[i]['mask'] for i in matching})==1
+                require((matching), f'Unrepresented independent primitive {fault}')
+                require((len({edges[i]['mask'] for i in matching})==1), "chain_reference: len({edges[i]['mask'] for i in matching})==1")
                 recovered ^= edges[matching[0]]['mask']
                 selected += matching
-            assert recovered==fault, f'Primitive logical label mismatch: {fault}'
+            require((recovered==fault), f'Primitive logical label mismatch: {fault}')
             mapped.update(selected)
         loss_edges.append(mapped)
     return circuit,probes,effects,edges,candidates,loss_edges,len(memo)
@@ -238,8 +239,8 @@ def run(binary,exporter):
         work=Path(tmp);write_bundle(work/'public',text,rows,circuit)
         subprocess.run([exporter,work/'public',work/'graph.json'],check=True,capture_output=True)
         graph=json.loads((work/'graph.json').read_text())
-        assert graph['syndromes']==detections.astype(int).tolist(), 'Independent m2d mismatch'
-        assert graph['losses']==[list(p) for p in patterns], 'Independent visible-loss mapping mismatch'
+        require((graph['syndromes']==detections.astype(int).tolist()), 'Independent m2d mismatch')
+        require((graph['losses']==[list(p) for p in patterns]), 'Independent visible-loss mapping mismatch')
         # DEM decomposition is not unique; compare full correlated Pauli
         # effects after coalescing equal parity masks, not a raw edge count.
         oracle_export=exporter.parent/'export_decoder_oracle'

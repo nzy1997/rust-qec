@@ -5,6 +5,7 @@ The real-circuit check exercises the blinded dataset exporter; its independent
 reference sees the private input mask only to prepare the same logical input.
 No decoder, envelope compiler, or private answer is used here.
 """
+from .shot_data import require
 import hashlib
 import json
 import math
@@ -112,7 +113,7 @@ def indicators(text, rows):
             indices = [cursor+int(re.fullmatch(r'rec\[(-\d+)\]',t)[1]) for t in op.targets]
             parity = np.logical_xor.reduce(rows[:,indices],axis=1)
             (detectors if op.name=='DETECTOR' else observable).append(parity)
-    assert cursor == rows.shape[1] == 50 and len(detectors)==16 and len(observable)==1
+    require((cursor == rows.shape[1] == 50 and len(detectors)==16 and len(observable)==1), 'low_probability: cursor == rows.shape[1] == 50 and len(detectors)==16 and len(observable)==1')
     columns = list(rows.T) + detectors + observable
     names = [f'measurement_{i}' for i in range(rows.shape[1])] + [f'detector_{i}' for i in range(len(detectors))] + ['observable']
     columns += [a & b for a,b in zip(detectors,detectors[1:])]
@@ -151,7 +152,7 @@ def real_circuit(binary, shots, exporter=export_rows):
         checked_answers=validate_dataset(lambda name:(work/'healthy'/name).read_bytes())
         independent=np.empty_like(observed)
         marker='TICK[rstim:logical_flip_point]'
-        assert text.count(marker)==1
+        require((text.count(marker)==1), 'low_probability: text.count(marker)==1')
         for mask in [0,1]:
             selected=masks==mask
             prepared=text.replace(marker,marker+'\nX 1 8 15') if mask else text

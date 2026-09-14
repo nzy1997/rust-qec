@@ -1,4 +1,5 @@
 """Independent repetition-graph objectives, including a strict conditioning witness."""
+from .shot_data import require
 import argparse
 import hashlib
 import itertools
@@ -67,22 +68,22 @@ def check_case(binary, exporter, work, wires):
     expected={(0,None,(0,)),(wires-2,None,())}
     expected.update((q,q+1,()) for q in range(wires-2))
     actual={(e['u'],e['v'],tuple(e['observables'])) for e in graph['edges']}
-    assert actual==expected and len(graph['edges'])==wires, 'Hand-derived graph mismatch'
-    assert all(abs(e['weight']-math.log(9))<1e-9 and e['loss_factor']==.5 for e in graph['edges'])
-    assert len(graph['loss_edges'])==wires and all(len(es)==1 for es in graph['loss_edges'])
+    require((actual==expected and len(graph['edges'])==wires), 'Hand-derived graph mismatch')
+    require((all(abs(e['weight']-math.log(9))<1e-9 and e['loss_factor']==.5 for e in graph['edges'])), "decoder_reference: all(abs(e['weight']-math.log(9))<1e-9 and e['loss_factor']==.5 for e in graph['edges'])")
+    require((len(graph['loss_edges'])==wires and all(len(es)==1 for es in graph['loss_edges'])), "decoder_reference: len(graph['loss_edges'])==wires and all(len(es)==1 for es in graph['loss_edges'])")
     subprocess.run([binary,'decode','--decoder','envelope-matching','--dataset',work/'public',
                     '--out',work/'predictions.b8','--stats-out',work/'stats.json'],check=True,capture_output=True)
     native=list((work/'predictions.b8').read_bytes()); python=[]; broken=[]; allowed=[]; canonical=[]
     for raw in range(1<<(2*wires)):
         acceptable,syndrome,flags=oracle(raw,wires=wires)
         allowed.append(acceptable)
-        assert graph['syndromes'][raw]==syndrome
+        require((graph['syndromes'][raw]==syndrome), "decoder_reference: graph['syndromes'][raw]==syndrome")
         mapped={i for loss in graph['losses'][raw] for i in graph['loss_edges'][loss]}
         expected_edges={i for i,e in enumerate(graph['edges']) if
                         (e['v'] is None and e['u']==0 and flags[0]) or
                         (e['v'] is not None and flags[e['u']+1]) or
                         (e['v'] is None and e['u']==wires-2 and flags[-1])}
-        assert mapped==expected_edges
+        require((mapped==expected_edges), 'decoder_reference: mapped==expected_edges')
         values=np.array(syndrome,dtype=np.uint8)
         python.append(int(build_matching(graph,graph['losses'][raw]).decode(values)[0]))
         # Execute a real defective decoder, not merely compare two oracle sets.
@@ -95,8 +96,8 @@ def check_case(binary, exporter, work, wires):
     placeholder_ok=all(native[i]==native[c] and python[i]==python[c] for i,c in enumerate(canonical))
     witness=21 if wires==5 else None  # Lost first three wires; raw values all zero.
     if witness is not None:
-        assert oracle(witness,False,wires)[0]=={0} and oracle(witness,True,wires)[0]=={1}
-        assert witness in ignored, 'Ignore-conditioning decoder escaped strict witness'
+        require((oracle(witness,False,wires)[0]=={0} and oracle(witness,True,wires)[0]=={1}), 'decoder_reference: oracle(witness,False,wires)[0]=={0} and oracle(witness,True,wires)[0]=={1}')
+        require((witness in ignored), 'Ignore-conditioning decoder escaped strict witness')
     passed=not any(failures.values()) and placeholder_ok and 0 in flipped and (wires!=5 or bool(ignored))
     return {'wires':wires,'rows_checked':len(allowed),'status':'PASS' if passed else 'FAIL',
             'hand_derived_graph_pass':True,'loss_mapping_pass':True,'placeholder_invariance_pass':placeholder_ok,

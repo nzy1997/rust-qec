@@ -15,7 +15,7 @@ export intentionally refuses to overwrite existing bundles.
 python3 -m venv drafts/atom-loss-venv
 drafts/atom-loss-venv/bin/pip install -r benchmarks/atom_loss/requirements.txt
 cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp \
-  --bin rustqec --example export_matching_benchmark --example export_decoder_oracle
+  --bin rustqec --example export_matching_benchmark --example export_decoder_oracle --example offline_matching_benchmark
 cargo build --release --locked -p rstim --example atom_loss_sampling_benchmark
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1
 drafts/atom-loss-venv/bin/python -m unittest benchmarks.atom_loss.test_reference
@@ -23,6 +23,8 @@ drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.run \
   --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.shot_data pack \
   --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
+drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.accuracy_seeds \
+  --work drafts/atom-loss-new-seeds --out drafts/atom-loss-results
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.publish \
   --out drafts/atom-loss-results
 drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.verify drafts/atom-loss-results
@@ -60,7 +62,7 @@ with the unchanged sampling evidence before publishing a complete bundle. Pack
 ### Download and rescore without building Rust
 
 `shot-data-v1.zip` contains all 16 synthetic corpora, public/private manifests,
-circuits, scoring keys and **all 150 prediction files** (three repetitions of
+circuits, scoring keys and **all 198 prediction files** (three repetitions of
 every backend), plus the decoding/tradeoff result JSON, per-file hashes and a
 standalone `rescore.py`. The private keys are published for auditing, but are
 never supplied to either decoder during measurement. After downloading the ZIP,
@@ -70,7 +72,7 @@ extract `rescore.py` and run with any Python 3.10+ installation:
 python3 rescore.py rescore shot-data-v1.zip
 ```
 
-Expected: `PASS: 16 corpora; 150 prediction files rescored`. No third-party
+Expected: `PASS: 16 corpora; 198 prediction files rescored`. No third-party
 Python packages or native binaries are needed. The checker verifies completeness, public/private schema and row formats,
 corpus/prediction hashes, scoring answers derived independently from measurement
 observable parity XOR input mask, failure rates and paired disagreements. Repository
@@ -172,13 +174,12 @@ correctness samples are separate from the 5,000-shot accuracy benchmark and do
 not increase its statistical sample size.
 
 `summary.csv` is regenerated from raw counts and phase times: every field,
-all 50 rows and the exact header are checked, including rate, Wilson interval
+all 66 rows and the exact header are checked, including rate, Wilson interval
 and median workflow time. Missing, duplicate or extra rows and resealed changes
 to any field must fail. Wilson intervals in the source JSON are also recomputed.
 
 The updated correctness report is linked to `provenance-correctness.json` and
-`source-snapshot-correctness.json`. Sampling and decoder timing records, their
-historical provenance, and the archived corpora/predictions remain unchanged.
+`source-snapshot-correctness.json`. Original sampling records and original corpus/prediction bytes remain unchanged. Decoder timings are freshly measured with the added offline adapter and aligned output boundary.
 
 `decoder_reference.py` independently specifies three- and five-wire parity-check
 graphs, their base weights log(9), and loss-conditioned weights. It checks the
@@ -248,7 +249,7 @@ SciPy produces the original statistics; tests compare the independent formulas.
 Floating-point comparisons allow numerical roundoff, but acceptance is decided
 from recomputed statistics. The standalone download remains Python 3.10+ with
 no external dependencies. Its updated script is included in the shot archive;
-original corpus, predictions and raw benchmark timing JSON remain unchanged.
+original corpus and existing prediction bytes remain unchanged; decoder timing JSON is replaced by fresh measurements.
 
 Regression matrices delete fields and observations, corrupt formats, truncate
 packed data, alter padding, flip one/all answers and masks with coherent file
@@ -276,11 +277,10 @@ against someone deliberately replacing every source and all evidence together.
    canonical syndromes, so it does not remove every use of loss flags.
    `timing-sweep.svg` also shows all 15 settings, with three-run medians/ranges,
    individual panel log y-ranges and no omitted timing points. `timing-sweep.csv`
-   exposes all 135 decoder repetitions, exact input-pattern counts, graph builds,
-   and native cache hits (blank for offline Python groups). Native streaming and
-   Python offline policies differ. At d=7, pLoss=.0003, native/Python envelope
-   medians are 178.66/144.01 µs/shot; at .001 they are 440.25/431.79. These include
-   rank reversals and close medians, not a universal or isolated-kernel ranking.
+   exposes all 180 decoder repetitions, exact input-pattern counts, graph builds,
+   and native streaming cache hits (blank for offline groups). Native offline
+   and PyMatching use the same group policy; native streaming remains separate.
+   Compare all settings and their repeat ranges, not a universal kernel ranking.
 3. **Accuracy / time:** d = 3, rounds = 2, Pauli 0.001, loss 0.003, 5,000 shared
    shots, seed 20260912. Add envelope MLE with a 500 ms per-shot timeout. Plot
    logical failure probability against amortized compilation + decoding time,
@@ -291,11 +291,10 @@ against someone deliberately replacing every source and all evidence together.
    build/test workload. Each repetition reruns and remeasures the common Rust compiler and public-row
    transformation. Python decode time includes sparse topology/weight preparation
    once per invocation, array conversion, loss-pattern
-   grouping, graph construction, batched decoding and reordering predictions.
+   grouping, graph construction, batched decoding, reordering predictions, and b8 output write/flush.
    Startup, scoring and JSON transport/loading are excluded. Native decode time
    includes buffered public-row reads and output packing/flush; the exporter's
-   transformation stage also includes public-row reads. These I/O boundaries
-   differ, so this is not a fully identical end-to-end process comparison.
+   transformation stage also includes public-row reads. Both offline adapters use the same public model exporter and exclude JSON transport/loading; both include output b8 encoding, writing and flush (without fsync). The native streaming CLI remains a separate policy comparison.
    Each batch repetition separately records sparse topology/weight preparation,
    array/group/selection, bulk graph construction,
    decode_batch API calls, output reordering, and remaining adapter/timer overhead.
@@ -360,7 +359,7 @@ matching predictions are not assumed identical.
 
 A nonzero exit, timeout or unsupported circuit is recorded as an incomplete run.
 No logical error rate is reported from its successful prefix. The publication
-step requires all three sweep comparators at all 15 settings; a missing/failed
+step requires all four sweep comparators at all 15 settings; a missing/failed
 comparator blocks curve publication rather than silently joining across a gap. The all-shot MLE
 success requirement is separate from the matching runs. Any missing graph export
 is recorded at case level. This first suite does not benchmark QEC-Playground or
@@ -380,3 +379,86 @@ Primary implementation sources:
 - `rstim/src/codegen/midswap.rs`, `rstim/src/executor.rs`,
   `rustqec-cli/src/decode/compiler.rs`, `rustqec-cli/src/decode/matching.rs`:
   generated workload and the production semantics being tested.
+
+
+## Deterministic origin and optimized-mode validation
+
+`validate_dataset` reconstructs the private mask from the declared seed and
+batch size, including domain-separated SHA-256 keys, ChaCha12 words, rand 0.8
+boolean sampling and the per-batch 64-bit `usize` shuffle. The standalone ZIP
+checker implements this independently in Python. All 16 original masks match.
+This replay is explicitly tied to rand 0.8 / rand_chacha 0.3 on a 64-bit host;
+it does not assume future versions of Rust `StdRng` preserve their stream.
+A regression changes masks and answers together to force a chosen decoder to
+zero failures, reseals the private manifest, and requires rejection.
+
+`python -m benchmarks.atom_loss.replay` also regenerates the original circuits
+and public/private sample bytes using the declared configuration. All 16 match.
+The fixed seeds are 20260911 for the sweep and 20260912 for tradeoff. CI repeats
+this check. Checksums alone establish internal integrity, not an authenticated
+source or immunity to an author changing the generator and the experiment plan.
+
+Every production Python evidence check uses explicit exceptions. CI runs the
+verifier both normally and with `python -O`; resealed corrupted chain metadata
+must fail in both modes. Tests may still use unittest assertions.
+
+## Matched offline policy and new timing measurements
+
+The additional `envelope-matching-offline` executable is a feature-gated
+benchmark adapter using rmatching. Both offline adapters consume the same
+exported public graph, group the whole batch in first-appearance pattern order,
+build one graph per distinct loss pattern, decode each group in batch, restore
+original shot order and write/flush the b8 predictions. They retain the batch
+and only one group's matching graph at a time. Preparation and grouping are
+inside their measured intervals. JSON transport/loading and process startup
+are excluded on both sides; each repetition freshly measures the same compiler
+and public-row transformation. There is no output fsync on either side.
+
+The original streaming CLI remains in the charts, explicitly as a different
+FIFO/work-budget policy. Its output still includes buffered writes and flush.
+Offline native predictions must equal streaming predictions on every retained
+corpus; graph build counts must equal the number of distinct input patterns.
+The three repetitions on each original corpus are fresh measurements with
+rotated serial backend order. Previous prediction values and sample bytes are
+unchanged. These are measured adapters, not language or kernel rankings.
+
+## Prospectively fixed multi-seed accuracy check
+
+Before sampling, the additional seeds were fixed to **2026091401, 2026091402,
+2026091403**, with 5,000 shots each at all 15 sweep settings and the tradeoff
+setting. No seed is replaced or sample count extended based on observed errors.
+Each seed compares native envelope matching, conditioned PyMatching and fixed
+PyMatching on identical public rows; tradeoff also includes MLE. All 48 corpora
+and 147 predictions are downloadable in `accuracy-seeds.zip`, together with
+`rescore.py`. Run `python -I -S rescore.py rescore-seeds accuracy-seeds.zip`.
+
+`accuracy-seeds.json` retains each seed's counts, Wilson intervals and paired
+discordant counts, plus pooled differences on 15,000 independently generated
+shots per setting. The paired difference is native failure probability minus
+the comparator's: negative values favor native. Its conservative pointwise 95%
+interval subtracts opposite ends of 97.5% Clopper-Pearson intervals for the two
+discordant probabilities (Bonferroni). It does not pretend the paired outcomes
+are independent. The independent checker inverts binomial CDFs using the Python
+standard library; regression values are checked against SciPy beta quantiles.
+These are pointwise intervals, not simultaneous coverage across all settings.
+Three seeds still do not establish a threshold or universal accuracy ranking.
+The old three timing repetitions remain only 5,000 accuracy shots; the new
+15,000-shot data are a separate experiment, not pooled with the original corpus.
+
+
+Reproduce the additional accuracy experiment (use a fresh work directory):
+
+```sh
+OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1 \
+  python -m benchmarks.atom_loss.accuracy_seeds \
+  --work drafts/atom-loss-new-seeds --out drafts/atom-loss-new-seed-results
+python -m benchmarks.atom_loss.replay --archive site/static/data/atom-loss/accuracy-seeds.zip
+python -O -m benchmarks.atom_loss.verify
+```
+
+Run the accuracy experiment separately from timing. The accuracy command records its
+provenance and exact source snapshot before sampling; published source and
+binary hashes are in `provenance-seeds.json`. Render only after both complete
+experiments and archives are present. Historical baseline timing values are
+available in Git history; current charts use the newly measured output-inclusive
+runs and include the offline native comparator.

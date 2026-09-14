@@ -17,6 +17,49 @@ def require(condition, message):
         raise ValueError('Dataset contract: ' + message)
 
 
+def mask_stream(seed, domain):
+    """Independent ChaCha12 word stream: rand 0.8 / rand_chacha 0.3, 64-bit host.
+
+    This reproduces the pinned exporter RNG, not a portable promise about StdRng
+    in future rand releases. Counter and stream start at zero; words are LE.
+    """
+    import struct
+    key=hashlib.sha256(b'rstim-decoder-dataset-v1\n'+domain+b'\n'+seed.to_bytes(8,'little')).digest()
+    initial=list(struct.unpack('<4I',b'expand 32-byte k'))+list(struct.unpack('<8I',key))
+    counter=0; mask=2**32-1
+    def rotate(v,n): return ((v<<n)|(v>>(32-n)))&mask
+    while True:
+        state=initial+[counter&mask,counter>>32,0,0];x=state.copy()
+        def quarter(a,b,c,d):
+            x[a]=(x[a]+x[b])&mask;x[d]=rotate(x[d]^x[a],16)
+            x[c]=(x[c]+x[d])&mask;x[b]=rotate(x[b]^x[c],12)
+            x[a]=(x[a]+x[b])&mask;x[d]=rotate(x[d]^x[a],8)
+            x[c]=(x[c]+x[d])&mask;x[b]=rotate(x[b]^x[c],7)
+        for _ in range(6):
+            for q in [(0,4,8,12),(1,5,9,13),(2,6,10,14),(3,7,11,15),
+                      (0,5,10,15),(1,6,11,12),(2,7,8,13),(3,4,9,14)]: quarter(*q)
+        yield from ((a+b)&mask for a,b in zip(x,state))
+        counter+=1
+
+
+def generated_masks(seed, shots, batch_shots):
+    """Reconstruct private labels including per-batch unbiased row shuffling."""
+    labels=mask_stream(seed,b'logical-mask');permutation=mask_stream(seed,b'row-permutation')
+    result=bytearray();maximum=2**64-1
+    for offset in range(0,shots,batch_shots):
+        batch=[next(labels)>>31 for _ in range(min(batch_shots,shots-offset))]
+        for index in range(len(batch)-1,0,-1):
+            width=index+1;zone=(width<<(64-width.bit_length()))-1
+            while True:
+                value=next(permutation)|(next(permutation)<<32)
+                product=value*width
+                if (product&maximum)<=zone: break
+            replacement=product>>64
+            batch[index],batch[replacement]=batch[replacement],batch[index]
+        result.extend(batch)
+    return bytes(result)
+
+
 def circuit_layout(text):
     """Independent record indexing for the benchmark's documented circuit subset.
 
@@ -105,6 +148,8 @@ def validate_dataset(read, expected=None):
     require(isinstance(generation['rstim_version'],str) and bool(generation['rstim_version']),'generation version')
     require(type(generation['batch_shots']) is int and generation['batch_shots']>0,'generation batch size')
     require(type(generation['seed']) is int and 0<=generation['seed']<2**64,'generation seed')
+    require(masks==generated_masks(generation['seed'],shots,generation['batch_shots']),
+            'mask differs from seeded exporter generation')
     record_bits=observables[0]
     derived=bytes((sum((rows[row*stride+bit//8]>>(bit%8))&1 for bit in record_bits)%2)^masks[row]
                   for row in range(shots))
@@ -215,13 +260,112 @@ def rescore(path, results_root=None):
     return f'PASS: {len(cases)} corpora; {count} prediction files rescored'
 
 
+SEEDS = [2026091401,2026091402,2026091403]
+
+
+def paired_interval(a,b,n):
+    """Conservative pointwise 95% CI for P(native-only wrong)-P(other-only wrong).
+
+    Each discordant count has a binomial marginal. Bound both at 97.5% using
+    Clopper-Pearson and subtract opposite ends; union bound gives >=95% joint
+    coverage without treating the two decoder outcomes as independent.
+    """
+    import math
+    def cdf(k,p):
+        if p==0:return 1.
+        if p==1:return float(k==n)
+        logs=[n*math.log1p(-p)]
+        for j in range(k):logs.append(logs[-1]+math.log(n-j)-math.log(j+1)+math.log(p)-math.log1p(-p))
+        top=max(logs)
+        return min(1.,math.exp(top)*math.fsum(math.exp(v-top) for v in logs))
+    def bound(k,target):
+        lo,hi=0.,1.
+        for _ in range(55):
+            mid=(lo+hi)/2
+            if cdf(k,mid)>target:lo=mid
+            else:hi=mid
+        return (lo+hi)/2
+    def cp(k):
+        if k>n//2:
+            lo,hi=cp(n-k);return 1-hi,1-lo
+        return (0. if k==0 else bound(k-1,.9875),1. if k==n else bound(k,.0125))
+    al,ah=cp(a);bl,bh=cp(b)
+    return [al-bh,ah-bl]
+
+
+def seed_summaries(cases):
+    grouped={}
+    for case in cases:grouped.setdefault(case['setting'],[]).append(case)
+    summaries=[]
+    for label,group in sorted(grouped.items()):
+        for backend in sorted(group[0]['paired']):
+            n=sum(c['shots'] for c in group)
+            a=sum(c['paired'][backend]['native_only_wrong'] for c in group)
+            b=sum(c['paired'][backend]['other_only_wrong'] for c in group)
+            summaries.append({'setting':label,'comparator':backend,'shots':n,
+                'native_only_wrong':a,'other_only_wrong':b,'difference':(a-b)/n,
+                'paired_95':paired_interval(a,b,n)})
+    return summaries
+
+
+def rescore_seeds(path, results_root=None):
+    with zipfile.ZipFile(path) as z:
+        index=json.loads(z.read('index.json'));report=json.loads(z.read('accuracy-seeds.json'))
+        if results_root is not None:
+            require(z.read('accuracy-seeds.json')==(results_root/'accuracy-seeds.json').read_bytes(),'seed report mismatch')
+            require(z.read('rescore.py')==Path(__file__).read_bytes(),'seed rescorer mismatch')
+        cases=report['cases'];settings={f'd{d}-p{p}' for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]}|{'tradeoff'}
+        require(len(cases)==48 and {(c['setting'],c['seed']) for c in cases}=={(label,seed) for label in settings for seed in SEEDS},'seed experiment completeness')
+        require(report['seeds']==SEEDS and report['shots_per_seed']==5000,'seed plan')
+        members={'accuracy-seeds.json','rescore.py'}
+        for c in cases:
+            label=c['setting'];prefix=f"{label}-s{c['seed']}"
+            read=lambda name:z.read(f'{prefix}/{name}')
+            d,p=(3,.003) if label=='tradeoff' else (int(label[1]),float(label.split('-p')[1]))
+            require(c['distance']==d and c['rounds']==(2 if label=='tradeoff' else d) and c['loss_probability']==p and c['shots']==5000,'seed workload')
+            answers=validate_dataset(read,c)
+            names={'envelope-matching','pymatching-envelope','pymatching-fixed'}|({'envelope-mle'} if label=='tradeoff' else set())
+            require(set(c['decoders'])==names and set(c['paired'])==names-{'envelope-matching'},'seed comparators')
+            for name in ['public/circuit.stim','public/manifest.json','public/shots.b8','private/manifest.json','private/answers.b8','private/masks.b8']:
+                members.add(prefix+'/'+name)
+            native=read('envelope-matching.b8')
+            for name,r in c['decoders'].items():
+                members.add(prefix+'/'+name+'.b8');pred=read(name+'.b8')
+                require(len(pred)==len(answers) and set(pred)<={0,1},'seed predictions')
+                errors=sum(a!=b for a,b in zip(pred,answers))
+                require(type(r['errors']) is int and type(r['shots']) is int,'seed integer counts')
+                require(r['errors']==errors and r['shots']==len(answers) and r['prediction_sha256']==hashlib.sha256(pred).hexdigest() and r['logical_error_rate']==errors/len(answers),'seed scores')
+                import math
+                rate=errors/len(answers);n=len(answers);zscore=1.959963984540054
+                center=(rate+zscore*zscore/(2*n))/(1+zscore*zscore/n)
+                half=zscore*math.sqrt(rate*(1-rate)/n+zscore*zscore/(4*n*n))/(1+zscore*zscore/n)
+                require(r['wilson_95']==[max(0.,center-half),min(1.,center+half)],'seed Wilson interval')
+                if name!='envelope-matching':
+                    a=sum(n!=k and q==k for n,q,k in zip(native,pred,answers))
+                    b=sum(n==k and q!=k for n,q,k in zip(native,pred,answers))
+                    require(c['paired'][name]=={'native_only_wrong':a,'other_only_wrong':b},'seed paired scores')
+        require(set(index['sha256'])==members and sorted(z.namelist())==sorted(members|{'index.json'}),'seed archive completeness')
+        for name,digest in index['sha256'].items():require(hashlib.sha256(z.read(name)).hexdigest()==digest,'seed archive checksum')
+        expected=seed_summaries(cases)
+        require(len(report['pooled'])==len(expected),'seed pooled completeness')
+        for actual,want in zip(report['pooled'],expected):
+            interval=actual['paired_95']
+            require(isinstance(interval,list) and len(interval)==2 and all(type(v) in [float,int] and math.isfinite(v) for v in interval),'seed paired interval format')
+            require(all(math.isclose(a,b,rel_tol=1e-10,abs_tol=1e-12) for a,b in zip(interval,want['paired_95'])),'seed pooled paired intervals')
+            require({**actual,'paired_95':want['paired_95']}==want,'seed pooled counts/difference')
+    return 'PASS: 48 independent-seed corpora and 147 predictions rescored'
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     subs = parser.add_subparsers(dest='command', required=True)
+    seeds = subs.add_parser('rescore-seeds')
+    seeds.add_argument('archive', type=Path)
     packing = subs.add_parser('pack')
     packing.add_argument('--work', type=Path, required=True)
     packing.add_argument('--out', type=Path, required=True)
     scoring = subs.add_parser('rescore')
     scoring.add_argument('archive', type=Path)
     args = parser.parse_args()
-    print(pack(args.work, args.out) if args.command == 'pack' else rescore(args.archive))
+    print(pack(args.work, args.out) if args.command == 'pack' else
+          rescore_seeds(args.archive) if args.command == 'rescore-seeds' else rescore(args.archive))

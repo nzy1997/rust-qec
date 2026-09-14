@@ -11,7 +11,8 @@ from .verify import require_complete_sweep
 from .artifacts import timing_rows
 
 STYLE = {
-    'envelope-matching': ('RustQEC envelope', '#b95428','o','-'),
+    'envelope-matching-offline': ('RustQEC offline batch', '#247554','v','-.'),
+    'envelope-matching': ('RustQEC streaming', '#b95428','o','-'),
     'pymatching-envelope': ('PyMatching + envelope (batch)', '#386b80','s','--'),
     'pymatching-fixed': ('PyMatching, fixed (batch)', '#797471','^',':'),
     'pymatching-fixed-loop': ('PyMatching, fixed (loop)', '#a99374','x',':'),
@@ -33,6 +34,29 @@ def emit(fig, out, name):
 
 
 def render(out):
+    seed_report=json.loads((out/'accuracy-seeds.json').read_text())
+    fig,axes=plt.subplots(1,3,figsize=(12.4,5.2),layout='constrained')
+    for ax,distance in zip(axes,[3,5,7]):
+        interval_bounds=[]
+        for backend,color,offset in [('pymatching-envelope','#386b80',-.06),('pymatching-fixed','#797471',.06)]:
+            cases=[c for c in seed_report['pooled'] if c['setting'].startswith(f'd{distance}-') and c['comparator']==backend]
+            cases.sort(key=lambda c:float(c['setting'].split('-p')[1]))
+            y=np.array([c['difference'] for c in cases]);lo=np.array([c['paired_95'][0] for c in cases]);hi=np.array([c['paired_95'][1] for c in cases])
+            interval_bounds.extend(lo);interval_bounds.extend(hi)
+            ax.errorbar(np.arange(5)+offset,y,yerr=[y-lo,hi-y],color=color,marker='o',ls='none',capsize=3,label=STYLE[backend][0])
+        ax.axhline(0,color='#aaa',lw=1)
+        ax.set(xticks=range(5),xticklabels=['.0001','.0003','.001','.003','.01'],title=f'd = {distance}, rounds = {distance}',
+               xlabel='Configured loss parameter pLoss',ylabel='Native − comparator failure probability')
+        ax.set_yscale('symlog',linthresh=.0005)
+        lower=min(interval_bounds)*1.5;upper=max(interval_bounds)*1.8
+        ticks=[v for v in [-.1,-.01,-.001,0.,.001] if lower<=v<=upper]
+        ax.set_yticks(ticks)
+        ax.set_ylim(lower,upper)
+        ax.tick_params(axis='x',labelsize=9);ax.grid(axis='y',alpha=.5)
+    handles,labels=axes[0].get_legend_handles_labels();fig.legend(handles,labels,loc='upper center',ncol=2,frameon=False)
+    fig.get_layout_engine().set(rect=(0,.19,1,.64))
+    fig.text(.5,.015,'Three predeclared independent seeds × 5,000 shots / setting · negative favors native · symmetric-log y-axis\nConservative pointwise 95% paired intervals (Clopper–Pearson + Bonferroni); no simultaneous or universal ranking claim.\nAll per-seed results and the additional tradeoff/MLE comparison are retained in JSON and the shot archive.',ha='center',fontsize=9,color='#605b56')
+    emit(fig,out,'accuracy-seeds')
     sampling=json.loads((out/'sampling.json').read_text())
     decoding=json.loads((out/'decoding.json').read_text())
     require_complete_sweep(decoding)
@@ -131,7 +155,7 @@ def render(out):
     fig,axes=plt.subplots(1,3,figsize=(12.4,4.8),layout='constrained')
     for ax,distance in zip(axes,[3,5,7]):
         cases=sorted([c for c in decoding if c['distance']==distance],key=lambda c:c['loss_probability'])
-        for name in ['envelope-matching','pymatching-envelope','pymatching-fixed']:
+        for name in ['envelope-matching','envelope-matching-offline','pymatching-envelope','pymatching-fixed']:
             label,color,marker,line=STYLE[name]
             xs,ys,lower,upper=[],[],[],[]
             for case in cases:
@@ -150,7 +174,7 @@ def render(out):
     fig.legend(handles,labels,loc='upper center',ncol=3,frameon=False,fontsize=9)
     fig.get_layout_engine().set(rect=(0,.20,1,.63))
     fig.text(.5,.01,'All 15 settings · 5,000 shared shots / setting · medians and observed ranges of 3 runs\n'
-             'Panel y-ranges differ. Native streaming cache vs Python offline groups; preparation and I/O boundaries differ.\n'
+             'Panel y-ranges differ. Streaming FIFO vs offline groups. Offline adapters share input transformation and include output write/flush.\n'
              'Adapter/workflow costs, NOT matching-kernel rankings. Timing repetitions reuse the same shots.',
              ha='center',fontsize=9,color='#605b56')
     emit(fig,out,'timing-sweep')
@@ -176,7 +200,7 @@ def render(out):
                     textcoords='offset points', ha='right' if name=='envelope-mle' else 'left',
                     fontsize=9, color=color)
     ax.set(xscale='log',xlabel='Amortized workflow time (µs / shot)',ylabel='Logical failure probability / experiment',
-           title=f"Accuracy and workflow time on the same {tradeoff['shots']:,} shots",ylim=(0,None))
+           title=f"Accuracy, offline adapters and streaming policy on {tradeoff['shots']:,} shots",ylim=(0,None))
     ax.grid(axis='y');ax.legend(loc='best',frameon=False,fontsize=10)
     fig.get_layout_engine().set(rect=(0,.17,1,1))
     fig.text(.5,.035,f"Mid-SWAP d = 3, rounds = 2 · pPauli = 0.001 · pLoss = 0.003\n95% Wilson intervals; timing median and range of 3 cold-cache runs\nBulk graph construction + topology preparation included; NOT a matching-kernel comparison.",ha='center',fontsize=9,color='#605b56')
@@ -190,7 +214,7 @@ def render(out):
             ('preprocess_seconds','Array / group / select','#c89464'),
             ('graph_build_seconds','Python graph construction','#b95428'),
             ('matching_seconds','decode_batch call','#386b80'),
-            ('output_seconds','Output reorder','#76998e'),
+            ('output_seconds','Reorder + write/flush','#76998e'),
             ('adapter_overhead_seconds','Bookkeeping / timers','#dadfdb')]
     fig,ax=plt.subplots(figsize=(9.4,4.4),layout='constrained')
     for row,name in enumerate(['pymatching-fixed','pymatching-envelope']):

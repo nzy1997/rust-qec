@@ -24,9 +24,14 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   const timing = page.locator('.loss-timing-figure img');
   await timing.scrollIntoViewIfNeeded();
   await expect.poll(() => timing.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
-  await expect(page.locator('.loss-timing-figure figcaption')).toContainText('178.66 and 144.01');
+  await expect(page.locator('.loss-timing-figure figcaption')).toContainText('Native offline batch');
   const timingCsv = await (await page.request.get('/data/atom-loss/timing-sweep.csv')).text();
-  expect(timingCsv.trim().split('\n')).toHaveLength(136);
+  expect(timingCsv.trim().split('\n')).toHaveLength(181);
+  const seeds = await (await page.request.get('/data/atom-loss/accuracy-seeds.json')).json();
+  expect(seeds.cases).toHaveLength(48);
+  const seedFigure = page.locator('img[src*="accuracy-seeds.svg"]');
+  await seedFigure.scrollIntoViewIfNeeded();
+  await expect.poll(() => seedFigure.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   const samplingCheck = await (await page.request.get('/data/atom-loss/correctness.json')).json();
   expect(samplingCheck.analytic_noise_controls.distribution_probes.cases).toHaveLength(26);
   expect(samplingCheck.analytic_noise_controls.distribution_probes.channel_replacement_mutations.DEPOLARIZE2_ix_only.rejected).toBe(true);
@@ -47,7 +52,7 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();
   expect((await downloadPromise).suggestedFilename()).toBe('summary.csv');
   const archiveDownload = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Download all 16 corpora and 150 prediction files (ZIP)' }).click();
+  await page.getByRole('link', { name: 'Download all 16 corpora and 198 prediction files (ZIP)' }).click();
   expect((await archiveDownload).suggestedFilename()).toBe('shot-data-v1.zip');
   const data = await (await page.request.get('/data/atom-loss/decoding.json')).json();
   expect(data).toHaveLength(15);

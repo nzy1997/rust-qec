@@ -19,6 +19,94 @@ import itertools
 
 
 class ReferenceTests(unittest.TestCase):
+    def test_seeded_mask_rejects_coherently_forced_perfect_decoder(self):
+        from .shot_data import validate_dataset, generated_masks
+        with zipfile.ZipFile(ROOT/'site/static/data/atom-loss/shot-data-v1.zip') as z:
+            payload={n.removeprefix('tradeoff/'):z.read(n) for n in z.namelist() if n.startswith('tradeoff/')}
+        old=payload['private/answers.b8'];target=payload['envelope-matching-0.b8']
+        masks=payload['private/masks.b8']
+        payload['private/masks.b8']=bytes(m^a^p for m,a,p in zip(masks,old,target))
+        payload['private/answers.b8']=target
+        manifest=json.loads(payload['private/manifest.json'])
+        for key,name in [('masks_file','masks.b8'),('answers_file','answers.b8')]:
+            manifest[key]['sha256']=hashlib.sha256(payload['private/'+name]).hexdigest()
+        payload['private/manifest.json']=json.dumps(manifest).encode()
+        with self.assertRaisesRegex(ValueError,'seeded exporter'):
+            validate_dataset(payload.__getitem__)
+        # Exercise an actual export spanning more than one 10,000-shot batch.
+        with tempfile.TemporaryDirectory() as tmp:
+            work=Path(tmp)
+            text=(ROOT/'benchmarks/atom_loss/fixtures/midswap_d3_r2.stim').read_text()
+            low_probability.export_rows(ROOT/'target/release/rustqec',text,10017,119,work)
+            manifest=json.loads((work/'private/manifest.json').read_text())
+            self.assertEqual((work/'private/masks.b8').read_bytes(),generated_masks(119,10017,manifest['generation']['batch_shots']))
+
+    def test_optimized_verifier_rejects_same_resealed_corruption(self):
+        import subprocess,sys
+        source=ROOT/'site/static/data/atom-loss'
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/'bundle';shutil.copytree(source,root)
+            chain=json.loads((root/'chain-correctness.json').read_text());chain['distance']=999
+            (root/'chain-correctness.json').write_text(json.dumps(chain))
+            manifest=json.loads((root/'bundle.json').read_text())
+            manifest['sha256']['chain-correctness.json']=hashlib.sha256((root/'chain-correctness.json').read_bytes()).hexdigest()
+            (root/'bundle.json').write_text(json.dumps(manifest))
+            for flags in [[],['-O']]:
+                result=subprocess.run([sys.executable,*flags,'-m','benchmarks.atom_loss.verify',str(root)],capture_output=True,text=True)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('chain',result.stderr)
+                self.assertIn('ValueError',result.stderr)
+        import ast
+        for path in (ROOT/'benchmarks/atom_loss').glob('*.py'):
+            if not path.name.startswith('test_'):
+                self.assertFalse(any(isinstance(n,ast.Assert) for n in ast.walk(ast.parse(path.read_text()))),str(path))
+
+    def test_paired_interval_matches_exact_binomial_marginals(self):
+        from scipy.stats import beta
+        from .shot_data import paired_interval
+        def cp(k,n):
+            return (0 if k==0 else beta.ppf(.0125,k,n-k+1),
+                    1 if k==n else beta.ppf(.9875,k+1,n-k))
+        for a,b,n in [(0,0,15000),(0,13,5000),(10,3,15000),(50,40,100),(100,0,100)]:
+            al,ah=cp(a,n);bl,bh=cp(b,n)
+            np.testing.assert_allclose(paired_interval(a,b,n),[al-bh,ah-bl],atol=1e-10)
+
+    def test_prediction_write_is_within_python_timing(self):
+        import time
+        graph={'edges':[{'u':0,'v':None,'observables':[0],'weight':1.,'loss_factor':.5}],
+               'loss_edges':[],'mean_weight':1.,'syndromes':[[0],[1]],'losses':[[],[]],
+               'compile_seconds':0.,'transform_seconds':0.}
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'predictions.b8';original=Path.open
+            def slow_open(p,*args,**kwargs):
+                if p==path:time.sleep(.02)
+                return original(p,*args,**kwargs)
+            with patch.object(Path,'open',slow_open):
+                result=measure_python(lambda _:graph,False,np.array([0,1]),1,prediction_path=path)
+            run=result['runs'][0]
+            self.assertGreaterEqual(run['write_seconds'],.02)
+            self.assertGreaterEqual(run['decode_seconds'],run['write_seconds'])
+            self.assertEqual(path.read_bytes(),bytes([0,1]))
+            self.assertAlmostEqual(sum(run[k] for k in ['topology_seconds','preprocess_seconds','graph_build_seconds','matching_seconds','output_seconds','adapter_overhead_seconds']),run['decode_seconds'])
+
+    def test_multiseed_archive_rejects_missing_seed_and_resealed_summary(self):
+        from .shot_data import rescore_seeds
+        with zipfile.ZipFile(ROOT/'site/static/data/atom-loss/accuracy-seeds.zip') as z:
+            original={n:z.read(n) for n in z.namelist()}
+        with tempfile.TemporaryDirectory() as tmp:
+            for defect in ['missing_seed','paired_summary','missing_prediction']:
+                payload=original.copy();report=json.loads(payload['accuracy-seeds.json'])
+                if defect=='missing_seed':report['cases'].pop()
+                elif defect=='paired_summary':report['pooled'][0]['paired_95']=[-1.,1.]
+                else:del payload[next(n for n in payload if n.endswith('/envelope-matching.b8'))]
+                payload['accuracy-seeds.json']=json.dumps(report).encode()
+                payload['index.json']=json.dumps({'sha256':{n:hashlib.sha256(v).hexdigest() for n,v in payload.items() if n!='index.json'}}).encode()
+                path=Path(tmp)/'mutated.zip'
+                with zipfile.ZipFile(path,'w',compression=zipfile.ZIP_DEFLATED) as z:
+                    for n,v in payload.items():z.writestr(n,v)
+                with self.subTest(defect=defect),self.assertRaises((ValueError,KeyError)):
+                    rescore_seeds(path)
+
     def test_loss_is_persistent_and_reset_restores(self):
         rows=reference.sample('R 0 1\nX 0\nLOSS(1) 0\nCX 0 1\nML 0 1\nR 0\nX 0\nML 0',128)
         np.testing.assert_array_equal(rows,np.tile([1,1,0,0,0,1],(128,1)))
@@ -431,7 +519,7 @@ class ReferenceTests(unittest.TestCase):
 
     def test_incomplete_comparison_cannot_be_published_as_a_curve(self):
         cases=[{'distance':d,'loss_probability':p,'decoders':{name:{'status':'ok'} for name in
-                ['envelope-matching','pymatching-fixed','pymatching-envelope']}}
+                ['envelope-matching','pymatching-fixed','pymatching-envelope','envelope-matching-offline']}}
                for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]]
         require_complete_sweep(cases)
         with self.assertRaises(ValueError): require_complete_sweep(cases[:-1])

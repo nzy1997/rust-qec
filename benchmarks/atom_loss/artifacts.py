@@ -7,7 +7,8 @@ REQUIRED_FILES = frozenset([
     'chain-correctness.json', 'midswap_d3_r2.stim', 'correctness.json',
     'decoder-correctness.json', 'sampling.json', 'decoding.json', 'tradeoff.json',
     'provenance-all.json', 'methodology.md', 'summary.csv', 'source-snapshot.json',
-    'shot-data-v1.zip', 'timing-sweep.csv',
+    'shot-data-v1.zip', 'timing-sweep.csv', 'accuracy-seeds.json', 'accuracy-seeds.zip',
+    'accuracy-seeds.png', 'accuracy-seeds.svg', 'provenance-seeds.json', 'source-snapshot-seeds.json',
 ] + [f'{name}.{ext}' for name in [
     'sampling-throughput', 'logical-error-rate', 'logical-error-rate-full',
     'accuracy-time', 'adapter-stages', 'sampling-reference-cost', 'timing-sweep'] for ext in ['svg', 'png']])
@@ -45,14 +46,14 @@ def timing_rows(decoding):
     for case in decoding:
         for name,result in case['decoders'].items():
             for rep,(record,total) in enumerate(zip(result['runs'],result['total_seconds'])):
-                native=name=='envelope-matching'
+                native=not name.startswith('pymatching')
                 stats=record['stats'] if native else record
                 yield {**{k:case[k] for k in ['distance','rounds','loss_probability']},
                     'decoder':name,'repetition':rep,'microseconds_per_shot':total/case['shots']*1e6,
                     'input_loss_patterns':case['graph']['loss_patterns'],
                     'graph_builds':stats['matching_graph_builds'] if native else stats['graph_builds'],
-                    'cache_hits':stats['cache_hits'] if native else '',
-                    'policy':'FIFO/work-budget streaming' if native else 'offline batch groups'}
+                    'cache_hits':stats['cache_hits'] if name=='envelope-matching' else '',
+                    'policy':'FIFO/work-budget streaming' if name=='envelope-matching' else 'offline batch groups'}
 
 
 SUMMARY_FIELDS = ['experiment','distance','rounds','loss_probability','decoder','status',
