@@ -8,56 +8,68 @@ unchanged at `data/atom-loss/` on the documentation site.
 
 ## Reproduce
 
-From the repository root, use a fresh working directory for every run. Dataset
-export intentionally refuses to overwrite existing bundles.
+Freeze all experiment source changes in a source commit **S**, then generate the
+entire bundle from a fresh, clean detached checkout of S. Use output and work
+directories outside that checkout. The entry point builds all five release
+binaries from scratch with `--locked`, runs correctness, sampling, the 16-case
+decoding experiment and the separate 48-case seed experiment serially, then
+packs, renders and verifies the complete bundle.
 
 ```sh
+# Run from the main checkout after committing the experiment sources.
 python3 -m venv drafts/atom-loss-venv
 drafts/atom-loss-venv/bin/pip install -r benchmarks/atom_loss/requirements.txt
-cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp \
-  --bin rustqec --example export_matching_benchmark --example export_decoder_oracle --example offline_matching_benchmark
-cargo build --release --locked -p rstim --example atom_loss_sampling_benchmark
-export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1
-drafts/atom-loss-venv/bin/python -m unittest benchmarks.atom_loss.test_reference
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.run \
-  --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.shot_data pack \
-  --work drafts/atom-loss-reproduction --out drafts/atom-loss-results
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.accuracy_seeds \
-  --work drafts/atom-loss-new-seeds --out drafts/atom-loss-results
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.publish \
-  --out drafts/atom-loss-results
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.verify drafts/atom-loss-results
+PYTHON="$(pwd)/drafts/atom-loss-venv/bin/python"
+OUTPUT="$(pwd)/drafts/atom-loss-clean-results"
+WORK="$(pwd)/drafts/atom-loss-clean-work"
+git worktree add --detach ../rustqec-evidence-source HEAD
+cd ../rustqec-evidence-source
+"$PYTHON" -m benchmarks.atom_loss.evidence_run --work "$WORK" --out "$OUTPUT"
+"$PYTHON" -m benchmarks.atom_loss.decoder_replay --root "$OUTPUT"
 ```
 
-The recorded run uses macOS, serial processes and no explicit CPU affinity.
-`provenance-all.json` records the actual CPU, OS, package versions, compiler,
-binary hashes, source hashes, command, seed configuration, and timing boundary.
-`source-snapshot.json` preserves the exact benchmark sources used in that run;
-overlay its `files` on the recorded base commit for historical reproduction.
-`bundle.json` seals the figures and raw results with SHA-256 checksums.
-Numeric times will vary across machines. Both backends receive exactly the same
-public corpus at each decoding point; their private answer key is used only after
-decoding. A shared seed does **not** imply identical random samples between Stim
-and RustQEC: the sampler check compares distributions, not row equality.
+Copy the resulting bundle into `site/static/data/atom-loss/` and commit artifacts
+in a subsequent commit **E**. `source_commit` means S, not E: requiring an artifact
+to contain its own commit hash would be circular. The verifier independently
+reconstructs the complete input inventory from Git and Cargo workspace members.
+All files in every workspace member, benchmark code/fixtures/requirements,
+workspace manifests/lockfile, toolchain/configuration and the evidence CI workflow
+must match S at the current checkout. New, missing or changed inputs fail; only
+changes outside that declared source scope, such as site artifacts, can follow S
+without invalidating evidence. Source S must be an ancestor of the current HEAD.
+This deliberately conservative inventory can require regeneration even for
+non-computational changes within a workspace member.
 
-The review-fix decoding run reuses all 16 original corpora and verifies their
-circuit, public-row and private-answer hashes before timing. Every existing
-backend's prediction hash must remain unchanged. `provenance-timing.json` and
-`source-snapshot-timing.json` describe this new decoding/oracle run; original
-sampling evidence keeps its original provenance. To repeat only decoding with
-retained corpora (the work directory must not exist):
+`source-manifest.json` records S, the complete Git blob/mode inventory and digest,
+exact build commands, compiler/Cargo versions and all five measured binary hashes.
+Every stage provenance and source snapshot must agree with that manifest and the
+current source files. Clean builds and clean source state are checked before and
+after measurement. Python packages are pinned in `requirements.txt` and actual
+versions, CPU, OS, threading environment and timing boundaries are recorded.
+`bundle.json` seals all required artifacts with SHA-256; source binding is an
+additional check, not inferred from those checksums.
 
-```sh
-drafts/atom-loss-venv/bin/python -m benchmarks.atom_loss.remeasure \
-  --corpora drafts/atom-loss-reproduction \
-  --baseline site/static/data/atom-loss \
-  --work drafts/atom-loss-retimed --out drafts/atom-loss-retimed-results
-```
+CI fetches S, builds the current code and regenerates public samples/private keys
+for all 64 corpora. `decoder_replay` separately re-decodes every backend/corpus
+combination (213 combinations, covering all 345 archived prediction files), with
+only public inputs in each decoder work directory. It compares prediction bytes
+and hashes, failure counts, Wilson intervals and recorded paired discordances.
+An executable mutation that flips a current native prediction while retaining the
+old archive must fail. Missing manifest inputs and a changed decoder/build input
+must also fail, including under optimized Python.
 
-The retiming output contains decoding results and its provenance; combine it
-with the unchanged sampling evidence before publishing a complete bundle. Pack
-`shot-data-v1.zip` from the new work directory after copying the retimed results.
+CI prediction replay validates results, **not historical performance**. It does
+not compare machine-dependent binary hashes or timing values across platforms.
+Any change in the measured source scope requires a new clean source commit and
+fresh evidence generation; replay alone cannot justify retaining old timings.
+Neither Git hashes nor CI provide protection against an author deliberately
+rewriting both the experiment and its checks; the source contract remains
+reviewable code.
+
+The recorded measurements use serial processes without explicit CPU affinity.
+Both decoders receive the same public corpus at each point, with scoring keys
+used only afterward. A shared seed does not imply row-identical samples between
+Stim and RustQEC; independent sampler checks compare distributions.
 
 ### Download and rescore without building Rust
 
@@ -179,7 +191,7 @@ and median workflow time. Missing, duplicate or extra rows and resealed changes
 to any field must fail. Wilson intervals in the source JSON are also recomputed.
 
 The updated correctness report is linked to `provenance-correctness.json` and
-`source-snapshot-correctness.json`. Original sampling records and original corpus/prediction bytes remain unchanged. Decoder timings are freshly measured with the added offline adapter and aligned output boundary.
+`source-snapshot-correctness.json`. All sampling, correctness, decoding and seed records are regenerated from the same clean source commit. The fixed workload configurations and declared seeds are retained; timings are newly measured.
 
 `decoder_reference.py` independently specifies three- and five-wire parity-check
 graphs, their base weights log(9), and loss-conditioned weights. It checks the
@@ -446,19 +458,15 @@ The old three timing repetitions remain only 5,000 accuracy shots; the new
 15,000-shot data are a separate experiment, not pooled with the original corpus.
 
 
-Reproduce the additional accuracy experiment (use a fresh work directory):
+The clean `evidence_run` entry point above runs the additional accuracy experiment
+after timing has finished. Its sources and measured binaries are bound to the
+same source commit in `provenance-seeds.json`. To verify the retained seed corpus:
 
 ```sh
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1 \
-  python -m benchmarks.atom_loss.accuracy_seeds \
-  --work drafts/atom-loss-new-seeds --out drafts/atom-loss-new-seed-results
 python -m benchmarks.atom_loss.replay --archive site/static/data/atom-loss/accuracy-seeds.zip
+python -m benchmarks.atom_loss.decoder_replay
 python -O -m benchmarks.atom_loss.verify
 ```
 
-Run the accuracy experiment separately from timing. The accuracy command records its
-provenance and exact source snapshot before sampling; published source and
-binary hashes are in `provenance-seeds.json`. Render only after both complete
-experiments and archives are present. Historical baseline timing values are
-available in Git history; current charts use the newly measured output-inclusive
-runs and include the offline native comparator.
+Historical timings remain available in Git history. Current figures show the
+fresh output-inclusive workflow measurements and the native offline comparator.

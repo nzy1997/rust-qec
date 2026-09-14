@@ -376,23 +376,8 @@ def main():
     binary, exporter, sampler = [ROOT/'target/release'/p for p in ['rustqec','examples/export_matching_benchmark','examples/atom_loss_sampling_benchmark']]
     out, work = args.out.resolve(), args.work.resolve()
     out.mkdir(parents=True, exist_ok=True)
-    provenance = {'started_utc':datetime.now(timezone.utc).isoformat(), 'command':sys.argv,
-                  'source_commit':subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
-                  'working_tree_dirty': bool(subprocess.check_output(['git','status','--porcelain','--untracked-files=no'], text=True).strip()),
-                  'os':platform.platform(),'cpu':cpu_model(),
-                  'python':sys.version,'dependencies':{p:importlib.metadata.version(p) for p in ['stim','numpy','pymatching','scipy','matplotlib']},
-                  'rustc':subprocess.check_output(['rustc','--version'],text=True).strip(),
-                  'binaries':{str(p.relative_to(ROOT)):digest(p) for p in [binary,exporter,sampler,exporter.parent/'export_decoder_oracle']},
-                  'environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','RAYON_NUM_THREADS']},
-                  'timing':'Serial processes; no explicit CPU pinning on macOS. Decode includes shared circuit compilation, public row transformation, graph construction and matching. Each repetition remeasures compilation and transformation. Excludes process startup and scoring; native decode includes buffered reads and output packing/flush, exporter transformation includes public row reads. PyMatching JSON loading is excluded. Cold caches each repetition; no steady-state claim.',
-                  'sources':{str(p.relative_to(ROOT)):digest(p) for p in [*sorted((ROOT/'benchmarks/atom_loss').glob('*.py')), *sorted((ROOT/'benchmarks/atom_loss/fixtures').glob('*.stim')), ROOT/'Cargo.lock', ROOT/'rustqec-cli/src/decode/benchmark.rs', ROOT/'rstim/examples/atom_loss_sampling_benchmark.rs']}}
-    save(out/f'provenance-{args.stage}.json', provenance)
-    snapshot_files = list(provenance['sources']) + ['rustqec-cli/Cargo.toml', 'rustqec-cli/src/lib.rs',
-                     'rustqec-cli/src/decode.rs', 'rustqec-cli/examples/export_matching_benchmark.rs',
-                     'rustqec-cli/examples/export_decoder_oracle.rs']
-    save(out/'source-snapshot.json', {'base_commit':provenance['source_commit'],
-         'description':'Exact benchmark sources at run time; overlay on base_commit.',
-         'files':{name:(ROOT/name).read_text() for name in snapshot_files}})
+    from .source_contract import capture
+    capture(out, args.stage, {'timing': 'Serial cold workflow measurements with rotated backend order. Includes compilation, transformation, graph construction, decoding and prediction write/flush. Excludes process startup, JSON transport/loading and scoring. Streaming and offline policies are distinct; no kernel ranking. Sampling records absolute Rust throughput and unoptimized reference cost with different parse/warmup boundaries.'})
     if args.stage in ['all','correctness']:
         result = correctness.run(binary)
         save(out/'correctness.json', result)
