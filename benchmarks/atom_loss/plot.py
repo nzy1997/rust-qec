@@ -201,6 +201,10 @@ def _render(out):
     failed=[]
     for i,(name,result) in enumerate(tradeoff['decoders'].items()):
         label,color,marker,_line=STYLE[name]
+        label = {
+            'envelope-matching': 'RustQEC envelope matching (streaming)',
+            'envelope-matching-offline': 'RustQEC envelope matching (batch)',
+        }.get(name, label)
         if result['status']!='ok':
             failed.append(label+': incomplete (no accuracy point)');continue
         times=np.array(result['total_seconds'])/result['shots']*1e6
