@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "b61d92575d10686fcc8ad298329e3bd266876a3b",
+  "source_commit": "ce196f09ea03302913d6f6f57f69790a366d8781",
   "working_tree_dirty": false,
   "inputs": {
     ".github/workflows/atom-loss-reference.yml": {
@@ -17,11 +17,11 @@
     },
     "benchmarks/atom_loss/README.md": {
       "mode": "100644",
-      "git_blob": "697dccfa58260baabfaadd73400a6e101ef3cada"
+      "git_blob": "6266420e8205b91914798a5afd80dff1d889fc85"
     },
     "benchmarks/atom_loss/accuracy_seeds.py": {
       "mode": "100644",
-      "git_blob": "c48d69baa8e13a5754597d6bde27b2ffd486659c"
+      "git_blob": "43212758bb7893d078eaf4355eed6c6e74c139d6"
     },
     "benchmarks/atom_loss/artifacts.py": {
       "mode": "100644",
@@ -49,7 +49,7 @@
     },
     "benchmarks/atom_loss/evidence_run.py": {
       "mode": "100644",
-      "git_blob": "d20a9ebb49deff84f7930c6a9e81e167525d019b"
+      "git_blob": "494b0290bd918649da663315b545f4762edc01c0"
     },
     "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": {
       "mode": "100644",
@@ -85,7 +85,7 @@
     },
     "benchmarks/atom_loss/replay.py": {
       "mode": "100644",
-      "git_blob": "cd1ae6aaa58cb86704d8fc7dd790fc4ed2e88d6a"
+      "git_blob": "c5a5b8345c1cccc7825ee57a6f92618d5f0438df"
     },
     "benchmarks/atom_loss/report_contract.py": {
       "mode": "100644",
@@ -97,15 +97,15 @@
     },
     "benchmarks/atom_loss/run.py": {
       "mode": "100644",
-      "git_blob": "e84e33c2cf648ff4d9f057548999f931e7cbf09e"
+      "git_blob": "4924a32e348bceed3c76da36a2d9bee846e30246"
     },
     "benchmarks/atom_loss/shot_data.py": {
       "mode": "100644",
-      "git_blob": "f192ba343090544c5bb2fbe33a7b430983ffbde4"
+      "git_blob": "361f6f27240c55f70c53a0a8a7583b69c6b4beb0"
     },
     "benchmarks/atom_loss/source_contract.py": {
       "mode": "100644",
-      "git_blob": "6fb57a863abf8c7f652004c289033cc12ed61529"
+      "git_blob": "a042ae6b31e494439426256cbca8335d155bc42a"
     },
     "benchmarks/atom_loss/test_reference.py": {
       "mode": "100644",
@@ -113,11 +113,11 @@
     },
     "benchmarks/atom_loss/test_source_contract.py": {
       "mode": "100644",
-      "git_blob": "9b5332ef9d7abb8c74d8927edf1a0c9d63d84d77"
+      "git_blob": "89176a031388b1bb96c36cbfe472fbe799b08a9f"
     },
     "benchmarks/atom_loss/verify.py": {
       "mode": "100644",
-      "git_blob": "74b62b52ae6d1dc4a1b555cecf8f14faa864fbc8"
+      "git_blob": "a40cf39f10adc62566893c2df5cda0cdce5965bf"
     },
     "benchmarks/rmatching-tools/Cargo.toml": {
       "mode": "100644",
@@ -2964,7 +2964,7 @@
       "git_blob": "744fef173e94e76704a1e86265093ceb464a2fab"
     }
   },
-  "input_digest": "5f7b31f99639038dcdc034a55ddfa7d633bda81866963b1fc280a429df491dee",
+  "input_digest": "4604c34d11e0fe8e69e30163a1e03643454650922e167cb17a323db8856c3302",
   "build_commands": [
     [
       "cargo",
@@ -2995,12 +2995,24 @@
       "atom_loss_sampling_benchmark"
     ]
   ],
+  "build_policy": "isolated-cargo-home; allowlisted-environment; no-external-ancestor-config-v1",
   "binaries": {
-    "target/release/rustqec": "61664c2d739c2903258c850ec3916a4122cedd6bcad1952fc842d693d4d8cc6c",
-    "target/release/examples/export_matching_benchmark": "70aafc222b3e7b180c00715806285547875a22470b8be805084c70350eea5cc1",
-    "target/release/examples/export_decoder_oracle": "866ad70a7f22b4abf4c449cee9d5e8e882e2c8e68cec33057a8f03dfc9edccd9",
-    "target/release/examples/offline_matching_benchmark": "5273758629307eff8a6b7bd115ba867216350aa5f882393496b2f312acd85bc3",
-    "target/release/examples/atom_loss_sampling_benchmark": "eb4a65b5813533da082dd98599f6adc8a9e73ca8fb115a9144aec3c4a1e5452c"
+    "target/release/rustqec": "88b79dd8f08551970e3e7d6031382b547d66335350dd09d8a6997cecd4034fe6",
+    "target/release/examples/export_matching_benchmark": "5acbab5e3754d7f4299315e915dc9bdcf2181fdff63853a32802da938753a6a2",
+    "target/release/examples/export_decoder_oracle": "71afa6762aa575d772a177f0385bbe2006e5accfb0e0399bf39cfeff49a94f58",
+    "target/release/examples/offline_matching_benchmark": "c3a2b8fa133dc77fb42e29d8ed78d33bb736279a0adfaa209a7ffc69b8335fb0",
+    "target/release/examples/atom_loss_sampling_benchmark": "c0cbb4bc7e34fdb8f75327a12588213dbf8175ed2ce0447f4eee351f2e7f6c0f"
+  },
+  "build_environment": {
+    "PATH": "/Users/nzy/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/TeX/texbin:/Users/nzy/.codex/tmp/arg0/codex-arg0wshqfL:/Users/nzy/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/nzy/.kimi-code/bin:/Users/nzy/.juliaup/bin:/Users/nzy/.local/bin:/Users/nzy/.local/gurobi1302/Library/gurobi1302/macos_universal2/bin:/Users/nzy/.local/typst-cli/bin:/Users/nzy/.cargo/bin:/Users/nzy/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources",
+    "HOME": "/Users/nzy",
+    "TMPDIR": "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/",
+    "CARGO_HOME": "/Users/nzy/rcode/rstim/drafts/round10-runs/cargo-home",
+    "LANG": "C",
+    "LC_ALL": "C",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "RAYON_NUM_THREADS": "1"
   },
   "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)\nbinary: rustc\ncommit-hash: 01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf\ncommit-date: 2026-02-11\nhost: aarch64-apple-darwin\nrelease: 1.93.1\nLLVM version: 21.1.8\n",
   "cargo": "cargo 1.93.1 (Homebrew)\n"

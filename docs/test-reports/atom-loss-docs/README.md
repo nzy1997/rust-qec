@@ -155,3 +155,34 @@ optimized bundle verification, both standalone archives under `python -I -S`,
 eight site checks and both Chromium/Firefox cases passed. Desktop/mobile
 captures were refreshed; the mobile viewport has no horizontal overflow.
 These are local results; hosted CI must run on the pushed artifact commit.
+
+## Independent-agent audit and build-environment fixes
+
+Three independent reviewers examined fairness/statistics, correctness coverage,
+and evidence integrity. The first two found no unresolved material issue in
+scope. The evidence reviewer reproduced two defects: unrecorded Cargo overrides
+could produce an unoptimized release build, and false Pauli-noise metadata could
+survive coherent resealing and replay.
+
+Source commit `ce196f09e` closes both paths. Evidence generation now uses a fresh
+Cargo home and an allowlisted build/measurement environment; external ancestor
+configuration and ignored/untracked checkout configuration are rejected. The
+regression builds an actual release executable with hostile parent profile
+settings and requires optimization without debug assertions. Every corpus now
+records Pauli probability 0.001, validators enforce it, and generator replay uses
+the declared probability. Original attack scripts were independently rerun;
+all identified bypasses were rejected before evidence regeneration.
+
+All experiments were regenerated from this clean source. All 345 prediction
+files and all 64 sets of public samples/masks/answers remain byte-identical;
+timing values are freshly measured. Local logs are `drafts/round10-generation.log`,
+`drafts/round10-tests.log`, and the round10 replay/site/browser logs. Independent
+review reports and exact attack scripts are retained under
+`drafts/agent-audit-fairness/`, `drafts/agent-audit-correctness/`, and
+`drafts/agent-audit-evidence/`.
+
+Post-fix local checks: 44 regression tests, all 213 current decoder/corpus
+combinations covering 345 archived predictions, both verifier modes, eight site
+checks, and Chromium/Firefox browser checks passed. Each initial agent finding
+was retested with its original reproduction; final independent verdicts are
+retained in the audit directories against the regenerated artifact commit.

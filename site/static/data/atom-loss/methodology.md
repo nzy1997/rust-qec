@@ -42,6 +42,20 @@ non-computational changes within a workspace member.
 
 `source-manifest.json` records S, the complete Git blob/mode inventory and digest,
 exact build commands, compiler/Cargo versions and all five measured binary hashes.
+Builds and measurement subprocesses receive an allowlisted environment with a
+fresh isolated Cargo home. Inherited Cargo profile/target options, Rust flags,
+native compiler flags and loader overrides are not forwarded. External ancestor
+`.cargo/config` files are rejected; checkout-local Cargo configuration is source
+bound. The effective build environment is recorded (network credentials are
+excluded). A regression executes the real entry point with optimization disabled
+in the parent environment and requires an optimized release binary without debug
+assertions; an ancestor profile override must be rejected before building.
+Every original and independent-seed case records the fixed Pauli probability
+0.001. Both bundle and standalone archive validators reject changed or missing
+noise metadata; generator replay uses the declared value and requires an exact
+circuit match. Coherently resealing JSON, archive indices and checksums cannot
+make a false noise setting valid.
+
 Every stage provenance and source snapshot must agree with that manifest and the
 current source files. Clean builds and clean source state are checked before and
 after measurement. Python packages are pinned in `requirements.txt` and actual
