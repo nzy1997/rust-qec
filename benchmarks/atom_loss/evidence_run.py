@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from .source_contract import ROOT, BUILD_COMMANDS, BINARIES, clean_source, capture, verify_bundle_source
+from .source_contract import ROOT, BUILD_COMMANDS, BINARIES, clean_source, capture, verify_bundle_source, build_environment, NETWORK_ENV_KEYS
 from .run import save, digest
 
 
@@ -25,9 +25,7 @@ def main():
             raise ValueError('Use fresh output/work directories outside the source checkout')
     if (ROOT/'target').exists():
         raise ValueError('Use a fresh source checkout without target/ to prevent stale builds')
-    for key in ['CARGO_TARGET_DIR', 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'RUSTC', 'RUSTC_WRAPPER', 'RUSTC_WORKSPACE_WRAPPER']:
-        if os.environ.get(key):
-            raise ValueError('Unsupported build override: '+key)
+    env = build_environment(ROOT, a.work/'cargo-home')
     for key in ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'RAYON_NUM_THREADS']:
         os.environ[key] = '1'
     import importlib.metadata
@@ -39,19 +37,20 @@ def main():
     binding = clean_source()
     a.out.mkdir(parents=True); a.work.mkdir(parents=True)
     for command in BUILD_COMMANDS:
-        subprocess.run(command, cwd=ROOT, check=True)
+        subprocess.run(command, cwd=ROOT, env=env, check=True)
     if clean_source() != binding:
         raise ValueError('Source changed during build')
     binding.update(binaries={name: digest(ROOT/name) for name in BINARIES},
-                   rustc=subprocess.check_output(['rustc', '-Vv'], text=True),
-                   cargo=subprocess.check_output(['cargo', '-V'], text=True))
+                   build_environment={key: value for key, value in env.items() if key not in NETWORK_ENV_KEYS},
+                   rustc=subprocess.check_output(['rustc', '-Vv'], text=True, env=env),
+                   cargo=subprocess.check_output(['cargo', '-V'], text=True, env=env))
     save(a.out/'source-manifest.json', binding)
     subprocess.run([sys.executable, '-m', 'benchmarks.atom_loss.run', '--work', str(a.work/'timing'),
-                    '--out', str(a.out)], cwd=ROOT, check=True)
+                    '--out', str(a.out)], cwd=ROOT, env=env, check=True)
     from .shot_data import pack
     print(pack(a.work/'timing', a.out), flush=True)
     subprocess.run([sys.executable, '-m', 'benchmarks.atom_loss.accuracy_seeds', '--work', str(a.work/'seeds'),
-                    '--out', str(a.out)], cwd=ROOT, check=True)
+                    '--out', str(a.out)], cwd=ROOT, env=env, check=True)
     # These stage links now refer to the same complete clean run, not old data.
     for stage in ['timing', 'correctness']:
         capture(a.out, stage, {'run': 'Complete clean regeneration; see provenance-all.json for start and timing boundaries.'})

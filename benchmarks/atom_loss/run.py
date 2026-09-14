@@ -47,9 +47,9 @@ def checked(args):
     return seconds
 
 
-def generate(binary, path, distance, rounds, loss):
+def generate(binary, path, distance, rounds, loss, pauli=.001):
     checked([binary, 'circuit', 'gen', '--code', 'surface_code', '--task', 'rotated_memory_z_midswap',
-             '--distance', distance, '--rounds', rounds, '--noise', .001,
+             '--distance', distance, '--rounds', rounds, '--noise', pauli,
              '--operation-loss-probability', loss, '--measurement-loss-probability', loss, '--out', path])
 
 

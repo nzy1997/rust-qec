@@ -21,6 +21,45 @@ BINARIES = ['target/release/rustqec'] + ['target/release/examples/'+name for nam
     ['export_matching_benchmark', 'export_decoder_oracle', 'offline_matching_benchmark', 'atom_loss_sampling_benchmark']]
 
 
+BUILD_POLICY = 'isolated-cargo-home; allowlisted-environment; no-external-ancestor-config-v1'
+BUILD_ENV_KEYS = ('PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'RUSTUP_HOME',
+                  'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT')
+NETWORK_ENV_KEYS = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+                    'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
+                    'SSL_CERT_FILE', 'SSL_CERT_DIR')
+
+
+def verify_local_cargo_config(repo):
+    # git status omits ignored files, but Cargo still consumes these two names.
+    for name in ('.cargo/config', '.cargo/config.toml'):
+        path = repo/name
+        if path.exists() or path.is_symlink():
+            tracked = git(repo, 'ls-tree', '--name-only', 'HEAD', '--', name).decode().strip()
+            if tracked != name or not path.is_file() or path.is_symlink():
+                raise ValueError('Cargo configuration must be tracked in the source commit: '+name)
+
+
+def build_environment(repo, cargo_home):
+    """No inherited Cargo/profile/compiler flags or ambient Cargo configuration.
+
+    Fresh CARGO_HOME isolates user registry/config state. Cargo also searches
+    ancestor directories independently of CARGO_HOME, so reject those configs.
+    The checkout's own .cargo files remain part of the source inventory.
+    """
+    for parent in repo.resolve().parents:
+        for name in ('config', 'config.toml'):
+            path = parent/'.cargo'/name
+            if path.exists():
+                raise ValueError('External ancestor Cargo configuration: '+str(path))
+    verify_local_cargo_config(repo)
+    if cargo_home.exists():
+        raise ValueError('Use a fresh isolated Cargo home')
+    env = {key: os.environ[key] for key in BUILD_ENV_KEYS + NETWORK_ENV_KEYS if key in os.environ}
+    env.update(CARGO_HOME=str(cargo_home.resolve()), LANG='C', LC_ALL='C',
+               OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', RAYON_NUM_THREADS='1')
+    return env
+
+
 def git(repo, *args):
     return subprocess.check_output(['git', '-C', str(repo), *args])
 
@@ -66,13 +105,14 @@ def check_worktree(repo, entries):
 
 
 def clean_source(repo=ROOT):
+    verify_local_cargo_config(repo)
     if git(repo, 'status', '--porcelain', '--untracked-files=all').strip():
         raise ValueError('Evidence generation requires a clean checkout; use a detached worktree and external output directories')
     commit = git(repo, 'rev-parse', 'HEAD').decode().strip()
     entries = inventory(repo, commit)
     check_worktree(repo, entries)
     return {'schema': 1, 'source_commit': commit, 'working_tree_dirty': False,
-            'inputs': entries, 'input_digest': input_digest(entries), 'build_commands': BUILD_COMMANDS}
+            'inputs': entries, 'input_digest': input_digest(entries), 'build_commands': BUILD_COMMANDS, 'build_policy': BUILD_POLICY}
 
 
 def verify_source(record, repo=ROOT):
@@ -85,6 +125,8 @@ def verify_source(record, repo=ROOT):
     expected = inventory(repo, commit)
     if record['inputs'] != expected or record['input_digest'] != input_digest(expected):
         raise ValueError('Incomplete or altered source inventory')
+    if record.get('build_policy') != BUILD_POLICY:
+        raise ValueError('Unexpected clean-build environment policy')
     if record['build_commands'] != BUILD_COMMANDS:
         raise ValueError('Unexpected evidence build commands')
     if inventory(repo, 'HEAD') != expected:
@@ -96,6 +138,7 @@ def verify_source(record, repo=ROOT):
     for name in added.decode().split('\0'):
         if name and (name.startswith(prefixes) or name in {'rust-toolchain', 'rust-toolchain.toml', 'build.rs'}):
             raise ValueError('Uncommitted source input: '+name)
+    verify_local_cargo_config(repo)
     check_worktree(repo, expected)
     return commit
 
@@ -132,6 +175,13 @@ def capture(out, stage, extra=None):
 def verify_bundle_source(out, repo=ROOT):
     binding = json.loads((out/'source-manifest.json').read_text())
     commit = verify_source(binding, repo)
+    env = binding.get('build_environment', {})
+    fixed = {'LANG': 'C', 'LC_ALL': 'C', 'OMP_NUM_THREADS': '1', 'OPENBLAS_NUM_THREADS': '1', 'RAYON_NUM_THREADS': '1'}
+    if (not {'PATH', 'HOME', 'CARGO_HOME'}.issubset(env)
+            or set(env) - (set(BUILD_ENV_KEYS) | set(fixed) | {'CARGO_HOME'})
+            or any(not isinstance(value, str) or not value for value in env.values())
+            or any(env.get(key) != value for key, value in fixed.items())):
+        raise ValueError('Invalid effective build environment')
     if set(binding['binaries']) != set(BINARIES) or any(len(h) != 64 for h in binding['binaries'].values()):
         raise ValueError('Incomplete clean-build binary manifest')
     for path in sorted(out.glob('provenance-*.json')):

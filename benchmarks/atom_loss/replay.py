@@ -18,7 +18,7 @@ def replay(archive, binary):
             read=lambda n:z.read(f'{label}/{n}')
             validate_dataset(read,case)
             work=Path(tmp)/label;work.mkdir();circuit=work/'circuit.stim'
-            generate(binary,circuit,case['distance'],case['rounds'],case['loss_probability'])
+            generate(binary,circuit,case['distance'],case['rounds'],case['loss_probability'],case['pauli_probability'])
             if circuit.read_bytes()!=read('public/circuit.stim'): raise ValueError('Regenerated circuit mismatch: '+label)
             generation=json.loads(read('private/manifest.json'))['generation']
             if generation['batch_shots']!=10000: raise ValueError('Unsupported CLI batch size')

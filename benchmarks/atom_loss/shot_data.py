@@ -224,6 +224,7 @@ def rescore(path, results_root=None):
         if len(cases) != 16 or len({label for label, _ in cases}) != 16:
             raise ValueError('Expected all 16 benchmark corpora')
         for label, case in cases:
+            require(case.get('pauli_probability') == .001, 'Declared Pauli probability differs from fixed workload')
             for name, key in [('circuit.stim', 'circuit_sha256'), ('public/shots.b8', 'public_rows_sha256'),
                               ('private/answers.b8', 'answers_sha256')]:
                 if hashlib.sha256(read(f'{label}/{name}')).hexdigest() != case[key]:
@@ -319,6 +320,7 @@ def rescore_seeds(path, results_root=None):
         require(report['seeds']==SEEDS and report['shots_per_seed']==5000,'seed plan')
         members={'accuracy-seeds.json','rescore.py'}
         for c in cases:
+            require(c.get('pauli_probability') == .001, 'Declared Pauli probability differs from fixed workload')
             label=c['setting'];prefix=f"{label}-s{c['seed']}"
             read=lambda name:z.read(f'{prefix}/{name}')
             d,p=(3,.003) if label=='tradeoff' else (int(label[1]),float(label.split('-p')[1]))

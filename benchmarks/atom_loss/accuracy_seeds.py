@@ -44,7 +44,7 @@ def run(work,out):
                      '--public-out',path/'public','--private-out',path/'private'])
             answers=np.frombuffer(validate_dataset(lambda n:(path/n).read_bytes()),dtype=np.uint8)
             public=json.loads((path/'public/manifest.json').read_text())
-            case={'setting':label,'distance':d,'rounds':rounds,'loss_probability':p,'shots':5000,'seed':seed,
+            case={'setting':label,'distance':d,'rounds':rounds,'loss_probability':p,'pauli_probability':.001,'shots':5000,'seed':seed,
                   'dataset_id':public['dataset_id'],'circuit_sha256':digest(path/'public/circuit.stim'),
                   'public_rows_sha256':digest(path/'public/shots.b8'),'answers_sha256':digest(path/'private/answers.b8'),
                   'decoders':{},'paired':{}}
