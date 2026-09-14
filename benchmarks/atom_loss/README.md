@@ -68,6 +68,16 @@ or require the verification machine to match the measurement host.
 `bundle.json` seals all required artifacts with SHA-256; source binding is an
 additional check, not inferred from those checksums.
 
+Workload metadata is also checked independently: loss-flag positions are derived
+from the archived circuit and unique patterns are counted from public shot bytes.
+Offline graph builds, PyMatching batch calls, fixed-weight controls, shot/circuit
+identities, adapter API/policy labels and the declared cyclic run order must agree
+with those inputs and the fixed experiment definition. Current-code decoder replay
+additionally compares exported graph dimensions and all retained non-time compiler,
+cache and decoder counters against each original repetition. Approximate native
+pattern estimates keep their explicit flag; they are not treated as exact unique
+counts. These checks validate reproducible work, not historical wall-clock time.
+
 The full verifier then redraws all eight charts from the validated JSON in a
 fresh temporary directory, using the source-bound renderer. SVG IDs are fixed and timestamps omitted. Anonymous path coordinates may differ
 by at most 0.000001 pt (one serialized decimal unit) because platform math
