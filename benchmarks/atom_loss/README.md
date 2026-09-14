@@ -362,16 +362,20 @@ against someone deliberately replacing every source and all evidence together.
 
 ## Three experiments
 
-1. **Sampling throughput:** Mid-SWAP d = 3, 5, 7, rounds = d, Pauli probability
+1. **Sampling time:** Mid-SWAP d = 3, 5, 7, rounds = d, Pauli probability
    0.001, operation and pre-measurement loss probabilities both 0.003. Both
    implementations return loss-visible rows and pack b8, in batches of 256.
    Rust parses once; auto-sampler preparation is timed on each call. The Python
    reference includes parsing, grouping and per-history Stim compilation.
    Imports, process startup and file I/O are excluded. Rust uses two warmups;
-   the Python reference uses one. The main figure shows Rust absolute throughput with a three-run median and
-   full range. A separate supplementary figure shows reference milliseconds per
-   batch. The reference is unoptimized, with different parsing boundaries; it is
-   **not native Stim performance** and no backend speedup ratio is inferred.
+   the Python reference uses one. The page compares their recorded milliseconds per
+   256-shot batch in a table, with medians and min/max over three runs calculated
+   directly from `sampling.json`. A prominent note above the table explains
+   that the Python reference is unoptimized and includes parsing, loss-history
+   circuit construction and Stim compilation, while Rust parsing is excluded.
+   These costs have different boundaries: this is **not native Stim performance**
+   and no backend speedup ratio is inferred. The separate Rust absolute-throughput
+   and reference-cost figures remain available in the evidence bundle.
 2. **Loss sweep:** d = 3, 5, 7, rounds = d; Pauli probability 0.001; each loss
    probability in 0.0001, 0.0003, 0.001, 0.003, 0.01. Each point uses 5,000 shared
    blinded shots with seed 20260911. Compare native envelope matching, PyMatching
@@ -415,15 +419,14 @@ probability that a wire is lost during an experiment. The exact generated circui
 hash, initial logical-X support derived from its coordinates, public-row hash,
 private-answer hash and dataset ID are retained at every decoding point.
 
-Logical error bars are pointwise 95% Wilson intervals. The loss sweep uses
-logarithmic axes. Its display is restricted to d = 3 and d = 5, with zero-failure
-points omitted and no lines joining across those gaps. The full d = 3, 5, 7
-sweep, including zero failures and their nonzero Wilson upper bounds, remains
-in the raw JSON and summary CSV. An additional full-sweep figure shows all 15
-settings: zero-event points use downward arrows at the exact one-sided 95%
-binomial upper bound `1 - 0.05**(1/N)` (about 0.000599 for N = 5,000), not a
-positive measured rate. Nonzero points retain Wilson intervals. Display
-omissions do not change scoring. Timing ranges are observed min/max, not confidence intervals.
+Logical error bars are pointwise 95% Wilson intervals. The default loss-sweep
+figure shows all 15 settings at d = 3, 5, 7 on logarithmic axes. Zero-event points
+use downward arrows at the exact one-sided 95% binomial upper bound
+`1 - 0.05**(1/N)` (about 0.000599 for N = 5,000), not a positive measured rate.
+Nonzero points retain Wilson intervals. The optional d = 3/5 detail omits
+zero-failure points, with no lines joining across those gaps. Both figures use
+the same complete raw JSON and summary CSV; display omissions do not change
+scoring. Timing ranges are observed min/max, not confidence intervals.
 The curves report failure per entire memory experiment; rounds vary with distance.
 Timing repeats reuse one corpus; they do not turn 5,000 shots into 15,000
 independent accuracy samples. Many low-loss points have only 0–5 failures and
