@@ -60,6 +60,11 @@ Every stage provenance and source snapshot must agree with that manifest and the
 current source files. Clean builds and clean source state are checked before and
 after measurement. Python packages are pinned in `requirements.txt` and actual
 versions, CPU, OS, threading environment and timing boundaries are recorded.
+The verifier compares recorded dependencies with the source-bound pins, compiler
+identity with the build manifest, and CPU/OS/Python identity across all stages.
+Recorded thread settings must match the single-thread measurement policy. These
+checks reject contradictory metadata; they do not authenticate historical timings
+or require the verification machine to match the measurement host.
 `bundle.json` seals all required artifacts with SHA-256; source binding is an
 additional check, not inferred from those checksums.
 
@@ -242,6 +247,15 @@ A regression additionally substitutes the broken adapter for the healthy one
 and requires the overall correctness report to fail. This covers the matching
 objective and public-row transformation, not the general loss-envelope compiler
 or Bayes-optimal logical-class decoding.
+
+The three/five-wire report retains the exported graph, every public syndrome and
+loss pattern, and all healthy and deliberately defective predictions. A separate
+standard-library checker derives the two complementary repetition-code corrections
+and checks their logical costs, graph/loss mappings, all rejection lists and the
+strict witness. Missing backends, failed case flags and contradictory witness
+predictions are rejected even after resealing checksums, including under `python -O`.
+CI reruns this oracle and validates the published observations against the same
+hand-derived definition; legal choices among tied optima remain acceptable.
 
 `chain_reference.py` adds a finite, real Mid-SWAP d=3, two-round chain check
 using the committed `fixtures/midswap_d3_r2.stim` (16 detectors). It covers four
