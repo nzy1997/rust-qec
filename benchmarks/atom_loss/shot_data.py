@@ -171,15 +171,91 @@ def cases_from(read):
         ('tradeoff', json.loads(read('tradeoff.json')))]
 
 
+def original_plan(cases):
+    """The download has a fixed experiment inventory, independent of its index."""
+    settings = {f'd{d}-p{p}': (d, d, p, 20260911)
+                for d in (3, 5, 7) for p in (.0001, .0003, .001, .003, .01)}
+    settings['tradeoff'] = (3, 2, .003, 20260912)
+    require(len(cases) == 16 and {label for label, _ in cases} == set(settings),
+            'original experiment requires all 16 fixed settings exactly once')
+    for label, case in cases:
+        d, rounds, loss, seed = settings[label]
+        for key, expected in [('distance', d), ('rounds', rounds), ('seed', seed), ('shots', 5000)]:
+            require(type(case.get(key)) is int and case[key] == expected,
+                    'original fixed workload '+key)
+        for key, expected in [('loss_probability', loss), ('pauli_probability', .001)]:
+            require(type(case.get(key)) in (int, float) and case[key] == expected,
+                    'Declared Pauli probability differs from fixed workload' if key == 'pauli_probability'
+                    else 'original fixed workload '+key)
+        backends = {'envelope-matching', 'envelope-matching-offline',
+                    'pymatching-fixed', 'pymatching-envelope'}
+        if label == 'tradeoff':
+            backends |= {'envelope-mle', 'pymatching-fixed-loop'}
+        require(type(case.get('decoders')) is dict and set(case['decoders']) == backends,
+                'original comparator inventory')
+        for name, result in case['decoders'].items():
+            require(type(result) is dict and result.get('status') == 'ok',
+                    'original comparator did not complete')
+            runs = result.get('runs')
+            require(type(runs) is list and len(runs) == 3
+                    and all(type(run) is dict and bool(run) for run in runs),
+                    'original comparator requires three complete run records')
+            if name.startswith('pymatching'):
+                require(all(type(run.get('export_repetition')) is int and run['export_repetition'] == rep
+                            for rep, run in enumerate(runs)), 'original Python repetition identity')
+            else:
+                require(all(run.get('status') == 'ok' and type(run.get('exit_code')) is int
+                            and run['exit_code'] == 0 for run in runs),
+                        'original native repetition did not complete')
+                for run in runs:
+                    stats = run.get('stats')
+                    require(type(stats) is dict and all(type(stats.get(key)) is int and stats[key] == value
+                            for key, value in [('attempted_shot_count', 5000), ('timeout_count', 0),
+                                               ('infeasible_shot_count', 0)]),
+                            'original native repetition has incomplete shot outcomes')
+
+
+def check_score(result, predicted, answers):
+    """Recompute every portable accuracy field; timing is outside this check."""
+    import math
+    require(len(predicted) == len(answers) and set(predicted) <= {0, 1}, 'Prediction rescore mismatch: invalid rows')
+    errors = sum(p != a for p, a in zip(predicted, answers))
+    shots = len(answers)
+    require(type(result.get('errors')) is int and result['errors'] == errors
+            and type(result.get('shots')) is int and result['shots'] == shots,
+            'Prediction rescore mismatch: integer counts')
+    require(result.get('prediction_sha256') == hashlib.sha256(predicted).hexdigest(),
+            'Prediction rescore mismatch: hash')
+    rate = errors/shots
+    require(type(result.get('logical_error_rate')) in (int, float)
+            and result['logical_error_rate'] == rate, 'Prediction rescore mismatch: failure rate')
+    z = 1.959963984540054
+    center = (rate+z*z/(2*shots))/(1+z*z/shots)
+    half = z*math.sqrt(rate*(1-rate)/shots+z*z/(4*shots*shots))/(1+z*z/shots)
+    interval = result.get('wilson_95')
+    require(type(interval) is list and len(interval) == 2
+            and all(type(v) in (int, float) and math.isfinite(v) for v in interval)
+            and interval == [max(0., center-half), min(1., center+half)],
+            'Prediction rescore mismatch: Wilson interval')
+
+
+def check_pairs(result, native, predicted, answers):
+    actual = [sum(n != p for n, p in zip(native, predicted)),
+              sum(n != a and p == a for n, p, a in zip(native, predicted, answers)),
+              sum(n == a and p != a for n, p, a in zip(native, predicted, answers))]
+    keys = ('disagreements_with_native', 'paired_native_only_wrong', 'paired_python_only_wrong')
+    require(all(type(result.get(key)) is int for key in keys)
+            and [result[key] for key in keys] == actual, 'paired errors differ from published results')
+
+
 def required_members(cases):
+    original_plan(cases)
     names = {'decoding.json', 'tradeoff.json', 'rescore.py'}
     for label, case in cases:
         names.update(f'{label}/{name}' for name in [
             'circuit.stim', 'public/circuit.stim', 'public/manifest.json',
             'public/shots.b8', 'private/manifest.json', 'private/answers.b8', 'private/masks.b8'])
-        for decoder, result in case['decoders'].items():
-            if result['status'] != 'ok' or len(result['runs']) != 3:
-                raise ValueError('Only complete three-run evidence can be archived')
+        for decoder in case['decoders']:
             names.update(f'{label}/{decoder}-{rep}.b8' for rep in range(3))
     return names
 
@@ -206,7 +282,7 @@ def rescore(path, results_root=None):
     with zipfile.ZipFile(path) as archive:
         read = archive.read
         index = json.loads(read('index.json'))
-        if index['schema'] != 1:
+        if type(index['schema']) is not int or index['schema'] != 1:
             raise ValueError('Unknown shot archive schema')
         cases = cases_from(read)
         expected = required_members(cases)
@@ -242,22 +318,11 @@ def rescore(path, results_root=None):
             for decoder, result in case['decoders'].items():
                 for rep in range(3):
                     predicted = read(f'{label}/{decoder}-{rep}.b8')
-                    if len(predicted) != len(answers) or not set(predicted) <= {0, 1}:
-                        raise ValueError('Invalid prediction rows')
-                    errors = sum(p != a for p, a in zip(predicted, answers))
-                    if (hashlib.sha256(predicted).hexdigest() != result['prediction_sha256']
-                            or errors != result['errors'] or result['shots'] != len(answers)
-                            or result['logical_error_rate'] != errors/len(answers)):
-                        raise ValueError(f'Prediction rescore mismatch: {label}/{decoder}/{rep}')
-                    if 'disagreements_with_native' in result:
-                        actual = [sum(n != p for n, p in zip(native, predicted)),
-                                  sum(n != a and p == a for n, p, a in zip(native, predicted, answers)),
-                                  sum(n == a and p != a for n, p, a in zip(native, predicted, answers))]
-                        expected_pairs = [result[k] for k in ['disagreements_with_native',
-                            'paired_native_only_wrong', 'paired_python_only_wrong']]
-                        if actual != expected_pairs:
-                            raise ValueError('Paired errors differ from published results')
+                    check_score(result, predicted, answers)
+                    if decoder.startswith('pymatching'):
+                        check_pairs(result, native, predicted, answers)
                     count += 1
+    require(count == 198, 'original experiment requires all 198 prediction files')
     return f'PASS: {len(cases)} corpora; {count} prediction files rescored'
 
 
@@ -317,14 +382,19 @@ def rescore_seeds(path, results_root=None):
             require(z.read('rescore.py')==Path(__file__).read_bytes(),'seed rescorer mismatch')
         cases=report['cases'];settings={f'd{d}-p{p}' for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]}|{'tradeoff'}
         require(len(cases)==48 and {(c['setting'],c['seed']) for c in cases}=={(label,seed) for label in settings for seed in SEEDS},'seed experiment completeness')
-        require(report['seeds']==SEEDS and report['shots_per_seed']==5000,'seed plan')
+        require(type(report['seeds']) is list and all(type(seed) is int for seed in report['seeds'])
+                and report['seeds']==SEEDS and type(report['shots_per_seed']) is int
+                and report['shots_per_seed']==5000,'seed plan')
         members={'accuracy-seeds.json','rescore.py'}
         for c in cases:
             require(c.get('pauli_probability') == .001, 'Declared Pauli probability differs from fixed workload')
             label=c['setting'];prefix=f"{label}-s{c['seed']}"
             read=lambda name:z.read(f'{prefix}/{name}')
             d,p=(3,.003) if label=='tradeoff' else (int(label[1]),float(label.split('-p')[1]))
-            require(c['distance']==d and c['rounds']==(2 if label=='tradeoff' else d) and c['loss_probability']==p and c['shots']==5000,'seed workload')
+            require(all(type(c.get(key)) is int for key in ('distance','rounds','shots','seed'))
+                    and c['distance']==d and c['rounds']==(2 if label=='tradeoff' else d)
+                    and type(c['loss_probability']) in (int,float) and c['loss_probability']==p
+                    and c['shots']==5000,'seed workload')
             answers=validate_dataset(read,c)
             names={'envelope-matching','pymatching-envelope','pymatching-fixed'}|({'envelope-mle'} if label=='tradeoff' else set())
             require(set(c['decoders'])==names and set(c['paired'])==names-{'envelope-matching'},'seed comparators')
@@ -333,24 +403,22 @@ def rescore_seeds(path, results_root=None):
             native=read('envelope-matching.b8')
             for name,r in c['decoders'].items():
                 members.add(prefix+'/'+name+'.b8');pred=read(name+'.b8')
-                require(len(pred)==len(answers) and set(pred)<={0,1},'seed predictions')
-                errors=sum(a!=b for a,b in zip(pred,answers))
-                require(type(r['errors']) is int and type(r['shots']) is int,'seed integer counts')
-                require(r['errors']==errors and r['shots']==len(answers) and r['prediction_sha256']==hashlib.sha256(pred).hexdigest() and r['logical_error_rate']==errors/len(answers),'seed scores')
-                import math
-                rate=errors/len(answers);n=len(answers);zscore=1.959963984540054
-                center=(rate+zscore*zscore/(2*n))/(1+zscore*zscore/n)
-                half=zscore*math.sqrt(rate*(1-rate)/n+zscore*zscore/(4*n*n))/(1+zscore*zscore/n)
-                require(r['wilson_95']==[max(0.,center-half),min(1.,center+half)],'seed Wilson interval')
+                check_score(r,pred,answers)
                 if name!='envelope-matching':
                     a=sum(n!=k and q==k for n,q,k in zip(native,pred,answers))
                     b=sum(n==k and q!=k for n,q,k in zip(native,pred,answers))
-                    require(c['paired'][name]=={'native_only_wrong':a,'other_only_wrong':b},'seed paired scores')
+                    pair=c['paired'][name]
+                    require(type(pair) is dict and all(type(v) is int for v in pair.values())
+                            and pair=={'native_only_wrong':a,'other_only_wrong':b},'seed paired scores')
         require(set(index['sha256'])==members and sorted(z.namelist())==sorted(members|{'index.json'}),'seed archive completeness')
         for name,digest in index['sha256'].items():require(hashlib.sha256(z.read(name)).hexdigest()==digest,'seed archive checksum')
         expected=seed_summaries(cases)
+        import math
         require(len(report['pooled'])==len(expected),'seed pooled completeness')
         for actual,want in zip(report['pooled'],expected):
+            require(all(type(actual.get(key)) is int for key in
+                        ('shots','native_only_wrong','other_only_wrong'))
+                    and type(actual.get('difference')) in (int,float), 'seed pooled score types')
             interval=actual['paired_95']
             require(isinstance(interval,list) and len(interval)==2 and all(type(v) in [float,int] and math.isfinite(v) for v in interval),'seed paired interval format')
             require(all(math.isclose(a,b,rel_tol=1e-10,abs_tol=1e-12) for a,b in zip(interval,want['paired_95'])),'seed pooled paired intervals')
