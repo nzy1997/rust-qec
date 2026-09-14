@@ -311,3 +311,63 @@ unresolved material issue remained within this exported-graph oracle scope.
 All 62 tests passed again after the deterministic-witness change
 (`drafts/round14-tests.log`, 236.403 seconds). Hosted CI on the pushed artifact
 commit must complete the final Linux native build and all archived-corpus replays.
+
+
+### Repeated fresh-context review of the complete PR
+
+The original user review prompt was recovered from four other Codex tasks:
+“审核PR712 重点看里面做的benchmark是否公平合理 有没有会被攻击的漏洞”.
+Ten new reviewers were run in five rounds, two per round, without inherited
+conversation or prior finding lists. Each reviewed the complete PR diff, not
+only the latest patch. Confirmed findings were fixed before freezing clean
+source and regenerating all evidence for the next round.
+
+| Round | Candidate | Confirmed new evidence-contract gaps |
+| --- | --- | --- |
+| 1 | `afaa9347` | Incomplete decoder-oracle observations; contradictory runtime provenance. |
+| 2 | `dc8313cb` | Sampling negative-control summaries not reconstructed from complete affected observations. |
+| 3 | `2ac3490d` | Work/graph counters not tied to public loss patterns and current decoder observations. |
+| 4 | `e28b515e` | Standalone ZIP scoring accepted missing comparators and inconsistent score/paired fields. |
+| 5 | `88bb87bf` | Neither independent reviewer found an unresolved material issue within the declared scope. |
+
+The fixes retain raw oracle and negative-control observations, independently
+recompute their conclusions, bind workload counts to public inputs and current
+replay, and enforce complete independently scored standalone archives. A
+regression in validation error ordering was also corrected; the final complete
+suite passes. Current published accuracy values were repeatedly independently
+recomputed and found correct throughout these reviews.
+
+The final measured source is
+`b7c274252438e015ea5a2987b06bc8afb2ceb63d`, with **750 bound inputs**. The clean
+run freshly rebuilt five binaries and regenerated all evidence and timings.
+All 537 `.b8` archive entries remain byte-identical to the previous revision,
+including all 64 public corpora/masks/answers and 345 prediction files.
+
+Final local validation:
+
+- **87 tests passed**, across the eight test modules in the evidence CI workflow
+  (`drafts/round18-tests.log`, 487.546 seconds).
+- Both ordinary and optimized-Python full verification passed.
+- Current generator replay matched all 64 corpora. Current decoder replay
+  matched all 213 backend/corpus combinations, all 345 predictions, scores and
+  the original non-time work counters.
+- All eight figures matched Linux/macOS redraws; eight site checks, Chromium
+  and Firefox evidence tests, desktop capture and mobile overflow checks passed.
+- Both final reviewers independently rescored all 64 corpora and 345 predictions
+  and recomputed paired intervals. Each also executed the ten d7/high-loss and
+  tradeoff decoder combinations against current binaries.
+- Reviewer 09 added a separate seven-wire, 16,384-row integer-cost oracle:
+  three matching backends passed; incorrect loss mappings, logical labels and
+  conditioning weights were rejected. It independently recomputed 784 Fisher
+  tests and the low-probability binomial intervals.
+- Reviewer 10 flipped all 110,990 lost-value placeholder bits in the d7/high-loss
+  corpus; four backends retained byte-identical predictions.
+
+Local reports and reproduction scripts are under
+`drafts/fresh-pr712-audit-09/` and `drafts/fresh-pr712-audit-10/`;
+`drafts/fresh-pr712-root/final.md` records the review loop. Review scripts are
+scratch artifacts, not production or CI dependencies. The final conclusion is
+scoped to this workload and evidence contract: it does not authenticate past
+wall-clock time or prove arbitrary-circuit physical correctness. Existing
+single-machine, incomplete timing rotation, low-event-count, shared compiler
+and finite independent physical-oracle limits remain explicitly disclosed.
