@@ -64,11 +64,13 @@ versions, CPU, OS, threading environment and timing boundaries are recorded.
 additional check, not inferred from those checksums.
 
 The full verifier then redraws all eight charts from the validated JSON in a
-fresh temporary directory, using the source-bound renderer. Every SVG must match
-in full; fixed IDs and omitted timestamps make its output deterministic. Every
+fresh temporary directory, using the source-bound renderer. SVG IDs are fixed and timestamps omitted. Anonymous path coordinates may differ
+by at most 0.000001 pt (one serialized decimal unit) because platform math
+libraries can round an endpoint differently. The bound is absolute, never
+relative; path commands/separators and all other bytes, including text, styles,
+transforms, IDs, references, viewBox and font glyphs, must match exactly. Every
 PNG must match in decoded pixels, dimensions, mode and metadata (compression
-bytes alone may differ). No perceptual tolerance or skipped platform check is
-used. The renderer resets ambient plotting styles, uses bundled DejaVu fonts,
+bytes alone may differ). No perceptual image tolerance or skipped platform check is used. The renderer resets ambient plotting styles, uses bundled DejaVu fonts,
 and requires the pinned plotting dependency stack and the wheel's bundled
 FreeType 2.6.1. A rendering-environment mismatch fails explicitly; it is not
 accepted as evidence equivalence. Published `methodology.md` must also equal this

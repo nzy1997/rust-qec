@@ -189,14 +189,21 @@ retained in the audit directories against the regenerated artifact commit.
 
 ## 2026-09-14: figures bound to validated data
 
-Source commit `fc91ba8796c9f662737b9342b8a9d452de4063ce` adds presentation
-verification after the numerical and source checks. All eight SVGs must match
-a deterministic redraw in full, and all eight PNGs must match its decoded
-pixels and metadata after complete loading. PNG chunk CRCs are checked too.
+Source commit `3624d7aa0f659bbd57d12f1b6d72726e32820a02` adds presentation
+verification after the numerical and source checks. All eight SVGs are checked
+against a deterministic redraw, and all eight PNGs must match its decoded pixels
+and metadata after complete loading. PNG chunk CRCs are checked too.
 The downloaded methodology must equal the source-bound README. Plotting uses
 pinned dependencies, bundled DejaVu fonts and FreeType 2.6.1, reset styles,
-fixed SVG IDs and no generated timestamps. macOS ARM and Linux x86-64 redrew
-identical SVG contents and PNG pixels/metadata with this environment.
+fixed SVG IDs and no generated timestamps. macOS ARM and Linux x86-64 showed
+one axis endpoint rounded apart by 0.000001 pt, while every PNG pixel matched.
+The verifier therefore permits at most one serialized decimal unit of absolute
+roundoff for anonymous absolute-path coordinates. Commands, separators, number
+counts and all other SVG bytes remain exact; no relative tolerance, text/style/
+transform relaxation, glyph-path tolerance or pixel tolerance is allowed.
+Boundary controls accept 0.000001 pt and reject 0.000002 pt, large-coordinate
+relative-tolerance attacks, changed commands/text/styles/transforms, relative
+paths and arc flags.
 
 Regressions reject a fabricated SVG, changed PNG pixels, swapped figures and
 altered methodology after their checksums are coherently updated. Both normal
@@ -216,10 +223,10 @@ fixed-weight ablation and workflow-only performance interpretation remain.
 
 Local validation completed:
 
-- `python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract`: 50 tests passed (`drafts/round11-tests.log`).
-- All 64 corpora regenerated; 213 current-decoder/corpus combinations matched all 345 prediction files (`drafts/round11-sample-replay.log`, `drafts/round11-decoder-replay.log`).
-- Ordinary and `python -O` bundle checks passed; the original resealed SVG attack failed specifically at figure comparison (`drafts/round11-final-verify.log`, `drafts/round11-original-repro.log`).
-- Eight site checks and Chromium/Firefox browser tests passed. The results capture was refreshed and mobile overflow checked (`drafts/round11-site.log`, `drafts/round11-browser.log`, `drafts/round11-capture.log`).
-- Independent final bundle review passed normal/optimized verification and all six figure tests (`drafts/round11-agent-audit/REPORT.md`).
+- `python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract`: 51 tests passed (`drafts/round12-tests.log`).
+- All 64 corpora regenerated; 213 current-decoder/corpus combinations matched all 345 prediction files (`drafts/round12-sample-replay.log`, `drafts/round12-decoder-replay.log`).
+- Ordinary and `python -O` bundle checks passed; the original resealed SVG attack failed specifically at figure comparison (`drafts/round12-final-verify.log`, `drafts/round12-original-repro.log`).
+- Eight site checks and Chromium/Firefox browser tests passed. The results capture was refreshed and mobile overflow checked (`drafts/round12-site.log`, `drafts/round12-browser.log`, `drafts/round12-capture.log`).
+- Independent final bundle review passed normal/optimized verification and all seven figure tests (`drafts/round11-agent-audit/REPORT.md`).
 
 These are local checks; hosted CI runs on the subsequent pushed artifact commit.
