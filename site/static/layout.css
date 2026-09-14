@@ -36,6 +36,9 @@ p { max-width: 76ch; }
 .version-strip { padding: 0; border-bottom: 1px solid var(--border); text-align: left; font-size: .8125rem; }
 .version-inner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 24px; min-height: 40px; padding-block: 8px; }
 .version-inner span { padding: 0; }
+.docs-version-control { display: flex; align-items: center; }
+.docs-version-control select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; max-width: 100%; }
+.docs-version-control [hidden] { display: none; }
 .version-inner > :last-child { margin-left: auto; }
 .site-header { background: transparent; border: 0; }
 .hero, .compact-hero { max-width: none; margin: 0; padding: 0 0 36px; }
@@ -96,13 +99,15 @@ pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 .workflow-grid p { color: var(--muted); font-size: .9375rem; min-height: 6.6em; }
 .workflow-grid a { display: block; padding: 4px 0; font-size: .875rem; text-decoration: none; }
 .workflow-grid a:hover { text-decoration: underline; }
-.home-install { padding: 40px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 48px; }
-.install-command { max-width: 760px; }
-.install-command .button { margin-top: 20px; }
-.install-alternatives { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; border-top: 1px solid var(--border); margin-top: 32px; padding-top: 28px; }
-.install-alternatives p { font-size: .9375rem; color: var(--muted); margin: 8px 0; }
-.install-alternatives a { font-size: .875rem; }
-.install-note { font-size: .8125rem; color: var(--muted); margin: 12px 0 0; }
+.home-atom-loss { padding: 40px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 48px; }
+.loss-workflow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; list-style: none; padding: 0; margin: 32px 0; }
+.loss-workflow li { min-width: 0; border-top: 2px solid var(--accent); padding-top: 20px; }
+.loss-workflow h3 { font-size: 1.125rem; margin: 0 0 12px; }
+.loss-workflow p { font-size: .9375rem; color: var(--muted); margin: 0 0 16px; }
+.loss-workflow-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px 32px; border-top: 1px solid var(--border); padding-top: 28px; }
+.loss-workflow-actions p { display: grid; gap: 4px; margin: 0; font-size: .8125rem; }
+.loss-status { color: var(--muted); }
+.atom-loss-bundles { min-width: 580px; }
 .home-support { display: flex; justify-content: space-between; align-items: center; gap: 40px; }
 .home-support h2 { font-size: 1.65rem; }
 .home-support p { color: var(--muted); max-width: 64ch; }
@@ -157,10 +162,10 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .version-inner > :last-child { margin-left: 0; }
   .home-hero h1 { max-width: none; }
   .home-hero .hero-copy { font-size: 1.125rem; }
-  .workflow-grid, .install-alternatives { grid-template-columns: 1fr; gap: 24px; }
+  .workflow-grid, .loss-workflow { grid-template-columns: 1fr; gap: 24px; }
   .workflow-grid p { min-height: 0; }
   .workflow-grid article + article { border-top: 1px solid var(--border); padding-top: 24px; }
-  .home-install { padding: 24px 20px; }
+  .home-atom-loss { padding: 24px 20px; }
   .home-capabilities { padding-block: 36px; }
   .actions { flex-direction: row; }
   .actions .button { width: auto; }

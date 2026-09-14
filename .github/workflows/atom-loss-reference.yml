@@ -1,0 +1,53 @@
+name: Atom-loss correctness reference
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'benchmarks/**'
+      - 'rustqec-cli/**'
+      - 'rstim/**'
+      - 'rstim-shot-web/**'
+      - 'rsinter/**'
+      - 'renvelope/**'
+      - 'rmatching/**'
+      - 'qec-ilp-core/**'
+      - 'qec-code/**'
+      - 'rbposd/**'
+      - 'rilpqec/**'
+      - 'site/static/data/atom-loss/**'
+      - '.github/workflows/atom-loss-reference.yml'
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r benchmarks/atom_loss/requirements.txt
+      - run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec --example export_matching_benchmark --example export_decoder_oracle --example offline_matching_benchmark
+      - run: python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract benchmarks.atom_loss.test_chain_reference benchmarks.atom_loss.test_decoder_contract benchmarks.atom_loss.test_sampler_mutations benchmarks.atom_loss.test_workload_contract benchmarks.atom_loss.test_standalone_contract
+      - run: python -m benchmarks.atom_loss.correctness --binary target/release/rustqec --out drafts/ci-atom-loss/correctness.json
+      - run: python -m benchmarks.atom_loss.decoder_reference --out drafts/ci-atom-loss/decoder-correctness.json --compare site/static/data/atom-loss/decoder-correctness.json
+      - run: python -m benchmarks.atom_loss.chain_reference --out drafts/ci-atom-loss/chain-correctness.json --compare site/static/data/atom-loss/chain-correctness.json
+      - run: python -m benchmarks.atom_loss.verify
+      - run: python -O -m benchmarks.atom_loss.verify
+      - run: python -m benchmarks.atom_loss.replay
+      - run: python -m benchmarks.atom_loss.replay --archive site/static/data/atom-loss/accuracy-seeds.zip
+      - run: python -m benchmarks.atom_loss.decoder_replay

@@ -13,6 +13,8 @@ use rstim::result_stream::ResultBlockReader;
 use rstim::sim::bit_table::BitTable;
 use serde::Serialize;
 
+#[cfg(feature = "benchmark-tools")]
+pub(crate) mod benchmark;
 mod compiler;
 mod dataset;
 mod matching;

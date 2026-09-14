@@ -17,6 +17,8 @@ not a circuit diagram or an assertion about a particular decoder.
 | [rustqec-logo-dark.svg](../site/static/brand/rustqec-logo-dark.svg) | Primary stacked logo on dark backgrounds |
 | [rustqec-lockup.svg](../site/static/brand/rustqec-lockup.svg) | Horizontal logo for the light site navigation |
 | [rustqec-mark.svg](../site/static/brand/rustqec-mark.svg) | Standalone icon and SVG favicon |
+| [favicon-32.png](../site/static/brand/favicon-32.png) | 32px PNG favicon fallback |
+| [favicon.ico](../site/static/favicon.ico) | ICO fallback containing 16px, 32px, and 48px images |
 | [rustqec-mark-mono.svg](../site/static/brand/rustqec-mark-mono.svg) | Single-color icon for print or engraving |
 | [preview.png](../site/static/brand/preview.png) | Raster review sheet; not a replacement for the SVG originals |
 
@@ -83,3 +85,24 @@ If the upstream font changes, retrieve the matching historical revision
 instead of silently changing the typeface. Keep the font license with
 redistributed wordmark assets. Regenerate the raster preview after changes
 to the vector originals.
+
+## Browser tab icons
+
+The shared page template declares ICO and PNG fallbacks before the SVG icon.
+Browsers choose an appropriate supported format and size. All paths are relative
+to the page's configured root, including nested documentation pages on GitHub
+Pages. The `?v=01c-1` query identifies this favicon revision; update it on all
+three links when changing the icon to refresh cached resources.
+
+Regenerate raster fallbacks from the committed SVG after changing the mark:
+
+```sh
+python3 -m venv drafts/favicon-venv
+drafts/favicon-venv/bin/python -m pip install CairoSVG Pillow
+drafts/favicon-venv/bin/python tools/generate_favicons.py
+```
+
+CairoSVG requires the Cairo system library (on macOS, `brew install cairo` if
+needed). These are regeneration dependencies, not site-build dependencies.
+The ICO uses bitmap entries for compatibility with older readers. The PNG
+and ICO have transparent backgrounds and preserve the mark's aspect ratio.
