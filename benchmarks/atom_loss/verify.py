@@ -6,19 +6,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from .artifacts import required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows, summary_rows, SUMMARY_FIELDS, wilson
-
-
-def require_complete_sweep(cases):
-    expected={(d,p) for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]}
-    if len(cases)!=15 or {(c['distance'],c['loss_probability']) for c in cases}!=expected:
-        raise ValueError('Loss sweep is incomplete; keep raw failures and do not publish a partial curve')
-    for case in cases:
-        decoders=case.get('decoders',{})
-        if set(decoders)!={'envelope-matching','pymatching-fixed','pymatching-envelope','envelope-matching-offline'}:
-            raise ValueError('Missing loss-sweep comparator')
-        if any(r.get('status')!='ok' for r in decoders.values()):
-            raise ValueError('Loss sweep includes failed runs; retain raw records without publishing a partial curve')
+from .artifacts import require_complete_sweep, required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows, summary_rows, SUMMARY_FIELDS, wilson
 
 
 def verify(root):
@@ -161,6 +149,8 @@ def verify(root):
     rescore_seeds(root/'accuracy-seeds.zip',root)
     from .source_contract import verify_bundle_source
     verify_bundle_source(root)
+    from .figure_contract import verify_presentation
+    verify_presentation(root)
     return 'PASS'
 
 
