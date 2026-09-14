@@ -7,7 +7,7 @@ producer's job; CI also compares a fresh producer run to the published report.
 import hashlib
 
 
-ROWS = 1504
+ROWS = 752
 OBJECTIVES = ('envelope-matching', 'envelope-mle')
 GRAPH_BACKENDS = ('pymatching-envelope', 'envelope-matching-offline')
 BACKENDS = OBJECTIVES + GRAPH_BACKENDS
@@ -31,7 +31,7 @@ def mapping(value, names, label, *, exact=True):
 
 
 def bits(values, label):
-    require(type(values) is list and len(values) == ROWS, label+' must contain 1504 rows')
+    require(type(values) is list and len(values) == ROWS, f'{label} must contain {ROWS} rows')
     require(all(type(value) is int and value in (0, 1) for value in values),
             label+' must contain integer binary predictions')
 
@@ -44,7 +44,8 @@ def rejected_rows(predictions, choices):
 def verify_chain(report):
     """Reject incomplete, internally inconsistent or failed chain evidence."""
     required = {
-        'status', 'fixture_sha256', 'distance', 'rounds', 'detectors', 'rows',
+        'status', 'fixture_sha256', 'measurement_sha256', 'witness_generation',
+        'distance', 'rounds', 'detectors', 'rows',
         'physical_fault_traces', 'patterns', 'stim_pauli_probes',
         'independent_effects', 'independent_graph_edges', 'native_graph_edges',
         'independent_effects_candidates_and_m2d_pass',
@@ -55,7 +56,7 @@ def verify_chain(report):
     require(report['status'] == 'PASS', 'report did not pass')
     for name, expected in {
         'distance': 3, 'rounds': 2, 'detectors': 16, 'rows': ROWS,
-        'physical_fault_traces': 5996, 'patterns': 4,
+        'physical_fault_traces': 2998, 'patterns': 4,
     }.items():
         require(type(report[name]) is int and report[name] == expected,
                 'incorrect fixed workload '+name)
@@ -64,9 +65,12 @@ def verify_chain(report):
     for name in ('stim_pauli_probes', 'independent_effects',
                  'independent_graph_edges', 'native_graph_edges'):
         require(type(report[name]) is int and report[name] > 0, 'invalid diagnostic '+name)
-    digest = report['fixture_sha256']
-    require(type(digest) is str and len(digest) == 64
-            and all(c in '0123456789abcdef' for c in digest), 'invalid fixture hash')
+    for field in ('fixture_sha256', 'measurement_sha256'):
+        digest = report[field]
+        require(type(digest) is str and len(digest) == 64
+                and all(c in '0123456789abcdef' for c in digest), 'invalid '+field)
+    require(report['witness_generation'] == 'stim-reference-sample',
+            'incorrect witness_generation')
     for name in ('method', 'mle_objective', 'scope'):
         require(type(report[name]) is str and bool(report[name].strip()), 'missing '+name)
     require(report['independent_effects_candidates_and_m2d_pass'] is True,
@@ -79,7 +83,7 @@ def verify_chain(report):
     mapping(answers, OBJECTIVES, 'allowed answers')
     for objective, choices in answers.items():
         require(type(choices) is list and len(choices) == ROWS,
-                objective+' allowed answers must contain 1504 rows')
+                f'{objective} allowed answers must contain {ROWS} rows')
         for row in choices:
             require(type(row) is list and row and all(type(v) is int and v in (0, 1) for v in row)
                     and row == sorted(set(row)), objective+' invalid allowed answer set')
@@ -139,6 +143,9 @@ def compare_reports(fresh, published):
     verify_chain(fresh)
     verify_chain(published)
     observations = {'backends', 'graph_adapter_controls'}
-    require({key: value for key, value in fresh.items() if key not in observations}
-            == {key: value for key, value in published.items() if key not in observations},
-            'Fresh chain oracle definitions differ from published evidence')
+    fresh_definitions = {key: value for key, value in fresh.items() if key not in observations}
+    published_definitions = {key: value for key, value in published.items() if key not in observations}
+    changed = sorted(key for key in fresh_definitions.keys() | published_definitions.keys()
+                     if key not in fresh_definitions or key not in published_definitions
+                     or fresh_definitions[key] != published_definitions[key])
+    require(not changed, 'Fresh chain oracle definitions differ from published evidence: '+', '.join(changed))

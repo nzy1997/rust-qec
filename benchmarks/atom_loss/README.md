@@ -246,8 +246,10 @@ or Bayes-optimal logical-class decoding.
 `chain_reference.py` adds a finite, real Mid-SWAP d=3, two-round chain check
 using the committed `fixtures/midswap_d3_r2.stim` (16 detectors). It covers four
 private onset histories (none, early, middle, late), enumerates every single
-Pauli-fault choice on each physically lowered circuit and samples two measurement
-outcomes per trace. This produces 5,996 traces including no-fault controls; duplicate records are removed and
+Pauli-fault choice on each physically lowered circuit and takes one canonical
+`reference_sample()` measurement witness per trace. Unlike seeded compiled
+sampling, this is independent of the host SIMD random stream. This produces
+2,998 traces including no-fault controls; duplicate records are removed and
 paired alternative lost-value placeholders are added. These enriched inputs are
 not IID samples and are never used to estimate a logical failure rate.
 
@@ -259,7 +261,7 @@ Pauli distribution (coalescing identical effects), candidate sets and row
 transformation must match. Altered compiler weights and missing candidates must
 be rejected. Exact min-plus dynamic programming over all 131,072 detector/logical
 parity states checks matching predictions against the independently constructed
-graph. All 1,504 rows run through native streaming matching, native MLE, and
+graph. All 752 rows run through native streaming matching, native MLE, and
 both actual exported-graph batch adapters (PyMatching and native offline). Each
 output is scored against the independent allowed answers, rather than agreement
 with another backend. Constant-zero, constant-one and flipped predictions must
@@ -272,7 +274,7 @@ decoder error; the other mutations must complete and produce oracle-rejected
 answers. The report retains row-level allowed answers, predictions and rejection
 indices. The verifier recomputes their summaries and requires every backend and
 negative control; CI reruns the full chain, compares its independently recomputed
-oracle definitions with the published artifact, and revalidates both sets of
+oracle definitions and measurement-row hash with the published artifact, and revalidates both sets of
 observations. Different choices among equally optimal logical answers are allowed. These checks cover this finite fixture and four
 loss histories, not arbitrary graph exports or all combinations of loss flags.
 
