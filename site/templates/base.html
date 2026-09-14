@@ -1,4 +1,5 @@
 {% set root = section.extra.root | default(value=".") %}
+{% set docs_version = load_data(path="generated/docs-version.json") %}
 {% set current_nav = section.extra.nav | default(value="home") %}<!doctype html>
 <html lang="en">
   <head>
@@ -10,12 +11,14 @@
       content="{% block description %}RustQEC — a quantum error correction workspace in Rust{% endblock description %}"
     >
     <meta name="theme-color" content="#fcfaf7">
-    <link rel="icon" type="image/svg+xml" href="{{ root }}/brand/rustqec-mark.svg">
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="{{ root }}/favicon.ico?v=01c-1">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ root }}/brand/favicon-32.png?v=01c-1">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="{{ root }}/brand/rustqec-mark.svg?v=01c-1">
     <link rel="stylesheet" href="{{ root }}/styles.css">
     {% block head %}{% endblock head %}
     <link rel="stylesheet" href="{{ root }}/layout.css">
   </head>
-  <body data-root="{{ root }}" data-page="{{ current_nav }}">
+  <body data-docs-version="{{ docs_version.id }}" data-root="{{ root }}" data-page="{{ current_nav }}">
     <a class="skip-link" href="{% if current_nav == 'home' %}#home-content{% else %}#main{% endif %}">Skip to content</a>
     <div class="nav-shell" id="top">
 
@@ -29,11 +32,12 @@
         <div class="nav-links">
           <a class="nav-link" href="{{ root }}/docs/">Documentation</a>
           <a class="nav-link{% if current_nav == "start" %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
-          <details class="nav-group"{% if current_nav in ["simulate", "data", "dems", "decode", "css", "qp101"] %} data-current="true"{% endif %}>
+          <details class="nav-group"{% if current_nav in ["simulate", "data", "dems", "decode", "css", "qp101", "loss"] %} data-current="true"{% endif %}>
             <summary>Guides</summary>
             <div class="nav-menu">
               <a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>Construct CSS codes</a>
               <a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate circuits</a>
+              <a href="{{ root }}/atom-loss/"{% if current_nav == "loss" %} aria-current="page"{% endif %}>Atom loss</a>
               <a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Sampling &amp; training data</a>
               <a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
               <a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Compare decoders</a>
@@ -60,7 +64,14 @@
         </details>
       </nav>
     </div>
-    {% if current_nav != "home" %}<div class="version-strip"><div class="version-inner"><span>Docs: development · master</span><a href="{{ root }}/get-started/#versions">Version guide</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Stable release v0.3.0 ↗</a></div></div>{% endif %}
+    <div class="version-strip"><div class="version-inner">
+      <div class="docs-version-control">
+        <span data-version-label>{{ docs_version.label }}</span>
+        <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
+        <select id="docs-version" hidden></select>
+      </div>
+      <a href="{{ root }}/get-started/#versions">About these docs</a>
+    </div></div>
     <div class="site-frame{% if current_nav not in ["home", "shot"] %} documentation-frame{% endif %}">
       {% if current_nav not in ["home", "shot"] %}
       <aside class="docs-sidebar" aria-label="Documentation navigation">
@@ -86,6 +97,7 @@
       <div class="footer-links"><a href="{{ root }}/support/#get-help">Get help</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.0">Release notes ↗</a><a href="https://github.com/nzy1997/rust-qec">GitHub ↗</a><a href="#top">Back to top</a></div>
     </footer>
     <script src="{{ root }}/js/docs.js" defer></script>
+    <script src="{{ root }}/js/versions.js" defer></script>
     {% block scripts %}{% endblock scripts %}
   </body>
 </html>

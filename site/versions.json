@@ -1,0 +1,11 @@
+{
+  "default": "master",
+  "versions": [
+    {
+      "id": "master",
+      "label": "Development · master",
+      "ref": "master",
+      "path": ""
+    }
+  ]
+}

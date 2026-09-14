@@ -1,0 +1,3090 @@
+{
+  "seeds": [
+    2026091401,
+    2026091402,
+    2026091403
+  ],
+  "shots_per_seed": 5000,
+  "cases": [
+    {
+      "setting": "d3-p0.0001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "b1e4446a0b41636620c6e20001af3513ea57754537cb696b7a27cd014248c85a",
+      "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+      "public_rows_sha256": "d55bd5af613520f794646a5786b7b2fd44dd0a6016d87f64bf2c6f3c3d922dc9",
+      "answers_sha256": "f259462496b18e7d6e6eaa19ed88f68dd026122395004794201040c6d5d5e833",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "2dea7da87745568eb38b6b3b36ad70b84661a0efeef6f4f5369edfa9827cf359"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "2dea7da87745568eb38b6b3b36ad70b84661a0efeef6f4f5369edfa9827cf359"
+        },
+        "pymatching-fixed": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "2dea7da87745568eb38b6b3b36ad70b84661a0efeef6f4f5369edfa9827cf359"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.0001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "9dcd657155c9b9f84d9a3c8176cd279f666217bec66b9931e872dc2202cfe56c",
+      "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+      "public_rows_sha256": "ac5d36d44dba1a950e0f15c23a9f92ebcb9d0e7e909e0f1f9e238c29081858cd",
+      "answers_sha256": "15c04de3f188d685169e9e4f9a04c98cef17362e2f8e928b3139154efa0c0b79",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "4f554055a43e85f142293f4db7685beb4a0642e644222d9f240245c5ab12c6f9"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "4f554055a43e85f142293f4db7685beb4a0642e644222d9f240245c5ab12c6f9"
+        },
+        "pymatching-fixed": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "4f554055a43e85f142293f4db7685beb4a0642e644222d9f240245c5ab12c6f9"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.0001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "462e7738345c1c6577b0cebeeffdc9705d252ea88269948587114ae3366df691",
+      "circuit_sha256": "52d06f684bdc91c21fb4aec411960f05c917b225afedb07a37633463abdb5fe2",
+      "public_rows_sha256": "0215dbb43aa46242dab0bf1c826a0702f865b8d2b74fa63039b44a9091e7e347",
+      "answers_sha256": "a13d7a55bed0841f6c42985e934f253c9c1aebeb7105fc2516c7c8fcbfbf685e",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "77a9fc7470a2a59e95b961e16eebba25d1cf495b4a002bc1839a51ba288ac0af"
+        },
+        "pymatching-envelope": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "77a9fc7470a2a59e95b961e16eebba25d1cf495b4a002bc1839a51ba288ac0af"
+        },
+        "pymatching-fixed": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "77a9fc7470a2a59e95b961e16eebba25d1cf495b4a002bc1839a51ba288ac0af"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.0003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "b50fef980eabad7ba1d2faea514f466f8a564eb59de6ff606a847b7803972253",
+      "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+      "public_rows_sha256": "ad0c184c67d3b00bd7798f26c3b521b467fb247865ea3cb1620568ea5d61fef6",
+      "answers_sha256": "f80b003ff8c1ad2b7d77bf1447b8701d715a8f302e4335f8d415961834a796e3",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 6,
+          "shots": 5000,
+          "logical_error_rate": 0.0012,
+          "wilson_95": [
+            0.0005500831677591556,
+            0.002615776292629832
+          ],
+          "prediction_sha256": "74d54f7dc32a5c21a862741a66089a6b0ecabe833a96e27d158063fa0761c1a6"
+        },
+        "pymatching-envelope": {
+          "errors": 6,
+          "shots": 5000,
+          "logical_error_rate": 0.0012,
+          "wilson_95": [
+            0.0005500831677591556,
+            0.002615776292629832
+          ],
+          "prediction_sha256": "74d54f7dc32a5c21a862741a66089a6b0ecabe833a96e27d158063fa0761c1a6"
+        },
+        "pymatching-fixed": {
+          "errors": 7,
+          "shots": 5000,
+          "logical_error_rate": 0.0014,
+          "wilson_95": [
+            0.0006783326019524562,
+            0.0028872197776585087
+          ],
+          "prediction_sha256": "a3df22f419f3908388c25689e83bf48ff176a772ee7575549e7d8a1e8e0ab051"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 1
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.0003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "1a6f1b518514cdf967c6771421759a7aeac55a8838b0fb783c565dbc6cb0ca98",
+      "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+      "public_rows_sha256": "e75009cbd54b46b13124e06ecc2b2386095602e0d8f0cf97d62a42486850069f",
+      "answers_sha256": "b5753d5299c85964fe60a0e38d862d08ac9398405d9c0dfa14ddf110bbd8557e",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "39457ba8681361532f1a2bfb8ba12c56d0cd0a2c96670cf679edaeedf6d33bcc"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "39457ba8681361532f1a2bfb8ba12c56d0cd0a2c96670cf679edaeedf6d33bcc"
+        },
+        "pymatching-fixed": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "39457ba8681361532f1a2bfb8ba12c56d0cd0a2c96670cf679edaeedf6d33bcc"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.0003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "f978f58da549b91763873da8ce7ba9ce76c4f88dc6ccce2b076a7146e26e0374",
+      "circuit_sha256": "9de7b28b2859d40f3332978e0130c6ac26716f92ed63152894f782921524558b",
+      "public_rows_sha256": "779aa73b4b33fa705053f13f40f50eca0330bffdf8b58326041919f745b868f8",
+      "answers_sha256": "ff5d99eb594a3c13b1d09c28c78d3bbb2abcd6e80cc1503a167dec556b7b4b50",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "ff6194362d3df551521d33e6f871f5c98933668d304d03bbc1a7770e6e0386e3"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "ff6194362d3df551521d33e6f871f5c98933668d304d03bbc1a7770e6e0386e3"
+        },
+        "pymatching-fixed": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "8590422cd1fa6700930dd182838946d073019c48d1dd7c26f880691048d50250"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 1
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "6f77c2f4260f0311d2afa9c53cfc76e7215eee3afaec326ca819274613e1efd8",
+      "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+      "public_rows_sha256": "d0174344779f2f946b2e7abdf39cba427f7ccac9cdcfd2d0f15ef6bc4274e093",
+      "answers_sha256": "81f3a0dc5f256fa6c5509a9d956a351ca41ab1ee76975a1c8395206ab1172b71",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "d78995a65f902251c46b60ca1a43b9a2823247f0c04da0caae3f2ec68985018f"
+        },
+        "pymatching-envelope": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "d78995a65f902251c46b60ca1a43b9a2823247f0c04da0caae3f2ec68985018f"
+        },
+        "pymatching-fixed": {
+          "errors": 9,
+          "shots": 5000,
+          "logical_error_rate": 0.0018,
+          "wilson_95": [
+            0.0009472935076811986,
+            0.003417644710373721
+          ],
+          "prediction_sha256": "2128066fc40bfa2c2afed7f6408de0d769e0e67b2ba69665586080cfb50adbfc"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 6
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "fd5625a8cb9543eda922c307d214ee5072152f59afddcde96c14a8213d4dc266",
+      "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+      "public_rows_sha256": "7ae41e8d525ae7e70c2308bd20ea5d6c8fd08f546f109681f8a179dca27858bb",
+      "answers_sha256": "c7fb310b55de312eb3f12913ec1d87758694c36b3f662974646b055e92a27f21",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "32fd933a319bed2b6e46a02b7edef3d87cee604542813781306832ebffc531a8"
+        },
+        "pymatching-envelope": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "32fd933a319bed2b6e46a02b7edef3d87cee604542813781306832ebffc531a8"
+        },
+        "pymatching-fixed": {
+          "errors": 6,
+          "shots": 5000,
+          "logical_error_rate": 0.0012,
+          "wilson_95": [
+            0.0005500831677591556,
+            0.002615776292629832
+          ],
+          "prediction_sha256": "bf70a18368930e1e80d341a652da40a5582db1f49f868075da0e8c78db31b42e"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 3
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.001",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "b9cd9ff6645e795c2abfa39f2ee80f4e8e4be1dd5abce10c9e8cf64ff184a393",
+      "circuit_sha256": "dcd193fcf30d2745dfa504c8880d2771099a8aa35592b2b56f74a4ff0cd41686",
+      "public_rows_sha256": "ba89be04f300742480746cd0d8182add722307e59563c6fb26ce3aca830f6fbb",
+      "answers_sha256": "742fbed0073c08254b5bce09a9b171e6ddbf61c90d5618a231fc07d1b3c6260d",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "63ff0cb00ef58f40b02eb8e8d725a92b90d929e2324725af4df03bb7abce71c3"
+        },
+        "pymatching-envelope": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "63ff0cb00ef58f40b02eb8e8d725a92b90d929e2324725af4df03bb7abce71c3"
+        },
+        "pymatching-fixed": {
+          "errors": 6,
+          "shots": 5000,
+          "logical_error_rate": 0.0012,
+          "wilson_95": [
+            0.0005500831677591556,
+            0.002615776292629832
+          ],
+          "prediction_sha256": "fc8b649ad69d7b33b7aafc0cd3ac40785d8a86a927b5d99755757baec4799db9"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 3
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "45200680c238b38f43be8a8096747d1a2709859ba742e03d3afdc923417c8338",
+      "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+      "public_rows_sha256": "d702d304bcc11d03f90a6bc7292e9df62d813e154058793b50edcf9b6baf6bd8",
+      "answers_sha256": "b1e439d9c3cf64907a9b8c7d48eeb41c6ca18c1448108ad80d2ed22bac0d6738",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 14,
+          "shots": 5000,
+          "logical_error_rate": 0.0028,
+          "wilson_95": [
+            0.0016686770757911352,
+            0.00469472573837367
+          ],
+          "prediction_sha256": "7709548514df2d21e175c87b5ea70e4f6c8d6de1ab60d2a7bcc96f41f61fbc3e"
+        },
+        "pymatching-envelope": {
+          "errors": 14,
+          "shots": 5000,
+          "logical_error_rate": 0.0028,
+          "wilson_95": [
+            0.0016686770757911352,
+            0.00469472573837367
+          ],
+          "prediction_sha256": "7709548514df2d21e175c87b5ea70e4f6c8d6de1ab60d2a7bcc96f41f61fbc3e"
+        },
+        "pymatching-fixed": {
+          "errors": 30,
+          "shots": 5000,
+          "logical_error_rate": 0.006,
+          "wilson_95": [
+            0.004206136160498105,
+            0.008552353361218335
+          ],
+          "prediction_sha256": "b40380e7bb2bbf39e033335b59fe316f381c1f3f2e92068122d84480f67c5e41"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 1,
+          "other_only_wrong": 17
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "cd97e421ef297b37bb048e7bfa0fb020e064d53c56db5bb8cd6ac0961a32fd9e",
+      "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+      "public_rows_sha256": "1ab07d466a0b9dc32558ac84f5691d9f0171420910e750835f89bd560e743cd8",
+      "answers_sha256": "c2e7022583a1545e88cde77b649b64e366b92aef0ab4117abbb1335e2afc501b",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 15,
+          "shots": 5000,
+          "logical_error_rate": 0.003,
+          "wilson_95": [
+            0.0018189297776376753,
+            0.004944165955749107
+          ],
+          "prediction_sha256": "b48c01ce1d1333c32cee364fbac4b35e307d1d13216d263cdd11cfff7c9cd2e1"
+        },
+        "pymatching-envelope": {
+          "errors": 15,
+          "shots": 5000,
+          "logical_error_rate": 0.003,
+          "wilson_95": [
+            0.0018189297776376753,
+            0.004944165955749107
+          ],
+          "prediction_sha256": "b48c01ce1d1333c32cee364fbac4b35e307d1d13216d263cdd11cfff7c9cd2e1"
+        },
+        "pymatching-fixed": {
+          "errors": 30,
+          "shots": 5000,
+          "logical_error_rate": 0.006,
+          "wilson_95": [
+            0.004206136160498105,
+            0.008552353361218335
+          ],
+          "prediction_sha256": "28a6183dc467ed173ca4278861e3c45e3dccacb6399602b0772f776d90d3bd84"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 2,
+          "other_only_wrong": 17
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.003",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "cff02b34c3b791e8122f2cc88d025e94fc5041e04daea98649080509567e2af9",
+      "circuit_sha256": "0e0bcf7217d77f863c2632f9d6d5e9822d7ea26954076cc45dae44cae415b0b4",
+      "public_rows_sha256": "e7ec27794839fb8b2b93fa57992df18345a90be88fb65d32689fe6a1d4604fd5",
+      "answers_sha256": "55cd62eedb700149e5dccddb37acfe5b637ce7510c94b599ae1e0e25703d1147",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 17,
+          "shots": 5000,
+          "logical_error_rate": 0.0034,
+          "wilson_95": [
+            0.0021239367958294426,
+            0.0054385447760012945
+          ],
+          "prediction_sha256": "1612545e820a6e1bf9f4f392c56e4bed80105ba1bf175074b9a0f98a9e4a8bad"
+        },
+        "pymatching-envelope": {
+          "errors": 17,
+          "shots": 5000,
+          "logical_error_rate": 0.0034,
+          "wilson_95": [
+            0.0021239367958294426,
+            0.0054385447760012945
+          ],
+          "prediction_sha256": "1612545e820a6e1bf9f4f392c56e4bed80105ba1bf175074b9a0f98a9e4a8bad"
+        },
+        "pymatching-fixed": {
+          "errors": 31,
+          "shots": 5000,
+          "logical_error_rate": 0.0062,
+          "wilson_95": [
+            0.0043713883985244135,
+            0.008786794042414002
+          ],
+          "prediction_sha256": "99fa0306a6b0c93504a459dfd5414eb72cafb1fa84649efdec85e635550e595b"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 1,
+          "other_only_wrong": 15
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.01",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "0b459e14426c9c349fafa104a041969558b7eed3d4c6028ceffffdb1da6263da",
+      "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+      "public_rows_sha256": "ed4feda9c80c2e255bcd24df77c962a3370acd2c17b65c39323eedb55414b655",
+      "answers_sha256": "3df844704b9bd739b654e61fd14f0e5263f436c4b8af90259a09f24d4bea8b22",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 98,
+          "shots": 5000,
+          "logical_error_rate": 0.0196,
+          "wilson_95": [
+            0.016110299881331586,
+            0.023827308147479305
+          ],
+          "prediction_sha256": "ecad475b63d798ca33d57296031efeef7e29d3efb4baaec70bdea324fee6b59e"
+        },
+        "pymatching-envelope": {
+          "errors": 99,
+          "shots": 5000,
+          "logical_error_rate": 0.0198,
+          "wilson_95": [
+            0.016291095598378512,
+            0.024046205349654355
+          ],
+          "prediction_sha256": "f3a4e49ce85e8110cd259b11db6ee6167ce119d9ea4f2c22b811cd5fcb2ec380"
+        },
+        "pymatching-fixed": {
+          "errors": 215,
+          "shots": 5000,
+          "logical_error_rate": 0.043,
+          "wilson_95": [
+            0.03771925108777711,
+            0.04898242849000511
+          ],
+          "prediction_sha256": "213218dd6d25fcbe11b02b44e874f993465210be2d2cf6fe1aefb715f1bee654"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 1
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 8,
+          "other_only_wrong": 125
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.01",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "0552a883e184639a7f5f055effd098983e79726d45690325678a29e252ee825f",
+      "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+      "public_rows_sha256": "140df0aaa5af95086063ffea987c8355a767093f79eab5f737b9c8e15b284a40",
+      "answers_sha256": "909a8117b298037d1d60bbf810e482500e81a62d2daf71c64aa97324ed4b03c4",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 113,
+          "shots": 5000,
+          "logical_error_rate": 0.0226,
+          "wilson_95": [
+            0.018832220387268353,
+            0.02710078142987219
+          ],
+          "prediction_sha256": "edfb09c74ac03e0a8c97a27ef76f76f9f11ed0ca73d9afc7417bdd6ca54ded36"
+        },
+        "pymatching-envelope": {
+          "errors": 113,
+          "shots": 5000,
+          "logical_error_rate": 0.0226,
+          "wilson_95": [
+            0.018832220387268353,
+            0.02710078142987219
+          ],
+          "prediction_sha256": "edfb09c74ac03e0a8c97a27ef76f76f9f11ed0ca73d9afc7417bdd6ca54ded36"
+        },
+        "pymatching-fixed": {
+          "errors": 232,
+          "shots": 5000,
+          "logical_error_rate": 0.0464,
+          "wilson_95": [
+            0.040909582282313894,
+            0.052586876922241926
+          ],
+          "prediction_sha256": "8367adc39e7039da2e8fbbe578654eb90f4cb1878bc1608762e1c75f9b55b694"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 14,
+          "other_only_wrong": 133
+        }
+      }
+    },
+    {
+      "setting": "d3-p0.01",
+      "distance": 3,
+      "rounds": 3,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "67fb3de2f884a2230c71d573db05e3392ea8e18ba473a10abfd73efd2017db12",
+      "circuit_sha256": "2e6324de0201fc8a992c8da14939d1bfdd796a74840593d0f9c719842f339faa",
+      "public_rows_sha256": "27af2a6fdf4db84c22ec8c20c0ec4902327efb569bdabb34c73a1bfc77ef9e31",
+      "answers_sha256": "ff098b028157f58a6fcb283fb2e7ba14ed3269b6cf0cabe526a4355eb8965698",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 114,
+          "shots": 5000,
+          "logical_error_rate": 0.0228,
+          "wilson_95": [
+            0.019014392098388816,
+            0.02731830263797371
+          ],
+          "prediction_sha256": "7dc3a0fb809a68a465076aa447fd939621f77f588b241747aafdb7553f9ec957"
+        },
+        "pymatching-envelope": {
+          "errors": 113,
+          "shots": 5000,
+          "logical_error_rate": 0.0226,
+          "wilson_95": [
+            0.018832220387268353,
+            0.02710078142987219
+          ],
+          "prediction_sha256": "47e828b60e788fdc7245f217838c112792478148cf877f669bea090ba609cf67"
+        },
+        "pymatching-fixed": {
+          "errors": 239,
+          "shots": 5000,
+          "logical_error_rate": 0.0478,
+          "wilson_95": [
+            0.042225787297577644,
+            0.05406852234153203
+          ],
+          "prediction_sha256": "7aa28e237fa2fc435285e418846d7f9257b366b57f8117beacd20e1c13b1f046"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 1,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 14,
+          "other_only_wrong": 139
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "edb79b789bfbf5e040457f29b83b0c3eb6e7a6ea19e29eeee4e30d189ed9e127",
+      "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+      "public_rows_sha256": "3bcaad38f88bc5489b6be26f32a6c2e9ea1eae585f9800213225b87f4a210d3c",
+      "answers_sha256": "12dfbd43798173ffca5bffac09d45dff8857e7320c681a83aa21de67130cc088",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12dfbd43798173ffca5bffac09d45dff8857e7320c681a83aa21de67130cc088"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12dfbd43798173ffca5bffac09d45dff8857e7320c681a83aa21de67130cc088"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12dfbd43798173ffca5bffac09d45dff8857e7320c681a83aa21de67130cc088"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "543861a373d7ac833ea324e0bf958dbb3c8952c7401fa752b92bd75d8ee06353",
+      "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+      "public_rows_sha256": "07129ea3c2f0e225dde8b51a5298d77c79a5149297113f32804c91164824a7a2",
+      "answers_sha256": "59e54fc5061eb06c71f581adc867a2d0bc53348c675524a5411ae0b3c9974e5c",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "04e8caeb733eda34186cad38e1f669a01590f5af94c4597da0c76111875c7b15"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "04e8caeb733eda34186cad38e1f669a01590f5af94c4597da0c76111875c7b15"
+        },
+        "pymatching-fixed": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "04e8caeb733eda34186cad38e1f669a01590f5af94c4597da0c76111875c7b15"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "702a501aeccf7044392805f79049db0041245c2c5913b950734e6a2e9c2c5fc4",
+      "circuit_sha256": "ceb83b055c05028f231c31a4d61eac5385b3372a63f227d6051a04982b06a9e1",
+      "public_rows_sha256": "15551d83ff08c4b4e72f75ca46b5d47ae7aca899b0d4e9d0d3a4cae53759f898",
+      "answers_sha256": "94886dbb199b4e93afeea4513cff97eff6dd3dfa2e30faf9654250590e9df576",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "94886dbb199b4e93afeea4513cff97eff6dd3dfa2e30faf9654250590e9df576"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "94886dbb199b4e93afeea4513cff97eff6dd3dfa2e30faf9654250590e9df576"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "94886dbb199b4e93afeea4513cff97eff6dd3dfa2e30faf9654250590e9df576"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "67b5c66cfbfc4c9d1396b7e2b72b9547dcc05aec62095ee40c120abe1ed80492",
+      "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+      "public_rows_sha256": "c5e279990248da55f20e40f1102cb2cef973e205e1c32b74759bd986bf24a224",
+      "answers_sha256": "8142a8a63a2a99bd89141a0244d55137d58487c0b51d2d249fbef243d6014779",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "8142a8a63a2a99bd89141a0244d55137d58487c0b51d2d249fbef243d6014779"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "8142a8a63a2a99bd89141a0244d55137d58487c0b51d2d249fbef243d6014779"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "8142a8a63a2a99bd89141a0244d55137d58487c0b51d2d249fbef243d6014779"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "b22fa98ce82f8161dce68df8fc3d7b9b6ed61bd6dea6f185489bc54a6d859356",
+      "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+      "public_rows_sha256": "3d0a2cd8ca79895d443199d3af8d62389989968a4ac3e36e94fef8764443189a",
+      "answers_sha256": "a6857f49ec7dfc1579a026e257f95754b89139bc3f77e8d016c8ec0eda12652d",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a6857f49ec7dfc1579a026e257f95754b89139bc3f77e8d016c8ec0eda12652d"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a6857f49ec7dfc1579a026e257f95754b89139bc3f77e8d016c8ec0eda12652d"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a6857f49ec7dfc1579a026e257f95754b89139bc3f77e8d016c8ec0eda12652d"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.0003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "d79394563db5e457456b782002385305bbc7de1b40aad8bb66c66f29adbf17ca",
+      "circuit_sha256": "11061adeabb342cc192482d8d254cad60d322f17bc0ce1484fc0c4dd4c847f14",
+      "public_rows_sha256": "86c287d078d067e884ffdf835380ad5560e9ddcd9a74140323ed46b65432de4d",
+      "answers_sha256": "a86a4bea0a8b31acae36face7ce5f348967d6859f08e8e48a0571050d11df650",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a86a4bea0a8b31acae36face7ce5f348967d6859f08e8e48a0571050d11df650"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a86a4bea0a8b31acae36face7ce5f348967d6859f08e8e48a0571050d11df650"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "a86a4bea0a8b31acae36face7ce5f348967d6859f08e8e48a0571050d11df650"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "cfffd7afa73629a7098c8dcc60c949c7ddd2d892dee05b3b52b0f3ad59b79ab1",
+      "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+      "public_rows_sha256": "fbfc79a07900b84e6d4dd7878eef57c80c043e05ff2aeb0a37fb6eaef780ae76",
+      "answers_sha256": "ca85515db78f6122723100c224d94521511233d2e8af1a4965cb51b90ef961fd",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "9e795941e154a0beb90c86fd64496313aa2ebf2b2b5f3cde0aecf05ef6730d89"
+        },
+        "pymatching-envelope": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "9e795941e154a0beb90c86fd64496313aa2ebf2b2b5f3cde0aecf05ef6730d89"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ca85515db78f6122723100c224d94521511233d2e8af1a4965cb51b90ef961fd"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 1,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "c7e7336e9e771e72c5aef98edf5983cdb658b78cb094b393acabaf221b2f8997",
+      "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+      "public_rows_sha256": "0f20d20c7457413d099ba6d3aba3a09764a40bbbfeb992044eeecf43209a9668",
+      "answers_sha256": "ae3f35d6e43ba92743c36aac4241075d41d461d9dd55eb8c4b62674036d78281",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ae3f35d6e43ba92743c36aac4241075d41d461d9dd55eb8c4b62674036d78281"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ae3f35d6e43ba92743c36aac4241075d41d461d9dd55eb8c4b62674036d78281"
+        },
+        "pymatching-fixed": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "d4da485a7561fa741e293b75b484b0ded0743df38a764a5116997bf1e9cdd24a"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 2
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.001",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "4e87d441bcab105f394a9094306bd237afba651a810e67fad86cfbd54788ca25",
+      "circuit_sha256": "99b21188bb74c01623b180b1e16ec28f9882483739feee7799ffedcb325e08ca",
+      "public_rows_sha256": "8d45b62f58a6f92d782d3c5a2b87eebadd2c45012ffef92597b649d12bd48817",
+      "answers_sha256": "3498e658a7e32e70242311d2721d24428c703a66605e9ad204cae84b9dfe87df",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "3498e658a7e32e70242311d2721d24428c703a66605e9ad204cae84b9dfe87df"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "3498e658a7e32e70242311d2721d24428c703a66605e9ad204cae84b9dfe87df"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "3498e658a7e32e70242311d2721d24428c703a66605e9ad204cae84b9dfe87df"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "0641ca80b06fcc9417d4f5bb071b6851f2473c551960b9676a680fa1cda405e5",
+      "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+      "public_rows_sha256": "d14a5170f5bfd1f544690a6c74ae42d70595a395e103f5b21c13ef8027e389ae",
+      "answers_sha256": "2578c8ee83d716c574cb4e8eeed98ccc4d36f002a29eff27e8d1a04ba3adaf12",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "9619307fb4ccfc0e6a43a898e7bd0c79e58c628a882f8db1422f7458308c5372"
+        },
+        "pymatching-envelope": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "9619307fb4ccfc0e6a43a898e7bd0c79e58c628a882f8db1422f7458308c5372"
+        },
+        "pymatching-fixed": {
+          "errors": 18,
+          "shots": 5000,
+          "logical_error_rate": 0.0036,
+          "wilson_95": [
+            0.002278440754413015,
+            0.005683733736639698
+          ],
+          "prediction_sha256": "19b1dd883f76139e75a1da6b4d57af6882b9f8e8ef7ac5640400c7cbca74bedf"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 16
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "d61c9b40824a0512d64fb5bba8e8ef758a4ddc5178086b56ed4cf45b8eb23dcc",
+      "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+      "public_rows_sha256": "ea494998448c830d8d1a2e2a57d13ba1ad14a59c3d4ac3a0fd769a9622aa2f27",
+      "answers_sha256": "82df8907809fc981cb909de010867713d8d017fa6ec079faf68f6681118ff0c6",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 5,
+          "shots": 5000,
+          "logical_error_rate": 0.001,
+          "wilson_95": [
+            0.00042721349110879964,
+            0.002338953050058211
+          ],
+          "prediction_sha256": "53203efedeb3129d18f363262dd22ac37051feea534352b53c235930871632a8"
+        },
+        "pymatching-envelope": {
+          "errors": 5,
+          "shots": 5000,
+          "logical_error_rate": 0.001,
+          "wilson_95": [
+            0.00042721349110879964,
+            0.002338953050058211
+          ],
+          "prediction_sha256": "53203efedeb3129d18f363262dd22ac37051feea534352b53c235930871632a8"
+        },
+        "pymatching-fixed": {
+          "errors": 17,
+          "shots": 5000,
+          "logical_error_rate": 0.0034,
+          "wilson_95": [
+            0.0021239367958294426,
+            0.0054385447760012945
+          ],
+          "prediction_sha256": "dea0162d7d5e6be6344563693e4b78ec52617a213baa3eafc1a853ac8a40c3da"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 12
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.003",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "4590b9a3e957f734c78e33acd2eb3d1469340f41b7801d1faecced4e111ea30d",
+      "circuit_sha256": "64f6f945a01addce805c92e8094659780439e51d6bb289fa16dfb6cbb8393913",
+      "public_rows_sha256": "3bd372321813b4d9c123c6a580cee3fac578f6e503460bd8a809cd7e93bca3da",
+      "answers_sha256": "aa20487033efc0b8e3c16d13adc2ae3d84d58c0709e50ffb87a24db5b26cae00",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "704f588bbe56faa27582818a6b1a6f3a8e497a864e5cd44d12656ed03017f062"
+        },
+        "pymatching-envelope": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "704f588bbe56faa27582818a6b1a6f3a8e497a864e5cd44d12656ed03017f062"
+        },
+        "pymatching-fixed": {
+          "errors": 7,
+          "shots": 5000,
+          "logical_error_rate": 0.0014,
+          "wilson_95": [
+            0.0006783326019524562,
+            0.0028872197776585087
+          ],
+          "prediction_sha256": "27e1ffaba0fca85cc703e0b074df6b381f3a9740937ce2fb82a6af9fb5f9c741"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 2,
+          "other_only_wrong": 7
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.01",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "ddfc639c82c5c7c9eab168e28043f5b032b19f3d352423cac09ab83e48cf4044",
+      "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+      "public_rows_sha256": "6c314a4c0e860f90c4fd6617173b61aecfc21dd790eeb82de0dc80241fb24ef6",
+      "answers_sha256": "940f54c26e9957fb1793813e568e36f14bf5f99983f4be025965b44a8bb4ee6a",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 33,
+          "shots": 5000,
+          "logical_error_rate": 0.0066,
+          "wilson_95": [
+            0.004703510713236264,
+            0.009254057566146109
+          ],
+          "prediction_sha256": "0b54c518bf8cb45494e23b19af0fffef0343d25d040d5de9536a57ff3ab2873c"
+        },
+        "pymatching-envelope": {
+          "errors": 33,
+          "shots": 5000,
+          "logical_error_rate": 0.0066,
+          "wilson_95": [
+            0.004703510713236264,
+            0.009254057566146109
+          ],
+          "prediction_sha256": "0b54c518bf8cb45494e23b19af0fffef0343d25d040d5de9536a57ff3ab2873c"
+        },
+        "pymatching-fixed": {
+          "errors": 255,
+          "shots": 5000,
+          "logical_error_rate": 0.051,
+          "wilson_95": [
+            0.04523938710267117,
+            0.05745000924399013
+          ],
+          "prediction_sha256": "9c0194d535384caf7b29f5bb7fa6db3c03150216e1f1d1ac22468fd2b830212a"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 7,
+          "other_only_wrong": 229
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.01",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "e0d3f0e4c7b4f27621b6bf245c3824c431c420ec2f804a7f4e48b35594c4ea2a",
+      "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+      "public_rows_sha256": "a991e86b7c17ac0e9a708db93d699c88ebbb20e767d413ff8d917f1b40a98f07",
+      "answers_sha256": "a1e8e6a678339f96e1eb82bb15e0003720e26bf76b493bec2f6d8ed9b4cb839e",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 42,
+          "shots": 5000,
+          "logical_error_rate": 0.0084,
+          "wilson_95": [
+            0.006220654387306615,
+            0.011334150165073551
+          ],
+          "prediction_sha256": "7f633e7231f20c0cb6810530b4aa5f9f8df4a249ecdd53f611d9ade2ad874b63"
+        },
+        "pymatching-envelope": {
+          "errors": 42,
+          "shots": 5000,
+          "logical_error_rate": 0.0084,
+          "wilson_95": [
+            0.006220654387306615,
+            0.011334150165073551
+          ],
+          "prediction_sha256": "7f633e7231f20c0cb6810530b4aa5f9f8df4a249ecdd53f611d9ade2ad874b63"
+        },
+        "pymatching-fixed": {
+          "errors": 260,
+          "shots": 5000,
+          "logical_error_rate": 0.052,
+          "wilson_95": [
+            0.04618252452365877,
+            0.058505336419112416
+          ],
+          "prediction_sha256": "14d3ea70a137d226a75c0f935f08204cdd5c2bee7c8c63970deaa315c5a3eef1"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 11,
+          "other_only_wrong": 229
+        }
+      }
+    },
+    {
+      "setting": "d5-p0.01",
+      "distance": 5,
+      "rounds": 5,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "b3c31d452ebbcaa3563d15f64ca9b76013c7a535aad80740def66eda4bdb6b39",
+      "circuit_sha256": "0d6a509875bcbbdbaaf191635b6ee966a6d841c4d622e89738428bdde3c4cc76",
+      "public_rows_sha256": "847fb87e204ce2c2d9c77cef03f3652145a70679e4b30b712cc7936598545728",
+      "answers_sha256": "e4844481c442377c4bede518a76b6cd44b6643e1ad4ba2dbabadcc3b339dd6cf",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 31,
+          "shots": 5000,
+          "logical_error_rate": 0.0062,
+          "wilson_95": [
+            0.0043713883985244135,
+            0.008786794042414002
+          ],
+          "prediction_sha256": "4b55b65efbfd63b6fe7eead81037368673421d140fda36ae63de05306983595b"
+        },
+        "pymatching-envelope": {
+          "errors": 31,
+          "shots": 5000,
+          "logical_error_rate": 0.0062,
+          "wilson_95": [
+            0.0043713883985244135,
+            0.008786794042414002
+          ],
+          "prediction_sha256": "4b55b65efbfd63b6fe7eead81037368673421d140fda36ae63de05306983595b"
+        },
+        "pymatching-fixed": {
+          "errors": 249,
+          "shots": 5000,
+          "logical_error_rate": 0.0498,
+          "wilson_95": [
+            0.04410847786419272,
+            0.05618276096713672
+          ],
+          "prediction_sha256": "e18607cc465d8309842c02bc35e71157ef04e291c9cfebc0f5c0ae8853a0eca0"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 6,
+          "other_only_wrong": 224
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "1886c25f76048f8e3446636aadcf15e9b6e5e6afb98cab80ad882662bb7528e2",
+      "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+      "public_rows_sha256": "21da0ee8450fd46fe9438796ac542e634cc74c92c618ce2b54393020199773ac",
+      "answers_sha256": "92db148b278fde1a3b9f233eb314211c79b3a0728b4a044b24eae0848fb25afe",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "92db148b278fde1a3b9f233eb314211c79b3a0728b4a044b24eae0848fb25afe"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "92db148b278fde1a3b9f233eb314211c79b3a0728b4a044b24eae0848fb25afe"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "92db148b278fde1a3b9f233eb314211c79b3a0728b4a044b24eae0848fb25afe"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "ad0d1dfb41adef68cf911b79c5f5a16a2e76d1b4c1073a42ca62295b1fff1fb0",
+      "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+      "public_rows_sha256": "c4085083aee541e833516c10030be47b0843f96471af37f170c30427e2835844",
+      "answers_sha256": "ad02049426c5b2f2319ca6033af3ede44bdf0d14ed3d12dadd633e1f63944f8b",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ad02049426c5b2f2319ca6033af3ede44bdf0d14ed3d12dadd633e1f63944f8b"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ad02049426c5b2f2319ca6033af3ede44bdf0d14ed3d12dadd633e1f63944f8b"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "ad02049426c5b2f2319ca6033af3ede44bdf0d14ed3d12dadd633e1f63944f8b"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "523bb868073cf9c4121e8852be924c46e748a36c55633f15cf470a2b0e078902",
+      "circuit_sha256": "f3bc2d27445f927f2d5c4f932ec2e2742cac14f933d101bbcc45763ab480dec6",
+      "public_rows_sha256": "5e5981ec380d9aff4dc1b8c54d50af7bd0be7aae24f04a9d0c303cbfe708bf60",
+      "answers_sha256": "c685bcc204a3d08e05207c5851d1f70385c73e7dccc17ed9d2c9d362154c917b",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "c685bcc204a3d08e05207c5851d1f70385c73e7dccc17ed9d2c9d362154c917b"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "c685bcc204a3d08e05207c5851d1f70385c73e7dccc17ed9d2c9d362154c917b"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "c685bcc204a3d08e05207c5851d1f70385c73e7dccc17ed9d2c9d362154c917b"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "1c3a4b4da0442d3e9b76b2a2ec04a3ccfdc6b72348f79554c9866131816eed8f",
+      "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+      "public_rows_sha256": "96e9fc31a778b02aab2b36d09160cba22ee646ddee4d8b13c71d00a3b62354b3",
+      "answers_sha256": "4bb422e76d0c2ff4b14f84f6959b4f97c458930beb367b3fbe1df50b89b73902",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4bb422e76d0c2ff4b14f84f6959b4f97c458930beb367b3fbe1df50b89b73902"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4bb422e76d0c2ff4b14f84f6959b4f97c458930beb367b3fbe1df50b89b73902"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4bb422e76d0c2ff4b14f84f6959b4f97c458930beb367b3fbe1df50b89b73902"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "79b7d0eadb07d8c5e488f4ee6837f9e3b3f6391549e671bd3a317566f73b24be",
+      "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+      "public_rows_sha256": "da311169892e8de5bd2836d52cd19f0933d0f7b933eaf7f600d1c698cddeda65",
+      "answers_sha256": "0c93bc4d4daa69319770bc9ec03ac3dec6c55562cabcb0fa6819ba6327cc178c",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "0c93bc4d4daa69319770bc9ec03ac3dec6c55562cabcb0fa6819ba6327cc178c"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "0c93bc4d4daa69319770bc9ec03ac3dec6c55562cabcb0fa6819ba6327cc178c"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "0c93bc4d4daa69319770bc9ec03ac3dec6c55562cabcb0fa6819ba6327cc178c"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.0003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.0003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "e5f69a1e738e03549a3fbf23b47bf574207cd5e7b6f98c83dd424b4a0a982123",
+      "circuit_sha256": "6a8a01d81080b3b881273a6b760cb08b7e519b534f902466b8fb0487f7d9b540",
+      "public_rows_sha256": "2f5120e7819df87c6c24b087d8269275acade4383688aceeaf4d6d2e0f1b4fa1",
+      "answers_sha256": "4ee3f006b90b36e2297b1cbb4b6d0adbd1b6527fc98b50198f84f8950c1d3df2",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4ee3f006b90b36e2297b1cbb4b6d0adbd1b6527fc98b50198f84f8950c1d3df2"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4ee3f006b90b36e2297b1cbb4b6d0adbd1b6527fc98b50198f84f8950c1d3df2"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "4ee3f006b90b36e2297b1cbb4b6d0adbd1b6527fc98b50198f84f8950c1d3df2"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "1a75ba81c4658f742c747e3f8b40752b15a705563c0855c2013c3f4bdd2b6262",
+      "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+      "public_rows_sha256": "c773d9bd22cf3a30ff38e4597af3e785d2805cef60ff38940553a965f1ed1159",
+      "answers_sha256": "09f149e27f6c681e6aa8a441387e9a295335c9eaf6dab2c99e64091d1c26db44",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "09f149e27f6c681e6aa8a441387e9a295335c9eaf6dab2c99e64091d1c26db44"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "09f149e27f6c681e6aa8a441387e9a295335c9eaf6dab2c99e64091d1c26db44"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "09f149e27f6c681e6aa8a441387e9a295335c9eaf6dab2c99e64091d1c26db44"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "aeb4d0bb7afa48ceb2c8a433f27910e7121faacb7aa3b7429e41c1966331e395",
+      "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+      "public_rows_sha256": "f0a0b3fa7645e345e3487a7a807503cf0b363afc66e63491c488b0f24e19f78c",
+      "answers_sha256": "454828f7bc173f432b6c6e03d265f205ac88a1b01a561ca8a9d7de27c190ee00",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "454828f7bc173f432b6c6e03d265f205ac88a1b01a561ca8a9d7de27c190ee00"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "454828f7bc173f432b6c6e03d265f205ac88a1b01a561ca8a9d7de27c190ee00"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "454828f7bc173f432b6c6e03d265f205ac88a1b01a561ca8a9d7de27c190ee00"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.001",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.001,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "9a17499efa2f5926effa156b4ae58ec3dd3a31396af1baac9728be0f7b49a4c8",
+      "circuit_sha256": "7486bebacca35baf618b6ec9ec1a364179521cd5e65eb151a57f1dea8bf0c560",
+      "public_rows_sha256": "9657ebb417425198b57c451c7b9ee63fb26c0a215e2f0ccba404357afacca2d4",
+      "answers_sha256": "12c62df973ad5f74b726b34298d7d6c6580844bd8b9977e3df96eb0ba7ee63ab",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12c62df973ad5f74b726b34298d7d6c6580844bd8b9977e3df96eb0ba7ee63ab"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12c62df973ad5f74b726b34298d7d6c6580844bd8b9977e3df96eb0ba7ee63ab"
+        },
+        "pymatching-fixed": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "12c62df973ad5f74b726b34298d7d6c6580844bd8b9977e3df96eb0ba7ee63ab"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "bd7aae8ac80c95934c4996012696d9093f2ed09cdf4da1f8d6899900e94ff5c8",
+      "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+      "public_rows_sha256": "048cb1702f712f7d03ed6f975a0d3f2d467e43fa232dbca7c6322c9cc2d795d3",
+      "answers_sha256": "0a455be711f954520ff57df51084f86f61dc536b287655e502880d2d3d6b2e26",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "3c272e43ef9405b79c8e4ea08a23c8163f2a4f75907c01644bc0c0c36fbe7a72"
+        },
+        "pymatching-envelope": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "3c272e43ef9405b79c8e4ea08a23c8163f2a4f75907c01644bc0c0c36fbe7a72"
+        },
+        "pymatching-fixed": {
+          "errors": 4,
+          "shots": 5000,
+          "logical_error_rate": 0.0008,
+          "wilson_95": [
+            0.00031114697610156263,
+            0.0020553266458434704
+          ],
+          "prediction_sha256": "65bd142d8c40f15bbaf86fb34594a0528e41faec5c99e0ebf543f465cac0ee95"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 2
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "25e27dfc4844e9f968f72ce9985e96ead349844f4cdaae5d958fc65e656f407b",
+      "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+      "public_rows_sha256": "d7f99bec0e6ca857494d3258396d7d4caa3e8ce2252b2eb3905b8b9a5e792d57",
+      "answers_sha256": "bf56fd86a6e1b34f7d302b347bfe03659cad5e2c114995fa11741f73532e9834",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "bf56fd86a6e1b34f7d302b347bfe03659cad5e2c114995fa11741f73532e9834"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "bf56fd86a6e1b34f7d302b347bfe03659cad5e2c114995fa11741f73532e9834"
+        },
+        "pymatching-fixed": {
+          "errors": 5,
+          "shots": 5000,
+          "logical_error_rate": 0.001,
+          "wilson_95": [
+            0.00042721349110879964,
+            0.002338953050058211
+          ],
+          "prediction_sha256": "adf88b3a34077ab7c7b7b6461f6af77b2bd3863f9dc6fe93e4895a710d8c9fc1"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 5
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.003",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "66e7cdfac90df8b980519e9f2cffdc26d0403c0dfe9217ad15cacd09df36dc20",
+      "circuit_sha256": "58f59a53d2166bd9fbc74afa4a001c66cc4c35da2f8b758eca076007494b91cc",
+      "public_rows_sha256": "083654c309497ee5ab3581412e10396849bdf36ae4acf09ef1484ef0aef2f018",
+      "answers_sha256": "9611e71318857da589d0d066a22f3cb9a1562b51532a31a46ea307d5fee3a739",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "9611e71318857da589d0d066a22f3cb9a1562b51532a31a46ea307d5fee3a739"
+        },
+        "pymatching-envelope": {
+          "errors": 0,
+          "shots": 5000,
+          "logical_error_rate": 0.0,
+          "wilson_95": [
+            0.0,
+            0.0007677019450571244
+          ],
+          "prediction_sha256": "9611e71318857da589d0d066a22f3cb9a1562b51532a31a46ea307d5fee3a739"
+        },
+        "pymatching-fixed": {
+          "errors": 11,
+          "shots": 5000,
+          "logical_error_rate": 0.0022,
+          "wilson_95": [
+            0.001228915407138813,
+            0.003935408649360061
+          ],
+          "prediction_sha256": "b9a29511b3e5c609001342479059ad589fc3748aca00c417717ddb71ed367911"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 11
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.01",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "e0bde220e336cf1cb844cecca71e54be53a6e854a2752eca4b24537b18cfa4a2",
+      "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+      "public_rows_sha256": "1c02fad4a3f10ee226ca4a64e4524ab22fa7e03809ff19008319131000bd3523",
+      "answers_sha256": "0c42fd2682944a70281f2e5ca1acb571cebb1cd7f25737607c54c30a0c1b1811",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 26,
+          "shots": 5000,
+          "logical_error_rate": 0.0052,
+          "wilson_95": [
+            0.003551168641804525,
+            0.0076085492030240065
+          ],
+          "prediction_sha256": "0e69d15094c2c918d746ffc700cd6102ac800e9e2ce3955f30a0cdc43c1d3cbd"
+        },
+        "pymatching-envelope": {
+          "errors": 26,
+          "shots": 5000,
+          "logical_error_rate": 0.0052,
+          "wilson_95": [
+            0.003551168641804525,
+            0.0076085492030240065
+          ],
+          "prediction_sha256": "0e69d15094c2c918d746ffc700cd6102ac800e9e2ce3955f30a0cdc43c1d3cbd"
+        },
+        "pymatching-fixed": {
+          "errors": 316,
+          "shots": 5000,
+          "logical_error_rate": 0.0632,
+          "wilson_95": [
+            0.05678516000428789,
+            0.07028550441491403
+          ],
+          "prediction_sha256": "b67bc51ecf08b5a6b6180088b358a32a3224668c721781bfb8c710d3a4c3d581"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 2,
+          "other_only_wrong": 292
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.01",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "2c0b9a375d2f471e04b030043ac2e2382fd45e22f702271b49788e1866f26b97",
+      "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+      "public_rows_sha256": "d6dfb5dda27db4a536f206ae61962a4717eb5e894bfab6973899665db40cafc9",
+      "answers_sha256": "d26b612f221bb993807579c8f0f5a925e2078eed95b0b5840433f89f829a0e51",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 19,
+          "shots": 5000,
+          "logical_error_rate": 0.0038,
+          "wilson_95": [
+            0.002434138850885676,
+            0.005927728559389015
+          ],
+          "prediction_sha256": "0815c5adea80db61acf8570ba192367bd7f8c9935227396b13d9d910da4c9195"
+        },
+        "pymatching-envelope": {
+          "errors": 19,
+          "shots": 5000,
+          "logical_error_rate": 0.0038,
+          "wilson_95": [
+            0.002434138850885676,
+            0.005927728559389015
+          ],
+          "prediction_sha256": "0815c5adea80db61acf8570ba192367bd7f8c9935227396b13d9d910da4c9195"
+        },
+        "pymatching-fixed": {
+          "errors": 307,
+          "shots": 5000,
+          "logical_error_rate": 0.0614,
+          "wilson_95": [
+            0.055076678775241784,
+            0.06839674937096234
+          ],
+          "prediction_sha256": "8a9fecb2e9d0a2122927d2dfe790bf7f76b065271e7cfb5d1356269546cdc696"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 6,
+          "other_only_wrong": 294
+        }
+      }
+    },
+    {
+      "setting": "d7-p0.01",
+      "distance": 7,
+      "rounds": 7,
+      "loss_probability": 0.01,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "dd83e8898d55b3f394f11719d8b9412197dca18023d85bae4bd70c3efb7de216",
+      "circuit_sha256": "e29fa8186bf6dc8cc192eca70a9ee47bfaa7e9f29ed3e3429d075daa4ad37d13",
+      "public_rows_sha256": "8d7f3606759c7d92e3214e1077f7c0340c5c0d9b3e8051d3763fbdaa8a44be49",
+      "answers_sha256": "2459b8364604528255b37371b6a574aad34008531369f95f9a3ce5a96e7fce14",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 14,
+          "shots": 5000,
+          "logical_error_rate": 0.0028,
+          "wilson_95": [
+            0.0016686770757911352,
+            0.00469472573837367
+          ],
+          "prediction_sha256": "429c7c225da15ceb49b6edd937e254f1f4a5e6c96d7be7158fdd24ca1dadf791"
+        },
+        "pymatching-envelope": {
+          "errors": 14,
+          "shots": 5000,
+          "logical_error_rate": 0.0028,
+          "wilson_95": [
+            0.0016686770757911352,
+            0.00469472573837367
+          ],
+          "prediction_sha256": "429c7c225da15ceb49b6edd937e254f1f4a5e6c96d7be7158fdd24ca1dadf791"
+        },
+        "pymatching-fixed": {
+          "errors": 309,
+          "shots": 5000,
+          "logical_error_rate": 0.0618,
+          "wilson_95": [
+            0.05545620400945182,
+            0.06881660997519626
+          ],
+          "prediction_sha256": "9d1fd7ca342496370636d6a5f52be23bbdca06910fef89da11b18585760d0c38"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 3,
+          "other_only_wrong": 298
+        }
+      }
+    },
+    {
+      "setting": "tradeoff",
+      "distance": 3,
+      "rounds": 2,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091401,
+      "dataset_id": "c2a88d21fa569d9c535d1021b4508e9b4b797a966869b28b5c809fa22a02eb39",
+      "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+      "public_rows_sha256": "036fcc50517faa317f1fcb9f98710558e82d2e06bc24eaeb0e72a8fe8be49ae4",
+      "answers_sha256": "37f26959ac44ddc6c9d9268ed8965637dd05487033b5b1aa9c8e4d63a9fd0cd1",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 16,
+          "shots": 5000,
+          "logical_error_rate": 0.0032,
+          "wilson_95": [
+            0.0019707278219023715,
+            0.0051920608307063874
+          ],
+          "prediction_sha256": "f501f0930a3b5ed38f90e755515690314d3444ff414a4874105ae4c901c2640c"
+        },
+        "pymatching-envelope": {
+          "errors": 16,
+          "shots": 5000,
+          "logical_error_rate": 0.0032,
+          "wilson_95": [
+            0.0019707278219023715,
+            0.0051920608307063874
+          ],
+          "prediction_sha256": "f501f0930a3b5ed38f90e755515690314d3444ff414a4874105ae4c901c2640c"
+        },
+        "pymatching-fixed": {
+          "errors": 26,
+          "shots": 5000,
+          "logical_error_rate": 0.0052,
+          "wilson_95": [
+            0.003551168641804525,
+            0.0076085492030240065
+          ],
+          "prediction_sha256": "dada82cf1370a14e257c35fecbb587eac587a3ee851a10c9c7a3c39572d4fcbb"
+        },
+        "envelope-mle": {
+          "errors": 3,
+          "shots": 5000,
+          "logical_error_rate": 0.0006,
+          "wilson_95": [
+            0.00020407465419434642,
+            0.001762706048528709
+          ],
+          "prediction_sha256": "3d76531024e8a79514700edca47cb0963c770bd7bf322c4a6c146ce2e412237b"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 1,
+          "other_only_wrong": 11
+        },
+        "envelope-mle": {
+          "native_only_wrong": 13,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "tradeoff",
+      "distance": 3,
+      "rounds": 2,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091402,
+      "dataset_id": "258d3f1a059043ab2a401149eb4ea407a4e563043336c687a2c5b1666ce853ad",
+      "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+      "public_rows_sha256": "03a1e5fdd3fea708089df5283038fb7cb4c89e24b39eed645a48cb39be990f46",
+      "answers_sha256": "b4f7295e5600ac44e28c35694808a792efbd9032fdcb47b5e6b708f4da68a3f6",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 7,
+          "shots": 5000,
+          "logical_error_rate": 0.0014,
+          "wilson_95": [
+            0.0006783326019524562,
+            0.0028872197776585087
+          ],
+          "prediction_sha256": "98c101b791a79ca2f207aa60bdb71607508ab2291c55132057b4969e27285ce3"
+        },
+        "pymatching-envelope": {
+          "errors": 7,
+          "shots": 5000,
+          "logical_error_rate": 0.0014,
+          "wilson_95": [
+            0.0006783326019524562,
+            0.0028872197776585087
+          ],
+          "prediction_sha256": "98c101b791a79ca2f207aa60bdb71607508ab2291c55132057b4969e27285ce3"
+        },
+        "pymatching-fixed": {
+          "errors": 14,
+          "shots": 5000,
+          "logical_error_rate": 0.0028,
+          "wilson_95": [
+            0.0016686770757911352,
+            0.00469472573837367
+          ],
+          "prediction_sha256": "580e28f20876b062c9a0137f7b74c9281a8c6a86f3b12580b5d27b0328d25723"
+        },
+        "envelope-mle": {
+          "errors": 1,
+          "shots": 5000,
+          "logical_error_rate": 0.0002,
+          "wilson_95": [
+            3.530578343936526e-05,
+            0.0011320890808397363
+          ],
+          "prediction_sha256": "1099bdaf95305d8b0c54866e6603d4667f06973bd3338e8f9827e84bf78d9cf6"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 7
+        },
+        "envelope-mle": {
+          "native_only_wrong": 6,
+          "other_only_wrong": 0
+        }
+      }
+    },
+    {
+      "setting": "tradeoff",
+      "distance": 3,
+      "rounds": 2,
+      "loss_probability": 0.003,
+      "pauli_probability": 0.001,
+      "shots": 5000,
+      "seed": 2026091403,
+      "dataset_id": "60706c8dca21840d92d70f7d040f0ca28056e4bc5256817fa563a0adccb50645",
+      "circuit_sha256": "45525ca2301befd56fecd33702e2934b91446dd3058fee1e5c4355fbd7c953c9",
+      "public_rows_sha256": "f4a01b3eaf8f07204fc4cfefe0c1bf395c82d88cd0c36c1a39ea9548a600e872",
+      "answers_sha256": "d643fecee78063c09753ada7ba15f23dc6b128ab752c9cb3edfc209784e70704",
+      "decoders": {
+        "envelope-matching": {
+          "errors": 12,
+          "shots": 5000,
+          "logical_error_rate": 0.0024,
+          "wilson_95": [
+            0.0013734655564128324,
+            0.004190551419308018
+          ],
+          "prediction_sha256": "47fdc635d66db894b82d351d1d9069c443717014001726339f5830826bb810da"
+        },
+        "pymatching-envelope": {
+          "errors": 12,
+          "shots": 5000,
+          "logical_error_rate": 0.0024,
+          "wilson_95": [
+            0.0013734655564128324,
+            0.004190551419308018
+          ],
+          "prediction_sha256": "47fdc635d66db894b82d351d1d9069c443717014001726339f5830826bb810da"
+        },
+        "pymatching-fixed": {
+          "errors": 21,
+          "shots": 5000,
+          "logical_error_rate": 0.0042,
+          "wilson_95": [
+            0.002748774410314672,
+            0.006412478838403972
+          ],
+          "prediction_sha256": "3f0c8fc4e312d286053df4c4f1bda9392237c7124013c88c30691b31c21c2b71"
+        },
+        "envelope-mle": {
+          "errors": 2,
+          "shots": 5000,
+          "logical_error_rate": 0.0004,
+          "wilson_95": [
+            0.00010970128207763504,
+            0.0014573865014234437
+          ],
+          "prediction_sha256": "e1870abe3bd45824ab08c2766e63c68d50f784788b0b38890b859d02a90d3335"
+        }
+      },
+      "paired": {
+        "pymatching-envelope": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 0
+        },
+        "pymatching-fixed": {
+          "native_only_wrong": 0,
+          "other_only_wrong": 9
+        },
+        "envelope-mle": {
+          "native_only_wrong": 12,
+          "other_only_wrong": 2
+        }
+      }
+    }
+  ],
+  "pooled": [
+    {
+      "setting": "d3-p0.0001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d3-p0.0001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d3-p0.0003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d3-p0.0003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 2,
+      "difference": -0.00013333333333333334,
+      "paired_95": [
+        -0.0005413735046497642,
+        0.00028095174978975956
+      ]
+    },
+    {
+      "setting": "d3-p0.001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d3-p0.001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 12,
+      "difference": -0.0008,
+      "paired_95": [
+        -0.0014915360566184338,
+        -8.136197518104904e-05
+      ]
+    },
+    {
+      "setting": "d3-p0.003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d3-p0.003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 4,
+      "other_only_wrong": 49,
+      "difference": -0.003,
+      "paired_95": [
+        -0.004416661911414266,
+        -0.001560366763962151
+      ]
+    },
+    {
+      "setting": "d3-p0.01",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 1,
+      "other_only_wrong": 1,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00042448016883364637,
+        0.00042448016883364637
+      ]
+    },
+    {
+      "setting": "d3-p0.01",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 36,
+      "other_only_wrong": 397,
+      "difference": -0.024066666666666667,
+      "paired_95": [
+        -0.027962115443816854,
+        -0.020151053494452592
+      ]
+    },
+    {
+      "setting": "d5-p0.0001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.0001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.0003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.0003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 1,
+      "other_only_wrong": 2,
+      "difference": -6.666666666666667e-05,
+      "paired_95": [
+        -0.000540534919520913,
+        0.0004141780620799673
+      ]
+    },
+    {
+      "setting": "d5-p0.003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 2,
+      "other_only_wrong": 35,
+      "difference": -0.0022,
+      "paired_95": [
+        -0.0033714944983007644,
+        -0.000999059459112911
+      ]
+    },
+    {
+      "setting": "d5-p0.01",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d5-p0.01",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 24,
+      "other_only_wrong": 682,
+      "difference": -0.043866666666666665,
+      "paired_95": [
+        -0.04846704259255974,
+        -0.039232950282233
+      ]
+    },
+    {
+      "setting": "d7-p0.0001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.0001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.0003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.0003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.001",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.001",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.003",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.003",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 18,
+      "difference": -0.0012,
+      "paired_95": [
+        -0.002004366684855305,
+        -0.0003649558044268586
+      ]
+    },
+    {
+      "setting": "d7-p0.01",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "d7-p0.01",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 11,
+      "other_only_wrong": 884,
+      "difference": -0.0582,
+      "paired_95": [
+        -0.06305745446468278,
+        -0.053295537894330586
+      ]
+    },
+    {
+      "setting": "tradeoff",
+      "comparator": "envelope-mle",
+      "shots": 15000,
+      "native_only_wrong": 31,
+      "other_only_wrong": 2,
+      "difference": 0.0019333333333333333,
+      "paired_95": [
+        0.0007843811526980493,
+        0.003053691896701488
+      ]
+    },
+    {
+      "setting": "tradeoff",
+      "comparator": "pymatching-envelope",
+      "shots": 15000,
+      "native_only_wrong": 0,
+      "other_only_wrong": 0,
+      "difference": 0.0,
+      "paired_95": [
+        -0.00029209244167228976,
+        0.00029209244167228976
+      ]
+    },
+    {
+      "setting": "tradeoff",
+      "comparator": "pymatching-fixed",
+      "shots": 15000,
+      "native_only_wrong": 1,
+      "other_only_wrong": 27,
+      "difference": -0.0017333333333333333,
+      "paired_95": [
+        -0.0027428392767149534,
+        -0.0006892573224951959
+      ]
+    }
+  ]
+}

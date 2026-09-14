@@ -6,7 +6,7 @@
   <div class="home-intro" id="home-content" tabindex="-1">
     <h1>Quantum error correction in Rust</h1>
     <p class="hero-copy">Define codes, construct circuits, simulate noise, and benchmark decoders in one workspace.</p>
-    <div class="actions"><a class="button primary" href="#install">Install with Cargo <span aria-hidden="true">→</span></a><a class="button" href="interactive/">Try a circuit in your browser</a></div>
+    <div class="actions"><a class="button primary" href="get-started/#install">Install with Cargo <span aria-hidden="true">→</span></a><a class="button" href="interactive/">Try a circuit in your browser</a></div>
     <p class="hero-meta"><a href="docs/#reference">Rust APIs</a><span aria-hidden="true">·</span><a href="get-started/#tools">Command line tools</a><span aria-hidden="true">·</span><a href="interactive/">Browser viewer · no installation</a></p>
   </div>
 </div>
@@ -41,13 +41,29 @@
     </article>
   </div>
 </section>
-<section id="install" class="install-section home-install" aria-labelledby="install-heading">
-  <div class="section-heading"><p class="eyebrow">Stable release · v0.3.0</p><h2 id="install-heading">Install the CLI</h2><p class="section-copy">Install with Rust and Cargo, then follow the quickstart to run your first circuit. No source checkout is needed for this tutorial.</p></div>
-  <div class="install-command"><pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre><p class="install-note">Installs the <code>rustqec</code> command for circuit and dataset tasks.</p><a class="button primary" href="get-started/#first-circuit">Run your first circuit →</a></div>
-  <div class="install-alternatives">
-    <div><h3>No Rust installed?</h3><p>Download prebuilt command-line tools without a Rust toolchain.</p><a href="get-started/#native-install">Install prebuilt binaries →</a></div>
-    <div><h3>Use the Rust libraries</h3><p>Add the crates you need to your own Rust project.</p><a href="docs/#reference">Browse library APIs →</a></div>
-    <div><h3>Extend the CLI</h3><p>Enable optional features for additional solvers and tools.</p><a href="get-started/#cargo-install">CLI features &amp; setup →</a></div>
+<section id="atom-loss" class="home-atom-loss" aria-labelledby="atom-loss-heading">
+  <div class="section-heading">
+    <p class="eyebrow">Atom loss</p>
+    <h2 id="atom-loss-heading">From atom-loss circuits to loss-aware decoding</h2>
+    <p class="section-copy">Model atom loss alongside Pauli noise, preserve loss flags in sampled data, and use that information when decoding.</p>
+  </div>
+  <ol class="loss-workflow" aria-label="Atom-loss workflow">
+    <li>
+      <h3>Model the loss</h3>
+      <p>Generate Mid-SWAP memory circuits with operation and measurement loss, alongside Pauli noise.</p>
+    </li>
+    <li>
+      <h3>Keep the loss information</h3>
+      <p>Carry measurement values and loss flags together. Keep decoder inputs separate from the answers used to evaluate them.</p>
+    </li>
+    <li>
+      <h3>Decode with loss awareness</h3>
+      <p>Use envelope matching or exact MLE on supported circuits, accounting for loss when predicting logical outcomes.</p>
+    </li>
+  </ol>
+  <div class="loss-workflow-actions">
+    <a class="button primary" href="atom-loss/">Explore the atom-loss workflow <span aria-hidden="true">→</span></a>
+    <p><span class="loss-status">Envelope decoding · Beta</span></p>
   </div>
 </section>
 <section class="home-support" aria-label="Validation and support"><div><h2>Supported features &amp; benchmark results</h2><p>Explore feature support and version compatibility, or inspect benchmark results with their conditions and reproduction steps.</p></div><div class="content-links"><a href="support/">Support &amp; compatibility →</a><a href="validation/">Performance &amp; validation →</a></div></section>
