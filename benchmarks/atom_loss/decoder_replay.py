@@ -10,27 +10,59 @@ from .run import ROOT, checked, export_graph, native_decode, python_decode, pyth
 from .shot_data import cases_from, validate_dataset, rescore, rescore_seeds
 
 
+
+def without_timings(record):
+    return {key:value for key,value in record.items() if not key.endswith('_seconds')}
+
+
+def verify_work_observations(case, observations, graph_metadata, label):
+    """Compare reproducible work counters, never replay historical durations."""
+    def same(actual,expected,context):
+        # Preserve JSON scalar types: bool/float cannot substitute for integer counters.
+        if json.dumps(actual,sort_keys=True) != json.dumps(expected,sort_keys=True):
+            raise ValueError('Current workload metadata differs from archive: '+context)
+    same(graph_metadata,without_timings(case['graph']),label+'/graph')
+    for name,current in observations.items():
+        for rep,run in enumerate(case['decoders'][name]['runs']):
+            if name=='envelope-matching-offline':
+                historical=without_timings(run['batch'])
+            elif name.startswith('pymatching'):
+                historical=without_timings(run)
+                historical.pop('export_repetition',None)
+            else:
+                historical=without_timings(run['stats'])
+            same(current,historical,f'{label}/{name}/run{rep}')
+
+
 def decode_current(work, binary, exporter, names):
     """Only public files exist in work; private keys are loaded after decoding."""
     graph = export_graph(exporter, work, 'replay')
-    predictions = {}
+    predictions = {}; observations = {}
     for name in names:
         if name in {'envelope-matching', 'envelope-mle'}:
             pred, record = native_decode(binary, work, name, 'replay')
             if record['status'] != 'ok':
                 raise ValueError('Current decoder failed: '+name+' '+str(record))
+            observations[name] = without_timings(record['stats'])
         elif name == 'envelope-matching-offline':
             path = work/(name+'.b8')
             checked([exporter.parent/'offline_matching_benchmark', work/'graph-replay.json', path, work/'offline-stats.json'])
             pred = np.frombuffer(path.read_bytes(), dtype=np.uint8)
+            observations[name] = without_timings(json.loads((work/'offline-stats.json').read_text()))
         elif name == 'pymatching-fixed-loop':
-            pred = python_decode_loop(graph, False)[0]
+            pred, stats = python_decode_loop(graph, False)
+            observations[name] = without_timings(stats)
         elif name in {'pymatching-fixed', 'pymatching-envelope'}:
-            pred = python_decode(graph, name == 'pymatching-envelope')[0]
+            pred, stats = python_decode(graph, name == 'pymatching-envelope')
+            observations[name] = without_timings(stats)
         else:
             raise ValueError('Unknown comparator: '+name)
         predictions[name] = pred
-    return predictions
+    graph_metadata = {key:graph[key] for key in ['source','num_observables']}
+    manifest = json.loads((work/'public/manifest.json').read_text())
+    graph_metadata.update(edges=len(graph['edges']), detectors=manifest['circuit']['detectors'],
+                          loss_patterns=len(set(map(tuple,graph['losses']))))
+    return predictions, observations, graph_metadata
 
 
 def replay_case(z, label, case, work, binary, exporter, seeded):
@@ -38,7 +70,9 @@ def replay_case(z, label, case, work, binary, exporter, seeded):
     public.mkdir(parents=True)
     for name in ['manifest.json', 'circuit.stim', 'shots.b8']:
         (public/name).write_bytes(z.read(f'{label}/public/{name}'))
-    predictions = decode_current(work, binary, exporter, case['decoders'])
+    predictions, observations, graph_metadata = decode_current(work, binary, exporter, case['decoders'])
+    if not seeded:
+        verify_work_observations(case, observations, graph_metadata, label)
     # Scoring keys and historical predictions have not been given to a decoder.
     answers = np.frombuffer(validate_dataset(lambda n: z.read(f'{label}/{n}'), case), dtype=np.uint8)
     native = predictions['envelope-matching']

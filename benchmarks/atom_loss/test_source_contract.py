@@ -192,6 +192,58 @@ class DecoderReplayTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Current decoder differs from archive'):
                 replay_case(z, label, case, path/'bad', wrapper, exporter, False)
 
+    def test_current_workload_counters_are_replayed_without_historical_durations(self):
+        from .decoder_replay import decode_current, verify_work_observations, replay_case
+        from .shot_data import cases_from
+        binary=ROOT/'target/release/rustqec';exporter=ROOT/'target/release/examples/export_matching_benchmark'
+        with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(ROOT/'site/static/data/atom-loss/shot-data-v1.zip') as z:
+            path=Path(tmp);label,case=cases_from(z.read)[0]
+            public=path/'probe/public';public.mkdir(parents=True)
+            for name in ['manifest.json','circuit.stim','shots.b8']:
+                (public/name).write_bytes(z.read(f'{label}/public/{name}'))
+            _,observations,graph=decode_current(path/'probe',binary,exporter,case['decoders'])
+            verify_work_observations(case,observations,graph,label)
+            changed=copy.deepcopy(case)
+            changed['graph']['compile_seconds']=999.
+            for entry in changed['decoders'].values():
+                for run in entry['runs']:
+                    run['compile_seconds']=999.
+            verify_work_observations(changed,observations,graph,label)
+            for backend,section,field in [('envelope-matching','stats','primitive_probe_count'),
+                    ('envelope-matching','stats','cache_hits'),
+                    ('envelope-matching-offline','batch','graph_builds'),
+                    ('pymatching-envelope',None,'batch_calls'),('pymatching-fixed',None,'graph_api')]:
+                changed=copy.deepcopy(case)
+                record=changed['decoders'][backend]['runs'][0]
+                record=record[section] if section else record
+                record[field]='wrong' if field=='graph_api' else record[field]+1
+                with self.subTest(backend=backend,field=field),self.assertRaisesRegex(ValueError,'Current workload metadata'):
+                    verify_work_observations(changed,observations,graph,label)
+            changed=copy.deepcopy(case);changed['graph']['edges']+=1
+            with self.assertRaisesRegex(ValueError,'Current workload metadata'):
+                verify_work_observations(changed,observations,graph,label)
+            # Execute a real decoder whose predictions are unchanged but its
+            # output stats are defective. The integrated replay must reject it.
+            wrapper=path/'wrong-stats'
+            wrapper.write_text('#!'+sys.executable+'\nimport json,pathlib,subprocess,sys\n'
+                +'subprocess.run(['+repr(str(binary))+', *sys.argv[1:]],check=True)\n'
+                +'p=pathlib.Path(sys.argv[sys.argv.index("--stats-out")+1])\n'
+                +'s=json.loads(p.read_text());s["primitive_probe_count"]+=1;p.write_text(json.dumps(s))\n')
+            wrapper.chmod(0o755)
+            with self.assertRaisesRegex(ValueError,'Current workload metadata'):
+                replay_case(z,label,case,path/'bad-stats',wrapper,exporter,False)
+            # Run the same actual wrapper through optimized Python, rather than
+            # checking only a hand-built comparison dictionary.
+            program=('import pathlib,zipfile,sys; from benchmarks.atom_loss.decoder_replay import replay_case; '
+                'from benchmarks.atom_loss.shot_data import cases_from; '
+                'z=zipfile.ZipFile(sys.argv[1]); label,case=cases_from(z.read)[0]; '
+                'replay_case(z,label,case,pathlib.Path(sys.argv[2]),pathlib.Path(sys.argv[3]),pathlib.Path(sys.argv[4]),False)')
+            result=subprocess.run([sys.executable,'-O','-c',program,str(ROOT/'site/static/data/atom-loss/shot-data-v1.zip'),
+                str(path/'bad-optimized'),str(wrapper),str(exporter)],cwd=ROOT,capture_output=True,text=True)
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('Current workload metadata',result.stderr)
+
+
 
 class BuildEnvironmentTests(unittest.TestCase):
     def test_real_entrypoint_ignores_inherited_profile_override(self):
