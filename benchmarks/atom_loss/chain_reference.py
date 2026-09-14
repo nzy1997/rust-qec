@@ -255,12 +255,15 @@ def run(binary,exporter):
     # opportunities. Enumerate every single Pauli fault on the lowered circuit.
     ops=reference.parse(text)
     nloss=sum(len(op.targets) for op in ops if op.name=='LOSS')
+    # A canonical, physically allowed noiseless reference witness avoids the
+    # architecture-dependent RNG streams of Stim compiled sampling. These are
+    # finite correctness witnesses, never IID accuracy observations.
     rows=[]
-    for seed,site in enumerate([None,0,nloss//2,nloss-1]):
+    for site in [None,0,nloss//2,nloss-1]:
         history=np.zeros(nloss,dtype=bool)
         if site is not None: history[site]=1
         lowered=reference.lower(ops,history)
-        rows.extend(lowered.without_noise().compile_sampler(seed=701+seed).sample(2))
+        rows.append(lowered.without_noise().reference_sample())
         for position,instruction in enumerate(lowered):
             if instruction.name not in ['X_ERROR','Y_ERROR','Z_ERROR','DEPOLARIZE1','DEPOLARIZE2']: continue
             targets=[t.value for t in instruction.targets_copy()]
@@ -274,7 +277,7 @@ def run(binary,exporter):
                 for pauli,q in fault:
                     if pauli!='I': injected.append(pauli,[q])
                 injected += lowered[position+1:].without_noise()
-                rows.extend(injected.compile_sampler(seed=701+seed).sample(2))
+                rows.append(injected.reference_sample())
     fault_traces=len(rows)
     rows=np.unique(np.array(rows,dtype=np.uint8),axis=0)
     flags=[p['flag'] for p in probes]
@@ -361,6 +364,7 @@ def run(binary,exporter):
                         for m,backends in graph_controls.items() for c in backends.values())
     passed=controls_pass and all(mutations.values()) and all(not r['rejected_rows'] and r['flipped_prediction_rejected'] and r['placeholder_invariance'] and r['constant_zero_rejected'] and r['constant_one_rejected'] for r in results.values())
     return {'status':'PASS' if passed else 'FAIL','fixture_sha256':digest(FIXTURE),'distance':3,'rounds':2,
+            'measurement_sha256':hashlib.sha256(rows.tobytes()).hexdigest(),'witness_generation':'stim-reference-sample',
             'detectors':count,'rows':len(rows),'physical_fault_traces':fault_traces,'patterns':len(cache),'stim_pauli_probes':probe_count,
             'independent_effects':len(effects),'independent_graph_edges':len(edges),
             'independent_effects_candidates_and_m2d_pass':True,'compiler_output_mutations_rejected':mutations,'native_graph_edges':len(graph['edges']),'backends':results,

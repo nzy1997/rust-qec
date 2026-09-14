@@ -12,7 +12,7 @@ from unittest.mock import patch
 import numpy as np
 
 from . import chain_reference, run
-from .chain_contract import compare_reports, verify_chain
+from .chain_contract import ROWS, compare_reports, verify_chain
 
 
 class ChainContractTests(unittest.TestCase):
@@ -29,6 +29,9 @@ class ChainContractTests(unittest.TestCase):
 
     def test_actual_healthy_graph_adapters_and_three_mutants(self):
         verify_chain(self.report)
+        self.assertEqual(self.report['witness_generation'], 'stim-reference-sample')
+        self.assertEqual(self.report['measurement_sha256'],
+                         'f179f618bd3a18bcab28565103c4717c0111d3ae3a534d326200698e8d118cea')
         for backend in chain_reference.GRAPH_BACKENDS:
             self.assertEqual(self.report['backends'][backend]['rejected_rows'], [])
             for mutation in chain_reference.GRAPH_MUTATIONS:
@@ -58,8 +61,13 @@ class ChainContractTests(unittest.TestCase):
             self.reject(lambda r, n=name: r['allowed_answers'][n].pop())
             for value in ([], [0, 0], [1, 0], [True], [0.0], [2], None):
                 self.reject(lambda r, n=name, v=value: r['allowed_answers'][n].__setitem__(0, v))
-        self.reject(lambda r: r.update(rows=1503))
-        self.reject(lambda r: r.update(rows=1504.0))
+        self.reject(lambda r: r.update(rows=ROWS-1))
+        self.reject(lambda r: r.update(rows=float(ROWS)))
+        for field in ('measurement_sha256', 'witness_generation'):
+            self.reject(lambda r, f=field: r.pop(f))
+        for value in ('invalid-hash', 'g'*64, None, 0):
+            self.reject(lambda r, v=value: r.update(measurement_sha256=v))
+        self.reject(lambda r: r.update(witness_generation='seeded-iid-sample'))
 
     def test_all_stored_summaries_and_hashes_are_recomputed(self):
         for name, original in self.report['backends'].items():
@@ -79,7 +87,7 @@ class ChainContractTests(unittest.TestCase):
                 record['predictions'][0] ^= 1
                 record['prediction_sha256'] = hashlib.sha256(bytes(record['predictions'])).hexdigest()
             self.reject(change)
-        self.reject(lambda r: r['allowed_answers'].__setitem__('envelope-matching', [[0, 1]]*1504))
+        self.reject(lambda r: r['allowed_answers'].__setitem__('envelope-matching', [[0, 1]]*ROWS))
 
     def test_mutant_outcomes_need_actual_complete_wrong_predictions(self):
         for mutation in chain_reference.GRAPH_MUTATIONS:
@@ -87,7 +95,7 @@ class ChainContractTests(unittest.TestCase):
                 def control(report):
                     return report['graph_adapter_controls'][mutation][backend]
                 self.reject(lambda r: control(r).__setitem__('outcome', 'accepted'))
-                self.reject(lambda r: control(r).__setitem__('rejected_rows', [1504]))
+                self.reject(lambda r: control(r).__setitem__('rejected_rows', [ROWS]))
                 if mutation != 'empty_edges':
                     self.reject(lambda r: control(r).update(outcome='decoder_error', predictions=None, rejected_rows=[]))
                 if control(self.report)['outcome'] == 'oracle_rejected':
@@ -140,9 +148,9 @@ class ChainContractTests(unittest.TestCase):
     def test_fresh_comparison_accepts_different_legal_tied_optima(self):
         alternate = copy.deepcopy(self.report)
         choices = alternate['allowed_answers']['envelope-mle']
-        row = next(i for i, values in enumerate(choices[:752]) if len(values) == 2)
+        row = next(i for i, values in enumerate(choices[:ROWS//2]) if len(values) == 2)
         record = alternate['backends']['envelope-mle']
-        for i in (row, row+752):
+        for i in (row, row+ROWS//2):
             record['predictions'][i] ^= 1
         record['predicted_ones'] = sum(record['predictions'])
         record['prediction_sha256'] = hashlib.sha256(bytes(record['predictions'])).hexdigest()
@@ -154,19 +162,24 @@ class ChainContractTests(unittest.TestCase):
         changed = copy.deepcopy(self.report)
         changed['method'] += ' Different definition.'
         verify_chain(changed)
-        with self.assertRaisesRegex(ValueError, 'oracle definitions differ'):
+        with self.assertRaisesRegex(ValueError, 'oracle definitions differ.*method'):
+            compare_reports(changed, self.report)
+        changed = copy.deepcopy(self.report)
+        changed['measurement_sha256'] = '0'*64
+        verify_chain(changed)
+        with self.assertRaisesRegex(ValueError, 'oracle definitions differ.*measurement_sha256'):
             compare_reports(changed, self.report)
         changed = copy.deepcopy(self.report)
         # Remove only the unchosen answer from a tied row and its placeholder
         # counterpart, keeping this report internally consistent and valid.
         choices = changed['allowed_answers']['envelope-mle']
-        row = next(i for i, values in enumerate(choices[:752]) if len(values) == 2)
+        row = next(i for i, values in enumerate(choices[:ROWS//2]) if len(values) == 2)
         record = changed['backends']['envelope-mle']
-        for i in (row, row+752):
+        for i in (row, row+ROWS//2):
             choices[i] = [record['predictions'][i]]
         record['unique_optimum_rows'] += 2
         verify_chain(changed)
-        with self.assertRaisesRegex(ValueError, 'oracle definitions differ'):
+        with self.assertRaisesRegex(ValueError, 'oracle definitions differ.*allowed_answers'):
             compare_reports(changed, self.report)
 
 

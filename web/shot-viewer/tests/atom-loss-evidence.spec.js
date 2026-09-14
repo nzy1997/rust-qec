@@ -47,7 +47,7 @@ test('atom-loss evidence exposes three real figures and downloadable measurement
   const chain = await (await page.request.get('/data/atom-loss/chain-correctness.json')).json();
   expect(chain.status).toBe('PASS');
   for (const backend of ['pymatching-envelope', 'envelope-matching-offline']) {
-    expect(chain.backends[backend].checked_rows).toBe(1504);
+    expect(chain.backends[backend].checked_rows).toBe(752);
     expect(chain.backends[backend].rejected_rows).toEqual([]);
     for (const mutation of ['empty_loss_mapping', 'relative_weights']) {
       expect(chain.graph_adapter_controls[mutation][backend].outcome).toBe('oracle_rejected');
