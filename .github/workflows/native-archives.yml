@@ -311,6 +311,172 @@ jobs:
           path: staged-release/
           if-no-files-found: error
 
+  envelope-installed:
+    needs: [prepare, aggregate]
+    name: Envelope installed check / ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+      RELEASE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Download staged release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release
+      - name: Verify and extract the target archive
+        run: |
+          set -euo pipefail
+          archive="staged-release/rustqec-${RELEASE_TAG}-${RELEASE_TARGET}.tar.gz"
+          python3 staged-release/verify_release_archive.py \
+            --archive "$archive" \
+            --checksums staged-release/SHA256SUMS \
+            --manifest staged-release/release-manifest.json \
+            --expected-tag "$RELEASE_TAG"
+          root="$(basename "$archive" .tar.gz)"
+          PYTHONPATH=staged-release python3 - "$archive" "$root" <<'PY'
+          import sys
+          from pathlib import Path
+          from verify_release_archive import safe_extract
+          safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
+          PY
+      - name: Test the installed archive against the envelope contract
+        run: |
+          set -euo pipefail
+          archive="staged-release/rustqec-${RELEASE_TAG}-${RELEASE_TARGET}.tar.gz"
+          root="$(basename "$archive" .tar.gz)"
+          mkdir -p envelope-evidence
+          python3 tooling/tools/check_installed_envelope.py \
+            --bin-dir "$PWD/extracted/$root/bin" \
+            --matrix tooling/docs/envelope-support.json \
+            --target "$RELEASE_TARGET" \
+            --archive "$archive" \
+            --source-sha "$SOURCE_SHA" \
+            --expect-ilp \
+            --out "envelope-evidence/installed-${RELEASE_TARGET}.json"
+      - name: Upload installed-envelope report
+        uses: actions/upload-artifact@v4
+        with:
+          name: envelope-installed-${{ matrix.target }}
+          path: envelope-evidence/
+          if-no-files-found: error
+
+  envelope-evidence:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    steps:
+      - name: Checkout immutable build source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          fetch-depth: 0
+          path: source
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r source/benchmarks/atom_loss/requirements.txt
+      - name: Build the envelope CLI from the candidate revision
+        working-directory: source
+        run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec
+      - name: Generate the revision-bound evidence bundle
+        working-directory: source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          mkdir -p envelope-evidence
+          python3 tools/check_envelope_support.py \
+            --binary target/release/rustqec \
+            --matrix docs/envelope-support.json \
+            --out envelope-evidence/support.json
+          python3 -m benchmarks.atom_loss.readiness_correctness \
+            --binary target/release/rustqec \
+            --matrix docs/envelope-support.json \
+            --profile full \
+            --out envelope-evidence/correctness.json
+          python3 -m benchmarks.atom_loss.readiness_resources \
+            --binary target/release/rustqec \
+            --matrix docs/envelope-support.json \
+            --profile smoke \
+            --out envelope-evidence/resources.json
+          python3 -m benchmarks.atom_loss.readiness_resources \
+            --verify benchmarks/atom_loss/readiness/resources/manifest.json
+      - name: Upload generated envelope evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: envelope-generated
+          path: source/envelope-evidence/
+          if-no-files-found: error
+
+  envelope-release-gate:
+    needs: [prepare, envelope-evidence, envelope-installed]
+    runs-on: ubuntu-24.04
+    env:
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: tooling
+      - name: Download generated evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: envelope-generated
+          path: evidence
+      - name: Download installed-envelope reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: envelope-installed-*
+          path: evidence
+          merge-multiple: true
+      - name: Aggregate the envelope release decision
+        run: |
+          set -euo pipefail
+          mkdir -p gate-out
+          python3 tooling/tools/check_envelope_release.py \
+            --evidence-dir evidence \
+            --matrix tooling/docs/envelope-support.json \
+            --policy tooling/docs/envelope-compatibility-policy.md \
+            --candidate-revision "$SOURCE_SHA" \
+            --out gate-out/release-gate.json
+      - name: Prove the gate rejects defective bundles
+        run: |
+          python3 tooling/tools/check_envelope_release.py \
+            --self-test \
+            --evidence-dir evidence \
+            --matrix tooling/docs/envelope-support.json \
+            --policy tooling/docs/envelope-compatibility-policy.md \
+            --candidate-revision "$SOURCE_SHA"
+      - name: Upload the envelope release decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: envelope-release-gate
+          path: gate-out/
+          if-no-files-found: error
+
   verify-linux-runtime:
     needs: [prepare, aggregate]
     runs-on: ubuntu-24.04
@@ -441,7 +607,7 @@ jobs:
 
   publish:
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    needs: [prepare, checker-tests, verify-linux-runtime, verify-macos-runtime]
+    needs: [prepare, checker-tests, verify-linux-runtime, verify-macos-runtime, envelope-release-gate]
     runs-on: ubuntu-24.04
     permissions:
       actions: read

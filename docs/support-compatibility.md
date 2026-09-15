@@ -78,6 +78,47 @@ Successful decoding of the pinned fixtures shows that these support paths
 still work. It is not publication-scale validation, a logical-error-rate
 campaign, or evidence that arbitrary atom-loss circuits are supported.
 
+### Release-readiness gate
+
+Promotion from Beta to Supported is decided per decoder by the
+release-readiness gate (issue #716), not by the matrix alone. The gate
+aggregates the revision-bound evidence bundle — the support-matrix result, the
+independent correctness suite, the measured resource envelope, and one
+installed-artifact contract report per official native target
+(`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`) — and promotes a decoder
+only when every artifact passes and was produced from the release candidate
+revision (or a recorded source-equivalence check):
+
+```sh
+python3 tools/check_envelope_release.py \
+  --evidence-dir drafts/envelope-readiness \
+  --matrix docs/envelope-support.json \
+  --policy docs/envelope-compatibility-policy.md \
+  --candidate-revision "$(git rev-parse HEAD)" \
+  --out drafts/envelope-readiness/release-gate.json
+```
+
+The installed-artifact reports are produced from the verified release archive
+of each platform (never a PATH binary):
+
+```sh
+python3 tools/check_installed_envelope.py \
+  --bin-dir extracted/<archive-root>/bin \
+  --matrix docs/envelope-support.json \
+  --target aarch64-apple-darwin \
+  --archive <archive.tar.gz> \
+  --source-sha <candidate-revision> \
+  --expect-ilp \
+  --out drafts/envelope-readiness/installed-aarch64-apple-darwin.json
+```
+
+A missing expected decoder, a missing platform report, or a revision mismatch
+fails the gate; the decoder then remains Beta with its blocking gaps recorded
+in the gate report. What the promoted surface freezes — CLI arguments, dataset
+interpretation, prediction packing, structured error codes, statistics
+semantics, and the evolution/deprecation rules — is defined by
+[`docs/envelope-compatibility-policy.md`](envelope-compatibility-policy.md).
+
 ## Mid-SWAP configuration migration
 
 The pre-1.0 Mid-SWAP API no longer accepts the old catch-all

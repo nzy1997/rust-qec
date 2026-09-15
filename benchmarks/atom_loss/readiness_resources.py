@@ -84,6 +84,15 @@ EXCLUSIONS_FULL = [
 ]
 
 
+def checkout_revision():
+    try:
+        result = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True,
+                                text=True, cwd=ROOT, check=False)
+    except OSError:
+        return None
+    return result.stdout.strip() or None
+
+
 def machine_identity():
     memory = None
     if sys.platform == 'darwin':
@@ -483,6 +492,7 @@ def run_campaign(binary, matrix_path, profile, out_path):
     result = {
         'schema_version': SCHEMA,
         'profile': profile,
+        'checkout_revision': checkout_revision(),
         'generated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         'machine': machine_identity(),
         'build': build_identity(binary),
@@ -532,6 +542,7 @@ def write_retained_report(result, out_dir):
         'schema_version': MANIFEST_SCHEMA,
         'generated_by': 'python3 -m benchmarks.atom_loss.readiness_resources --profile full',
         'generated_at': result['generated_at'],
+        'checkout_revision': result.get('checkout_revision'),
         'machine': result['machine'], 'build': result['build'], 'matrix': result['matrix'],
         'stress_budget': result['stress_budget'],
         'total_wall_seconds': result['total_wall_seconds'],
