@@ -1,8 +1,8 @@
 {
-  "source_commit": "b2851707e406ac9177e8e027ede352adef4e0999",
+  "source_commit": "c2c5214b6de8e0909b8e2b79dd00093822bdde88",
   "working_tree_dirty": false,
-  "input_digest": "d68e529de1e19173fb90c3b00b0f642b982de40751226fe4c8a24d81968ba421",
-  "started_utc": "2026-09-15T07:42:07.085160+00:00",
+  "input_digest": "2a15c5270b63186b9d902a14e37a895096832fd8091ea23ef23de3cf5cb647e5",
+  "started_utc": "2026-09-15T08:28:35.303990+00:00",
   "command": [
     "/private/tmp/rstim-evidence2/benchmarks/atom_loss/evidence_run.py",
     "--out",
@@ -52,7 +52,7 @@
     "benchmarks/atom_loss/plot.py": "2e36632a15287701f71c3aaa4bf4254911c5bbb4a78460d0a1ad4e5824534d5e",
     "benchmarks/atom_loss/probe_specs.py": "e0670a655d47975d5f2ba4f26a036f0908f5440ae81bb7792803807ccd10ad2c",
     "benchmarks/atom_loss/publish.py": "fc0b2b1bdd92f1aea7466c5c93392b1f9a13a4ce0139f5a0ce396f536db1df39",
-    "benchmarks/atom_loss/readiness/resources/report.md": "fb8cb3324ceff6a1b8950bc6cc48ba2cd57e5d6f898a4a9c34eb9f9e27e49d2e",
+    "benchmarks/atom_loss/readiness/resources/report.md": "fb04d685abd4aa09430598e2ad6ad7d5d40550e013c4f1b79a863786dee74928",
     "benchmarks/atom_loss/readiness_correctness.py": "9064a0800bb848fc1ad884f9213fed1e31a7170d33849ee6cad5caada62eddbf",
     "benchmarks/atom_loss/readiness_resources.py": "2c09c2b03aa550c6fc675a005cc53873ca92930b7343177441654f101d78aefb",
     "benchmarks/atom_loss/reference.py": "5466f849afa6fe5bcb398a425248defe03af6f06e722da90f3c268e98bb06396",

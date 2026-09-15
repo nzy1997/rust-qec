@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "b2851707e406ac9177e8e027ede352adef4e0999",
+  "source_commit": "c2c5214b6de8e0909b8e2b79dd00093822bdde88",
   "working_tree_dirty": false,
   "inputs": {
     ".github/workflows/atom-loss-reference.yml": {
@@ -89,91 +89,91 @@
     },
     "benchmarks/atom_loss/readiness/resources/manifest.json": {
       "mode": "100644",
-      "git_blob": "1debb7d63749b496009b3d28b79821eb5f7c2b5d"
+      "git_blob": "fa5c85a6aa3bbfb3bfdce01d248bdb52e1b1ff49"
     },
     "benchmarks/atom_loss/readiness/resources/raw/fail-mle-candidate-limit.json": {
       "mode": "100644",
-      "git_blob": "b61bef8e3453935e088d7405f24ba115de967e00"
+      "git_blob": "c1aa16c62adbd26a197917ae6dec2574cb5e327c"
     },
     "benchmarks/atom_loss/readiness/resources/raw/fail-mle-infeasible.json": {
       "mode": "100644",
-      "git_blob": "f2530f6d0cdfd451b86f04d4d40f8c5db1a684e6"
+      "git_blob": "b5d88b4a8881d7c3d226e2b6882a136f79d0c324"
     },
     "benchmarks/atom_loss/readiness/resources/raw/fail-mle-solve-timeout.json": {
       "mode": "100644",
-      "git_blob": "688dfb7b138df4311d62de88bc0410e02539e6ed"
+      "git_blob": "aa391170e0d73228345c4d43a3fd57642b1ab7f1"
     },
     "benchmarks/atom_loss/readiness/resources/raw/fail-stale-output-overwrite.json": {
       "mode": "100644",
-      "git_blob": "fb1af0848186568b971db2da79f9907226125f7f"
+      "git_blob": "3cf13eb4c4c49ab548469ebc0bf8efd4f90c8ff8"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p002-b1024.json": {
       "mode": "100644",
-      "git_blob": "02b394b4db766bbd4153c1e524756b9784cdfdcd"
+      "git_blob": "50071e39e6403fcabfab19efb1c005489018b93c"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p002-b16384.json": {
       "mode": "100644",
-      "git_blob": "578d93cdb1b3e6c5e93dba8f2d2b3a83ebc2d97b"
+      "git_blob": "ca55f9ad31fe1db573222055f3b42da7f9c3524c"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p002-b65536.json": {
       "mode": "100644",
-      "git_blob": "4dbd7acbaafc2c6ef8d619de8fe4f3aacf34fffc"
+      "git_blob": "1e7ce0570301ef6a6e755311d47dfb3a1a986a6a"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p020-b1024.json": {
       "mode": "100644",
-      "git_blob": "7ece92d22d7f902db575d7c6a844cdc6b216addd"
+      "git_blob": "12ef61200506e5e4ba2db595dd5fde39697648b6"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p020-b16384.json": {
       "mode": "100644",
-      "git_blob": "667d85e68af7df4524702a085f213341ac184604"
+      "git_blob": "a3295ed3cfd045abb4c577d8ab1b96003cd8921f"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p020-b65536.json": {
       "mode": "100644",
-      "git_blob": "f869ed7b3c0c63e705b9ecb57a20ec688031e944"
+      "git_blob": "54c357738799b7dbd47148af4cdc9252f8f0272a"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p100-b1024.json": {
       "mode": "100644",
-      "git_blob": "1b1acddb5f2073029dbe80be43c11f2b2870b4bf"
+      "git_blob": "425f668e28bd1f8c5f49168a215ec421767ae94f"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p100-b16384.json": {
       "mode": "100644",
-      "git_blob": "f6f1f635d51f6b5e94af2a0f067e91a2add9e050"
+      "git_blob": "d52a20c05b7135305922202bb5951bf9ae4713ab"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r2-p100-b65536.json": {
       "mode": "100644",
-      "git_blob": "6555b5133ae28a6bf02e75aaa7642037362c2a36"
+      "git_blob": "fd04f14f25af38dadbe0cfcad2c9defe1942b46b"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d3r3-p020-b16384.json": {
       "mode": "100644",
-      "git_blob": "49f491f5ec5bc0bb48b18347848570ed86ea1971"
+      "git_blob": "f4ecc22374f0e26bfe69ef20a94f7343f37fadb0"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-d5r3-p020-b16384.json": {
       "mode": "100644",
-      "git_blob": "631946b2e434809f58972b87ba7966ec3f7dcaa6"
+      "git_blob": "6bfb3eaf283beca7c505b6658db63fc26982f308"
     },
     "benchmarks/atom_loss/readiness/resources/raw/matching-eviction-wires24.json": {
       "mode": "100644",
-      "git_blob": "8c1d452bc1f097a64cecac1198835fd1d03886b5"
+      "git_blob": "4da9f603d1d943d02f61360a5b509647e0a5b9fb"
     },
     "benchmarks/atom_loss/readiness/resources/raw/mle-d3r2-p002-b1024.json": {
       "mode": "100644",
-      "git_blob": "8cdcd5c86c99eef7975370e7fff2cdab91bf3777"
+      "git_blob": "0d80f4e6920a5a90633ab0ace9d32affe67991ec"
     },
     "benchmarks/atom_loss/readiness/resources/raw/mle-d3r2-p002-b16384.json": {
       "mode": "100644",
-      "git_blob": "a5bdb8938884816d83bfed54f605658eeacd0f94"
+      "git_blob": "29888863ac3014d7735d9c0afc9f421e55536979"
     },
     "benchmarks/atom_loss/readiness/resources/raw/mle-eviction-wires24.json": {
       "mode": "100644",
-      "git_blob": "43e8a8d7f45ed8eba8826390bc5548a26cd2bbc4"
+      "git_blob": "177a02adc1ad0ada6e95d89d2db6d7623c91b87d"
     },
     "benchmarks/atom_loss/readiness/resources/report.json": {
       "mode": "100644",
-      "git_blob": "0976e594c122eef81d6d86050c293713168614be"
+      "git_blob": "65950535fb7fd4182aa492e6db7251bd9aa0324c"
     },
     "benchmarks/atom_loss/readiness/resources/report.md": {
       "mode": "100644",
-      "git_blob": "aa2fe6cbbd2dbd1eca2119cb821d57d41cae28a6"
+      "git_blob": "3b4648f31bcacaa758ac4c26ee3fef27a3c862f5"
     },
     "benchmarks/atom_loss/readiness_correctness.py": {
       "mode": "100644",
@@ -2877,7 +2877,7 @@
     },
     "rstim/tests/site_contract.rs": {
       "mode": "100644",
-      "git_blob": "31d47b24ebe2bab14d7964acb0c0c9a7da631e1d"
+      "git_blob": "775314ff78b7dd4282b8cd20038a0432ff198ff6"
     },
     "rstim/tests/site_gallery.rs": {
       "mode": "100644",
@@ -3100,7 +3100,7 @@
       "git_blob": "744fef173e94e76704a1e86265093ceb464a2fab"
     }
   },
-  "input_digest": "d68e529de1e19173fb90c3b00b0f642b982de40751226fe4c8a24d81968ba421",
+  "input_digest": "2a15c5270b63186b9d902a14e37a895096832fd8091ea23ef23de3cf5cb647e5",
   "build_commands": [
     [
       "cargo",
