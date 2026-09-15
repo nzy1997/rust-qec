@@ -17,7 +17,7 @@
         "Not the exact declared fault-configuration objective; no logical-class Bayes-optimality claim.",
         "--shot-timeout-ms is rejected as invalid_arguments; per-shot timeouts apply to the MLE solve path only."
       ],
-      "numeric_operating_limits": "See benchmarks/atom_loss/readiness/resources/ (issue #715) once published; until then no numeric domain beyond the pinned controls below is promised."
+      "numeric_operating_limits": "Measured operating envelope: benchmarks/atom_loss/readiness/resources/ (report.md + manifest.json, issue #715). Recommendations are workload/machine-specific; larger configurations are unmeasured, not promised."
     },
     "envelope-mle": {
       "required_build_features": ["ilp"],
@@ -29,7 +29,7 @@
         "Per-shot solve time is unbounded without --shot-timeout-ms; timeout and infeasible outcomes are reported via distinct structured errors.",
         "Missing the ilp build feature removes the decoder from capabilities entirely; a supported MLE promise requires an ILP-capable archive."
       ],
-      "numeric_operating_limits": "See benchmarks/atom_loss/readiness/resources/ (issue #715) once published; until then no numeric domain beyond the pinned controls below is promised."
+      "numeric_operating_limits": "Measured operating envelope: benchmarks/atom_loss/readiness/resources/ (report.md + manifest.json, issue #715). Recommendations are workload/machine-specific; larger configurations are unmeasured, not promised."
     }
   },
   "circuit_contract": {

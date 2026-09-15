@@ -47,6 +47,8 @@ jobs:
       - run: python3 tools/check_envelope_support.py --self-test --binary target/release/rustqec
       - run: python -m benchmarks.atom_loss.readiness_correctness --binary target/release/rustqec --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-correctness.json
       - run: python -m benchmarks.atom_loss.readiness_correctness --self-test --binary target/release/rustqec
+      - run: python -m benchmarks.atom_loss.readiness_resources --binary target/release/rustqec --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-resources.json
+      - run: python -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources/manifest.json
       - run: python -m benchmarks.atom_loss.correctness --binary target/release/rustqec --out drafts/ci-atom-loss/correctness.json
       - run: python -m benchmarks.atom_loss.decoder_reference --out drafts/ci-atom-loss/decoder-correctness.json --compare site/static/data/atom-loss/decoder-correctness.json
       - run: python -m benchmarks.atom_loss.chain_reference --out drafts/ci-atom-loss/chain-correctness.json --compare site/static/data/atom-loss/chain-correctness.json

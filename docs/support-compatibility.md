@@ -45,7 +45,7 @@ rather than silently skipping the MLE controls.
 | Maturity | Beta (proposed candidate for a first supported release) | Beta |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
 | Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
-| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; numeric limits are set by the resource report ([#715](https://github.com/nzy1997/rust-qec/issues/715)) | Checked on the pinned d=5/r=15 fixture and the canonical known-answer control |
+| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Checked on the pinned d=5/r=15 fixture and the canonical known-answer control; per-pattern ILP cost bounds its [measured range](../benchmarks/atom_loss/readiness/resources/report.md) |
 | Conventional Stim-annotated family | Isolated checked example (pinned fixture only) | Excluded: rejects the pinned fixture as `unsupported_circuit` (candidate limit) before publishing any output file |
 | Per-shot timeout | Rejected (`--shot-timeout-ms` is MLE-only) | `--shot-timeout-ms`; timeout stops the batch with `decode_timeout` (exit 3), writing diagnostic statistics but no predictions |
 | Infeasible shot | Not applicable | `decode_infeasible` (exit 3), diagnostic statistics but no predictions |

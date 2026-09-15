@@ -1,0 +1,45 @@
+{
+  "id": "mle-d3r2-p002-b1024",
+  "decoder": "envelope-mle",
+  "kind": "repeated-patterns",
+  "expected": {
+    "outcome": "success"
+  },
+  "circuit": {
+    "source": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+    "sha256": "4b2c2c55fe0006c28f7d2f68fb83c25252a26c64d4bdddce797510cd7f413671"
+  },
+  "loss_rate": 0.002,
+  "shots": 1024,
+  "seed": 715401,
+  "corpus": {
+    "shots": 1024,
+    "seed": 715401,
+    "rows_sha256": "93a0941be47186ec8290b89cb096e285653b4e3f3883bca866b5a2011f7c9103",
+    "distinct_patterns_in_corpus": 45,
+    "sampler": "rustqec circuit sample --shots 1024 --seed 715401 (workload generation)"
+  },
+  "exit_code": 0,
+  "wall_seconds": 2.2221045419573784,
+  "peak_rss_watermark_bytes": 212320256,
+  "compile_seconds": 0.002779,
+  "decode_seconds": 2.212897042,
+  "attempted_shots": 1024,
+  "completed_shots": 1024,
+  "observed_pattern_count": 45,
+  "distinct_loss_patterns_exact": true,
+  "cache": {
+    "builds": 45,
+    "hits": 979,
+    "eviction_rebuilds_observed": 0
+  },
+  "timeout_count": 0,
+  "infeasible_shot_count": 0,
+  "predictions": {
+    "installed": true,
+    "sha256": "a682d356ff5e98feba82b20a2d200b5ec4961ce23b214d770d7bd9165b1af7d9",
+    "bytes": 1024
+  },
+  "stats_written": true,
+  "output_rule_problems": []
+}
