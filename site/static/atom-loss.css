@@ -1,0 +1,100 @@
+/* Atom-loss reading paths: tutorial, concepts, and evidence. */
+body[data-page="loss"] { --page-width: 1480px; }
+body[data-page="loss"] .documentation-frame { grid-template-columns: 190px minmax(0, 1fr); gap: 44px; }
+.loss-hero { padding-bottom: 28px; }
+.loss-hero.loss-hero h1 { font-size: clamp(2.4rem, 3.5vw, 3.25rem); line-height: 1.08; letter-spacing: -.045em; margin-top: 16px; max-width: 23ch; }
+.loss-hero .hero-copy { font-size: 1.1875rem; line-height: 1.6; max-width: 60ch; }
+.loss-hero .eyebrow { display: flex; align-items: center; gap: 12px; }
+.loss-badge { color: #76531d; background: #f6ebd7; border: 1px solid #e7d3af; padding: 2px 9px; border-radius: 5px; font-size: .72rem; letter-spacing: .03em; text-transform: none; }
+.loss-meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 22px 0; color: var(--muted); font-size: .875rem; }
+.loss-meta span + span { border-left: 1px solid var(--border); padding-left: 20px; }
+.loss-hero .actions { margin-top: 24px; gap: 12px; }
+.loss-hero-note { font-size: .875rem; color: var(--muted); max-width: 80ch; margin-top: 22px; }
+.loss-page-nav { display: flex; flex-wrap: wrap; gap: 8px 26px; border-bottom: 1px solid var(--border); margin-bottom: 36px; }
+.loss-page-nav a { color: var(--muted); padding: 12px 0; font-size: .9375rem; font-weight: 550; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.loss-page-nav a[aria-current] { color: var(--accent-dark); border-color: var(--accent); }
+body[data-page="loss"] main { min-width: 0; }
+body[data-page="loss"] .task-section { margin-bottom: 44px; }
+body[data-page="loss"] main h2 { font-size: clamp(1.6rem, 2.4vw, 2rem); margin: 0 0 14px; line-height: 1.25; }
+body[data-page="loss"] main p { line-height: 1.7; }
+body[data-page="loss"] .loss-step { border-top: 1px solid var(--border); padding-top: 36px; }
+.loss-step .eyebrow { margin: 0 0 10px; color: var(--accent-dark); }
+.loss-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; padding: 0; margin: 24px 0; background: #f4eee7; border: 1px solid var(--border); border-radius: 8px; }
+.loss-flow li { min-width: 0; padding: 18px 14px; position: relative; }
+.loss-flow li + li { border-left: 1px solid #e2d6c9; }
+.loss-flow span { display: block; color: var(--accent-dark); font-size: .75rem; margin-bottom: 12px; font-weight: 650; }
+.loss-flow strong { display: block; font-size: 1rem; }
+.loss-flow small { display: block; font-size: .75rem; color: var(--muted); margin-top: 6px; }
+.loss-inline-note { border-left: 2px solid #c6b4a1; padding: 4px 0 4px 14px; font-size: .875rem; color: var(--muted); }
+.loss-inline-note strong { color: var(--text); margin-right: 5px; }
+.loss-disclosure { border-block: 1px solid var(--border); padding: 14px 0; margin: 16px 0; }
+.loss-disclosure + .loss-disclosure { border-top: 0; margin-top: -16px; }
+.loss-disclosure > summary { cursor: pointer; font-weight: 550; font-size: .9375rem; padding-right: 8px; }
+.loss-disclosure[open] > summary { margin-bottom: 14px; color: var(--accent-dark); }
+.loss-disclosure p, .loss-disclosure li { font-size: .9375rem; }
+.loss-bundle-grid, .loss-next-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 22px 0; }
+.loss-bundle-grid > div { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 7px; background: #fff; }
+.loss-label, .loss-next-grid > a > span { font-size: .6875rem; font-weight: 650; letter-spacing: .075em; color: var(--muted); }
+.loss-bundle-grid h3 { font-size: 1rem; margin: 10px 0 8px; overflow-wrap: anywhere; }
+.loss-bundle-grid p, .loss-next-grid p { margin: 0; font-size: .875rem; color: var(--muted); }
+.loss-output { padding: 12px 0; font-size: .875rem; }
+.loss-output strong { color: #386558; margin-right: 9px; }
+.loss-success { background: #eef5f1; border: 1px solid #cddfd5; border-radius: 8px; padding: 20px; margin-top: 24px; }
+.loss-success .loss-label { color: #386558; }
+body[data-page="loss"] .loss-success pre { background: transparent; color: #244e3e; padding: 12px 0 0; border: 0; margin: 0; font-size: 1rem; }
+.loss-success .output-toolbar { display: none; }
+.loss-success p { margin: 12px 0 0; font-size: .875rem; color: #386558; }
+.loss-next-grid > a { display: block; padding: 22px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; background: #fff; }
+.loss-next-grid > a:hover { border-color: var(--accent); background: #faf3ec; }
+.loss-next-grid strong { display: block; margin: 10px 0; font-size: 1.0625rem; }
+.loss-concept-list { padding-left: 22px; }
+.loss-concept-list li { padding-left: 6px; margin: 16px 0; }
+.loss-findings { display: grid; gap: 0; border-block: 1px solid var(--border); margin: 24px 0; }
+.loss-findings p { padding: 18px 0; margin: 0; }
+.loss-findings p + p { border-top: 1px solid var(--border); }
+.loss-findings strong { display: block; font-size: 1.0625rem; margin-bottom: 5px; }
+.loss-findings span { display: block; color: var(--muted); font-size: .9375rem; }
+body[data-page="loss"] figure figcaption { font-size: .875rem; line-height: 1.7; }
+.loss-figure-actions { display: flex; gap: 24px; margin: 8px 0; font-size: .8125rem; }
+body[data-page="loss"] figure .loss-figure-actions a { display: inline; background: none; border: 0; border-radius: 0; }
+body[data-page="loss"] .loss-sampling-context { font-size: .875rem; }
+body[data-page="loss"] pre { font-size: .875rem; line-height: 1.65; }
+body[data-page="loss"] .page-toc a { text-decoration: none; color: var(--muted); font-size: .8125rem; line-height: 1.5; }
+body[data-page="loss"] .page-toc a[aria-current] { color: var(--accent-dark); font-weight: 650; }
+@media (min-width: 1250px) {
+  body[data-page="loss"] .reading-layout.has-toc { display: grid; grid-template-columns: minmax(0, 1fr) 180px; gap: 38px; align-items: start; }
+  body[data-page="loss"] .page-toc { grid-column: 2; grid-row: 1; position: sticky; top: var(--docs-nav-offset, 92px); max-height: calc(100dvh - var(--docs-nav-offset, 92px) - 24px); overflow: auto; }
+  body[data-page="loss"] .reading-layout > main { grid-column: 1; grid-row: 1; }
+  body[data-page="loss"] .page-toc .toc-disclosure { border-block: 0; border-left: 1px solid var(--border); padding: 4px 0 4px 18px; }
+  body[data-page="loss"] .page-toc nav { gap: 12px; }
+  body[data-page="loss"] .page-toc summary { font-size: .75rem; color: var(--muted); }
+  /* Reports reserve a wider canvas so multi-panel figures retain readable labels. */
+  body:has(.loss-findings) .reading-layout.has-toc { grid-template-columns: minmax(0, 1fr); }
+  body:has(.loss-findings) .reading-layout > main { grid-row: 2; }
+  body:has(.loss-findings) .page-toc { position: static; grid-column: 1; max-height: none; }
+  body:has(.loss-findings) .page-toc nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1249px) {
+  body[data-page="loss"] .documentation-frame { gap: 32px; }
+  body[data-page="loss"] .page-toc { position: sticky; top: var(--docs-nav-offset, 84px); background: var(--bg); z-index: 5; border-bottom: 1px solid var(--border); }
+  body[data-page="loss"] [id] { scroll-margin-top: calc(var(--docs-nav-offset, 84px) + var(--loss-toc-offset, 0px)); }
+  body[data-page="loss"] .toc-disclosure { padding: 10px 0; }
+  body[data-page="loss"] .page-toc nav { max-height: 45dvh; overflow: auto; }
+}
+@media (max-width: 899px) {
+  body[data-page="loss"] .documentation-frame { display: block; }
+  .loss-hero.loss-hero h1 { font-size: 2.75rem; }
+}
+@media (max-width: 599px) {
+  .loss-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loss-flow li:nth-child(3) { border-left: 0; }
+  .loss-flow li:nth-child(n+3) { border-top: 1px solid #e2d6c9; }
+  .loss-bundle-grid, .loss-next-grid { grid-template-columns: 1fr; }
+  .loss-meta { gap: 6px 14px; }
+  .loss-meta span + span { padding-left: 0; border: 0; }
+  .loss-page-nav { gap: 0 16px; }
+  .loss-page-nav a { font-size: .8125rem; }
+  .loss-hero .hero-copy br { display: none; }
+  .loss-hero-note { font-size: .8125rem; }
+  .loss-success { padding: 16px; }
+}
