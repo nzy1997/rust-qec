@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import zipfile
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -64,6 +65,23 @@ class AtomLossGuideTest(unittest.TestCase):
             self.assertNotEqual(bad_decode.returncode, 0)
             self.assertFalse((work / 'rejected.b8').exists())
             self.assertFalse((work / 'rejected.json').exists())
+
+        # The downloadable path must work without a source checkout or pasted code.
+        with tempfile.TemporaryDirectory(prefix='rustqec-loss-download-') as tmp:
+            work = Path(tmp)
+            with zipfile.ZipFile(REPO / 'site/static/examples/atom-loss/tutorial.zip') as archive:
+                archive.extractall(work)
+            result = subprocess.run(['sh', 'run.sh'], cwd=work, env=env,
+                                    text=True, capture_output=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(result.stdout.endswith('Decoded shots: 64\nLoss patterns: 10\nLogical errors: 0 / 64\n'), result.stdout)
+            predictions = work / 'predictions.b8'
+            predictions.write_bytes(predictions.read_bytes()[:-1])
+            result = subprocess.run(['python3', 'check.py'], cwd=work, env=env,
+                                    text=True, capture_output=True, timeout=60)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Incomplete rows', result.stderr)
+            self.assertEqual(result.stdout, '')
 
 
 if __name__ == '__main__':
