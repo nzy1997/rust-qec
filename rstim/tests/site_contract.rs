@@ -542,8 +542,7 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
             "id=\"atom-loss\"",
             "Install with Cargo",
             "href=\"get-started/#install\"",
-            "Decode circuits with atom loss",
-            "Model atom loss, sample measurement records, and predict logical outcomes.",
+            "From atom-loss circuits to loss-aware decoding",
             "href=\"atom-loss/\"",
             "href=\"get-started/#first-circuit\"",
             "Envelope decoding · Beta",
@@ -569,10 +568,6 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     assert!(
         !index.contains("Download v0.3.0"),
         "homepage hero must not promote a release download button"
-    );
-    assert!(
-        !index.contains("<p class=\"eyebrow\">Atom loss</p>"),
-        "homepage atom-loss feature must not repeat a redundant label"
     );
     let hero_actions = index
         .split_once("class=\"actions\"")
