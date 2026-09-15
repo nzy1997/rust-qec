@@ -70,6 +70,10 @@ build-site: build-shot-viewer
 	mkdir -p _site/examples _site/data
 	cp rstim/doc/qp101.schema.json _site/qp101.schema.json
 	cp rstim/doc/QP101-ZY.md _site/QP101-ZY.md
+	mkdir -p _site/support _site/benchmarks/atom_loss/readiness/resources
+	cp docs/envelope-support.json _site/support/envelope-support.json
+	cp docs/envelope-compatibility-policy.md _site/support/envelope-compatibility-policy.md
+	cp benchmarks/atom_loss/readiness/resources/report.md _site/benchmarks/atom_loss/readiness/resources/report.md
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json

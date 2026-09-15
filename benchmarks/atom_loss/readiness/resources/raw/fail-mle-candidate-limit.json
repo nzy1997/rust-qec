@@ -1,0 +1,28 @@
+{
+  "id": "fail-mle-candidate-limit",
+  "decoder": "envelope-mle",
+  "kind": "failure-semantics",
+  "expected": {
+    "outcome": "rejection",
+    "exit_code": 2,
+    "error_code": "unsupported_circuit",
+    "stats_written": false
+  },
+  "shots": 0,
+  "exit_code": 2,
+  "error_code": "unsupported_circuit",
+  "error_message": "loss envelope for measurement 720 exceeds candidate limit",
+  "wall_seconds": 0.16102491691708565,
+  "peak_rss_watermark_bytes": 215252992,
+  "completed_shots": 0,
+  "attempted_shots": 0,
+  "compile_seconds": null,
+  "predictions": {
+    "installed": false,
+    "pre_existing": false,
+    "unchanged": false
+  },
+  "stats_written": false,
+  "stats": null,
+  "output_rule_problems": []
+}

@@ -63,10 +63,11 @@ def mask_of(targets, detectors):
     return mask
 
 
-def independent_model(text):
+def independent_model(text, require_shape=(16,1)):
     circuit,probes=normalized(text)
     count=circuit.num_detectors
-    require((count==16 and circuit.num_observables==1), 'chain_reference: count==16 and circuit.num_observables==1')
+    if require_shape is not None:
+        require((count==require_shape[0] and circuit.num_observables==require_shape[1]), 'chain_reference: count==16 and circuit.num_observables==1')
     coords=circuit.get_detector_coordinates()
     dem=circuit.detector_error_model(decompose_errors=True).flattened()
     effects=[];edges=[]
