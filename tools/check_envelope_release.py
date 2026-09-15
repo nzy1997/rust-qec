@@ -32,11 +32,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -284,8 +286,11 @@ DEFAULT_RETAINED_REPORT = Path("benchmarks/atom_loss/readiness/resources/manifes
 # whose measurement-relevant sources are identical to the measured revision.
 RETAINED_EQUIVALENCE_PATHS = (
     "benchmarks/atom_loss/readiness_resources.py",
+    "benchmarks/atom_loss/requirements.txt",
     "docs/envelope-support.json",
+    "Cargo.toml",
     "Cargo.lock",
+    ".cargo",
     "rustqec-cli/src", "rustqec-cli/Cargo.toml",
     "renvelope/src", "renvelope/Cargo.toml",
     "rmatching/src", "rmatching/Cargo.toml",
@@ -328,12 +333,14 @@ def support_gaps(decoder: str, results: list[dict[str, Any]], matrix: dict[str, 
     return gaps
 
 
-def correctness_gaps(decoder: str, evidence: dict[str, Any]) -> list[str]:
-    """Per-decoder cases, coverage categories and row accounting must be intact."""
+def correctness_case_gaps(decoder: str, cases: list[dict[str, Any]]) -> list[str]:
+    """Per-decoder case details must be complete and internally consistent.
+
+    Row-level quantities are checked against the case's own detail records, so
+    a truncated prediction vector or a hand-written checked_rows cannot pass.
+    """
     label = "correctness"
     gaps: list[str] = []
-    cases = evidence.get("cases") or []
-    coverage = evidence.get("coverage") or {}
     end_to_end = [c for c in cases if c.get("evidence_level") == "independent-end-to-end"]
     if not end_to_end:
         gaps.append(f"{label}: no independent end-to-end case covers {decoder}")
@@ -343,32 +350,128 @@ def correctness_gaps(decoder: str, evidence: dict[str, Any]) -> list[str]:
         if backend is None:
             gaps.append(f"{label}: case {name} did not execute {decoder}")
             continue
+        rows = case.get("rows")
+        allowed = (case.get("allowed_answers") or {}).get(decoder)
+        if not isinstance(rows, int) or rows <= 0:
+            gaps.append(f"{label}: case {name}: missing row count")
+            continue
+        if not isinstance(allowed, list) or len(allowed) != rows:
+            gaps.append(
+                f"{label}: case {name}: allowed-answer count does not match case rows "
+                f"for {decoder}"
+            )
+            continue
+        predictions = backend.get("predictions")
+        if not isinstance(predictions, list) or len(predictions) != rows:
+            gaps.append(
+                f"{label}: case {name}: {decoder} prediction count "
+                f"{len(predictions) if isinstance(predictions, list) else 'n/a'} "
+                f"does not match case rows {rows}"
+            )
+        if backend.get("checked_rows") != rows:
+            gaps.append(
+                f"{label}: case {name}: {decoder} checked_rows "
+                f"{backend.get('checked_rows')!r} does not match case rows {rows}"
+            )
+        singleton = sum(1 for answers in allowed if len(answers) == 1)
+        if backend.get("unique_optimum_rows") != singleton:
+            gaps.append(f"{label}: case {name}: {decoder} unique-optimum count inconsistent")
+        if backend.get("allowed_tie_rows") != rows - singleton:
+            gaps.append(f"{label}: case {name}: {decoder} allowed-tie count inconsistent")
+        if isinstance(predictions, list) and len(predictions) == rows:
+            half = rows // 2
+            if backend.get("placeholder_invariance") != (predictions[:half] == predictions[half:]):
+                gaps.append(
+                    f"{label}: case {name}: {decoder} placeholder_invariance flag "
+                    "inconsistent with the recorded predictions"
+                )
+            if backend.get("prediction_sha256") != hashlib.sha256(
+                bytes(predictions)
+            ).hexdigest():
+                gaps.append(
+                    f"{label}: case {name}: {decoder} prediction hash inconsistent "
+                    "with the recorded predictions"
+                )
         if backend.get("rejected_rows"):
             gaps.append(f"{label}: case {name}: {decoder} predictions outside allowed optima")
         if not backend.get("flipped_prediction_rejected"):
             gaps.append(f"{label}: case {name}: flipped-answer control missing for {decoder}")
         if not backend.get("placeholder_invariance"):
             gaps.append(f"{label}: case {name}: placeholder invariance not shown for {decoder}")
-        if not backend.get("checked_rows"):
-            gaps.append(f"{label}: case {name}: zero rows checked for {decoder}")
         if any(m.get("decoder") == decoder for m in case.get("mismatches") or []):
             gaps.append(f"{label}: case {name}: mismatches recorded for {decoder}")
-    categories = coverage.get("history_categories") or {}
+    return gaps
+
+
+def recomputed_coverage(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Recompute the coverage summary from case details, mirroring the suite."""
+    categories: dict[str, int] = defaultdict(int)
+    channels: set[str] = set()
+    points = []
+    placeholder_pairs = 0
+    total_rows = 0
+    checked_rows = 0
+    tie_rows = 0
+    for case in cases:
+        for history in case.get("histories") or []:
+            if history.get("exercised"):
+                categories[history.get("category")] += 1
+        channels |= set(case.get("noise_channels_exercised") or [])
+        points.append({
+            "case": case.get("name"),
+            "detectors": case.get("detectors"),
+            "evidence_level": case.get("evidence_level"),
+        })
+        placeholder_pairs += case.get("placeholder_pairs") or 0
+        total_rows += case.get("rows") or 0
+        if case.get("evidence_level") == "independent-end-to-end":
+            for outcome in (case.get("backends") or {}).values():
+                tie_rows += outcome.get("allowed_tie_rows") or 0
+                checked_rows += outcome.get("checked_rows") or 0
+    return {
+        "history_categories": {c: categories[c] for c in REQUIRED_HISTORY_CATEGORIES},
+        "single_loss_histories": categories["single_loss"],
+        "noise_channels": sorted(channels),
+        "circuit_points": points,
+        "placeholder_pairs": placeholder_pairs,
+        "total_rows": total_rows,
+        "checked_rows": checked_rows,
+        "allowed_tie_rows": tie_rows,
+        "randomized_differential_seeds": [case.get("seed") for case in cases],
+    }
+
+
+def correctness_summary_gaps(evidence: dict[str, Any]) -> list[str]:
+    """The declared coverage summary must equal the case details recomputed."""
+    label = "correctness"
+    gaps: list[str] = []
+    cases = evidence.get("cases") or []
+    declared = evidence.get("coverage") or {}
+    expected = recomputed_coverage(cases)
+    inconsistent = [
+        field for field, value in expected.items() if declared.get(field) != value
+    ]
+    if inconsistent:
+        gaps.append(
+            f"{label}: declared coverage does not match the case details: "
+            + ", ".join(inconsistent)
+        )
+    categories = expected["history_categories"]
     missing_categories = [c for c in REQUIRED_HISTORY_CATEGORIES if categories.get(c, 0) <= 0]
     if missing_categories:
         gaps.append(f"{label}: missing loss-history coverage: {', '.join(missing_categories)}")
     missing_channels = [
-        c for c in REQUIRED_NOISE_CHANNELS if c not in (coverage.get("noise_channels") or [])
+        c for c in REQUIRED_NOISE_CHANNELS if c not in expected["noise_channels"]
     ]
     if missing_channels:
         gaps.append(f"{label}: missing noise-channel coverage: {', '.join(missing_channels)}")
-    if len(coverage.get("circuit_points") or []) < 2:
+    if len(expected["circuit_points"]) < 2:
         gaps.append(f"{label}: missing circuit size/round coverage")
-    if (coverage.get("placeholder_pairs") or 0) <= 0:
+    if expected["placeholder_pairs"] <= 0:
         gaps.append(f"{label}: missing placeholder-invariance coverage")
-    if (coverage.get("checked_rows") or 0) <= 0:
+    if expected["checked_rows"] <= 0:
         gaps.append(f"{label}: zero checked rows")
-    if not coverage.get("randomized_differential_seeds"):
+    if not expected["randomized_differential_seeds"]:
         gaps.append(f"{label}: no randomized differential seeds")
     return gaps
 
@@ -405,7 +508,7 @@ def decoder_coverage(
     if correctness is None:
         missing.append("correctness: report unavailable")
     else:
-        missing += correctness_gaps(decoder, correctness)
+        missing += correctness_case_gaps(decoder, correctness.get("cases") or [])
     resources = (generated.get("resources") or {}).get("evidence")
     if resources is None:
         missing.append("resource-envelope: report unavailable")
@@ -504,26 +607,36 @@ def evaluate(
         generated[name] = check_generated_evidence(
             name, evidence_dir / filename, schema, candidate, pairs, gaps
         )
+    correctness_evidence = (generated.get("correctness") or {}).get("evidence")
+    if correctness_evidence is not None:
+        gaps += correctness_summary_gaps(correctness_evidence)
     installed: dict[str, dict[str, Any] | None] = {}
     for target in targets:
         installed[target] = check_installed_report(
             target, evidence_dir / f"installed-{target}.json", candidate, pairs, gaps
         )
 
+    # Every gap recorded so far (evidence status, revision binding, retained
+    # report, matrix, policy, correctness summary) blocks promotion: a decoder
+    # must never read "supported" while its evidence base is failing.
+    evidence_gaps = list(gaps)
     decisions: dict[str, Any] = {}
     for decoder, declaration in matrix["decoders"].items():
         proposed = declaration.get("proposed_release_maturity")
         coverage_gaps = decoder_coverage(decoder, generated, installed, matrix)
         blocking = list(coverage_gaps)
-        if proposed != "supported-candidate":
+        if proposed == "supported-candidate":
+            blocking += evidence_gaps
+        else:
             # Beta decoders do not gate the release, but their evidence state
             # is still reported.
             blocking = []
-        earned = proposed == "supported-candidate" and not coverage_gaps
-        if proposed == "supported-candidate" and coverage_gaps:
+        earned = proposed == "supported-candidate" and not blocking
+        if proposed == "supported-candidate" and blocking:
+            shown = "; ".join(blocking[:4]) + ("..." if len(blocking) > 4 else "")
             gaps.append(
-                f"decoder {decoder} proposed as supported-candidate lacks evidence: "
-                + ", ".join(coverage_gaps)
+                f"decoder {decoder} proposed as supported-candidate is held at beta: "
+                + shown
             )
         decisions[decoder] = {
             "current_maturity": declaration.get("current_maturity"),
@@ -647,7 +760,60 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
     sixth = mutate("retained-report-revision-mismatch", stale_retained,
                    "retained resource report revision")
 
-    passed = all([first, second, third, fourth, fifth, sixth])
+    def truncate_predictions(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            for backend in (case.get("backends") or {}).values():
+                predictions = backend.get("predictions")
+                if predictions:
+                    backend["predictions"] = [predictions[0]]
+                backend["checked_rows"] = 1 if predictions else 0
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    seventh = mutate("truncated-decoder-predictions", truncate_predictions,
+                     "does not match case rows")
+
+    def fudge_coverage(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        evidence["coverage"]["checked_rows"] = 1
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    eighth = mutate("declared-coverage-inconsistent", fudge_coverage,
+                    "does not match the case details")
+
+    with tempfile.TemporaryDirectory(prefix="envelope-release-selftest-") as temporary:
+        clone = Path(temporary) / "evidence"
+        shutil.copytree(evidence_dir, clone)
+        fail_correctness(clone, Path(temporary))
+        demoted_report = evaluate(clone, matrix_path, policy_path, candidate,
+                                  DEFAULT_TARGETS, None, None)
+    demoted = demoted_report["decoders"]["envelope-matching"]
+    ninth = (demoted_report["status"] == "fail"
+             and demoted["decision"] == "beta"
+             and bool(demoted["blocking_gaps"]))
+    observations.append({
+        "mutation": "supported-decision-demoted",
+        "rejected": ninth,
+        "detail": {
+            "decision": demoted["decision"],
+            "blocking_gaps": demoted["blocking_gaps"][:2],
+        },
+    })
+
+    tenth = ("Cargo.toml" in RETAINED_EQUIVALENCE_PATHS
+             and "benchmarks/atom_loss/requirements.txt" in RETAINED_EQUIVALENCE_PATHS)
+    observations.append({
+        "mutation": "equivalence-paths-cover-build-config",
+        "rejected": tenth,
+        "detail": sorted(RETAINED_EQUIVALENCE_PATHS),
+    })
+
+    passed = all([first, second, third, fourth, fifth, sixth, seventh, eighth,
+                  ninth, tenth])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
         print(f"{PASS_LINE} self-test")
