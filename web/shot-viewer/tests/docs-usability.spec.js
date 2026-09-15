@@ -407,6 +407,32 @@ for (const width of [768, 1050]) {
   });
 }
 
+for (const [path, heading] of [
+  ['/atom-loss/#sample-loss', '#sample-loss'],
+  ['/atom-loss-concepts/#supported-circuits', '#supported-circuits'],
+  ['/atom-loss-evidence/#loss-accuracy-time', '#loss-accuracy-time'],
+]) {
+  test(`atom-loss chapter links clear the compact table of contents: ${path}`, async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 900 });
+    await page.goto(path);
+    const toc = page.locator('.page-toc');
+    const target = page.locator(heading);
+    await expect(target).toBeInViewport({ ratio: 1 });
+    await expect.poll(async () => {
+      const [tocBox, targetBox] = await Promise.all([toc.boundingBox(), target.boundingBox()]);
+      return targetBox.y - tocBox.y - tocBox.height;
+    }).toBeGreaterThanOrEqual(0);
+    await toc.locator('.toc-disclosure > summary').click();
+    await toc.locator(`a[href="${heading}"]`).click();
+    await expect(toc.locator('.toc-disclosure')).not.toHaveAttribute('open', '');
+    await expect(target).toBeInViewport({ ratio: 1 });
+    await expect.poll(async () => {
+      const [tocBox, targetBox] = await Promise.all([toc.boundingBox(), target.boundingBox()]);
+      return targetBox.y - tocBox.y - tocBox.height;
+    }).toBeGreaterThanOrEqual(0);
+  });
+}
+
 test("highlighted decoder source is the exact downloadable runnable example", async ({ page, request }) => {
   const source = await request.get("/examples/first-decode/src/main.rs");
   expect(source.ok()).toBe(true);

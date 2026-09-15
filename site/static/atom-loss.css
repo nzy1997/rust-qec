@@ -77,6 +77,7 @@ body[data-page="loss"] .page-toc a[aria-current] { color: var(--accent-dark); fo
 @media (max-width: 1249px) {
   body[data-page="loss"] .documentation-frame { gap: 32px; }
   body[data-page="loss"] .page-toc { position: sticky; top: var(--docs-nav-offset, 84px); background: var(--bg); z-index: 5; border-bottom: 1px solid var(--border); }
+  body[data-page="loss"] [id] { scroll-margin-top: calc(var(--docs-nav-offset, 84px) + var(--loss-toc-offset, 0px)); }
   body[data-page="loss"] .toc-disclosure { padding: 10px 0; }
   body[data-page="loss"] .page-toc nav { max-height: 45dvh; overflow: auto; }
 }
