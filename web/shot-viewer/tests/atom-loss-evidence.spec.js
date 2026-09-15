@@ -2,13 +2,14 @@ import { test, expect } from '@playwright/test';
 
 test('atom-loss evidence exposes sampling costs, figures and downloadable measurements', async ({ page }) => {
   await page.goto('/atom-loss/#atom-loss-results');
+  await expect(page).toHaveURL(/atom-loss-evidence\/#atom-loss-results$/);
   const figures = page.locator('.loss-result-figure');
   await expect(figures).toHaveCount(2);
   for (const figure of await figures.all()) {
     await figure.scrollIntoViewIfNeeded();
     await expect.poll(() => figure.locator('img').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
     await expect(figure.locator('figcaption')).toContainText(/shots|Distance/);
-    const href = await figure.locator('a').getAttribute('href');
+    const href = await figure.locator('a').first().getAttribute('href');
     const response = await page.request.get(new URL(href, page.url()).href);
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain('<svg');

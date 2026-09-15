@@ -43,6 +43,8 @@ PAGE_FILES = (
     "index.html",
     "get-started/index.html",
     "atom-loss/index.html",
+    "atom-loss-concepts/index.html",
+    "atom-loss-evidence/index.html",
     "docs/index.html",
     "support/index.html",
     "simulator/index.html",
@@ -61,6 +63,8 @@ JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
     "atom-loss/index.html": ("loss-information", "model-loss", "sample-loss", "decode-loss", "check-predictions", "supported-circuits"),
+    "atom-loss-concepts/index.html": ("loss-record", "data-boundary", "choose-decoder", "supported-circuits"),
+    "atom-loss-evidence/index.html": ("atom-loss-results", "loss-correctness", "loss-sampling-throughput", "loss-logical-error-rate", "loss-accuracy-time", "loss-seed-accuracy", "loss-timing-sweep", "loss-adapter-stages", "loss-evidence-methods"),
     "index.html": ("capabilities",),
     "get-started/index.html": (
         "install",
@@ -1289,7 +1293,8 @@ const copyBlocks = document.querySelectorAll("pre code");
     write_text(site_root / "js/search.js", '// Local documentation search')
     write_text(site_root / "data/docs-search.json", '[]')
 
-    write_text(site_root / "atom-loss/index.html", '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS["atom-loss/index.html"]) + '</main></body></html>')
+    for page in ("atom-loss/index.html", "atom-loss-concepts/index.html", "atom-loss-evidence/index.html"):
+        write_text(site_root / page, '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[page]) + '</main></body></html>')
 
     for page in PAGE_FILES:
         page_path = site_root / page

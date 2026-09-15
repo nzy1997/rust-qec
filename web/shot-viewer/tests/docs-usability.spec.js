@@ -58,15 +58,20 @@ test('home routes first-time, library, and prebuilt users to the promised instru
   await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
 });
 
-test('home atom-loss feature has one destination with the complete walkthrough', async ({ page }) => {
+test('home atom-loss feature presents one clear outcome and destination', async ({ page }) => {
   await page.goto('/');
-  const feature = page.getByRole('region', { name: 'From atom-loss circuits to loss-aware decoding' });
+  const feature = page.getByRole('region', { name: 'Decode circuits with atom loss' });
+  await expect(feature.getByRole('heading', { level: 2 })).toHaveText('Decode circuits with atom loss');
+  await expect(feature.locator('.eyebrow')).toHaveCount(0);
+  await expect(feature.locator('.section-copy')).toHaveText(
+    'Model atom loss, sample measurement records, and predict logical outcomes.',
+  );
   await expect(feature.getByRole('listitem')).toHaveCount(3);
   await expect(feature.getByRole('link')).toHaveCount(1);
   await expect(feature.getByRole('link')).toHaveAttribute('href', 'atom-loss/');
   await feature.getByRole('link').click();
   await expect(page).toHaveURL(/\/atom-loss\/$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('From atom loss to logical predictions');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss\./);
   await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
   await expect(page.locator('[data-output]')).toContainText('Logical errors: 0 / 64');
   await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Atom loss');
@@ -448,8 +453,8 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
 
 test('atom loss search leads to its dedicated walkthrough and retains the support reference', async ({ page }) => {
   await page.goto('/docs/?q=atom+loss');
-  const first = page.locator('#search-results li').first();
-  await expect(first).toContainText('Construct a circuit with atom loss');
+  const first = page.locator('#search-results li').filter({ has: page.locator('a[href$="atom-loss/#model-loss"]') });
+  await expect(first).toContainText('Generate the circuit');
   await expect(first.locator('mark').first()).toBeVisible();
   await expect(first.locator('a')).toHaveAttribute('href', /atom-loss\/#model-loss$/);
   await expect(page.locator('#search-results a[href$="support/#atom-loss-support-boundary"]')).toBeVisible();
