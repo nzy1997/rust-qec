@@ -112,11 +112,16 @@ python3 tools/check_installed_envelope.py \
   --out drafts/envelope-readiness/installed-aarch64-apple-darwin.json
 ```
 
-A missing expected decoder, a missing platform report, or a revision mismatch
-fails the gate; the decoder then remains Beta with its blocking gaps recorded
-in the gate report. What the promoted surface freezes — CLI arguments, dataset
-interpretation, prediction packing, structured error codes, statistics
-semantics, and the evolution/deprecation rules — is defined by
+A missing expected decoder, a missing platform report, a partially executed
+control set, hollowed correctness coverage, or a revision mismatch fails the
+gate; the decoder then remains Beta with its blocking gaps recorded in the
+gate report. The retained full resource report supports a candidate only when
+its measurement revision is an ancestor of the candidate with identical
+measurement-relevant sources (the measurement script, the decoder crates and
+`Cargo.lock`); otherwise the full campaign must be rerun. What the promoted
+surface freezes — CLI arguments, dataset interpretation, prediction packing,
+structured error codes, statistics semantics, and the evolution/deprecation
+rules — is defined by
 [`docs/envelope-compatibility-policy.md`](envelope-compatibility-policy.md).
 
 ## Mid-SWAP configuration migration

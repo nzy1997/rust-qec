@@ -676,6 +676,14 @@ def verify_manifest(manifest_path):
         if raw.get('cache', {}).get('hits', 0) <= 0:
             problems.append(f"{case['id']}: repeated-pattern case recorded no cache hits")
     budget = manifest['stress_budget']['values']
+    # Manifest summary fields that must be identical to the raw record; a
+    # passing summary must never launder an out-of-budget or tampered raw.
+    # Absent fields normalize to None on both sides (the manifest writer uses
+    # record.get), so only genuinely divergent values mismatch.
+    summary_fields = ('decoder', 'kind', 'loss_rate', 'shots', 'seed', 'exit_code',
+                      'error_code', 'compile_seconds', 'decode_seconds', 'stats_written',
+                      'peak_rss_watermark_bytes', 'observed_pattern_count', 'cache',
+                      'completed_shots', 'output_rule_problems')
     for case in manifest['cases']:
         if case['wall_seconds'] > budget['per_case_wall_seconds']:
             problems.append(f"{case['id']}: measured wall exceeds declared budget")
@@ -686,6 +694,11 @@ def verify_manifest(manifest_path):
             problems += [f"{case['id']}: {p}" for p in evaluate_run(raw)]
             if raw['wall_seconds'] != case['wall_seconds']:
                 problems.append(f"{case['id']}: manifest/raw wall mismatch")
+            if raw.get('peak_rss_watermark_bytes', 0) > budget['peak_rss_bytes']:
+                problems.append(f"{case['id']}: raw peak RSS exceeds declared budget")
+            for field in summary_fields:
+                if raw.get(field) != case.get(field):
+                    problems.append(f"{case['id']}: manifest/raw {field} mismatch")
     if manifest['total_wall_seconds'] > budget['total_wall_seconds']:
         problems.append('measured total wall exceeds declared budget')
     # Resource claims must agree with raw measurements.
@@ -803,6 +816,22 @@ def self_test(binary):
         fourth = any('no eviction' in p for p in problems_d)
         observations.append({'mutation': 'cache-eviction-without-eviction', 'rejected': fourth,
                              'detail': problems_d[:2]})
+
+        # Tamper E: inflate only the raw record's peak memory, reseal its hash,
+        # and leave the manifest summary unchanged (review repro: 100 GiB raw RSS).
+        shutil.copytree(RESOURCES_DIR, work/'resources-e')
+        manifest_e = json.loads((work/'resources-e/manifest.json').read_text())
+        target = next(c for c in manifest_e['cases'] if c['kind'] != 'failure-semantics')
+        raw_path = work/'resources-e'/target['raw']
+        raw = json.loads(raw_path.read_text())
+        raw['peak_rss_watermark_bytes'] = 100 * 1024**3
+        save(raw_path, raw)
+        target['raw_sha256'] = digest(raw_path)
+        save(work/'resources-e/manifest.json', manifest_e)
+        problems_e = verify_manifest(work/'resources-e/manifest.json')
+        fifth = any('raw peak RSS' in p for p in problems_e)
+        observations.append({'mutation': 'raw-only-peak-memory-inflated', 'rejected': fifth,
+                             'detail': problems_e[:2]})
 
     passed = all(o['rejected'] for o in observations)
     print(json.dumps({'self_test_mutations': observations}, indent=2))

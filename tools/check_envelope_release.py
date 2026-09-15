@@ -267,32 +267,217 @@ def check_installed_report(
     }
 
 
+# Coverage contracts mirrored from the suites that produce the evidence. Keep
+# these in sync with benchmarks/atom_loss/readiness_correctness.py; the gate
+# intentionally fails loudly when the suite's structure drifts.
+REQUIRED_NOISE_CHANNELS = ("X_ERROR", "DEPOLARIZE1", "DEPOLARIZE2")
+REQUIRED_HISTORY_CATEGORIES = (
+    "no_loss",
+    "multiple_simultaneous_losses",
+    "loss_in_different_rounds",
+    "reset_restoring_wire",
+)
+RETAINED_MANIFEST_SCHEMA = "rustqec.envelope-resources-manifest.v1"
+DEFAULT_RETAINED_REPORT = Path("benchmarks/atom_loss/readiness/resources/manifest.json")
+
+# The retained full resource report supports promotion only for candidates
+# whose measurement-relevant sources are identical to the measured revision.
+RETAINED_EQUIVALENCE_PATHS = (
+    "benchmarks/atom_loss/readiness_resources.py",
+    "docs/envelope-support.json",
+    "Cargo.lock",
+    "rustqec-cli/src", "rustqec-cli/Cargo.toml",
+    "renvelope/src", "renvelope/Cargo.toml",
+    "rmatching/src", "rmatching/Cargo.toml",
+    "qec-ilp-core/src", "qec-ilp-core/Cargo.toml",
+    "rstim/src", "rstim/Cargo.toml",
+)
+
+
+def expected_controls(matrix: dict[str, Any], decoder: str) -> set[str]:
+    """Every control the matrix declares for this decoder (variants expanded)."""
+    return {
+        control["id"]
+        for control in support.expand_controls(matrix)
+        if decoder in control["decoders"]
+    }
+
+
+def support_gaps(decoder: str, results: list[dict[str, Any]], matrix: dict[str, Any],
+                 label: str) -> list[str]:
+    """The complete declared control set must be executed and passing."""
+    expected = expected_controls(matrix, decoder)
+    observed: dict[str, Any] = {}
+    for record in results:
+        if record.get("decoder") == decoder:
+            observed.setdefault(record.get("control"), record.get("status"))
+    missing = sorted(control for control in expected if control not in observed)
+    failing = sorted(
+        control for control, status in observed.items()
+        if control in expected and status != "pass"
+    )
+    gaps = []
+    if missing:
+        shown = ", ".join(missing[:3]) + ("..." if len(missing) > 3 else "")
+        gaps.append(
+            f"{label}: incomplete control set for {decoder}: "
+            f"{len(observed)}/{len(expected)} controls executed, missing {shown}"
+        )
+    if failing:
+        gaps.append(f"{label}: failing controls for {decoder}: {', '.join(failing[:3])}")
+    return gaps
+
+
+def correctness_gaps(decoder: str, evidence: dict[str, Any]) -> list[str]:
+    """Per-decoder cases, coverage categories and row accounting must be intact."""
+    label = "correctness"
+    gaps: list[str] = []
+    cases = evidence.get("cases") or []
+    coverage = evidence.get("coverage") or {}
+    end_to_end = [c for c in cases if c.get("evidence_level") == "independent-end-to-end"]
+    if not end_to_end:
+        gaps.append(f"{label}: no independent end-to-end case covers {decoder}")
+    for case in end_to_end:
+        name = case.get("name", "?")
+        backend = (case.get("backends") or {}).get(decoder)
+        if backend is None:
+            gaps.append(f"{label}: case {name} did not execute {decoder}")
+            continue
+        if backend.get("rejected_rows"):
+            gaps.append(f"{label}: case {name}: {decoder} predictions outside allowed optima")
+        if not backend.get("flipped_prediction_rejected"):
+            gaps.append(f"{label}: case {name}: flipped-answer control missing for {decoder}")
+        if not backend.get("placeholder_invariance"):
+            gaps.append(f"{label}: case {name}: placeholder invariance not shown for {decoder}")
+        if not backend.get("checked_rows"):
+            gaps.append(f"{label}: case {name}: zero rows checked for {decoder}")
+        if any(m.get("decoder") == decoder for m in case.get("mismatches") or []):
+            gaps.append(f"{label}: case {name}: mismatches recorded for {decoder}")
+    categories = coverage.get("history_categories") or {}
+    missing_categories = [c for c in REQUIRED_HISTORY_CATEGORIES if categories.get(c, 0) <= 0]
+    if missing_categories:
+        gaps.append(f"{label}: missing loss-history coverage: {', '.join(missing_categories)}")
+    missing_channels = [
+        c for c in REQUIRED_NOISE_CHANNELS if c not in (coverage.get("noise_channels") or [])
+    ]
+    if missing_channels:
+        gaps.append(f"{label}: missing noise-channel coverage: {', '.join(missing_channels)}")
+    if len(coverage.get("circuit_points") or []) < 2:
+        gaps.append(f"{label}: missing circuit size/round coverage")
+    if (coverage.get("placeholder_pairs") or 0) <= 0:
+        gaps.append(f"{label}: missing placeholder-invariance coverage")
+    if (coverage.get("checked_rows") or 0) <= 0:
+        gaps.append(f"{label}: zero checked rows")
+    if not coverage.get("randomized_differential_seeds"):
+        gaps.append(f"{label}: no randomized differential seeds")
+    return gaps
+
+
+def resources_gaps(decoder: str, evidence: dict[str, Any]) -> list[str]:
+    cases = evidence.get("cases") or []
+    workloads = [
+        c for c in cases
+        if c.get("decoder") == decoder and c.get("kind") != "failure-semantics"
+    ]
+    gaps = []
+    if not any(c.get("exit_code") == 0 and not c.get("output_rule_problems") for c in workloads):
+        gaps.append(f"resource-envelope: no successful workload case for {decoder}")
+    if not any(c.get("kind") == "cache-eviction" for c in workloads):
+        gaps.append(f"resource-envelope: no cache-eviction case for {decoder}")
+    return gaps
+
+
 def decoder_coverage(
     decoder: str,
     generated: dict[str, dict[str, Any] | None],
     installed: dict[str, dict[str, Any] | None],
+    matrix: dict[str, Any],
 ) -> list[str]:
-    """Which evidence artifacts demonstrably exercise this decoder."""
+    """Which evidence artifacts demonstrably exercise this decoder, in full."""
     missing: list[str] = []
     support_result = (generated.get("support") or {}).get("evidence")
-    if support_result is None or not any(
-        r.get("decoder") == decoder and r.get("status") == "pass"
-        for r in support_result.get("results", [])
-    ):
-        missing.append("support-matrix")
+    if support_result is None:
+        missing.append("support-matrix: report unavailable")
+    else:
+        missing += support_gaps(decoder, support_result.get("results", []), matrix,
+                                "support-matrix")
+    correctness = (generated.get("correctness") or {}).get("evidence")
+    if correctness is None:
+        missing.append("correctness: report unavailable")
+    else:
+        missing += correctness_gaps(decoder, correctness)
     resources = (generated.get("resources") or {}).get("evidence")
-    if resources is None or not any(
-        c.get("decoder") == decoder for c in resources.get("cases", [])
-    ):
-        missing.append("resource-envelope")
+    if resources is None:
+        missing.append("resource-envelope: report unavailable")
+    else:
+        missing += resources_gaps(decoder, resources)
     for target, record in installed.items():
         report = (record or {}).get("report")
-        controls = (report or {}).get("controls", [])
-        if report is None or not any(
-            c.get("decoder") == decoder and c.get("status") == "pass" for c in controls
-        ):
+        if report is None:
             missing.append(f"installed:{target}")
+        else:
+            missing += support_gaps(decoder, report.get("controls", []), matrix,
+                                    f"installed:{target}")
     return missing
+
+
+def check_retained_report(path: Path, candidate: str, gaps: list[str]) -> dict[str, Any]:
+    """Bind the committed full resource report to the candidate's sources.
+
+    The report is a committed artifact, so it cannot name its own commit; the
+    gate instead requires its measurement revision to be an ancestor of the
+    candidate with zero changes in measurement-relevant sources since then.
+    """
+    record: dict[str, Any] = {"path": str(path)}
+    if not path.is_file():
+        gaps.append(f"retained full resource report missing: {path}")
+        record["present"] = False
+        return record
+    record["present"] = True
+    manifest = load_json(path)
+    if manifest.get("schema_version") != RETAINED_MANIFEST_SCHEMA:
+        gaps.append(
+            f"retained resource report schema mismatch: {manifest.get('schema_version')!r}"
+        )
+        return record
+    if manifest.get("status") != "pass":
+        gaps.append("retained resource report does not record a passing campaign")
+    revision = manifest.get("checkout_revision")
+    record["checkout_revision"] = revision
+    if not revision:
+        gaps.append("retained resource report does not record its checkout revision")
+        record["binding"] = "missing"
+        return record
+    decision = is_ancestor(str(revision), candidate)
+    if decision is not True:
+        gaps.append(
+            f"retained resource report revision {revision} is not an ancestor of the "
+            f"candidate {candidate}"
+        )
+        record["binding"] = "not-an-ancestor"
+        return record
+    diff = subprocess.run(
+        ["git", "diff", "--name-only", str(revision), candidate, "--",
+         *RETAINED_EQUIVALENCE_PATHS],
+        capture_output=True, text=True, cwd=REPO_ROOT, check=False,
+    )
+    if diff.returncode:
+        gaps.append("cannot verify retained-report source equivalence (git diff failed)")
+        record["binding"] = "unverifiable"
+        return record
+    changed = [line for line in diff.stdout.splitlines() if line]
+    record["changed_equivalence_paths"] = changed
+    if changed:
+        shown = ", ".join(changed[:5]) + ("..." if len(changed) > 5 else "")
+        gaps.append(
+            f"retained full resource report was measured at {revision} but "
+            f"measurement-relevant sources changed since: {shown}; rerun the full "
+            "resource campaign at the candidate"
+        )
+        record["binding"] = "sources-differ"
+    else:
+        record["binding"] = "source-equivalent"
+    return record
 
 
 def evaluate(
@@ -302,6 +487,7 @@ def evaluate(
     candidate: str,
     targets: tuple[str, ...],
     equivalence_path: Path | None,
+    retained_report_path: Path | None = None,
 ) -> dict[str, Any]:
     matrix = support.load_matrix(matrix_path)
     pairs = load_equivalence(equivalence_path)
@@ -309,6 +495,9 @@ def evaluate(
 
     matrix_record = check_matrix_binding(matrix, candidate, gaps)
     policy_record = check_policy(policy_path, gaps)
+    if retained_report_path is None:
+        retained_report_path = REPO_ROOT / DEFAULT_RETAINED_REPORT
+    retained_record = check_retained_report(retained_report_path, candidate, gaps)
 
     generated: dict[str, dict[str, Any] | None] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
@@ -324,7 +513,7 @@ def evaluate(
     decisions: dict[str, Any] = {}
     for decoder, declaration in matrix["decoders"].items():
         proposed = declaration.get("proposed_release_maturity")
-        coverage_gaps = decoder_coverage(decoder, generated, installed)
+        coverage_gaps = decoder_coverage(decoder, generated, installed, matrix)
         blocking = list(coverage_gaps)
         if proposed != "supported-candidate":
             # Beta decoders do not gate the release, but their evidence state
@@ -355,6 +544,7 @@ def evaluate(
             **matrix_record,
         },
         "compatibility_policy": policy_record,
+        "retained_resource_report": retained_record,
         "evidence": {
             name: ({k: v for k, v in record.items() if k != "evidence"} if record else None)
             for name, record in generated.items()
@@ -369,10 +559,11 @@ def evaluate(
     }
 
 
-def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidate: str) -> int:
+def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidate: str,
+              retained_report_path: Path | None = None) -> int:
     """The gate must reject defective evidence bundles."""
     baseline = evaluate(evidence_dir, matrix_path, policy_path, candidate,
-                        DEFAULT_TARGETS, None)
+                        DEFAULT_TARGETS, None, retained_report_path)
     observations: list[dict[str, Any]] = [
         {"mutation": "baseline", "status": baseline["status"],
          "detail": baseline["blocking_gaps"][:1]},
@@ -386,9 +577,9 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         with tempfile.TemporaryDirectory(prefix="envelope-release-selftest-") as temporary:
             clone = Path(temporary) / "evidence"
             shutil.copytree(evidence_dir, clone)
-            transform(clone)
+            retained = transform(clone, Path(temporary))
             report = evaluate(clone, matrix_path, policy_path, candidate,
-                              DEFAULT_TARGETS, None)
+                              DEFAULT_TARGETS, None, retained)
             rejected = report["status"] == "fail" and any(
                 needle in gap for gap in report["blocking_gaps"]
             )
@@ -399,28 +590,64 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
             })
             return rejected
 
-    def drop_linux(clone: Path) -> None:
+    def drop_linux(clone: Path, temporary: Path) -> Path | None:
         (clone / f"installed-{DEFAULT_TARGETS[0]}.json").unlink()
+        return None
 
     first = mutate("missing-platform-report", drop_linux, "missing installed-envelope report")
 
-    def mismatch_revision(clone: Path) -> None:
+    def mismatch_revision(clone: Path, temporary: Path) -> Path | None:
         path = clone / "support.json"
         evidence = load_json(path)
         evidence["checkout_revision"] = "0" * 40
         path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
 
     second = mutate("revision-mismatch", mismatch_revision, "is not the candidate")
 
-    def fail_correctness(clone: Path) -> None:
+    def fail_correctness(clone: Path, temporary: Path) -> Path | None:
         path = clone / "correctness.json"
         evidence = load_json(path)
         evidence["status"] = "fail"
         path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
 
     third = mutate("failing-evidence", fail_correctness, "status is")
 
-    passed = first and second and third
+    def hollow_correctness(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        evidence["cases"] = []
+        evidence["coverage"] = {}
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    fourth = mutate("hollowed-correctness", hollow_correctness, "correctness")
+
+    def partial_support(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "support.json"
+        evidence = load_json(path)
+        evidence["results"] = [
+            r for r in evidence["results"]
+            if r.get("control") == "mini-circuit-known-answer"
+        ]
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    fifth = mutate("partial-support-controls", partial_support, "incomplete control set")
+
+    def stale_retained(clone: Path, temporary: Path) -> Path:
+        source = retained_report_path or REPO_ROOT / DEFAULT_RETAINED_REPORT
+        clone_retained = temporary / "retained-manifest.json"
+        manifest = load_json(source)
+        manifest["checkout_revision"] = "0" * 40
+        clone_retained.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        return clone_retained
+
+    sixth = mutate("retained-report-revision-mismatch", stale_retained,
+                   "retained resource report revision")
+
+    passed = all([first, second, third, fourth, fifth, sixth])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
         print(f"{PASS_LINE} self-test")
@@ -442,6 +669,9 @@ def main() -> int:
                              f"(default: {', '.join(DEFAULT_TARGETS)})")
     parser.add_argument("--equivalence", type=Path,
                         help="recorded source-equivalence checks for revision mismatches")
+    parser.add_argument("--retained-report", type=Path,
+                        help="committed full resource report to bind to the candidate "
+                             f"(default: {DEFAULT_RETAINED_REPORT})")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
@@ -454,11 +684,12 @@ def main() -> int:
     targets = tuple(args.targets) if args.targets else DEFAULT_TARGETS
 
     if args.self_test:
-        return self_test(args.evidence_dir, args.matrix, args.policy, candidate)
+        return self_test(args.evidence_dir, args.matrix, args.policy, candidate,
+                         args.retained_report)
 
     try:
         report = evaluate(args.evidence_dir, args.matrix, args.policy, candidate,
-                          targets, args.equivalence)
+                          targets, args.equivalence, args.retained_report)
     except (GateError, support.MatrixError) as error:
         print(f"FAIL envelope release readiness: {error}", file=sys.stderr)
         return 1
