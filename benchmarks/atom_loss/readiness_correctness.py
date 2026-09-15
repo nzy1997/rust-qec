@@ -53,6 +53,15 @@ def sha_text(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def checkout_revision():
+    try:
+        result = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True,
+                                text=True, cwd=ROOT, check=False)
+    except OSError:
+        return None
+    return result.stdout.strip() or None
+
+
 def binary_record(binary):
     version = subprocess.run([str(binary), '--version'], capture_output=True, text=True).stdout.strip()
     return {'path': str(binary), 'sha256': digest(binary), 'version': version}
@@ -463,6 +472,7 @@ def run_suite(binary, matrix_path, profile, out_path=None):
     result = {
         'schema_version': SCHEMA,
         'profile': profile,
+        'checkout_revision': checkout_revision(),
         'binary': binary_record(binary),
         'matrix': {'path': str(matrix_path), 'sha256': digest(Path(matrix_path)),
                    'source_revision': matrix.get('applies_to', {}).get('source_revision')},

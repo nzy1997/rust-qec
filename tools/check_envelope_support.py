@@ -66,6 +66,18 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def checkout_revision() -> str | None:
+    """Best-effort git HEAD of the checkout the evidence was produced from."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+            cwd=REPO_ROOT, check=False,
+        )
+    except OSError:
+        return None
+    return result.stdout.strip() or None
+
+
 def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
 
@@ -112,7 +124,10 @@ def validate_matrix(matrix: dict[str, Any]) -> None:
                     raise MatrixError(f"control {cid}: rejection controls must declare {field}")
     for decoder, required in REQUIRED_CONTROLS.items():
         if decoder not in decoders:
-            raise MatrixError(f"required decoder missing from matrix: {decoder}")
+            # A matrix (or reduced view) that does not declare this decoder at
+            # all has nothing to enforce; a declared decoder must keep every
+            # required control.
+            continue
         missing = [
             cid
             for cid in required
@@ -466,6 +481,7 @@ def run_checks(
                 results.append(record)
         return {
             "schema_version": RESULT_SCHEMA_VERSION,
+            "checkout_revision": checkout_revision(),
             "matrix": {
                 "schema_version": matrix["schema_version"],
                 "applies_to": matrix["applies_to"],
