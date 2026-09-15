@@ -1,0 +1,45 @@
+{
+  "id": "matching-d3r2-p020-b65536",
+  "decoder": "envelope-matching",
+  "kind": "batch-scale",
+  "expected": {
+    "outcome": "success"
+  },
+  "circuit": {
+    "source": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+    "sha256": "7ce3a9b456d892e9b97ab18c245cb7bee4eb04a921585b3549cc1b96b79486de"
+  },
+  "loss_rate": 0.02,
+  "shots": 65536,
+  "seed": 716131,
+  "corpus": {
+    "shots": 65536,
+    "seed": 716131,
+    "rows_sha256": "e16056faf711528eb7bdde283c380fb43a235dbeabb904e9495f75968ed80ddc",
+    "distinct_patterns_in_corpus": 11713,
+    "sampler": "rustqec circuit sample --shots 65536 --seed 716131 (workload generation)"
+  },
+  "exit_code": 0,
+  "wall_seconds": 0.5681355420965701,
+  "peak_rss_watermark_bytes": 44007424,
+  "compile_seconds": 0.001115375,
+  "decode_seconds": 0.556105417,
+  "attempted_shots": 65536,
+  "completed_shots": 65536,
+  "observed_pattern_count": 11669,
+  "distinct_loss_patterns_exact": false,
+  "cache": {
+    "builds": 28107,
+    "hits": 37429,
+    "eviction_rebuilds_observed": 16438
+  },
+  "timeout_count": 0,
+  "infeasible_shot_count": 0,
+  "predictions": {
+    "installed": true,
+    "sha256": "c9ffe3f70a5b476554fa3f465d20f56864288c791920b224394070b2fce6a640",
+    "bytes": 65536
+  },
+  "stats_written": true,
+  "output_rule_problems": []
+}

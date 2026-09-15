@@ -1,0 +1,28 @@
+{
+  "id": "fail-stale-output-overwrite",
+  "decoder": "envelope-matching",
+  "kind": "failure-semantics",
+  "expected": {
+    "outcome": "rejection",
+    "exit_code": 2,
+    "error_code": "output_error",
+    "stats_written": false
+  },
+  "shots": 0,
+  "exit_code": 2,
+  "error_code": "output_error",
+  "error_message": "output already exists: /var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/envelope-resources-full-eoefqvjw/fail-stale-output-overwrite.b8",
+  "wall_seconds": 0.005906041944399476,
+  "peak_rss_watermark_bytes": 212320256,
+  "completed_shots": 0,
+  "attempted_shots": 0,
+  "compile_seconds": null,
+  "predictions": {
+    "installed": true,
+    "pre_existing": true,
+    "unchanged": true
+  },
+  "stats_written": false,
+  "stats": null,
+  "output_rule_problems": []
+}
