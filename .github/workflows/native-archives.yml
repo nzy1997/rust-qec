@@ -400,7 +400,7 @@ jobs:
       - run: pip install -r source/benchmarks/atom_loss/requirements.txt
       - name: Build the envelope CLI from the candidate revision
         working-directory: source
-        run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec
+        run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec --example export_matching_benchmark --example export_decoder_oracle
       - name: Generate the revision-bound evidence bundle
         working-directory: source
         run: |
