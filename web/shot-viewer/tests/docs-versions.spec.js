@@ -5,7 +5,9 @@ test('only master is advertised, including nested pages', async ({ page, request
   const catalog = await response.json();
   expect(catalog.current).toBe('master');
   expect(catalog.versions.map(version => version.id)).toEqual(['master']);
-  for (const path of ['/', '/get-started/', '/qp101/protocol/']) {
+  await page.goto('/');
+  await expect(page.locator('.version-strip')).toHaveCount(0);
+  for (const path of ['/get-started/', '/qp101/protocol/']) {
     await page.goto(path);
     await expect(page.locator('[data-version-label]')).toHaveText('Development · master');
     await expect(page.getByLabel('Documentation version')).toBeHidden();

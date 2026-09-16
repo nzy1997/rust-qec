@@ -83,30 +83,31 @@ pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 .footer-brand { display: grid; gap: 12px; }
 .footer-brand img { display: block; width: 128px; height: auto; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-/* Product home: a focused introduction, then tasks and an install route. */
+/* Product home: one value proposition with atom loss integrated into it. */
 .home-hero { display: block; padding: 80px 0; }
+.home-intro { max-width: 900px; }
 .home-hero h1 { font-size: clamp(2.75rem, 5.5vw, 4.5rem); max-width: 22ch; line-height: 1.08; }
-.home-hero .hero-copy { font-size: 1.25rem; max-width: none; margin-top: 24px; }
+.home-hero .hero-copy { font-size: 1.25rem; max-width: 64ch; margin-top: 24px; }
 .home-hero .actions { margin-top: 28px; }
-.hero-meta { color: var(--muted); font-size: .8125rem; margin: 20px 0 0; }
-.hero-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
-.hero-meta a { color: inherit; }
+.atom-loss-button { border-color: #d8b29d; background: var(--accent-soft); color: var(--accent-dark); }
+.atom-loss-button:hover { border-color: var(--brand-copper); background: #f1dccd; }
+.home-example { display: grid; grid-template-columns: minmax(220px, .65fr) minmax(0, 1.35fr); gap: 40px; align-items: center; margin: 0 0 48px; padding: 32px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
+.home-example-copy h2 { margin-top: 0; }
+.home-example-copy p:not(.eyebrow) { color: var(--muted); }
+.home-example-copy > a { display: inline-block; margin-top: 8px; font-weight: 600; text-decoration: none; }
+.home-example-copy > a:hover { text-decoration: underline; }
+.home-example-preview { display: block; min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 18px; }
+.home-example-preview img { display: block; width: 100%; height: auto; }
 .home-capabilities { border-top: 1px solid var(--border); padding: 48px 0 56px; }
 .workflow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; margin-top: 32px; }
 .workflow-grid article { min-width: 0; }
 .step-number { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--accent-soft); font-size: .8125rem; font-weight: 600; color: var(--accent-dark); }
 .workflow-grid h3 { margin-top: 12px; font-size: 1.375rem; }
+.workflow-grid h3 a { color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; }
+.workflow-grid h3 a span { color: var(--accent); font-size: .9em; }
 .workflow-grid p { color: var(--muted); font-size: .9375rem; min-height: 6.6em; }
-.workflow-grid a { display: block; padding: 4px 0; font-size: .875rem; text-decoration: none; }
+.workflow-grid a { display: inline-block; text-decoration: none; }
 .workflow-grid a:hover { text-decoration: underline; }
-.home-atom-loss { padding: 40px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 48px; }
-.loss-workflow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; list-style: none; padding: 0; margin: 32px 0; }
-.loss-workflow li { min-width: 0; border-top: 2px solid var(--accent); padding-top: 20px; }
-.loss-workflow h3 { font-size: 1.125rem; margin: 0 0 12px; }
-.loss-workflow p { font-size: .9375rem; color: var(--muted); margin: 0 0 16px; }
-.loss-workflow-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px 32px; border-top: 1px solid var(--border); padding-top: 28px; }
-.loss-workflow-actions p { display: grid; gap: 4px; margin: 0; font-size: .8125rem; }
-.loss-status { color: var(--muted); }
 .atom-loss-bundles { min-width: 580px; }
 .home-support { display: flex; justify-content: space-between; align-items: center; gap: 40px; }
 .home-support h2 { font-size: 1.65rem; }
@@ -151,7 +152,9 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .docs-navigation[open] > summary::after { content: '−'; }
   .docs-navigation:not([open]) > nav { display: none; }
   .docs-navigation nav { padding: 12px; background: var(--surface-muted); }
-  .home-hero { padding: 48px 0; }
+  .home-hero { padding: 56px 0; }
+  .home-hero h1 { font-size: 2.8rem; }
+  .home-example { grid-template-columns: 1fr; gap: 28px; }
   .home-support { display: block; }
   .workflow-grid { gap: 24px; }
 }
@@ -162,10 +165,10 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .version-inner > :last-child { margin-left: 0; }
   .home-hero h1 { max-width: none; }
   .home-hero .hero-copy { font-size: 1.125rem; }
-  .workflow-grid, .loss-workflow { grid-template-columns: 1fr; gap: 24px; }
+  .workflow-grid { grid-template-columns: 1fr; gap: 24px; }
   .workflow-grid p { min-height: 0; }
   .workflow-grid article + article { border-top: 1px solid var(--border); padding-top: 24px; }
-  .home-atom-loss { padding: 24px 20px; }
+  .home-example { padding: 24px 20px; }
   .home-capabilities { padding-block: 36px; }
   .actions { flex-direction: row; }
   .actions .button { width: auto; }
