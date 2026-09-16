@@ -202,9 +202,10 @@ class NegativeControlTests(unittest.TestCase):
             plan["limits_and_semantics"]["timeout"]["scope"] = "compile-and-solve"
         self.assert_plan_rejected(mutate, "solve phase")
 
-    def test_premature_maturity_promotion_fails(self):
+    def test_supported_maturity_without_publication_record_fails(self):
         def mutate(plan):
             plan["maturity"]["current"] = "supported"
+            plan["maturity"]["promotion_release"] = None
         self.assert_plan_rejected(mutate, "promoted before the evidence exists")
 
     def test_correctness_identity_must_be_pinned(self):
@@ -286,7 +287,8 @@ class CommittedPlanTests(unittest.TestCase):
     def test_committed_plan_passes_and_documents_the_domain(self):
         """One consistent scoped plan must pass, so unconditional failure cannot win."""
         plan = scope.load_plan(PLAN_PATH)
-        self.assertEqual(plan["maturity"]["current"], "beta")
+        self.assertEqual(plan["maturity"]["current"], "supported")
+        self.assertEqual(plan["maturity"]["promotion_release"], "v0.3.2")
         table = scope.domain_table(plan)
         self.assertIn("midswap-d3-r2-loss-0.002-batches-1024-16384", table)
         self.assertIn("midswap-d3-r1-loss-0.01-batches-1024-16384", table)

@@ -16,8 +16,8 @@ async function servedMatrix(request) {
   return matrix;
 }
 
-function matchingPublication(matrix) {
-  const decoder = matrix.decoders['envelope-matching'];
+function decoderPublication(matrix, name) {
+  const decoder = matrix.decoders[name];
   expect(decoder.current_maturity).toBe('supported');
   const published = decoder.published_support;
   expect(published).toBeTruthy();
@@ -28,11 +28,16 @@ function matchingPublication(matrix) {
   return published;
 }
 
+const matchingPublication = matrix => decoderPublication(matrix, 'envelope-matching');
+const mlePublication = matrix => decoderPublication(matrix, 'envelope-mle');
+
 const matchingBadge = page => page.locator('[data-decoder-badge="envelope-matching"]');
 const mleBadge = page => page.locator('[data-decoder-badge="envelope-mle"]');
 
 test('tutorial and concepts render the version-bound Supported label with evidence links', async ({ page, request }, testInfo) => {
-  const published = matchingPublication(await servedMatrix(request));
+  const matrix = await servedMatrix(request);
+  const published = matchingPublication(matrix);
+  const mlePublished = mlePublication(matrix);
 
   await page.goto('/atom-loss-concepts/');
   const conceptBadge = matchingBadge(page);
@@ -46,8 +51,13 @@ test('tutorial and concepts render the version-bound Supported label with eviden
   await expect(boundary).toContainText('Supported since');
   await expect(boundary).toContainText(published.release);
   const conceptMle = mleBadge(page);
-  await expect(conceptMle).toHaveText('Envelope MLE · Beta');
-  await expect(conceptMle.locator('a')).toHaveCount(0);
+  await expect(conceptMle.locator('a')).toHaveText(`Envelope MLE · Supported · ${mlePublished.release}`);
+  await expect(conceptMle.locator('a')).toHaveAttribute('href', mlePublished.release_url);
+  await expect(conceptMle).toHaveAttribute('data-release', mlePublished.release);
+  await expect(conceptMle).toHaveAttribute('data-evidence-asset', mlePublished.evidence_asset);
+  await expect(page.locator('[data-evidence-link="envelope-mle"]')).toHaveAttribute('href', mlePublished.release_url);
+  await expect(boundary).toContainText('four exact measured points');
+  await expect(boundary).toContainText('requires an ILP-capable build');
   await page.screenshot({ path: testInfo.outputPath('atom-loss-concepts-support.png'), fullPage: true });
 
   await page.goto('/atom-loss/');
@@ -63,6 +73,8 @@ test('missing support evidence keeps the Beta label', async ({ page }) => {
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
   await expect(matchingBadge(page).locator('a')).toHaveCount(0);
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
 });
 
 test('failed support evidence keeps the Beta label', async ({ page, request }) => {
@@ -73,6 +85,17 @@ test('failed support evidence keeps the Beta label', async ({ page, request }) =
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
   await expect(matchingBadge(page).locator('a')).toHaveCount(0);
+});
+
+test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => {
+  const matrix = await servedMatrix(request);
+  matrix.decoders['envelope-mle'].published_support.evidence_asset = '';
+  await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
+  await page.goto('/atom-loss-concepts/');
+  const matching = matchingPublication(matrix);
+  await expect(matchingBadge(page).locator('a')).toHaveText(`Envelope matching · Supported · ${matching.release}`);
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
 });
 
 test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, request }) => {
@@ -87,10 +110,12 @@ test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, re
   await expect(matchingBadge(page)).not.toContainText('Supported');
 });
 
-test('MLE does not inherit the matching Supported badge', async ({ page, request }) => {
+test('the previous Matching-only release does not promote MLE', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
-  // Hostile fixture: MLE claims supported maturity without any published evidence.
-  matrix.decoders['envelope-mle'].current_maturity = 'supported';
+  // v0.3.1 published Matching only; MLE had no publication record.
+  delete matrix.decoders['envelope-mle'].published_support;
+  matrix.decoders['envelope-mle'].current_maturity = 'beta';
+  matrix.decoders['envelope-mle'].proposed_release_maturity = 'beta';
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
   const published = matchingPublication(matrix);
