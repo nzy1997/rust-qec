@@ -549,6 +549,7 @@ fn homepage_presents_a_focused_workflow_and_atom_loss_feature() {
             "Get started",
             "href=\"get-started/\"",
             "Inspect a detector circuit",
+            "Use Shot Lab to inspect a circuit one shot at a time",
             "From codes to decoding",
             "href=\"atom-loss/\"",
             "href=\"get-started/#first-circuit\"",
