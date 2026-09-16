@@ -1,6 +1,6 @@
 {
   "schema_version": "rustqec.envelope-mle-scope.v1",
-  "purpose": "Executable candidate support contract for the envelope-mle decoder (issue #721). Declares the narrow finite domain in which MLE can be promoted to Supported, the exact evidence every part of that domain requires, and the failure/output semantics that bound out-of-budget behavior. Verified offline by tools/test_envelope_mle_scope.py and enforced at release time by tools/check_envelope_release.py (issue #722). This plan does not by itself promote MLE: current_maturity stays beta until every required case is fulfilled by revision-bound evidence and a release passes the gate.",
+  "purpose": "Executable support contract for the envelope-mle decoder (issues #721-#723). Declares the narrow finite Supported domain, the exact evidence every part of that domain requires, and the failure/output semantics that bound out-of-budget behavior. Verified offline by tools/test_envelope_mle_scope.py and enforced at release time by tools/check_envelope_release.py. The first immutable publication of this promise is v0.3.2.",
   "applies_to": {
     "repository": "nzy1997/rust-qec",
     "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
@@ -12,10 +12,10 @@
     "ilp"
   ],
   "maturity": {
-    "current": "beta",
+    "current": "supported",
     "proposed_release_maturity": "supported-candidate",
-    "promotion_rule": "MLE is promoted to Supported only when (a) every required case below is fulfilled by revision-bound evidence, (b) the declared workload matrix is executed inside the budgets declared before measurement, (c) installed ILP-capable archives pass the known-answer and rejection controls on both native targets, and (d) the release gate passes on the exact release candidate. A green Matching release never promotes MLE.",
-    "promotion_release": null
+    "promotion_rule": "MLE is Supported only for a publication where (a) every required case below is fulfilled by revision-bound evidence, (b) the declared workload matrix is executed inside the budgets declared before measurement, (c) installed ILP-capable archives pass the known-answer and rejection controls on both native targets, and (d) the release gate passes on the exact release candidate. A green Matching release never promotes MLE.",
+    "promotion_release": "v0.3.2"
   },
   "domain": {
     "circuit_family": "midswap",

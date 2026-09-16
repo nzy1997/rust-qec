@@ -29,8 +29,16 @@
     },
     "envelope-mle": {
       "required_build_features": ["ilp"],
-      "current_maturity": "beta",
-      "proposed_release_maturity": "beta",
+      "current_maturity": "supported",
+      "proposed_release_maturity": "supported-candidate",
+      "published_support": {
+        "maturity": "supported",
+        "release": "v0.3.2",
+        "release_url": "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.2",
+        "evidence_asset": "envelope-support-evidence-v0.3.2.tar.gz",
+        "evidence_url": "https://github.com/nzy1997/rust-qec/releases/download/v0.3.2/envelope-support-evidence-v0.3.2.tar.gz",
+        "scope": "Exactly four measured Mid-SWAP workload points: d=3/r=2 at loss 0.002 and d=3/r=1 at loss 0.01, each with batches 1,024 and 16,384; no interpolation."
+      },
       "objective": "Exact most-likely fault configuration for the declared envelope model, solved per conditioned loss pattern with ILP.",
       "known_limitations": [
         "Envelope candidate count is bounded (rejects with unsupported_circuit when the limit is exceeded, e.g. the conventional fixture).",
@@ -69,7 +77,7 @@
     ]
   },
   "release_candidate_scope": {
-    "statement": "First supported-release candidate scope: envelope-matching on flat loss-visible Mid-SWAP memory-Z circuits inside the circuit contract above, within the numeric operating limits of the resource report. envelope-mle remains Beta. Conventional circuits remain isolated checked examples at Beta. Known accepted regression cases are retained without being promoted merely because they run.",
+    "statement": "Supported-release candidate scope: envelope-matching on flat loss-visible Mid-SWAP memory-Z circuits inside the circuit contract above, within the numeric operating limits of the resource report; and envelope-mle at exactly the four measured workload points declared by docs/envelope-mle-scope.json, with no interpolation. Conventional circuits remain isolated checked examples for Matching and outside the MLE supported domain. Known accepted regression cases are retained without being promoted merely because they run.",
     "promotion_gate": "Issue #716 per-decoder release-readiness gate (correctness + resources + installed-artifact checks on both native platforms)"
   },
   "controls": [
