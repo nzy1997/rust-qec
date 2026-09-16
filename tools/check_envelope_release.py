@@ -95,13 +95,13 @@ def candidate_revision() -> str:
     return revision
 
 
-def is_ancestor(ancestor: str, descendant: str) -> bool | None:
+def is_ancestor(ancestor: str, descendant: str, repo_root: Path = REPO_ROOT) -> bool | None:
     """True/False when git can decide, None when it cannot."""
     if ancestor == descendant:
         return True
     result = subprocess.run(
         ["git", "merge-base", "--is-ancestor", ancestor, descendant],
-        cwd=REPO_ROOT, check=False,
+        cwd=repo_root, check=False,
     )
     if result.returncode == 0:
         return True
@@ -284,9 +284,22 @@ DEFAULT_RETAINED_REPORT = Path("benchmarks/atom_loss/readiness/resources/manifes
 
 # The retained full resource report supports promotion only for candidates
 # whose measurement-relevant sources are identical to the measured revision.
+# This covers the measurement driver, its transitive helper modules (corpus
+# and circuit generation, dataset packaging, workload execution), the input
+# fixtures the workloads consume, and the build configuration that affects
+# the measured performance.
 RETAINED_EQUIVALENCE_PATHS = (
     "benchmarks/atom_loss/readiness_resources.py",
+    "benchmarks/atom_loss/chain_reference.py",
+    "benchmarks/atom_loss/decoder_reference.py",
+    "benchmarks/atom_loss/run.py",
+    "benchmarks/atom_loss/reference.py",
+    "benchmarks/atom_loss/artifacts.py",
+    "benchmarks/atom_loss/correctness.py",
+    "benchmarks/atom_loss/shot_data.py",
+    "benchmarks/atom_loss/fixtures",
     "benchmarks/atom_loss/requirements.txt",
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss",
     "docs/envelope-support.json",
     "Cargo.toml",
     "Cargo.lock",
@@ -524,7 +537,8 @@ def decoder_coverage(
     return missing
 
 
-def check_retained_report(path: Path, candidate: str, gaps: list[str]) -> dict[str, Any]:
+def check_retained_report(path: Path, candidate: str, gaps: list[str],
+                          repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     """Bind the committed full resource report to the candidate's sources.
 
     The report is a committed artifact, so it cannot name its own commit; the
@@ -551,7 +565,7 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str]) -> dict[s
         gaps.append("retained resource report does not record its checkout revision")
         record["binding"] = "missing"
         return record
-    decision = is_ancestor(str(revision), candidate)
+    decision = is_ancestor(str(revision), candidate, repo_root)
     if decision is not True:
         gaps.append(
             f"retained resource report revision {revision} is not an ancestor of the "
@@ -562,7 +576,7 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str]) -> dict[s
     diff = subprocess.run(
         ["git", "diff", "--name-only", str(revision), candidate, "--",
          *RETAINED_EQUIVALENCE_PATHS],
-        capture_output=True, text=True, cwd=REPO_ROOT, check=False,
+        capture_output=True, text=True, cwd=repo_root, check=False,
     )
     if diff.returncode:
         gaps.append("cannot verify retained-report source equivalence (git diff failed)")
@@ -805,15 +819,74 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
     })
 
     tenth = ("Cargo.toml" in RETAINED_EQUIVALENCE_PATHS
-             and "benchmarks/atom_loss/requirements.txt" in RETAINED_EQUIVALENCE_PATHS)
+             and "benchmarks/atom_loss/requirements.txt" in RETAINED_EQUIVALENCE_PATHS
+             and "benchmarks/atom_loss/decoder_reference.py" in RETAINED_EQUIVALENCE_PATHS
+             and "benchmarks/atom_loss/chain_reference.py" in RETAINED_EQUIVALENCE_PATHS
+             and "benchmarks/atom_loss/fixtures" in RETAINED_EQUIVALENCE_PATHS
+             and "rustqec-cli/tests/fixtures/current_rstim_atom_loss"
+             in RETAINED_EQUIVALENCE_PATHS)
     observations.append({
         "mutation": "equivalence-paths-cover-build-config",
         "rejected": tenth,
         "detail": sorted(RETAINED_EQUIVALENCE_PATHS),
     })
 
+    def helper_source_mutation() -> bool:
+        """Editing a measurement helper must invalidate the retained report."""
+        with tempfile.TemporaryDirectory(prefix="envelope-release-selftest-") as temporary:
+            repo = Path(temporary) / "repo"
+            helper = repo / "benchmarks" / "atom_loss" / "decoder_reference.py"
+            helper.parent.mkdir(parents=True)
+
+            def git(*argv: str) -> str:
+                result = subprocess.run(
+                    ["git", "-c", "user.name=selftest", "-c",
+                     "user.email=selftest@example.invalid", *argv],
+                    cwd=repo, capture_output=True, text=True, check=True,
+                )
+                return result.stdout.strip()
+
+            git("init", "-q")
+            helper.write_text("def noise(): return 'X_ERROR(0.1)'\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "baseline helper")
+            measured = git("rev-parse", "HEAD")
+            helper.write_text("def noise(): return 'X_ERROR(0.2)'\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "-q", "-m", "change the measured corpus")
+            candidate_head = git("rev-parse", "HEAD")
+
+            manifest_path = Path(temporary) / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "schema_version": RETAINED_MANIFEST_SCHEMA,
+                "status": "pass",
+                "checkout_revision": measured,
+            }) + "\n", encoding="utf-8")
+            mutated_gaps: list[str] = []
+            mutated = check_retained_report(manifest_path, candidate_head,
+                                            mutated_gaps, repo)
+            control_gaps: list[str] = []
+            control = check_retained_report(manifest_path, measured,
+                                            control_gaps, repo)
+            return (
+                mutated["binding"] == "sources-differ"
+                and "benchmarks/atom_loss/decoder_reference.py"
+                in mutated["changed_equivalence_paths"]
+                and any("measurement-relevant sources changed" in gap
+                        for gap in mutated_gaps)
+                and control["binding"] == "source-equivalent"
+                and not control_gaps
+            )
+
+    eleventh = helper_source_mutation()
+    observations.append({
+        "mutation": "helper-source-change-invalidates-retained-report",
+        "rejected": eleventh,
+        "detail": "decoder_reference.py edit must flip the binding to sources-differ",
+    })
+
     passed = all([first, second, third, fourth, fifth, sixth, seventh, eighth,
-                  ninth, tenth])
+                  ninth, tenth, eleventh])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
         print(f"{PASS_LINE} self-test")
