@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +29,29 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
             with self.assertRaises(publication.PublicationError) as caught:
                 publication.verify_release_dir(legacy, ("envelope-matching",))
             self.assertIn("lacks a verified envelope promotion", str(caught.exception))
+
+    def test_verification_marker_records_verified_bundle_identity(self) -> None:
+        result = {
+            "tag": "v1.2.3",
+            "version": "1.2.3",
+            "source_sha": "a" * 40,
+            "evidence_bundle": {"asset": "evidence.tar.gz", "sha256": "b" * 64},
+            "supported_decoders": ["envelope-matching"],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = Path(temporary) / "verification.json"
+            publication.write_verification_marker(result, marker)
+            record = json.loads(marker.read_text(encoding="utf-8"))
+        self.assertEqual(record["schema_version"], publication.VERIFICATION_SCHEMA)
+        self.assertEqual(record["verification"], "pass")
+        self.assertEqual(record["evidence_bundle"], result["evidence_bundle"])
+
+    def test_marker_output_requires_release_verification_and_expected_decoder(self) -> None:
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                publication.main(["--self-test", "--marker-out", "marker.json"])
+            with self.assertRaises(SystemExit):
+                publication.main(["--release-dir", "release", "--marker-out", "marker.json"])
 
 
 if __name__ == "__main__":

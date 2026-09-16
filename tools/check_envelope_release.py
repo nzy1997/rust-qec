@@ -209,6 +209,7 @@ def check_generated_evidence(
         gaps.append(f"{name} evidence status is {evidence.get('status')!r}, not 'pass'")
     return {
         "path": str(path),
+        "sha256": support.sha256_file(path),
         "schema_version": schema,
         "checkout_revision": revision,
         "revision_bound": bound,
@@ -260,6 +261,8 @@ def check_installed_report(
         )
     return {
         "path": str(path),
+        "sha256": support.sha256_file(path),
+        "portable_sha256": json_document_sha256(portable_installed_report(report)),
         "target": target,
         "source_revision": revision,
         "revision_bound": bound,
@@ -267,6 +270,39 @@ def check_installed_report(
         "status": report.get("status"),
         "report": report,
     }
+
+
+def portable_installed_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Machine-independent installed report retained in publication bundles."""
+    archive = report.get("archive") or {}
+    return {
+        "schema_version": report["schema_version"],
+        "target": report["target"],
+        "source_revision": report["source_revision"],
+        "ilp": report["ilp"],
+        "matrix": {
+            "sha256": report["matrix"]["sha256"],
+            "schema_version": report["matrix"]["schema_version"],
+        },
+        "binary": {
+            "sha256": report["binary"]["sha256"],
+            "version": report["binary"]["version"],
+            "advertised_decoders": report["binary"]["advertised_decoders"],
+        },
+        "archive": {
+            "filename": Path(str(archive.get("path") or archive.get("filename", ""))).name,
+            "sha256": archive.get("sha256"),
+        },
+        "controls": report.get("controls", []),
+        "previous_fixture_semantics": report.get("previous_fixture_semantics"),
+        "status": report["status"],
+        "problems": report.get("problems", []),
+    }
+
+
+def json_document_sha256(document: dict[str, Any]) -> str:
+    payload = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 # Coverage contracts mirrored from the suites that produce the evidence. Keep
@@ -551,6 +587,7 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
         record["present"] = False
         return record
     record["present"] = True
+    record["sha256"] = support.sha256_file(path)
     manifest = load_json(path)
     if manifest.get("schema_version") != RETAINED_MANIFEST_SCHEMA:
         gaps.append(
