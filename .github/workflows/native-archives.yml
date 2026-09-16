@@ -92,6 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m unittest tools.test_verify_release_archive
+      - run: python3 -m unittest tools.test_check_envelope_publication
 
   shot-assets:
     needs: prepare
@@ -477,6 +478,77 @@ jobs:
           path: gate-out/
           if-no-files-found: error
 
+  envelope-publication:
+    needs: [prepare, aggregate, envelope-release-gate]
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+      SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+    steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+      - name: Download the staged release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: native-release-bundle
+          path: staged-release
+      - name: Download generated envelope evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: envelope-generated
+          path: evidence
+      - name: Download installed-envelope reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: envelope-installed-*
+          path: evidence
+          merge-multiple: true
+      - name: Download the envelope release decision
+        uses: actions/download-artifact@v4
+        with:
+          name: envelope-release-gate
+          path: gate-out
+      - name: Assemble the version-bound support evidence bundle
+        run: |
+          set -euo pipefail
+          python3 tooling/tools/check_envelope_publication.py build \
+            --tag "$RELEASE_TAG" \
+            --source-sha "$SOURCE_SHA" \
+            --release-manifest staged-release/release-manifest.json \
+            --archives-dir staged-release \
+            --evidence-dir evidence \
+            --gate-report gate-out/release-gate.json \
+            --matrix tooling/docs/envelope-support.json \
+            --policy tooling/docs/envelope-compatibility-policy.md \
+            --retained-resources tooling/benchmarks/atom_loss/readiness/resources \
+            --out-dir publication
+      - name: Round-trip verify the bundle against the staged release
+        run: |
+          set -euo pipefail
+          mkdir audit
+          cp staged-release/rustqec-*.tar.gz staged-release/SHA256SUMS \
+            staged-release/release-manifest.json audit/
+          cp publication/* audit/
+          supported="$(tar -xzOf publication/envelope-support-evidence-*.tar.gz \
+            --wildcards '*/publication.json' | \
+            python3 -c 'import json, sys; print(" ".join(json.load(sys.stdin)["supported_decoders"]))')"
+          expect=()
+          for decoder in $supported; do
+            expect+=(--expect-decoder "$decoder")
+          done
+          python3 tooling/tools/check_envelope_publication.py \
+            --release-dir audit "${expect[@]}"
+      - name: Prove the verifier rejects defective bundles
+        run: python3 tooling/tools/check_envelope_publication.py --self-test
+      - name: Upload the envelope support evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: envelope-publication
+          path: publication/
+          if-no-files-found: error
+
   verify-linux-runtime:
     needs: [prepare, aggregate]
     runs-on: ubuntu-24.04
@@ -607,17 +679,44 @@ jobs:
 
   publish:
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    needs: [prepare, checker-tests, verify-linux-runtime, verify-macos-runtime, envelope-release-gate]
+    needs: [prepare, checker-tests, verify-linux-runtime, verify-macos-runtime, envelope-release-gate, envelope-publication]
     runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: write
     steps:
+      - name: Checkout current release tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
       - name: Download the release-gated verified bundle
         uses: actions/download-artifact@v4
         with:
           name: native-release-bundle
           path: staged-release
+      - name: Download the envelope support evidence bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: envelope-publication
+          path: publication
+      - name: Reconcile the evidence bundle with the staged release before upload
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir audit
+          cp staged-release/rustqec-*.tar.gz staged-release/SHA256SUMS \
+            staged-release/release-manifest.json audit/
+          cp publication/* audit/
+          supported="$(tar -xzOf publication/envelope-support-evidence-*.tar.gz \
+            --wildcards '*/publication.json' | \
+            python3 -c 'import json, sys; print(" ".join(json.load(sys.stdin)["supported_decoders"]))')"
+          expect=()
+          for decoder in $supported; do
+            expect+=(--expect-decoder "$decoder")
+          done
+          python3 tooling/tools/check_envelope_publication.py \
+            --release-dir audit "${expect[@]}"
       - name: Attach new assets to the existing release without overwriting
         env:
           GH_TOKEN: ${{ github.token }}
@@ -627,7 +726,7 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
           fi
           existing_assets="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          for asset in staged-release/rustqec-*.tar.gz staged-release/SHA256SUMS staged-release/release-manifest.json staged-release/verify_release_archive.py; do
+          for asset in staged-release/rustqec-*.tar.gz staged-release/SHA256SUMS staged-release/release-manifest.json staged-release/verify_release_archive.py publication/envelope-support-evidence-*.tar.gz publication/envelope-support-evidence-*.tar.gz.sha256; do
             if grep -Fxq "$(basename "$asset")" <<< "$existing_assets"; then
               echo "release asset already exists; refusing to overwrite: $(basename "$asset")" >&2
               exit 1
@@ -638,4 +737,6 @@ jobs:
             staged-release/SHA256SUMS \
             staged-release/release-manifest.json \
             staged-release/verify_release_archive.py \
+            publication/envelope-support-evidence-*.tar.gz \
+            publication/envelope-support-evidence-*.tar.gz.sha256 \
             --repo "$GITHUB_REPOSITORY"
