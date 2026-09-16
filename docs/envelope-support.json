@@ -4,7 +4,7 @@
   "applies_to": {
     "repository": "nzy1997/rust-qec",
     "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
-    "release_line": "0.3 release line (v0.3.1 and later)",
+    "release_line": "0.3 release line (v0.3.2 and later)",
     "note": "The promise applies to the recorded source revision and later revisions for which tools/check_envelope_support.py passes. A version string alone is not a synonym for stable support: per-decoder promotion is gated by the release-readiness check (issue #716) and is durable only through the release's published evidence bundle (issue #719). Releases without that bundle, such as v0.3.0, lack a verified promotion."
   },
   "decoders": {
@@ -14,12 +14,12 @@
       "proposed_release_maturity": "supported-candidate",
       "published_support": {
         "maturity": "supported",
-        "release": "v0.3.1",
-        "release_url": "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.1",
-        "evidence_asset": "envelope-support-evidence-v0.3.1.tar.gz",
-        "evidence_url": "https://github.com/nzy1997/rust-qec/releases/download/v0.3.1/envelope-support-evidence-v0.3.1.tar.gz",
-        "verification_asset": "envelope-support-verification-v0.3.1.json",
-        "verification_url": "https://api.github.com/repos/nzy1997/rust-qec/releases/tags/v0.3.1",
+        "release": "v0.3.2",
+        "release_url": "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.2",
+        "evidence_asset": "envelope-support-evidence-v0.3.2.tar.gz",
+        "evidence_url": "https://github.com/nzy1997/rust-qec/releases/download/v0.3.2/envelope-support-evidence-v0.3.2.tar.gz",
+        "verification_asset": "envelope-support-verification-v0.3.2.json",
+        "verification_url": "https://api.github.com/repos/nzy1997/rust-qec/releases/tags/v0.3.2",
         "scope": "Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope."
       },
       "objective": "Minimum-weight perfect matching on a loss-conditioned graph; an approximation to the declared fault-configuration objective. Ties are resolved by the matching implementation and are only checked against the explicitly allowed answer sets recorded by the independent correctness suite.",
