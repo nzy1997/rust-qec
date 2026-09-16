@@ -118,7 +118,7 @@ def require(condition: bool, message: str) -> None:
 def derive_decoders(
     matrix: dict[str, Any],
     gate_report: dict[str, Any],
-    mle_plan: dict[str, Any],
+    mle_plan: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """The only maturity/scope a bundle may claim, derived from the evidence.
 
@@ -140,19 +140,24 @@ def derive_decoders(
         )
         scope_statement = matrix["release_candidate_scope"]["statement"]
         scope_plan = None
-        if name == "envelope-mle":
+        if name == "envelope-mle" and mle_plan is not None:
             scope_statement = mle_plan["domain"]["no_interpolation"]
             scope_plan = "scope/envelope-mle-scope.json"
-        decoders[name] = {
+        record = {
             "maturity": decision["decision"],
             "objective": declaration["objective"],
             "required_build_features": declaration.get("required_build_features", []),
             "circuit_families": families,
             "scope_statement": scope_statement,
-            "scope_plan": scope_plan,
             "numeric_operating_limits": declaration["numeric_operating_limits"],
             "known_limitations": declaration["known_limitations"],
         }
+        # Matching-only legacy bundles (v0.3.1) predate the MLE scope-plan
+        # member. Preserve their exact publication shape while requiring the
+        # plan for every bundle that actually carries one or promotes MLE.
+        if scope_plan is not None:
+            record["scope_plan"] = scope_plan
+        decoders[name] = record
     return decoders
 
 
@@ -705,19 +710,27 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         policy_sha == (publication.get("policy") or {}).get("sha256"),
         "bundled compatibility policy does not match the publication record",
     )
-    scope_path = bundle / "scope/envelope-mle-scope.json"
-    try:
-        mle_plan = mle_scope.load_plan(scope_path)
-    except (mle_scope.ScopeError, json.JSONDecodeError) as error:
-        raise PublicationError(f"bundled MLE scope plan is invalid: {error}") from error
     scope_record = publication.get("mle_scope") or {}
-    require(
-        scope_record.get("path") == "scope/envelope-mle-scope.json"
-        and scope_record.get("sha256") == sha256_file(scope_path)
-        and scope_record.get("source_revision")
-        == mle_plan.get("applies_to", {}).get("source_revision"),
-        "bundled MLE scope plan does not match the publication record",
-    )
+    scope_path = bundle / "scope/envelope-mle-scope.json"
+    mle_plan: dict[str, Any] | None = None
+    if scope_record:
+        require(scope_path.is_file(), "publication records an MLE scope plan but the bundle omits it")
+        try:
+            mle_plan = mle_scope.load_plan(scope_path)
+        except (mle_scope.ScopeError, json.JSONDecodeError) as error:
+            raise PublicationError(f"bundled MLE scope plan is invalid: {error}") from error
+        require(
+            scope_record.get("path") == "scope/envelope-mle-scope.json"
+            and scope_record.get("sha256") == sha256_file(scope_path)
+            and scope_record.get("source_revision")
+            == mle_plan.get("applies_to", {}).get("source_revision"),
+            "bundled MLE scope plan does not match the publication record",
+        )
+    else:
+        require(
+            not scope_path.exists(),
+            "bundle carries an unrecorded MLE scope plan",
+        )
 
     gate_report = load_json(bundle / "release-gate.json", "bundled gate report")
     check_gate_report(gate_report, source_sha, matrix_sha, policy_sha, "bundled gate report")
@@ -730,13 +743,29 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         tuple(gate_report.get("required_targets", ())) == tuple(REQUIRED_TARGETS),
         "gate report does not cover both official release targets",
     )
-    require(
-        (gate_report.get("mle_scope_plan") or {}).get("sha256")
-        == scope_record.get("sha256"),
-        "bundled MLE scope plan does not match the plan consumed by the gate",
+    mle_decision = (gate_report.get("decoders", {}).get("envelope-mle") or {}).get(
+        "decision"
     )
+    if mle_plan is not None:
+        require(
+            (gate_report.get("mle_scope_plan") or {}).get("sha256")
+            == scope_record.get("sha256"),
+            "bundled MLE scope plan does not match the plan consumed by the gate",
+        )
+    else:
+        require(
+            mle_decision != "supported" and "envelope-mle" not in expect_decoders,
+            "an MLE Supported publication requires a bundled, gate-bound MLE scope plan",
+        )
 
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
+        recorded = (publication.get("evidence") or {}).get(name) or {}
+        if name == "mle-resources" and not recorded:
+            require(
+                mle_decision != "supported",
+                "an MLE Supported publication requires bundled mle-resources evidence",
+            )
+            continue
         path = bundle / "evidence" / filename
         evidence = load_json(path, f"bundled {name} evidence")
         require_schema(evidence, schema, f"bundled {name} evidence")
@@ -757,7 +786,6 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
                 not problems,
                 "bundled MLE resource evidence failed replay: " + "; ".join(problems),
             )
-        recorded = (publication.get("evidence") or {}).get(name) or {}
         require(
             recorded.get("sha256") == sha256_file(path),
             f"bundled {name} evidence does not match the publication record",
@@ -1440,6 +1468,52 @@ def self_test() -> int:
         except PublicationError as error:
             mle_supported = observe("mle-supported-baseline", False, str(error))
 
+        # v0.3.1 is a valid Matching-only publication from before the MLE
+        # scope-plan and MLE-resource members existed. New verifiers must keep
+        # accepting that immutable bundle for Matching, while refusing an MLE
+        # expectation against it.
+        def make_matching_only_legacy(bundle_root: Path) -> None:
+            (bundle_root / "scope/envelope-mle-scope.json").unlink()
+            (bundle_root / "evidence/mle-resources.json").unlink()
+            gate_path = bundle_root / "release-gate.json"
+            gate_record = json.loads(gate_path.read_text(encoding="utf-8"))
+            gate_record.pop("mle_scope_plan", None)
+            gate_record["evidence"].pop("mle-resources", None)
+            gate_path.write_text(json.dumps(gate_record, indent=2) + "\n", encoding="utf-8")
+            publication_path = bundle_root / "publication.json"
+            publication_record = json.loads(publication_path.read_text(encoding="utf-8"))
+            publication_record.pop("mle_scope", None)
+            publication_record["evidence"].pop("mle-resources", None)
+            mle_claim = publication_record["decoders"]["envelope-mle"]
+            mle_claim.pop("scope_plan", None)
+            mle_claim["scope_statement"] = _fixture_matrix()["release_candidate_scope"][
+                "statement"
+            ]
+            publication_record["gate_report"]["sha256"] = sha256_file(gate_path)
+            publication_path.write_text(
+                json.dumps(publication_record, indent=2) + "\n", encoding="utf-8"
+            )
+
+        staged = fresh_stage("audit-matching-only-legacy")
+        repack_bundle(staged, bundle_name, make_matching_only_legacy)
+        try:
+            legacy_result = verify_release_dir(staged, ("envelope-matching",))
+            try:
+                verify_release_dir(staged, ("envelope-mle",))
+            except PublicationError as error:
+                legacy_mle_rejected = "requires a bundled, gate-bound MLE scope" in str(error)
+            else:
+                legacy_mle_rejected = False
+            matching_only_legacy = observe(
+                "matching-only-legacy-bundle",
+                legacy_result["supported_decoders"] == ["envelope-matching"]
+                and legacy_mle_rejected,
+                {"supported": legacy_result["supported_decoders"],
+                 "mle_rejected": legacy_mle_rejected},
+            )
+        except PublicationError as error:
+            matching_only_legacy = observe("matching-only-legacy-bundle", False, str(error))
+
         # A Beta-only legacy fixture must not satisfy --expect-decoder envelope-matching.
         legacy = make_selftest_fixture(work / "legacy-beta", matching_decision="beta")
         build_bundle(
@@ -1472,7 +1546,7 @@ def self_test() -> int:
 
     passed = all([
         baseline, swapped, missing, missing_mle_resources, invalid_mle_scope,
-        scope, failed_gate, mle_supported, beta_only, legacy_missing,
+        scope, failed_gate, mle_supported, matching_only_legacy, beta_only, legacy_missing,
     ])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
