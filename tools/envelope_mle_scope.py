@@ -19,7 +19,7 @@ fail validation.
 
 Usage:
     python3 tools/envelope_mle_scope.py --plan docs/envelope-mle-scope.json --domain-table
-    python3 tools/envelope_mle_scope.py --evaluate '{"circuit": {"family": "midswap", "distance": 3, "rounds": 2, "loss_rate": 0.002, "observables": 1}, "shots": 1024}'
+    python3 tools/envelope_mle_scope.py --evaluate '{"circuit": {"family": "midswap", "contract_valid": true, "flat": true, "readout_basis": "Z", "observables": 1, "sweep_bits": 0, "instructions": ["R", "LOSS", "ML", "DETECTOR", "OBSERVABLE_INCLUDE"], "distance": 3, "rounds": 2, "loss_rate": 0.002}, "shots": 1024}'
     python3 tools/envelope_mle_scope.py --resolve
 """
 
@@ -42,6 +42,7 @@ DECODER = "envelope-mle"
 # plan drops one of them, so a narrower evidence base cannot pass.
 BASELINE_REQUIRED_CASES = (
     "correctness:midswap-d3-r2-fixture",
+    "correctness:midswap-d3-r2-p002-generated",
     "correctness:midswap-d3-r1-generated",
     "correctness:midswap-d3-r3-generated",
     "control:mini-circuit-known-answer",
@@ -128,6 +129,15 @@ def validate_plan(plan: dict[str, Any]) -> None:
                 _fail(problems,
                       f"case {cid}: correctness cases must pin circuit_params "
                       "distance/rounds/loss_rate")
+            identity = case.get("evidence_identity") or {}
+            if (not isinstance(identity.get("source"), str)
+                    or not identity["source"]
+                    or not isinstance(identity.get("circuit_sha256"), str)
+                    or len(identity["circuit_sha256"]) != 64
+                    or not isinstance(identity.get("seed"), int)):
+                _fail(problems,
+                      f"case {cid}: correctness cases must pin evidence_identity "
+                      "source/circuit_sha256/seed")
         if kind == "resource-workload":
             if not isinstance(case.get("real_circuit"), bool):
                 _fail(problems, f"case {cid}: resource workloads must declare real_circuit")
@@ -191,9 +201,24 @@ def validate_plan(plan: dict[str, Any]) -> None:
             _fail(problems, f"duplicate or missing domain point id: {pid!r}")
             continue
         seen_points.add(pid)
-        for field in ("distance", "rounds", "loss_rate_max", "batch_max"):
+        for field in ("distance", "rounds"):
             if not isinstance(point.get(field), (int, float)) or point[field] <= 0:
                 _fail(problems, f"domain point {pid}: missing positive {field}")
+        loss_rates = point.get("loss_rates")
+        if (not isinstance(loss_rates, list) or not loss_rates
+                or any(not isinstance(value, (int, float)) or value <= 0
+                       for value in loss_rates)
+                or len(set(loss_rates)) != len(loss_rates)):
+            _fail(problems,
+                  f"domain point {pid}: loss_rates must be unique positive values")
+            loss_rates = []
+        batches = point.get("batches")
+        if (not isinstance(batches, list) or not batches
+                or any(not isinstance(value, int) or value <= 0 for value in batches)
+                or len(set(batches)) != len(batches)):
+            _fail(problems,
+                  f"domain point {pid}: batches must be unique positive integers")
+            batches = []
         evidence = point.get("required_evidence")
         if not isinstance(evidence, list) or not evidence:
             _fail(problems, f"domain point {pid}: no required evidence declared")
@@ -222,32 +247,39 @@ def validate_plan(plan: dict[str, Any]) -> None:
                   f"domain point {pid}: no independent end-to-end correctness case "
                   "on this circuit shape; compiler-only or borrowed evidence cannot "
                   "cover a grid point")
-        elif not any(
-                float((by_id[cid].get("circuit_params") or {}).get("loss_rate", -1))
-                == float(point["loss_rate_max"]) for cid in end_to_end):
+        elif loss_rates and not all(
+                any(float((by_id[cid].get("circuit_params") or {}).get(
+                              "loss_rate", -1)) == float(value)
+                    for cid in end_to_end)
+                for value in loss_rates):
             _fail(problems,
                   f"domain point {pid}: end-to-end correctness must be measured at "
-                  f"the point's loss ceiling {point['loss_rate_max']}")
+                  f"every exact declared loss point {loss_rates}")
         real_workloads = [
             cid for cid in evidence
             if by_id[cid]["kind"] == "resource-workload"
             and by_id[cid].get("real_circuit") and matches(cid)
         ]
-        batches = {
-            int(by_id[cid]["circuit_params"]["batch"])
-            for cid in real_workloads
-            if isinstance((by_id[cid].get("circuit_params") or {}).get("batch"), int)
-        }
         if not real_workloads:
             _fail(problems,
                   f"domain point {pid}: no real-circuit resource workload on this "
                   "circuit shape; Matching-only or synthetic cache evidence cannot "
                   "cover a grid point")
-        elif max(batches or {0}) < int(point["batch_max"]):
-            _fail(problems,
-                  f"domain point {pid}: batch ceiling {point['batch_max']} exceeds "
-                  "the largest measured real-circuit batch on this circuit shape "
-                  f"{max(batches or {0})}")
+        else:
+            measured = {
+                (float(by_id[cid]["circuit_params"]["loss_rate"]),
+                 int(by_id[cid]["circuit_params"]["batch"]))
+                for cid in real_workloads
+            }
+            declared = {
+                (float(loss_rate), int(batch))
+                for loss_rate in loss_rates for batch in batches
+            }
+            missing_points = declared - measured
+            if missing_points:
+                _fail(problems,
+                      f"domain point {pid}: real-circuit resource coverage is "
+                      f"missing exact loss/batch point(s) {sorted(missing_points)}")
         for cid in evidence:
             if by_id[cid].get("counts_toward_domain") is False:
                 _fail(problems,
@@ -268,8 +300,8 @@ def _point_covers(point: dict[str, Any], circuit: dict[str, Any], shots: int) ->
     return (
         circuit.get("distance") == point.get("distance")
         and circuit.get("rounds") == point.get("rounds")
-        and 0 < float(circuit.get("loss_rate", -1)) <= float(point["loss_rate_max"])
-        and 0 < shots <= int(point["batch_max"])
+        and circuit.get("loss_rate") in point["loss_rates"]
+        and shots in point["batches"]
     )
 
 
@@ -281,22 +313,41 @@ def evaluate_case(plan: dict[str, Any], descriptor: dict[str, Any]) -> dict[str,
     support-boundary verdict only; it never predicts decode success.
     """
     reasons: list[str] = []
-    circuit = descriptor.get("circuit") or {}
+    circuit = descriptor.get("circuit")
+    if not isinstance(circuit, dict):
+        return {
+            "status": "outside-supported-domain",
+            "reasons": ["circuit must be an explicit descriptor object"],
+        }
     shots = descriptor.get("shots")
     domain = plan["domain"]
     if circuit.get("family") != domain["circuit_family"]:
         reasons.append(
             f"circuit family {circuit.get('family')!r} is not {domain['circuit_family']!r}")
-    if circuit.get("flat", True) is not True:
+    if circuit.get("contract_valid") is not True:
+        reasons.append(
+            "contract_valid must be explicitly true after validating the full "
+            "circuit contract")
+    if circuit.get("flat") is not True:
         reasons.append("only flat circuits are in the domain (REPEAT blocks are rejected)")
-    basis = circuit.get("readout_basis", "Z")
+    basis = circuit.get("readout_basis")
     if basis != "Z":
         reasons.append(f"readout basis {basis!r} is not Z; X/Y-basis loss readouts are rejected")
-    observables = circuit.get("observables", 1)
+    observables = circuit.get("observables")
     if not isinstance(observables, int) or not 1 <= observables <= 64:
         reasons.append(f"observable count {observables!r} is outside 1..=64")
-    if circuit.get("sweep_bits", 0) != 0:
+    if circuit.get("sweep_bits") != 0:
         reasons.append("sweep bits are outside the domain")
+    instructions = circuit.get("instructions")
+    allowed = set(domain["allowed_instructions"])
+    if (not isinstance(instructions, list) or not instructions
+            or any(not isinstance(item, str) for item in instructions)):
+        reasons.append("instructions must be an explicit non-empty list of names")
+    else:
+        disallowed = sorted({item for item in instructions if item not in allowed})
+        if disallowed:
+            reasons.append("instructions outside the declared contract: "
+                           + ", ".join(disallowed))
     if not isinstance(shots, int) or shots <= 0:
         reasons.append(f"shot count {shots!r} is not a positive batch size")
     if not reasons:
@@ -307,7 +358,7 @@ def evaluate_case(plan: dict[str, Any], descriptor: dict[str, Any]) -> dict[str,
                 "no declared domain point covers "
                 f"distance={circuit.get('distance')}, rounds={circuit.get('rounds')}, "
                 f"loss_rate={circuit.get('loss_rate')}, shots={shots}; the supported "
-                "grid is finite and does not interpolate beyond its measured ceilings")
+                "grid contains exact measured loss/batch points and does not interpolate")
     if reasons:
         return {"status": "outside-supported-domain", "reasons": reasons}
     return {"status": "in-domain", "point": point["id"]}
@@ -357,13 +408,14 @@ def domain_table(plan: dict[str, Any]) -> str:
     """Reviewable rendering of the accepted finite domain."""
     lines = [
         "Accepted finite MLE candidate domain (no interpolation beyond these points):",
-        "| Point | Distance | Rounds | Loss rate | Batch | Required evidence |",
+        "| Point | Distance | Rounds | Loss rates | Batches | Required evidence |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for point in plan["domain"]["points"]:
         lines.append(
             f"| {point['id']} | {point['distance']} | {point['rounds']} "
-            f"| (0, {point['loss_rate_max']}] | ≤ {point['batch_max']} "
+            f"| {', '.join(map(str, point['loss_rates']))} "
+            f"| {', '.join(map(str, point['batches']))} "
             f"| {', '.join(point['required_evidence'])} |")
     return "\n".join(lines)
 

@@ -48,6 +48,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools import check_envelope_support as support  # noqa: E402
 from tools import envelope_mle_scope as mle_scope  # noqa: E402
+from benchmarks.atom_loss import mle_candidate_resources as mle_resource_campaign  # noqa: E402
 
 SCHEMA_VERSION = "rustqec.envelope-release-report.v1"
 EQUIVALENCE_SCHEMA = "rustqec.source-equivalence.v1"
@@ -287,23 +288,14 @@ DEFAULT_RETAINED_REPORT = Path("benchmarks/atom_loss/readiness/resources/manifes
 # MLE candidate-scope contracts mirrored from docs/envelope-mle-scope.json and
 # benchmarks/atom_loss/mle_candidate_resources.py; the gate intentionally
 # fails loudly when the plan or the campaign drifts from these values.
-MLE_RESOURCES_SCHEMA = "rustqec.envelope-mle-candidate-resources.v1"
-MLE_EXPECTED_BUDGET = {
-    "per_case_wall_seconds": 900,
-    "total_wall_seconds": 3600,
-    "peak_rss_bytes": 4 * 1024**3,
-}
-MLE_REQUIRED_WORKLOADS = (
-    "mle-d3r2-p002-b1024",
-    "mle-d3r2-p002-b16384",
-    "mle-d3r1-p010-b1024",
-    "mle-d3r1-p010-b16384",
-    "mle-eviction-wires24",
+MLE_RESOURCES_SCHEMA = mle_resource_campaign.SCHEMA
+MLE_EXPECTED_BUDGET = mle_resource_campaign.BUDGET
+MLE_REQUIRED_WORKLOADS = tuple(
+    workload["id"] for workload in mle_resource_campaign.WORKLOADS
 )
 MLE_FAILURE_CODES = {
-    "fail-mle-candidate-limit": "unsupported_circuit",
-    "fail-mle-solve-timeout": "decode_timeout",
-    "fail-mle-infeasible": "decode_infeasible",
+    case_id: expectation[0]
+    for case_id, expectation in mle_resource_campaign.EXPECTED_FAILURE_CODES.items()
 }
 
 # The retained full resource report supports promotion only for candidates
@@ -654,6 +646,7 @@ def mle_plan_gaps(
     plan: dict[str, Any],
     generated: dict[str, dict[str, Any] | None],
     installed: dict[str, dict[str, Any] | None],
+    plan_path: Path,
 ) -> list[str]:
     """Map the scope plan's required case IDs onto the actual evidence.
 
@@ -674,6 +667,14 @@ def mle_plan_gaps(
         for r in (support_result or {}).get("results", [])
     }
     res_cases = {c.get("id"): c for c in (mle_resources or {}).get("cases", [])}
+
+    if mle_resources is not None:
+        gaps.extend(
+            f"{label}: {problem}"
+            for problem in mle_resource_campaign.verify_document(
+                mle_resources, plan_path
+            )
+        )
 
     declared_workloads = {
         c["workload_id"] for c in plan["required_cases"] if c["kind"] == "resource-workload"
@@ -701,6 +702,20 @@ def mle_plan_gaps(
                             "execute envelope-mle")
             elif found.get("status") != "pass":
                 gaps.append(f"{label}: correctness case {case['case_name']} is not passing")
+            else:
+                expected_identity = case.get("evidence_identity") or {}
+                for field in ("source", "circuit_sha256", "seed"):
+                    if found.get(field) != expected_identity.get(field):
+                        gaps.append(
+                            f"{label}: correctness case {case['case_name']} {field} "
+                            f"{found.get(field)!r} does not match pinned identity "
+                            f"{expected_identity.get(field)!r}"
+                        )
+                if found.get("circuit_params") != case.get("circuit_params"):
+                    gaps.append(
+                        f"{label}: correctness case {case['case_name']} circuit_params "
+                        "do not match the pinned plan"
+                    )
         elif kind == "correctness-compiler-only":
             found = corr_cases.get(case["case_name"])
             if found is None:
@@ -709,6 +724,19 @@ def mle_plan_gaps(
             elif found.get("evidence_level") != "compiler-output-only":
                 gaps.append(f"{label}: case {case['case_name']} evidence level "
                             f"{found.get('evidence_level')!r} is not compiler-output-only")
+            else:
+                expected_identity = case.get("evidence_identity") or {}
+                for field in ("source", "circuit_sha256", "seed"):
+                    if found.get(field) != expected_identity.get(field):
+                        gaps.append(
+                            f"{label}: compiler-only case {case['case_name']} {field} "
+                            "does not match the pinned identity"
+                        )
+                if found.get("circuit_params") != case.get("circuit_params"):
+                    gaps.append(
+                        f"{label}: compiler-only case {case['case_name']} "
+                        "circuit_params do not match the pinned plan"
+                    )
         elif kind == "support-control":
             record = support_results.get((case["matrix_control"], "envelope-mle"))
             if record is None:
@@ -769,13 +797,6 @@ def mle_plan_gaps(
                         f"available={ilp.get('available')}); MLE Supported requires "
                         "ILP-capable archives on both native targets"
                     )
-    if mle_resources is not None:
-        budget = mle_resources.get("stress_budget") or {}
-        if not budget.get("declared_before_run"):
-            gaps.append(f"{label}: MLE workload budgets were not declared before measurement")
-        elif budget.get("values") != MLE_EXPECTED_BUDGET:
-            gaps.append(f"{label}: declared MLE workload budget drifted from the "
-                        "campaign constants")
     return gaps
 
 
@@ -868,7 +889,9 @@ def evaluate(
             if decoder == "envelope-mle":
                 blocking += mle_gaps
                 if mle_plan is not None:
-                    blocking += mle_plan_gaps(mle_plan, generated, installed)
+                    blocking += mle_plan_gaps(
+                        mle_plan, generated, installed, Path(mle_scope_path)
+                    )
         else:
             # Beta decoders do not gate the release, but their evidence state
             # is still reported.
@@ -917,6 +940,13 @@ def evaluate(
             "path": str(mle_scope_path),
             "present": mle_plan is not None,
             "enforced": mle_enforced,
+            "sha256": (
+                support.sha256_file(Path(mle_scope_path)) if mle_plan is not None else None
+            ),
+            "source_revision": (
+                mle_plan.get("applies_to", {}).get("source_revision")
+                if mle_plan is not None else None
+            ),
         },
         "evidence": {
             name: ({k: v for k, v in record.items() if k != "evidence"} if record else None)
@@ -953,7 +983,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
             shutil.copytree(evidence_dir, clone)
             retained = transform(clone, Path(temporary))
             report = evaluate(clone, matrix_path, policy_path, candidate,
-                              DEFAULT_TARGETS, None, retained)
+                              DEFAULT_TARGETS, None, retained, mle_scope_path)
             rejected = report["status"] == "fail" and any(
                 needle in gap for gap in report["blocking_gaps"]
             )
@@ -1163,7 +1193,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         path = clone / "correctness.json"
         evidence = load_json(path)
         for case in evidence["cases"]:
-            if case.get("name") == "midswap-d3-r2-fixture":
+            if case.get("name") == "midswap-d3-r2-p002-generated":
                 case["evidence_level"] = "compiler-output-only"
                 case.pop("backends", None)
                 case.pop("allowed_answers", None)
@@ -1173,6 +1203,21 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
 
     fourteenth = mutate("compiler-only-substituted-for-end-to-end",
                         compiler_only_substitution, "independent-end-to-end")
+
+    def correctness_identity_substitution(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case.get("name") == "midswap-d3-r1-generated":
+                case["circuit_sha256"] = "0" * 64
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    identity_bound = mutate(
+        "mle-correctness-input-identity-substituted",
+        correctness_identity_substitution,
+        "does not match pinned identity",
+    )
 
     def no_ilp_installed(clone: Path, temporary: Path) -> Path | None:
         path = clone / f"installed-{DEFAULT_TARGETS[0]}.json"
@@ -1188,6 +1233,83 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
     fifteenth = mutate("no-ilp-installed-report", no_ilp_installed,
                        "ILP-capable")
 
+    def mle_total_wall_over_budget(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        evidence["total_wall_seconds"] = MLE_EXPECTED_BUDGET["total_wall_seconds"] * 2
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    sixteenth = mutate("mle-total-wall-over-budget", mle_total_wall_over_budget,
+                       "total wall")
+
+    def mle_peak_rss_over_budget(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        evidence["cases"][0]["peak_rss_watermark_bytes"] = \
+            MLE_EXPECTED_BUDGET["peak_rss_bytes"] * 2
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    seventeenth = mutate("mle-peak-rss-over-budget", mle_peak_rss_over_budget,
+                         "peak RSS")
+
+    def mle_failure_exit_code_changed(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case["id"] == "fail-mle-candidate-limit":
+                case["exit_code"] = 99
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    eighteenth = mutate("mle-failure-exit-code-changed", mle_failure_exit_code_changed,
+                        "exit 2")
+
+    def mle_cache_hits_removed(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case["id"] == "mle-d3r2-p002-b1024":
+                case["cache"]["hits"] = 0
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    nineteenth = mutate("mle-cache-hits-removed", mle_cache_hits_removed,
+                        "recorded no cache hits")
+
+    def mle_completed_shots_changed(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case["id"] == "mle-d3r1-p010-b1024":
+                case["completed_shots"] = 1023
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    twentieth = mutate("mle-completed-shots-changed", mle_completed_shots_changed,
+                       "completed shots")
+
+    def mle_output_rule_violation(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case["id"] == "fail-mle-infeasible":
+                # Keep the cached verdict deceptively clean. Replay must derive
+                # the violation from raw output state and reject it anyway.
+                case["predictions"] = {
+                    "installed": True,
+                    "pre_existing": False,
+                    "unchanged": False,
+                }
+                case["stats_written"] = False
+                case["output_rule_problems"] = []
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    twenty_first = mutate("mle-output-rule-violation", mle_output_rule_violation,
+                          "failed run installed a prediction file")
+
     # Decision-level control: under each MLE-specific mutation the Matching
     # decision must stay supported while MLE falls back to beta with an
     # actionable gap.
@@ -1199,12 +1321,12 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
                                    DEFAULT_TARGETS, None, None, mle_scope_path)
     matching_decision = decision_report["decoders"]["envelope-matching"]
     mle_decision = decision_report["decoders"]["envelope-mle"]
-    sixteenth = (matching_decision["decision"] == "supported"
-                 and mle_decision["decision"] == "beta"
-                 and bool(mle_decision["blocking_gaps"]))
+    twenty_second = (matching_decision["decision"] == "supported"
+                     and mle_decision["decision"] == "beta"
+                     and bool(mle_decision["blocking_gaps"]))
     observations.append({
         "mutation": "mle-demoted-matching-preserved",
-        "rejected": sixteenth,
+        "rejected": twenty_second,
         "detail": {
             "matching": matching_decision["decision"],
             "mle": mle_decision["decision"],
@@ -1214,7 +1336,8 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
 
     passed = all([first, second, third, fourth, fifth, sixth, seventh, eighth,
                   ninth, tenth, eleventh, twelfth, thirteenth, fourteenth,
-                  fifteenth, sixteenth])
+                  identity_bound, fifteenth, sixteenth, seventeenth, eighteenth, nineteenth,
+                  twentieth, twenty_first, twenty_second])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
         print(f"{PASS_LINE} self-test")

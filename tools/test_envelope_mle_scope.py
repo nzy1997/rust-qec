@@ -35,10 +35,15 @@ def in_domain_descriptor() -> dict:
     return {
         "circuit": {
             "family": "midswap",
+            "contract_valid": True,
             "flat": True,
             "readout_basis": "Z",
             "observables": 1,
             "sweep_bits": 0,
+            "instructions": [
+                "R", "H", "CX", "LOSS", "ML", "DETECTOR",
+                "OBSERVABLE_INCLUDE",
+            ],
             "distance": 3,
             "rounds": 2,
             "loss_rate": 0.002,
@@ -54,7 +59,8 @@ class DeclaredDomainTests(unittest.TestCase):
     def test_declared_mle_case_is_in_domain(self):
         verdict = scope.evaluate_case(self.plan, in_domain_descriptor())
         self.assertEqual(verdict["status"], "in-domain")
-        self.assertEqual(verdict["point"], "midswap-d3-r2-loss-le-0.003-batch-le-16384")
+        self.assertEqual(
+            verdict["point"], "midswap-d3-r2-loss-0.002-batches-1024-16384")
 
     def test_second_declared_point_is_in_domain(self):
         descriptor = in_domain_descriptor()
@@ -63,7 +69,8 @@ class DeclaredDomainTests(unittest.TestCase):
         descriptor["shots"] = 16384
         verdict = scope.evaluate_case(self.plan, descriptor)
         self.assertEqual(verdict["status"], "in-domain")
-        self.assertEqual(verdict["point"], "midswap-d3-r1-loss-le-0.01-batch-le-16384")
+        self.assertEqual(
+            verdict["point"], "midswap-d3-r1-loss-0.01-batches-1024-16384")
 
     def test_verdict_is_a_support_boundary_not_a_decoder_prediction(self):
         verdict = scope.evaluate_case(self.plan, in_domain_descriptor())
@@ -104,10 +111,20 @@ class OutOfScopeTests(unittest.TestCase):
         descriptor["circuit"]["loss_rate"] = 0.02
         self.assert_outside(descriptor, "no declared domain point")
 
+    def test_unmeasured_lower_loss_is_outside(self):
+        descriptor = in_domain_descriptor()
+        descriptor["circuit"]["loss_rate"] = 0.001
+        self.assert_outside(descriptor, "exact measured")
+
     def test_larger_batch_is_outside(self):
         descriptor = in_domain_descriptor()
         descriptor["shots"] = 65536
         self.assert_outside(descriptor, "no declared domain point")
+
+    def test_unmeasured_smaller_batch_is_outside(self):
+        descriptor = in_domain_descriptor()
+        descriptor["shots"] = 512
+        self.assert_outside(descriptor, "exact measured")
 
     def test_x_basis_readout_is_outside(self):
         descriptor = in_domain_descriptor()
@@ -118,6 +135,26 @@ class OutOfScopeTests(unittest.TestCase):
         descriptor = in_domain_descriptor()
         descriptor["circuit"]["flat"] = False
         self.assert_outside(descriptor, "flat")
+
+    def test_missing_contract_attestation_is_outside(self):
+        descriptor = in_domain_descriptor()
+        del descriptor["circuit"]["contract_valid"]
+        self.assert_outside(descriptor, "contract_valid")
+
+    def test_missing_contract_field_is_outside(self):
+        descriptor = in_domain_descriptor()
+        del descriptor["circuit"]["readout_basis"]
+        self.assert_outside(descriptor, "readout basis")
+
+    def test_disallowed_instruction_is_outside(self):
+        descriptor = in_domain_descriptor()
+        descriptor["circuit"]["instructions"].append("MXL")
+        self.assert_outside(descriptor, "instructions outside")
+
+    def test_missing_instruction_inventory_is_outside(self):
+        descriptor = in_domain_descriptor()
+        del descriptor["circuit"]["instructions"]
+        self.assert_outside(descriptor, "explicit non-empty list")
 
 
 class RequirementResolutionTests(unittest.TestCase):
@@ -170,14 +207,19 @@ class NegativeControlTests(unittest.TestCase):
             plan["maturity"]["current"] = "supported"
         self.assert_plan_rejected(mutate, "promoted before the evidence exists")
 
+    def test_correctness_identity_must_be_pinned(self):
+        def mutate(plan):
+            del plan["required_cases"][0]["evidence_identity"]["circuit_sha256"]
+        self.assert_plan_rejected(mutate, "must pin evidence_identity")
+
     def test_widening_the_grid_without_evidence_fails(self):
         def mutate(plan):
             plan["domain"]["points"].append({
                 "id": "midswap-d3-r3-loss-le-0.01-batch-le-16384",
                 "distance": 3,
                 "rounds": 3,
-                "loss_rate_max": 0.01,
-                "batch_max": 16384,
+                "loss_rates": [0.01],
+                "batches": [16384],
                 "justification": "smuggled in without measured coverage",
                 "required_evidence": ["correctness:midswap-d3-r3-generated"],
             })
@@ -191,8 +233,8 @@ class NegativeControlTests(unittest.TestCase):
                 "id": "midswap-d3-r3-borrowed",
                 "distance": 3,
                 "rounds": 3,
-                "loss_rate_max": 0.01,
-                "batch_max": 1024,
+                "loss_rates": [0.01],
+                "batches": [1024],
                 "justification": "borrows the r=1 measurements",
                 "required_evidence": [
                     "correctness:midswap-d3-r1-generated",
@@ -208,14 +250,28 @@ class NegativeControlTests(unittest.TestCase):
             point = plan["domain"]["points"][0]
             point["required_evidence"] = [
                 cid for cid in point["required_evidence"]
-                if cid != "correctness:midswap-d3-r2-fixture"
+                if cid != "correctness:midswap-d3-r2-p002-generated"
             ] + ["correctness:midswap-d3-r3-generated"]
         self.assert_plan_rejected(mutate, "no independent end-to-end correctness case")
 
-    def test_batch_ceiling_beyond_measurement_fails(self):
+    def test_adding_unmeasured_batch_fails(self):
         def mutate(plan):
-            plan["domain"]["points"][0]["batch_max"] = 65536
-        self.assert_plan_rejected(mutate, "batch ceiling")
+            plan["domain"]["points"][0]["batches"].append(65536)
+        self.assert_plan_rejected(mutate, "missing exact loss/batch")
+
+    def test_adding_unmeasured_loss_fails(self):
+        def mutate(plan):
+            plan["domain"]["points"][0]["loss_rates"].append(0.0025)
+        self.assert_plan_rejected(mutate, "missing exact loss/batch")
+
+    def test_correctness_at_a_different_loss_does_not_cover_a_point(self):
+        def mutate(plan):
+            case = next(
+                c for c in plan["required_cases"]
+                if c["id"] == "correctness:midswap-d3-r2-p002-generated"
+            )
+            case["circuit_params"]["loss_rate"] = 0.003
+        self.assert_plan_rejected(mutate, "exact declared loss point")
 
     def test_dropping_conventional_exclusion_fails(self):
         def mutate(plan):
@@ -232,8 +288,8 @@ class CommittedPlanTests(unittest.TestCase):
         plan = scope.load_plan(PLAN_PATH)
         self.assertEqual(plan["maturity"]["current"], "beta")
         table = scope.domain_table(plan)
-        self.assertIn("midswap-d3-r2-loss-le-0.003-batch-le-16384", table)
-        self.assertIn("midswap-d3-r1-loss-le-0.01-batch-le-16384", table)
+        self.assertIn("midswap-d3-r2-loss-0.002-batches-1024-16384", table)
+        self.assertIn("midswap-d3-r1-loss-0.01-batches-1024-16384", table)
         print("\n" + table)
 
 
