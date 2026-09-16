@@ -100,14 +100,20 @@ test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => 
 
 test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
-  // v0.3.0 predates the evidence bundle: no published_support, maturity Beta.
-  delete matrix.decoders['envelope-matching'].published_support;
-  matrix.decoders['envelope-matching'].current_maturity = 'beta';
+  // v0.3.0 predates every envelope evidence bundle: both decoders are Beta.
+  for (const name of ['envelope-matching', 'envelope-mle']) {
+    delete matrix.decoders[name].published_support;
+    matrix.decoders[name].current_maturity = 'beta';
+    matrix.decoders[name].proposed_release_maturity = 'beta';
+  }
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
   await expect(matchingBadge(page).locator('a')).toHaveCount(0);
   await expect(matchingBadge(page)).not.toContainText('Supported');
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
+  await expect(mleBadge(page)).not.toContainText('Supported');
 });
 
 test('the previous Matching-only release does not promote MLE', async ({ page, request }) => {
