@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "ae13b3a71fddfb912c6e7e994caba24da2bd7e64",
+  "source_commit": "d10066b60451cfc265c99af20f5c298b9f2c725c",
   "working_tree_dirty": false,
   "inputs": {
     ".github/workflows/atom-loss-reference.yml": {
@@ -3141,17 +3141,17 @@
   ],
   "build_policy": "isolated-cargo-home; allowlisted-environment; no-external-ancestor-config-v1",
   "binaries": {
-    "target/release/rustqec": "34777869500bed5dead1e8b65eac195133704b28d2927c2f72a9ff66cc0f8c47",
-    "target/release/examples/export_matching_benchmark": "3ab069daa23d579ab2d206dfb5ecfcd044c7eedd41a32051f1f5002fb5ac329d",
-    "target/release/examples/export_decoder_oracle": "5a3fbedc8e96fd78df8a9b82bc171bc0846f65e874b303f70d335f0ef8927ec7",
-    "target/release/examples/offline_matching_benchmark": "bfde1530930032518c5caca5472696f2514d848d7da5f59f25486626389aac6f",
-    "target/release/examples/atom_loss_sampling_benchmark": "936fa101689a80542eb3779848bcb246acad4c5199c7b1d0d484ed596f4ea1b1"
+    "target/release/rustqec": "d23a31ca4c7c23922f7b25d90a6b4c608699896c343168c45661dab00770adf8",
+    "target/release/examples/export_matching_benchmark": "6832b8e677b7aef3709ee9f26db0dcbe6f5997705c87a75a3065beddb6b6c65d",
+    "target/release/examples/export_decoder_oracle": "6bafdbcdd30fa44f5127f8b464b255dd0f225ec043ca7a1e7e9dda46236a9bbd",
+    "target/release/examples/offline_matching_benchmark": "107997e820552b34b8f51d0f39505ec8a4e32681eefc59fe74593fcb97f9c7a2",
+    "target/release/examples/atom_loss_sampling_benchmark": "ce7f7f74e578157ced49fa0a6c23bc4f82e9baa7631838a14ff6e574c20c0191"
   },
   "build_environment": {
     "PATH": "/Users/nzy/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/TeX/texbin:/opt/homebrew/bin:/Users/nzy/.codex/tmp/arg0/codex-arg0OLv9Nt:/Users/nzy/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/nzy/.kimi-code/bin:/Users/nzy/.juliaup/bin:/Users/nzy/.local/bin:/Users/nzy/.local/gurobi1302/Library/gurobi1302/macos_universal2/bin:/Users/nzy/.local/typst-cli/bin:/opt/homebrew/sbin:/Users/nzy/.cargo/bin:/Users/nzy/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources",
     "HOME": "/Users/nzy",
     "TMPDIR": "/var/folders/dn/vkst__210t7dsflfgbt4f4n40000gn/T/",
-    "CARGO_HOME": "/private/tmp/rstim-atom-loss-721-723-ae13b3a/work/cargo-home",
+    "CARGO_HOME": "/private/tmp/rstim-atom-loss-721-723-d10066b/work/cargo-home",
     "LANG": "C",
     "LC_ALL": "C",
     "OMP_NUM_THREADS": "1",
