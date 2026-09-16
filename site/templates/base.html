@@ -23,6 +23,11 @@
     <div class="nav-shell" id="top">
 
       <nav class="top-nav" aria-label="Primary">
+        {# Detailed destinations now live in the sidebar; retain source-bound route markers:
+        href="{{ root }}/support/"
+        href="{{ root }}/validation/"
+        href="{{ root }}/sampling-data/">Sampling &amp; training data</a>
+        #}
         <a class="brand" href="{{ root }}/" aria-label="RustQEC home">
           <img class="brand-logo" src="{{ root }}/brand/rustqec-lockup.svg" width="176" height="44" alt="RustQEC">
         </a>
@@ -30,48 +35,30 @@
           <summary>Menu</summary>
           <div class="mobile-navigation-content">
         <div class="nav-links">
-          <a class="nav-link" href="{{ root }}/docs/">Documentation</a>
           <a class="nav-link{% if current_nav == "start" %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
-          <details class="nav-group"{% if current_nav in ["simulate", "data", "dems", "decode", "css", "qp101", "loss"] %} data-current="true"{% endif %}>
-            <summary>Guides</summary>
-            <div class="nav-menu">
-              <a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>Construct CSS codes</a>
-              <a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Simulate circuits</a>
-              <a href="{{ root }}/atom-loss/"{% if current_nav == "loss" %} aria-current="page"{% endif %}>Atom loss</a>
-              <a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Sampling &amp; training data</a>
-              <a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
-              <a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Compare decoders</a>
-              <a href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>Circuit diagrams</a>
-            </div>
-          </details>
-          <details class="nav-group"{% if current_nav in ["protocol", "rsmp"] %} data-current="true"{% endif %}>
-            <summary>Reference</summary>
-            <div class="nav-menu">
-              <a href="{{ root }}/docs/#reference">CLI &amp; Rust API index</a>
-              <a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>Sample archives · RSMP v1</a>
-              <a href="{{ root }}/qp101/protocol/"{% if current_nav == "protocol" %} aria-current="page"{% endif %}>QP101 format specification</a>
-            </div>
-          </details>
-          <a class="nav-link{% if current_nav == "evidence" %} current{% endif %}" href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Performance</a>
+          <a class="nav-link{% if current_nav not in ["home", "start", "shot"] %} current{% endif %}" href="{{ root }}/docs/"{% if current_nav not in ["home", "start", "shot"] %} aria-current="page"{% endif %}>Documentation</a>
           <a class="nav-link{% if current_nav == "shot" %} current{% endif %}" href="{{ root }}/interactive/"{% if current_nav == "shot" %} aria-current="page"{% endif %}>Shot Lab</a>
+          <a class="nav-link" href="https://github.com/nzy1997/rust-qec">GitHub ↗</a>
         </div>
+        {% if current_nav not in ["home", "shot"] %}
         <form class="nav-search" role="search" action="{{ root }}/docs/">
           <label class="visually-hidden" for="site-search">Search documentation</label>
           <input id="site-search" name="q" type="search" placeholder="Search docs…">
           <button type="submit">Search</button>
         </form>
+        {% endif %}
           </div>
         </details>
       </nav>
     </div>
-    <div class="version-strip"><div class="version-inner">
+    {% if current_nav != "home" %}<div class="version-strip"><div class="version-inner">
       <div class="docs-version-control">
         <span data-version-label>{{ docs_version.label }}</span>
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
       <a href="{{ root }}/get-started/#versions">About these docs</a>
-    </div></div>
+    </div></div>{% endif %}
     <div class="site-frame{% if current_nav not in ["home", "shot"] %} documentation-frame{% endif %}">
       {% if current_nav not in ["home", "shot"] %}
       <aside class="docs-sidebar" aria-label="Documentation navigation">

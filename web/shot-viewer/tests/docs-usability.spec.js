@@ -13,63 +13,59 @@ async function codeToolbarFor(page, text) {
   return code.locator("xpath=preceding-sibling::div[contains(@class, 'code-toolbar')][1]");
 }
 
-test("home leads to the Cargo installation path", async ({ page }) => {
+test("home leads to the getting-started path", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Install with Cargo" }).click();
-  await expect(page).toHaveURL(/\/get-started\/#install$/);
-  await expect(page.locator("h2#install")).toBeInViewport();
-  await expect(page.locator("h2#install")).toContainText("1. Install with Cargo");
+  await page.getByRole("link", { name: "Get started", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/get-started\/$/);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Your first detector event");
   await page.getByRole("link", { name: "create your circuit", exact: true }).click();
   await expect(page.getByRole("heading", { name: "2. Create and inspect a circuit" })).toBeInViewport();
 });
 
-test("home offers Cargo and Shot Lab as primary destinations", async ({ page }) => {
+test("home keeps one primary action, integrates atom loss, and presents Shot Lab visually", async ({ page }) => {
   await page.goto("/");
 
-  const actions = page.locator(".home-hero .actions a");
-  await expect(actions).toHaveCount(2);
-  expect(await actions.allTextContents()).toEqual([
-    "Install with Cargo →",
-    "Try a circuit in your browser",
-  ]);
-  expect(await actions.evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual([
-    "get-started/#install",
-    "interactive/",
-  ]);
+  const primaryAction = page.locator(".home-hero .actions .button.primary");
+  await expect(primaryAction).toHaveCount(1);
+  await expect(primaryAction).toHaveText("Get started →");
+  await expect(primaryAction).toHaveAttribute("href", "get-started/");
+  const atomLossAction = page.locator(".home-hero .atom-loss-button");
+  await expect(atomLossAction).toHaveText("Atom-loss sampling and decoding →");
+  await expect(atomLossAction).toHaveAttribute("href", "atom-loss/");
 
-  const destinations = await actions.evaluateAll((links) => links.map((link) => link.href));
-  expect(new Set(destinations).size).toBe(2);
+  const shotLab = page.locator(".home-example");
+  await expect(shotLab.getByRole("link", { name: "Explore a circuit in Shot Lab" })).toHaveAttribute("href", "interactive/");
+  await expect(shotLab.locator("img")).toHaveAttribute("src", "gallery/atom-loss-sample.svg");
   await expect(page.locator('a[href="#install"]')).toHaveCount(0);
 });
 
-test('home routes first-time, library, and prebuilt users to the promised instructions', async ({ page }) => {
+test('home routes first-time users to the workflow and docs retains the API index', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('link', { name: 'Create your first circuit' }).click();
+  const stageLinks = page.locator('.workflow-grid article h3 a');
+  await expect(stageLinks).toHaveCount(4);
+  expect(await stageLinks.allTextContents()).toEqual([
+    'Define codes →',
+    'Construct circuits →',
+    'Simulate circuits →',
+    'Decode & benchmark →',
+  ]);
+  await page.getByRole('link', { name: 'Construct circuits' }).click();
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
   await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Rust APIs', exact: true }).click();
+  await page.goto('/docs/');
+  await page.getByRole('link', { name: 'CLI and Rust API reference' }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Install with Cargo' }).click();
+  await page.goto('/get-started/');
   await page.getByRole('link', { name: 'native package without Rust', exact: true }).click();
   await expect(page.locator('#native-install')).toHaveAttribute('open', '');
   await expect(page.getByRole('link', { name: 'Linux x86_64 archive' })).toBeVisible();
   await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
 });
 
-test('home atom-loss feature presents one clear outcome and destination', async ({ page }) => {
+test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
   await page.goto('/');
-  const feature = page.getByRole('region', { name: 'Decode circuits with atom loss' });
-  await expect(feature.getByRole('heading', { level: 2 })).toHaveText('Decode circuits with atom loss');
-  await expect(feature.locator('.eyebrow')).toHaveCount(0);
-  await expect(feature.locator('.section-copy')).toHaveText(
-    'Model atom loss, sample measurement records, and predict logical outcomes.',
-  );
-  await expect(feature.getByRole('listitem')).toHaveCount(3);
-  await expect(feature.getByRole('link')).toHaveCount(1);
-  await expect(feature.getByRole('link')).toHaveAttribute('href', 'atom-loss/');
-  await feature.getByRole('link').click();
+  await expect(page.locator('.home-hero')).toContainText('simulate circuit noise and atom loss');
+  await page.getByRole('link', { name: 'Atom-loss sampling and decoding' }).click();
   await expect(page).toHaveURL(/\/atom-loss\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss\./);
   await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
@@ -87,7 +83,7 @@ test('home skip link reaches the product introduction and preserves its next act
   await expect(page.locator('#home-content')).toBeFocused();
   await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('link', { name: 'Install with Cargo' })).toBeFocused();
+  await expect(page.getByRole('link', { name: 'Get started', exact: true }).last()).toBeFocused();
 });
 
 test("installation starts with one copyable command and keeps manual steps optional", async ({ page }) => {
@@ -139,16 +135,16 @@ test("copy failure gives a manual-copy response", async ({ page }) => {
   await expect(toolbar.locator(".copy-status")).toHaveText("Copy unavailable. Select the code and copy manually.");
 });
 
-test("navigation opens from the keyboard and Escape returns focus", async ({ page }) => {
-  await page.goto("/");
-  const guides = page.locator(".nav-group").filter({ hasText: "Guides" });
-  const summary = guides.locator("summary");
-  await summary.focus();
-  await page.keyboard.press("Enter");
-  await expect(guides).toHaveAttribute("open", "");
-  await page.keyboard.press("Escape");
-  await expect(guides).not.toHaveAttribute("open", "");
-  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).toBe("SUMMARY");
+test("documentation uses the home navigation with an added search", async ({ page }) => {
+  await page.goto("/docs/");
+  expect(await page.locator(".nav-links > a").allTextContents()).toEqual([
+    "Get started",
+    "Documentation",
+    "Shot Lab",
+    "GitHub ↗",
+  ]);
+  await expect(page.locator(".nav-group")).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "Search documentation" })).toBeVisible();
 });
 
 test("long protocol page supplies rendered content and usable table-of-contents anchors", async ({ page }) => {
@@ -219,6 +215,7 @@ test("key documentation pages fit a 390px viewport without page overflow", async
     await page.locator(".mobile-navigation > summary").click();
     for (const label of ["Guides", "Reference"]) {
       const menu = page.locator(".nav-group").filter({ hasText: label });
+      if (await menu.count() === 0) continue;
       await menu.locator("summary").click();
       const bounds = await menu.locator(".nav-menu").boundingBox();
       expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -229,7 +226,7 @@ test("key documentation pages fit a 390px viewport without page overflow", async
 });
 
 test("search finds commands and concepts, preserves queries, and handles no matches", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/docs/");
   await page.getByRole("searchbox", { name: "Search documentation" }).fill("rmatching");
   await page.locator(".nav-search button").click();
   await expect(page).toHaveURL(/\/docs\/\?q=rmatching/);
@@ -447,10 +444,10 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
     await expect(page.locator('.page-toc')).toBeHidden();
     const hero = await page.locator('.home-hero').boundingBox();
     const capabilities = await page.locator('#capabilities').boundingBox();
-    const feature = await page.locator('#atom-loss').boundingBox();
+    const shotLab = await page.locator('.home-example').boundingBox();
     expect(Math.abs(hero.x - capabilities.x)).toBeLessThan(1);
-    expect(Math.abs(hero.x - feature.x)).toBeLessThan(1);
-    expect(Math.abs(hero.width - feature.width)).toBeLessThan(1);
+    expect(Math.abs(hero.x - shotLab.x)).toBeLessThan(1);
+    expect(Math.abs(hero.width - shotLab.width)).toBeLessThan(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     if (width < 1200) {
       const toggle = page.locator('.mobile-navigation > summary');
@@ -463,8 +460,8 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
       await expect(page.locator('.nav-links')).toBeHidden();
     } else {
       const brand = await page.locator('.brand').boundingBox();
-      const search = await page.locator('.nav-search').boundingBox();
-      expect(Math.abs(brand.y + brand.height / 2 - search.y - search.height / 2)).toBeLessThan(2);
+      const navigation = await page.locator('.nav-links').boundingBox();
+      expect(Math.abs(brand.y + brand.height / 2 - navigation.y - navigation.height / 2)).toBeLessThan(2);
     }
     for (const path of ['/get-started/', '/support/']) {
       await page.goto(path);

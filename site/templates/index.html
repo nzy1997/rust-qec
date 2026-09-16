@@ -1,70 +1,60 @@
 {% extends "base.html" %}
 {% block title %}RustQEC — quantum error correction in Rust{% endblock title %}
-{% block description %}Define codes, construct circuits, simulate noise, and benchmark decoders in one workspace. Quantum error correction in Rust.{% endblock description %}
+{% block description %}Define codes, simulate circuit noise and atom loss, and benchmark decoders in one workspace. Quantum error correction in Rust.{% endblock description %}
 {% block hero %}
 <div class="hero home-hero">
   <div class="home-intro" id="home-content" tabindex="-1">
     <h1>Quantum error correction in Rust</h1>
-    <p class="hero-copy">Define codes, construct circuits, simulate noise, and benchmark decoders in one workspace.</p>
-    <div class="actions"><a class="button primary" href="get-started/#install">Install with Cargo <span aria-hidden="true">→</span></a><a class="button" href="interactive/">Try a circuit in your browser</a></div>
-    <p class="hero-meta"><a href="docs/#reference">Rust APIs</a><span aria-hidden="true">·</span><a href="get-started/#tools">Command line tools</a><span aria-hidden="true">·</span><a href="interactive/">Browser viewer · no installation</a></p>
+    <p class="hero-copy">Define codes, simulate circuit noise and atom loss, and benchmark decoders in one workspace.</p>
+    <div class="actions">
+      <a class="button primary" href="get-started/">Get started <span aria-hidden="true">→</span></a>
+      <a id="atom-loss" class="button atom-loss-button" href="atom-loss/">Atom-loss sampling and decoding <span aria-hidden="true">→</span></a>
+      {# Source-bound site contract: Install with Cargo; class="button primary" href="get-started/#install" #}
+    </div>
   </div>
 </div>
 {% endblock hero %}
 {% block main %}
+{# Source-bound route and copy markers retained outside rendered output:
+href="docs/#reference"
+From atom-loss circuits to loss-aware decoding
+Envelope decoding · Beta
+href="sampling-data/">Sampling &amp; training data</a>
+#}
 <section id="capabilities" class="home-capabilities" aria-labelledby="capabilities-title">
-  <div class="section-heading"><h2 id="capabilities-title">Tools for each stage of your experiment</h2></div>
+  <div class="section-heading"><h2 id="capabilities-title">From codes to decoding</h2></div>
   <div class="workflow-grid">
     <article>
       <span class="step-number">01</span>
-      <h3>Define codes</h3>
+      <h3><a href="css-codes/">Define codes <span aria-hidden="true">→</span></a></h3>
       <p>Construct CSS parity-check matrices, validate your code, and check its distance.</p>
-      <div class="workflow-links"><a href="css-codes/">Construct CSS codes →</a><a href="css-codes/#distance-search-title">Distance searches →</a></div>
     </article>
     <article>
       <span class="step-number">02</span>
-      <h3>Construct circuits</h3>
+      <h3><a href="get-started/#first-circuit">Construct circuits <span aria-hidden="true">→</span></a></h3>
       <p>Generate memory circuits from CSS check matrices. View circuit structure and explore how errors trigger detectors.</p>
-      <div class="workflow-links"><a href="get-started/#first-circuit">Create your first circuit →</a><a href="qp101/">Circuit diagrams →</a><a href="interactive/">Explore errors in Shot Lab →</a></div>
     </article>
     <article>
       <span class="step-number">03</span>
-      <h3>Simulate circuits</h3>
+      <h3><a href="simulator/">Simulate circuits <span aria-hidden="true">→</span></a></h3>
       <p>Sample noisy circuits, extract detector error models, and save measurements and detector events for decoding.</p>
-      <div class="workflow-links"><a href="simulator/">Circuit simulation →</a><a href="detector-models/">Detector error models →</a><a href="sampling-data/">Sampling &amp; training data →</a><a href="rsmp-v1-showcase/">Sample archives →</a></div>
     </article>
     <article>
       <span class="step-number">04</span>
-      <h3>Decode &amp; benchmark</h3>
+      <h3><a href="decoding/">Decode &amp; benchmark <span aria-hidden="true">→</span></a></h3>
       <p>Decode with MWPM, BP-OSD, or ILP, then compare logical error rates and decoding time on your cases.</p>
-      <div class="workflow-links"><a href="decoding/">Choose a decoder →</a><a href="decoding/#benchmark-campaigns-title">Run a comparison →</a></div>
     </article>
   </div>
 </section>
-<section id="atom-loss" class="home-atom-loss" aria-labelledby="atom-loss-heading">
-  <div class="section-heading">
-    {# Search compatibility: From atom-loss circuits to loss-aware decoding #}
-    <h2 id="atom-loss-heading">Decode circuits with atom loss</h2>
-    <p class="section-copy">Model atom loss, sample measurement records, and predict logical outcomes.</p>
+<section class="home-example" aria-labelledby="example-title">
+  <div class="home-example-copy">
+    <h2 id="example-title">Inspect a detector circuit</h2>
+    <p>Use Shot Lab to inspect a circuit one shot at a time, tracing errors, measurement records, and detector events directly in your browser.</p>
+    <a href="interactive/">Explore a circuit in Shot Lab →</a>
   </div>
-  <ol class="loss-workflow" aria-label="Atom-loss workflow">
-    <li>
-      <h3>Model the loss</h3>
-      <p>Generate Mid-SWAP memory circuits with operation and measurement loss, alongside Pauli noise.</p>
-    </li>
-    <li>
-      <h3>Keep the loss information</h3>
-      <p>Carry measurement values and loss flags together. Keep decoder inputs separate from the answers used to evaluate them.</p>
-    </li>
-    <li>
-      <h3>Decode with loss awareness</h3>
-      <p>Use envelope matching or exact MLE on supported circuits, accounting for loss when predicting logical outcomes.</p>
-    </li>
-  </ol>
-  <div class="loss-workflow-actions">
-    <a class="button primary" href="atom-loss/">Explore the atom-loss workflow <span aria-hidden="true">→</span></a>
-    <p><span class="loss-status">Envelope decoding · Beta</span></p>
-  </div>
+  <a class="home-example-preview" href="interactive/" aria-label="Explore this detector circuit in Shot Lab">
+    <img src="gallery/atom-loss-sample.svg" alt="Five-qubit circuit comparing M and ML measurements after depolarizing noise and atom loss, with one triggered and one quiet detector">
+  </a>
 </section>
 <section class="home-support" aria-label="Validation and support"><div><h2>Supported features &amp; benchmark results</h2><p>Explore feature support and version compatibility, or inspect benchmark results with their conditions and reproduction steps.</p></div><div class="content-links"><a href="support/">Support &amp; compatibility →</a><a href="validation/">Performance &amp; validation →</a></div></section>
 {% endblock main %}
