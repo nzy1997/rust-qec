@@ -53,3 +53,42 @@ python3 verify_release_archive.py \
 Publication first checks the names of existing release assets and stops if any
 requested name already exists. It never uses an overwrite option and leaves the
 body and notes of an existing GitHub Release unchanged.
+
+## Envelope support evidence bundle
+
+A release whose gate promotes an envelope decoder also publishes
+`envelope-support-evidence-<tag>.tar.gz` and its `.sha256` sidecar. The bundle
+is assembled from the same candidate run that built the archives and freezes
+one version-bound record of the support claim:
+
+- the passing per-decoder release-gate report;
+- the exact support matrix and compatibility policy the gate consumed;
+- the support, correctness, and resource evidence and their retained raw
+  resource observations;
+- one installed-envelope report per official target, bound to its published
+  archive by filename and SHA-256 (machine-local build paths are redacted);
+- a human-readable `SUMMARY.md` of decoder maturity, scope, version,
+  platforms, and limitations.
+
+Decoder maturity and scope inside the bundle are derived from the gate
+decision, never edited by hand. The workflow rejects mismatched tags or
+commits, archive-hash drift, missing platforms, failed evidence, and
+promotion claims the gate did not earn before anything is uploaded.
+
+Download every asset of a release into one directory and verify the published
+support without rerunning any evidence campaign:
+
+```sh
+python3 tools/check_envelope_publication.py \
+  --release-dir <download-dir> --expect-decoder envelope-matching
+```
+
+The command reconciles the tag, source commit, release manifest, both archive
+identities, the per-platform installed reports, and the gate decision, then
+prints the decoder scope and version followed by `PASS envelope published
+support`. `--expect-decoder` may be repeated. Releases that predate the bundle
+(v0.3.0 is the only one) contain no evidence asset: the verifier reports them
+as lacking a verified envelope promotion rather than treating them as
+Supported. `python3 tools/check_envelope_publication.py --self-test` proves
+offline that swapped platform reports, removed platforms, unsupported scope
+claims, and failed gates are all rejected.

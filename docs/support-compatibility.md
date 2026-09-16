@@ -124,6 +124,17 @@ structured error codes, statistics semantics, and the evolution/deprecation
 rules — is defined by
 [`docs/envelope-compatibility-policy.md`](envelope-compatibility-policy.md).
 
+A passing gate decides candidacy; the durable proof travels with the release.
+Each native release whose gate promotes a decoder publishes a checksummed,
+version-bound evidence bundle (`envelope-support-evidence-<tag>.tar.gz`)
+freezing the gate report, the consumed matrix/policy, the support, correctness
+and resource evidence, and one archive-bound installed report per platform.
+Verify a downloaded release with
+`python3 tools/check_envelope_publication.py --release-dir <dir> --expect-decoder <name>`;
+releases without the bundle (v0.3.0) are reported as lacking a verified
+promotion. See the
+[native archive guide](https://github.com/nzy1997/rust-qec/blob/master/docs/native-release-archives.md#envelope-support-evidence-bundle).
+
 ## Mid-SWAP configuration migration
 
 The pre-1.0 Mid-SWAP API no longer accepts the old catch-all
