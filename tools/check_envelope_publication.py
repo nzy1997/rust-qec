@@ -55,6 +55,10 @@ PASS_LINE = "PASS envelope published support"
 BUNDLE_PREFIX = "envelope-support-evidence-"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SEMVER_TAG = re.compile(r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+FIRST_SUPPORTED_RELEASES = {
+    "envelope-matching": "v0.3.1",
+    "envelope-mle": "v0.3.2",
+}
 BUNDLE_SUMS_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._/-]*)")
 
 GENERATED_EVIDENCE = {
@@ -206,6 +210,11 @@ def check_published_support_bindings(
         require(
             published_version <= bundle_version,
             f"{name} published_support release {release} is newer than bundle {tag}",
+        )
+        require(
+            release == FIRST_SUPPORTED_RELEASES.get(name),
+            f"{name} published_support release {release} does not match its immutable "
+            f"first Supported release {FIRST_SUPPORTED_RELEASES.get(name)}",
         )
         asset = f"{BUNDLE_PREFIX}{release}.tar.gz"
         release_url = f"https://github.com/nzy1997/rust-qec/releases/tag/{release}"
@@ -988,7 +997,7 @@ def print_summary(result: dict[str, Any], expect_decoders: tuple[str, ...]) -> N
 # Offline self-test with synthetic fixtures
 # ---------------------------------------------------------------------------
 
-SELFTEST_TAG = "v9.9.9"
+SELFTEST_TAG = "v0.3.2"
 SELFTEST_SHA = "a" * 40
 SELFTEST_RETAINED_SHA = "b" * 40
 
@@ -1004,12 +1013,20 @@ def _fixture_matrix() -> dict[str, Any]:
                 "proposed_release_maturity": "supported-candidate",
                 "published_support": {
                     "maturity": "supported",
-                    "release": SELFTEST_TAG,
-                    "release_url": f"https://github.com/nzy1997/rust-qec/releases/tag/{SELFTEST_TAG}",
-                    "evidence_asset": f"{BUNDLE_PREFIX}{SELFTEST_TAG}.tar.gz",
+                    "release": FIRST_SUPPORTED_RELEASES["envelope-matching"],
+                    "release_url": (
+                        "https://github.com/nzy1997/rust-qec/releases/tag/"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}"
+                    ),
+                    "evidence_asset": (
+                        f"{BUNDLE_PREFIX}"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}.tar.gz"
+                    ),
                     "evidence_url": (
                         "https://github.com/nzy1997/rust-qec/releases/download/"
-                        f"{SELFTEST_TAG}/{BUNDLE_PREFIX}{SELFTEST_TAG}.tar.gz"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}/"
+                        f"{BUNDLE_PREFIX}"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}.tar.gz"
                     ),
                     "scope": "Synthetic Matching support scope.",
                 },
