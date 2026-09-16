@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import io
 import json
 import tempfile
@@ -11,9 +12,44 @@ import unittest
 from pathlib import Path
 
 from tools import check_envelope_publication as publication
+from tools import check_envelope_release as gate
 
 
 class EnvelopePublicationSelfTest(unittest.TestCase):
+    def test_resource_freshness_ignores_only_publication_metadata(self) -> None:
+        matrix = {
+            "purpose": "old prose",
+            "decoders": {
+                "envelope-matching": {
+                    "current_maturity": "supported",
+                    "published_support": {
+                        "release": "v0.3.1",
+                        "evidence_url": "https://example.invalid/old",
+                    },
+                    "controls": ["midswap"],
+                }
+            },
+        }
+        metadata_edit = copy.deepcopy(matrix)
+        metadata_edit["purpose"] = "new prose"
+        metadata_edit["decoders"]["envelope-matching"]["published_support"] = {
+            "release": "v0.3.1",
+            "verification_url": "https://example.invalid/marker",
+        }
+        contract_edit = copy.deepcopy(metadata_edit)
+        contract_edit["decoders"]["envelope-matching"]["controls"].append(
+            "conventional"
+        )
+
+        self.assertEqual(
+            gate.measurement_matrix_projection(matrix),
+            gate.measurement_matrix_projection(metadata_edit),
+        )
+        self.assertNotEqual(
+            gate.measurement_matrix_projection(matrix),
+            gate.measurement_matrix_projection(contract_edit),
+        )
+
     def test_self_test_rejects_defective_bundles(self) -> None:
         self.assertEqual(publication.self_test(), 0)
 
