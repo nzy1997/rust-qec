@@ -209,6 +209,7 @@ def check_generated_evidence(
         gaps.append(f"{name} evidence status is {evidence.get('status')!r}, not 'pass'")
     return {
         "path": str(path),
+        "sha256": support.sha256_file(path),
         "schema_version": schema,
         "checkout_revision": revision,
         "revision_bound": bound,
@@ -260,6 +261,8 @@ def check_installed_report(
         )
     return {
         "path": str(path),
+        "sha256": support.sha256_file(path),
+        "portable_sha256": json_document_sha256(portable_installed_report(report)),
         "target": target,
         "source_revision": revision,
         "revision_bound": bound,
@@ -267,6 +270,39 @@ def check_installed_report(
         "status": report.get("status"),
         "report": report,
     }
+
+
+def portable_installed_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Machine-independent installed report retained in publication bundles."""
+    archive = report.get("archive") or {}
+    return {
+        "schema_version": report["schema_version"],
+        "target": report["target"],
+        "source_revision": report["source_revision"],
+        "ilp": report["ilp"],
+        "matrix": {
+            "sha256": report["matrix"]["sha256"],
+            "schema_version": report["matrix"]["schema_version"],
+        },
+        "binary": {
+            "sha256": report["binary"]["sha256"],
+            "version": report["binary"]["version"],
+            "advertised_decoders": report["binary"]["advertised_decoders"],
+        },
+        "archive": {
+            "filename": Path(str(archive.get("path") or archive.get("filename", ""))).name,
+            "sha256": archive.get("sha256"),
+        },
+        "controls": report.get("controls", []),
+        "previous_fixture_semantics": report.get("previous_fixture_semantics"),
+        "status": report["status"],
+        "problems": report.get("problems", []),
+    }
+
+
+def json_document_sha256(document: dict[str, Any]) -> str:
+    payload = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 # Coverage contracts mirrored from the suites that produce the evidence. Keep
@@ -310,6 +346,36 @@ RETAINED_EQUIVALENCE_PATHS = (
     "qec-ilp-core/src", "qec-ilp-core/Cargo.toml",
     "rstim/src", "rstim/Cargo.toml",
 )
+
+
+def measurement_matrix_projection(matrix: dict[str, Any]) -> dict[str, Any]:
+    """Return only matrix fields that can change the measured resource claim.
+
+    Publication URLs, asset names, and prose do not affect the circuits or
+    workloads used by the retained campaign. Keep every other field so a
+    changed contract, control, scope, or decoder configuration still makes
+    the retained measurements stale.
+    """
+    projected = json.loads(json.dumps(matrix))
+    projected.pop("purpose", None)
+    for decoder in (projected.get("decoders") or {}).values():
+        if isinstance(decoder, dict):
+            decoder.pop("published_support", None)
+    return projected
+
+
+def git_json(revision: str, path: str, repo_root: Path) -> dict[str, Any] | None:
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        capture_output=True, text=True, cwd=repo_root, check=False,
+    )
+    if result.returncode:
+        return None
+    try:
+        document = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    return document if isinstance(document, dict) else None
 
 
 def expected_controls(matrix: dict[str, Any], decoder: str) -> set[str]:
@@ -551,6 +617,7 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
         record["present"] = False
         return record
     record["present"] = True
+    record["sha256"] = support.sha256_file(path)
     manifest = load_json(path)
     if manifest.get("schema_version") != RETAINED_MANIFEST_SCHEMA:
         gaps.append(
@@ -583,6 +650,15 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
         record["binding"] = "unverifiable"
         return record
     changed = [line for line in diff.stdout.splitlines() if line]
+    matrix_path = "docs/envelope-support.json"
+    if matrix_path in changed:
+        measured_matrix = git_json(str(revision), matrix_path, repo_root)
+        candidate_matrix = git_json(candidate, matrix_path, repo_root)
+        if (measured_matrix is not None and candidate_matrix is not None
+                and measurement_matrix_projection(measured_matrix)
+                == measurement_matrix_projection(candidate_matrix)):
+            changed.remove(matrix_path)
+            record["ignored_publication_metadata_changes"] = [matrix_path]
     record["changed_equivalence_paths"] = changed
     if changed:
         shown = ", ".join(changed[:5]) + ("..." if len(changed) > 5 else "")

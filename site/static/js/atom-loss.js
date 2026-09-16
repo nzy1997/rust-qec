@@ -1,5 +1,6 @@
 /* Preserve incoming evidence links after separating the tutorial and report. */
 (() => {
+  if (!/\/atom-loss(?:-concepts|-evidence)?\/$/.test(location.pathname)) return;
   const legacy = new Set(['atom-loss-results', 'loss-correctness', 'loss-sampling-throughput',
     'loss-logical-error-rate', 'loss-accuracy-time', 'loss-seed-accuracy',
     'loss-timing-sweep', 'loss-adapter-stages']);
@@ -49,14 +50,12 @@
   });
 })();
 
-/* Decoder maturity labels are rendered from the version-bound support matrix
-   (_site/support/envelope-support.json, copied verbatim from
-   docs/envelope-support.json), never from hand-edited markup. The static
-   badge defaults to Beta; it upgrades to "Supported · <release>" only when
-   the matrix both declares the decoder supported and names the release whose
-   evidence bundle carries the promise. Missing, failed, or pre-release
-   (v0.3.0) evidence leaves the Beta label untouched, and each decoder is
-   resolved independently so MLE cannot inherit Matching's badge. */
+/* Decoder maturity labels default to Beta. The support matrix declares the
+   intended release, but is not proof that publication happened. A badge and
+   its surrounding prose upgrade only after the release API shows the small
+   verification marker that the workflow uploads *after* it downloads and
+   verifies the published archives and evidence bundle. Missing markers leave
+   every claim at Beta. */
 (() => {
   const DECODER_LABELS = {
     'envelope-matching': 'Envelope matching',
@@ -64,7 +63,14 @@
   };
   const upgradeDecoderBadges = async () => {
     const badges = [...document.querySelectorAll('[data-decoder-badge]')];
-    if (!badges.length) return;
+    const names = new Set([
+      ...badges.map(badge => badge.dataset.decoderBadge),
+      ...[...document.querySelectorAll('[data-decoder-support-copy]')]
+        .map(copy => copy.dataset.decoderSupportCopy),
+      ...[...document.querySelectorAll('[data-evidence-link]')]
+        .map(link => link.dataset.evidenceLink),
+    ]);
+    if (!names.size) return;
     let matrix;
     try {
       const response = await fetch(new URL('../support/envelope-support.json', location.href));
@@ -76,26 +82,71 @@
     const decoders = matrix && matrix.schema_version === 'rustqec.envelope-support.v1'
       ? matrix.decoders : null;
     if (!decoders) return;
-    for (const badge of badges) {
-      const name = badge.dataset.decoderBadge;
+    for (const name of names) {
       const decoder = decoders[name];
       const published = decoder && decoder.published_support;
       if (!decoder || decoder.current_maturity !== 'supported' || !published
           || published.maturity !== 'supported'
           || typeof published.release !== 'string' || !published.release
           || typeof published.release_url !== 'string' || !published.release_url
-          || typeof published.evidence_asset !== 'string' || !published.evidence_asset) {
+          || typeof published.evidence_asset !== 'string' || !published.evidence_asset
+          || typeof published.verification_asset !== 'string' || !published.verification_asset
+          || typeof published.verification_url !== 'string' || !published.verification_url) {
         continue;
       }
-      const link = document.createElement('a');
-      link.href = published.release_url;
-      link.textContent = `${DECODER_LABELS[name] || name} · Supported · ${published.release}`;
-      link.title = `Verified by ${published.evidence_asset}`;
-      badge.textContent = '';
-      badge.appendChild(link);
-      badge.dataset.release = published.release;
-      badge.dataset.evidenceAsset = published.evidence_asset;
-      badge.classList.add('loss-badge-supported');
+      let release;
+      try {
+        const response = await fetch(published.verification_url, { cache: 'no-store' });
+        if (!response.ok) continue;
+        release = await response.json();
+      } catch {
+        continue;
+      }
+      const assets = new Map(Array.isArray(release && release.assets)
+        ? release.assets.filter(asset => asset && asset.state === 'uploaded')
+          .map(asset => [asset.name, asset])
+        : []);
+      const evidenceAsset = assets.get(published.evidence_asset);
+      const sidecarAsset = assets.get(`${published.evidence_asset}.sha256`);
+      const markerAsset = assets.get(published.verification_asset);
+      const labelParts = typeof (markerAsset && markerAsset.label) === 'string'
+        ? markerAsset.label.split(';') : [];
+      const label = Object.fromEntries(labelParts.slice(1).map(part => {
+        const equals = part.indexOf('=');
+        return equals > 0 ? [part.slice(0, equals), part.slice(equals + 1)] : ['', ''];
+      }));
+      if (!release || release.tag_name !== published.release || release.draft === true
+          || typeof release.published_at !== 'string' || !release.published_at
+          || !evidenceAsset || !sidecarAsset || !markerAsset
+          || labelParts[0] !== 'rustqec-envelope-verification-v1'
+          || label.tag !== published.release || label.status !== 'pass'
+          || !/^[0-9a-f]{40}$/.test(label.source || '')
+          || label.evidence !== evidenceAsset.digest
+          || label.marker !== markerAsset.digest
+          || !(label.supported || '').split(',').includes(name)) {
+        continue;
+      }
+      for (const badge of badges.filter(item => item.dataset.decoderBadge === name)) {
+        const link = document.createElement('a');
+        link.href = published.release_url;
+        link.textContent = `${DECODER_LABELS[name] || name} · Supported · ${published.release}`;
+        link.title = `Verified by ${published.evidence_asset}`;
+        badge.textContent = '';
+        badge.appendChild(link);
+        badge.dataset.release = published.release;
+        badge.dataset.evidenceAsset = published.evidence_asset;
+        badge.classList.add('loss-badge-supported');
+      }
+      for (const copy of document.querySelectorAll(`[data-decoder-support-copy="${name}"]`)) {
+        copy.textContent = `Supported since ${published.release}`;
+      }
+      for (const placeholder of document.querySelectorAll(`[data-evidence-link="${name}"]`)) {
+        const evidenceLink = document.createElement('a');
+        evidenceLink.href = published.release_url;
+        evidenceLink.dataset.evidenceLink = name;
+        evidenceLink.textContent = 'version-bound evidence bundle';
+        placeholder.replaceWith(evidenceLink);
+      }
     }
   };
   upgradeDecoderBadges();

@@ -4,7 +4,7 @@ This document tracks the development branch. The installed quickstart and
 version-pinned API examples target v0.3.0; use that release's notes for its frozen support boundary.
 Development-branch wording describes the upcoming release state; a decoder
 maturity is binding only for a published release whose evidence bundle
-verifies it (v0.3.1 is the first release with an envelope promotion). It is a
+verifies it (v0.3.1 is the first candidate for an envelope promotion). It is a
 contract for using the shipped interfaces, not a claim that every research
 component, circuit dialect, decoder, or benchmark result is ready for
 publication-scale use.
@@ -15,7 +15,7 @@ publication-scale use.
 | --- | --- | --- |
 | `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
-| Atom-loss `envelope-matching` decoder | Supported (v0.3.1 and later) | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope, verified by the v0.3.1 release evidence bundle. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
+| Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta (v0.3.1 Supported candidate)</span> | Candidate scope: flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope. The Supported promise begins only after the v0.3.1 release assets are published, independently verified, and carry the post-publication verification marker. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
 | Atom-loss `envelope-mle` decoder | Beta | The narrow Mid-SWAP controls declared by the executable support matrix below. Requires the `ilp` feature or an official native archive; the conventional fixture is outside its candidate limit. Remains Beta independently of Matching. |
 | Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
 
@@ -45,7 +45,7 @@ rather than silently skipping the MLE controls.
 
 | Property | `envelope-matching` | `envelope-mle` |
 | --- | --- | --- |
-| Maturity | Supported since v0.3.1 (verified by the release evidence bundle) | Beta |
+| Maturity | <span data-decoder-support-copy="envelope-matching">Beta; candidate for Supported in v0.3.1 after published evidence verification</span> | Beta |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
 | Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
 | Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Checked on the pinned d=5/r=15 fixture and the canonical known-answer control; per-pattern ILP cost bounds its [measured range](../benchmarks/atom_loss/readiness/resources/report.md) |
