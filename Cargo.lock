@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "rustqec-cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap",
  "qec-ilp-core",
