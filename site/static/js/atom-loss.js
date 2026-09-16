@@ -1,5 +1,6 @@
 /* Preserve incoming evidence links after separating the tutorial and report. */
 (() => {
+  if (!/\/atom-loss(?:-concepts|-evidence)?\/$/.test(location.pathname)) return;
   const legacy = new Set(['atom-loss-results', 'loss-correctness', 'loss-sampling-throughput',
     'loss-logical-error-rate', 'loss-accuracy-time', 'loss-seed-accuracy',
     'loss-timing-sweep', 'loss-adapter-stages']);
