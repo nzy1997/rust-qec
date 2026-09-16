@@ -424,6 +424,12 @@ jobs:
             --out envelope-evidence/resources.json
           python3 -m benchmarks.atom_loss.readiness_resources \
             --verify benchmarks/atom_loss/readiness/resources/manifest.json
+          python3 -m benchmarks.atom_loss.mle_candidate_resources \
+            --binary target/release/rustqec \
+            --plan docs/envelope-mle-scope.json \
+            --out envelope-evidence/mle-resources.json
+          python3 -m benchmarks.atom_loss.mle_candidate_resources \
+            --verify envelope-evidence/mle-resources.json
       - name: Upload generated envelope evidence
         uses: actions/upload-artifact@v4
         with:

@@ -47,12 +47,14 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools import check_envelope_support as support  # noqa: E402
+from tools import envelope_mle_scope as mle_scope  # noqa: E402
 
 SCHEMA_VERSION = "rustqec.envelope-release-report.v1"
 EQUIVALENCE_SCHEMA = "rustqec.source-equivalence.v1"
 PASS_LINE = "PASS envelope release readiness"
 DEFAULT_MATRIX = Path("docs/envelope-support.json")
 DEFAULT_POLICY = Path("docs/envelope-compatibility-policy.md")
+DEFAULT_MLE_SCOPE = Path("docs/envelope-mle-scope.json")
 DEFAULT_TARGETS = ("x86_64-unknown-linux-gnu", "aarch64-apple-darwin")
 
 # Evidence artifacts the gate consumes, relative to the evidence directory.
@@ -281,6 +283,28 @@ REQUIRED_HISTORY_CATEGORIES = (
 )
 RETAINED_MANIFEST_SCHEMA = "rustqec.envelope-resources-manifest.v1"
 DEFAULT_RETAINED_REPORT = Path("benchmarks/atom_loss/readiness/resources/manifest.json")
+
+# MLE candidate-scope contracts mirrored from docs/envelope-mle-scope.json and
+# benchmarks/atom_loss/mle_candidate_resources.py; the gate intentionally
+# fails loudly when the plan or the campaign drifts from these values.
+MLE_RESOURCES_SCHEMA = "rustqec.envelope-mle-candidate-resources.v1"
+MLE_EXPECTED_BUDGET = {
+    "per_case_wall_seconds": 900,
+    "total_wall_seconds": 3600,
+    "peak_rss_bytes": 4 * 1024**3,
+}
+MLE_REQUIRED_WORKLOADS = (
+    "mle-d3r2-p002-b1024",
+    "mle-d3r2-p002-b16384",
+    "mle-d3r1-p010-b1024",
+    "mle-d3r1-p010-b16384",
+    "mle-eviction-wires24",
+)
+MLE_FAILURE_CODES = {
+    "fail-mle-candidate-limit": "unsupported_circuit",
+    "fail-mle-solve-timeout": "decode_timeout",
+    "fail-mle-infeasible": "decode_infeasible",
+}
 
 # The retained full resource report supports promotion only for candidates
 # whose measurement-relevant sources are identical to the measured revision.
@@ -597,6 +621,164 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
     return record
 
 
+def check_mle_scope_plan(
+    path: Path | None,
+    candidate: str,
+    gaps: list[str],
+) -> dict[str, Any] | None:
+    """Load and bind the MLE candidate scope plan to the candidate revision."""
+    if path is None:
+        return None
+    if not path.is_file():
+        gaps.append(f"MLE scope plan missing: {path}")
+        return None
+    try:
+        plan = mle_scope.load_plan(path)
+    except (mle_scope.ScopeError, json.JSONDecodeError) as error:
+        gaps.append(f"MLE scope plan invalid: {error}")
+        return None
+    pinned = plan.get("applies_to", {}).get("source_revision")
+    if not pinned:
+        gaps.append("MLE scope plan applies_to.source_revision is missing")
+    else:
+        decision = is_ancestor(str(pinned), candidate)
+        if decision is not True:
+            gaps.append(
+                f"MLE scope plan revision {pinned} is not an ancestor of the "
+                f"candidate {candidate}; re-pin the plan before gating this candidate"
+            )
+    return plan
+
+
+def mle_plan_gaps(
+    plan: dict[str, Any],
+    generated: dict[str, dict[str, Any] | None],
+    installed: dict[str, dict[str, Any] | None],
+) -> list[str]:
+    """Map the scope plan's required case IDs onto the actual evidence.
+
+    Every required case must be fulfilled by evidence of its own declared
+    kind and shape: compiler-only output never satisfies an end-to-end
+    requirement, Matching-only or synthetic runs never count as real-circuit
+    MLE coverage, budgets fixed before measurement are enforced against the
+    recorded values, and both installed reports must be ILP-capable.
+    """
+    label = "mle-scope"
+    gaps: list[str] = []
+    correctness = (generated.get("correctness") or {}).get("evidence")
+    support_result = (generated.get("support") or {}).get("evidence")
+    mle_resources = (generated.get("mle-resources") or {}).get("evidence")
+    corr_cases = {c.get("name"): c for c in (correctness or {}).get("cases", [])}
+    support_results = {
+        (r.get("control"), r.get("decoder")): r
+        for r in (support_result or {}).get("results", [])
+    }
+    res_cases = {c.get("id"): c for c in (mle_resources or {}).get("cases", [])}
+
+    declared_workloads = {
+        c["workload_id"] for c in plan["required_cases"] if c["kind"] == "resource-workload"
+    }
+    if declared_workloads != set(MLE_REQUIRED_WORKLOADS):
+        gaps.append(
+            f"{label}: declared resource workloads {sorted(declared_workloads)} drift "
+            f"from the gate's mirrored set {sorted(MLE_REQUIRED_WORKLOADS)}"
+        )
+
+    for case in plan["required_cases"]:
+        cid, kind = case["id"], case["kind"]
+        if kind == "correctness-end-to-end":
+            found = corr_cases.get(case["case_name"])
+            if found is None:
+                gaps.append(f"{label}: required correctness case {case['case_name']} "
+                            "not executed")
+            elif found.get("evidence_level") != "independent-end-to-end":
+                gaps.append(f"{label}: correctness case {case['case_name']} evidence "
+                            f"level {found.get('evidence_level')!r} is not "
+                            "independent-end-to-end; compiler-only evidence cannot "
+                            "fulfil this requirement")
+            elif "envelope-mle" not in (found.get("backends") or {}):
+                gaps.append(f"{label}: correctness case {case['case_name']} did not "
+                            "execute envelope-mle")
+            elif found.get("status") != "pass":
+                gaps.append(f"{label}: correctness case {case['case_name']} is not passing")
+        elif kind == "correctness-compiler-only":
+            found = corr_cases.get(case["case_name"])
+            if found is None:
+                gaps.append(f"{label}: supporting compiler-output case {case['case_name']} "
+                            "not executed")
+            elif found.get("evidence_level") != "compiler-output-only":
+                gaps.append(f"{label}: case {case['case_name']} evidence level "
+                            f"{found.get('evidence_level')!r} is not compiler-output-only")
+        elif kind == "support-control":
+            record = support_results.get((case["matrix_control"], "envelope-mle"))
+            if record is None:
+                gaps.append(f"{label}: matrix control {case['matrix_control']} not "
+                            "executed for envelope-mle")
+            elif record.get("status") != "pass":
+                gaps.append(f"{label}: matrix control {case['matrix_control']} is not "
+                            "passing for envelope-mle")
+        elif kind == "resource-workload":
+            if mle_resources is None:
+                gaps.append(f"{label}: MLE candidate resource report unavailable; "
+                            "run benchmarks/atom_loss/mle_candidate_resources.py")
+                break
+            record = res_cases.get(case["workload_id"])
+            if record is None:
+                gaps.append(f"{label}: required workload {case['workload_id']} not measured")
+                continue
+            if record.get("exit_code") != 0 or record.get("output_rule_problems"):
+                gaps.append(f"{label}: workload {case['workload_id']} did not succeed "
+                            "cleanly")
+            if record.get("wall_seconds", float("inf")) > \
+                    MLE_EXPECTED_BUDGET["per_case_wall_seconds"]:
+                gaps.append(f"{label}: workload {case['workload_id']} wall "
+                            f"{record.get('wall_seconds'):.1f}s exceeds the declared "
+                            "budget; narrow the candidate promise explicitly instead "
+                            "of relabeling omitted evidence")
+            if bool(record.get("real_circuit")) != bool(case.get("real_circuit")):
+                gaps.append(f"{label}: workload {case['workload_id']} real_circuit "
+                            "flag disagrees with the plan")
+            expected_params = case.get("circuit_params") or {}
+            params = record.get("circuit_params") or {}
+            for field in ("distance", "rounds", "loss_rate", "batch"):
+                if params.get(field) != expected_params.get(field):
+                    gaps.append(f"{label}: workload {case['workload_id']} measured "
+                                f"{field}={params.get(field)!r}, plan declares "
+                                f"{expected_params.get(field)!r}")
+        elif kind == "failure-semantics":
+            record = res_cases.get(case["workload_id"]) if mle_resources else None
+            code = MLE_FAILURE_CODES.get(case["workload_id"])
+            if record is None:
+                gaps.append(f"{label}: failure-semantics case {case['workload_id']} "
+                            "not executed")
+            elif record.get("error_code") != code or record.get("completed_shots") != 0:
+                gaps.append(f"{label}: failure-semantics case {case['workload_id']} "
+                            f"expected {code} with zero completed shots")
+            elif case["workload_id"] == "fail-mle-solve-timeout" and \
+                    not record.get("compilation_outside_timeout"):
+                gaps.append(f"{label}: {case['workload_id']} must show compilation "
+                            "outside the solve-phase timeout")
+        elif kind == "installed-platform":
+            report = (installed.get(case["target"]) or {}).get("report")
+            if report is not None:
+                ilp = report.get("ilp", {})
+                if ilp.get("expected") is not True or ilp.get("available") is not True:
+                    gaps.append(
+                        f"{label}: installed report for {case['target']} is not an "
+                        f"ILP-capable expectation (expected={ilp.get('expected')}, "
+                        f"available={ilp.get('available')}); MLE Supported requires "
+                        "ILP-capable archives on both native targets"
+                    )
+    if mle_resources is not None:
+        budget = mle_resources.get("stress_budget") or {}
+        if not budget.get("declared_before_run"):
+            gaps.append(f"{label}: MLE workload budgets were not declared before measurement")
+        elif budget.get("values") != MLE_EXPECTED_BUDGET:
+            gaps.append(f"{label}: declared MLE workload budget drifted from the "
+                        "campaign constants")
+    return gaps
+
+
 def evaluate(
     evidence_dir: Path,
     matrix_path: Path,
@@ -605,10 +787,13 @@ def evaluate(
     targets: tuple[str, ...],
     equivalence_path: Path | None,
     retained_report_path: Path | None = None,
+    mle_scope_path: Path | None = DEFAULT_MLE_SCOPE,
 ) -> dict[str, Any]:
     matrix = support.load_matrix(matrix_path)
     pairs = load_equivalence(equivalence_path)
     gaps: list[str] = []
+    if mle_scope_path is not None and not Path(mle_scope_path).is_absolute():
+        mle_scope_path = REPO_ROOT / mle_scope_path
 
     matrix_record = check_matrix_binding(matrix, candidate, gaps)
     policy_record = check_policy(policy_path, gaps)
@@ -616,10 +801,47 @@ def evaluate(
         retained_report_path = REPO_ROOT / DEFAULT_RETAINED_REPORT
     retained_record = check_retained_report(retained_report_path, candidate, gaps)
 
+    # The MLE Supported proposal lives in the scope plan (issue #721); the
+    # matrix may also propose MLE directly at publication time. Either way the
+    # plan must be present, valid and fulfilled. MLE-specific gaps block only
+    # the MLE decision: MLE validation must never hold back a Matching
+    # release (issue #723).
+    matrix_mle_proposed = (
+        matrix["decoders"].get("envelope-mle", {}).get("proposed_release_maturity")
+        == "supported-candidate"
+    )
+    mle_gaps: list[str] = []
+    mle_plan = check_mle_scope_plan(mle_scope_path, candidate, mle_gaps)
+    plan_mle_proposed = bool(
+        mle_plan
+        and mle_plan.get("maturity", {}).get("proposed_release_maturity")
+        == "supported-candidate"
+    )
+    mle_enforced = matrix_mle_proposed or plan_mle_proposed
+    if mle_enforced and mle_plan is None:
+        mle_gaps.append(
+            "an MLE Supported proposal requires a valid MLE scope plan "
+            f"({mle_scope_path}); the proposal is rejected until the plan exists"
+        )
+    if mle_plan is not None:
+        plan_current = mle_plan.get("maturity", {}).get("current")
+        matrix_current = matrix["decoders"].get("envelope-mle", {}).get("current_maturity")
+        if matrix_current == "supported" and plan_current != "supported":
+            mle_gaps.append(
+                "matrix promotes envelope-mle to supported ahead of the scope plan "
+                f"(plan maturity.current={plan_current!r}); publish the plan's "
+                "promotion record together with the matrix claim"
+            )
+
     generated: dict[str, dict[str, Any] | None] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
         generated[name] = check_generated_evidence(
             name, evidence_dir / filename, schema, candidate, pairs, gaps
+        )
+    if mle_enforced:
+        generated["mle-resources"] = check_generated_evidence(
+            "mle-resources", evidence_dir / "mle-resources.json",
+            MLE_RESOURCES_SCHEMA, candidate, pairs, mle_gaps
         )
     correctness_evidence = (generated.get("correctness") or {}).get("evidence")
     if correctness_evidence is not None:
@@ -637,10 +859,16 @@ def evaluate(
     decisions: dict[str, Any] = {}
     for decoder, declaration in matrix["decoders"].items():
         proposed = declaration.get("proposed_release_maturity")
+        if decoder == "envelope-mle" and mle_enforced:
+            proposed = "supported-candidate"
         coverage_gaps = decoder_coverage(decoder, generated, installed, matrix)
         blocking = list(coverage_gaps)
         if proposed == "supported-candidate":
             blocking += evidence_gaps
+            if decoder == "envelope-mle":
+                blocking += mle_gaps
+                if mle_plan is not None:
+                    blocking += mle_plan_gaps(mle_plan, generated, installed)
         else:
             # Beta decoders do not gate the release, but their evidence state
             # is still reported.
@@ -652,13 +880,26 @@ def evaluate(
                 f"decoder {decoder} proposed as supported-candidate is held at beta: "
                 + shown
             )
-        decisions[decoder] = {
+        decision_record = {
             "current_maturity": declaration.get("current_maturity"),
             "proposed_release_maturity": proposed,
             "decision": "supported" if earned else "beta",
             "coverage_gaps": coverage_gaps,
             "blocking_gaps": blocking,
         }
+        if decoder == "envelope-mle":
+            decision_record["scope_plan"] = (
+                {
+                    "path": str(mle_scope_path),
+                    "proposed_release_maturity": mle_plan.get("maturity", {}).get(
+                        "proposed_release_maturity"),
+                    "enforced": mle_enforced,
+                }
+                if mle_plan is not None
+                else {"path": str(mle_scope_path), "enforced": mle_enforced,
+                      "present": False}
+            )
+        decisions[decoder] = decision_record
 
     status = "pass" if not gaps else "fail"
     return {
@@ -672,6 +913,11 @@ def evaluate(
         },
         "compatibility_policy": policy_record,
         "retained_resource_report": retained_record,
+        "mle_scope_plan": {
+            "path": str(mle_scope_path),
+            "present": mle_plan is not None,
+            "enforced": mle_enforced,
+        },
         "evidence": {
             name: ({k: v for k, v in record.items() if k != "evidence"} if record else None)
             for name, record in generated.items()
@@ -687,10 +933,11 @@ def evaluate(
 
 
 def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidate: str,
-              retained_report_path: Path | None = None) -> int:
+              retained_report_path: Path | None = None,
+              mle_scope_path: Path | None = DEFAULT_MLE_SCOPE) -> int:
     """The gate must reject defective evidence bundles."""
     baseline = evaluate(evidence_dir, matrix_path, policy_path, candidate,
-                        DEFAULT_TARGETS, None, retained_report_path)
+                        DEFAULT_TARGETS, None, retained_report_path, mle_scope_path)
     observations: list[dict[str, Any]] = [
         {"mutation": "baseline", "status": baseline["status"],
          "detail": baseline["blocking_gaps"][:1]},
@@ -885,8 +1132,89 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         "detail": "decoder_reference.py edit must flip the binding to sources-differ",
     })
 
+    def remove_mle_real_circuit_case(clone: Path, temporary: Path) -> Path | None:
+        """Drop one MLE-required real-circuit case; keep the declared coverage
+        internally consistent so only the MLE scope mapping can catch it."""
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        evidence["cases"] = [
+            c for c in evidence["cases"] if c.get("name") != "midswap-d3-r1-generated"
+        ]
+        evidence["coverage"] = recomputed_coverage(evidence["cases"])
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    twelfth = mutate("mle-real-circuit-case-removed", remove_mle_real_circuit_case,
+                     "midswap-d3-r1-generated")
+
+    def mle_workload_over_budget(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "mle-resources.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case["id"] == "mle-d3r1-p010-b16384":
+                case["wall_seconds"] = MLE_EXPECTED_BUDGET["per_case_wall_seconds"] * 2
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    thirteenth = mutate("mle-workload-over-budget", mle_workload_over_budget,
+                        "exceeds the declared budget")
+
+    def compiler_only_substitution(clone: Path, temporary: Path) -> Path | None:
+        path = clone / "correctness.json"
+        evidence = load_json(path)
+        for case in evidence["cases"]:
+            if case.get("name") == "midswap-d3-r2-fixture":
+                case["evidence_level"] = "compiler-output-only"
+                case.pop("backends", None)
+                case.pop("allowed_answers", None)
+        evidence["coverage"] = recomputed_coverage(evidence["cases"])
+        path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    fourteenth = mutate("compiler-only-substituted-for-end-to-end",
+                        compiler_only_substitution, "independent-end-to-end")
+
+    def no_ilp_installed(clone: Path, temporary: Path) -> Path | None:
+        path = clone / f"installed-{DEFAULT_TARGETS[0]}.json"
+        report = load_json(path)
+        report["ilp"] = {"expected": False, "available": False}
+        report["binary"]["advertised_decoders"] = ["envelope-matching"]
+        report["controls"] = [
+            c for c in report["controls"] if c.get("decoder") == "envelope-matching"
+        ]
+        path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        return None
+
+    fifteenth = mutate("no-ilp-installed-report", no_ilp_installed,
+                       "ILP-capable")
+
+    # Decision-level control: under each MLE-specific mutation the Matching
+    # decision must stay supported while MLE falls back to beta with an
+    # actionable gap.
+    with tempfile.TemporaryDirectory(prefix="envelope-release-selftest-") as temporary:
+        clone = Path(temporary) / "evidence"
+        shutil.copytree(evidence_dir, clone)
+        remove_mle_real_circuit_case(clone, Path(temporary))
+        decision_report = evaluate(clone, matrix_path, policy_path, candidate,
+                                   DEFAULT_TARGETS, None, None, mle_scope_path)
+    matching_decision = decision_report["decoders"]["envelope-matching"]
+    mle_decision = decision_report["decoders"]["envelope-mle"]
+    sixteenth = (matching_decision["decision"] == "supported"
+                 and mle_decision["decision"] == "beta"
+                 and bool(mle_decision["blocking_gaps"]))
+    observations.append({
+        "mutation": "mle-demoted-matching-preserved",
+        "rejected": sixteenth,
+        "detail": {
+            "matching": matching_decision["decision"],
+            "mle": mle_decision["decision"],
+            "mle_blocking_gaps": mle_decision["blocking_gaps"][:2],
+        },
+    })
+
     passed = all([first, second, third, fourth, fifth, sixth, seventh, eighth,
-                  ninth, tenth, eleventh])
+                  ninth, tenth, eleventh, twelfth, thirteenth, fourteenth,
+                  fifteenth, sixteenth])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
         print(f"{PASS_LINE} self-test")
@@ -911,6 +1239,12 @@ def main() -> int:
     parser.add_argument("--retained-report", type=Path,
                         help="committed full resource report to bind to the candidate "
                              f"(default: {DEFAULT_RETAINED_REPORT})")
+    parser.add_argument("--mle-scope", type=Path, default=DEFAULT_MLE_SCOPE,
+                        help="MLE candidate scope plan enforcing the MLE Supported "
+                             f"proposal (default: {DEFAULT_MLE_SCOPE})")
+    parser.add_argument("--no-mle-scope", action="store_true",
+                        help="do not load an MLE scope plan; only valid when neither "
+                             "the matrix nor a plan proposes MLE Supported")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
@@ -921,14 +1255,15 @@ def main() -> int:
         print(f"FAIL envelope release readiness: {error}", file=sys.stderr)
         return 2
     targets = tuple(args.targets) if args.targets else DEFAULT_TARGETS
+    mle_scope = None if args.no_mle_scope else args.mle_scope
 
     if args.self_test:
         return self_test(args.evidence_dir, args.matrix, args.policy, candidate,
-                         args.retained_report)
+                         args.retained_report, mle_scope)
 
     try:
         report = evaluate(args.evidence_dir, args.matrix, args.policy, candidate,
-                          targets, args.equivalence, args.retained_report)
+                          targets, args.equivalence, args.retained_report, mle_scope)
     except (GateError, support.MatrixError) as error:
         print(f"FAIL envelope release readiness: {error}", file=sys.stderr)
         return 1
