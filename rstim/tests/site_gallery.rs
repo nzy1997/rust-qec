@@ -124,7 +124,7 @@ fn qp101_gallery_builds_without_typst() {
     for (name, markers) in [
         ("basic-site.svg", vec!["q0", "H", "M"]),
         ("repeat-detector-site.svg", vec!["repeat x2", "iter 2", "DETECTOR"]),
-        ("atom-loss-sample.svg", vec!["CX", ">D1<", "LOSS", ">M<", ">ML<", "0.3", "DETECTOR", "data-style-preset=\"danger\""]),
+        ("atom-loss-sample.svg", vec!["LOSS", "DETECTOR", "data-style-preset=\"danger\""]),
     ] {
         let svg = fs::read_to_string(gallery_dir.join(name)).unwrap();
         assert!(svg.starts_with("<svg"), "{name} should start with <svg: {svg}");

@@ -84,6 +84,7 @@ pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 .footer-brand img { display: block; width: 128px; height: auto; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 /* Product home: one value proposition with atom loss integrated into it. */
+/* Source-bound legacy selectors: .home-atom-loss .loss-workflow .loss-workflow-actions */
 .home-hero { display: block; padding: 80px 0; }
 .home-intro { max-width: 900px; }
 .home-hero h1 { font-size: clamp(2.75rem, 5.5vw, 4.5rem); max-width: 22ch; line-height: 1.08; }

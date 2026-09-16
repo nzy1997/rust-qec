@@ -445,9 +445,9 @@ fn task_oriented_content_pages_are_linked() {
     );
 
     assert_contains_all(
-        &reference,
-        &["id=\"reference\"", "CLI and Rust API reference"],
-        "documentation library reference entry",
+        &index,
+        &["href=\"docs/#reference\""],
+        "homepage library reference entry",
     );
     assert_contains_all(
         &reference,
@@ -486,7 +486,6 @@ fn new_documentation_routes_use_canonical_sources() {
     let support = read_repo_file("site/templates/support.html");
     let protocol = read_repo_file("site/templates/protocol.html");
     let base = read_repo_file("site/templates/base.html");
-    let docs_navigation = read_repo_file("site/templates/partials/docs-navigation.html");
     let prepare_docs = read_repo_file("tools/prepare_site_docs.py");
 
     assert_contains_all(
@@ -512,16 +511,11 @@ fn new_documentation_routes_use_canonical_sources() {
         &base,
         &[
             "{{ root }}/get-started/",
-            "{{ root }}/docs/",
-            "{{ root }}/interactive/",
+            "{{ root }}/support/",
+            "{{ root }}/validation/",
             "{{ root }}/js/docs.js",
         ],
-        "shared top navigation",
-    );
-    assert_contains_all(
-        &docs_navigation,
-        &["{{ root }}/support/", "{{ root }}/validation/"],
-        "documentation sidebar navigation",
+        "shared documentation navigation",
     );
     assert_contains_all(
         &prepare_docs,
@@ -536,7 +530,7 @@ fn new_documentation_routes_use_canonical_sources() {
 }
 
 #[test]
-fn homepage_presents_a_focused_workflow_and_atom_loss_feature() {
+fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     let index = read_repo_file("site/templates/index.html");
     let get_started = read_repo_file("site/templates/get-started.html");
     let readme = read_repo_file("README.md");
@@ -546,16 +540,12 @@ fn homepage_presents_a_focused_workflow_and_atom_loss_feature() {
         &index,
         &[
             "id=\"atom-loss\"",
-            "Get started",
-            "href=\"get-started/\"",
-            "Inspect a detector circuit",
-            "Use Shot Lab to inspect a circuit one shot at a time",
-            "From codes to decoding",
+            "Install with Cargo",
+            "href=\"get-started/#install\"",
+            "From atom-loss circuits to loss-aware decoding",
             "href=\"atom-loss/\"",
             "href=\"get-started/#first-circuit\"",
-            "gallery/atom-loss-sample.svg",
-            "simulate circuit noise and atom loss",
-            "Atom-loss sampling and decoding",
+            "Envelope decoding · Beta",
         ],
         "homepage atom-loss feature and installation routes",
     );
@@ -588,8 +578,8 @@ fn homepage_presents_a_focused_workflow_and_atom_loss_feature() {
         .0;
     assert_contains_all(
         hero_actions,
-        &["class=\"button primary\" href=\"get-started/\""],
-        "homepage primary getting-started action",
+        &["class=\"button primary\" href=\"get-started/#install\""],
+        "homepage primary Cargo action",
     );
     assert!(
         !hero_actions.contains("get-started/#first-circuit"),
@@ -610,16 +600,16 @@ fn homepage_presents_a_focused_workflow_and_atom_loss_feature() {
     );
     assert_contains_all(
         &styles,
-        &[".home-example", ".home-example-preview", ".atom-loss-button"],
-        "homepage example and integrated atom-loss feature styles",
+        &[".home-atom-loss", ".loss-workflow", ".loss-workflow-actions"],
+        "homepage atom-loss feature styles",
     );
 }
 
 #[test]
 fn sampling_data_page_preserves_training_and_loss_contracts() {
     let page = read_repo_file("site/templates/sampling-data.html");
-    let docs_navigation = read_repo_file("site/templates/partials/docs-navigation.html");
-    let docs = read_repo_file("site/templates/docs.html");
+    let base = read_repo_file("site/templates/base.html");
+    let index = read_repo_file("site/templates/index.html");
     let styles = read_repo_file("site/static/styles.css");
 
     assert_contains_all(
@@ -654,14 +644,14 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
         "sampling and training-data page",
     );
     assert_contains_all(
-        &docs_navigation,
+        &base,
         &["href=\"{{ root }}/sampling-data/\"", ">Sampling &amp; training data</a>"],
         "sampling-data navigation",
     );
     assert_contains_all(
-        &docs,
-        &["href=\"../sampling-data/\"", "Save sampling and training data"],
-        "sampling-data documentation entry",
+        &index,
+        &["href=\"sampling-data/\"", "Sampling &amp; training data"],
+        "sampling-data homepage entry",
     );
     assert_contains_all(
         &styles,
