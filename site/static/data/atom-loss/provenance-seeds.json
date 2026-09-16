@@ -1,25 +1,25 @@
 {
-  "source_commit": "41fad414abeffd4ec52ae4f8e355079177f942af",
+  "source_commit": "c2c5214b6de8e0909b8e2b79dd00093822bdde88",
   "working_tree_dirty": false,
-  "input_digest": "fb309a771e7edc12887fde3f0942e29dc5062e94bbc144a649aa07349174caec",
-  "started_utc": "2026-09-14T11:57:56.461345+00:00",
+  "input_digest": "2a15c5270b63186b9d902a14e37a895096832fd8091ea23ef23de3cf5cb647e5",
+  "started_utc": "2026-09-15T08:22:37.787654+00:00",
   "command": [
-    "/Users/nzy/rcode/rstim/drafts/round20-source/benchmarks/atom_loss/accuracy_seeds.py",
+    "/private/tmp/rstim-evidence2/benchmarks/atom_loss/accuracy_seeds.py",
     "--work",
-    "/Users/nzy/rcode/rstim/drafts/round20-runs/seeds",
+    "/private/tmp/atom-loss-work/seeds",
     "--out",
-    "/Users/nzy/rcode/rstim/drafts/round20-results"
+    "/private/tmp/atom-loss-out"
   ],
   "os": "macOS-26.6.2-arm64-arm-64bit",
   "cpu": "Apple M4",
-  "python": "3.12.13 (main, Mar  3 2026, 15:35:03) [Clang 21.1.4 ]",
+  "python": "3.12.14 (main, Sep  1 2026, 14:09:38) [Clang 22.1.3 ]",
   "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)\nbinary: rustc\ncommit-hash: 01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf\ncommit-date: 2026-02-11\nhost: aarch64-apple-darwin\nrelease: 1.93.1\nLLVM version: 21.1.8\n",
   "binaries": {
-    "target/release/rustqec": "9cb0d76bbf3ffe1f5ca5528536d316101acff1bef64bf00e0d44777965c5e3ba",
-    "target/release/examples/export_matching_benchmark": "a1c1e3c80a3f98d1f4d8d4eac7ca98fa1ad443a2dcc9fee0766a6842bdafac0f",
-    "target/release/examples/export_decoder_oracle": "e6d65e45b7aa1945fdebb24dfc14c654f9961a2d27776e19ae427063a851a995",
-    "target/release/examples/offline_matching_benchmark": "d35359c934047c2d83ab72734b9bddfa89b410f1ddb069e556cac363972eea64",
-    "target/release/examples/atom_loss_sampling_benchmark": "8b253b87a55eac835f9dee1ed51eaf52d26e7b3126acf4f533e7d2737298e005"
+    "target/release/rustqec": "52f5943011412fc0c43ce19cabb15c70aedffd1d1cb4200263f63be83446902f",
+    "target/release/examples/export_matching_benchmark": "d57c88093e30b6209aeb7e3f9a204a826925a234b6def27091993ccfe991b418",
+    "target/release/examples/export_decoder_oracle": "58cae40ff6753fc89a27747a6e8fa97c04a928530db3bac5bf1488819783e68b",
+    "target/release/examples/offline_matching_benchmark": "35e063ae870b7acccbe06a85385644e6f28293dfa3ffe11af5173b2d97c6a2a9",
+    "target/release/examples/atom_loss_sampling_benchmark": "ad45c557b09a1c94b0d3bd724bd3b98650a68557e8b4c0396ff80914413269ef"
   },
   "dependencies": {
     "stim": "1.16.0",
@@ -38,7 +38,7 @@
     "benchmarks/atom_loss/accuracy_seeds.py": "69c58f904026af1c2729021bbd45bfec354f0264612db13dbc8a72125554d5d9",
     "benchmarks/atom_loss/artifacts.py": "64f55a00958148c0cc42034ba7cb0c3545063fc04126abc32647744bcaba565d",
     "benchmarks/atom_loss/chain_contract.py": "5b7d9ff9fd06b058fddd6691c801cb8128aa0f1f90406862c3f11bd9a9eff849",
-    "benchmarks/atom_loss/chain_reference.py": "0d5dd26550db452c6aa5895c7d08cf002e60fe9fac2b6a9bf10059914f4eab0d",
+    "benchmarks/atom_loss/chain_reference.py": "98141b9706f9de862103b7aff25462c638ef1eac9411717da75e23296f384f3d",
     "benchmarks/atom_loss/channel_probes.py": "dee64528bdd749063fa9db0d044a53dffdd0aa1957241f145a55f4c4db6e16d5",
     "benchmarks/atom_loss/correctness.py": "ba240becde07e5a0f86992ad9ae7b45d8207915e2c6a7a23905bfa33bc38603c",
     "benchmarks/atom_loss/decoder_contract.py": "898e7a44aef375cf03f162ff4c3d567d3da0069f7402e433d18337d89479fe03",
@@ -52,6 +52,9 @@
     "benchmarks/atom_loss/plot.py": "2e36632a15287701f71c3aaa4bf4254911c5bbb4a78460d0a1ad4e5824534d5e",
     "benchmarks/atom_loss/probe_specs.py": "e0670a655d47975d5f2ba4f26a036f0908f5440ae81bb7792803807ccd10ad2c",
     "benchmarks/atom_loss/publish.py": "fc0b2b1bdd92f1aea7466c5c93392b1f9a13a4ce0139f5a0ce396f536db1df39",
+    "benchmarks/atom_loss/readiness/resources/report.md": "fb04d685abd4aa09430598e2ad6ad7d5d40550e013c4f1b79a863786dee74928",
+    "benchmarks/atom_loss/readiness_correctness.py": "9064a0800bb848fc1ad884f9213fed1e31a7170d33849ee6cad5caada62eddbf",
+    "benchmarks/atom_loss/readiness_resources.py": "2c09c2b03aa550c6fc675a005cc53873ca92930b7343177441654f101d78aefb",
     "benchmarks/atom_loss/reference.py": "5466f849afa6fe5bcb398a425248defe03af6f06e722da90f3c268e98bb06396",
     "benchmarks/atom_loss/remeasure.py": "8129e53c63833e89e704d0bed685991166468db39def9cfc2747ff09f7e3b91a",
     "benchmarks/atom_loss/replay.py": "bf81eb4a23ae7225e16ec1f87a1cd850cdc50c14487c5a35d9e3fcdbb6d7a725",
