@@ -1,88 +1,224 @@
 {
   "standard": "QP101-ZY",
   "version": "1.0",
-  "num_qubits": 3,
+  "num_qubits": 5,
   "operations": [
+    {
+      "type": "gate",
+      "gate": "R",
+      "targets": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        0,
+        1
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        2
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        3,
+        4
+      ]
+    },
     {
       "type": "noise",
       "gate": "DEPOLARIZE1",
-      "params": [1.0],
-      "raw_targets": [{ "kind": "qubit", "index": 0 }],
+      "params": [
+        0.1
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 4
+        }
+      ]
+    },
+    {
+      "type": "noise",
+      "gate": "DEPOLARIZE1",
+      "params": [
+        0.3
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 1
+        }
+      ],
       "annotations": [
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [
+            0
+          ],
           "label": "X",
           "style": {
             "preset": "danger",
             "color": "red",
             "highlight": true
           },
-          "tags": ["sample-trace", "query-result"],
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "noise",
             "branch_label": "X",
             "instr_name": "DEPOLARIZE1",
-            "op_path": [0],
+            "op_path": [
+              5
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": [],
-            "target_qubits": [0]
+            "target_qubits": [
+              1
+            ]
           }
         }
       ]
     },
     {
+      "type": "tick"
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        1,
+        2
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        0,
+        1
+      ]
+    },
+    {
+      "type": "gate",
+      "gate": "CX",
+      "targets": [
+        3,
+        4
+      ]
+    },
+    {
       "type": "noise",
       "gate": "LOSS",
-      "params": [1.0],
-      "raw_targets": [{ "kind": "qubit", "index": 1 }],
+      "params": [
+        0.1
+      ],
+      "raw_targets": [
+        {
+          "kind": "qubit",
+          "index": 0
+        },
+        {
+          "kind": "qubit",
+          "index": 1
+        },
+        {
+          "kind": "qubit",
+          "index": 2
+        },
+        {
+          "kind": "qubit",
+          "index": 3
+        },
+        {
+          "kind": "qubit",
+          "index": 4
+        }
+      ],
       "annotations": [
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [
+            0
+          ],
           "label": "L",
           "style": {
             "preset": "danger",
             "color": "red",
             "highlight": true
           },
-          "tags": ["sample-trace", "query-result"],
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "noise",
             "branch_label": "L",
             "instr_name": "LOSS",
-            "op_path": [1],
+            "op_path": [
+              10
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": [],
-            "target_qubits": [1]
+            "target_qubits": [
+              0
+            ]
           }
-        }
-      ]
-    },
-    {
-      "type": "noise",
-      "gate": "LOSS",
-      "params": [1.0],
-      "raw_targets": [{ "kind": "qubit", "index": 2 }],
-      "annotations": [
+        },
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [
+            4
+          ],
           "label": "L",
           "style": {
             "preset": "danger",
             "color": "red",
             "highlight": true
           },
-          "tags": ["sample-trace", "query-result"],
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "noise",
             "branch_label": "L",
             "instr_name": "LOSS",
-            "op_path": [2],
+            "op_path": [
+              10
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": [],
-            "target_qubits": [2]
+            "target_qubits": [
+              4
+            ]
           }
         }
       ]
@@ -90,13 +226,22 @@
     {
       "type": "gate",
       "gate": "M",
-      "targets": [1],
+      "targets": [
+        0,
+        1,
+        2
+      ],
       "annotations": [
         {
           "kind": "marker",
-          "target_slots": [0],
+          "target_slots": [
+            0
+          ],
           "label": "1[L]",
-          "tags": ["sample-trace", "query-result"],
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "measurement",
             "bit": true,
@@ -104,40 +249,59 @@
             "instr_name": "M",
             "loss_cause": true,
             "measurement_index": 1,
-            "op_path": [3],
+            "op_path": [
+              11
+            ],
+            "query_kind": "sample_trace",
+            "repeat_iterations": [],
+            "target_qubit": 0
+          }
+        },
+        {
+          "kind": "marker",
+          "target_slots": [
+            1
+          ],
+          "label": "1",
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
+          "context": {
+            "annotation_kind": "measurement",
+            "bit": true,
+            "component": "value",
+            "instr_name": "M",
+            "loss_cause": false,
+            "measurement_index": 2,
+            "op_path": [
+              11
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": [],
             "target_qubit": 1
           }
-        }
-      ]
-    },
-    {
-      "type": "gate",
-      "gate": "MRL",
-      "targets": [2],
-      "annotations": [
+        },
         {
           "kind": "marker",
-          "target_slots": [0],
-          "label": "L=1 | M=1[L]",
-          "tags": ["sample-trace", "query-result"],
+          "target_slots": [
+            2
+          ],
+          "label": "1",
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "measurement",
-            "components": {
-              "loss_flag": {
-                "bit": true,
-                "measurement_index": 2
-              },
-              "value": {
-                "bit": true,
-                "loss_cause": true,
-                "measurement_index": 3
-              }
-            },
-            "instr_name": "MRL",
-            "loss_visible": true,
-            "op_path": [4],
+            "bit": true,
+            "component": "value",
+            "instr_name": "M",
+            "loss_cause": false,
+            "measurement_index": 3,
+            "op_path": [
+              11
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": [],
             "target_qubit": 2
@@ -146,9 +310,90 @@
       ]
     },
     {
+      "type": "gate",
+      "gate": "ML",
+      "targets": [
+        3,
+        4
+      ],
+      "annotations": [
+        {
+          "kind": "marker",
+          "target_slots": [
+            0
+          ],
+          "label": "L=0 | M=0",
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
+          "context": {
+            "annotation_kind": "measurement",
+            "components": {
+              "loss_flag": {
+                "bit": false,
+                "measurement_index": 4
+              },
+              "value": {
+                "bit": false,
+                "loss_cause": false,
+                "measurement_index": 5
+              }
+            },
+            "instr_name": "ML",
+            "loss_visible": true,
+            "op_path": [
+              12
+            ],
+            "query_kind": "sample_trace",
+            "repeat_iterations": [],
+            "target_qubit": 3
+          }
+        },
+        {
+          "kind": "marker",
+          "target_slots": [
+            1
+          ],
+          "label": "L=1 | M=1[L]",
+          "tags": [
+            "sample-trace",
+            "query-result"
+          ],
+          "context": {
+            "annotation_kind": "measurement",
+            "components": {
+              "loss_flag": {
+                "bit": true,
+                "measurement_index": 6
+              },
+              "value": {
+                "bit": true,
+                "loss_cause": true,
+                "measurement_index": 7
+              }
+            },
+            "instr_name": "ML",
+            "loss_visible": true,
+            "op_path": [
+              12
+            ],
+            "query_kind": "sample_trace",
+            "repeat_iterations": [],
+            "target_qubit": 4
+          }
+        }
+      ]
+    },
+    {
       "type": "detector",
       "coords": [],
-      "sources": [{ "kind": "rec", "offset": -3 }],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -7
+        }
+      ],
       "annotations": [
         {
           "kind": "marker",
@@ -158,15 +403,44 @@
             "color": "blue",
             "highlight": true
           },
-          "tags": ["dem-symptom", "query-result"],
+          "tags": [
+            "dem-symptom",
+            "query-result"
+          ],
           "context": {
             "annotation_kind": "detector",
             "detector_index": 0,
             "flipped": true,
-            "op_path": [5],
+            "op_path": [
+              13
+            ],
             "query_kind": "sample_trace",
             "repeat_iterations": []
           }
+        }
+      ]
+    },
+    {
+      "type": "detector",
+      "coords": [],
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -6
+        },
+        {
+          "kind": "rec",
+          "offset": -5
+        }
+      ]
+    },
+    {
+      "type": "observable_include",
+      "index": 0,
+      "sources": [
+        {
+          "kind": "rec",
+          "offset": -1
         }
       ]
     }
