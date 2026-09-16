@@ -4,7 +4,7 @@ This document tracks the development branch. The installed quickstart and
 version-pinned API examples target v0.3.0; use that release's notes for its frozen support boundary.
 Development-branch wording describes the upcoming release state; a decoder
 maturity is binding only for a published release whose evidence bundle
-verifies it (v0.3.1 is the first release with an envelope promotion). It is a
+verifies it (v0.3.1 is the first candidate for an envelope promotion). It is a
 contract for using the shipped interfaces, not a claim that every research
 component, circuit dialect, decoder, or benchmark result is ready for
 publication-scale use.
