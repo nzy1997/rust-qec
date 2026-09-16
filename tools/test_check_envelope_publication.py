@@ -56,6 +56,22 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
         with self.assertRaises(publication.PublicationError):
             publication.check_published_support_bindings("v0.3.2", matrix, gate, bad_plan)
 
+        backdated_matrix = copy.deepcopy(matrix)
+        backdated = backdated_matrix["decoders"]["envelope-mle"]["published_support"]
+        backdated["release"] = "v0.3.1"
+        backdated["release_url"] = "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.1"
+        backdated["evidence_asset"] = "envelope-support-evidence-v0.3.1.tar.gz"
+        backdated["evidence_url"] = (
+            "https://github.com/nzy1997/rust-qec/releases/download/v0.3.1/"
+            "envelope-support-evidence-v0.3.1.tar.gz"
+        )
+        backdated_plan = copy.deepcopy(plan)
+        backdated_plan["maturity"]["promotion_release"] = "v0.3.1"
+        with self.assertRaises(publication.PublicationError):
+            publication.check_published_support_bindings(
+                "v0.3.2", backdated_matrix, gate, backdated_plan
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
