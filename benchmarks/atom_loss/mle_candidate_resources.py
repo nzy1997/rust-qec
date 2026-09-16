@@ -145,7 +145,24 @@ def validate_records(records, budget, total_wall):
     """Budget/output-rule/coverage validation shared by run and verify."""
     problems = []
     for record in records:
-        problems += [f"{record['id']}: {p}" for p in record['output_rule_problems']]
+        # Never trust the producer's cached verdict: replay the output contract
+        # from the raw file-state/exit fields so an edited report cannot hide a
+        # newly installed partial prediction or a missing diagnostic report.
+        try:
+            output_problems = resources.evaluate_run(record)
+        except (KeyError, TypeError) as error:
+            problems.append(
+                f"{record.get('id', '<missing-id>')}: malformed output-semantics "
+                f"record ({error})"
+            )
+            output_problems = []
+        if record.get('output_rule_problems') != output_problems:
+            problems.append(
+                f"{record.get('id', '<missing-id>')}: recorded output_rule_problems "
+                "do not match replayed output semantics"
+            )
+        problems += [f"{record.get('id', '<missing-id>')}: {p}"
+                     for p in output_problems]
         if record['wall_seconds'] > budget['per_case_wall_seconds']:
             problems.append(f"{record['id']}: wall {record['wall_seconds']:.1f}s "
                             'exceeds the declared budget')
@@ -192,9 +209,8 @@ def validate_records(records, budget, total_wall):
     return problems
 
 
-def verify_report(report_path):
-    """Fast structural replay of a produced report; no decoder execution."""
-    report = json.loads(Path(report_path).read_text())
+def verify_document(report, plan_path=PLAN_PATH):
+    """Fast structural replay of a report already loaded in memory."""
     problems = []
     if report.get('schema_version') != SCHEMA:
         return [f"unsupported report schema: {report.get('schema_version')!r}"]
@@ -209,11 +225,28 @@ def verify_report(report_path):
         problems.append('declared budget drifted from the campaign constants')
     if not report['build'].get('sha256') or not report['machine'].get('platform'):
         problems.append('machine/build identity incomplete')
+    plan_path = Path(plan_path)
+    if not plan_path.is_file():
+        problems.append(f'scope plan is missing: {plan_path}')
+    else:
+        plan = json.loads(plan_path.read_text())
+        binding = report.get('scope_plan') or {}
+        if binding.get('sha256') != digest(plan_path):
+            problems.append('report scope-plan SHA-256 does not match the consumed plan')
+        if binding.get('source_revision') != \
+                plan.get('applies_to', {}).get('source_revision'):
+            problems.append('report scope-plan source revision does not match the consumed plan')
     problems += validate_records(report['cases'], report['stress_budget']['values'],
                                  report['total_wall_seconds'])
     if report.get('status') != 'pass' or report.get('problems'):
         problems.append('report does not record a passing campaign')
     return problems
+
+
+def verify_report(report_path, plan_path=PLAN_PATH):
+    """Fast structural replay of a produced report; no decoder execution."""
+    report = json.loads(Path(report_path).read_text())
+    return verify_document(report, plan_path)
 
 
 def main():
@@ -224,7 +257,7 @@ def main():
     parser.add_argument('--verify', type=Path)
     args = parser.parse_args()
     if args.verify is not None:
-        problems = verify_report(args.verify)
+        problems = verify_report(args.verify, args.plan)
         if not problems:
             print(f'{PASS_LINE} verify')
             raise SystemExit(0)
