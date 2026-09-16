@@ -19,7 +19,7 @@ evidence campaigns:
     python3 tools/check_envelope_publication.py \
       --release-dir drafts/envelope-release-audit \
       --expect-decoder envelope-matching \
-      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.1.json
+      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.2.json
 
 ``--expect-decoder`` may be repeated to require more than one Supported
 decoder. Releases that predate the bundle (such as v0.3.0) contain no evidence
