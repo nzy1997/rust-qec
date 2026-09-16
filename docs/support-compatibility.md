@@ -16,7 +16,7 @@ publication-scale use.
 | `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
 | Atom-loss `envelope-matching` decoder | Supported (v0.3.1 and later) | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope, verified by the v0.3.1 release evidence bundle. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
-| Atom-loss `envelope-mle` decoder | Beta | The narrow Mid-SWAP controls declared by the executable support matrix below. Requires the `ilp` feature or an official native archive; the conventional fixture is outside its candidate limit. Remains Beta independently of Matching. |
+| Atom-loss `envelope-mle` decoder | Beta | The bounded Mid-SWAP candidate domain declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json) (issue #721): distance 3, rounds 1–2, per-point loss/batch ceilings. Requires the `ilp` feature or an official native archive; the conventional fixture is outside its candidate limit. Remains Beta independently of Matching until the plan's evidence is fulfilled and the gate passes. |
 | Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
 
 ## Atom-loss support boundary
@@ -45,10 +45,10 @@ rather than silently skipping the MLE controls.
 
 | Property | `envelope-matching` | `envelope-mle` |
 | --- | --- | --- |
-| Maturity | Supported since v0.3.1 (verified by the release evidence bundle) | Beta |
+| Maturity | Supported since v0.3.1 (verified by the release evidence bundle) | Beta (candidate domain declared by the [MLE scope plan](envelope-mle-scope.json); promotion gated on its evidence) |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
 | Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
-| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Checked on the pinned d=5/r=15 fixture and the canonical known-answer control; per-pattern ILP cost bounds its [measured range](../benchmarks/atom_loss/readiness/resources/report.md) |
+| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Candidate domain: distance 3, rounds 1–2, loss ≤ 0.003 (r=2) / ≤ 0.01 (r=1), batches ≤ 16,384 — the finite measured points of the [MLE scope plan](envelope-mle-scope.json), with per-pattern ILP cost bounding its [measured range](../benchmarks/atom_loss/readiness/resources/report.md) |
 | Conventional Stim-annotated family | Isolated checked example (pinned fixture only) | Excluded: rejects the pinned fixture as `unsupported_circuit` (candidate limit) before publishing any output file |
 | Per-shot timeout | Rejected (`--shot-timeout-ms` is MLE-only) | `--shot-timeout-ms`; timeout stops the batch with `decode_timeout` (exit 3), writing diagnostic statistics but no predictions |
 | Infeasible shot | Not applicable | `decode_infeasible` (exit 3), diagnostic statistics but no predictions |
@@ -60,6 +60,28 @@ timeout/infeasible may emit diagnostic statistics with zero completed
 predictions. For any circuit outside the checked domain, treat
 `unsupported_circuit` as a support-boundary result: do not reinterpret it as a
 prediction, and do not rely on absent output files.
+
+### MLE candidate support scope
+
+The MLE candidate domain and its evidence requirements are declared as a
+machine-readable plan, [`docs/envelope-mle-scope.json`](envelope-mle-scope.json)
+(issue #721). The plan pins the finite supported grid — Mid-SWAP distance 3,
+rounds 1–2, per-point loss ceilings 0.003 (r=2) and 0.01 (r=1), batches up to
+16,384 — the required correctness/resource/installed-platform evidence for
+every declared point, the candidate-limit and solve-only timeout semantics,
+and the standing exclusion of the conventional family. An offline suite
+validates the plan and classifies decode jobs against the domain boundary
+(`in-domain` vs `outside-supported-domain`, a support statement rather than a
+decoder prediction):
+
+```sh
+python3 -m unittest tools.test_envelope_mle_scope
+```
+
+Out-of-domain inputs are unpromised, not automatically rejected: only the
+hard limits (candidate count, REPEAT blocks, unsupported instructions) produce
+a guaranteed structured rejection. The plan keeps MLE at Beta until every
+required case is fulfilled and the release gate passes (issue #722).
 
 ### Regression controls
 
