@@ -22,7 +22,7 @@ GALLERY_ENTRIES = (
     GalleryEntry(
         Path("qp101-viz/examples/atom-loss-sample.stim"),
         "atom-loss-sample.svg",
-        ("--sample_shot", "--seed", "7"),
+        ("--sample_shot", "--seed", "16"),
     ),
 )
 
