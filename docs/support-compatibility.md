@@ -132,8 +132,8 @@ and resource evidence, and one archive-bound installed report per platform.
 Verify a downloaded release with
 `python3 tools/check_envelope_publication.py --release-dir <dir> --expect-decoder <name>`;
 releases without the bundle (v0.3.0) are reported as lacking a verified
-promotion. See
-[`docs/native-release-archives.md`](native-release-archives.md#envelope-support-evidence-bundle).
+promotion. See the
+[native archive guide](https://github.com/nzy1997/rust-qec/blob/master/docs/native-release-archives.md#envelope-support-evidence-bundle).
 
 ## Mid-SWAP configuration migration
 
