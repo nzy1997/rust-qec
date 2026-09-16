@@ -22,14 +22,32 @@ Fast replay of a produced report:
 """
 from .shot_data import require
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
 import tempfile
 import time
 
-from . import readiness_resources as resources
-from .run import ROOT, save, digest
+from .output_rules import evaluate_run
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def save(path, value):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2) + '\n', encoding='utf-8')
+
+
+def digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def runtime_resources():
+    """Load numeric/Stim dependencies only for a real campaign, not gate replay."""
+    from . import readiness_resources
+    return readiness_resources
 
 SCHEMA = 'rustqec.envelope-mle-candidate-resources.v1'
 PASS_LINE = 'PASS envelope MLE candidate resources'
@@ -79,6 +97,7 @@ EXCLUSIONS = [
 
 def measure_workload(binary, work, spec):
     """Execute one declared workload and return its raw observation record."""
+    resources = runtime_resources()
     if spec['kind'] == 'cache-eviction':
         case = {'id': spec['id'], 'decoder': 'envelope-mle', 'kind': spec['kind'],
                 'circuit_text': resources.decoder_reference.circuit_for(24),
@@ -100,6 +119,7 @@ def measure_workload(binary, work, spec):
 
 def mle_failure_cases(binary, work):
     """The MLE failure-semantics controls from the shared failure runner."""
+    resources = runtime_resources()
     records = [r for r in resources.failure_cases(binary, work)
                if r['id'] in FAILURE_CASE_IDS]
     require(len(records) == len(FAILURE_CASE_IDS),
@@ -109,6 +129,7 @@ def mle_failure_cases(binary, work):
 
 
 def run_campaign(binary, plan_path, out_path):
+    resources = runtime_resources()
     plan = json.loads(Path(plan_path).read_text())
     require(plan.get('schema_version') == 'rustqec.envelope-mle-scope.v1',
             'MLE candidate campaign requires the scope plan schema')
@@ -149,7 +170,7 @@ def validate_records(records, budget, total_wall):
         # from the raw file-state/exit fields so an edited report cannot hide a
         # newly installed partial prediction or a missing diagnostic report.
         try:
-            output_problems = resources.evaluate_run(record)
+            output_problems = evaluate_run(record)
         except (KeyError, TypeError) as error:
             problems.append(
                 f"{record.get('id', '<missing-id>')}: malformed output-semantics "
