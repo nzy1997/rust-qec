@@ -15,7 +15,7 @@ publication-scale use.
 | --- | --- | --- |
 | `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
-| Atom-loss `envelope-matching` decoder | Supported (v0.3.1 and later) | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope, verified by the v0.3.1 release evidence bundle. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
+| Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope, verified by the v0.3.1 release evidence bundle. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
 | Atom-loss `envelope-mle` decoder | Beta | The bounded Mid-SWAP candidate domain declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json) (issue #721): four exact measured d=3 loss/batch points at rounds 1–2, without interpolation. Requires the `ilp` feature or an official native archive; the conventional fixture is outside its candidate limit. Remains Beta independently of Matching until the plan's evidence is fulfilled and the gate passes. |
 | Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
 
@@ -45,7 +45,7 @@ rather than silently skipping the MLE controls.
 
 | Property | `envelope-matching` | `envelope-mle` |
 | --- | --- | --- |
-| Maturity | Supported since v0.3.1 (verified by the release evidence bundle) | Beta (candidate domain declared by the [MLE scope plan](envelope-mle-scope.json); promotion gated on its evidence) |
+| Maturity | <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> (verified by the release evidence bundle) | Beta (candidate domain declared by the [MLE scope plan](envelope-mle-scope.json); promotion gated on its evidence) |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
 | Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
 | Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Candidate domain: the four measured d=3 points in the [MLE scope plan](envelope-mle-scope.json): r=2 at loss 0.002 and r=1 at loss 0.01, each with batches 1,024 and 16,384. No unmeasured loss/batch interpolation or universal timing guarantee. |
