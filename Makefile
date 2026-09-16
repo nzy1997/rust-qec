@@ -73,6 +73,7 @@ build-site: build-shot-viewer
 	mkdir -p _site/support _site/benchmarks/atom_loss/readiness/resources
 	cp docs/envelope-support.json _site/support/envelope-support.json
 	cp docs/envelope-compatibility-policy.md _site/support/envelope-compatibility-policy.md
+	cp docs/envelope-mle-scope.json _site/support/envelope-mle-scope.json
 	cp benchmarks/atom_loss/readiness/resources/report.md _site/benchmarks/atom_loss/readiness/resources/report.md
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
