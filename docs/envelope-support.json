@@ -1,6 +1,6 @@
 {
   "schema_version": "rustqec.envelope-support.v1",
-  "purpose": "Executable, decoder-specific support matrix for the atom-loss envelope decoders. Verified by tools/check_envelope_support.py, which runs every declared control against a real rustqec binary. Per-decoder promotion out of Beta is decided by the release-readiness gate and published through the version-bound evidence bundle; published_support records which release carries each decoder's Supported promise.",
+  "purpose": "Executable, decoder-specific support matrix for the atom-loss envelope decoders. Verified by tools/check_envelope_support.py, which runs every declared control against a real rustqec binary. Per-decoder promotion out of Beta is decided by the release-readiness gate and published through the version-bound evidence bundle. published_support declares the intended release metadata but is not publication proof: consumers must also fetch the post-publication verification marker.",
   "applies_to": {
     "repository": "nzy1997/rust-qec",
     "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
@@ -18,6 +18,8 @@
         "release_url": "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.1",
         "evidence_asset": "envelope-support-evidence-v0.3.1.tar.gz",
         "evidence_url": "https://github.com/nzy1997/rust-qec/releases/download/v0.3.1/envelope-support-evidence-v0.3.1.tar.gz",
+        "verification_asset": "envelope-support-verification-v0.3.1.json",
+        "verification_url": "https://api.github.com/repos/nzy1997/rust-qec/releases/tags/v0.3.1",
         "scope": "Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope."
       },
       "objective": "Minimum-weight perfect matching on a loss-conditioned graph; an approximation to the declared fault-configuration objective. Ties are resolved by the matching implementation and are only checked against the explicitly allowed answer sets recorded by the independent correctness suite.",
