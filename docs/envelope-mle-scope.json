@@ -1,0 +1,325 @@
+{
+  "schema_version": "rustqec.envelope-mle-scope.v1",
+  "purpose": "Executable candidate support contract for the envelope-mle decoder (issue #721). Declares the narrow finite domain in which MLE can be promoted to Supported, the exact evidence every part of that domain requires, and the failure/output semantics that bound out-of-budget behavior. Verified offline by tools/test_envelope_mle_scope.py and enforced at release time by tools/check_envelope_release.py (issue #722). This plan does not by itself promote MLE: current_maturity stays beta until every required case is fulfilled by revision-bound evidence and a release passes the gate.",
+  "applies_to": {
+    "repository": "nzy1997/rust-qec",
+    "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
+    "matrix": "docs/envelope-support.json",
+    "note": "The plan applies to the recorded source revision and later revisions for which tools/test_envelope_mle_scope.py passes. The release gate re-binds the plan to each candidate by requiring this revision to be an ancestor of the candidate with identical scope-relevant sources."
+  },
+  "decoder": "envelope-mle",
+  "required_build_features": [
+    "ilp"
+  ],
+  "maturity": {
+    "current": "beta",
+    "proposed_release_maturity": "supported-candidate",
+    "promotion_rule": "MLE is promoted to Supported only when (a) every required case below is fulfilled by revision-bound evidence, (b) the declared workload matrix is executed inside the budgets declared before measurement, (c) installed ILP-capable archives pass the known-answer and rejection controls on both native targets, and (d) the release gate passes on the exact release candidate. A green Matching release never promotes MLE.",
+    "promotion_release": null
+  },
+  "domain": {
+    "circuit_family": "midswap",
+    "generator": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap (and the pinned fixtures derived from it)",
+    "readout_basis": "Z basis only: ML/MZL (terminal) and MRL/MRZL (resetting) loss-visible readouts; X/Y-basis loss readouts are rejected as unsupported_circuit",
+    "observables": "1..=64",
+    "sweep_bits": 0,
+    "flat_only": true,
+    "allowed_instructions": [
+      "QUBIT_COORDS",
+      "SHIFT_COORDS",
+      "TICK",
+      "R",
+      "RZ",
+      "H",
+      "CX",
+      "CNOT",
+      "ZCX",
+      "X_ERROR",
+      "DEPOLARIZE1",
+      "DEPOLARIZE2",
+      "LOSS",
+      "ML",
+      "MZL",
+      "MRL",
+      "MRZL",
+      "DETECTOR",
+      "OBSERVABLE_INCLUDE"
+    ],
+    "circuit_contract_restrictions": "All restrictions of docs/envelope-support.json circuit_contract apply unchanged (flat circuits, terminal ML/MZL, interleaved loss flag/value records, complete disjoint CX pairs, finite sub-0.5 Pauli probabilities, no decomposed non-graphlike effects).",
+    "points": [
+      {
+        "id": "midswap-d3-r2-loss-le-0.003-batch-le-16384",
+        "distance": 3,
+        "rounds": 2,
+        "loss_rate_max": 0.003,
+        "batch_max": 16384,
+        "justification": "Correctness is measured end-to-end at the pinned d=3/r=2 fixture (loss 0.003); operating cost is measured at the generated d=3/r=2 circuit (loss 0.002) with 1,024 and 16,384 shots. For a fixed circuit the number of conditioned loss patterns \u2014 the dominant ILP cost \u2014 grows with the loss rate, so cost below the measured loss is bounded by the measured points; no timing promise is made, only the measured budget behavior plus the bounded stop semantics.",
+        "required_evidence": [
+          "correctness:midswap-d3-r2-fixture",
+          "resource:mle-d3r2-p002-b1024",
+          "resource:mle-d3r2-p002-b16384"
+        ]
+      },
+      {
+        "id": "midswap-d3-r1-loss-le-0.01-batch-le-16384",
+        "distance": 3,
+        "rounds": 1,
+        "loss_rate_max": 0.01,
+        "batch_max": 16384,
+        "justification": "Correctness is measured end-to-end at the generated d=3/r=1 circuit (loss 0.01, seed 714002). The matching 1,024/16,384-shot operating points at loss 0.01 are measured by the bounded follow-up campaign declared in this plan; they are not inherited from the d=3/r=2 measurements, because maxima from different cases are not a supported cross-product.",
+        "required_evidence": [
+          "correctness:midswap-d3-r1-generated",
+          "resource:mle-d3r1-p010-b1024",
+          "resource:mle-d3r1-p010-b16384"
+        ]
+      }
+    ],
+    "no_interpolation": "The supported domain is exactly the two declared points (with loss/batch at or below the measured ceilings). Distances other than 3, rounds above 2, loss rates above a point's ceiling, batches above 16,384, and every other circuit family are outside the supported domain. Out-of-domain inputs are unpromised, not automatically rejected: a working out-of-domain input may still decode, but only the hard limits below produce a guaranteed structured rejection.",
+    "pinned_witnesses": [
+      "The inline mini-circuit known-answer and placeholder-invariance controls pin the decode semantics independent of circuit scale.",
+      "The pinned canonical-detector MLE fixture pins an independently derived known answer (renvelope exact solver, issue #679 provenance).",
+      "The pinned d=5/r=15 Mid-SWAP acceptance fixture is a regression control only; it does not widen the supported domain to d=5."
+    ]
+  },
+  "limits_and_semantics": {
+    "candidate_limit": {
+      "max_envelope_candidates": 100000,
+      "behavior": "Exceeding the envelope candidate limit rejects the batch as unsupported_circuit (exit 2) before any prediction or statistics file is published. The pinned conventional fixture is the standing witness and remains the explicit exclusion of the conventional family from the MLE domain."
+    },
+    "timeout": {
+      "argument": "--shot-timeout-ms",
+      "scope": "solve-phase-only",
+      "note": "The timeout bounds the per-shot ILP solve phase only; compilation and the rest of the batch are outside it. Compilation coverage must never be claimed from this timeout.",
+      "behavior": "On timeout the batch stops with decode_timeout (exit 3): diagnostic statistics are written (including compile_seconds, attempted_shot_count, timeout_count), no prediction file is published, and completed shots count as zero."
+    },
+    "infeasible": {
+      "behavior": "A shot with no feasible correction stops the batch with decode_infeasible (exit 3): diagnostic statistics but no predictions; distinct from timeout and from unsupported input."
+    },
+    "count_semantics": "shot_count is completed shots; attempted_shot_count counts started shots (at most one more than completed when a stop fired); distinct_loss_patterns counts conditioned models built; timeout_count and infeasible_shot_count are reported separately.",
+    "cache": "At most 1024 conditioned decoder artifacts (FIFO eviction); eviction rebuilds are measured and stay correct, just slower.",
+    "output_rules": "A failed or incomplete run never installs a prediction file that did not exist before, never modifies a pre-existing one, and counts zero completed shots; diagnostic statistics on timeout/infeasible are the only sanctioned partial output."
+  },
+  "exclusions": [
+    {
+      "id": "conventional-family-candidate-limit",
+      "statement": "Conventional (non-Mid-SWAP) Stim-annotated circuits are outside the MLE supported domain; the pinned conventional fixture exceeds the candidate limit and must keep rejecting as unsupported_circuit before any output is published.",
+      "control": "conventional-mle-candidate-explosion-rejection"
+    },
+    {
+      "id": "matching-evidence-not-transferable",
+      "statement": "Matching-only workloads and the synthetic cache-eviction corpus never count as real-circuit MLE coverage; the synthetic corpus is cache-behavior evidence only.",
+      "control": null
+    },
+    {
+      "id": "no-logical-class-bayes-claim",
+      "statement": "MLE is the exact most-likely fault configuration of the declared envelope model; no logical-class Bayes-optimality or logical-error-rate claim is made.",
+      "control": null
+    }
+  ],
+  "required_cases": [
+    {
+      "id": "correctness:midswap-d3-r2-fixture",
+      "kind": "correctness-end-to-end",
+      "suite": "benchmarks/atom_loss/readiness_correctness.py",
+      "case_name": "midswap-d3-r2-fixture",
+      "evidence_level": "independent-end-to-end",
+      "input": "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim (pinned, loss 0.003)",
+      "oracle": "independent Stim oracle: private loss histories, Stim-derived DEM and Pauli fault propagation, exact min-plus enumeration of allowed optima; never cached native predictions",
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 2,
+        "loss_rate": 0.003
+      }
+    },
+    {
+      "id": "correctness:midswap-d3-r1-generated",
+      "kind": "correctness-end-to-end",
+      "suite": "benchmarks/atom_loss/readiness_correctness.py",
+      "case_name": "midswap-d3-r1-generated",
+      "evidence_level": "independent-end-to-end",
+      "input": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (seed 714002)",
+      "oracle": "independent Stim oracle (as above)",
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 1,
+        "loss_rate": 0.01
+      }
+    },
+    {
+      "id": "correctness:midswap-d3-r3-generated",
+      "kind": "correctness-compiler-only",
+      "suite": "benchmarks/atom_loss/readiness_correctness.py",
+      "case_name": "midswap-d3-r3-generated",
+      "evidence_level": "compiler-output-only",
+      "input": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 (seed 714003)",
+      "oracle": "independent compiler-output validation only; supporting evidence that never satisfies an end-to-end requirement",
+      "counts_toward_domain": false,
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 3,
+        "loss_rate": 0.01
+      }
+    },
+    {
+      "id": "control:mini-circuit-known-answer",
+      "kind": "support-control",
+      "matrix_control": "mini-circuit-known-answer",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "hand-computed known answers pinned by rustqec-cli/tests/decode.rs (EXPECTED_PREDICTIONS)"
+    },
+    {
+      "id": "control:lost-value-placeholder-invariance",
+      "kind": "support-control",
+      "matrix_control": "lost-value-placeholder-invariance",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "loss-visible record contract: placeholder value bits are arbitrary; predictions must be identical"
+    },
+    {
+      "id": "control:midswap-canonical-mle-known-answer",
+      "kind": "support-control",
+      "matrix_control": "midswap-canonical-mle-known-answer",
+      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle (pinned)",
+      "oracle": "independently derived expected observables (renvelope exact solver, issue #679 provenance.json, reference_cases.json.zst sha256 80d39123d29836059acf45575031b07d29ed919a46f63426bbc96ce7af9cd1a4)"
+    },
+    {
+      "id": "control:midswap-fixture-mle-acceptance",
+      "kind": "support-control",
+      "matrix_control": "midswap-fixture-mle-acceptance",
+      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap (pinned d=5/r=15)",
+      "oracle": "pinned prediction hash and statistics; regression control only, not a domain promise",
+      "counts_toward_domain": false
+    },
+    {
+      "id": "control:conventional-mle-candidate-explosion-rejection",
+      "kind": "support-control",
+      "matrix_control": "conventional-mle-candidate-explosion-rejection",
+      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional (pinned)",
+      "oracle": "structured rejection contract: unsupported_circuit, exit 2, no prediction or statistics files"
+    },
+    {
+      "id": "control:mle-solve-timeout",
+      "kind": "support-control",
+      "matrix_control": "mle-solve-timeout",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "structured stop contract: decode_timeout, exit 3, diagnostic statistics without predictions"
+    },
+    {
+      "id": "control:mle-infeasible-shot",
+      "kind": "support-control",
+      "matrix_control": "mle-infeasible-shot",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "structured stop contract: decode_infeasible, exit 3, diagnostic statistics without predictions"
+    },
+    {
+      "id": "control:mle-unsupported-detector-layout",
+      "kind": "support-control",
+      "matrix_control": "mle-unsupported-detector-layout",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "unsupported input contract: unsupported_circuit, exit 2, no outputs"
+    },
+    {
+      "id": "control:repeat-block-rejection",
+      "kind": "support-control",
+      "matrix_control": "repeat-block-rejection",
+      "input": "inline circuit in docs/envelope-support.json",
+      "oracle": "unsupported input contract: REPEAT blocks are rejected before flattening"
+    },
+    {
+      "id": "resource:mle-d3r2-p002-b1024",
+      "kind": "resource-workload",
+      "workload_id": "mle-d3r2-p002-b1024",
+      "circuit": "real midswap d=3/r=2 generated circuit, loss 0.002, seed 715401",
+      "budget": "declared before measurement by the MLE candidate campaign; retained in benchmarks/atom_loss/readiness/resources/raw/mle-d3r2-p002-b1024.json (issue #715) and re-measured at the candidate revision",
+      "real_circuit": true,
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 2,
+        "loss_rate": 0.002,
+        "batch": 1024
+      }
+    },
+    {
+      "id": "resource:mle-d3r2-p002-b16384",
+      "kind": "resource-workload",
+      "workload_id": "mle-d3r2-p002-b16384",
+      "circuit": "real midswap d=3/r=2 generated circuit, loss 0.002, seed 715402",
+      "budget": "as above; retained raw record benchmarks/atom_loss/readiness/resources/raw/mle-d3r2-p002-b16384.json",
+      "real_circuit": true,
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 2,
+        "loss_rate": 0.002,
+        "batch": 16384
+      }
+    },
+    {
+      "id": "resource:mle-d3r1-p010-b1024",
+      "kind": "resource-workload",
+      "workload_id": "mle-d3r1-p010-b1024",
+      "circuit": "real midswap d=3/r=1 generated circuit, loss 0.01, seed 721401",
+      "budget": "declared before measurement; measured by benchmarks/atom_loss/mle_candidate_resources.py at the candidate revision",
+      "real_circuit": true,
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 1,
+        "loss_rate": 0.01,
+        "batch": 1024
+      }
+    },
+    {
+      "id": "resource:mle-d3r1-p010-b16384",
+      "kind": "resource-workload",
+      "workload_id": "mle-d3r1-p010-b16384",
+      "circuit": "real midswap d=3/r=1 generated circuit, loss 0.01, seed 721402",
+      "budget": "declared before measurement; measured by benchmarks/atom_loss/mle_candidate_resources.py at the candidate revision",
+      "real_circuit": true,
+      "circuit_params": {
+        "distance": 3,
+        "rounds": 1,
+        "loss_rate": 0.01,
+        "batch": 16384
+      }
+    },
+    {
+      "id": "resource:mle-eviction-wires24",
+      "kind": "resource-workload",
+      "workload_id": "mle-eviction-wires24",
+      "circuit": "synthetic 24-wire eviction corpus (1,401 distinct patterns > 1,024-artifact cache bound)",
+      "budget": "declared before measurement; cache-behavior evidence only",
+      "real_circuit": false
+    },
+    {
+      "id": "failure:fail-mle-candidate-limit",
+      "kind": "failure-semantics",
+      "workload_id": "fail-mle-candidate-limit",
+      "expected": "unsupported_circuit, exit 2, no prediction or statistics files",
+      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional (pinned), --shot-timeout-ms 2000"
+    },
+    {
+      "id": "failure:fail-mle-solve-timeout",
+      "kind": "failure-semantics",
+      "workload_id": "fail-mle-solve-timeout",
+      "expected": "decode_timeout, exit 3, diagnostic statistics without predictions, compilation outside the timeout (compile_seconds recorded, exactly one attempted shot)",
+      "input": "inline mini-circuit (as in docs/envelope-support.json mle-solve-timeout), --shot-timeout-ms 0"
+    },
+    {
+      "id": "failure:fail-mle-infeasible",
+      "kind": "failure-semantics",
+      "workload_id": "fail-mle-infeasible",
+      "expected": "decode_infeasible, exit 3, diagnostic statistics without predictions",
+      "input": "inline infeasible mini-circuit (as in docs/envelope-support.json mle-infeasible-shot)"
+    },
+    {
+      "id": "installed:x86_64-unknown-linux-gnu",
+      "kind": "installed-platform",
+      "target": "x86_64-unknown-linux-gnu",
+      "expected": "installed-envelope report from the verified ILP-capable archive: full MLE known-answer and rejection control set passing, ilp expected and available"
+    },
+    {
+      "id": "installed:aarch64-apple-darwin",
+      "kind": "installed-platform",
+      "target": "aarch64-apple-darwin",
+      "expected": "installed-envelope report from the verified ILP-capable archive: full MLE known-answer and rejection control set passing, ilp expected and available"
+    }
+  ]
+}
