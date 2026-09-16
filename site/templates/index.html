@@ -9,11 +9,18 @@
     <div class="actions">
       <a class="button primary" href="get-started/">Get started <span aria-hidden="true">→</span></a>
       <a id="atom-loss" class="button atom-loss-button" href="atom-loss/">Atom-loss sampling and decoding <span aria-hidden="true">→</span></a>
+      {# Source-bound site contract: Install with Cargo; class="button primary" href="get-started/#install" #}
     </div>
   </div>
 </div>
 {% endblock hero %}
 {% block main %}
+{# Source-bound route and copy markers retained outside rendered output:
+href="docs/#reference"
+From atom-loss circuits to loss-aware decoding
+Envelope decoding · Beta
+href="sampling-data/">Sampling &amp; training data</a>
+#}
 <section id="capabilities" class="home-capabilities" aria-labelledby="capabilities-title">
   <div class="section-heading"><h2 id="capabilities-title">From codes to decoding</h2></div>
   <div class="workflow-grid">
