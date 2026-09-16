@@ -12,36 +12,117 @@ publication-scale use.
 | --- | --- | --- |
 | `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
-| Atom-loss envelope decoding | Beta | The checked Mid-SWAP fixture below is supported by the current native compiler and `envelope-mle`; other circuit shapes remain limited by the compiler's explicit acceptance rules. |
+| Atom-loss `envelope-matching` decoder | Beta | The checked Mid-SWAP domain declared by the executable support matrix below. Included in default CLI builds. A first supported release for this decoder is proposed through the per-decoder readiness gate; it is not yet stable. |
+| Atom-loss `envelope-mle` decoder | Beta | The narrow Mid-SWAP controls declared by the executable support matrix below. Requires the `ilp` feature or an official native archive; the conventional fixture is outside its candidate limit. Remains Beta independently of Matching. |
 | Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
 
 ## Atom-loss support boundary
 
-The native atom-loss compiler accepts the flat, loss-visible Mid-SWAP subset
-used by `rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/`.
-The supported regression control is intentionally narrow: it exercises the
-current d=5/r=15 Mid-SWAP circuit and one pinned row with `envelope-mle`.
+The atom-loss support promise is defined per decoder by the executable matrix
+[`docs/envelope-support.json`](envelope-support.json). The matrix records each
+decoder's build features and maturity, the circuit contract (families, readout
+basis, allowed instructions, observable/sweep/REPEAT restrictions), the
+revision the promise applies to, and one acceptance or rejection control for
+every declared behavior. It is verified by executing both decoders against the
+declared controls:
 
-Run the positive control:
+```sh
+cargo build --release --locked -p rustqec-cli --features ilp
+python3 tools/check_envelope_support.py \
+  --binary target/release/rustqec \
+  --matrix docs/envelope-support.json \
+  --out drafts/envelope-readiness/support.json
+```
+
+The checker exits nonzero unless every control matches, including structured
+rejection codes and output-file rules; a binary without ILP fails the run
+rather than silently skipping the MLE controls.
+
+### Decoder-specific support table
+
+| Property | `envelope-matching` | `envelope-mle` |
+| --- | --- | --- |
+| Maturity | Beta (proposed candidate for a first supported release) | Beta |
+| Build requirement | Default CLI builds | `--features ilp` or an official native archive |
+| Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
+| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Checked on the pinned d=5/r=15 fixture and the canonical known-answer control; per-pattern ILP cost bounds its [measured range](../benchmarks/atom_loss/readiness/resources/report.md) |
+| Conventional Stim-annotated family | Isolated checked example (pinned fixture only) | Excluded: rejects the pinned fixture as `unsupported_circuit` (candidate limit) before publishing any output file |
+| Per-shot timeout | Rejected (`--shot-timeout-ms` is MLE-only) | `--shot-timeout-ms`; timeout stops the batch with `decode_timeout` (exit 3), writing diagnostic statistics but no predictions |
+| Infeasible shot | Not applicable | `decode_infeasible` (exit 3), diagnostic statistics but no predictions |
+| Unsupported input | `unsupported_circuit` (exit 2), no prediction or statistics files | Same |
+
+Unsupported input, timeout, and infeasible outcomes are distinct results:
+compilation rejection produces neither predictions nor statistics, while MLE
+timeout/infeasible may emit diagnostic statistics with zero completed
+predictions. For any circuit outside the checked domain, treat
+`unsupported_circuit` as a support-boundary result: do not reinterpret it as a
+prediction, and do not rely on absent output files.
+
+### Regression controls
+
+The Mid-SWAP MLE positive control:
 
 ```sh
 cargo test --locked -p rustqec-cli --test external_fixtures current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified -- --exact
 ```
 
-Successful decoding of that small fixture shows that this current support path
-still works. It is not publication-scale validation, a logical-error-rate
-campaign, or evidence that arbitrary atom-loss circuits are supported.
-
-The conventional candidate-explosion fixture is explicitly excluded from this
-route. It must fail before publishing prediction or statistics files, using the
-existing `unsupported_circuit` structured failure:
+The conventional candidate-explosion fixture is explicitly excluded from the
+MLE route. It must fail before publishing prediction or statistics files,
+using the existing `unsupported_circuit` structured failure:
 
 ```sh
 cargo test --locked -p rustqec-cli --test external_fixtures current_rstim_atom_loss_conventional_envelope_mle_rejects_candidate_explosion -- --exact
 ```
 
-For any other circuit, treat `unsupported_circuit` as a support-boundary result:
-do not reinterpret it as a prediction, and do not rely on absent output files.
+Successful decoding of the pinned fixtures shows that these support paths
+still work. It is not publication-scale validation, a logical-error-rate
+campaign, or evidence that arbitrary atom-loss circuits are supported.
+
+### Release-readiness gate
+
+Promotion from Beta to Supported is decided per decoder by the
+release-readiness gate (issue #716), not by the matrix alone. The gate
+aggregates the revision-bound evidence bundle — the support-matrix result, the
+independent correctness suite, the measured resource envelope, and one
+installed-artifact contract report per official native target
+(`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`) — and promotes a decoder
+only when every artifact passes and was produced from the release candidate
+revision (or a recorded source-equivalence check):
+
+```sh
+python3 tools/check_envelope_release.py \
+  --evidence-dir drafts/envelope-readiness \
+  --matrix docs/envelope-support.json \
+  --policy docs/envelope-compatibility-policy.md \
+  --candidate-revision "$(git rev-parse HEAD)" \
+  --out drafts/envelope-readiness/release-gate.json
+```
+
+The installed-artifact reports are produced from the verified release archive
+of each platform (never a PATH binary):
+
+```sh
+python3 tools/check_installed_envelope.py \
+  --bin-dir extracted/<archive-root>/bin \
+  --matrix docs/envelope-support.json \
+  --target aarch64-apple-darwin \
+  --archive <archive.tar.gz> \
+  --source-sha <candidate-revision> \
+  --expect-ilp \
+  --out drafts/envelope-readiness/installed-aarch64-apple-darwin.json
+```
+
+A missing expected decoder, a missing platform report, a partially executed
+control set, hollowed correctness coverage, or a revision mismatch fails the
+gate; the decoder then remains Beta with its blocking gaps recorded in the
+gate report. The retained full resource report supports a candidate only when
+its measurement revision is an ancestor of the candidate with identical
+measurement-relevant sources (the measurement script, the decoder crates and
+`Cargo.lock`); otherwise the full campaign must be rerun. What the promoted
+surface freezes — CLI arguments, dataset interpretation, prediction packing,
+structured error codes, statistics semantics, and the evolution/deprecation
+rules — is defined by
+[`docs/envelope-compatibility-policy.md`](envelope-compatibility-policy.md).
 
 ## Mid-SWAP configuration migration
 

@@ -1,0 +1,45 @@
+{
+  "id": "mle-d3r2-p002-b16384",
+  "decoder": "envelope-mle",
+  "kind": "repeated-patterns",
+  "expected": {
+    "outcome": "success"
+  },
+  "circuit": {
+    "source": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+    "sha256": "4b2c2c55fe0006c28f7d2f68fb83c25252a26c64d4bdddce797510cd7f413671"
+  },
+  "loss_rate": 0.002,
+  "shots": 16384,
+  "seed": 715402,
+  "corpus": {
+    "shots": 16384,
+    "seed": 715402,
+    "rows_sha256": "eedbda88cbb021c0b3330b81fb4932d28709fb6ef3d06b4ce68a2806a8d057a6",
+    "distinct_patterns_in_corpus": 267,
+    "sampler": "rustqec circuit sample --shots 16384 --seed 715402 (workload generation)"
+  },
+  "exit_code": 0,
+  "wall_seconds": 35.31120162503794,
+  "peak_rss_watermark_bytes": 215252992,
+  "compile_seconds": 0.002738417,
+  "decode_seconds": 35.298526334,
+  "attempted_shots": 16384,
+  "completed_shots": 16384,
+  "observed_pattern_count": 267,
+  "distinct_loss_patterns_exact": true,
+  "cache": {
+    "builds": 267,
+    "hits": 16117,
+    "eviction_rebuilds_observed": 0
+  },
+  "timeout_count": 0,
+  "infeasible_shot_count": 0,
+  "predictions": {
+    "installed": true,
+    "sha256": "b439cb4b60227ec6b9635a26244a62f98c9dc10e1f5c7b137fd317641265c958",
+    "bytes": 16384
+  },
+  "stats_written": true,
+  "output_rule_problems": []
+}

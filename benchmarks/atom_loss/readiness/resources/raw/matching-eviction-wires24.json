@@ -1,0 +1,45 @@
+{
+  "id": "matching-eviction-wires24",
+  "decoder": "envelope-matching",
+  "kind": "cache-eviction",
+  "expected": {
+    "outcome": "success"
+  },
+  "circuit": {
+    "source": "benchmarks.atom_loss.decoder_reference.circuit_for(24)",
+    "sha256": "6c9b4c80f163e19c0f7b873e385335d0f3ab9660e0b6e62eef6341aee02a59f6"
+  },
+  "loss_rate": null,
+  "shots": 1601,
+  "seed": null,
+  "corpus": {
+    "shots": 1601,
+    "seed": null,
+    "rows_sha256": "1ce7baaa2f7bc35308d97a545d978f2a00397ce33a5ab06c5d79c2e66a74eca3",
+    "distinct_patterns_in_corpus": 1401,
+    "sampler": "deterministic synthetic loss-flag patterns on decoder_reference.circuit_for(24); engineered to exceed the 1024-artifact cache bound and force an eviction rebuild"
+  },
+  "exit_code": 0,
+  "wall_seconds": 0.016344500007107854,
+  "peak_rss_watermark_bytes": 215252992,
+  "compile_seconds": 0.000252334,
+  "decode_seconds": 0.008113458,
+  "attempted_shots": 1601,
+  "completed_shots": 1601,
+  "observed_pattern_count": 1401,
+  "distinct_loss_patterns_exact": true,
+  "cache": {
+    "builds": 1402,
+    "hits": 199,
+    "eviction_rebuilds_observed": 1
+  },
+  "timeout_count": 0,
+  "infeasible_shot_count": 0,
+  "predictions": {
+    "installed": true,
+    "sha256": "fd2a70e258a6114e834d3cdf4d43e3dc4fa5d919be0ed464a0e2fa8f8dff98a9",
+    "bytes": 1601
+  },
+  "stats_written": true,
+  "output_rule_problems": []
+}
