@@ -751,6 +751,10 @@ jobs:
               exit 1
             fi
           done
+          if grep -Fxq "envelope-support-verification-${TAG}.json" <<< "$existing_assets"; then
+            echo "release verification marker already exists; refusing to overwrite" >&2
+            exit 1
+          fi
           gh release upload "$TAG" \
             staged-release/rustqec-*.tar.gz \
             staged-release/SHA256SUMS \
@@ -759,3 +763,34 @@ jobs:
             publication/envelope-support-evidence-*.tar.gz \
             publication/envelope-support-evidence-*.tar.gz.sha256 \
             --repo "$GITHUB_REPOSITORY"
+      - name: Verify the published assets and enable the website claim
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          mkdir published-audit
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir published-audit \
+            --pattern 'rustqec-*.tar.gz' \
+            --pattern 'SHA256SUMS' \
+            --pattern 'release-manifest.json' \
+            --pattern 'envelope-support-evidence-*.tar.gz' \
+            --pattern 'envelope-support-evidence-*.tar.gz.sha256'
+          supported="$(tar -xzOf published-audit/envelope-support-evidence-*.tar.gz \
+            --wildcards '*/publication.json' | \
+            python3 -c 'import json, sys; print(" ".join(json.load(sys.stdin)["supported_decoders"]))')"
+          expect=()
+          for decoder in $supported; do
+            expect+=(--expect-decoder "$decoder")
+          done
+          marker="publication/envelope-support-verification-${TAG}.json"
+          python3 tooling/tools/check_envelope_publication.py \
+            --release-dir published-audit "${expect[@]}" --marker-out "$marker"
+          evidence_sha="$(sha256sum published-audit/envelope-support-evidence-*.tar.gz | awk '{print $1}')"
+          marker_sha="$(sha256sum "$marker" | awk '{print $1}')"
+          supported_csv="${supported// /,}"
+          marker_label="rustqec-envelope-verification-v1;tag=${TAG};source=${SOURCE_SHA};evidence=sha256:${evidence_sha};marker=sha256:${marker_sha};supported=${supported_csv};status=pass"
+          gh release upload "$TAG" "$marker#$marker_label" --repo "$GITHUB_REPOSITORY"

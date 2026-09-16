@@ -17,11 +17,16 @@ evidence campaigns:
 
     python3 tools/check_envelope_publication.py --self-test
     python3 tools/check_envelope_publication.py \
-      --release-dir drafts/envelope-release-audit --expect-decoder envelope-matching
+      --release-dir drafts/envelope-release-audit \
+      --expect-decoder envelope-matching \
+      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.1.json
 
 ``--expect-decoder`` may be repeated to require more than one Supported
 decoder. Releases that predate the bundle (such as v0.3.0) contain no evidence
 asset and are reported as lacking a verified promotion, never as Supported.
+``--marker-out`` is valid only in release-directory verification mode and
+requires at least one expected decoder; the release workflow uses it only
+after downloading the published assets and verifying them again.
 """
 
 from __future__ import annotations
@@ -49,6 +54,7 @@ from tools import envelope_mle_scope as mle_scope  # noqa: E402
 from tools import verify_release_archive  # noqa: E402
 
 PUBLICATION_SCHEMA = "rustqec.envelope-publication.v1"
+VERIFICATION_SCHEMA = "rustqec.envelope-publication-verification.v1"
 MATRIX_SCHEMA = support.SCHEMA_VERSION
 REQUIRED_TARGETS = gate.DEFAULT_TARGETS
 PASS_LINE = "PASS envelope published support"
@@ -59,6 +65,7 @@ FIRST_SUPPORTED_RELEASES = {
     "envelope-matching": "v0.3.1",
     "envelope-mle": "v0.3.2",
 }
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 BUNDLE_SUMS_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._/-]*)")
 
 GENERATED_EVIDENCE = {
@@ -248,31 +255,9 @@ def check_published_support_bindings(
 
 
 def sanitize_installed_report(report: dict[str, Any]) -> dict[str, Any]:
-    archive = report.get("archive") or {}
-    return {
-        "schema_version": report["schema_version"],
-        "target": report["target"],
-        "source_revision": report["source_revision"],
-        "ilp": report["ilp"],
-        "matrix": {
-            "sha256": report["matrix"]["sha256"],
-            "schema_version": report["matrix"]["schema_version"],
-        },
-        "binary": {
-            "sha256": report["binary"]["sha256"],
-            "version": report["binary"]["version"],
-            "advertised_decoders": report["binary"]["advertised_decoders"],
-        },
-        "archive": {
-            "filename": Path(str(archive.get("path", ""))).name,
-            "sha256": archive.get("sha256"),
-        },
-        "controls": report.get("controls", []),
-        "previous_fixture_semantics": report.get("previous_fixture_semantics"),
-        "status": report["status"],
-        "problems": report.get("problems", []),
-        "redacted_machine_local_paths": list(REDACTED_INSTALLED_PATHS),
-    }
+    portable = gate.portable_installed_report(report)
+    portable["redacted_machine_local_paths"] = list(REDACTED_INSTALLED_PATHS)
+    return portable
 
 
 def check_gate_report(gate_report: dict[str, Any], source_sha: str,
@@ -305,10 +290,37 @@ def check_gate_report(gate_report: dict[str, Any], source_sha: str,
         retained.get("present") is True and retained.get("binding") == "source-equivalent",
         f"{label} does not record a source-equivalent retained resource report",
     )
+    require(
+        SHA256.fullmatch(str(retained.get("sha256", ""))) is not None,
+        f"{label} does not bind the retained resource report by SHA-256",
+    )
+    for name in GENERATED_EVIDENCE:
+        record = (gate_report.get("evidence") or {}).get(name) or {}
+        if (name == "mle-resources" and not record
+                and (gate_report.get("decoders", {}).get("envelope-mle") or {}).get(
+                    "decision") != "supported"):
+            continue
+        require(
+            SHA256.fullmatch(str(record.get("sha256", ""))) is not None,
+            f"{label} does not bind {name} evidence by SHA-256",
+        )
+    for target in REQUIRED_TARGETS:
+        record = (gate_report.get("installed") or {}).get(target) or {}
+        require(
+            SHA256.fullmatch(str(record.get("sha256", ""))) is not None,
+            f"{label} does not bind the installed report for {target} by SHA-256",
+        )
+        require(
+            SHA256.fullmatch(str(record.get("portable_sha256", ""))) is not None,
+            f"{label} does not bind the portable installed report for {target}",
+        )
 
 
-def check_generated_evidence_files(evidence_dir: Path, source_sha: str) -> dict[str, bytes]:
+def check_generated_evidence_files(
+    evidence_dir: Path, source_sha: str, gate_report: dict[str, Any]
+) -> tuple[dict[str, bytes], dict[str, dict[str, Any]]]:
     payloads: dict[str, bytes] = {}
+    documents: dict[str, dict[str, Any]] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
         path = evidence_dir / filename
         evidence = load_json(path, f"{name} evidence")
@@ -322,12 +334,19 @@ def check_generated_evidence_files(evidence_dir: Path, source_sha: str) -> dict[
             evidence.get("status") == "pass",
             f"{name} evidence status is {evidence.get('status')!r}, not 'pass'",
         )
+        gate_record = (gate_report.get("evidence") or {}).get(name) or {}
+        require(
+            gate_record.get("sha256") == sha256_file(path),
+            f"{name} evidence does not match the exact input inspected by the release gate",
+        )
         payloads[f"evidence/{filename}"] = path.read_bytes()
-    return payloads
+        documents[name] = evidence
+    return payloads, documents
 
 
 def load_installed_report(evidence_dir: Path, target: str, source_sha: str,
-                          matrix_sha: str, archives: dict[str, Any]) -> dict[str, Any]:
+                          matrix_sha: str, archives: dict[str, Any],
+                          gate_report: dict[str, Any]) -> dict[str, Any]:
     path = evidence_dir / f"installed-{target}.json"
     report = load_json(path, f"installed-envelope report for {target}")
     require_schema(report, gate.INSTALLED_SCHEMA, f"installed report for {target}")
@@ -366,7 +385,48 @@ def load_installed_report(evidence_dir: Path, target: str, source_sha: str,
         (report.get("matrix") or {}).get("sha256") == matrix_sha,
         f"installed report for {target} consumed a different support matrix",
     )
+    gate_record = (gate_report.get("installed") or {}).get(target) or {}
+    require(
+        gate_record.get("sha256") == sha256_file(path),
+        f"installed report for {target} does not match the exact input inspected by the release gate",
+    )
+    require(
+        gate_record.get("portable_sha256")
+        == gate.json_document_sha256(gate.portable_installed_report(report)),
+        f"installed report for {target} does not match the portable content inspected by the release gate",
+    )
     return sanitize_installed_report(report)
+
+
+def check_evidence_completeness(
+    matrix: dict[str, Any],
+    gate_report: dict[str, Any],
+    generated: dict[str, dict[str, Any]],
+    installed: dict[str, dict[str, Any]],
+) -> None:
+    """Re-run the release gate's structural checks on the bundled evidence.
+
+    Hash binding proves these are the files the gate consumed; this second
+    check prevents a stale or hand-edited passing gate report from blessing a
+    structurally incomplete bundle.
+    """
+    gaps = gate.correctness_summary_gaps(generated["correctness"])
+    wrapped_generated = {
+        name: {"evidence": evidence} for name, evidence in generated.items()
+    }
+    wrapped_installed = {
+        target: {"report": report} for target, report in installed.items()
+    }
+    for decoder, decision in (gate_report.get("decoders") or {}).items():
+        if decision.get("decision") == "supported":
+            gaps += gate.decoder_coverage(
+                decoder, wrapped_generated, wrapped_installed, matrix
+            )
+    require(
+        not gaps,
+        "bundled evidence fails the release gate's completeness checks: "
+        + "; ".join(gaps[:4]),
+    )
 
 
 def collect_retained_resources(retained_dir: Path, expected_revision: str) -> dict[str, bytes]:
@@ -552,10 +612,16 @@ def build_bundle(
     check_published_support_bindings(tag, matrix, gate_report, mle_plan)
     retained_revision = gate_report["retained_resource_report"]["checkout_revision"]
 
-    payloads = check_generated_evidence_files(evidence_dir, source_sha)
+    payloads, generated_documents = check_generated_evidence_files(
+        evidence_dir, source_sha, gate_report
+    )
     platforms: list[dict[str, Any]] = []
+    installed_documents: dict[str, dict[str, Any]] = {}
     for target in REQUIRED_TARGETS:
-        sanitized = load_installed_report(evidence_dir, target, source_sha, matrix_sha, archives)
+        sanitized = load_installed_report(
+            evidence_dir, target, source_sha, matrix_sha, archives, gate_report
+        )
+        installed_documents[target] = sanitized
         archive_identity = next(
             identity for identity in archives.values() if identity["target"] == target
         )
@@ -578,7 +644,15 @@ def build_bundle(
     gate_bytes = gate_report_path.read_bytes()
     payloads["release-gate.json"] = gate_bytes
     retained_payloads = collect_retained_resources(retained_dir, retained_revision)
+    require(
+        sha256_bytes(retained_payloads["retained-resources/manifest.json"])
+        == gate_report["retained_resource_report"].get("sha256"),
+        "retained resource manifest does not match the exact input inspected by the release gate",
+    )
     payloads.update(retained_payloads)
+    check_evidence_completeness(
+        matrix, gate_report, generated_documents, installed_documents
+    )
 
     decoders = derive_decoders(matrix, gate_report, mle_plan)
     publication: dict[str, Any] = {
@@ -837,6 +911,7 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         )
     check_published_support_bindings(tag, matrix, gate_report, mle_plan)
 
+    generated_documents: dict[str, dict[str, Any]] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
         recorded = (publication.get("evidence") or {}).get(name) or {}
         if name == "mle-resources" and not recorded:
@@ -869,6 +944,12 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
             recorded.get("sha256") == sha256_file(path),
             f"bundled {name} evidence does not match the publication record",
         )
+        require(
+            ((gate_report.get("evidence") or {}).get(name) or {}).get("sha256")
+            == sha256_file(path),
+            f"bundled {name} evidence does not match the exact input inspected by the release gate",
+        )
+        generated_documents[name] = evidence
 
     retained = publication.get("retained_resources") or {}
     retained_manifest = load_json(
@@ -887,6 +968,29 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         "retained resource report revision disagreement between the bundle, the "
         "publication record and the gate report",
     )
+    require(
+        sha256_file(bundle / "retained-resources/manifest.json")
+        == gate_report["retained_resource_report"].get("sha256"),
+        "bundled retained resource manifest does not match the exact input inspected by the release gate",
+    )
+    for case in retained_manifest.get("cases", []):
+        raw = case.get("raw")
+        if not raw:
+            continue
+        require(
+            ".." not in PurePosixPath(raw).parts,
+            f"unsafe retained raw observation path {raw}",
+        )
+        raw_path = bundle / "retained-resources" / raw
+        require(raw_path.is_file(), f"missing retained raw observation {raw}")
+        require(
+            SHA256.fullmatch(str(case.get("raw_sha256", ""))) is not None,
+            f"retained raw observation {raw} lacks a valid manifest SHA-256",
+        )
+        require(
+            sha256_file(raw_path) == case["raw_sha256"],
+            f"retained raw observation {raw} does not match the gate-bound manifest",
+        )
     for relative, digest in (retained.get("files") or {}).items():
         path = bundle / relative
         require(path.is_file(), f"missing retained raw observation {relative}")
@@ -900,6 +1004,7 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         sorted(platform.get("target") for platform in platforms) == sorted(REQUIRED_TARGETS),
         "publication record does not cover exactly the two official release targets",
     )
+    installed_documents: dict[str, dict[str, Any]] = {}
     for platform in platforms:
         target = platform["target"]
         report = load_json(bundle / platform["installed_report"],
@@ -948,6 +1053,16 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
             == platform.get("installed_report_sha256"),
             f"bundled installed report for {target} does not match the publication record",
         )
+        require(
+            ((gate_report.get("installed") or {}).get(target) or {}).get("portable_sha256")
+            == gate.json_document_sha256(gate.portable_installed_report(report)),
+            f"bundled installed report for {target} does not match the portable content inspected by the release gate",
+        )
+        installed_documents[target] = report
+
+    check_evidence_completeness(
+        matrix, gate_report, generated_documents, installed_documents
+    )
 
     expected_claims = derive_decoders(matrix, gate_report, mle_plan)
     require(
@@ -972,6 +1087,10 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         "tag": tag,
         "version": publication.get("version"),
         "source_sha": source_sha,
+        "evidence_bundle": {
+            "asset": bundle_name,
+            "sha256": sha256_file(release_dir / bundle_name),
+        },
         "decoders": expected_claims,
         "supported_decoders": supported_decoders(expected_claims),
         "platforms": platforms,
@@ -991,6 +1110,21 @@ def print_summary(result: dict[str, Any], expect_decoders: tuple[str, ...]) -> N
             print(f"  scope: {record['scope_statement']}")
             print(f"  operating limits: {record['numeric_operating_limits']}")
     print(PASS_LINE)
+
+
+def write_verification_marker(result: dict[str, Any], path: Path) -> None:
+    """Write the browser-readable marker only after downloaded assets verify."""
+    marker = {
+        "schema_version": VERIFICATION_SCHEMA,
+        "tag": result["tag"],
+        "version": result["version"],
+        "source_sha": result["source_sha"],
+        "evidence_bundle": result["evidence_bundle"],
+        "supported_decoders": result["supported_decoders"],
+        "verification": "pass",
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -1069,6 +1203,8 @@ def _fixture_gate_report(
     scope_sha: str,
     matching_decision: str,
     mle_decision: str,
+    evidence_dir: Path,
+    retained_manifest: Path,
 ) -> dict[str, Any]:
     proposed = "supported-candidate" if matching_decision == "supported" else "beta"
     blocking = [] if matching_decision == "supported" else ["envelope-matching held at beta: synthetic"]
@@ -1092,6 +1228,7 @@ def _fixture_gate_report(
         "retained_resource_report": {
             "path": "benchmarks/atom_loss/readiness/resources/manifest.json",
             "present": True,
+            "sha256": sha256_file(retained_manifest),
             "checkout_revision": SELFTEST_RETAINED_SHA,
             "changed_equivalence_paths": [],
             "binding": "source-equivalent",
@@ -1106,6 +1243,7 @@ def _fixture_gate_report(
         "evidence": {
             name: {
                 "path": f"evidence/{filename}",
+                "sha256": sha256_file(evidence_dir / filename),
                 "schema_version": schema,
                 "checkout_revision": SELFTEST_SHA,
                 "revision_bound": True,
@@ -1117,6 +1255,15 @@ def _fixture_gate_report(
         "installed": {
             target: {
                 "path": f"evidence/installed-{target}.json",
+                "sha256": sha256_file(evidence_dir / f"installed-{target}.json"),
+                "portable_sha256": gate.json_document_sha256(
+                    gate.portable_installed_report(
+                        load_json(
+                            evidence_dir / f"installed-{target}.json",
+                            f"installed fixture for {target}",
+                        )
+                    )
+                ),
                 "target": target,
                 "source_revision": SELFTEST_SHA,
                 "revision_bound": True,
@@ -1148,6 +1295,60 @@ def _fixture_gate_report(
     }
 
 
+def _fixture_correctness() -> dict[str, Any]:
+    cases = []
+    for index, prediction in enumerate((0, 1), 1):
+        predictions = [prediction, prediction]
+        case = {
+            "name": f"synthetic-{index}",
+            "evidence_level": "independent-end-to-end",
+            "seed": index,
+            "detectors": index,
+            "histories": [
+                {"category": category, "exercised": True}
+                for category in (
+                    "no_loss",
+                    "single_loss",
+                    "multiple_simultaneous_losses",
+                    "loss_in_different_rounds",
+                    "reset_restoring_wire",
+                )
+            ],
+            "noise_channels_exercised": list(gate.REQUIRED_NOISE_CHANNELS),
+            "rows": 2,
+            "placeholder_pairs": 1,
+            "allowed_answers": {
+                "envelope-matching": [[prediction], [prediction]],
+                "envelope-mle": [[prediction], [prediction]],
+            },
+            "backends": {
+                "envelope-matching": {
+                    "predictions": predictions,
+                    "checked_rows": 2,
+                    "unique_optimum_rows": 2,
+                    "allowed_tie_rows": 0,
+                    "placeholder_invariance": True,
+                    "prediction_sha256": hashlib.sha256(bytes(predictions)).hexdigest(),
+                    "rejected_rows": [],
+                    "flipped_prediction_rejected": True,
+                },
+                "envelope-mle": {
+                    "predictions": predictions,
+                    "checked_rows": 2,
+                    "unique_optimum_rows": 2,
+                    "allowed_tie_rows": 0,
+                    "placeholder_invariance": True,
+                    "prediction_sha256": hashlib.sha256(bytes(predictions)).hexdigest(),
+                    "rejected_rows": [],
+                    "flipped_prediction_rejected": True,
+                },
+            },
+            "mismatches": [],
+        }
+        cases.append(case)
+    return {"cases": cases, "coverage": gate.recomputed_coverage(cases)}
+
+
 def _fixture_installed(target: str, archive_name: str, archive_sha: str,
                        matrix_sha: str) -> dict[str, Any]:
     return {
@@ -1168,7 +1369,10 @@ def _fixture_installed(target: str, archive_name: str, archive_sha: str,
             "sha256": matrix_sha,
             "schema_version": MATRIX_SCHEMA,
         },
-        "controls": [{"decoder": "envelope-matching", "control": "mini", "status": "pass"}],
+        "controls": [
+            {"decoder": "envelope-matching", "control": "mini", "status": "pass"},
+            {"decoder": "envelope-mle", "control": "mini", "status": "pass"},
+        ],
         "previous_fixture_semantics": "synthetic fixture",
         "status": "pass",
         "problems": [],
@@ -1337,14 +1541,30 @@ def make_selftest_fixture(
     scope_sha = sha256_file(mle_scope_path)
 
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
-        evidence = (_fixture_mle_resources(mle_scope_path)
-                    if name == "mle-resources" else {
-                        "schema_version": schema,
-                        "checkout_revision": SELFTEST_SHA,
-                        "status": "pass",
-                        "results": [],
-                        "cases": [],
-                    })
+        if name == "mle-resources":
+            evidence = _fixture_mle_resources(mle_scope_path)
+        else:
+            evidence = {
+                "schema_version": schema,
+                "checkout_revision": SELFTEST_SHA,
+                "status": "pass",
+                "results": [],
+                "cases": [],
+            }
+        if name == "correctness":
+            evidence.update(_fixture_correctness())
+        elif name == "resources":
+            evidence["cases"] = [
+                {
+                    "id": f"{decoder}-{kind}",
+                    "decoder": decoder,
+                    "kind": kind,
+                    "exit_code": 0,
+                    "output_rule_problems": [],
+                }
+                for decoder in ("envelope-matching", "envelope-mle")
+                for kind in ("workload", "cache-eviction")
+            ]
         (base / "evidence" / filename).write_text(json.dumps(evidence, indent=2) + "\n",
                                                   encoding="utf-8")
     for target in REQUIRED_TARGETS:
@@ -1352,18 +1572,6 @@ def make_selftest_fixture(
         report = _fixture_installed(target, name, archives[name]["sha256"], matrix_sha)
         (base / "evidence" / f"installed-{target}.json").write_text(
             json.dumps(report, indent=2) + "\n", encoding="utf-8")
-
-    gate_path = base / "release-gate.json"
-    gate_path.write_text(
-        json.dumps(
-            _fixture_gate_report(
-                matrix_sha, policy_sha, scope_sha, matching_decision, mle_decision
-            ),
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
 
     raw_payload = b'{"synthetic": "raw observation"}'
     retained_manifest = {
@@ -1380,6 +1588,23 @@ def make_selftest_fixture(
     (base / "retained" / "raw" / "matching-synthetic.json").write_bytes(raw_payload)
     (base / "retained" / "report.md").write_text("# synthetic resource report\n",
                                                 encoding="utf-8")
+
+    gate_path = base / "release-gate.json"
+    gate_path.write_text(
+        json.dumps(
+            _fixture_gate_report(
+                matrix_sha,
+                policy_sha,
+                scope_sha,
+                matching_decision,
+                mle_decision,
+                base / "evidence",
+                base / "retained" / "manifest.json",
+            ),
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
 
     return {
         "tag": SELFTEST_TAG,
@@ -1636,6 +1861,81 @@ def self_test() -> int:
             )
         except PublicationError as error:
             matching_only_legacy = observe("matching-only-legacy-bundle", False, str(error))
+        def hollow_correctness_keep_gate_hash(bundle_root: Path) -> None:
+            evidence_path = bundle_root / "evidence/correctness.json"
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+            evidence["cases"] = []
+            evidence["coverage"] = {}
+            evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+            publication_path = bundle_root / "publication.json"
+            record = json.loads(publication_path.read_text(encoding="utf-8"))
+            record["evidence"]["correctness"]["sha256"] = sha256_file(evidence_path)
+            publication_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+        staged = fresh_stage("audit-hollow-correctness-bound")
+        repack_bundle(staged, bundle_name, hollow_correctness_keep_gate_hash)
+        correctness_bound = expect_failure(
+            "hollow-correctness-does-not-match-gate-input",
+            staged,
+            "exact input inspected by the release gate",
+        )
+
+        def hollow_correctness_rewrite_gate_hash(bundle_root: Path) -> None:
+            hollow_correctness_keep_gate_hash(bundle_root)
+            evidence_path = bundle_root / "evidence/correctness.json"
+            gate_path = bundle_root / "release-gate.json"
+            report = json.loads(gate_path.read_text(encoding="utf-8"))
+            report["evidence"]["correctness"]["sha256"] = sha256_file(evidence_path)
+            gate_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            publication_path = bundle_root / "publication.json"
+            record = json.loads(publication_path.read_text(encoding="utf-8"))
+            record["gate_report"]["sha256"] = sha256_file(gate_path)
+            publication_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+        staged = fresh_stage("audit-hollow-correctness-rewritten-gate")
+        repack_bundle(staged, bundle_name, hollow_correctness_rewrite_gate_hash)
+        correctness_complete = expect_failure(
+            "hollow-correctness-fails-completeness",
+            staged,
+            "completeness checks",
+        )
+
+        def rewrite_installed_report(bundle_root: Path) -> None:
+            target = REQUIRED_TARGETS[0]
+            report_path = bundle_root / f"evidence/installed-{target}.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["binary"]["version"] = "rustqec 0.0.0-rewritten"
+            report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            publication_path = bundle_root / "publication.json"
+            record = json.loads(publication_path.read_text(encoding="utf-8"))
+            platform = next(item for item in record["platforms"] if item["target"] == target)
+            platform["installed_report_sha256"] = sha256_file(report_path)
+            publication_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+        staged = fresh_stage("audit-rewritten-installed")
+        repack_bundle(staged, bundle_name, rewrite_installed_report)
+        installed_bound = expect_failure(
+            "rewritten-installed-report-does-not-match-gate",
+            staged,
+            "portable content inspected by the release gate",
+        )
+
+        def rewrite_retained_raw(bundle_root: Path) -> None:
+            raw_path = bundle_root / "retained-resources/raw/matching-synthetic.json"
+            raw_path.write_bytes(b'{"synthetic": "rewritten observation"}')
+            publication_path = bundle_root / "publication.json"
+            record = json.loads(publication_path.read_text(encoding="utf-8"))
+            relative = "retained-resources/raw/matching-synthetic.json"
+            record["retained_resources"]["files"][relative] = sha256_file(raw_path)
+            publication_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+        staged = fresh_stage("audit-rewritten-retained-raw")
+        repack_bundle(staged, bundle_name, rewrite_retained_raw)
+        retained_raw_bound = expect_failure(
+            "rewritten-retained-raw-does-not-match-manifest",
+            staged,
+            "gate-bound manifest",
+        )
 
         # A Beta-only legacy fixture must not satisfy --expect-decoder envelope-matching.
         legacy = make_selftest_fixture(work / "legacy-beta", matching_decision="beta")
@@ -1670,6 +1970,10 @@ def self_test() -> int:
     passed = all([
         baseline, swapped, missing, missing_mle_resources, invalid_mle_scope,
         scope, failed_gate, mle_supported, matching_only_legacy, beta_only, legacy_missing,
+        correctness_bound,
+        correctness_complete,
+        installed_bound,
+        retained_raw_bound,
     ])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
@@ -1691,6 +1995,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="directory of downloaded assets for one candidate/release")
     parser.add_argument("--expect-decoder", action="append", dest="expect_decoders",
                         default=[], help="decoder that must be Supported; repeatable")
+    parser.add_argument(
+        "--marker-out",
+        type=Path,
+        help="write a publication-verification marker after all downloaded assets pass",
+    )
     parser.add_argument("--self-test", action="store_true")
     subparsers = parser.add_subparsers(dest="command")
     build_parser = subparsers.add_parser(
@@ -1708,6 +2017,12 @@ def main(argv: list[str] | None = None) -> int:
                               default=gate.DEFAULT_RETAINED_REPORT.parent)
     build_parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
+
+    if args.marker_out is not None:
+        if args.self_test or args.command is not None:
+            parser.error("--marker-out is valid only with --release-dir verification")
+        if not args.expect_decoders:
+            parser.error("--marker-out requires at least one --expect-decoder")
 
     if args.self_test:
         return self_test()
@@ -1746,6 +2061,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FAIL envelope published support: {error}", file=sys.stderr)
         return 1
     print_summary(result, tuple(args.expect_decoders))
+    if args.marker_out is not None:
+        write_verification_marker(result, args.marker_out)
+        print(f"wrote publication verification marker {args.marker_out}")
     return 0
 
 
