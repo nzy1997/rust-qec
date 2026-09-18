@@ -7,11 +7,13 @@ contract referenced by the release-readiness gate
 revisions for which that gate passes. Per-decoder maturity (Beta vs Supported)
 is decided by the gate; this document defines the surface each maturity level
 promises to keep stable. The first candidate to publish Supported promises
-with the hardened verifier is v0.3.2: `envelope-matching` in its measured
+with the hardened verifier is v0.3.3: `envelope-matching` in its measured
 Mid-SWAP envelope and `envelope-mle` in its finite four-point scope. Their
 frozen surfaces are the ones this policy defines, and the release evidence
 bundle binds this document by SHA-256. The staged v0.3.1 release did not
-complete post-publication verification and established no Supported promise.
+complete post-publication verification. The v0.3.2 evidence bundle backdates
+Matching support to v0.3.1 and fails the current verifier. Neither candidate
+established a consistent Supported promise.
 
 Scope: the `rustqec` CLI envelope-decoder surface — `decode`, `capabilities`,
 `circuit stats` — as exercised by `docs/envelope-support.json`. Anything not

@@ -116,6 +116,7 @@
         return equals > 0 ? [part.slice(0, equals), part.slice(equals + 1)] : ['', ''];
       }));
       if (!release || release.tag_name !== published.release || release.draft === true
+          || release.prerelease === true
           || typeof release.published_at !== 'string' || !release.published_at
           || !evidenceAsset || !sidecarAsset || !markerAsset
           || labelParts[0] !== 'rustqec-envelope-v2'
