@@ -14,8 +14,8 @@ import unittest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = REPO_ROOT / "site/static/install.sh"
 HASHES = {
-    "linux": "3ebafcd684f06478ee9d6f4fc85da61e10de4e498020b86c0e76806b67c35aff",
-    "mac": "a74da165d4cd562aaa9e9cbc06d0a42bdf508e65bf283868df1dede4f0a6e8f7",
+    "linux": "3e5e1e8736182b171534ad1b17f272711c32910e3afa770b32b71b52df37ee93",
+    "mac": "5ab3f70b35cf6beb68335515c1c64e14d426cbe9e50baa229d2d20788df9a2b9",
 }
 TARGETS = {
     "linux": ("Linux", "x86_64", "x86_64-unknown-linux-gnu"),
@@ -58,7 +58,7 @@ class InstallScriptTest(unittest.TestCase):
 
     def _make_archive(self, platform: str, *, runnable: bool = True) -> None:
         _system, _machine, target = TARGETS[platform]
-        root = self.root / f"rustqec-v0.3.0-{target}"
+        root = self.root / f"rustqec-v0.3.3-{target}"
         binaries = root / "bin"
         binaries.mkdir(parents=True)
         for command in ("rustqec", "rstim"):
@@ -129,7 +129,7 @@ class InstallScriptTest(unittest.TestCase):
                     self.assertTrue(binary.is_file())
                     self.assertTrue(os.access(binary, os.X_OK))
                 self.assertIn(
-                    f"/v0.3.0/rustqec-v0.3.0-{TARGETS[platform][2]}.tar.gz",
+                    f"/v0.3.3/rustqec-v0.3.3-{TARGETS[platform][2]}.tar.gz",
                     self.curl_log.read_text(encoding="utf-8"),
                 )
 

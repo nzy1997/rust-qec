@@ -6,7 +6,7 @@
   <p class="eyebrow">ATOM LOSS <span class="loss-badge" data-decoder-badge="envelope-matching">Envelope matching · Beta</span></p>
   <h1>Decode with<br>atom loss.</h1>
   <p class="hero-copy">Run your first loss-aware decoding experiment.<br>One circuit, 64 shots, four steps from sample to score.</p>
-  <div class="loss-meta"><span>CLI install · v0.3.0</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
+  <div class="loss-meta"><span>CLI install · v0.3.3</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
   <div class="actions"><a class="button primary" href="#model-loss">Start the tutorial <span aria-hidden="true">→</span></a><a class="button" href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
   <p class="loss-hero-note">This tutorial uses envelope matching, <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span>, within its verified Mid-SWAP scope. Envelope MLE is separately <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span>, with a declared scope limited to four exact measured points and requiring ILP; this walkthrough is one generated Mid-SWAP case. <a href="../atom-loss-concepts/#supported-circuits">Supported circuits →</a></p>
 </div>
@@ -25,9 +25,9 @@
   <p class="loss-inline-note"><strong>Data boundary</strong> Only public records enter the decoder. Private answers are used at the final scoring step.</p>
   <details class="loss-disclosure"><summary>Before you start: install &amp; working directory</summary>
     <p>Install the CLI below, or use a <a href="../get-started/#native-install">native binary</a>. The default CLI includes envelope matching; no optional ILP solver is needed.</p>
-    <pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.0</code></pre>
+    <pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.3</code></pre>
     <p>Run the steps in order in a fresh directory, with <code>rustqec</code> on PATH and Python 3 installed. The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README; after extracting it, run <code>sh run.sh</code> to execute all four steps.</p>
-    <p>This site is <strong>{{ docs_version.label }}</strong>; the installation command pins v0.3.0. <a href="../get-started/#versions">Version details</a>.</p>
+    <p>This site is <strong>{{ docs_version.label }}</strong>; the installation command pins v0.3.3. <a href="../get-started/#versions">Version details</a>.</p>
   </details>
 </section>
 <section class="task-section loss-step" aria-labelledby="model-loss">

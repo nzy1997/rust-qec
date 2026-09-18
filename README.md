@@ -29,7 +29,7 @@ python3 tools/check_site_build.py _site
 ```
 
 The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
-pins the native CLI examples to v0.3.0. `make build-site` stages the canonical
+pins the native CLI examples to v0.3.3. `make build-site` stages the canonical
 QP101 and support contracts into ignored `site/generated/` before Zola renders
 them. Edit `rstim/doc/QP101-ZY.md` or `docs/support-compatibility.md` to update
 those pages; do not edit the generated copies.
@@ -71,7 +71,7 @@ If Rust and Cargo are already installed, use the crates.io CLI as the default
 entry point:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.3.0
+cargo install --locked rustqec-cli --version 0.3.3
 ```
 
 If Rust is not installed, get it from the official
@@ -125,12 +125,13 @@ python3 tools/check_installed_quickstart.py --bin-dir "$(dirname "$(command -v r
 
 ### Cargo and Rust library users
 
-The v0.3.0 crates are available on crates.io; see the
-[release and migration notes](docs/releases/v0.3.0.md). Install the basic CLI
+The library crates remain at 0.3.0, while `rustqec-cli` 0.3.3 is the
+current verified Envelope release; see the
+[release notes](docs/releases/v0.3.3.md). Install the basic CLI
 without the ILP solver:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.3.0
+cargo install --locked rustqec-cli --version 0.3.3
 ```
 
 This installs `rustqec`, sufficient for the full example above. Add `--features ilp`

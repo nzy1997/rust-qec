@@ -100,7 +100,7 @@ test("installation starts with one copyable command and keeps manual steps optio
   await expect(manual).not.toHaveAttribute("open", "");
   await installation.getByRole("button", { name: "Copy Shell · install" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
-    "cargo install --locked rustqec-cli --version 0.3.0",
+    "cargo install --locked rustqec-cli --version 0.3.3",
   );
   await native.locator("summary").first().click();
   await expect(installation.getByRole("link", { name: "Inspect the installer" })).toHaveAttribute("href", "../install.sh");
@@ -277,7 +277,7 @@ test("development guides point to a master checkout and stable checkout is expli
   await page.getByRole("link", { name: "configured repository checkout" }).click();
   await expect(page.locator('pre[data-language="Shell · development source"]')).toContainText("git clone --branch master");
   await page.locator("#stable-source summary").click();
-  await expect(page.locator('pre[data-language="Shell · stable source"]')).toContainText("git clone --branch v0.3.0");
+  await expect(page.locator('pre[data-language="Shell · stable source"]')).toContainText("git clone --branch v0.3.3");
 });
 
 test("support table labels stay intact while the table, not the page, scrolls", async ({ page }) => {
