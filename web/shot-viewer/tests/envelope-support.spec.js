@@ -49,6 +49,7 @@ function verifiedRelease(published, { includeMarker = true, supported = 'envelop
   return {
     tag_name: published.release,
     draft: false,
+    prerelease: false,
     published_at: '2026-09-16T05:00:00Z',
     assets,
   };
@@ -168,6 +169,18 @@ test('marker metadata for a different evidence hash keeps the Beta label', async
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]')).toContainText('Beta');
 });
 
+test('a prerelease with a verification marker keeps both decoders at Beta', async ({ page, request }) => {
+  const matrix = await servedMatrix(request);
+  const published = matchingPublication(matrix);
+  const release = verifiedRelease(published, { supported: 'envelope-matching,envelope-mle' });
+  release.prerelease = true;
+  await page.route(published.verification_url, route => route.fulfill({ json: release }));
+  await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
+  await page.goto('/atom-loss-concepts/');
+  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+});
+
 test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
   matrix.decoders['envelope-mle'].published_support.evidence_asset = '';
@@ -200,7 +213,7 @@ test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, re
 
 test('the previous Matching-only release does not promote MLE', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
-  // v0.3.1 published Matching only; MLE had no publication record.
+  // A Matching-only candidate must not promote MLE.
   delete matrix.decoders['envelope-mle'].published_support;
   matrix.decoders['envelope-mle'].current_maturity = 'beta';
   matrix.decoders['envelope-mle'].proposed_release_maturity = 'beta';
