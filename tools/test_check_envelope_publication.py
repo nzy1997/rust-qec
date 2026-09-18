@@ -79,7 +79,7 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
                 "envelope-mle": {"decision": "supported"},
             }
         }
-        publication.check_published_support_bindings("v0.3.2", matrix, gate, plan)
+        publication.check_published_support_bindings("v0.3.3", matrix, gate, plan)
 
         matching_backdated = copy.deepcopy(matrix)
         matching = matching_backdated["decoders"]["envelope-matching"]["published_support"]
@@ -92,7 +92,7 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
         )
         with self.assertRaises(publication.PublicationError):
             publication.check_published_support_bindings(
-                "v0.3.2", matching_backdated, gate, plan
+                "v0.3.3", matching_backdated, gate, plan
             )
 
         bad_asset = copy.deepcopy(matrix)
@@ -100,12 +100,12 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
             "evidence_asset"
         ] = "stale.tar.gz"
         with self.assertRaises(publication.PublicationError):
-            publication.check_published_support_bindings("v0.3.2", bad_asset, gate, plan)
+            publication.check_published_support_bindings("v0.3.3", bad_asset, gate, plan)
 
         bad_plan = copy.deepcopy(plan)
         bad_plan["maturity"]["promotion_release"] = "v0.3.1"
         with self.assertRaises(publication.PublicationError):
-            publication.check_published_support_bindings("v0.3.2", matrix, gate, bad_plan)
+            publication.check_published_support_bindings("v0.3.3", matrix, gate, bad_plan)
 
         backdated_matrix = copy.deepcopy(matrix)
         backdated = backdated_matrix["decoders"]["envelope-mle"]["published_support"]
@@ -120,7 +120,7 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
         backdated_plan["maturity"]["promotion_release"] = "v0.3.1"
         with self.assertRaises(publication.PublicationError):
             publication.check_published_support_bindings(
-                "v0.3.2", backdated_matrix, gate, backdated_plan
+                "v0.3.3", backdated_matrix, gate, backdated_plan
             )
 
     def test_verification_marker_records_verified_bundle_identity(self) -> None:

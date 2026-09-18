@@ -19,7 +19,7 @@ evidence campaigns:
     python3 tools/check_envelope_publication.py \
       --release-dir drafts/envelope-release-audit \
       --expect-decoder envelope-matching \
-      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.2.json
+      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.3.json
 
 ``--expect-decoder`` may be repeated to require more than one Supported
 decoder. Releases that predate the bundle (such as v0.3.0) contain no evidence
@@ -62,8 +62,8 @@ BUNDLE_PREFIX = "envelope-support-evidence-"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SEMVER_TAG = re.compile(r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 FIRST_SUPPORTED_RELEASES = {
-    "envelope-matching": "v0.3.2",
-    "envelope-mle": "v0.3.2",
+    "envelope-matching": "v0.3.3",
+    "envelope-mle": "v0.3.3",
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 BUNDLE_SUMS_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._/-]*)")
@@ -1130,7 +1130,7 @@ def write_verification_marker(result: dict[str, Any], path: Path) -> None:
 # Offline self-test with synthetic fixtures
 # ---------------------------------------------------------------------------
 
-SELFTEST_TAG = "v0.3.2"
+SELFTEST_TAG = "v0.3.3"
 SELFTEST_SHA = "a" * 40
 SELFTEST_RETAINED_SHA = "b" * 40
 
@@ -1815,7 +1815,7 @@ def self_test() -> int:
         except PublicationError as error:
             mle_supported = observe("mle-supported-baseline", False, str(error))
 
-        # A synthetic Matching-only v0.3.2 bundle may omit the MLE scope-plan
+        # A synthetic Matching-only v0.3.3 bundle may omit the MLE scope-plan
         # and MLE-resource members. It must still refuse an MLE expectation.
         def make_matching_only_legacy(bundle_root: Path) -> None:
             (bundle_root / "scope/envelope-mle-scope.json").unlink()

@@ -93,6 +93,26 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 -m unittest tools.test_verify_release_archive
       - run: python3 -m unittest tools.test_check_envelope_publication
+      - name: Regress against the immutable v0.3.2 publication defect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p published-v032
+          gh release download v0.3.2 --repo "$GITHUB_REPOSITORY" --dir published-v032 \
+            --pattern 'rustqec-*.tar.gz' \
+            --pattern 'SHA256SUMS' \
+            --pattern 'release-manifest.json' \
+            --pattern 'envelope-support-evidence-*.tar.gz' \
+            --pattern 'envelope-support-evidence-*.tar.gz.sha256'
+          if python3 tools/check_envelope_publication.py \
+            --release-dir published-v032 \
+            --expect-decoder envelope-matching \
+            --expect-decoder envelope-mle > published-v032-check.log 2>&1; then
+            echo 'the defective v0.3.2 publication was unexpectedly accepted' >&2
+            exit 1
+          fi
+          grep -F 'envelope-matching published_support release v0.3.1 does not match its immutable first Supported release v0.3.3' published-v032-check.log
 
   shot-assets:
     needs: prepare
