@@ -50,6 +50,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tools import check_envelope_release as gate  # noqa: E402
 from tools import check_envelope_support as support  # noqa: E402
+from tools import envelope_mle_scope as mle_scope  # noqa: E402
 from tools import verify_release_archive  # noqa: E402
 
 PUBLICATION_SCHEMA = "rustqec.envelope-publication.v1"
@@ -66,6 +67,7 @@ GENERATED_EVIDENCE = {
     "support": ("support.json", support.RESULT_SCHEMA_VERSION),
     "correctness": ("correctness.json", "rustqec.envelope-readiness-correctness.v1"),
     "resources": ("resources.json", "rustqec.envelope-readiness-resources.v1"),
+    "mle-resources": ("mle-resources.json", gate.MLE_RESOURCES_SCHEMA),
 }
 
 # Machine-local absolute paths recorded by the candidate run are dropped when
@@ -120,11 +122,16 @@ def require(condition: bool, message: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def derive_decoders(matrix: dict[str, Any], gate_report: dict[str, Any]) -> dict[str, Any]:
+def derive_decoders(
+    matrix: dict[str, Any],
+    gate_report: dict[str, Any],
+    mle_plan: dict[str, Any] | None,
+) -> dict[str, Any]:
     """The only maturity/scope a bundle may claim, derived from the evidence.
 
-    Maturity is the gate decision and the scope text is copied verbatim from
-    the consumed matrix; a hand-edited claim therefore never reconciles.
+    Maturity is the gate decision. Matching scope comes from the consumed
+    matrix, while MLE scope comes from the separately gated finite-domain
+    plan; a hand-edited claim therefore never reconciles.
     """
     contract = matrix["circuit_contract"]
     families = [
@@ -138,15 +145,26 @@ def derive_decoders(matrix: dict[str, Any], gate_report: dict[str, Any]) -> dict
             isinstance(decision, dict) and decision.get("decision") in ("supported", "beta"),
             f"gate report does not record a supported/beta decision for {name}",
         )
-        decoders[name] = {
+        scope_statement = matrix["release_candidate_scope"]["statement"]
+        scope_plan = None
+        if name == "envelope-mle" and mle_plan is not None:
+            scope_statement = mle_plan["domain"]["no_interpolation"]
+            scope_plan = "scope/envelope-mle-scope.json"
+        record = {
             "maturity": decision["decision"],
             "objective": declaration["objective"],
             "required_build_features": declaration.get("required_build_features", []),
             "circuit_families": families,
-            "scope_statement": matrix["release_candidate_scope"]["statement"],
+            "scope_statement": scope_statement,
             "numeric_operating_limits": declaration["numeric_operating_limits"],
             "known_limitations": declaration["known_limitations"],
         }
+        # Matching-only legacy bundles (v0.3.1) predate the MLE scope-plan
+        # member. Preserve their exact publication shape while requiring the
+        # plan for every bundle that actually carries one or promotes MLE.
+        if scope_plan is not None:
+            record["scope_plan"] = scope_plan
+        decoders[name] = record
     return decoders
 
 
@@ -201,6 +219,10 @@ def check_gate_report(gate_report: dict[str, Any], source_sha: str,
     )
     for name in GENERATED_EVIDENCE:
         record = (gate_report.get("evidence") or {}).get(name) or {}
+        if (name == "mle-resources" and not record
+                and (gate_report.get("decoders", {}).get("envelope-mle") or {}).get(
+                    "decision") != "supported"):
+            continue
         require(
             SHA256.fullmatch(str(record.get("sha256", ""))) is not None,
             f"{label} does not bind {name} evidence by SHA-256",
@@ -462,6 +484,7 @@ def build_bundle(
     gate_report_path: Path,
     matrix_path: Path,
     policy_path: Path,
+    mle_scope_path: Path,
     retained_dir: Path,
     out_dir: Path,
 ) -> tuple[Path, Path, dict[str, Any]]:
@@ -498,6 +521,17 @@ def build_bundle(
 
     gate_report = load_json(gate_report_path, "envelope release gate report")
     check_gate_report(gate_report, source_sha, matrix_sha, policy_sha, "gate report")
+    try:
+        mle_plan = mle_scope.load_plan(mle_scope_path)
+    except (mle_scope.ScopeError, json.JSONDecodeError) as error:
+        raise PublicationError(f"invalid MLE scope plan: {error}") from error
+    mle_scope_bytes = mle_scope_path.read_bytes()
+    mle_scope_sha = sha256_bytes(mle_scope_bytes)
+    gate_scope = gate_report.get("mle_scope_plan") or {}
+    require(
+        gate_scope.get("sha256") == mle_scope_sha,
+        "MLE scope plan does not match the plan consumed by the release gate",
+    )
     retained_revision = gate_report["retained_resource_report"]["checkout_revision"]
 
     payloads, generated_documents = check_generated_evidence_files(
@@ -528,6 +562,7 @@ def build_bundle(
         })
     payloads["matrix/envelope-support.json"] = matrix_bytes
     payloads["policy/envelope-compatibility-policy.md"] = policy_bytes
+    payloads["scope/envelope-mle-scope.json"] = mle_scope_bytes
     gate_bytes = gate_report_path.read_bytes()
     payloads["release-gate.json"] = gate_bytes
     retained_payloads = collect_retained_resources(retained_dir, retained_revision)
@@ -541,7 +576,7 @@ def build_bundle(
         matrix, gate_report, generated_documents, installed_documents
     )
 
-    decoders = derive_decoders(matrix, gate_report)
+    decoders = derive_decoders(matrix, gate_report, mle_plan)
     publication: dict[str, Any] = {
         "schema_version": PUBLICATION_SCHEMA,
         "tag": tag,
@@ -553,6 +588,11 @@ def build_bundle(
         "platforms": platforms,
         "matrix": {"path": "matrix/envelope-support.json", "sha256": matrix_sha},
         "policy": {"path": "policy/envelope-compatibility-policy.md", "sha256": policy_sha},
+        "mle_scope": {
+            "path": "scope/envelope-mle-scope.json",
+            "sha256": mle_scope_sha,
+            "source_revision": mle_plan.get("applies_to", {}).get("source_revision"),
+        },
         "gate_report": {"path": "release-gate.json", "sha256": sha256_bytes(gate_bytes)},
         "evidence": {
             name: {"path": f"evidence/{filename}", "sha256": sha256_bytes(payloads[f"evidence/{filename}"])}
@@ -744,6 +784,27 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         policy_sha == (publication.get("policy") or {}).get("sha256"),
         "bundled compatibility policy does not match the publication record",
     )
+    scope_record = publication.get("mle_scope") or {}
+    scope_path = bundle / "scope/envelope-mle-scope.json"
+    mle_plan: dict[str, Any] | None = None
+    if scope_record:
+        require(scope_path.is_file(), "publication records an MLE scope plan but the bundle omits it")
+        try:
+            mle_plan = mle_scope.load_plan(scope_path)
+        except (mle_scope.ScopeError, json.JSONDecodeError) as error:
+            raise PublicationError(f"bundled MLE scope plan is invalid: {error}") from error
+        require(
+            scope_record.get("path") == "scope/envelope-mle-scope.json"
+            and scope_record.get("sha256") == sha256_file(scope_path)
+            and scope_record.get("source_revision")
+            == mle_plan.get("applies_to", {}).get("source_revision"),
+            "bundled MLE scope plan does not match the publication record",
+        )
+    else:
+        require(
+            not scope_path.exists(),
+            "bundle carries an unrecorded MLE scope plan",
+        )
 
     gate_report = load_json(bundle / "release-gate.json", "bundled gate report")
     check_gate_report(gate_report, source_sha, matrix_sha, policy_sha, "bundled gate report")
@@ -756,9 +817,30 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         tuple(gate_report.get("required_targets", ())) == tuple(REQUIRED_TARGETS),
         "gate report does not cover both official release targets",
     )
+    mle_decision = (gate_report.get("decoders", {}).get("envelope-mle") or {}).get(
+        "decision"
+    )
+    if mle_plan is not None:
+        require(
+            (gate_report.get("mle_scope_plan") or {}).get("sha256")
+            == scope_record.get("sha256"),
+            "bundled MLE scope plan does not match the plan consumed by the gate",
+        )
+    else:
+        require(
+            mle_decision != "supported" and "envelope-mle" not in expect_decoders,
+            "an MLE Supported publication requires a bundled, gate-bound MLE scope plan",
+        )
 
     generated_documents: dict[str, dict[str, Any]] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
+        recorded = (publication.get("evidence") or {}).get(name) or {}
+        if name == "mle-resources" and not recorded:
+            require(
+                mle_decision != "supported",
+                "an MLE Supported publication requires bundled mle-resources evidence",
+            )
+            continue
         path = bundle / "evidence" / filename
         evidence = load_json(path, f"bundled {name} evidence")
         require_schema(evidence, schema, f"bundled {name} evidence")
@@ -771,7 +853,14 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
             evidence.get("status") == "pass",
             f"bundled {name} evidence status is {evidence.get('status')!r}",
         )
-        recorded = (publication.get("evidence") or {}).get(name) or {}
+        if (name == "mle-resources"
+                and (gate_report.get("decoders", {}).get("envelope-mle") or {}).get(
+                    "decision") == "supported"):
+            problems = gate.mle_resource_campaign.verify_document(evidence, scope_path)
+            require(
+                not problems,
+                "bundled MLE resource evidence failed replay: " + "; ".join(problems),
+            )
         require(
             recorded.get("sha256") == sha256_file(path),
             f"bundled {name} evidence does not match the publication record",
@@ -896,7 +985,7 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
         matrix, gate_report, generated_documents, installed_documents
     )
 
-    expected_claims = derive_decoders(matrix, gate_report)
+    expected_claims = derive_decoders(matrix, gate_report, mle_plan)
     require(
         publication.get("decoders") == expected_claims,
         "publication decoder claims do not match the gate decision and the consumed "
@@ -1013,7 +1102,9 @@ def _fixture_matrix() -> dict[str, Any]:
 def _fixture_gate_report(
     matrix_sha: str,
     policy_sha: str,
+    scope_sha: str,
     matching_decision: str,
+    mle_decision: str,
     evidence_dir: Path,
     retained_manifest: Path,
 ) -> dict[str, Any]:
@@ -1043,6 +1134,13 @@ def _fixture_gate_report(
             "checkout_revision": SELFTEST_RETAINED_SHA,
             "changed_equivalence_paths": [],
             "binding": "source-equivalent",
+        },
+        "mle_scope_plan": {
+            "path": "docs/envelope-mle-scope.json",
+            "present": True,
+            "enforced": mle_decision == "supported",
+            "sha256": scope_sha,
+            "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
         },
         "evidence": {
             name: {
@@ -1086,8 +1184,10 @@ def _fixture_gate_report(
             },
             "envelope-mle": {
                 "current_maturity": "beta",
-                "proposed_release_maturity": "beta",
-                "decision": "beta",
+                "proposed_release_maturity": (
+                    "supported-candidate" if mle_decision == "supported" else "beta"
+                ),
+                "decision": mle_decision,
                 "coverage_gaps": [],
                 "blocking_gaps": [],
             },
@@ -1119,7 +1219,10 @@ def _fixture_correctness() -> dict[str, Any]:
             "noise_channels_exercised": list(gate.REQUIRED_NOISE_CHANNELS),
             "rows": 2,
             "placeholder_pairs": 1,
-            "allowed_answers": {"envelope-matching": [[prediction], [prediction]]},
+            "allowed_answers": {
+                "envelope-matching": [[prediction], [prediction]],
+                "envelope-mle": [[prediction], [prediction]],
+            },
             "backends": {
                 "envelope-matching": {
                     "predictions": predictions,
@@ -1130,7 +1233,17 @@ def _fixture_correctness() -> dict[str, Any]:
                     "prediction_sha256": hashlib.sha256(bytes(predictions)).hexdigest(),
                     "rejected_rows": [],
                     "flipped_prediction_rejected": True,
-                }
+                },
+                "envelope-mle": {
+                    "predictions": predictions,
+                    "checked_rows": 2,
+                    "unique_optimum_rows": 2,
+                    "allowed_tie_rows": 0,
+                    "placeholder_invariance": True,
+                    "prediction_sha256": hashlib.sha256(bytes(predictions)).hexdigest(),
+                    "rejected_rows": [],
+                    "flipped_prediction_rejected": True,
+                },
             },
             "mismatches": [],
         }
@@ -1158,14 +1271,98 @@ def _fixture_installed(target: str, archive_name: str, archive_sha: str,
             "sha256": matrix_sha,
             "schema_version": MATRIX_SCHEMA,
         },
-        "controls": [{"decoder": "envelope-matching", "control": "mini", "status": "pass"}],
+        "controls": [
+            {"decoder": "envelope-matching", "control": "mini", "status": "pass"},
+            {"decoder": "envelope-mle", "control": "mini", "status": "pass"},
+        ],
         "previous_fixture_semantics": "synthetic fixture",
         "status": "pass",
         "problems": [],
     }
 
 
-def make_selftest_fixture(base: Path, matching_decision: str = "supported") -> dict[str, Any]:
+def _fixture_mle_resources(scope_path: Path) -> dict[str, Any]:
+    cases = []
+    for workload in gate.mle_resource_campaign.WORKLOADS:
+        shots = workload["shots"] or 1601
+        cases.append({
+            "id": workload["id"],
+            "kind": workload["kind"],
+            "real_circuit": workload["real_circuit"],
+            "circuit_params": {
+                "distance": workload["distance"],
+                "rounds": workload["rounds"],
+                "loss_rate": workload["loss"],
+                "batch": workload["shots"],
+            },
+            "expected": {"outcome": "success"},
+            "output_rule_problems": [],
+            "wall_seconds": 1.0,
+            "peak_rss_watermark_bytes": 1024,
+            "exit_code": 0,
+            "shots": shots,
+            "completed_shots": shots,
+            "predictions": {"installed": True},
+            "stats_written": True,
+            "cache": {
+                "hits": 1,
+                "eviction_rebuilds_observed": (
+                    1 if workload["kind"] == "cache-eviction" else 0
+                ),
+            },
+        })
+    for case_id, (error_code, exit_code) in \
+            gate.mle_resource_campaign.EXPECTED_FAILURE_CODES.items():
+        stats_written = case_id != "fail-mle-candidate-limit"
+        cases.append({
+            "id": case_id,
+            "kind": "failure-semantics",
+            "expected": {
+                "outcome": "rejection",
+                "exit_code": exit_code,
+                "error_code": error_code,
+                "stats_written": stats_written,
+            },
+            "output_rule_problems": [],
+            "wall_seconds": 1.0,
+            "peak_rss_watermark_bytes": 1024,
+            "exit_code": exit_code,
+            "error_code": error_code,
+            "completed_shots": 0,
+            "predictions": {
+                "installed": False,
+                "pre_existing": False,
+                "unchanged": False,
+            },
+            "stats_written": stats_written,
+            "compilation_outside_timeout": True,
+        })
+    plan = json.loads(scope_path.read_text(encoding="utf-8"))
+    return {
+        "schema_version": gate.MLE_RESOURCES_SCHEMA,
+        "checkout_revision": SELFTEST_SHA,
+        "machine": {"platform": "synthetic"},
+        "build": {"sha256": "f" * 64},
+        "scope_plan": {
+            "sha256": sha256_file(scope_path),
+            "source_revision": plan["applies_to"]["source_revision"],
+        },
+        "stress_budget": {
+            "declared_before_run": True,
+            "values": gate.MLE_EXPECTED_BUDGET,
+        },
+        "total_wall_seconds": float(len(cases)),
+        "cases": cases,
+        "status": "pass",
+        "problems": [],
+    }
+
+
+def make_selftest_fixture(
+    base: Path,
+    matching_decision: str = "supported",
+    mle_decision: str = "beta",
+) -> dict[str, Any]:
     """A complete synthetic candidate run: archives, manifest, evidence, gate."""
     for sub in ("release", "evidence", "retained/raw", "out"):
         (base / sub).mkdir(parents=True, exist_ok=True)
@@ -1216,25 +1413,35 @@ def make_selftest_fixture(base: Path, matching_decision: str = "supported") -> d
     policy_path = base / "policy.md"
     policy_path.write_text("# synthetic compatibility policy\n", encoding="utf-8")
     policy_sha = sha256_file(policy_path)
+    mle_scope_path = base / "envelope-mle-scope.json"
+    shutil.copyfile(REPO_ROOT / gate.DEFAULT_MLE_SCOPE, mle_scope_path)
+    scope_sha = sha256_file(mle_scope_path)
 
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
-        evidence = {
-            "schema_version": schema,
-            "checkout_revision": SELFTEST_SHA,
-            "status": "pass",
-            "results": [],
-            "cases": [],
-        }
+        if name == "mle-resources":
+            evidence = _fixture_mle_resources(mle_scope_path)
+        else:
+            evidence = {
+                "schema_version": schema,
+                "checkout_revision": SELFTEST_SHA,
+                "status": "pass",
+                "results": [],
+                "cases": [],
+            }
         if name == "correctness":
             evidence.update(_fixture_correctness())
         elif name == "resources":
-            evidence["cases"] = [{
-                "id": "matching-eviction",
-                "decoder": "envelope-matching",
-                "kind": "cache-eviction",
-                "exit_code": 0,
-                "output_rule_problems": [],
-            }]
+            evidence["cases"] = [
+                {
+                    "id": f"{decoder}-{kind}",
+                    "decoder": decoder,
+                    "kind": kind,
+                    "exit_code": 0,
+                    "output_rule_problems": [],
+                }
+                for decoder in ("envelope-matching", "envelope-mle")
+                for kind in ("workload", "cache-eviction")
+            ]
         (base / "evidence" / filename).write_text(json.dumps(evidence, indent=2) + "\n",
                                                   encoding="utf-8")
     for target in REQUIRED_TARGETS:
@@ -1265,7 +1472,9 @@ def make_selftest_fixture(base: Path, matching_decision: str = "supported") -> d
             _fixture_gate_report(
                 matrix_sha,
                 policy_sha,
+                scope_sha,
                 matching_decision,
+                mle_decision,
                 base / "evidence",
                 base / "retained" / "manifest.json",
             ),
@@ -1283,6 +1492,7 @@ def make_selftest_fixture(base: Path, matching_decision: str = "supported") -> d
         "gate_report_path": gate_path,
         "matrix_path": matrix_path,
         "policy_path": policy_path,
+        "mle_scope_path": mle_scope_path,
         "retained_dir": base / "retained",
         "out_dir": base / "out",
         "release_dir": base / "release",
@@ -1355,6 +1565,7 @@ def self_test() -> int:
                 gate_report_path=fixture["gate_report_path"],
                 matrix_path=fixture["matrix_path"],
                 policy_path=fixture["policy_path"],
+                mle_scope_path=fixture["mle_scope_path"],
                 retained_dir=fixture["retained_dir"],
                 out_dir=fixture["out_dir"],
             )
@@ -1399,6 +1610,27 @@ def self_test() -> int:
         missing = expect_failure("missing-platform-report", staged,
                                  "missing bundled installed-envelope report")
 
+        def drop_mle_resources(bundle_root: Path) -> None:
+            (bundle_root / "evidence/mle-resources.json").unlink()
+
+        staged = fresh_stage("audit-missing-mle-resources")
+        repack_bundle(staged, bundle_name, drop_mle_resources)
+        missing_mle_resources = expect_failure(
+            "missing-mle-resource-report", staged, "missing bundled mle-resources evidence"
+        )
+
+        def invalidate_mle_scope(bundle_root: Path) -> None:
+            path = bundle_root / "scope/envelope-mle-scope.json"
+            plan = json.loads(path.read_text(encoding="utf-8"))
+            plan["schema_version"] = "invalid"
+            path.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+
+        staged = fresh_stage("audit-invalid-mle-scope")
+        repack_bundle(staged, bundle_name, invalidate_mle_scope)
+        invalid_mle_scope = expect_failure(
+            "invalid-mle-scope-plan", staged, "bundled MLE scope plan is invalid"
+        )
+
         def widen_scope(bundle_root: Path) -> None:
             path = bundle_root / "publication.json"
             record = json.loads(path.read_text(encoding="utf-8"))
@@ -1422,6 +1654,90 @@ def self_test() -> int:
         failed_gate = expect_failure("failed-gate-with-supported-claim", staged,
                                      "passing gate decision")
 
+        # The same publication path must accept the narrow MLE domain when the
+        # release gate has actually promoted it and its scoped evidence verifies.
+        mle_fixture = make_selftest_fixture(
+            work / "mle-supported", mle_decision="supported"
+        )
+        try:
+            _mle_bundle, _mle_sidecar, mle_publication = build_bundle(
+                tag=mle_fixture["tag"],
+                source_sha=mle_fixture["source_sha"],
+                release_manifest=mle_fixture["release_manifest"],
+                archives_dir=mle_fixture["archives_dir"],
+                evidence_dir=mle_fixture["evidence_dir"],
+                gate_report_path=mle_fixture["gate_report_path"],
+                matrix_path=mle_fixture["matrix_path"],
+                policy_path=mle_fixture["policy_path"],
+                mle_scope_path=mle_fixture["mle_scope_path"],
+                retained_dir=mle_fixture["retained_dir"],
+                out_dir=mle_fixture["out_dir"],
+            )
+            mle_result = verify_release_dir(
+                stage_release_dir(mle_fixture, work / "audit-mle-supported"),
+                ("envelope-matching", "envelope-mle"),
+            )
+            mle_supported = observe(
+                "mle-supported-baseline",
+                mle_result["supported_decoders"]
+                == ["envelope-matching", "envelope-mle"]
+                and mle_publication["supported_decoders"]
+                == ["envelope-matching", "envelope-mle"]
+                and "exactly four measured workload points"
+                in mle_publication["decoders"]["envelope-mle"]["scope_statement"],
+                {
+                    "supported": mle_result["supported_decoders"],
+                    "scope": mle_publication["decoders"]["envelope-mle"]["scope_statement"],
+                },
+            )
+        except PublicationError as error:
+            mle_supported = observe("mle-supported-baseline", False, str(error))
+
+        # v0.3.1 is a valid Matching-only publication from before the MLE
+        # scope-plan and MLE-resource members existed. New verifiers must keep
+        # accepting that immutable bundle for Matching, while refusing an MLE
+        # expectation against it.
+        def make_matching_only_legacy(bundle_root: Path) -> None:
+            (bundle_root / "scope/envelope-mle-scope.json").unlink()
+            (bundle_root / "evidence/mle-resources.json").unlink()
+            gate_path = bundle_root / "release-gate.json"
+            gate_record = json.loads(gate_path.read_text(encoding="utf-8"))
+            gate_record.pop("mle_scope_plan", None)
+            gate_record["evidence"].pop("mle-resources", None)
+            gate_path.write_text(json.dumps(gate_record, indent=2) + "\n", encoding="utf-8")
+            publication_path = bundle_root / "publication.json"
+            publication_record = json.loads(publication_path.read_text(encoding="utf-8"))
+            publication_record.pop("mle_scope", None)
+            publication_record["evidence"].pop("mle-resources", None)
+            mle_claim = publication_record["decoders"]["envelope-mle"]
+            mle_claim.pop("scope_plan", None)
+            mle_claim["scope_statement"] = _fixture_matrix()["release_candidate_scope"][
+                "statement"
+            ]
+            publication_record["gate_report"]["sha256"] = sha256_file(gate_path)
+            publication_path.write_text(
+                json.dumps(publication_record, indent=2) + "\n", encoding="utf-8"
+            )
+
+        staged = fresh_stage("audit-matching-only-legacy")
+        repack_bundle(staged, bundle_name, make_matching_only_legacy)
+        try:
+            legacy_result = verify_release_dir(staged, ("envelope-matching",))
+            try:
+                verify_release_dir(staged, ("envelope-mle",))
+            except PublicationError as error:
+                legacy_mle_rejected = "requires a bundled, gate-bound MLE scope" in str(error)
+            else:
+                legacy_mle_rejected = False
+            matching_only_legacy = observe(
+                "matching-only-legacy-bundle",
+                legacy_result["supported_decoders"] == ["envelope-matching"]
+                and legacy_mle_rejected,
+                {"supported": legacy_result["supported_decoders"],
+                 "mle_rejected": legacy_mle_rejected},
+            )
+        except PublicationError as error:
+            matching_only_legacy = observe("matching-only-legacy-bundle", False, str(error))
         def hollow_correctness_keep_gate_hash(bundle_root: Path) -> None:
             evidence_path = bundle_root / "evidence/correctness.json"
             evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
@@ -1509,6 +1825,7 @@ def self_test() -> int:
             gate_report_path=legacy["gate_report_path"],
             matrix_path=legacy["matrix_path"],
             policy_path=legacy["policy_path"],
+            mle_scope_path=legacy["mle_scope_path"],
             retained_dir=legacy["retained_dir"],
             out_dir=legacy["out_dir"],
         )
@@ -1528,17 +1845,12 @@ def self_test() -> int:
                                         "lacks a verified envelope promotion")
 
     passed = all([
-        baseline,
-        swapped,
-        missing,
-        scope,
-        failed_gate,
+        baseline, swapped, missing, missing_mle_resources, invalid_mle_scope,
+        scope, failed_gate, mle_supported, matching_only_legacy, beta_only, legacy_missing,
         correctness_bound,
         correctness_complete,
         installed_bound,
         retained_raw_bound,
-        beta_only,
-        legacy_missing,
     ])
     print(json.dumps({"self_test_mutations": observations}, indent=2))
     if passed:
@@ -1577,6 +1889,7 @@ def main(argv: list[str] | None = None) -> int:
     build_parser.add_argument("--gate-report", type=Path, required=True)
     build_parser.add_argument("--matrix", type=Path, default=gate.DEFAULT_MATRIX)
     build_parser.add_argument("--policy", type=Path, default=gate.DEFAULT_POLICY)
+    build_parser.add_argument("--mle-scope", type=Path, default=gate.DEFAULT_MLE_SCOPE)
     build_parser.add_argument("--retained-resources", type=Path,
                               default=gate.DEFAULT_RETAINED_REPORT.parent)
     build_parser.add_argument("--out-dir", type=Path, required=True)
@@ -1602,6 +1915,7 @@ def main(argv: list[str] | None = None) -> int:
                 gate_report_path=args.gate_report,
                 matrix_path=args.matrix,
                 policy_path=args.policy,
+                mle_scope_path=args.mle_scope,
                 retained_dir=args.retained_resources,
                 out_dir=args.out_dir,
             )
