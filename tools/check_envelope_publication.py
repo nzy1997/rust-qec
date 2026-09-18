@@ -19,7 +19,7 @@ evidence campaigns:
     python3 tools/check_envelope_publication.py \
       --release-dir drafts/envelope-release-audit \
       --expect-decoder envelope-matching \
-      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.1.json
+      --marker-out drafts/envelope-release-audit/envelope-support-verification-v0.3.2.json
 
 ``--expect-decoder`` may be repeated to require more than one Supported
 decoder. Releases that predate the bundle (such as v0.3.0) contain no evidence
@@ -62,7 +62,7 @@ BUNDLE_PREFIX = "envelope-support-evidence-"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SEMVER_TAG = re.compile(r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 FIRST_SUPPORTED_RELEASES = {
-    "envelope-matching": "v0.3.1",
+    "envelope-matching": "v0.3.2",
     "envelope-mle": "v0.3.2",
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -164,9 +164,8 @@ def derive_decoders(
             "numeric_operating_limits": declaration["numeric_operating_limits"],
             "known_limitations": declaration["known_limitations"],
         }
-        # Matching-only legacy bundles (v0.3.1) predate the MLE scope-plan
-        # member. Preserve their exact publication shape while requiring the
-        # plan for every bundle that actually carries one or promotes MLE.
+        # A Matching-only bundle need not carry the MLE scope-plan member.
+        # Require the plan for every bundle that promotes MLE.
         if scope_plan is not None:
             record["scope_plan"] = scope_plan
         decoders[name] = record
@@ -1816,10 +1815,8 @@ def self_test() -> int:
         except PublicationError as error:
             mle_supported = observe("mle-supported-baseline", False, str(error))
 
-        # v0.3.1 is a valid Matching-only publication from before the MLE
-        # scope-plan and MLE-resource members existed. New verifiers must keep
-        # accepting that immutable bundle for Matching, while refusing an MLE
-        # expectation against it.
+        # A synthetic Matching-only v0.3.2 bundle may omit the MLE scope-plan
+        # and MLE-resource members. It must still refuse an MLE expectation.
         def make_matching_only_legacy(bundle_root: Path) -> None:
             (bundle_root / "scope/envelope-mle-scope.json").unlink()
             (bundle_root / "evidence/mle-resources.json").unlink()
