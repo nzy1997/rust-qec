@@ -792,5 +792,6 @@ jobs:
           evidence_sha="$(sha256sum published-audit/envelope-support-evidence-*.tar.gz | awk '{print $1}')"
           marker_sha="$(sha256sum "$marker" | awk '{print $1}')"
           supported_csv="${supported// /,}"
-          marker_label="rustqec-envelope-verification-v1;tag=${TAG};source=${SOURCE_SHA};evidence=sha256:${evidence_sha};marker=sha256:${marker_sha};supported=${supported_csv};status=pass"
+          marker_label="rustqec-envelope-v2;t=${TAG};s=${SOURCE_SHA};e=${evidence_sha};m=${marker_sha};d=${supported_csv};ok=1"
+          test "${#marker_label}" -le 255
           gh release upload "$TAG" "$marker#$marker_label" --repo "$GITHUB_REPOSITORY"
