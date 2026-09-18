@@ -1,9 +1,10 @@
 # Crates.io publication and user installation
 
-The **v0.3.0** release publishes the first eight workspace crates to crates.io.
-See the [release and migration notes](releases/v0.3.0.md). The website installer
-uses the v0.3.0 native archives; the historical v0.2.1 release and archives remain
-available from GitHub.
+The **v0.3.0** release published the first eight workspace crates to crates.io.
+`rustqec-cli` 0.3.3 is the current verified Envelope CLI; the other seven
+crates remain at 0.3.0. See the [v0.3.3 release notes](releases/v0.3.3.md).
+The website installer uses the v0.3.3 native archives. Historical v0.2.1
+release assets remain available from GitHub.
 
 ## One task, one installation entry
 
@@ -11,7 +12,7 @@ The introductory workflow uses only `rustqec`: capability discovery, circuit
 stats, detector sampling, and DEM generation. Install the published command:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.3.0
+cargo install --locked rustqec-cli --version 0.3.3
 ```
 
 The default build includes envelope matching but not the native HiGHS solver.
