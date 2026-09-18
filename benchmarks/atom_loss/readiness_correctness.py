@@ -272,13 +272,14 @@ def decode_public(binary, decoder, public, work, timeout=300):
 
 
 def oracle_case(name, text, *, binary, exporters, work, seed, source,
-                end_to_end=True, fault_histories=('no_loss',), random_histories=8):
+                circuit_params, end_to_end=True, fault_histories=('no_loss',),
+                random_histories=8):
     """One independently checked case; returns its evidence record."""
     record = {'name': name, 'source': source, 'circuit_sha256': sha_text(text),
               'expected_answer_source': INDEPENDENT_SOURCE if end_to_end else
               'independent Stim compiler-output validation only (no end-to-end enumeration)',
               'evidence_level': 'independent-end-to-end' if end_to_end else 'compiler-output-only',
-              'seed': seed}
+              'seed': seed, 'circuit_params': circuit_params}
     case_work = work/name
     case_work.mkdir()
     circuit, probes, effects, edges, candidates, loss_edges, probe_count = \
@@ -415,19 +416,26 @@ def run_suite(binary, matrix_path, profile, out_path=None):
         cases.append(oracle_case(
             'midswap-d3-r2-fixture', fixture_text, binary=binary, exporters=exporters,
             work=work, seed=714_001, source=str(FIXTURE.relative_to(ROOT)),
+            circuit_params={'distance': 3, 'rounds': 2, 'loss_rate': 0.003},
             fault_histories=fault_histories,
             random_histories=params['random_histories']))
-        for distance, rounds, seed in ((3, 1, 714_002),):
-            text, command_text = generate_circuit(binary, work, distance, rounds, 0.01)
+        for distance, rounds, loss, seed, name in (
+            (3, 2, 0.002, 721_000, 'midswap-d3-r2-p002-generated'),
+            (3, 1, 0.01, 714_002, 'midswap-d3-r1-generated'),
+        ):
+            text, command_text = generate_circuit(binary, work, distance, rounds, loss)
             cases.append(oracle_case(
-                f'midswap-d{distance}-r{rounds}-generated', text, binary=binary,
+                name, text, binary=binary,
                 exporters=exporters, work=work, seed=seed, source=command_text,
+                circuit_params={'distance': distance, 'rounds': rounds,
+                                'loss_rate': loss},
                 fault_histories=fault_histories,
                 random_histories=max(4, params['random_histories']//2)))
         text, command_text = generate_circuit(binary, work, 3, 3, 0.01)
         case = oracle_case(
             'midswap-d3-r3-generated', text, binary=binary, exporters=exporters,
             work=work, seed=714_003, source=command_text, end_to_end=False,
+            circuit_params={'distance': 3, 'rounds': 3, 'loss_rate': 0.01},
             fault_histories=(), random_histories=4)
         cases.append(case)
         exclusions.append({'case': case['name'], 'reason': case['exclusion']})
@@ -532,6 +540,7 @@ def self_test(binary):
         work = Path(tmp)
         case = oracle_case('self-test-mini', text, binary=binary, exporters=exporters,
                            work=work, seed=714_900, source='matrix inline control',
+                           circuit_params={'distance': 1, 'rounds': 1, 'loss_rate': 0.01},
                            random_histories=2)
         require(case['status'] == 'pass', 'self-test baseline case must pass')
 
