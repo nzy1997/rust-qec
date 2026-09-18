@@ -60,6 +60,11 @@ REQUIRED_TARGETS = gate.DEFAULT_TARGETS
 PASS_LINE = "PASS envelope published support"
 BUNDLE_PREFIX = "envelope-support-evidence-"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+SEMVER_TAG = re.compile(r"^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+FIRST_SUPPORTED_RELEASES = {
+    "envelope-matching": "v0.3.1",
+    "envelope-mle": "v0.3.2",
+}
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 BUNDLE_SUMS_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._/-]*)")
 
@@ -170,6 +175,78 @@ def derive_decoders(
 
 def supported_decoders(decoders: dict[str, Any]) -> list[str]:
     return sorted(name for name, record in decoders.items() if record["maturity"] == "supported")
+
+
+def check_published_support_bindings(
+    tag: str,
+    matrix: dict[str, Any],
+    gate_report: dict[str, Any],
+    mle_plan: dict[str, Any] | None,
+) -> None:
+    """Bind immutable release claims to canonical publication identities.
+
+    Candidate/PR archive tags are intentionally exempt: they prove that a
+    promotion can be earned before a permanent release exists. Every semantic
+    release bundle must instead reconcile each Supported gate decision with
+    the matrix's durable publication record. A later release may carry a
+    decoder first published earlier, so the recorded release may precede the
+    bundle tag, but it may never be newer or internally inconsistent.
+    """
+    tag_match = SEMVER_TAG.fullmatch(tag)
+    if tag_match is None:
+        return
+    bundle_version = tuple(map(int, tag_match.groups()))
+    for name, decision in (gate_report.get("decoders") or {}).items():
+        if (decision or {}).get("decision") != "supported":
+            continue
+        declaration = (matrix.get("decoders") or {}).get(name) or {}
+        require(
+            declaration.get("current_maturity") == "supported",
+            f"immutable release {tag} earned {name} support but the matrix does not "
+            "publish current_maturity=supported",
+        )
+        published = declaration.get("published_support") or {}
+        release = published.get("release")
+        release_match = SEMVER_TAG.fullmatch(str(release))
+        require(
+            published.get("maturity") == "supported" and release_match is not None,
+            f"immutable release {tag} earned {name} support without a canonical "
+            "published_support release record",
+        )
+        published_version = tuple(map(int, release_match.groups()))
+        require(
+            published_version <= bundle_version,
+            f"{name} published_support release {release} is newer than bundle {tag}",
+        )
+        require(
+            release == FIRST_SUPPORTED_RELEASES.get(name),
+            f"{name} published_support release {release} does not match its immutable "
+            f"first Supported release {FIRST_SUPPORTED_RELEASES.get(name)}",
+        )
+        asset = f"{BUNDLE_PREFIX}{release}.tar.gz"
+        release_url = f"https://github.com/nzy1997/rust-qec/releases/tag/{release}"
+        evidence_url = f"https://github.com/nzy1997/rust-qec/releases/download/{release}/{asset}"
+        require(
+            published.get("release_url") == release_url
+            and published.get("evidence_asset") == asset
+            and published.get("evidence_url") == evidence_url
+            and isinstance(published.get("scope"), str)
+            and bool(published["scope"].strip()),
+            f"{name} published_support URLs, evidence asset, or scope are not "
+            f"canonical for {release}",
+        )
+        if name == "envelope-mle":
+            require(
+                mle_plan is not None,
+                "an immutable MLE Supported publication requires its scope plan",
+            )
+            maturity = mle_plan.get("maturity") or {}
+            require(
+                maturity.get("current") == "supported"
+                and maturity.get("promotion_release") == release,
+                "MLE scope promotion_release/current maturity do not match the "
+                f"matrix publication {release}",
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +609,7 @@ def build_bundle(
         gate_scope.get("sha256") == mle_scope_sha,
         "MLE scope plan does not match the plan consumed by the release gate",
     )
+    check_published_support_bindings(tag, matrix, gate_report, mle_plan)
     retained_revision = gate_report["retained_resource_report"]["checkout_revision"]
 
     payloads, generated_documents = check_generated_evidence_files(
@@ -831,6 +909,7 @@ def _verify_extracted(bundle: Path, release_dir: Path, bundle_name: str,
             mle_decision != "supported" and "envelope-mle" not in expect_decoders,
             "an MLE Supported publication requires a bundled, gate-bound MLE scope plan",
         )
+    check_published_support_bindings(tag, matrix, gate_report, mle_plan)
 
     generated_documents: dict[str, dict[str, Any]] = {}
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
@@ -1052,7 +1131,7 @@ def write_verification_marker(result: dict[str, Any], path: Path) -> None:
 # Offline self-test with synthetic fixtures
 # ---------------------------------------------------------------------------
 
-SELFTEST_TAG = "v9.9.9"
+SELFTEST_TAG = "v0.3.2"
 SELFTEST_SHA = "a" * 40
 SELFTEST_RETAINED_SHA = "b" * 40
 
@@ -1064,8 +1143,27 @@ def _fixture_matrix() -> dict[str, Any]:
         "decoders": {
             "envelope-matching": {
                 "required_build_features": [],
-                "current_maturity": "beta",
+                "current_maturity": "supported",
                 "proposed_release_maturity": "supported-candidate",
+                "published_support": {
+                    "maturity": "supported",
+                    "release": FIRST_SUPPORTED_RELEASES["envelope-matching"],
+                    "release_url": (
+                        "https://github.com/nzy1997/rust-qec/releases/tag/"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}"
+                    ),
+                    "evidence_asset": (
+                        f"{BUNDLE_PREFIX}"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}.tar.gz"
+                    ),
+                    "evidence_url": (
+                        "https://github.com/nzy1997/rust-qec/releases/download/"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}/"
+                        f"{BUNDLE_PREFIX}"
+                        f"{FIRST_SUPPORTED_RELEASES['envelope-matching']}.tar.gz"
+                    ),
+                    "scope": "Synthetic Matching support scope.",
+                },
                 "objective": "Minimum-weight perfect matching on a loss-conditioned graph.",
                 "known_limitations": ["Not the exact declared fault-configuration objective."],
                 "numeric_operating_limits": "Measured operating envelope: retained resource report.",
@@ -1407,14 +1505,39 @@ def make_selftest_fixture(
     (base / "release" / "SHA256SUMS").write_text("\n".join(checksum_lines) + "\n",
                                                  encoding="utf-8")
 
+    matrix = _fixture_matrix()
+    if mle_decision == "supported":
+        matrix["decoders"]["envelope-mle"].update({
+            "current_maturity": "supported",
+            "published_support": {
+                "maturity": "supported",
+                "release": SELFTEST_TAG,
+                "release_url": (
+                    f"https://github.com/nzy1997/rust-qec/releases/tag/{SELFTEST_TAG}"
+                ),
+                "evidence_asset": f"{BUNDLE_PREFIX}{SELFTEST_TAG}.tar.gz",
+                "evidence_url": (
+                    "https://github.com/nzy1997/rust-qec/releases/download/"
+                    f"{SELFTEST_TAG}/{BUNDLE_PREFIX}{SELFTEST_TAG}.tar.gz"
+                ),
+                "scope": "Synthetic finite MLE support scope.",
+            },
+        })
     matrix_path = base / "matrix.json"
-    matrix_path.write_text(json.dumps(_fixture_matrix(), indent=2) + "\n", encoding="utf-8")
+    matrix_path.write_text(json.dumps(matrix, indent=2) + "\n", encoding="utf-8")
     matrix_sha = sha256_file(matrix_path)
     policy_path = base / "policy.md"
     policy_path.write_text("# synthetic compatibility policy\n", encoding="utf-8")
     policy_sha = sha256_file(policy_path)
     mle_scope_path = base / "envelope-mle-scope.json"
     shutil.copyfile(REPO_ROOT / gate.DEFAULT_MLE_SCOPE, mle_scope_path)
+    if mle_decision == "supported":
+        fixture_plan = json.loads(mle_scope_path.read_text(encoding="utf-8"))
+        fixture_plan["maturity"]["current"] = "supported"
+        fixture_plan["maturity"]["promotion_release"] = SELFTEST_TAG
+        mle_scope_path.write_text(
+            json.dumps(fixture_plan, indent=2) + "\n", encoding="utf-8"
+        )
     scope_sha = sha256_file(mle_scope_path)
 
     for name, (filename, schema) in GENERATED_EVIDENCE.items():
