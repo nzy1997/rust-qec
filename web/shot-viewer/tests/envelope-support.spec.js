@@ -15,8 +15,8 @@ async function servedMatrix(request) {
   return matrix;
 }
 
-function matchingPublication(matrix) {
-  const decoder = matrix.decoders['envelope-matching'];
+function decoderPublication(matrix, name) {
+  const decoder = matrix.decoders[name];
   expect(decoder.current_maturity).toBe('supported');
   const published = decoder.published_support;
   expect(published).toBeTruthy();
@@ -29,6 +29,8 @@ function matchingPublication(matrix) {
   return published;
 }
 
+const matchingPublication = matrix => decoderPublication(matrix, 'envelope-matching');
+const mlePublication = matrix => decoderPublication(matrix, 'envelope-mle');
 function verifiedRelease(published, { includeMarker = true, supported = 'envelope-matching' } = {}) {
   const evidenceDigest = `sha256:${'b'.repeat(64)}`;
   const markerDigest = `sha256:${'c'.repeat(64)}`;
@@ -52,9 +54,9 @@ function verifiedRelease(published, { includeMarker = true, supported = 'envelop
   };
 }
 
-async function serveVerifiedPublication(page, published) {
+async function serveVerifiedPublication(page, published, supported = 'envelope-matching') {
   await page.route(published.verification_url, route => route.fulfill({
-    json: verifiedRelease(published),
+    json: verifiedRelease(published, { supported }),
   }));
 }
 
@@ -62,8 +64,11 @@ const matchingBadge = page => page.locator('[data-decoder-badge="envelope-matchi
 const mleBadge = page => page.locator('[data-decoder-badge="envelope-mle"]');
 
 test('tutorial and concepts render the version-bound Supported label with evidence links', async ({ page, request }, testInfo) => {
-  const published = matchingPublication(await servedMatrix(request));
+  const matrix = await servedMatrix(request);
+  const published = matchingPublication(matrix);
+  const mlePublished = mlePublication(matrix);
   await serveVerifiedPublication(page, published);
+  await serveVerifiedPublication(page, mlePublished, 'envelope-matching,envelope-mle');
 
   await page.goto('/atom-loss-concepts/');
   const conceptBadge = matchingBadge(page);
@@ -77,8 +82,13 @@ test('tutorial and concepts render the version-bound Supported label with eviden
   await expect(boundary).toContainText('Supported since');
   await expect(boundary).toContainText(published.release);
   const conceptMle = mleBadge(page);
-  await expect(conceptMle).toHaveText('Envelope MLE · Beta');
-  await expect(conceptMle.locator('a')).toHaveCount(0);
+  await expect(conceptMle.locator('a')).toHaveText(`Envelope MLE · Supported · ${mlePublished.release}`);
+  await expect(conceptMle.locator('a')).toHaveAttribute('href', mlePublished.release_url);
+  await expect(conceptMle).toHaveAttribute('data-release', mlePublished.release);
+  await expect(conceptMle).toHaveAttribute('data-evidence-asset', mlePublished.evidence_asset);
+  await expect(page.locator('[data-evidence-link="envelope-mle"]')).toHaveAttribute('href', mlePublished.release_url);
+  await expect(boundary).toContainText('four exact measured points');
+  await expect(boundary).toContainText('requires an ILP-capable build');
   await page.screenshot({ path: testInfo.outputPath('atom-loss-concepts-support.png'), fullPage: true });
 
   await page.goto('/atom-loss/');
@@ -93,6 +103,10 @@ test('tutorial and concepts render the version-bound Supported label with eviden
   await expect(supportCopies).toHaveCount(2);
   await expect(supportCopies.first()).toHaveText(`Supported since ${published.release}`);
   await expect(supportCopies.last()).toHaveText(`Supported since ${published.release}`);
+  const mleSupportCopies = page.locator('[data-decoder-support-copy="envelope-mle"]');
+  await expect(mleSupportCopies).toHaveCount(2);
+  await expect(mleSupportCopies.first()).toHaveText(`Supported since ${mlePublished.release}`);
+  await expect(mleSupportCopies.last()).toHaveText(`Supported since ${mlePublished.release}`);
 });
 
 test('missing support evidence keeps the Beta label', async ({ page }) => {
@@ -100,12 +114,16 @@ test('missing support evidence keeps the Beta label', async ({ page }) => {
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
   await expect(matchingBadge(page).locator('a')).toHaveCount(0);
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
 });
 
 test('missing publication verification marker keeps badge and body at Beta', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
   const published = matchingPublication(matrix);
+  const mlePublished = mlePublication(matrix);
   await page.route(published.verification_url, route => route.fulfill({ status: 404, body: 'not found' }));
+  await page.route(mlePublished.verification_url, route => route.fulfill({ status: 404, body: 'not found' }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
@@ -115,6 +133,7 @@ test('missing publication verification marker keeps badge and body at Beta', asy
   await expect(page.locator('[data-evidence-link="envelope-matching"]')).not.toHaveAttribute('href');
   await page.goto('/support/');
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]').first()).toContainText('Beta');
+  await expect(page.locator('[data-decoder-support-copy="envelope-mle"]').first()).toContainText('Beta');
 });
 
 test('marker metadata without Matching support keeps the Beta label', async ({ page, request }) => {
@@ -142,22 +161,42 @@ test('marker metadata for a different evidence hash keeps the Beta label', async
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]')).toContainText('Beta');
 });
 
+test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => {
+  const matrix = await servedMatrix(request);
+  matrix.decoders['envelope-mle'].published_support.evidence_asset = '';
+  const matching = matchingPublication(matrix);
+  await serveVerifiedPublication(page, matching);
+  await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
+  await page.goto('/atom-loss-concepts/');
+  await expect(matchingBadge(page).locator('a')).toHaveText(`Envelope matching · Supported · ${matching.release}`);
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
+});
+
 test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
-  // v0.3.0 predates the evidence bundle: no published_support, maturity Beta.
-  delete matrix.decoders['envelope-matching'].published_support;
-  matrix.decoders['envelope-matching'].current_maturity = 'beta';
+  // v0.3.0 predates every envelope evidence bundle: both decoders are Beta.
+  for (const name of ['envelope-matching', 'envelope-mle']) {
+    delete matrix.decoders[name].published_support;
+    matrix.decoders[name].current_maturity = 'beta';
+    matrix.decoders[name].proposed_release_maturity = 'beta';
+  }
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
   await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
   await expect(matchingBadge(page).locator('a')).toHaveCount(0);
   await expect(matchingBadge(page)).not.toContainText('Supported');
+  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(mleBadge(page).locator('a')).toHaveCount(0);
+  await expect(mleBadge(page)).not.toContainText('Supported');
 });
 
-test('MLE does not inherit the matching Supported badge', async ({ page, request }) => {
+test('the previous Matching-only release does not promote MLE', async ({ page, request }) => {
   const matrix = await servedMatrix(request);
-  // Hostile fixture: MLE claims supported maturity without any published evidence.
-  matrix.decoders['envelope-mle'].current_maturity = 'supported';
+  // v0.3.1 published Matching only; MLE had no publication record.
+  delete matrix.decoders['envelope-mle'].published_support;
+  matrix.decoders['envelope-mle'].current_maturity = 'beta';
+  matrix.decoders['envelope-mle'].proposed_release_maturity = 'beta';
   const published = matchingPublication(matrix);
   await serveVerifiedPublication(page, published);
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));

@@ -1,27 +1,27 @@
 # Envelope decoder operating envelope
 
-Measured 2026-09-18T01:49:02Z on `macOS-26.6.2-arm64-arm-64bit-Mach-O` (arm64, 10 CPUs, 32.00 GiB).
-Binary `rustqec 0.3.2` sha256 `1e81bf55c0e31cea…`.
+Measured 2026-09-16T06:59:47Z on `macOS-26.6.2-arm64-arm-64bit-Mach-O` (arm64, 10 CPUs, 32.00 GiB).
+Binary `rustqec 0.3.2` sha256 `17f4d3227edd108e…`.
 
 These are workload- and machine-specific measurements, not universal latency guarantees. The stress budget was declared before the run: per-case wall ≤ 900 s, total ≤ 3600 s, peak RSS ≤ 4.00 GiB.
 
 | Case | Decoder | Kind | Loss | Shots | Wall (s) | Compile (s) | Decode (s) | Patterns | Cache builds | Cache hits | Eviction rebuilds | Peak RSS watermark |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | matching-d3r2-p002-b1024 | envelope-matching | batch-scale | 0.002 | 1024 | 0.01 | 0.001 | 0.00 | 49 | 49 | 975 | 0 | 7.3 MiB |
-| matching-d3r2-p002-b16384 | envelope-matching | batch-scale | 0.002 | 16384 | 0.03 | 0.001 | 0.02 | 245 | 245 | 16139 | 0 | 12.8 MiB |
-| matching-d3r2-p002-b65536 | envelope-matching | batch-scale | 0.002 | 65536 | 0.08 | 0.001 | 0.07 | 433 | 433 | 65103 | 0 | 16.9 MiB |
-| matching-d3r2-p020-b1024 | envelope-matching | batch-scale | 0.02 | 1024 | 0.02 | 0.001 | 0.01 | 598 | 598 | 426 | 0 | 22.1 MiB |
-| matching-d3r2-p020-b16384 | envelope-matching | batch-scale | 0.02 | 16384 | 0.16 | 0.001 | 0.15 | 4684 | 7219 | 9165 | 2535 | 42.0 MiB |
-| matching-d3r2-p020-b65536 | envelope-matching | batch-scale | 0.02 | 65536 | 0.60 | 0.001 | 0.58 | 11669 | 28107 | 37429 | 16438 | 42.1 MiB |
-| matching-d3r2-p100-b1024 | envelope-matching | batch-scale | 0.1 | 1024 | 0.04 | 0.001 | 0.02 | 1024 | 1024 | 0 | 0 | 42.1 MiB |
-| matching-d3r2-p100-b16384 | envelope-matching | batch-scale | 0.1 | 16384 | 0.41 | 0.001 | 0.40 | 16244 | 16381 | 3 | 137 | 43.8 MiB |
-| matching-d3r2-p100-b65536 | envelope-matching | batch-scale | 0.1 | 65536 | 1.62 | 0.001 | 1.60 | 65536 | 65519 | 17 | 0 | 44.0 MiB |
-| matching-d3r3-p020-b16384 | envelope-matching | circuit-scale | 0.02 | 16384 | 0.47 | 0.002 | 0.46 | 9059 | 12326 | 4058 | 3267 | 68.2 MiB |
-| matching-d5r3-p020-b16384 | envelope-matching | circuit-scale | 0.02 | 16384 | 7.05 | 0.005 | 6.98 | 16314 | 16384 | 0 | 70 | 274.2 MiB |
-| matching-eviction-wires24 | envelope-matching | cache-eviction | synthetic | 1601 | 0.04 | 0.001 | 0.02 | 1401 | 1402 | 199 | 1 | 274.2 MiB |
-| mle-d3r2-p002-b1024 | envelope-mle | repeated-patterns | 0.002 | 1024 | 11.49 | 0.006 | 11.47 | 45 | 45 | 979 | 0 | 274.2 MiB |
-| mle-d3r2-p002-b16384 | envelope-mle | repeated-patterns | 0.002 | 16384 | 81.08 | 0.006 | 81.05 | 267 | 267 | 16117 | 0 | 274.2 MiB |
-| mle-eviction-wires24 | envelope-mle | cache-eviction | synthetic | 1601 | 1.11 | 0.000 | 1.09 | 1401 | 1402 | 199 | 1 | 274.2 MiB |
+| matching-d3r2-p002-b16384 | envelope-matching | batch-scale | 0.002 | 16384 | 0.03 | 0.001 | 0.02 | 245 | 245 | 16139 | 0 | 12.9 MiB |
+| matching-d3r2-p002-b65536 | envelope-matching | batch-scale | 0.002 | 65536 | 0.07 | 0.001 | 0.06 | 433 | 433 | 65103 | 0 | 17.0 MiB |
+| matching-d3r2-p020-b1024 | envelope-matching | batch-scale | 0.02 | 1024 | 0.02 | 0.001 | 0.01 | 598 | 598 | 426 | 0 | 22.0 MiB |
+| matching-d3r2-p020-b16384 | envelope-matching | batch-scale | 0.02 | 16384 | 0.15 | 0.001 | 0.14 | 4684 | 7219 | 9165 | 2535 | 41.7 MiB |
+| matching-d3r2-p020-b65536 | envelope-matching | batch-scale | 0.02 | 65536 | 0.56 | 0.001 | 0.55 | 11669 | 28107 | 37429 | 16438 | 41.9 MiB |
+| matching-d3r2-p100-b1024 | envelope-matching | batch-scale | 0.1 | 1024 | 0.03 | 0.001 | 0.02 | 1024 | 1024 | 0 | 0 | 41.9 MiB |
+| matching-d3r2-p100-b16384 | envelope-matching | batch-scale | 0.1 | 16384 | 0.45 | 0.001 | 0.44 | 16244 | 16381 | 3 | 137 | 43.7 MiB |
+| matching-d3r2-p100-b65536 | envelope-matching | batch-scale | 0.1 | 65536 | 1.49 | 0.001 | 1.48 | 65536 | 65519 | 17 | 0 | 43.8 MiB |
+| matching-d3r3-p020-b16384 | envelope-matching | circuit-scale | 0.02 | 16384 | 0.45 | 0.002 | 0.43 | 9059 | 12326 | 4058 | 3267 | 68.0 MiB |
+| matching-d5r3-p020-b16384 | envelope-matching | circuit-scale | 0.02 | 16384 | 1.96 | 0.005 | 1.93 | 16314 | 16384 | 0 | 70 | 204.3 MiB |
+| matching-eviction-wires24 | envelope-matching | cache-eviction | synthetic | 1601 | 0.02 | 0.000 | 0.01 | 1401 | 1402 | 199 | 1 | 204.3 MiB |
+| mle-d3r2-p002-b1024 | envelope-mle | repeated-patterns | 0.002 | 1024 | 2.28 | 0.003 | 2.27 | 45 | 45 | 979 | 0 | 204.3 MiB |
+| mle-d3r2-p002-b16384 | envelope-mle | repeated-patterns | 0.002 | 16384 | 36.05 | 0.003 | 36.03 | 267 | 267 | 16117 | 0 | 204.3 MiB |
+| mle-eviction-wires24 | envelope-mle | cache-eviction | synthetic | 1601 | 1.00 | 0.000 | 0.98 | 1401 | 1402 | 199 | 1 | 204.3 MiB |
 
 ## Failure semantics (tested against the real CLI)
 
