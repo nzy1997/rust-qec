@@ -43,7 +43,7 @@ function verifiedRelease(published, { includeMarker = true, supported = 'envelop
       name: published.verification_asset,
       state: 'uploaded',
       digest: markerDigest,
-      label: `rustqec-envelope-verification-v1;tag=${published.release};source=${'a'.repeat(40)};evidence=${evidenceDigest};marker=${markerDigest};supported=${supported};status=pass`,
+      label: `rustqec-envelope-v2;t=${published.release};s=${'a'.repeat(40)};e=${evidenceDigest.slice(7)};m=${markerDigest.slice(7)};d=${supported};ok=1`,
     });
   }
   return {
@@ -53,6 +53,13 @@ function verifiedRelease(published, { includeMarker = true, supported = 'envelop
     assets,
   };
 }
+
+test('verification metadata for both decoders fits the GitHub asset-label limit', async ({ request }) => {
+  const published = mlePublication(await servedMatrix(request));
+  const release = verifiedRelease(published, { supported: 'envelope-matching,envelope-mle' });
+  const marker = release.assets.find(asset => asset.name === published.verification_asset);
+  expect(marker.label.length).toBeLessThanOrEqual(255);
+});
 
 async function serveVerifiedPublication(page, published, supported = 'envelope-matching') {
   await page.route(published.verification_url, route => route.fulfill({
@@ -153,7 +160,7 @@ test('marker metadata for a different evidence hash keeps the Beta label', async
   const published = matchingPublication(matrix);
   const release = verifiedRelease(published);
   const marker = release.assets.find(asset => asset.name === published.verification_asset);
-  marker.label = marker.label.replace(/evidence=sha256:[0-9a-f]{64}/, `evidence=sha256:${'e'.repeat(64)}`);
+  marker.label = marker.label.replace(/;e=[0-9a-f]{64}/, `;e=${'e'.repeat(64)}`);
   await page.route(published.verification_url, route => route.fulfill({ json: release }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');

@@ -118,12 +118,14 @@
       if (!release || release.tag_name !== published.release || release.draft === true
           || typeof release.published_at !== 'string' || !release.published_at
           || !evidenceAsset || !sidecarAsset || !markerAsset
-          || labelParts[0] !== 'rustqec-envelope-verification-v1'
-          || label.tag !== published.release || label.status !== 'pass'
-          || !/^[0-9a-f]{40}$/.test(label.source || '')
-          || label.evidence !== evidenceAsset.digest
-          || label.marker !== markerAsset.digest
-          || !(label.supported || '').split(',').includes(name)) {
+          || labelParts[0] !== 'rustqec-envelope-v2'
+          || label.t !== published.release || label.ok !== '1'
+          || !/^[0-9a-f]{40}$/.test(label.s || '')
+          || !/^[0-9a-f]{64}$/.test(label.e || '')
+          || !/^[0-9a-f]{64}$/.test(label.m || '')
+          || `sha256:${label.e}` !== evidenceAsset.digest
+          || `sha256:${label.m}` !== markerAsset.digest
+          || !(label.d || '').split(',').includes(name)) {
         continue;
       }
       for (const badge of badges.filter(item => item.dataset.decoderBadge === name)) {
