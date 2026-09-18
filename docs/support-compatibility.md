@@ -46,7 +46,6 @@ rather than silently skipping the MLE controls.
 
 | Property | `envelope-matching` | `envelope-mle` |
 | --- | --- | --- |
-| Maturity | <span data-decoder-support-copy="envelope-matching">Beta; candidate for Supported in v0.3.2 after published evidence verification</span> | Beta |
 | Maturity | <span data-decoder-support-copy="envelope-matching">Beta; candidate for Supported in v0.3.2 after published evidence verification</span> | Beta (candidate domain declared by the [MLE scope plan](envelope-mle-scope.json); publication remains a separate later step) |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
 | Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
