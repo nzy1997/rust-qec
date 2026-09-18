@@ -1,7 +1,8 @@
 # Support and compatibility contract
 
-This document tracks the development branch. The installed quickstart and
-version-pinned API examples target v0.3.0; use that release's notes for its frozen support boundary.
+This document tracks the development branch. The installed CLI quickstart
+targets v0.3.3; unchanged library API examples remain pinned to v0.3.0.
+Use each release's notes for its frozen support boundary.
 Development-branch wording describes the upcoming release state; a decoder
 maturity is binding only for a published release whose evidence bundle
 verifies it (v0.3.3 is the corrected candidate for both Matching and MLE). It is a

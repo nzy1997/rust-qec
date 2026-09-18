@@ -483,14 +483,20 @@ fn task_oriented_content_pages_are_linked() {
 #[test]
 fn new_documentation_routes_use_canonical_sources() {
     let get_started = read_repo_file("site/templates/get-started.html");
+    let installer = read_repo_file("site/static/install.sh");
     let support = read_repo_file("site/templates/support.html");
     let protocol = read_repo_file("site/templates/protocol.html");
     let base = read_repo_file("site/templates/base.html");
     let prepare_docs = read_repo_file("tools/prepare_site_docs.py");
+    let installer_version = installer
+        .lines()
+        .find_map(|line| line.strip_prefix("VERSION="))
+        .expect("native installer must pin a release version");
+    let archive_marker = format!("rustqec-{installer_version}-");
 
     assert_contains_all(
         &get_started,
-        &["id=\"install\"", "rustqec-v0.3.0-", "id=\"source-build\""],
+        &["id=\"install\"", &archive_marker, "id=\"source-build\""],
         "versioned onboarding entry point",
     );
     assert_contains_all(
