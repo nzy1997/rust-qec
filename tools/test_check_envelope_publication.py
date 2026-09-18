@@ -81,6 +81,20 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
         }
         publication.check_published_support_bindings("v0.3.2", matrix, gate, plan)
 
+        matching_backdated = copy.deepcopy(matrix)
+        matching = matching_backdated["decoders"]["envelope-matching"]["published_support"]
+        matching["release"] = "v0.3.1"
+        matching["release_url"] = "https://github.com/nzy1997/rust-qec/releases/tag/v0.3.1"
+        matching["evidence_asset"] = "envelope-support-evidence-v0.3.1.tar.gz"
+        matching["evidence_url"] = (
+            "https://github.com/nzy1997/rust-qec/releases/download/v0.3.1/"
+            "envelope-support-evidence-v0.3.1.tar.gz"
+        )
+        with self.assertRaises(publication.PublicationError):
+            publication.check_published_support_bindings(
+                "v0.3.2", matching_backdated, gate, plan
+            )
+
         bad_asset = copy.deepcopy(matrix)
         bad_asset["decoders"]["envelope-mle"]["published_support"][
             "evidence_asset"

@@ -4,7 +4,7 @@ This document tracks the development branch. The installed quickstart and
 version-pinned API examples target v0.3.0; use that release's notes for its frozen support boundary.
 Development-branch wording describes the upcoming release state; a decoder
 maturity is binding only for a published release whose evidence bundle
-verifies it (v0.3.1 first promoted Matching; v0.3.2 first promotes MLE). It is a
+verifies it (v0.3.2 is the first candidate for both Matching and MLE). It is a
 contract for using the shipped interfaces, not a claim that every research
 component, circuit dialect, decoder, or benchmark result is ready for
 publication-scale use.
@@ -15,8 +15,8 @@ publication-scale use.
 | --- | --- | --- |
 | `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
-| Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope, verified by the v0.3.1 release evidence bundle. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
-| Atom-loss `envelope-mle` decoder | <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span> | Exactly four measured Mid-SWAP workload points declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json): d=3/r=2 at loss 0.002 and d=3/r=1 at loss 0.01, each at batches 1,024 and 16,384, with no interpolation. Requires the `ilp` feature or an official native archive; the conventional fixture and every unlisted size/loss/batch point are outside the Supported promise. |
+| Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta unless v0.3.2 publication verification succeeds</span> | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope. The v0.3.1 prerelease did not complete publication verification. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
+| Atom-loss `envelope-mle` decoder | <span data-decoder-support-copy="envelope-mle">Beta unless v0.3.2 publication verification succeeds</span> | Exactly four measured Mid-SWAP workload points declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json): d=3/r=2 at loss 0.002 and d=3/r=1 at loss 0.01, each at batches 1,024 and 16,384, with no interpolation. Requires the `ilp` feature or an official native archive; the conventional fixture and every unlisted size/loss/batch point are outside the Supported promise. |
 | Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
 
 ## Atom-loss support boundary
@@ -80,9 +80,10 @@ python3 -m unittest tools.test_envelope_mle_scope
 
 Out-of-domain inputs are unpromised, not automatically rejected: only the
 hard limits (candidate count, REPEAT blocks, unsupported instructions) produce
-a guaranteed structured rejection. v0.3.2 records the first promotion after
-every required case was fulfilled and the release gate passed on the exact
-published source; later Supported releases must pass the same gate again.
+a guaranteed structured rejection. v0.3.2 can record the first promotion only
+after every required case, the release gate on the exact source, and the
+post-publication asset verification succeed. Later Supported releases must
+pass the same gate again.
 
 ### Regression controls
 
