@@ -288,7 +288,7 @@ class CommittedPlanTests(unittest.TestCase):
         """One consistent scoped plan must pass, so unconditional failure cannot win."""
         plan = scope.load_plan(PLAN_PATH)
         self.assertEqual(plan["maturity"]["current"], "supported")
-        self.assertEqual(plan["maturity"]["promotion_release"], "v0.3.2")
+        self.assertEqual(plan["maturity"]["promotion_release"], "v0.3.3")
         table = scope.domain_table(plan)
         self.assertIn("midswap-d3-r2-loss-0.002-batches-1024-16384", table)
         self.assertIn("midswap-d3-r1-loss-0.01-batches-1024-16384", table)
