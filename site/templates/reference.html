@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}CLI and Rust API reference — RustQEC{% endblock title %}
+{% block description %}RustQEC command arguments, inputs, outputs, exit codes, structured errors, and versioned Rust API links.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Reference</p><h1>CLI and Rust API reference</h1><p class="hero-copy">Look up command contracts, machine-readable errors, and the crate versions represented by this documentation.</p></div>{% endblock hero %}
+{% block main %}
+{% set cli_reference = load_data(path="generated/cli-reference.json") %}
+<section class="task-section" aria-labelledby="reference-boundary"><h2 id="reference-boundary">Reference boundary</h2>
+<p>This page describes <code>rustqec-cli</code> {{ docs_version.packages.rustqec_cli.version }} from the RustQEC {{ docs_version.release_line }} {{ docs_version.channel }} documentation edition. Run <code>rustqec capabilities --format json</code> against an installed binary for its executable contract. Command help and capabilities output take precedence when a different package version is installed.</p>
+<div class="content-links"><a href="../get-started/#versions">Package and documentation versions</a><a href="../support/#compatibility-and-deprecation-policy">Compatibility policy</a></div></section>
+
+<section class="task-section" aria-labelledby="rustqec-commands"><h2 id="rustqec-commands">rustqec commands</h2>
+<p>The command contracts below are generated during every site build from <code>{{ cli_reference.source_command }}</code>. The page build fails if that contract is missing or malformed.</p>
+<div class="content-links"><a href="#machine-contract">Inspect your installed binary</a><a href="#rust-apis">Open Rust API links</a></div>
+{% for command in cli_reference.commands %}<article class="reference-command" aria-labelledby="{{ command.anchor }}">
+<h3 id="{{ command.anchor }}"><code>{{ command.command_line }}</code></h3>
+<p><strong>Inputs:</strong> {{ command.input_sources | join(sep=", ") }}. <strong>Status formats:</strong> {{ command.formats | join(sep=", ") }}. <strong>Output schema:</strong> <code>{{ command.output_schema }}</code>. <strong>Success exit:</strong> <code>{{ command.success_exit_code }}</code>.</p>
+{% if command.decoders | length > 0 %}<p><strong>Advertised decoders:</strong> <code>{{ command.decoders | join(sep="</code>, <code>") | safe }}</code>.</p>{% endif %}
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Required</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>{% for argument in command.arguments %}
+<tr><td><code>{{ argument.flag }}</code></td><td>{% if argument.required %}Yes{% else %}No{% endif %}</td><td><code>{{ argument.values | join(sep=" | ") }}</code></td><td>{% if argument.default %}<code>{{ argument.default }}</code>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+{% if command.artifacts | length > 0 %}<h4>Artifacts</h4><div class="table-wrap"><table><thead><tr><th>Name</th><th>Flag</th><th>Format</th></tr></thead><tbody>{% for artifact in command.artifacts %}<tr><td>{{ artifact.name }}</td><td><code>{{ artifact.flag }}</code></td><td><code>{{ artifact.format }}</code></td></tr>{% endfor %}</tbody></table></div>{% endif %}
+<h4>Structured errors</h4><div class="table-wrap"><table><thead><tr><th>Code</th><th>Exit</th><th>Channel</th></tr></thead><tbody>{% for error in command.errors %}<tr><td><code>{{ error.code }}</code></td><td><code>{{ error.exit_code }}</code></td><td><code>{{ error.channel }}</code></td></tr>{% endfor %}</tbody></table></div>
+</article>{% endfor %}</section>
+
+<section class="task-section" aria-labelledby="common-options"><h2 id="common-options">Arguments and output contracts</h2>
+<h3>Global arguments</h3>
+<div class="table-wrap"><table><thead><tr><th>Argument</th><th>Required</th><th>Accepted value</th><th>Default</th></tr></thead><tbody>{% for argument in cli_reference.global_arguments %}
+<tr><td><code>{{ argument.flag }}</code></td><td>{% if argument.required %}Yes{% else %}No{% endif %}</td><td><code>{{ argument.values | join(sep=" | ") }}</code></td><td>{% if argument.default %}<code>{{ argument.default }}</code>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<div class="docs-grid">
+<article class="docs-card"><h3>Input</h3><p>Commands that accept <code>--in</code> read stdin when the flag is omitted. Dataset commands use directories with a manifest and fixed artifact names.</p></article>
+<article class="docs-card"><h3>Output</h3><p><code>--format human|json</code> controls command status output where offered. Artifact flags such as <code>--out</code> and <code>--stats-out</code> name separate files.</p></article>
+<article class="docs-card"><h3>Errors</h3><p>Global error formatting and each command’s structured error channel are listed from the executable contract above.</p></article>
+</div>
+<pre data-language="Shell"><code>rustqec --error-format json circuit stats --in missing.stim</code></pre>
+<pre data-output="true" data-language="Error envelope shape"><code>{
+  "schema_version": "rustqec.cli.v1",
+  "status": "error",
+  "command": "circuit.stats",
+  "error": {"code": "input_error", "message": "..."}
+}</code></pre>
+</section>
+
+<section class="task-section" aria-labelledby="exit-codes"><h2 id="exit-codes">Exit codes and structured errors</h2>
+<div class="table-wrap"><table><thead><tr><th>Exit</th><th>Status</th><th>Reported codes</th><th>Channel</th></tr></thead><tbody>{% for exit in cli_reference.exit_codes %}
+<tr><td><code>{{ exit.value }}</code></td><td>{{ exit.status | title }}</td><td>{% if exit.errors | length > 0 %}<code>{{ exit.errors | join(sep="</code>, <code>") | safe }}</code>{% else %}<code>ok</code>{% endif %}</td><td>{% if exit.channels | length > 0 %}<code>{{ exit.channels | join(sep=" | ") }}</code>{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table></div>
+<p>Use the error <code>code</code> for automation. Human messages add context but are not the compatibility key.</p></section>
+
+<section class="task-section" aria-labelledby="machine-contract"><h2 id="machine-contract">Inspect the installed binary</h2>
+<pre data-language="Shell"><code>rustqec capabilities --format json &gt; capabilities.json
+rustqec --version</code></pre>
+<p>The capabilities document lists every command’s argument values, output schema, artifact format, success code, structured errors, and available decoders. Optional features such as <code>ilp</code> change that document. This rendered page was generated from schema <code>{{ cli_reference.schema_version }}</code>.</p></section>
+
+<section class="task-section" aria-labelledby="rust-apis"><h2 id="rust-apis">Versioned Rust APIs</h2>
+<p>These versions are generated from the workspace manifests during the site build. They can differ by patch while remaining in the RustQEC {{ docs_version.release_line }} release line.</p>
+<div class="table-wrap"><table><thead><tr><th>Crate</th><th>Version</th><th>Primary surface</th><th>API</th></tr></thead><tbody>
+<tr><td><code>rstim</code></td><td>{{ docs_version.packages.rstim.version }}</td><td>Circuits, simulation, DEM, formats</td><td><a href="https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/">docs.rs ↗</a></td></tr>
+<tr><td><code>rmatching</code></td><td>{{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">docs.rs ↗</a></td></tr>
+<tr><td><code>rbposd</code></td><td>{{ docs_version.packages.rbposd.version }}</td><td>BP-OSD decoding</td><td><a href="https://docs.rs/rbposd/{{ docs_version.packages.rbposd.version }}/rbposd/">docs.rs ↗</a></td></tr>
+<tr><td><code>rilpqec</code></td><td>{{ docs_version.packages.rilpqec.version }}</td><td>ILP decoding</td><td><a href="https://docs.rs/rilpqec/{{ docs_version.packages.rilpqec.version }}/rilpqec/">docs.rs ↗</a></td></tr>
+<tr><td><code>rsinter</code></td><td>{{ docs_version.packages.rsinter.version }}</td><td>Experiments and decoder replay</td><td><a href="https://docs.rs/rsinter/{{ docs_version.packages.rsinter.version }}/rsinter/">docs.rs ↗</a></td></tr>
+<tr><td><code>qec-code</code></td><td>{{ docs_version.packages.qec_code.version }}</td><td>CSS construction and distance</td><td><a href="https://docs.rs/qec-code/{{ docs_version.packages.qec_code.version }}/qec_code/">docs.rs ↗</a></td></tr>
+<tr><td><code>qec-ilp-core</code></td><td>{{ docs_version.packages.qec_ilp_core.version }}</td><td>Shared ILP models</td><td><a href="https://docs.rs/qec-ilp-core/{{ docs_version.packages.qec_ilp_core.version }}/qec_ilp_core/">docs.rs ↗</a></td></tr>
+</tbody></table></div></section>
+{% endblock main %}

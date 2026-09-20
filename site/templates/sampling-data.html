@@ -6,12 +6,13 @@
 {% block hero %}
 <div class="hero compact-hero data-hero">
   <p class="eyebrow">Sampling and data</p>
-  <h1>Sample once. Save every meaning.</h1>
+  <h1>Sampling and training datasets</h1>
   <p class="hero-copy">
     Start with a Stim circuit, choose a shot format, and keep measurement
     values, loss information, and private labels aligned from simulation to
     decoder training.
   </p>
+  <p class="doc-note"><strong>Advanced guide.</strong> The commands below use a <a href="../get-started/#source-build">configured repository checkout</a> and its Python loader. New users should begin with the <a href="../get-started/">installed CLI tutorial</a>.</p>
   <div class="data-pipeline" aria-label="Sampling data flow">
     <span><small>1</small><strong>circuit.stim</strong><em>experiment</em></span>
     <span><small>2</small><strong>sample</strong><em>seeded shots</em></span>
@@ -101,15 +102,17 @@ cargo run --release --locked -p rustqec-cli --bin rustqec -- \
   --error-trace</code></pre>
   <div class="bundle-grid">
     <article class="bundle-card public-bundle">
-      <span class="badge measured">Safe to publish</span>
       <h3><code>data/public/</code></h3>
+      <span class="badge measured">Safe to publish</span>
+      <p>Shareable circuit, manifest, and measurement rows for the decoder.</p>
       <pre class="file-tree"><code>manifest.json  # shape, hashes, dataset id
 circuit.stim  # public logical-zero circuit
 shots.b8      # one measurement row per shot</code></pre>
     </article>
     <article class="bundle-card private-bundle">
-      <span class="badge caveat">Keep private</span>
       <h3><code>data/private/</code></h3>
+      <span class="badge caveat">Keep private</span>
+      <p>Answer labels, masks, seed, and optional error trace for scoring or training.</p>
       <pre class="file-tree"><code>manifest.json  # seed and private hashes
 answers.b8    # physical logical-error target
 masks.b8      # injected logical input bit

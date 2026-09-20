@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from html import escape
 from html.parser import HTMLParser
 import json
 import os
@@ -81,10 +82,10 @@ def page_routes(site: Path) -> dict:
     return pages
 
 
-def write_indexes(catalog: dict, sites: dict[str, Path]) -> None:
+def write_indexes(catalog: dict, sites: dict[str, Path], pages: dict | None = None) -> None:
     if set(sites) != {v["id"] for v in catalog["versions"]}:
         raise ValueError("Every advertised documentation version must have a built snapshot")
-    pages = {key: page_routes(site) for key, site in sites.items()}
+    pages = pages or {key: page_routes(site) for key, site in sites.items()}
     for current in catalog["versions"]:
         entries = []
         for version in catalog["versions"]:
@@ -93,6 +94,50 @@ def write_indexes(catalog: dict, sites: dict[str, Path]) -> None:
                             "root": relative + "/", "pages": pages[version["id"]]})
         (sites[current["id"]] / "versions.json").write_text(
             json.dumps({"current": current["id"], "versions": entries}, ensure_ascii=False) + "\n")
+
+
+def synchronize_version_navigation(primary: Path, snapshot: Path, version: dict) -> None:
+    """Add the current edition controls around otherwise frozen documentation content."""
+    source_script = primary / "js/versions.js"
+    if not source_script.is_file():
+        raise ValueError(f"Missing shared version navigation script: {source_script}")
+    destination_script = snapshot / "js/versions.js"
+    destination_script.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source_script, destination_script)
+    for page in snapshot.rglob("*.html"):
+        html = page.read_text()
+        if f'data-docs-version="{version["id"]}"' not in html:
+            continue
+        root_match = re.search(r'data-root="([^"]+)"', html)
+        if not root_match:
+            raise ValueError(f"Version-aware page is missing data-root: {page}")
+        root = escape(root_match.group(1), quote=True)
+        label = escape(version["label"])
+        additions = []
+        if 'id="docs-version"' not in html:
+            additions.append(f'''\n    <div class="version-strip"><div class="version-inner">
+      <div class="docs-version-control">
+        <span data-version-label>{label}</span>
+        <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
+        <select id="docs-version" hidden></select>
+      </div>
+      <a href="{root}/get-started/#versions">About these docs</a>
+    </div></div>\n''')
+        if version.get("channel") == "stable" and 'id="docs-edition-notice"' not in html:
+            release_line = escape(version["release_line"])
+            native_release = escape(version["native_release"])
+            additions.append(f'''\n    <aside class="version-strip docs-edition-notice" id="docs-edition-notice" aria-label="Documentation edition">
+      <div class="version-inner"><strong>Frozen stable edition:</strong> RustQEC {release_line}, coordinated release v{native_release}. Page text is preserved from that release; this edition banner defines its publication status.</div>
+    </aside>\n''')
+        if not additions:
+            continue
+        insertion = html.find('<div class="site-frame')
+        if insertion < 0:
+            body = re.search(r'<body\b[^>]*>', html)
+            if body is None:
+                raise ValueError(f"Version-aware page is missing body markup: {page}")
+            insertion = body.end()
+        page.write_text(html[:insertion] + "".join(additions) + html[insertion:])
 
 
 def assemble(catalog: dict, sites: dict[str, Path], output: Path) -> None:
@@ -109,12 +154,18 @@ def assemble(catalog: dict, sites: dict[str, Path], output: Path) -> None:
         marker = f'data-docs-version="{version["id"]}"'
         if marker not in (sites[version["id"]] / "index.html").read_text():
             raise ValueError(f"Snapshot version does not match its registration: {version['id']}")
-    # Index each isolated snapshot before copying, so root routes cannot include other versions.
-    write_indexes(catalog, sites)
+    pages = {key: page_routes(site) for key, site in sites.items()}
     shutil.copytree(primary, output)
+    published_sites = {catalog["default"]: output}
     for version in catalog["versions"]:
         if version["id"] != catalog["default"]:
-            shutil.copytree(sites[version["id"]], output / version["path"])
+            snapshot = output / version["path"]
+            shutil.copytree(sites[version["id"]], snapshot)
+            synchronize_version_navigation(output, snapshot, version)
+            published_sites[version["id"]] = snapshot
+    # Write cross-version indexes only into the publication copies. Isolated
+    # input snapshots must remain independently testable and deployable.
+    write_indexes(catalog, published_sites, pages)
 
 
 def build_versions(config: Path, primary: Path, output: Path) -> None:

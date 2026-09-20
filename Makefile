@@ -65,6 +65,7 @@ build-shot-viewer:
 
 build-site: build-shot-viewer
 	python3 tools/prepare_site_docs.py
+	python3 tools/build_cli_reference.py
 	rm -rf _site
 	zola --root site build --output-dir $(CURDIR)/_site $(if $(DOCS_SITE_BASE_URL),--base-url "$(DOCS_SITE_BASE_URL)")
 	mkdir -p _site/examples _site/data

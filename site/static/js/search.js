@@ -7,6 +7,26 @@
   if (!form || !input) return;
   const root = new URL(`${document.body.dataset.root}/`, location.href);
   const normalize = (text) => text.toLowerCase().replace(/[-_]/g, ' ');
+  function excerptAroundMatch(prose, terms, limit = 260) {
+    if (prose.length <= limit) return prose;
+    const normalized = normalize(prose);
+    const positions = terms
+      .map((term) => normalized.indexOf(term))
+      .filter((position) => position >= 0);
+    const matchPosition = positions.length ? Math.min(...positions) : 0;
+    let start = Math.max(0, matchPosition - 80);
+    let end = Math.min(prose.length, start + limit);
+    if (end === prose.length) start = Math.max(0, end - limit);
+    if (start > 0) {
+      const nextSpace = prose.indexOf(' ', start);
+      if (nextSpace >= 0 && nextSpace < matchPosition) start = nextSpace + 1;
+    }
+    if (end < prose.length) {
+      const previousSpace = prose.lastIndexOf(' ', end);
+      if (previousSpace > matchPosition) end = previousSpace;
+    }
+    return `${start > 0 ? '…' : ''}${prose.slice(start, end).trim()}${end < prose.length ? '…' : ''}`;
+  }
   let indexPromise;
   let revision = 0;
   function highlighted(text, terms) {
@@ -47,9 +67,17 @@
       if (!terms.length) { status.textContent = 'Enter a command, crate, or concept to search.'; return; }
       const phrase = terms.join(' ');
       const matches = index.filter((entry) => terms.every((term) => normalize(`${entry.page_title} ${entry.title} ${entry.text}`).includes(term)))
-        .map((entry) => ({ ...entry, score: (normalize(entry.title).includes(phrase) ? 20 : 0)
-          + terms.filter((term) => normalize(entry.title).includes(term)).length * 5
-          + (normalize(entry.excerpt || '').includes(phrase) ? 3 : 0) }))
+        .map((entry) => {
+          const pageTitle = normalize(entry.page_title.replace(/ — RustQEC$/, ''));
+          const focusedPageBonus = pageTitle.includes(phrase)
+            ? Math.max(0, 30 - (pageTitle.length - phrase.length))
+            : 0;
+          return { ...entry, score: focusedPageBonus
+            + terms.filter((term) => pageTitle.includes(term)).length * 5
+            + (normalize(entry.title).includes(phrase) ? 20 : 0)
+            + terms.filter((term) => normalize(entry.title).includes(term)).length * 5
+            + (normalize(entry.excerpt || '').includes(phrase) ? 3 : 0) };
+        })
         .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
       status.textContent = matches.length ? `${matches.length} matching sections${matches.length > 20 ? ' · showing the first 20' : ''}` : 'No matching sections. Try a command, crate, or shorter term, or browse below.';
       for (const entry of matches.slice(0, 20)) {
@@ -62,10 +90,7 @@
         link.append(highlighted(entry.title, terms));
         const snippet = document.createElement('p');
         const prose = entry.excerpt || 'Open this section for commands, examples, and reference details.';
-        const sentences = prose.match(/[^.!?]+[.!?]?(?:\s+|$)/g) || [prose];
-        const start = Math.max(0, sentences.findIndex((sentence) => terms.every((term) => normalize(sentence).includes(term))));
-        const excerpt = sentences.slice(start).join('').trim();
-        const shortened = excerpt.length > 260 ? `${excerpt.slice(0, 257).replace(/\s+\S*$/, '')}…` : excerpt;
+        const shortened = excerptAroundMatch(prose, terms);
         snippet.append(highlighted(shortened, terms));
         item.append(breadcrumb, link, snippet);
         results.append(item);

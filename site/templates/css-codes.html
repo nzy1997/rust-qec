@@ -15,17 +15,24 @@
 <p class="content-links"><a href="../get-started/">First time here? Get started</a><a href="../validation/">How to interpret benchmark evidence</a></p>
 <section id="css-construction" class="task-section" aria-labelledby="css-construction-title">
   <div class="section-heading"><p class="eyebrow">Run it</p><h2 id="css-construction-title">Build and inspect a code</h2></div>
-  <p class="doc-note">Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. <code>list</code> names available codes; <code>show steane</code> prints the selected code description. Distance-search results below are separate reference cases.</p>
+  <p class="doc-note">Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. <code>list</code> names available codes; <code>show steane</code> prints the selected code description.</p>
 <pre class="quick-command"><code>cargo run -p qec-code --features cli --bin qec-code -- list
 cargo run -p qec-code --features cli --bin qec-code -- show steane</code></pre>
 </section>
 
 <section id="distance-search" class="task-section" aria-labelledby="distance-search-title">
   <div class="section-heading">
-    <p class="eyebrow">Results</p>
-    <h2 id="distance-search-title">Exact results for small reference codes</h2>
-    <p class="section-copy">Random-window searches report candidate upper bounds; they do not prove exact distance.</p>
+    <p class="eyebrow">Check the distance</p>
+    <h2 id="distance-search-title">Compute an exact distance</h2>
+    <p class="section-copy">The built-in Steane code is small enough for the default exact search. The result includes a logical class and a weight-3 witness.</p>
   </div>
+  <pre class="quick-command" data-language="Shell · exact distance"><code>cargo run -p qec-code --features cli --bin qec-code -- code steane distance</code></pre>
+  <pre data-output="true" data-language="Expected output"><code>distance: 3
+logical_class: XLike
+witness: x=[1, 1, 0, 1, 0, 0, 0] z=[0, 0, 0, 0, 0, 0, 0] weight=3</code></pre>
+  <p>The witness proves that a weight-3 logical operator exists. Because this command completes an exact search, <code>distance: 3</code> also certifies that no lower-weight logical operator exists.</p>
+  <h3 id="reference-distance-results">Reference results and larger searches</h3>
+  <p>Exact ILP and randomized search commands support larger or custom CSS matrices. Random-window searches return candidate upper bounds; they do not prove exact distance.</p>
   <div class="table-wrap result-table">
     <table>
       <thead><tr><th>Code</th><th>Method</th><th>Distance</th></tr></thead>

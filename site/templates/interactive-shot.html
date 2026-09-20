@@ -5,6 +5,7 @@
 {% block head %}
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
 <link rel="stylesheet" href="{{ root }}/interactive/shot-viewer.css">
+<noscript><style>.shot-startup{display:none}</style></noscript>
 {% endblock head %}
 
 {% block hero %}
@@ -18,6 +19,11 @@
 {% endblock hero %}
 
 {% block main %}
+<aside class="shot-startup" data-shot-startup data-state="loading" role="status">
+  <strong>Loading Shot Lab…</strong>
+  <p data-shot-message>Loading the WebAssembly simulator and circuit viewer.</p>
+  <div data-shot-recovery hidden><p><strong>Recovery options</strong></p><div class="content-links"><a href="">Refresh this page</a><a href="{{ root }}/qp101/">Use the circuit diagram guide</a><a href="{{ root }}/support/#get-help">Report a persistent problem</a></div></div>
+</aside>
 <section
   id="shot-viewer"
   class="shot-app"
@@ -26,8 +32,8 @@
   data-wasm-url="{{ root }}/interactive/pkg/rstim_shot_web_bg.wasm"
   aria-label="Interactive quantum circuit shot viewer"
 >
-  <noscript><p class="shot-fallback">This tool needs JavaScript and WebAssembly. The rest of the RustQEC documentation remains available without them.</p></noscript>
+  <noscript><div class="shot-fallback"><p><strong>Shot Lab is unavailable.</strong> This tool needs JavaScript and WebAssembly. The rest of the RustQEC documentation remains available without them.</p><div class="content-links"><a href="{{ root }}/qp101/">Use the circuit diagram guide</a><a href="{{ root }}/support/#get-help">Get help</a></div></div></noscript>
 </section>
 {% endblock main %}
 
-{% block scripts %}<script type="module" src="{{ root }}/interactive/app.js"></script>{% endblock scripts %}
+{% block scripts %}<script type="module" data-shot-module src="{{ root }}/interactive/app.js"></script><script src="{{ root }}/js/shot-startup.js"></script>{% endblock scripts %}

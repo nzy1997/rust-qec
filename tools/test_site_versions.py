@@ -17,19 +17,24 @@ class SiteVersionsTest(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.catalog = {"default": "master", "versions": [
             {"id": "master", "label": "Development · master", "ref": "master", "path": ""},
-            {"id": "v1", "label": "Release v1", "ref": "a" * 40, "path": "versions/v1"},
+            {"id": "v1", "label": "Release v1", "ref": "a" * 40, "path": "versions/v1",
+             "channel": "stable", "release_line": "1", "native_release": "1.0.0"},
         ]}
         self.sites = {}
         for version in self.catalog["versions"]:
             site = self.root / version["id"]
             site.mkdir()
-            html = f'<body data-docs-version="{version["id"]}"><h1 id="top">Docs</h1></body>'
-            (site / "index.html").write_text(html)
+            home = f'<body data-docs-version="{version["id"]}" data-root="."><h1 id="top">Docs</h1></body>'
+            nested = f'<body data-docs-version="{version["id"]}" data-root=".."><h1 id="top">Docs</h1></body>'
+            (site / "index.html").write_text(home)
             (site / "docs").mkdir()
-            (site / "docs/index.html").write_text(html)
+            (site / "docs/index.html").write_text(nested)
             (site / "search-index.json").write_text(version["id"])
             (site / "interactive").mkdir()
             (site / "interactive/engine.wasm").write_bytes(version["id"].encode())
+            (site / "js").mkdir()
+            (site / "js/versions.js").write_text(f"navigation for {version['id']}")
+            (site / "versions.json").write_text(f"isolated {version['id']}")
             self.sites[version["id"]] = site
 
     def test_two_snapshots_keep_assets_search_and_routes_separate(self):
@@ -44,6 +49,28 @@ class SiteVersionsTest(unittest.TestCase):
             self.assertEqual(index["versions"][0]["pages"]["docs/"], ["top"])
         index = json.loads((output / "versions/v1/versions.json").read_text())
         self.assertEqual(index["versions"][0]["root"], "../../")
+        self.assertEqual((output / "versions/v1/js/versions.js").read_text(), "navigation for master")
+        self.assertEqual((self.sites["master"] / "versions.json").read_text(), "isolated master")
+        self.assertEqual((self.sites["v1"] / "versions.json").read_text(), "isolated v1")
+
+    def test_frozen_home_receives_current_version_navigation(self):
+        stable_home = self.sites["v1"] / "index.html"
+        stable_home.write_text('<body data-docs-version="v1" data-root="."><div class="site-frame"></div></body>')
+        output = self.root / "published"
+        assemble(self.catalog, self.sites, output)
+        html = (output / "versions/v1/index.html").read_text()
+        self.assertIn('id="docs-version"', html)
+        self.assertIn('Release v1', html)
+        self.assertIn('./get-started/#versions', html)
+
+    def test_every_frozen_page_receives_authoritative_stable_identity(self):
+        output = self.root / "published"
+        assemble(self.catalog, self.sites, output)
+        for page in [output / "versions/v1/index.html", output / "versions/v1/docs/index.html"]:
+            html = page.read_text()
+            self.assertIn('id="docs-edition-notice"', html)
+            self.assertIn("Frozen stable edition:", html)
+            self.assertIn("RustQEC 1, coordinated release v1.0.0", html)
 
     def test_missing_snapshot_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Every advertised"):
@@ -75,9 +102,15 @@ class SiteVersionsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "full commit SHA"):
             read_catalog(config)
 
-    def test_only_master_is_registered_in_production(self):
+    def test_production_registers_development_and_frozen_0_3_docs(self):
         catalog = read_catalog(Path(__file__).resolve().parent.parent / "site/versions.json")
-        self.assertEqual([v["id"] for v in catalog["versions"]], ["master"])
+        self.assertEqual([v["id"] for v in catalog["versions"]], ["master", "0.3"])
+        stable = catalog["versions"][1]
+        self.assertEqual(stable["path"], "versions/0.3")
+        self.assertEqual(stable["ref"], "24cbe9b1e5a653f8bbd53ed7b8930fef13e22928")
+        self.assertEqual(stable["channel"], "stable")
+        self.assertEqual(stable["native_release"], "0.3.3")
+        self.assertEqual(catalog["versions"][0]["native_release"], "0.3.3")
 
     def test_additional_edition_builds_from_its_pinned_commit(self):
         repo = self.root / "repository"
@@ -101,7 +134,7 @@ root = Path('_site')
 root.mkdir()
 version = os.environ['DOCS_VERSION']
 base = os.environ['DOCS_SITE_BASE_URL']
-(root / 'index.html').write_text(f'<body data-docs-version="{version}" id="top">{base}</body>')
+(root / 'index.html').write_text(f'<body data-docs-version="{version}" data-root="." id="top">{base}</body>')
 (root / 'source.txt').write_text(Path('source.txt').read_text())
 ''')
         builder.chmod(0o755)
