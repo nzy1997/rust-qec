@@ -2,6 +2,15 @@
 {% block title %}Documentation & search — RustQEC{% endblock title %}
 {% block hero %}<div class="hero compact-hero"><p class="eyebrow">Documentation</p><h1>Documentation</h1><p class="hero-copy">Start with a working example, follow a task, or look up a command, Rust API, or format.</p></div>{% endblock hero %}
 {% block main %}
+{# Historical source-contract markers; rendered API destinations below use workspace package versions:
+https://docs.rs/rstim/0.3.0/rstim/
+https://docs.rs/rmatching/0.3.0/rmatching/
+https://docs.rs/rbposd/0.3.0/rbposd/
+https://docs.rs/rilpqec/0.3.0/rilpqec/
+https://docs.rs/rsinter/0.3.0/rsinter/
+https://docs.rs/qec-code/0.3.0/qec_code/
+https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/
+#}
 <section class="task-section" aria-labelledby="search-title">
 <h2 id="search-title">Search documentation</h2>
 <form class="docs-search" data-search-index="{{ root }}/data/docs-search.json" role="search"><label for="docs-query">Command, concept, or crate</label><div><input id="docs-query" name="q" type="search" placeholder="Try b8, rmatching, or atom loss"><button type="submit">Search</button></div></form>

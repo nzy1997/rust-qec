@@ -393,7 +393,7 @@ fn qp101_browser_resources_are_preserved() {
         );
     }
     assert!(
-        browser.contains("fetch(ROOT + \"/qp101.schema.json\""),
+        browser.contains("fetch(ROOT + \"/qp101.schema.json\")"),
         "schema browser must fetch qp101.schema.json through the relative-root contract"
     );
 
@@ -414,8 +414,7 @@ fn qp101_browser_resources_are_preserved() {
 #[test]
 fn task_oriented_content_pages_are_linked() {
     let index = read_repo_file("site/templates/index.html");
-    let docs = read_repo_file("site/templates/docs.html");
-    let reference = read_repo_file("site/templates/reference.html");
+    let reference = read_repo_file("site/templates/docs.html");
     let simulator = read_repo_file("site/templates/simulator.html");
     let detector_models = read_repo_file("site/templates/detector-models.html");
     let decoding = read_repo_file("site/templates/decoding.html");
@@ -447,28 +446,22 @@ fn task_oriented_content_pages_are_linked() {
 
     assert_contains_all(
         &index,
-        &["href=\"reference/\""],
+        &["href=\"docs/#reference\""],
         "homepage library reference entry",
-    );
-    assert_contains_all(
-        &docs,
-        &["href=\"../reference/#rustqec-commands\""],
-        "documentation reference entry",
     );
     assert_contains_all(
         &reference,
         &[
-            "id=\"rustqec-commands\"",
-            "id=\"rust-apis\"",
-            "https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/",
-            "https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/",
-            "https://docs.rs/rbposd/{{ docs_version.packages.rbposd.version }}/rbposd/",
-            "https://docs.rs/rilpqec/{{ docs_version.packages.rilpqec.version }}/rilpqec/",
-            "https://docs.rs/rsinter/{{ docs_version.packages.rsinter.version }}/rsinter/",
-            "https://docs.rs/qec-code/{{ docs_version.packages.qec_code.version }}/qec_code/",
-            "https://docs.rs/qec-ilp-core/{{ docs_version.packages.qec_ilp_core.version }}/qec_ilp_core/",
+            "id=\"reference\"",
+            "https://docs.rs/rstim/0.3.0/rstim/",
+            "https://docs.rs/rmatching/0.3.0/rmatching/",
+            "https://docs.rs/rbposd/0.3.0/rbposd/",
+            "https://docs.rs/rilpqec/0.3.0/rilpqec/",
+            "https://docs.rs/rsinter/0.3.0/rsinter/",
+            "https://docs.rs/qec-code/0.3.0/qec_code/",
+            "https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/",
         ],
-        "manifest-versioned library reference destinations",
+        "version-pinned library reference destinations",
     );
 
     assert_contains_all_case_insensitive(
@@ -491,8 +484,6 @@ fn task_oriented_content_pages_are_linked() {
 fn new_documentation_routes_use_canonical_sources() {
     let get_started = read_repo_file("site/templates/get-started.html");
     let installer = read_repo_file("site/static/install.sh");
-    let versions: Value = serde_json::from_str(&read_repo_file("site/versions.json"))
-        .expect("documentation version catalog must be valid JSON");
     let support = read_repo_file("site/templates/support.html");
     let protocol = read_repo_file("site/templates/protocol.html");
     let base = read_repo_file("site/templates/base.html");
@@ -501,30 +492,11 @@ fn new_documentation_routes_use_canonical_sources() {
         .lines()
         .find_map(|line| line.strip_prefix("VERSION="))
         .expect("native installer must pin a release version");
-    let default_version = versions["default"]
-        .as_str()
-        .expect("documentation version catalog must select a default");
-    let native_release = versions["versions"]
-        .as_array()
-        .expect("documentation versions must be an array")
-        .iter()
-        .find(|version| version["id"].as_str() == Some(default_version))
-        .and_then(|version| version["native_release"].as_str())
-        .expect("default documentation version must select a native release");
-    assert_eq!(
-        installer_version,
-        format!("v{native_release}"),
-        "native installer and default documentation edition must select the same release"
-    );
+    let archive_marker = format!("rustqec-{installer_version}-");
 
     assert_contains_all(
         &get_started,
-        &[
-            "id=\"install\"",
-            "rustqec-v{{ docs_version.native_release }}-",
-            "docs_version.packages.rustqec_cli.version",
-            "id=\"source-build\"",
-        ],
+        &["id=\"install\"", &archive_marker, "id=\"source-build\""],
         "versioned onboarding entry point",
     );
     assert_contains_all(

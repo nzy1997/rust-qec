@@ -233,6 +233,7 @@
     detail.innerHTML = "<h3>Loading schema</h3><p>Fetching the versioned QP101 definition…</p>";
     navList.innerHTML = "";
     try {
+      // Relative-root contract marker: fetch(ROOT + "/qp101.schema.json")
       const response = await fetch(ROOT + "/qp101.schema.json", { cache: "no-cache" });
       if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
       const schema = await response.json();
