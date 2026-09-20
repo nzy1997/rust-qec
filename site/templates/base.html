@@ -1,6 +1,7 @@
 {% set root = section.extra.root | default(value=".") %}
 {% set docs_version = load_data(path="generated/docs-version.json") %}
-{% set current_nav = section.extra.nav | default(value="home") %}<!doctype html>
+{% set current_nav = section.extra.nav | default(value="home") %}
+{% set loss_view = section.extra.loss_view | default(value="") %}<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -51,14 +52,15 @@
         </details>
       </nav>
     </div>
-    {% if current_nav != "home" %}<div class="version-strip"><div class="version-inner">
+    <div class="version-strip"><div class="version-inner">
       <div class="docs-version-control">
         <span data-version-label>{{ docs_version.label }}</span>
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
       <a href="{{ root }}/get-started/#versions">About these docs</a>
-    </div></div>{% endif %}
+    </div></div>
+    {% if docs_version.channel == "stable" %}<aside class="version-strip docs-edition-notice" id="docs-edition-notice" aria-label="Documentation edition"><div class="version-inner"><strong>Frozen stable edition:</strong> RustQEC {{ docs_version.release_line }}, coordinated release v{{ docs_version.native_release }}. Page text is preserved from that release; this edition banner defines its publication status.</div></aside>{% endif %}
     <div class="site-frame{% if current_nav not in ["home", "shot"] %} documentation-frame{% endif %}">
       {% if current_nav not in ["home", "shot"] %}
       <aside class="docs-sidebar" aria-label="Documentation navigation">
@@ -67,7 +69,7 @@
       {% endif %}
       <div class="page-content">
         <header class="site-header">
-          {% if current_nav not in ["home", "shot"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/docs/">Documentation</a><span aria-hidden="true">/</span><span>{{ section.title }}</span></nav>{% endif %}
+          {% if current_nav not in ["home", "shot"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/docs/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
           {% block hero %}{% endblock hero %}
         </header>
         <div class="reading-layout">
@@ -81,7 +83,7 @@
 
     <footer class="site-footer">
       <div class="footer-brand"><a href="{{ root }}/" aria-label="RustQEC home"><img src="{{ root }}/brand/rustqec-lockup.svg" width="128" height="32" alt="RustQEC" loading="lazy"></a><span>A quantum error correction workspace in Rust</span></div>
-      <div class="footer-links"><a href="{{ root }}/support/#get-help">Get help</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v0.3.3">Release notes ↗</a><a href="https://github.com/nzy1997/rust-qec">GitHub ↗</a><a href="#top">Back to top</a></div>
+      <div class="footer-links"><a href="{{ root }}/support/#get-help">Get help</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v{{ docs_version.native_release }}">RustQEC {{ docs_version.release_line }} release notes ↗</a><a href="https://github.com/nzy1997/rust-qec">GitHub ↗</a><a href="#top">Back to top</a></div>
     </footer>
     <script src="{{ root }}/js/docs.js" defer></script>
     <script src="{{ root }}/js/versions.js" defer></script>

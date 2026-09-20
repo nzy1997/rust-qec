@@ -46,7 +46,9 @@ PAGE_FILES = (
     "atom-loss-concepts/index.html",
     "atom-loss-evidence/index.html",
     "docs/index.html",
+    "reference/index.html",
     "support/index.html",
+    "maintainers/index.html",
     "simulator/index.html",
     "sampling-data/index.html",
     "detector-models/index.html",
@@ -59,7 +61,7 @@ PAGE_FILES = (
     "interactive/index.html",
     "interactive/local/index.html",
 )
-JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js")
+JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js", "js/shot-startup.js")
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
     "atom-loss/index.html": ("loss-information", "model-loss", "sample-loss", "decode-loss", "check-predictions", "supported-circuits"),
@@ -80,8 +82,10 @@ PAGE_REQUIRED_ANCHORS = {
         "atom-loss-support-boundary",
         "mid-swap-configuration-migration",
         "compatibility-and-deprecation-policy",
-        "evidence-and-known-exclusions",
+        "maintainer-procedures",
     ),
+    "reference/index.html": ("reference-boundary", "rustqec-commands", "command-circuit-stats", "command-decode", "common-options", "exit-codes", "machine-contract", "rust-apis"),
+    "maintainers/index.html": ("atom-loss-regression-controls", "decoder-release-readiness-gate", "publication-evidence-bundle", "release-checklist"),
     "simulator/index.html": ("circuit-simulation",),
     "sampling-data/index.html": (
         "choose-path",
@@ -1045,6 +1049,41 @@ def make_fixture_site() -> SiteFixture:
   <h2 id="mid-swap-configuration-migration">Mid-SWAP configuration migration</h2>
   <h2 id="compatibility-and-deprecation-policy">Compatibility and deprecation policy</h2>
   <h2 id="evidence-and-known-exclusions">Evidence and known exclusions</h2>
+  <h2 id="maintainer-procedures">Maintainer procedures</h2>
+  <a href="../maintainers/">Maintainer reference</a>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "reference/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <h1 id="reference-boundary">Reference</h1>
+  <section id="rustqec-commands">
+    <h2>rustqec commands</h2>
+    <h3 id="command-circuit-stats">circuit.stats</h3>
+    <h3 id="command-decode">decode</h3>
+  </section>
+  <section id="common-options"><h2>Common options</h2></section>
+  <section id="exit-codes"><h2>Exit codes</h2></section>
+  <section id="machine-contract"><h2>Machine contract</h2></section>
+  <section id="rust-apis"><h2>Rust APIs</h2></section>
+</body>
+</html>
+""",
+    )
+    write_text(
+        site_root / "maintainers/index.html",
+        """<!doctype html>
+<html lang="en">
+<body data-root="..">
+  <h1>Maintainer reference</h1>
+  <section id="atom-loss-regression-controls"></section>
+  <section id="decoder-release-readiness-gate"></section>
+  <section id="publication-evidence-bundle"></section>
+  <section id="release-checklist"></section>
 </body>
 </html>
 """,
@@ -1288,6 +1327,7 @@ const localRefs = [
 const copyBlocks = document.querySelectorAll("pre code");
 """,
     )
+    write_text(site_root / "js/shot-startup.js", '// Shot Lab startup state reporting')
 
     write_text(site_root / "docs/index.html", '<html><body><main><h1>Documentation</h1></main></body></html>')
     write_text(site_root / "js/search.js", '// Local documentation search')

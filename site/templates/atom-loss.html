@@ -6,7 +6,7 @@
   <p class="eyebrow">ATOM LOSS <span class="loss-badge" data-decoder-badge="envelope-matching">Envelope matching · Beta</span></p>
   <h1>Decode with<br>atom loss.</h1>
   <p class="hero-copy">Run your first loss-aware decoding experiment.<br>One circuit, 64 shots, four steps from sample to score.</p>
-  <div class="loss-meta"><span>CLI install · v0.3.3</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
+  <div class="loss-meta"><span>Requires rustqec-cli 0.3.3+</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
   <div class="actions"><a class="button primary" href="#model-loss">Start the tutorial <span aria-hidden="true">→</span></a><a class="button" href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
   <p class="loss-hero-note">This tutorial uses envelope matching, <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span>, within its verified Mid-SWAP scope. Envelope MLE is separately <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span>, with a declared scope limited to four exact measured points and requiring ILP; this walkthrough is one generated Mid-SWAP case. <a href="../atom-loss-concepts/#supported-circuits">Supported circuits →</a></p>
 </div>
@@ -25,9 +25,9 @@
   <p class="loss-inline-note"><strong>Data boundary</strong> Only public records enter the decoder. Private answers are used at the final scoring step.</p>
   <details class="loss-disclosure"><summary>Before you start: install &amp; working directory</summary>
     <p>Install the CLI below, or use a <a href="../get-started/#native-install">native binary</a>. The default CLI includes envelope matching; no optional ILP solver is needed.</p>
-    <pre data-language="Shell"><code>cargo install --locked rustqec-cli --version 0.3.3</code></pre>
+    <pre data-language="Shell"><code>cargo install --locked rustqec-cli</code></pre>
     <p>Run the steps in order in a fresh directory, with <code>rustqec</code> on PATH and Python 3 installed. The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README; after extracting it, run <code>sh run.sh</code> to execute all four steps.</p>
-    <p>This site is <strong>{{ docs_version.label }}</strong>; the installation command pins v0.3.3. <a href="../get-started/#versions">Version details</a>.</p>
+    <p>This site is <strong>{{ docs_version.label }}</strong>. The installation command selects the latest stable package; this guide requires <code>rustqec-cli</code> 0.3.3 or later in the 0.3 line. <a href="../get-started/#versions">Version details</a>.</p>
   </details>
 </section>
 <section class="task-section loss-step" aria-labelledby="model-loss">
@@ -99,10 +99,10 @@ Logical errors: 0 / 64</code></pre>
 </section>
 <section class="task-section" aria-labelledby="supported-circuits">
   <h2 id="supported-circuits">Troubleshooting &amp; support</h2>
-  <details class="loss-disclosure"><summary>The decoder reports unsupported_circuit</summary><p>The input falls outside the compiler’s acceptance rules. Start with the exact circuit above, then compare your changes with the <a href="../support/#atom-loss-support-boundary">support contract</a>. A rejection is not a logical prediction.</p></details>
-  <details class="loss-disclosure"><summary>The output differs from the example</summary><p>Check the CLI version, seed 7, 64 shots, circuit parameters and decoder choice. Use a fresh directory and rerun all four steps. Do not score a failed or incomplete decoding run.</p></details>
-  <details class="loss-disclosure"><summary>The check reports mismatched datasets or incomplete rows</summary><p>Regenerate the public and private bundles together, then rerun decoding. Both manifests must share a <code>dataset_id</code>, and prediction, answer and statistics counts must agree. Do not combine files from different runs.</p></details>
-  <details class="loss-disclosure"><summary>Should I apply the private input masks again?</summary><p>No. The physical logical-error targets already account for the hidden logical-input masks. Compare predictions directly with <code>answers.b8</code>.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-unsupported-circuit">The decoder reports unsupported_circuit</summary><p>The input falls outside the compiler’s acceptance rules. Start with the exact circuit above, then compare your changes with the <a href="../support/#atom-loss-support-boundary">support contract</a>. A rejection is not a logical prediction.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-different-output">The output differs from the example</summary><p>Check the CLI version, seed 7, 64 shots, circuit parameters and decoder choice. Use a fresh directory and rerun all four steps. Do not score a failed or incomplete decoding run.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-dataset-mismatch">The check reports mismatched datasets or incomplete rows</summary><p>Regenerate the public and private bundles together, then rerun decoding. Both manifests must share a <code>dataset_id</code>, and prediction, answer and statistics counts must agree. Do not combine files from different runs.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-input-masks">Should I apply the private input masks again?</summary><p>No. The physical logical-error targets already account for the hidden logical-input masks. Compare predictions directly with <code>answers.b8</code>.</p></details>
 </section>
 <section class="task-section" aria-labelledby="next-steps">
   <span id="atom-loss-results" aria-hidden="true"></span><h2 id="next-steps">Take the next step</h2>

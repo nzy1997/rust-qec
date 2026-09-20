@@ -62,6 +62,15 @@ test('home routes first-time users to the workflow and docs retains the API inde
   await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
 });
 
+test('CLI reference is generated from the executable capabilities contract', async ({ page }) => {
+  await page.goto('/reference/');
+  await expect(page.locator('.reference-command')).toHaveCount(8);
+  await expect(page.locator('#command-circuit-gen')).toContainText('rustqec circuit gen');
+  await expect(page.locator('#command-circuit-gen').locator('xpath=..')).toContainText('--before-round-data-loss-probability');
+  await expect(page.locator('#command-decode').locator('xpath=..')).toContainText('decode_timeout');
+  await expect(page.locator('main')).toContainText('rustqec capabilities --format json');
+});
+
 test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.home-hero')).toContainText('simulate circuit noise and atom loss');
@@ -100,7 +109,7 @@ test("installation starts with one copyable command and keeps manual steps optio
   await expect(manual).not.toHaveAttribute("open", "");
   await installation.getByRole("button", { name: "Copy Shell · install" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
-    "cargo install --locked rustqec-cli --version 0.3.3",
+    "cargo install --locked rustqec-cli",
   );
   await native.locator("summary").first().click();
   await expect(installation.getByRole("link", { name: "Inspect the installer" })).toHaveAttribute("href", "../install.sh");
@@ -245,7 +254,9 @@ test("search finds commands and concepts, preserves queries, and handles no matc
 
 test("search failure keeps the reference index usable", async ({ page }) => {
   await page.route("**/data/docs-search.json", (route) => route.fulfill({ status: 503, body: "unavailable" }));
+  const failedIndex = page.waitForResponse("**/data/docs-search.json");
   await page.goto("/docs/?q=rmatching");
+  await failedIndex;
   await expect(page.locator("#search-status")).toContainText("Search is unavailable");
   await expect(page.locator('main a[href="../decoding/#first-decode"]').first()).toBeVisible();
 });
@@ -274,7 +285,7 @@ test("output is labeled separately and never copied with the command", async ({ 
 
 test("development guides point to a master checkout and stable checkout is explicit", async ({ page }) => {
   await page.goto("/sampling-data/");
-  await page.getByRole("link", { name: "configured repository checkout" }).click();
+  await page.getByRole("link", { name: "configured repository checkout" }).first().click();
   await expect(page.locator('pre[data-language="Shell · development source"]')).toContainText("git clone --branch master");
   await page.locator("#stable-source summary").click();
   await expect(page.locator('pre[data-language="Shell · stable source"]')).toContainText("git clone --branch v0.3.3");
@@ -477,6 +488,7 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
 test('atom loss search leads to its dedicated walkthrough and retains the support reference', async ({ page }) => {
   await page.goto('/docs/?q=atom+loss');
   const first = page.locator('#search-results li').filter({ has: page.locator('a[href$="atom-loss/#model-loss"]') });
+  await expect(page.locator('#search-results li').first().locator('a')).toHaveAttribute('href', /atom-loss\//);
   await expect(first).toContainText('Generate the circuit');
   await expect(first.locator('mark').first()).toBeVisible();
   await expect(first.locator('a')).toHaveAttribute('href', /atom-loss\/#model-loss$/);
