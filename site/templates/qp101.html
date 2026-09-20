@@ -12,6 +12,17 @@
 {% endblock hero %}
 
 {% block main %}
+<section class="home-example" aria-labelledby="qp101-preview-title">
+  <div class="home-example-copy">
+    <p class="eyebrow">Result preview</p>
+    <h2 id="qp101-preview-title">See the rendered circuit first</h2>
+    <p>RustQEC turns a Stim circuit into an SVG you can inspect in a browser and an ordered QP101 JSON document for downstream tools.</p>
+    <div class="content-links"><a href="#qp101">Render your circuit ↓</a><a href="#gallery">Browse examples →</a></div>
+  </div>
+  <a class="home-example-preview" href="../gallery/basic-site.svg" aria-label="Open the basic circuit SVG">
+    <img src="../gallery/basic-site.svg" alt="QP101 diagram showing a basic circuit with a gate, control, tick, and measurement">
+  </a>
+</section>
 <section id="qp101" class="qp101-section" aria-labelledby="qp101-title">
   <div class="section-heading">
     <p class="eyebrow">Run it</p>

@@ -3,9 +3,21 @@
   "versions": [
     {
       "id": "master",
-      "label": "Development · master",
+      "label": "RustQEC 0.3 · Development",
       "ref": "master",
-      "path": ""
+      "path": "",
+      "channel": "development",
+      "release_line": "0.3",
+      "native_release": "0.3.3"
+    },
+    {
+      "id": "0.3",
+      "label": "RustQEC 0.3 · Stable (v0.3.3)",
+      "ref": "24cbe9b1e5a653f8bbd53ed7b8930fef13e22928",
+      "path": "versions/0.3",
+      "channel": "stable",
+      "release_line": "0.3",
+      "native_release": "0.3.3"
     }
   ]
 }

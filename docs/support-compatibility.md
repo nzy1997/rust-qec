@@ -1,13 +1,14 @@
 # Support and compatibility contract
 
-This document tracks the development branch. The installed CLI quickstart
-targets v0.3.3; unchanged library API examples remain pinned to v0.3.0.
-Use each release's notes for its frozen support boundary.
-Development-branch wording describes the upcoming release state; a decoder
-maturity is binding only for a published release whose evidence bundle
-verifies it (v0.3.3 is the corrected candidate for both Matching and MLE). It is a
-contract for using the shipped interfaces, not a claim that every research
-component, circuit dialect, decoder, or benchmark result is ready for
+This document defines the support contract for the RustQEC 0.3 release line.
+The documentation edition banner identifies whether a rendered copy follows
+the development branch or a frozen stable release.
+The coordinated repository release and individual crate patch versions are
+separate: a requirement such as `rustqec-cli >=0.3.1,<0.4.0` applies to that
+package without renaming the whole documentation set. A decoder maturity is
+binding only for a published package release whose evidence bundle verifies
+it. This is a contract for using the shipped interfaces, not a claim that every
+research component, circuit dialect, decoder, or benchmark result is ready for
 publication-scale use.
 
 ## Support levels
@@ -26,21 +27,10 @@ The atom-loss support promise is defined per decoder by the executable matrix
 [`docs/envelope-support.json`](envelope-support.json). The matrix records each
 decoder's build features and maturity, the circuit contract (families, readout
 basis, allowed instructions, observable/sweep/REPEAT restrictions), the
-revision the promise applies to, and one acceptance or rejection control for
-every declared behavior. It is verified by executing both decoders against the
-declared controls:
-
-```sh
-cargo build --release --locked -p rustqec-cli --features ilp
-python3 tools/check_envelope_support.py \
-  --binary target/release/rustqec \
-  --matrix docs/envelope-support.json \
-  --out drafts/envelope-readiness/support.json
-```
-
-The checker exits nonzero unless every control matches, including structured
-rejection codes and output-file rules; a binary without ILP fails the run
-rather than silently skipping the MLE controls.
+revision the promise applies to, and the expected acceptance or rejection for
+every declared behavior. Users should treat this matrix as the authoritative
+machine-readable boundary. The commands that verify it before a release live
+in the [maintainer reference](maintainer-reference.md).
 
 ### Decoder-specific support table
 
@@ -84,85 +74,8 @@ hard limits (candidate count, REPEAT blocks, unsupported instructions) produce
 a guaranteed structured rejection. v0.3.3 can record the first promotion only
 after every required case, the release gate on the exact source, and the
 post-publication asset verification succeed. Later Supported releases must
-pass the same gate again.
-
-### Regression controls
-
-The Mid-SWAP MLE positive control:
-
-```sh
-cargo test --locked -p rustqec-cli --test external_fixtures current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified -- --exact
-```
-
-The conventional candidate-explosion fixture is explicitly excluded from the
-MLE route. It must fail before publishing prediction or statistics files,
-using the existing `unsupported_circuit` structured failure:
-
-```sh
-cargo test --locked -p rustqec-cli --test external_fixtures current_rstim_atom_loss_conventional_envelope_mle_rejects_candidate_explosion -- --exact
-```
-
-Successful decoding of the pinned fixtures shows that these support paths
-still work. It is not publication-scale validation, a logical-error-rate
-campaign, or evidence that arbitrary atom-loss circuits are supported.
-
-### Release-readiness gate
-
-Promotion from Beta to Supported is decided per decoder by the
-release-readiness gate (issue #716), not by the matrix alone. The gate
-aggregates the revision-bound evidence bundle — the support-matrix result, the
-independent correctness suite, the measured resource envelope, and one
-installed-artifact contract report per official native target
-(`x86_64-unknown-linux-gnu`, `aarch64-apple-darwin`) — and promotes a decoder
-only when every artifact passes and was produced from the release candidate
-revision (or a recorded source-equivalence check):
-
-```sh
-python3 tools/check_envelope_release.py \
-  --evidence-dir drafts/envelope-readiness \
-  --matrix docs/envelope-support.json \
-  --policy docs/envelope-compatibility-policy.md \
-  --candidate-revision "$(git rev-parse HEAD)" \
-  --out drafts/envelope-readiness/release-gate.json
-```
-
-The installed-artifact reports are produced from the verified release archive
-of each platform (never a PATH binary):
-
-```sh
-python3 tools/check_installed_envelope.py \
-  --bin-dir extracted/<archive-root>/bin \
-  --matrix docs/envelope-support.json \
-  --target aarch64-apple-darwin \
-  --archive <archive.tar.gz> \
-  --source-sha <candidate-revision> \
-  --expect-ilp \
-  --out drafts/envelope-readiness/installed-aarch64-apple-darwin.json
-```
-
-A missing expected decoder, a missing platform report, a partially executed
-control set, hollowed correctness coverage, or a revision mismatch fails the
-gate; the decoder then remains Beta with its blocking gaps recorded in the
-gate report. The retained full resource report supports a candidate only when
-its measurement revision is an ancestor of the candidate with identical
-measurement-relevant sources (the measurement script, the decoder crates and
-`Cargo.lock`); otherwise the full campaign must be rerun. What the promoted
-surface freezes — CLI arguments, dataset interpretation, prediction packing,
-structured error codes, statistics semantics, and the evolution/deprecation
-rules — is defined by
-[`docs/envelope-compatibility-policy.md`](envelope-compatibility-policy.md).
-
-A passing gate decides candidacy; the durable proof travels with the release.
-Each native release whose gate promotes a decoder publishes a checksummed,
-version-bound evidence bundle (`envelope-support-evidence-<tag>.tar.gz`)
-freezing the gate report, the consumed matrix/policy, the MLE scope plan, the
-support/correctness/general-resource/MLE-resource evidence, and one
-archive-bound installed report per platform.
-Verify a downloaded release with
-`python3 tools/check_envelope_publication.py --release-dir <dir> --expect-decoder <name>`;
-releases without the bundle (v0.3.0) are reported as lacking a verified
-promotion. See the
-[native archive guide](https://github.com/nzy1997/rust-qec/blob/master/docs/native-release-archives.md#envelope-support-evidence-bundle).
+pass the same gate again. Maintainer regression, gate, and publication-bundle
+commands live in the [maintainer reference](maintainer-reference.md).
 
 ## Mid-SWAP configuration migration
 
@@ -225,29 +138,10 @@ migration path when one exists. The Mid-SWAP field rename above is an example:
 the removed field remains a compile-time error so callers must choose the four
 separate channels rather than receive an implicit mapping.
 
-The repository tag identifies a RustQEC source release. Workspace crates are
-independently versioned packages: inspect each crate's `Cargo.toml` and Cargo
-metadata when selecting a dependency version. A repository tag therefore does
-not imply that every workspace package has the same package version.
-
-## Evidence and known exclusions
-
-The publication-evidence checker can be structurally consistent while still
-reporting `publication_ready=false`; it currently reports gaps rather than
-freshly reproduced publication-grade measurements. Passing that consistency
-check is not publication readiness.
-
-The following open work remains outside this contract:
-
-- [#601](https://github.com/nzy1997/rust-qec/issues/601): publication-grade,
-  multi-platform benchmark evidence.
-- [#209](https://github.com/nzy1997/rust-qec/issues/209): BB circuit BP-OSD
-  runtime gap investigation.
-- [#550](https://github.com/nzy1997/rust-qec/issues/550): high-rate classical
-  APM smoke-case runtime investigation.
-
-These links preserve the known limitations; they do not claim that their
-historical measurements have been rerun for this release line.
+The repository tag identifies a coordinated RustQEC source release. Published
+workspace crates share its major/minor release line, while package-only patch
+releases can advance independently. Inspect each crate's `Cargo.toml` and Cargo
+metadata when reproducing an exact package version.
 
 <span id="development-cargo-features-before-the-first-registry-release"></span>
 

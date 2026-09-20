@@ -9,12 +9,15 @@
 <ul id="search-results" class="search-results"></ul>
 <noscript><p>Search needs JavaScript. All documentation links below remain available.</p></noscript>
 </section>
-<section class="task-section" aria-labelledby="start"><h2 id="start">Start here</h2><ul>
-<li><a href="../get-started/">Install with Cargo and run your first detector event</a> — no source checkout needed.</li>
-<li><a href="../get-started/#native-install">Native binaries without Rust</a> — installation alternative.</li>
-<li><a href="../get-started/#source-build">Development source setup</a> — master workflows.</li>
-<li><a href="../interactive/">Shot Lab</a> — inspect a circuit in your browser.</li>
-</ul></section>
+<section class="task-section" aria-labelledby="start">
+<div class="section-heading"><p class="eyebrow">Choose a path</p><h2 id="start">Start with the result you need</h2><p class="section-copy">Each path states its setup and ends with an observable result.</p></div>
+<div class="docs-grid">
+  <article class="docs-card"><p class="eyebrow">First visit</p><h3><a class="card-title-link" href="../get-started/">Verify an installation</a></h3><p>Install the unified CLI, create a one-qubit circuit, and confirm a deterministic detector event.</p><div class="docs-card-links"><a href="../get-started/">Cargo install →</a><a href="../get-started/#native-install">Native binaries</a></div></article>
+  <article class="docs-card"><p class="eyebrow">Decode</p><h3><a class="card-title-link" href="../decoding/#first-decode">Predict a logical observable</a></h3><p>Run a complete graphlike MWPM example with two detector rows and inspect both predictions.</p><div class="docs-card-links"><a href="../decoding/#first-decode">Run the example →</a><a href="../detector-models/">Learn about DEMs</a></div></article>
+  <article class="docs-card"><p class="eyebrow">Train or evaluate</p><h3><a class="card-title-link" href="../sampling-data/">Prepare aligned datasets</a></h3><p>Export public decoder inputs and private truth while preserving loss information and row alignment.</p><div class="docs-card-links"><a href="../sampling-data/">Open the advanced guide →</a><a href="../atom-loss/">Try the installed CLI tutorial</a></div></article>
+</div>
+<p class="content-links"><a href="../interactive/">Inspect a circuit in Shot Lab →</a><a href="../get-started/#source-build">Set up a development checkout →</a></p>
+</section>
 <section class="task-section" aria-labelledby="guides"><h2 id="guides">Task guides</h2><ol>
 <li><a href="../atom-loss/">Atom loss: from circuit to logical predictions</a></li>
 <li><a href="../simulator/">Simulate circuits and sample measurements</a></li>
@@ -32,16 +35,12 @@
 <li><a href="../qp101/protocol/">QP101 JSON format specification</a></li>
 </ul></section>
 <section class="task-section" aria-labelledby="reference"><h2 id="reference">CLI and Rust API reference</h2>
-<p>CLI help describes the binary you installed. The API links below are pinned to v0.3.0; for development workflows, use the matching source checkout.</p>
+<p>The formal reference records command inputs, outputs, exit codes, structured errors, and the exact crate versions represented by this source tree.</p>
 <div class="table-wrap"><table><thead><tr><th>Tool / crate</th><th>Purpose</th><th>Reference</th></tr></thead><tbody>
-<tr><td>rustqec</td><td>Unified circuit and dataset commands</td><td><code>rustqec --help</code>; <code>rustqec capabilities --format json</code></td></tr>
-<tr><td>rstim</td><td>Stim-style simulator, DEM, rendering</td><td><code>rstim --help</code>; <a href="https://docs.rs/rstim/0.3.0/rstim/">Rust API</a></td></tr>
-<tr><td>rmatching</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/0.3.0/rmatching/">Rust API</a>; <a href="../decoding/#first-decode">working example</a></td></tr>
-<tr><td>rbposd</td><td>BP-OSD decoding</td><td><a href="https://docs.rs/rbposd/0.3.0/rbposd/">Rust API</a></td></tr>
-<tr><td>rilpqec</td><td>ILP decoding</td><td><a href="https://docs.rs/rilpqec/0.3.0/rilpqec/">Rust API</a></td></tr>
-<tr><td>rsinter</td><td>Experiment collection and decoder replay</td><td><code>rsinter --help</code>; <a href="https://docs.rs/rsinter/0.3.0/rsinter/">Rust API</a></td></tr>
-<tr><td>qec-code</td><td>CSS matrices and distance checks</td><td><code>qec-code --help</code>; <a href="https://docs.rs/qec-code/0.3.0/qec_code/">Rust API</a></td></tr>
-<tr><td>qec-ilp-core</td><td>Shared ILP models and solver support</td><td><a href="https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/">Rust API</a></td></tr>
+<tr><td><code>rustqec</code></td><td>Unified circuit and dataset commands</td><td><a href="../reference/#rustqec-commands">Command reference</a></td></tr>
+<tr><td><code>rstim</code> {{ docs_version.packages.rstim.version }}</td><td>Stim-style simulator, DEM, rendering</td><td><a href="https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/">Rust API</a></td></tr>
+<tr><td><code>rmatching</code> {{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">Rust API</a>; <a href="../decoding/#first-decode">working example</a></td></tr>
+<tr><td><code>qec-code</code> {{ docs_version.packages.qec_code.version }}</td><td>CSS matrices and distance checks</td><td><a href="https://docs.rs/qec-code/{{ docs_version.packages.qec_code.version }}/qec_code/">Rust API</a></td></tr>
 </tbody></table></div></section>
 <section class="task-section" aria-labelledby="validation"><h2 id="validation">Performance, validation, and support</h2><ul>
 <li><a href="../validation/">Find benchmark evidence and reproduction instructions</a></li>

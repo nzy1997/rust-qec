@@ -88,7 +88,7 @@ test('tutorial and concepts render the version-bound Supported label with eviden
   await expect(evidenceLink).toHaveAttribute('href', published.release_url);
   const boundary = page.locator('.task-section').filter({ has: page.locator('#supported-circuits') });
   await expect(boundary).toContainText('Supported since');
-  await expect(boundary).toContainText(published.release);
+  await expect(boundary).toContainText(published.release.slice(1));
   const conceptMle = mleBadge(page);
   await expect(conceptMle.locator('a')).toHaveText(`Envelope MLE · Supported · ${mlePublished.release}`);
   await expect(conceptMle.locator('a')).toHaveAttribute('href', mlePublished.release_url);

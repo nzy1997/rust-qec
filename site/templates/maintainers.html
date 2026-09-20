@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Maintainer reference — RustQEC{% endblock title %}
+{% block description %}RustQEC release gates, regression commands, evidence bundles, and publication checks for maintainers.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Maintainers</p><h1>Release and evidence reference</h1><p class="hero-copy">Run regression controls, assemble release evidence, and verify a candidate without mixing internal procedures into user support.</p></div>{% endblock hero %}
+{% block main %}<article class="prose">
+<p class="doc-note"><strong>Maintainer scope.</strong> For installation, compatibility, and runtime failures, use the <a href="../support/">user support contract</a>. This page assumes a configured source checkout.</p>
+{{ load_data(path="generated/maintainer-reference.md", format="plain") | replace(from="# Maintainer reference", to="") | markdown | safe }}
+</article>{% endblock main %}
