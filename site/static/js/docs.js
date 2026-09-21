@@ -121,25 +121,65 @@
       const output = pre.dataset.output === 'true';
       const label = document.createElement('span');
       label.textContent = output ? (pre.dataset.language || 'Expected output') : languageFor(pre, code);
-      const bar = document.createElement('div');
-      bar.className = output ? 'code-toolbar output-toolbar' : 'code-toolbar';
-      bar.append(label);
-      if (!output) {
-        highlight(code, label.textContent);
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = 'Copy';
-        button.setAttribute('aria-label', `Copy ${label.textContent}`);
-        const status = document.createElement('span');
-        status.className = 'copy-status';
-        status.setAttribute('role', 'status');
-        button.addEventListener('click', async () => {
-          try { await navigator.clipboard.writeText(code.textContent); status.textContent = 'Copied'; }
-          catch { status.textContent = 'Copy unavailable. Select the code and copy manually.'; }
-        });
-        bar.append(status, button);
+      if (output) {
+        const terminal = pre.previousElementSibling;
+        if (terminal?.classList.contains('terminal-block')) {
+          const result = document.createElement('div');
+          result.className = 'terminal-output';
+          label.className = 'terminal-output-label';
+          pre.before(result);
+          result.append(label, pre);
+          terminal.append(result);
+          return;
+        }
+        const bar = document.createElement('div');
+        bar.className = 'code-toolbar output-toolbar';
+        bar.append(label);
+        pre.before(bar);
+        return;
       }
-      pre.before(bar);
+      highlight(code, label.textContent);
+      const block = document.createElement('div');
+      block.className = 'code-block';
+      const isShell = label.textContent.trim().toLowerCase() === 'shell';
+      if (isShell) {
+        block.classList.add('terminal-block');
+        const chrome = document.createElement('div');
+        chrome.className = 'terminal-chrome';
+        chrome.setAttribute('aria-hidden', 'true');
+        chrome.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+        block.append(chrome);
+      }
+      pre.before(block);
+      block.append(pre);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'code-copy-button';
+      button.title = 'Copy';
+      button.setAttribute('aria-label', `Copy ${label.textContent}`);
+      const copyIcon = '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>';
+      const copiedIcon = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg>';
+      button.innerHTML = copyIcon;
+      const status = document.createElement('span');
+      status.className = 'visually-hidden';
+      status.setAttribute('role', 'status');
+      block.append(button, status);
+      let resetCopyState;
+      button.addEventListener('click', async () => {
+        clearTimeout(resetCopyState);
+        try {
+          await navigator.clipboard.writeText(code.textContent);
+          button.innerHTML = `${copiedIcon}<span>Copied</span>`;
+          button.title = 'Copied';
+          status.textContent = 'Copied';
+          resetCopyState = setTimeout(() => {
+            button.innerHTML = copyIcon;
+            button.title = 'Copy';
+          }, 1500);
+        } catch {
+          status.textContent = 'Copy unavailable. Select the code and copy manually.';
+        }
+      });
     });
     main.querySelectorAll('.prose table').forEach((table) => {
       if (!table.parentElement.classList.contains('table-wrap')) {

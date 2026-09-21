@@ -1,0 +1,5 @@
+R 0
+X_ERROR(1) 0
+M 0
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]
