@@ -374,6 +374,14 @@ def measurement_matrix_projection(matrix: dict[str, Any]) -> dict[str, Any]:
     """
     projected = json.loads(json.dumps(matrix))
     projected.pop("purpose", None)
+    # The source revision is provenance metadata, not a measurement input.
+    # History cleanup may replace it with the surviving equivalent commit
+    # without changing the controls or workloads described by the matrix.
+    applies_to = projected.get("applies_to")
+    if isinstance(applies_to, dict):
+        applies_to.pop("source_revision", None)
+        if not applies_to:
+            projected.pop("applies_to", None)
     for decoder in (projected.get("decoders") or {}).values():
         if isinstance(decoder, dict):
             decoder.pop("published_support", None)
