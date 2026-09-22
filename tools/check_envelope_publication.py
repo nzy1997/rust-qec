@@ -1237,7 +1237,7 @@ def _fixture_gate_report(
             "present": True,
             "enforced": mle_decision == "supported",
             "sha256": scope_sha,
-            "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
+            "source_revision": "f8ed9348da62dba72205e24a826ce75965f3c2b2",
         },
         "evidence": {
             name: {
