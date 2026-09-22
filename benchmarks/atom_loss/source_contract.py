@@ -21,9 +21,9 @@ BINARIES = ['target/release/rustqec'] + ['target/release/examples/'+name for nam
     ['export_matching_benchmark', 'export_decoder_oracle', 'offline_matching_benchmark', 'atom_loss_sampling_benchmark']]
 
 
-BUILD_POLICY = 'isolated-cargo-home; allowlisted-environment; no-external-ancestor-config-v1'
+BUILD_POLICY = 'isolated-cargo-home; allowlisted-environment; no-external-ancestor-config-v2'
 BUILD_ENV_KEYS = ('PATH', 'HOME', 'TMPDIR', 'TMP', 'TEMP', 'RUSTUP_HOME',
-                  'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT')
+                  'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'LIBCLANG_PATH')
 NETWORK_ENV_KEYS = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
                     'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
                     'SSL_CERT_FILE', 'SSL_CERT_DIR')
