@@ -2,7 +2,7 @@
   "schema_version": "rustqec.envelope-resources-manifest.v1",
   "generated_by": "python3 -m benchmarks.atom_loss.readiness_resources --profile full",
   "generated_at": "2026-09-18T05:10:27Z",
-  "checkout_revision": "6864ed633eb246afd797cdf48bccd9e1d67fa8d4",
+  "checkout_revision": "e959b6080c12f73243b3c7eaa20d6d1f870b3cb4",
   "machine": {
     "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
     "machine": "arm64",
@@ -22,7 +22,7 @@
   "matrix": {
     "path": "docs/envelope-support.json",
     "sha256": "2c5385b117edabe7879afc9bc38a7578c7eb657773bece83b10ca10bb13e044f",
-    "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2"
+    "source_revision": "f8ed9348da62dba72205e24a826ce75965f3c2b2"
   },
   "stress_budget": {
     "declared_before_run": true,
