@@ -6,6 +6,7 @@
 //! probabilities of a classical mixture. Measurement and circuit dispatch are
 //! added in later stages of issue #739.
 
+use crate::ir::{StimInstr, StimTarget};
 use crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot;
 use crate::sim::tableau::StabilizerState;
 use rand::Rng;
@@ -442,4 +443,217 @@ fn i_pow(exponent: u8) -> ComplexAmp {
         2 => ComplexAmp::new(-1.0, 0.0),
         _ => ComplexAmp::new(0.0, -1.0),
     }
+}
+
+/// Opt-in circuit runner for the currently supported near-Clifford operations.
+///
+/// The pure-Clifford `Executor` and compiled samplers are unaffected. This
+/// experimental runner validates the full instruction tree before execution.
+#[derive(Clone, Debug)]
+pub struct NearCliffordExecutor {
+    instructions: Vec<StimInstr>,
+    num_qubits: usize,
+    max_active_qubits: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NearCliffordShot {
+    pub measurements: Vec<bool>,
+}
+
+const MAX_NEAR_CLIFFORD_QUBITS: usize = 4096;
+
+impl NearCliffordExecutor {
+    /// Compiles with a default active-rank limit of 16.
+    pub fn compile(instructions: Vec<StimInstr>) -> Result<Self, String> {
+        Self::compile_with_limit(instructions, 16)
+    }
+
+    pub fn compile_text(text: &str) -> Result<Self, String> {
+        Self::compile(crate::parser::parse_lines(text)?)
+    }
+
+    pub fn compile_with_limit(
+        instructions: Vec<StimInstr>,
+        max_active_qubits: usize,
+    ) -> Result<Self, String> {
+        let mut terminal = false;
+        let mut max_qubit = None;
+        validate_near_block(&instructions, &mut terminal, &mut max_qubit)?;
+        let num_qubits = max_qubit
+            .map(|q| {
+                usize::try_from(q)
+                    .ok()
+                    .and_then(|q| q.checked_add(1))
+                    .ok_or_else(|| {
+                        "near-Clifford qubit index exceeds platform capacity".to_string()
+                    })
+            })
+            .transpose()?
+            .unwrap_or(0);
+        if num_qubits > MAX_NEAR_CLIFFORD_QUBITS {
+            return Err(format!(
+                "near-Clifford circuit exceeds {MAX_NEAR_CLIFFORD_QUBITS} physical qubits"
+            ));
+        }
+        Ok(Self {
+            instructions,
+            num_qubits,
+            max_active_qubits,
+        })
+    }
+
+    pub fn run(&self, rng: &mut impl Rng) -> Result<NearCliffordShot, String> {
+        let mut state = ActiveState::new(self.num_qubits, self.max_active_qubits);
+        let mut measurements = Vec::new();
+        run_near_block(&self.instructions, &mut state, &mut measurements, rng)?;
+        Ok(NearCliffordShot { measurements })
+    }
+
+    pub fn sample(
+        &self,
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<Vec<NearCliffordShot>, String> {
+        (0..shots).map(|_| self.run(rng)).collect()
+    }
+}
+
+fn validate_near_block(
+    instructions: &[StimInstr],
+    terminal: &mut bool,
+    max_qubit: &mut Option<u32>,
+) -> Result<(), String> {
+    for instruction in instructions {
+        match instruction {
+            StimInstr::Repeat { count, body } => {
+                if *count == 0 {
+                    return Err("near-Clifford REPEAT count must be positive".into());
+                }
+                let before = *terminal;
+                validate_near_block(body, terminal, max_qubit)?;
+                if *count > 1 && *terminal && !before {
+                    return Err(
+                        "near-Clifford repeated terminal measurement is not yet supported".into(),
+                    );
+                }
+            }
+            StimInstr::Op {
+                name,
+                args,
+                targets,
+                ..
+            } => {
+                let single = matches!(
+                    name.as_str(),
+                    "I" | "H"
+                        | "S"
+                        | "SQRT_Z"
+                        | "S_DAG"
+                        | "SQRT_Z_DAG"
+                        | "X"
+                        | "Y"
+                        | "Z"
+                        | "T"
+                        | "T_DAG"
+                );
+                let pair = matches!(name.as_str(), "CX" | "CNOT" | "ZCX" | "CZ" | "ZCZ" | "SWAP");
+                let measure = matches!(name.as_str(), "M" | "MZ" | "MX" | "MY");
+                if !single && !pair && !measure {
+                    return Err(format!("near-Clifford unsupported gate {name}"));
+                }
+                if !args.is_empty() {
+                    return Err(format!("near-Clifford {name} takes no arguments"));
+                }
+                if *terminal && !measure {
+                    return Err(format!(
+                        "near-Clifford unitary {name} follows terminal measurement"
+                    ));
+                }
+                if pair && !targets.len().is_multiple_of(2) {
+                    return Err(format!("near-Clifford {name} requires qubit pairs"));
+                }
+                if matches!(name.as_str(), "T" | "T_DAG") && targets.is_empty() {
+                    return Err(format!("near-Clifford {name} requires a qubit target"));
+                }
+                for target in targets {
+                    let q = match target {
+                        StimTarget::Qubit(q) => *q,
+                        StimTarget::QubitInv(q) if measure => *q,
+                        _ => return Err(format!("near-Clifford {name} requires qubit targets")),
+                    };
+                    *max_qubit = Some(max_qubit.map_or(q, |previous| previous.max(q)));
+                }
+                if pair {
+                    for pair in targets.chunks_exact(2) {
+                        if pair[0].qubit_index() == pair[1].qubit_index() {
+                            return Err(format!("near-Clifford {name} requires distinct qubits"));
+                        }
+                    }
+                }
+                if measure && !targets.is_empty() {
+                    *terminal = true;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn run_near_block(
+    instructions: &[StimInstr],
+    state: &mut ActiveState,
+    measurements: &mut Vec<bool>,
+    rng: &mut impl Rng,
+) -> Result<(), String> {
+    for instruction in instructions {
+        match instruction {
+            StimInstr::Repeat { count, body } => {
+                for _ in 0..*count {
+                    run_near_block(body, state, measurements, rng)?;
+                }
+            }
+            StimInstr::Op { name, targets, .. } => {
+                if matches!(name.as_str(), "CX" | "CNOT" | "ZCX" | "CZ" | "ZCZ" | "SWAP") {
+                    for pair in targets.chunks_exact(2) {
+                        let a = pair[0].qubit_index().unwrap() as usize;
+                        let b = pair[1].qubit_index().unwrap() as usize;
+                        let gate = match name.as_str() {
+                            "CX" | "CNOT" | "ZCX" => CliffordGate::CX(a, b),
+                            "CZ" | "ZCZ" => CliffordGate::CZ(a, b),
+                            _ => CliffordGate::Swap(a, b),
+                        };
+                        state.apply_clifford(gate)?;
+                    }
+                    continue;
+                }
+                for target in targets {
+                    let q = target.qubit_index().unwrap() as usize;
+                    match name.as_str() {
+                        "I" => {}
+                        "H" => state.apply_clifford(CliffordGate::H(q))?,
+                        "S" | "SQRT_Z" => state.apply_clifford(CliffordGate::S(q))?,
+                        "S_DAG" | "SQRT_Z_DAG" => state.apply_clifford(CliffordGate::SDag(q))?,
+                        "X" => state.apply_clifford(CliffordGate::X(q))?,
+                        "Y" => state.apply_clifford(CliffordGate::Y(q))?,
+                        "Z" => state.apply_clifford(CliffordGate::Z(q))?,
+                        "T" => state.t(q)?,
+                        "T_DAG" => state.t_dag(q)?,
+                        "M" | "MZ" | "MX" | "MY" => {
+                            let basis = match name.as_str() {
+                                "MX" => MeasurementBasis::X,
+                                "MY" => MeasurementBasis::Y,
+                                _ => MeasurementBasis::Z,
+                            };
+                            let mut result = state.measure(q, basis, rng)?;
+                            result ^= matches!(target, StimTarget::QubitInv(_));
+                            measurements.push(result);
+                        }
+                        _ => unreachable!("validated near-Clifford operation"),
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
