@@ -27,6 +27,31 @@ implemented, without changing the existing Clifford execution path. Arbitrary
 angle rotations, ZX compilation, GPU execution, and throughput claims are
 outside issue #739.
 
+The experimental circuit entry point is `NearCliffordExecutor`. It takes
+`StimInstr` values or parses circuit text, validates the supported subset before
+running, and returns one measurement bit vector per shot. For example:
+
+```rust
+use rand::{SeedableRng, rngs::StdRng};
+use rstim::near_clifford::NearCliffordExecutor;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let circuit = NearCliffordExecutor::compile_text("H 0\nT 0\nMX 0")?;
+    let mut rng = StdRng::seed_from_u64(42);
+    let shots = circuit.sample(100, &mut rng)?;
+    assert_eq!(shots.len(), 100);
+    Ok(())
+}
+```
+
+The first circuit API accepts the basic single-qubit Clifford generators,
+`CX`/`CNOT`/`ZCX`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT` blocks containing
+unitaries, and terminal `M`/`MZ`/`MX`/`MY`. Additional Clifford aliases,
+mid-circuit operations, feedback, and annotations are delivered in later PRs.
+The default active-rank limit is 16; `compile_with_limit` lets callers choose a
+different limit. Reaching the limit returns an error. The circuit entry point
+also rejects more than 4096 physical qubits before allocating a tableau.
+
 ## Shared frame, active coordinates, and phase
 
 The exact pure state is a **coherent** sum of orthogonal basis states from one
