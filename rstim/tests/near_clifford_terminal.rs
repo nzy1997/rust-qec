@@ -43,6 +43,79 @@ fn compare_after_unframing(active: &ActiveState, oracle: &mut DenseOracle) {
 }
 
 #[test]
+fn diagonal_parity_measurement_retires_one_active_coordinate() {
+    for (n, control, target) in [(2, 0, 1), (3, 1, 2)] {
+        let mut saw_outcome = [false; 2];
+        for seed in 0..32 {
+            let mut active = ActiveState::new(n, n);
+            let mut oracle = DenseOracle::new(n);
+            for q in 0..n {
+                active.apply_clifford(CliffordGate::H(q)).unwrap();
+                oracle.h(q);
+                active.t(q).unwrap();
+                oracle.t(q);
+                active.apply_clifford(CliffordGate::H(q)).unwrap();
+                oracle.h(q);
+            }
+            active
+                .apply_clifford(CliffordGate::CX(control, target))
+                .unwrap();
+            oracle.cx(control, target);
+            assert_eq!(active.active_rank(), n);
+
+            let mut rng = StdRng::seed_from_u64(seed);
+            let outcome = active
+                .measure(target, MeasurementBasis::Z, &mut rng)
+                .unwrap();
+            saw_outcome[usize::from(outcome)] = true;
+            oracle.collapse(target, 'Z', outcome);
+            assert_eq!(active.active_rank(), n - 1);
+            assert_eq!(active.coefficients().len(), 1 << (n - 1));
+
+            // Undo the frame and compare every amplitude, including the
+            // shifted origin required by the -1 parity outcome.
+            oracle.cx(control, target);
+            let mut actual = vec![ComplexAmp::default(); 1 << n];
+            for (coordinate, coefficient) in active.coefficients().iter().enumerate() {
+                let mut bits = 0;
+                for q in 0..n {
+                    bits |= usize::from(active.origin()[q]) << (n - q - 1);
+                }
+                for (axis_number, axis) in active.active_axes().iter().enumerate() {
+                    if coordinate & (1 << axis_number) != 0 {
+                        for (q, &bit) in axis.iter().enumerate() {
+                            bits ^= usize::from(bit) << (n - q - 1);
+                        }
+                    }
+                }
+                actual[bits] = actual[bits] + *coefficient * active.global_phase();
+            }
+            for (amplitude, expected) in actual.into_iter().zip(oracle.amplitudes()) {
+                assert!((amplitude.re - expected.re).abs() < 1e-12);
+                assert!((amplitude.im - expected.im).abs() < 1e-12);
+            }
+            oracle.cx(control, target);
+            let next_outcome = active.measure(0, MeasurementBasis::Y, &mut rng).unwrap();
+            oracle.collapse(0, 'Y', next_outcome);
+            for q in 0..n {
+                for (basis, letter) in [
+                    (MeasurementBasis::X, 'X'),
+                    (MeasurementBasis::Y, 'Y'),
+                    (MeasurementBasis::Z, 'Z'),
+                ] {
+                    let (zero, one) = active.measurement_probabilities(q, basis).unwrap();
+                    assert!(
+                        (zero - oracle.measurement_probability(q, letter, false)).abs() < 1e-12
+                    );
+                    assert!((one - oracle.measurement_probability(q, letter, true)).abs() < 1e-12);
+                }
+            }
+        }
+        assert!(saw_outcome.into_iter().all(|seen| seen));
+    }
+}
+
+#[test]
 fn two_t_terminal_measurement_probabilities_match_oracle() {
     let (active, oracle) = setup_two_t();
     for (basis, oracle_basis) in [
