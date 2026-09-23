@@ -216,10 +216,15 @@ impl ActiveState {
     ) -> Result<(f64, f64), String> {
         let pauli = self.single_qubit_pauli(q, basis)?;
         let (mask, independent) = self.coordinate_mask(&pauli.x);
-        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
+        let zero = self.pauli_probability_zero(&pauli, mask, independent);
+        Ok((zero, 1.0 - zero))
+    }
+
+    fn pauli_probability_zero(&self, pauli: &Pauli, mask: usize, independent: bool) -> f64 {
         let expectation = if independent {
             0.0
         } else {
+            let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
             self.coefficients
                 .iter()
                 .enumerate()
@@ -235,8 +240,7 @@ impl ActiveState {
                 })
                 .sum::<f64>()
         };
-        let zero = ((1.0 + expectation) / 2.0).clamp(0.0, 1.0);
-        Ok((zero, 1.0 - zero))
+        ((1.0 + expectation) / 2.0).clamp(0.0, 1.0)
     }
 
     /// Samples and collapses a Pauli-basis measurement. `true` is the -1 outcome.
@@ -271,8 +275,9 @@ impl ActiveState {
             return Ok(outcome != 0);
         }
         let pauli = self.single_qubit_pauli(q, basis)?;
-        let (probability_zero, _) = self.measurement_probabilities(q, basis)?;
-        let mask = self.ensure_axis(&pauli.x)?;
+        let (mask, independent) = self.coordinate_mask(&pauli.x);
+        let probability_zero = self.pauli_probability_zero(&pauli, mask, independent);
+        let mask = self.ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
         let outcome = rng.r#gen::<f64>() >= probability_zero;
         self.collapse_pauli_measurement(&pauli, mask, outcome)?;
         Ok(outcome)
@@ -430,6 +435,15 @@ impl ActiveState {
 
     fn ensure_axis(&mut self, x: &[bool]) -> Result<usize, String> {
         let (mask, independent) = self.coordinate_mask(x);
+        self.ensure_axis_with_coordinates(x, mask, independent)
+    }
+
+    fn ensure_axis_with_coordinates(
+        &mut self,
+        x: &[bool],
+        mask: usize,
+        independent: bool,
+    ) -> Result<usize, String> {
         if !independent {
             return Ok(mask);
         }
@@ -493,24 +507,24 @@ impl ActiveState {
     }
 
     fn physical_pauli(&self, physical_x: &[bool], physical_z: &[bool]) -> Result<Pauli, String> {
-        let snapshot = self.frame.canonical_snapshot();
-        let n = snapshot.num_qubits;
+        let n = self.num_qubits();
         let mut virtual_x = vec![false; n];
         let mut virtual_z = vec![false; n];
         for i in 0..n {
-            virtual_x[i] =
-                dot(physical_x, &snapshot.z[n + i]) ^ dot(physical_z, &snapshot.x[n + i]);
-            virtual_z[i] = dot(physical_x, &snapshot.z[i]) ^ dot(physical_z, &snapshot.x[i]);
+            let (x, z, _) = self.frame.canonical_row(n + i);
+            virtual_x[i] = dot(physical_x, z) ^ dot(physical_z, x);
+            let (x, z, _) = self.frame.canonical_row(i);
+            virtual_z[i] = dot(physical_x, z) ^ dot(physical_z, x);
         }
         let mut product = Pauli::identity(n);
         for (i, &selected) in virtual_x.iter().enumerate() {
             if selected {
-                product.multiply(&Pauli::from_snapshot_row(&snapshot, i));
+                product.multiply(&Pauli::from_tableau_row(&self.frame, i));
             }
         }
         for (i, &selected) in virtual_z.iter().enumerate() {
             if selected {
-                product.multiply(&Pauli::from_snapshot_row(&snapshot, n + i));
+                product.multiply(&Pauli::from_tableau_row(&self.frame, n + i));
             }
         }
         if product.x != physical_x || product.z != physical_z {
@@ -558,6 +572,16 @@ impl Pauli {
             x: snapshot.x[row].clone(),
             z: snapshot.z[row].clone(),
             phase: (snapshot.phase[row] + (y_count % 4) as u8) % 4,
+        }
+    }
+
+    fn from_tableau_row(frame: &StabilizerState, row: usize) -> Self {
+        let (x, z, phase) = frame.canonical_row(row);
+        let y_count = x.iter().zip(z).filter(|(x, z)| **x && **z).count();
+        Self {
+            x: x.to_vec(),
+            z: z.to_vec(),
+            phase: (phase + (y_count % 4) as u8) % 4,
         }
     }
 
@@ -799,10 +823,13 @@ fn sample_cached_terminal_measurements(
         {
             let q = targets[depth].qubit_index().unwrap() as usize;
             if node.measurement.is_none() {
-                let (probability_zero, _) = node.state.measurement_probabilities(q, basis)?;
                 let pauli = node.state.single_qubit_pauli(q, basis)?;
+                let (mask, independent) = node.state.coordinate_mask(&pauli.x);
+                let probability_zero = node.state.pauli_probability_zero(&pauli, mask, independent);
                 // Match measure(): a rank-limit error happens before the RNG draw.
-                let mask = node.state.ensure_axis(&pauli.x)?;
+                let mask = node
+                    .state
+                    .ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
                 node.measurement = Some((probability_zero, pauli, mask));
             }
             let (probability_zero, pauli, mask) = node.measurement.as_ref().unwrap();

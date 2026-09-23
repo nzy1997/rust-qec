@@ -31,6 +31,9 @@ impl StabilizerState {
             phase: self.phase.clone(),
         }
     }
+    pub(crate) fn canonical_row(&self, row: usize) -> (&[bool], &[bool], u8) {
+        (&self.x[row], &self.z[row], self.phase[row])
+    }
     // END issue-456 read-only snapshot accessor
     pub fn h(&mut self, q: usize) {
         for i in 0..2 * self.n {
