@@ -197,4 +197,57 @@ impl DenseOracle {
     pub fn even_x_parity_probability(&self, a: usize, b: usize) -> f64 {
         (1.0 + self.pauli_xx_expectation(a, b)) / 2.0
     }
+
+    pub fn measurement_probability(&self, qubit: usize, basis: char, one: bool) -> f64 {
+        let mut copy = self.clone();
+        copy.rotate_into_measurement_basis(qubit, basis);
+        let mask = copy.mask(qubit);
+        copy.amplitudes
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| (*index & mask != 0) == one)
+            .map(|(_, amplitude)| amplitude.norm_sqr())
+            .sum()
+    }
+
+    pub fn collapse(&mut self, qubit: usize, basis: char, one: bool) {
+        self.rotate_into_measurement_basis(qubit, basis);
+        let mask = self.mask(qubit);
+        for (index, amplitude) in self.amplitudes.iter_mut().enumerate() {
+            if (index & mask != 0) != one {
+                *amplitude = Amp::default();
+            }
+        }
+        let norm = self
+            .amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!(norm > 1e-15);
+        for amplitude in &mut self.amplitudes {
+            *amplitude = *amplitude * (1.0 / norm);
+        }
+        match basis {
+            'X' => self.h(qubit),
+            'Y' => {
+                self.h(qubit);
+                self.s(qubit);
+            }
+            'Z' => {}
+            _ => panic!("unsupported basis {basis}"),
+        }
+    }
+
+    fn rotate_into_measurement_basis(&mut self, qubit: usize, basis: char) {
+        match basis {
+            'X' => self.h(qubit),
+            'Y' => {
+                self.s_dag(qubit);
+                self.h(qubit);
+            }
+            'Z' => {}
+            _ => panic!("unsupported basis {basis}"),
+        }
+    }
 }
