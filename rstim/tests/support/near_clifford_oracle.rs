@@ -1,6 +1,7 @@
 //! Independent, small-qubit state-vector oracle for near-Clifford tests.
 //! This deliberately applies matrix entries to computational amplitudes rather
 //! than sharing any production stabilizer/frame update code.
+#![allow(dead_code)]
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Amp {
@@ -104,8 +105,69 @@ impl DenseOracle {
         }
     }
 
+    pub fn x(&mut self, qubit: usize) {
+        let mask = self.mask(qubit);
+        for low in 0..self.amplitudes.len() {
+            if low & mask == 0 {
+                self.amplitudes.swap(low, low | mask);
+            }
+        }
+    }
+
+    pub fn z(&mut self, qubit: usize) {
+        let mask = self.mask(qubit);
+        for (index, amplitude) in self.amplitudes.iter_mut().enumerate() {
+            if index & mask != 0 {
+                *amplitude = *amplitude * -1.0;
+            }
+        }
+    }
+
+    pub fn y(&mut self, qubit: usize) {
+        let mask = self.mask(qubit);
+        for low in 0..self.amplitudes.len() {
+            if low & mask == 0 {
+                let high = low | mask;
+                let a = self.amplitudes[low];
+                let b = self.amplitudes[high];
+                self.amplitudes[low] = b * Amp::new(0.0, -1.0);
+                self.amplitudes[high] = a * Amp::new(0.0, 1.0);
+            }
+        }
+    }
+
+    pub fn cz(&mut self, a: usize, b: usize) {
+        assert_ne!(a, b);
+        let a = self.mask(a);
+        let b = self.mask(b);
+        for (index, amplitude) in self.amplitudes.iter_mut().enumerate() {
+            if index & a != 0 && index & b != 0 {
+                *amplitude = *amplitude * -1.0;
+            }
+        }
+    }
+
+    pub fn swap(&mut self, a: usize, b: usize) {
+        assert_ne!(a, b);
+        let a = self.mask(a);
+        let b = self.mask(b);
+        for index in 0..self.amplitudes.len() {
+            if index & a == 0 && index & b != 0 {
+                self.amplitudes.swap(index, index ^ (a | b));
+            }
+        }
+    }
+
     pub fn t(&mut self, qubit: usize) {
         self.phase(qubit, std::f64::consts::FRAC_PI_4);
+    }
+
+    pub fn s(&mut self, qubit: usize) {
+        self.phase(qubit, std::f64::consts::FRAC_PI_2);
+    }
+
+    pub fn s_dag(&mut self, qubit: usize) {
+        self.phase(qubit, -std::f64::consts::FRAC_PI_2);
     }
 
     pub fn t_dag(&mut self, qubit: usize) {
