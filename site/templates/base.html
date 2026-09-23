@@ -36,13 +36,12 @@
           <summary>Menu</summary>
           <div class="mobile-navigation-content">
         <div class="nav-links">
-          <a class="nav-link{% if current_nav == "start" %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
-          <a class="nav-link{% if current_nav not in ["home", "start", "shot"] %} current{% endif %}" href="{{ root }}/docs/"{% if current_nav not in ["home", "start", "shot"] %} aria-current="page"{% endif %}>Documentation</a>
+          <a class="nav-link{% if current_nav not in ["home", "shot"] %} current{% endif %}" href="{{ root }}/get-started/"{% if current_nav not in ["home", "shot"] %} aria-current="page"{% endif %}>Documentation</a>
           <a class="nav-link{% if current_nav == "shot" %} current{% endif %}" href="{{ root }}/interactive/"{% if current_nav == "shot" %} aria-current="page"{% endif %}>Shot Lab</a>
           <a class="nav-link" href="https://github.com/nzy1997/rust-qec">GitHub ↗</a>
         </div>
         {% if current_nav not in ["home", "shot"] %}
-        <form class="nav-search" role="search" action="{{ root }}/docs/">
+        <form class="nav-search" role="search" action="{{ root }}/get-started/#documentation-search">
           <label class="visually-hidden" for="site-search">Search documentation</label>
           <input id="site-search" name="q" type="search" placeholder="Search docs…">
           <button type="submit">Search</button>
@@ -69,7 +68,7 @@
       {% endif %}
       <div class="page-content">
         <header class="site-header">
-          {% if current_nav not in ["home", "shot"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/docs/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
+          {% if current_nav not in ["home", "shot"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/get-started/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
           {% block hero %}{% endblock hero %}
         </header>
         <div class="reading-layout">

@@ -8,9 +8,9 @@ DETECTOR rec[-1]
 OBSERVABLE_INCLUDE(0) rec[-1]
 STIM`;
 
-async function codeToolbarFor(page, text) {
+async function codeBlockFor(page, text) {
   const code = page.locator("pre").filter({ hasText: text });
-  return code.locator("xpath=preceding-sibling::div[contains(@class, 'code-toolbar')][1]");
+  return code.locator("xpath=ancestor::div[contains(@class, 'code-block')][1]");
 }
 
 test("home leads to the getting-started path", async ({ page }) => {
@@ -39,7 +39,7 @@ test("home keeps one primary action, integrates atom loss, and presents Shot Lab
   await expect(page.locator('a[href="#install"]')).toHaveCount(0);
 });
 
-test('home routes first-time users to the workflow and docs retains the API index', async ({ page }) => {
+test('home routes first-time users to the workflow and docs links to the API reference', async ({ page }) => {
   await page.goto('/');
   const stageLinks = page.locator('.workflow-grid article h3 a');
   await expect(stageLinks).toHaveCount(4);
@@ -52,11 +52,10 @@ test('home routes first-time users to the workflow and docs retains the API inde
   await page.getByRole('link', { name: 'Construct circuits' }).click();
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
   await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
-  await page.goto('/docs/');
-  await page.getByRole('link', { name: 'CLI and Rust API reference' }).click();
+  await page.locator('.docs-sidebar').getByRole('link', { name: 'CLI & Rust APIs' }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
   await page.goto('/get-started/');
-  await page.getByRole('link', { name: 'native package without Rust', exact: true }).click();
+  await page.getByRole('link', { name: 'native package', exact: true }).click();
   await expect(page.locator('#native-install')).toHaveAttribute('open', '');
   await expect(page.getByRole('link', { name: 'Linux x86_64 archive' })).toBeVisible();
   await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
@@ -107,7 +106,8 @@ test("installation starts with one copyable command and keeps manual steps optio
   const native = installation.locator("#native-install");
   const manual = native.locator("details");
   await expect(manual).not.toHaveAttribute("open", "");
-  await installation.getByRole("button", { name: "Copy Shell · install" }).click();
+  const installCommand = await codeBlockFor(installation, "cargo install --locked rustqec-cli");
+  await installCommand.getByRole("button", { name: "Copy Shell" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
     "cargo install --locked rustqec-cli",
   );
@@ -125,9 +125,9 @@ test("copying preserves the complete circuit heredoc", async ({ page }) => {
     });
   });
   await page.goto("/get-started/");
-  const toolbar = await codeToolbarFor(page, "cat > circuit.stim");
-  await toolbar.getByRole("button", { name: "Copy Shell · create input" }).click();
-  await expect(toolbar.locator(".copy-status")).toHaveText("Copied");
+  const block = await codeBlockFor(page, "cat > circuit.stim");
+  await block.getByRole("button", { name: "Copy Shell" }).click();
+  await expect(block.getByRole("status")).toHaveText("Copied");
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(CIRCUIT_HEREDOC);
 });
 
@@ -139,15 +139,15 @@ test("copy failure gives a manual-copy response", async ({ page }) => {
     });
   });
   await page.goto("/get-started/");
-  const toolbar = await codeToolbarFor(page, "cat > circuit.stim");
-  await toolbar.getByRole("button", { name: "Copy Shell · create input" }).click();
-  await expect(toolbar.locator(".copy-status")).toHaveText("Copy unavailable. Select the code and copy manually.");
+  const block = await codeBlockFor(page, "cat > circuit.stim");
+  await block.getByRole("button", { name: "Copy Shell" }).click();
+  await expect(block.getByRole("status")).toHaveText("Copy unavailable. Select the code and copy manually.");
 });
 
 test("documentation uses the home navigation with an added search", async ({ page }) => {
   await page.goto("/docs/");
+  await expect(page).toHaveURL(/\/get-started\/$/);
   expect(await page.locator(".nav-links > a").allTextContents()).toEqual([
-    "Get started",
     "Documentation",
     "Shot Lab",
     "GitHub ↗",
@@ -193,9 +193,9 @@ test("dynamic evidence commands copy executable source-checkout commands", async
   await page.goto("/decoding/");
   const reproduction = page.locator(".evidence-reproduction").first();
   await reproduction.locator("summary").click();
-  const toolbar = await codeToolbarFor(reproduction, "make surface-decoder-compare-full");
-  await expect(toolbar).toBeVisible();
-  await toolbar.getByRole("button", { name: "Copy Shell · source checkout" }).click();
+  const block = await codeBlockFor(reproduction, "make surface-decoder-compare-full");
+  await expect(block).toBeVisible();
+  await block.getByRole("button", { name: "Copy Shell" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe("make surface-decoder-compare-full\nmake bench-surface-full");
   await expect.poll(() => page.evaluate(() => window.__copiedText.includes("$"))).toBe(false);
 });
@@ -235,12 +235,12 @@ test("key documentation pages fit a 390px viewport without page overflow", async
 });
 
 test("search finds commands and concepts, preserves queries, and handles no matches", async ({ page }) => {
-  await page.goto("/docs/");
+  await page.goto("/get-started/");
   await page.getByRole("searchbox", { name: "Search documentation" }).fill("rmatching");
   await page.locator(".nav-search button").click();
-  await expect(page).toHaveURL(/\/docs\/\?q=rmatching/);
+  await expect(page).toHaveURL(/\/get-started\/\?q=rmatching/);
   await expect(page.locator("#search-results")).toContainText("Quantum error correction decoders");
-  const query = page.locator("#docs-query");
+  const query = page.getByRole("searchbox", { name: "Search documentation" });
   await query.fill("b8");
   await expect(page.locator("#search-results")).toContainText("Sampling and training data");
   await query.fill("atom loss");
@@ -249,13 +249,13 @@ test("search finds commands and concepts, preserves queries, and handles no matc
   await expect(page.locator("#search-status")).toContainText("No matching sections");
   await expect(page.locator("#search-results li")).toHaveCount(0);
   await query.fill("   ");
-  await expect(page.locator("#search-status")).toContainText("Browse the index below");
+  await expect(page.locator("#documentation-search")).toBeHidden();
 });
 
 test("search failure keeps the reference index usable", async ({ page }) => {
   await page.route("**/data/docs-search.json", (route) => route.fulfill({ status: 503, body: "unavailable" }));
   const failedIndex = page.waitForResponse("**/data/docs-search.json");
-  await page.goto("/docs/?q=rmatching");
+  await page.goto("/get-started/?q=rmatching#documentation-search");
   await failedIndex;
   await expect(page.locator("#search-status")).toContainText("Search is unavailable");
   await expect(page.locator('main a[href="../decoding/#first-decode"]').first()).toBeVisible();
@@ -276,9 +276,10 @@ test("output is labeled separately and never copied with the command", async ({ 
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text) => { window.__copiedText = text; } } }));
   await page.goto("/get-started/#detector-output");
   const section = page.locator('section[aria-labelledby="detector-output"]');
-  await expect(section.locator(".output-toolbar")).toHaveText("Expected file contents");
-  await expect(section.locator(".output-toolbar button")).toHaveCount(0);
-  await section.getByRole("button", { name: "Copy Shell · installed CLI" }).click();
+  const command = await codeBlockFor(section, "rustqec circuit detect");
+  await expect(command.locator(".terminal-output-label")).toHaveText(["events.dets", "model.dem"]);
+  await expect(command.locator(".terminal-output button")).toHaveCount(0);
+  await command.getByRole("button", { name: "Copy Shell" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toContain("rustqec circuit detect");
   expect(await page.evaluate(() => window.__copiedText)).not.toContain("shot D0 L0");
 });
@@ -286,9 +287,9 @@ test("output is labeled separately and never copied with the command", async ({ 
 test("development guides point to a master checkout and stable checkout is explicit", async ({ page }) => {
   await page.goto("/sampling-data/");
   await page.getByRole("link", { name: "configured repository checkout" }).first().click();
-  await expect(page.locator('pre[data-language="Shell · development source"]')).toContainText("git clone --branch master");
+  await expect(page.locator("pre").filter({ hasText: "git clone --branch master" })).toBeVisible();
   await page.locator("#stable-source summary").click();
-  await expect(page.locator('pre[data-language="Shell · stable source"]')).toContainText("git clone --branch v0.3.3");
+  await expect(page.locator("pre").filter({ hasText: "git clone --branch v0.3.3" })).toBeVisible();
 });
 
 test("support table labels stay intact while the table, not the page, scrolls", async ({ page }) => {
@@ -486,7 +487,7 @@ for (const width of [390, 768, 1024, 1280, 1440, 1920]) {
 }
 
 test('atom loss search leads to its dedicated walkthrough and retains the support reference', async ({ page }) => {
-  await page.goto('/docs/?q=atom+loss');
+  await page.goto('/get-started/?q=atom+loss#documentation-search');
   const first = page.locator('#search-results li').filter({ has: page.locator('a[href$="atom-loss/#model-loss"]') });
   await expect(page.locator('#search-results li').first().locator('a')).toHaveAttribute('href', /atom-loss\//);
   await expect(first).toContainText('Generate the circuit');
@@ -502,7 +503,7 @@ for (const [query, destination] of [
   ['QP101 noise', 'qp101/protocol/#noise'],
 ]) {
   test(`search combines page context and section content for ${query}`, async ({ page }) => {
-    await page.goto(`/docs/?q=${encodeURIComponent(query)}`);
+    await page.goto(`/get-started/?q=${encodeURIComponent(query)}#documentation-search`);
     const result = page.locator(`#search-results a[href$="${destination}"]`);
     await expect(result).toBeVisible();
     await result.click();

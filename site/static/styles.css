@@ -1277,8 +1277,26 @@ pre code {
 pre { max-width: 100%; }
 .code-toolbar { display: flex; align-items: center; gap: .75rem; justify-content: space-between; margin-top: 1rem; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: .4rem .4rem 0 0; background: var(--surface-muted); color: var(--muted); font-size: .8rem; }
 .code-toolbar + pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
-.code-toolbar button { flex-shrink: 0; border: 1px solid var(--border); border-radius: .3rem; background: white; color: var(--accent-dark); padding: .35rem .75rem; cursor: pointer; font: inherit; }
-.copy-status { margin-left: auto; }
+.code-block { position: relative; margin-top: 1rem; }
+.code-block pre { margin: 0; }
+.code-block pre code { padding-right: 4rem; }
+.code-copy-button { position: absolute; top: .55rem; right: .55rem; display: inline-flex; align-items: center; gap: .35rem; min-width: 2.25rem; min-height: 2.25rem; justify-content: center; border: 1px solid #6f6964; border-radius: .35rem; padding: .35rem .5rem; background: #332d29; color: #fff; cursor: pointer; font: inherit; font-size: .75rem; }
+.code-copy-button:hover { background: #443c37; }
+.code-copy-button svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.terminal-block { overflow: hidden; border: 1px solid #403a36; border-radius: .65rem; background: #282522; box-shadow: 0 .55rem 1.4rem rgb(45 35 29 / 13%); }
+.terminal-chrome { display: flex; align-items: center; gap: .42rem; height: 2.25rem; padding: 0 .85rem; border-bottom: 1px solid #433d38; }
+.terminal-chrome i { width: .5rem; height: .5rem; border-radius: 50%; background: #ca7051; }
+.terminal-chrome i:nth-child(2) { background: #d3a65f; }
+.terminal-chrome i:nth-child(3) { background: #739b80; }
+.terminal-block > pre { border: 0; border-radius: 0; background: transparent; color: #f3ede8; padding: 1.2rem 4.25rem 1.2rem 1.05rem; }
+.terminal-block > pre code { position: relative; min-width: max-content; padding: 0 0 0 1.4rem; }
+.terminal-block > pre code::before { content: '$'; position: absolute; left: 0; color: #d17a59; font-weight: 750; }
+.terminal-block .code-copy-button { top: 2.8rem; right: .75rem; border-color: #5d554f; background: #332f2b; color: #ddd4cd; }
+.terminal-block .code-copy-button:hover { border-color: #81766e; background: #403a35; color: #fff; }
+.terminal-output { border-top: 1px dashed #554d47; }
+.terminal-output-label { display: block; padding: .75rem 1.5rem 0; color: #968b82; font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.terminal-output pre[data-output="true"] { margin: 0; border: 0; border-radius: 0; background: transparent; color: #b9d8c5; padding: .45rem 1.5rem 1.15rem; }
+.terminal-output pre[data-output="true"] code { padding: 0; }
 .evidence-status-summary { color: var(--muted); font-size: .86rem; }
 .evidence-details { margin-top: .75rem; }
 .result-plot-caption { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; margin-top: .6rem; font-size: .85rem; color: var(--muted); }
@@ -1308,11 +1326,8 @@ pre { max-width: 100%; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .nav-search { display: flex; gap: .4rem; margin-left: auto; }
 .nav-search input { width: 11rem; min-width: 0; }
-.nav-search input, .docs-search input { border: 1px solid var(--border); border-radius: .4rem; padding: .5rem .7rem; font: inherit; background: white; }
-.nav-search button, .docs-search button, .figure-dialog button { border: 1px solid var(--border); border-radius: .4rem; padding: .45rem .75rem; font: inherit; cursor: pointer; color: var(--accent-dark); background: white; }
-.docs-search label { display: block; margin-bottom: .4rem; font-weight: 600; }
-.docs-search > div { display: flex; gap: .5rem; }
-.docs-search input { flex: 1; width: 100%; min-width: 0; }
+.nav-search input { border: 1px solid var(--border); border-radius: .4rem; padding: .5rem .7rem; font: inherit; background: white; }
+.nav-search button, .figure-dialog button { border: 1px solid var(--border); border-radius: .4rem; padding: .45rem .75rem; font: inherit; cursor: pointer; color: var(--accent-dark); background: white; }
 .search-results { padding: 0; list-style: none; }
 .search-results li { padding: 1rem 0; border-bottom: 1px solid var(--border); }
 .search-results a { font-weight: 700; }

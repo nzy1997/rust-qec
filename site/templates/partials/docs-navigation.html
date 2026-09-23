@@ -1,10 +1,8 @@
 <details class="docs-navigation" open>
 <summary>Browse documentation</summary>
 <nav aria-label="Documentation sections">
-<p>Start</p>
-<a href="{{ root }}/docs/"{% if current_nav == "docs" %} aria-current="page"{% endif %}>Overview &amp; search</a>
-<a href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Installation &amp; first circuit</a>
 <p>Guides</p>
+<a href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Getting started</a>
 <a href="{{ root }}/atom-loss/"{% if current_nav == "loss" and loss_view == "tutorial" %} aria-current="page"{% endif %}>Atom loss</a>
 {% if current_nav == "loss" %}
 <a class="nav-child" href="{{ root }}/atom-loss-concepts/"{% if loss_view == "concepts" %} aria-current="page"{% endif %}>Concepts &amp; support</a>
