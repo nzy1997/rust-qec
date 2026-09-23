@@ -44,10 +44,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The first circuit API accepts the basic single-qubit Clifford generators,
-`CX`/`CNOT`/`ZCX`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT` blocks containing
-unitaries, and terminal `M`/`MZ`/`MX`/`MY`. Additional Clifford aliases,
-mid-circuit operations, feedback, and annotations are delivered in later PRs.
+The circuit API accepts the basic single-qubit Clifford generators,
+`CX`/`CNOT`/`ZCX`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT`, mid-circuit
+`M`/`MZ`/`MX`/`MY`, and `R`/`RZ`/`RX`/`RY` and
+`MR`/`MRZ`/`MRX`/`MRY` resets. Additional Clifford aliases,
+feedback, noise, and annotations are delivered in later PRs.
 The default active-rank limit is 16; `compile_with_limit` lets callers choose a
 different limit. Reaching the limit returns an error. The circuit entry point
 also rejects more than 4096 physical qubits before allocating a tableau.
@@ -96,6 +97,11 @@ and configured memory limit and return a resource-limit error if exceeded.
 Repeated T gates acting on the same active coordinate must not add a new
 dimension solely because the T count increased. The first implementation need
 not find a globally minimal active basis.
+
+After measurement, an axis with one zero-amplitude half is removed. Its fixed
+virtual bit is retained in the `origin` coordinate, so later gates see the
+correct Pauli sign. Other measurements can leave a non-minimal active basis;
+the configured rank limit still applies and reports an error if exceeded.
 
 The small-qubit test oracle is an independent dense state-vector simulator. It
 does not share the production frame or branch update code. A tableau without

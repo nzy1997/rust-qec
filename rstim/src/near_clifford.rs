@@ -82,6 +82,7 @@ pub enum MeasurementBasis {
 pub struct ActiveState {
     num_qubits: usize,
     frame: StabilizerState,
+    origin: Vec<bool>,
     axes: Vec<Vec<bool>>,
     coefficients: Vec<ComplexAmp>,
     global_phase: ComplexAmp,
@@ -93,6 +94,7 @@ impl ActiveState {
         Self {
             num_qubits,
             frame: StabilizerState::new(num_qubits),
+            origin: vec![false; num_qubits],
             axes: Vec::new(),
             coefficients: vec![ComplexAmp::new(1.0, 0.0)],
             global_phase: ComplexAmp::new(1.0, 0.0),
@@ -110,6 +112,11 @@ impl ActiveState {
 
     pub fn active_axes(&self) -> &[Vec<bool>] {
         &self.axes
+    }
+
+    /// Virtual basis bit string underlying coordinate zero.
+    pub fn origin(&self) -> &[bool] {
+        &self.origin
     }
 
     pub fn coefficients(&self) -> &[ComplexAmp] {
@@ -239,6 +246,30 @@ impl ActiveState {
         basis: MeasurementBasis,
         rng: &mut impl Rng,
     ) -> Result<bool, String> {
+        if q >= self.num_qubits() {
+            return Err(format!("qubit {q} outside near-Clifford state"));
+        }
+        if self.axes.is_empty() {
+            self.rebase_origin_into_frame();
+            let outcome = match basis {
+                MeasurementBasis::Z => self.frame.measure_z(q, rng).0,
+                MeasurementBasis::X => {
+                    self.frame.h(q);
+                    let bit = self.frame.measure_z(q, rng).0;
+                    self.frame.h(q);
+                    bit
+                }
+                MeasurementBasis::Y => {
+                    self.frame.s_dag(q);
+                    self.frame.h(q);
+                    let bit = self.frame.measure_z(q, rng).0;
+                    self.frame.h(q);
+                    self.frame.s(q);
+                    bit
+                }
+            };
+            return Ok(outcome != 0);
+        }
         let pauli = self.single_qubit_pauli(q, basis)?;
         let (probability_zero, _) = self.measurement_probabilities(q, basis)?;
         let mask = self.ensure_axis(&pauli.x)?;
@@ -270,6 +301,106 @@ impl ActiveState {
         }
         self.coefficients = next;
         Ok(outcome)
+    }
+
+    fn rebase_origin_into_frame(&mut self) {
+        if !self.origin.contains(&true) {
+            return;
+        }
+        let snapshot = self.frame.canonical_snapshot();
+        for (q, bit) in self.origin.iter_mut().enumerate() {
+            if *bit {
+                // U X_q |0> = (U X_q U†) U |0>. Apply that physical Pauli
+                // to the frame so the virtual origin returns to zero.
+                let pauli = Pauli::from_snapshot_row(&snapshot, q);
+                let y_count = pauli
+                    .x
+                    .iter()
+                    .zip(&pauli.z)
+                    .filter(|(x, z)| **x && **z)
+                    .count() as u8;
+                self.global_phase = self.global_phase * i_pow((pauli.phase + 4 - y_count % 4) % 4);
+                for (physical_q, (&x, &z)) in pauli.x.iter().zip(&pauli.z).enumerate() {
+                    match (x, z) {
+                        (true, true) => self.frame.y_gate(physical_q),
+                        (true, false) => self.frame.x_gate(physical_q),
+                        (false, true) => self.frame.z_gate(physical_q),
+                        (false, false) => {}
+                    }
+                }
+                *bit = false;
+            }
+        }
+    }
+
+    /// Measures and prepares the +1 eigenstate of the requested basis.
+    /// The returned bit is the measurement result before the reset correction.
+    pub fn measure_reset(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        rng: &mut impl Rng,
+    ) -> Result<bool, String> {
+        let outcome = self.measure(q, basis, rng)?;
+        if outcome {
+            let correction = match basis {
+                MeasurementBasis::Z => CliffordGate::X(q),
+                MeasurementBasis::X | MeasurementBasis::Y => CliffordGate::Z(q),
+            };
+            self.apply_clifford(correction)?;
+        }
+        self.retire_fixed_axes();
+        Ok(outcome)
+    }
+
+    pub fn reset(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        self.measure_reset(q, basis, rng).map(|_| ())
+    }
+
+    /// Removes active axes whose entire unused half has zero amplitude.
+    /// Measurement can fix a virtual computational bit; its value moves into
+    /// `origin`, keeping the represented physical state unchanged.
+    pub fn retire_fixed_axes(&mut self) -> usize {
+        let mut retired = 0;
+        let mut axis_index = 0;
+        while axis_index < self.axes.len() {
+            let mut half_norm = [0.0, 0.0];
+            for (index, coefficient) in self.coefficients.iter().enumerate() {
+                half_norm[(index >> axis_index) & 1] += coefficient.norm_sqr();
+            }
+            let fixed = if half_norm[0] < 1e-24 && half_norm[1] > 1e-24 {
+                Some(1)
+            } else if half_norm[1] < 1e-24 && half_norm[0] > 1e-24 {
+                Some(0)
+            } else {
+                None
+            };
+            if let Some(fixed) = fixed {
+                let axis = self.axes.remove(axis_index);
+                if fixed == 1 {
+                    xor(&mut self.origin, &axis);
+                }
+                let low_mask = (1 << axis_index) - 1;
+                let reduced_len = self.coefficients.len() / 2;
+                let reduced = (0..reduced_len)
+                    .map(|index| {
+                        let old_index =
+                            (index & low_mask) | (fixed << axis_index) | ((index & !low_mask) << 1);
+                        self.coefficients[old_index]
+                    })
+                    .collect();
+                self.coefficients = reduced;
+                retired += 1;
+            } else {
+                axis_index += 1;
+            }
+        }
+        retired
     }
 
     fn single_qubit_pauli(&self, q: usize, basis: MeasurementBasis) -> Result<Pauli, String> {
@@ -311,7 +442,7 @@ impl ActiveState {
     }
 
     fn virtual_bits(&self, index: usize) -> Vec<bool> {
-        let mut bits = vec![false; self.num_qubits()];
+        let mut bits = self.origin.clone();
         for (axis_index, axis) in self.axes.iter().enumerate() {
             if index & (1 << axis_index) != 0 {
                 xor(&mut bits, axis);
@@ -477,9 +608,8 @@ impl NearCliffordExecutor {
         instructions: Vec<StimInstr>,
         max_active_qubits: usize,
     ) -> Result<Self, String> {
-        let mut terminal = false;
         let mut max_qubit = None;
-        validate_near_block(&instructions, &mut terminal, &mut max_qubit)?;
+        validate_near_block(&instructions, &mut max_qubit)?;
         let num_qubits = max_qubit
             .map(|q| {
                 usize::try_from(q)
@@ -521,7 +651,6 @@ impl NearCliffordExecutor {
 
 fn validate_near_block(
     instructions: &[StimInstr],
-    terminal: &mut bool,
     max_qubit: &mut Option<u32>,
 ) -> Result<(), String> {
     for instruction in instructions {
@@ -530,13 +659,7 @@ fn validate_near_block(
                 if *count == 0 {
                     return Err("near-Clifford REPEAT count must be positive".into());
                 }
-                let before = *terminal;
-                validate_near_block(body, terminal, max_qubit)?;
-                if *count > 1 && *terminal && !before {
-                    return Err(
-                        "near-Clifford repeated terminal measurement is not yet supported".into(),
-                    );
-                }
+                validate_near_block(body, max_qubit)?;
             }
             StimInstr::Op {
                 name,
@@ -556,19 +679,21 @@ fn validate_near_block(
                         | "Z"
                         | "T"
                         | "T_DAG"
+                        | "R"
+                        | "RZ"
+                        | "RX"
+                        | "RY"
                 );
                 let pair = matches!(name.as_str(), "CX" | "CNOT" | "ZCX" | "CZ" | "ZCZ" | "SWAP");
-                let measure = matches!(name.as_str(), "M" | "MZ" | "MX" | "MY");
+                let measure = matches!(
+                    name.as_str(),
+                    "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY"
+                );
                 if !single && !pair && !measure {
                     return Err(format!("near-Clifford unsupported gate {name}"));
                 }
                 if !args.is_empty() {
                     return Err(format!("near-Clifford {name} takes no arguments"));
-                }
-                if *terminal && !measure {
-                    return Err(format!(
-                        "near-Clifford unitary {name} follows terminal measurement"
-                    ));
                 }
                 if pair && !targets.len().is_multiple_of(2) {
                     return Err(format!("near-Clifford {name} requires qubit pairs"));
@@ -590,9 +715,6 @@ fn validate_near_block(
                             return Err(format!("near-Clifford {name} requires distinct qubits"));
                         }
                     }
-                }
-                if measure && !targets.is_empty() {
-                    *terminal = true;
                 }
             }
         }
@@ -639,6 +761,14 @@ fn run_near_block(
                         "Z" => state.apply_clifford(CliffordGate::Z(q))?,
                         "T" => state.t(q)?,
                         "T_DAG" => state.t_dag(q)?,
+                        "R" | "RZ" | "RX" | "RY" => {
+                            let basis = match name.as_str() {
+                                "RX" => MeasurementBasis::X,
+                                "RY" => MeasurementBasis::Y,
+                                _ => MeasurementBasis::Z,
+                            };
+                            state.reset(q, basis, rng)?;
+                        }
                         "M" | "MZ" | "MX" | "MY" => {
                             let basis = match name.as_str() {
                                 "MX" => MeasurementBasis::X,
@@ -646,6 +776,17 @@ fn run_near_block(
                                 _ => MeasurementBasis::Z,
                             };
                             let mut result = state.measure(q, basis, rng)?;
+                            state.retire_fixed_axes();
+                            result ^= matches!(target, StimTarget::QubitInv(_));
+                            measurements.push(result);
+                        }
+                        "MR" | "MRZ" | "MRX" | "MRY" => {
+                            let basis = match name.as_str() {
+                                "MRX" => MeasurementBasis::X,
+                                "MRY" => MeasurementBasis::Y,
+                                _ => MeasurementBasis::Z,
+                            };
+                            let mut result = state.measure_reset(q, basis, rng)?;
                             result ^= matches!(target, StimTarget::QubitInv(_));
                             measurements.push(result);
                         }
