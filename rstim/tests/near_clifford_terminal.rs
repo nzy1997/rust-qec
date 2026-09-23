@@ -121,18 +121,20 @@ fn two_t_sampled_x_parity_detects_interference() {
 
 #[test]
 fn measurement_rank_limit_does_not_consume_randomness_or_mutate_state() {
-    let mut state = ActiveState::new(1, 0);
+    let mut state = ActiveState::new(2, 1);
     state.apply_clifford(CliffordGate::H(0)).unwrap();
+    state.t(0).unwrap();
+    state.apply_clifford(CliffordGate::H(1)).unwrap();
     let before = state.coefficients().to_vec();
     let mut rng = StdRng::seed_from_u64(739);
     let mut untouched_rng = StdRng::seed_from_u64(739);
     assert!(
         state
-            .measure(0, MeasurementBasis::Z, &mut rng)
+            .measure(1, MeasurementBasis::Z, &mut rng)
             .unwrap_err()
             .contains("active-state limit")
     );
     assert_eq!(state.coefficients(), before);
-    assert_eq!(state.active_rank(), 0);
+    assert_eq!(state.active_rank(), 1);
     assert_eq!(rng.r#gen::<u64>(), untouched_rng.r#gen::<u64>());
 }
