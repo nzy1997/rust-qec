@@ -60,6 +60,63 @@ fn two_t_terminal_measurement_probabilities_match_oracle() {
 }
 
 #[test]
+fn three_active_axes_preserve_pauli_probabilities_through_sequential_measurements() {
+    let mut active = ActiveState::new(3, 4);
+    let mut oracle = DenseOracle::new(3);
+    for q in 0..3 {
+        active.apply_clifford(CliffordGate::H(q)).unwrap();
+        oracle.h(q);
+    }
+    active.apply_clifford(CliffordGate::CX(0, 1)).unwrap();
+    oracle.cx(0, 1);
+    for q in 0..3 {
+        active.t(q).unwrap();
+        oracle.t(q);
+    }
+    active.apply_clifford(CliffordGate::X(2)).unwrap();
+    oracle.x(2);
+    active.apply_clifford(CliffordGate::H(1)).unwrap();
+    oracle.h(1);
+    active.t_dag(0).unwrap();
+    oracle.t_dag(0);
+    assert!(active.active_rank() >= 3);
+
+    let mut rng = StdRng::seed_from_u64(739);
+    for (q, basis, letter) in [
+        (2, MeasurementBasis::Y, 'Y'),
+        (0, MeasurementBasis::X, 'X'),
+        (1, MeasurementBasis::Z, 'Z'),
+    ] {
+        let (zero, one) = active.measurement_probabilities(q, basis).unwrap();
+        assert!((zero - oracle.measurement_probability(q, letter, false)).abs() < 1e-12);
+        assert!((one - oracle.measurement_probability(q, letter, true)).abs() < 1e-12);
+        let outcome = active.measure(q, basis, &mut rng).unwrap();
+        oracle.collapse(q, letter, outcome);
+        for check_q in 0..3 {
+            for (check_basis, check_letter) in [
+                (MeasurementBasis::X, 'X'),
+                (MeasurementBasis::Y, 'Y'),
+                (MeasurementBasis::Z, 'Z'),
+            ] {
+                let (actual_zero, actual_one) = active
+                    .measurement_probabilities(check_q, check_basis)
+                    .unwrap();
+                assert!(
+                    (actual_zero - oracle.measurement_probability(check_q, check_letter, false))
+                        .abs()
+                        < 1e-12
+                );
+                assert!(
+                    (actual_one - oracle.measurement_probability(check_q, check_letter, true))
+                        .abs()
+                        < 1e-12
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn sequential_terminal_x_measurements_preserve_interference() {
     let (mut active, mut oracle) = setup_two_t();
     let mut rng = StdRng::seed_from_u64(739);

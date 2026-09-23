@@ -20,10 +20,10 @@
     "sampler": "rustqec circuit sample --shots 1024 --seed 715427 (workload generation)"
   },
   "exit_code": 0,
-  "wall_seconds": 0.017783624993171543,
+  "wall_seconds": 0.017227332995389588,
   "peak_rss_watermark_bytes": 23478272,
-  "compile_seconds": 0.000981791,
-  "decode_seconds": 0.010824791,
+  "compile_seconds": 0.00094725,
+  "decode_seconds": 0.010580709,
   "attempted_shots": 1024,
   "completed_shots": 1024,
   "observed_pattern_count": 598,
