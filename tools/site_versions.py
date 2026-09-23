@@ -17,6 +17,31 @@ import tomllib
 
 
 REPO = Path(__file__).resolve().parent.parent
+EXTERNAL_ARTIFACT_PATHS = (
+    Path("docs/test-reports"),
+    Path("site/static/data/atom-loss"),
+    Path("site/static/rsmp-v1-showcase/og.png"),
+)
+
+
+def copy_external_artifacts(checkout: Path) -> None:
+    """Restore generated inputs removed from historical source snapshots.
+
+    Historical documentation commits predate the external artifact repository,
+    so their source trees no longer contain the data required by templates.
+    The primary checkout has already fetched and verified the pinned artifact
+    bundle; copy only those managed paths into the temporary historical clone.
+    """
+    for relative in EXTERNAL_ARTIFACT_PATHS:
+        source = REPO / relative
+        if not source.exists():
+            continue
+        destination = checkout / relative
+        if source.is_dir():
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
 
 
 def read_catalog(path: Path) -> dict:
@@ -186,6 +211,7 @@ def build_versions(config: Path, primary: Path, output: Path) -> None:
             subprocess.run(["git", "checkout", "--quiet", "--detach", version["ref"]], cwd=checkout, check=True)
             if not (checkout / "tools/site_versions.py").is_file():
                 raise ValueError("Snapshot must include the versioned documentation infrastructure")
+            copy_external_artifacts(checkout)
             base_url = tomllib.loads((REPO / "site/config.toml").read_text())["base_url"].rstrip("/")
             env = dict(os.environ, DOCS_VERSION=version["id"], DOCS_VERSIONS_FILE=str(config.resolve()),
                        DOCS_SITE_BASE_URL=f'{base_url}/{version["path"]}')

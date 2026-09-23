@@ -32,6 +32,7 @@ class EnvelopePublicationSelfTest(unittest.TestCase):
         }
         metadata_edit = copy.deepcopy(matrix)
         metadata_edit["purpose"] = "new prose"
+        metadata_edit["applies_to"] = {"source_revision": "rewritten-equivalent"}
         metadata_edit["decoders"]["envelope-matching"]["published_support"] = {
             "release": "v0.3.1",
             "verification_url": "https://example.invalid/marker",

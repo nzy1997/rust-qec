@@ -17,6 +17,22 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check changed tracked file sizes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          args=(--head "$HEAD_SHA")
+          if [ "$EVENT_NAME" = pull_request ]; then
+            args+=(--base "$PR_BASE_SHA")
+          elif [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            args+=(--base "$PUSH_BEFORE_SHA")
+          fi
+          python3 tools/check_tracked_file_sizes.py "${args[@]}"
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
@@ -41,7 +57,7 @@ jobs:
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Test repository governance gates
-        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope
+        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner
