@@ -102,6 +102,10 @@ fn near_clifford_two_t_known_answer() {
         NearCliffordExecutor::compile_text("H 0\nCX 0 1\nROT_Z(0.4487989505128276) 0\nH 0\nT 0")
             .unwrap_err();
     assert!(error.contains("unsupported gate ROT_Z"), "{error}");
+    let error =
+        NearCliffordExecutor::compile_text("H 0\nCX 0 1\nRZ(0.4487989505128276) 0\nH 0\nT 0")
+            .unwrap_err();
+    assert!(error.contains("RZ takes no arguments"), "{error}");
 }
 
 #[test]
