@@ -8,6 +8,7 @@
 
 use crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot;
 use crate::sim::tableau::StabilizerState;
+use rand::Rng;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ComplexAmp {
@@ -67,6 +68,13 @@ pub enum CliffordGate {
     CX(usize, usize),
     CZ(usize, usize),
     Swap(usize, usize),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MeasurementBasis {
+    X,
+    Y,
+    Z,
 }
 
 #[derive(Clone, Debug)]
@@ -165,32 +173,7 @@ impl ActiveState {
         let mut physical_z = vec![false; n];
         physical_z[q] = true;
         let pauli = self.physical_pauli(&vec![false; n], &physical_z)?;
-        let (mask, independent) = self.coordinate_mask(&pauli.x);
-        if independent {
-            let rank = self.axes.len();
-            let expanded_len = self
-                .coefficients
-                .len()
-                .checked_mul(2)
-                .ok_or_else(|| "near-Clifford active-state size overflow".to_string())?;
-            if rank >= self.max_active_qubits
-                || rank >= usize::BITS as usize - 1
-                || expanded_len > isize::MAX as usize / size_of::<ComplexAmp>()
-            {
-                return Err(format!(
-                    "near-Clifford active-state limit exceeded at rank {}",
-                    rank + 1
-                ));
-            }
-            self.axes.push(pauli.x.clone());
-            self.coefficients
-                .resize(expanded_len, ComplexAmp::default());
-        }
-        let mask = if independent {
-            self.coefficients.len() / 2
-        } else {
-            mask
-        };
+        let mask = self.ensure_axis(&pauli.x)?;
         let old = self.coefficients.clone();
         let mut next = vec![ComplexAmp::default(); old.len()];
         let c = (std::f64::consts::PI / 8.0).cos();
@@ -215,6 +198,115 @@ impl ActiveState {
         };
         self.global_phase = self.global_phase * ComplexAmp::new(angle.cos(), angle.sin());
         Ok(())
+    }
+
+    /// Born probabilities for the two outcomes, without changing the state.
+    pub fn measurement_probabilities(
+        &self,
+        q: usize,
+        basis: MeasurementBasis,
+    ) -> Result<(f64, f64), String> {
+        let pauli = self.single_qubit_pauli(q, basis)?;
+        let (mask, independent) = self.coordinate_mask(&pauli.x);
+        let expectation = if independent {
+            0.0
+        } else {
+            self.coefficients
+                .iter()
+                .enumerate()
+                .map(|(index, amplitude)| {
+                    let virtual_bits = self.virtual_bits(index);
+                    let sign = if dot(&pauli.z, &virtual_bits) {
+                        -1.0
+                    } else {
+                        1.0
+                    };
+                    let image = i_pow(pauli.phase) * (*amplitude * sign);
+                    let conjugate = self.coefficients[index ^ mask].conj();
+                    (conjugate * image).re
+                })
+                .sum::<f64>()
+        };
+        let zero = ((1.0 + expectation) / 2.0).clamp(0.0, 1.0);
+        Ok((zero, 1.0 - zero))
+    }
+
+    /// Samples and collapses a Pauli-basis measurement. `true` is the -1 outcome.
+    pub fn measure(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        rng: &mut impl Rng,
+    ) -> Result<bool, String> {
+        let pauli = self.single_qubit_pauli(q, basis)?;
+        let (probability_zero, _) = self.measurement_probabilities(q, basis)?;
+        let mask = self.ensure_axis(&pauli.x)?;
+        let outcome = rng.r#gen::<f64>() >= probability_zero;
+        let eigenvalue = if outcome { -1.0 } else { 1.0 };
+        let old = self.coefficients.clone();
+        let mut next = vec![ComplexAmp::default(); old.len()];
+        for (index, amplitude) in old.iter().copied().enumerate() {
+            let virtual_bits = self.virtual_bits(index);
+            let sign = if dot(&pauli.z, &virtual_bits) {
+                -1.0
+            } else {
+                1.0
+            };
+            let image = i_pow(pauli.phase) * (amplitude * (sign * eigenvalue));
+            next[index] = next[index] + amplitude * 0.5;
+            next[index ^ mask] = next[index ^ mask] + image * 0.5;
+        }
+        let norm = next
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        if norm <= 1e-15 {
+            return Err("near-Clifford measurement selected zero-probability outcome".into());
+        }
+        for amplitude in &mut next {
+            *amplitude = *amplitude * (1.0 / norm);
+        }
+        self.coefficients = next;
+        Ok(outcome)
+    }
+
+    fn single_qubit_pauli(&self, q: usize, basis: MeasurementBasis) -> Result<Pauli, String> {
+        let n = self.num_qubits();
+        if q >= n {
+            return Err(format!("qubit {q} outside near-Clifford state"));
+        }
+        let mut x = vec![false; n];
+        let mut z = vec![false; n];
+        x[q] = matches!(basis, MeasurementBasis::X | MeasurementBasis::Y);
+        z[q] = matches!(basis, MeasurementBasis::Y | MeasurementBasis::Z);
+        self.physical_pauli(&x, &z)
+    }
+
+    fn ensure_axis(&mut self, x: &[bool]) -> Result<usize, String> {
+        let (mask, independent) = self.coordinate_mask(x);
+        if !independent {
+            return Ok(mask);
+        }
+        let rank = self.axes.len();
+        let expanded_len = self
+            .coefficients
+            .len()
+            .checked_mul(2)
+            .ok_or_else(|| "near-Clifford active-state size overflow".to_string())?;
+        if rank >= self.max_active_qubits
+            || rank >= usize::BITS as usize - 1
+            || expanded_len > isize::MAX as usize / size_of::<ComplexAmp>()
+        {
+            return Err(format!(
+                "near-Clifford active-state limit exceeded at rank {}",
+                rank + 1
+            ));
+        }
+        self.axes.push(x.to_vec());
+        self.coefficients
+            .resize(expanded_len, ComplexAmp::default());
+        Ok(expanded_len / 2)
     }
 
     fn virtual_bits(&self, index: usize) -> Vec<bool> {
