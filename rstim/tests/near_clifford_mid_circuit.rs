@@ -19,8 +19,8 @@ fn fixed_active_axis_retires_and_later_t_matches_oracle() {
         let outcome = active.measure(0, MeasurementBasis::X, &mut rng).unwrap();
         oracle.collapse(0, 'X', outcome);
         seen[outcome as usize] = true;
-        assert_eq!(active.retire_fixed_axes(), 1);
         assert_eq!(active.active_rank(), 0);
+        assert_eq!(active.retire_fixed_axes(), 0);
         assert_eq!(active.origin(), &[outcome]);
 
         active.apply_clifford(CliffordGate::H(0)).unwrap();
@@ -106,7 +106,8 @@ fn pure_clifford_y_measurement_and_retired_origin_rebase() {
             if !state.measure(0, MeasurementBasis::X, &mut rng).unwrap() {
                 continue;
             }
-            assert_eq!(state.retire_fixed_axes(), 1);
+            assert_eq!(state.active_rank(), 0);
+            assert_eq!(state.retire_fixed_axes(), 0);
             assert_eq!(state.origin(), &[true, false]);
             state.apply_clifford(CliffordGate::H(0)).unwrap();
             if rotate_to_y {

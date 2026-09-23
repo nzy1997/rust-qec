@@ -315,7 +315,40 @@ impl ActiveState {
             *amplitude = *amplitude * (1.0 / norm);
         }
         self.coefficients = next;
+        if mask == 0 && sign_mask != 0 {
+            // A diagonal Pauli projection fixes the parity of these active
+            // coordinates. Change the affine basis so that the parity becomes
+            // one coordinate, then discard that fixed coordinate immediately.
+            debug_assert!(pauli.phase == 0 || pauli.phase == 2);
+            let fixed_parity = outcome ^ sign_origin ^ (pauli.phase == 2);
+            self.retire_fixed_parity(sign_mask, fixed_parity);
+        }
         Ok(())
+    }
+
+    fn retire_fixed_parity(&mut self, parity_mask: usize, fixed_parity: bool) {
+        let pivot = parity_mask.trailing_zeros() as usize;
+        let pivot_bit = 1 << pivot;
+        let other_mask = parity_mask ^ pivot_bit;
+        let pivot_axis = self.axes.remove(pivot);
+        if fixed_parity {
+            xor(&mut self.origin, &pivot_axis);
+        }
+        for (index, axis) in self.axes.iter_mut().enumerate() {
+            let old_index = index + usize::from(index >= pivot);
+            if other_mask & (1 << old_index) != 0 {
+                xor(axis, &pivot_axis);
+            }
+        }
+        let low_mask = pivot_bit - 1;
+        self.coefficients = (0..self.coefficients.len() / 2)
+            .map(|index| {
+                let without_pivot = (index & low_mask) | ((index & !low_mask) << 1);
+                let pivot_value =
+                    fixed_parity ^ ((without_pivot & other_mask).count_ones() & 1 != 0);
+                self.coefficients[without_pivot | (usize::from(pivot_value) << pivot)]
+            })
+            .collect();
     }
 
     fn rebase_origin_into_frame(&mut self) {
