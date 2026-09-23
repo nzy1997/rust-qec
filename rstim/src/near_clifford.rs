@@ -382,6 +382,9 @@ impl ActiveState {
             let mut half_norm = [0.0, 0.0];
             for (index, coefficient) in self.coefficients.iter().enumerate() {
                 half_norm[(index >> axis_index) & 1] += coefficient.norm_sqr();
+                if half_norm[0] >= 1e-24 && half_norm[1] >= 1e-24 {
+                    break;
+                }
             }
             let fixed = if half_norm[0] < 1e-24 && half_norm[1] > 1e-24 {
                 Some(1)
