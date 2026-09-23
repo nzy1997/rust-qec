@@ -3,7 +3,7 @@
   "purpose": "Executable support contract for the envelope-mle decoder (issues #721-#723). Declares the narrow finite Supported domain, the exact evidence every part of that domain requires, and the failure/output semantics that bound out-of-budget behavior. Verified offline by tools/test_envelope_mle_scope.py and enforced at release time by tools/check_envelope_release.py. The first immutable publication of this promise is v0.3.3.",
   "applies_to": {
     "repository": "nzy1997/rust-qec",
-    "source_revision": "359fc656d6a8d7150489fd6735fdf6f9f5e236c2",
+    "source_revision": "f8ed9348da62dba72205e24a826ce75965f3c2b2",
     "matrix": "docs/envelope-support.json",
     "note": "The plan applies to the recorded source revision and later revisions for which tools/test_envelope_mle_scope.py passes. The release gate re-binds the plan to each candidate by requiring this revision to be an ancestor of the candidate with identical scope-relevant sources."
   },

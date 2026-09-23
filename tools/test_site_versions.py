@@ -107,7 +107,7 @@ class SiteVersionsTest(unittest.TestCase):
         self.assertEqual([v["id"] for v in catalog["versions"]], ["master", "0.3"])
         stable = catalog["versions"][1]
         self.assertEqual(stable["path"], "versions/0.3")
-        self.assertEqual(stable["ref"], "24cbe9b1e5a653f8bbd53ed7b8930fef13e22928")
+        self.assertEqual(stable["ref"], "c4ca7e9c08f44ec2e09a280d0bcda9906cd0daa5")
         self.assertEqual(stable["channel"], "stable")
         self.assertEqual(stable["native_release"], "0.3.3")
         self.assertEqual(catalog["versions"][0]["native_release"], "0.3.3")
@@ -121,6 +121,9 @@ class SiteVersionsTest(unittest.TestCase):
         (repo / "site/config.toml").write_text('base_url = "https://example.org/rust-qec"\n')
         (repo / "tools/site_versions.py").write_text('# fixture supports version metadata\n')
         (repo / "tools/check_site_build.py").write_text('from pathlib import Path\nassert Path("_site/index.html").is_file()\n')
+        external_artifact = repo / "site/static/data/atom-loss/sampling.json"
+        external_artifact.parent.mkdir(parents=True)
+        external_artifact.write_text("external artifact")
         (repo / "Makefile").write_text('build-site:\n\t./build-fixture.py\n')
         builder = repo / "build-fixture.py"
         builder.write_text('''#!/usr/bin/env python3
@@ -134,6 +137,7 @@ root = Path('_site')
 root.mkdir()
 version = os.environ['DOCS_VERSION']
 base = os.environ['DOCS_SITE_BASE_URL']
+assert Path('site/static/data/atom-loss/sampling.json').read_text() == 'external artifact'
 (root / 'index.html').write_text(f'<body data-docs-version="{version}" data-root="." id="top">{base}</body>')
 (root / 'source.txt').write_text(Path('source.txt').read_text())
 ''')

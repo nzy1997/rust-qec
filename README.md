@@ -28,6 +28,12 @@ make build-site
 python3 tools/check_site_build.py _site
 ```
 
+Generated evidence bundles, documentation test reports and other large site
+artifacts live in the companion [`rust-qec-docs`](https://github.com/nzy1997/rust-qec-docs)
+repository. `make build-site` and the evidence workflow fetch the pinned
+artifact revision automatically; use `make fetch-doc-artifacts` when running
+those checks directly.
+
 The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
 pins the native CLI examples to v0.3.3. `make build-site` stages the canonical
 QP101 and support contracts into ignored `site/generated/` before Zola renders

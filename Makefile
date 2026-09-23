@@ -1,4 +1,4 @@
-.PHONY: help test check build-shot-viewer build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test check build-shot-viewer fetch-doc-artifacts build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -23,6 +23,7 @@ help:
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
+	@echo "  fetch-doc-artifacts  - Fetch the pinned generated docs and evidence artifacts"
 	@echo "  build-shot-viewer    - Rebuild the version-matched interactive-shot web bundle"
 	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
 	@echo "  publication-evidence-check - Validate the publication benchmark evidence bundle (issue #601)"
@@ -63,7 +64,10 @@ publication-evidence-check:
 build-shot-viewer:
 	tools/build_shot_viewer.sh
 
-build-site: build-shot-viewer
+fetch-doc-artifacts:
+	python3 tools/fetch_docs_artifacts.py
+
+build-site: build-shot-viewer fetch-doc-artifacts
 	python3 tools/prepare_site_docs.py
 	python3 tools/build_cli_reference.py
 	rm -rf _site
