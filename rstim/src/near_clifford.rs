@@ -274,6 +274,16 @@ impl ActiveState {
         let (probability_zero, _) = self.measurement_probabilities(q, basis)?;
         let mask = self.ensure_axis(&pauli.x)?;
         let outcome = rng.r#gen::<f64>() >= probability_zero;
+        self.collapse_pauli_measurement(&pauli, mask, outcome)?;
+        Ok(outcome)
+    }
+
+    fn collapse_pauli_measurement(
+        &mut self,
+        pauli: &Pauli,
+        mask: usize,
+        outcome: bool,
+    ) -> Result<(), String> {
         let eigenvalue = if outcome { -1.0 } else { 1.0 };
         let old = self.coefficients.clone();
         let mut next = vec![ComplexAmp::default(); old.len()];
@@ -300,7 +310,7 @@ impl ActiveState {
             *amplitude = *amplitude * (1.0 / norm);
         }
         self.coefficients = next;
-        Ok(outcome)
+        Ok(())
     }
 
     fn rebase_origin_into_frame(&mut self) {
@@ -671,7 +681,7 @@ impl NearCliffordExecutor {
         shots: usize,
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
-        (0..shots).map(|_| self.run(rng)).collect()
+        self.sample_with_sweep(shots, &[], rng)
     }
 
     pub fn sample_with_sweep(
@@ -680,9 +690,162 @@ impl NearCliffordExecutor {
         sweep_bits: &[bool],
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
+        if shots < 64 {
+            return (0..shots)
+                .map(|_| self.run_with_sweep(sweep_bits, rng))
+                .collect();
+        }
+
+        let prefix_len = self
+            .instructions
+            .iter()
+            .take_while(|instruction| is_deterministic_near_instruction(instruction))
+            .count();
+        if prefix_len == 0 {
+            return (0..shots)
+                .map(|_| self.run_with_sweep(sweep_bits, rng))
+                .collect();
+        }
+
+        let mut prepared = ActiveState::new(self.num_qubits, self.max_active_qubits);
+        run_near_block(
+            &self.instructions[..prefix_len],
+            &mut prepared,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            sweep_bits,
+            rng,
+        )?;
+
+        if self.num_qubits <= 64
+            && let [StimInstr::Op { name, targets, .. }] = &self.instructions[prefix_len..]
+            && matches!(name.as_str(), "M" | "MZ" | "MX" | "MY")
+            && !targets.is_empty()
+            && targets
+                .iter()
+                .all(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
+        {
+            let basis = match name.as_str() {
+                "MX" => MeasurementBasis::X,
+                "MY" => MeasurementBasis::Y,
+                _ => MeasurementBasis::Z,
+            };
+            return sample_cached_terminal_measurements(prepared, targets, basis, shots, rng);
+        }
+
         (0..shots)
-            .map(|_| self.run_with_sweep(sweep_bits, rng))
+            .map(|_| {
+                let mut state = prepared.clone();
+                let mut measurements = Vec::new();
+                let mut detectors = Vec::new();
+                let mut observables = Vec::new();
+                run_near_block(
+                    &self.instructions[prefix_len..],
+                    &mut state,
+                    &mut measurements,
+                    &mut detectors,
+                    &mut observables,
+                    sweep_bits,
+                    rng,
+                )?;
+                Ok(NearCliffordShot {
+                    measurements,
+                    detectors,
+                    observables,
+                })
+            })
             .collect()
+    }
+}
+
+struct TerminalMeasurementNode {
+    state: ActiveState,
+    measurement: Option<(f64, Pauli, usize)>,
+    children: [Option<Box<TerminalMeasurementNode>>; 2],
+}
+
+impl TerminalMeasurementNode {
+    fn new(state: ActiveState) -> Self {
+        Self {
+            state,
+            measurement: None,
+            children: [None, None],
+        }
+    }
+}
+
+fn sample_cached_terminal_measurements(
+    prepared: ActiveState,
+    targets: &[StimTarget],
+    basis: MeasurementBasis,
+    shots: usize,
+    rng: &mut impl Rng,
+) -> Result<Vec<NearCliffordShot>, String> {
+    // Bound the cache to at most 2^9 branches. Later measurements continue
+    // through the ordinary sampler from the cached collapsed state.
+    let cached_depth = targets.len().min(9);
+    let mut root = TerminalMeasurementNode::new(prepared);
+    let mut results = Vec::with_capacity(shots);
+    for _ in 0..shots {
+        let mut node = &mut root;
+        let mut measurements = Vec::with_capacity(targets.len());
+        let mut depth = 0;
+        while depth < cached_depth
+            && !node.state.axes.is_empty()
+            && node.state.coefficients.len() <= 1024
+        {
+            let q = targets[depth].qubit_index().unwrap() as usize;
+            if node.measurement.is_none() {
+                let (probability_zero, _) = node.state.measurement_probabilities(q, basis)?;
+                let pauli = node.state.single_qubit_pauli(q, basis)?;
+                // Match measure(): a rank-limit error happens before the RNG draw.
+                let mask = node.state.ensure_axis(&pauli.x)?;
+                node.measurement = Some((probability_zero, pauli, mask));
+            }
+            let (probability_zero, pauli, mask) = node.measurement.as_ref().unwrap();
+            let outcome = rng.r#gen::<f64>() >= *probability_zero;
+            let branch = usize::from(outcome);
+            if node.children[branch].is_none() {
+                let mut state = node.state.clone();
+                state.collapse_pauli_measurement(pauli, *mask, outcome)?;
+                state.retire_fixed_axes();
+                node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
+            }
+            measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
+            node = node.children[branch].as_mut().unwrap();
+            depth += 1;
+        }
+        let mut state = node.state.clone();
+        for target in &targets[depth..] {
+            let q = target.qubit_index().unwrap() as usize;
+            let outcome = state.measure(q, basis, rng)?;
+            state.retire_fixed_axes();
+            measurements.push(outcome ^ matches!(target, StimTarget::QubitInv(_)));
+        }
+        results.push(NearCliffordShot {
+            measurements,
+            detectors: Vec::new(),
+            observables: Vec::new(),
+        });
+    }
+    Ok(results)
+}
+
+// Only these instructions are independent of both the RNG and sweep inputs.
+// A REPEAT remains a boundary so its nested instruction tree needs no separate
+// classification or partial unrolling.
+fn is_deterministic_near_instruction(instruction: &StimInstr) -> bool {
+    let StimInstr::Op { name, targets, .. } = instruction else {
+        return false;
+    };
+    match name.as_str() {
+        "I" | "H" | "S" | "SQRT_Z" | "S_DAG" | "SQRT_Z_DAG" | "X" | "Y" | "Z" | "T" | "T_DAG"
+        | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => true,
+        "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ" | "SWAP" => targets
+            .iter()
+            .all(|target| matches!(target, StimTarget::Qubit(_))),
+        _ => false,
     }
 }
 
