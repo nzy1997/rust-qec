@@ -1,8 +1,8 @@
 +++
-title = "Documentation index"
+title = "Documentation"
 template = "docs.html"
 
 [extra]
 root = ".."
-nav = "docs"
+nav = "start"
 +++

@@ -83,6 +83,7 @@ build-site: build-shot-viewer fetch-doc-artifacts
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
+	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --in site/static/examples/getting-started.stim --out _site/examples/getting-started.svg
 	python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery
 	python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json
 	python3 tools/build_docs_search.py --site-root _site

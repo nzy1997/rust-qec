@@ -1,10 +1,11 @@
 /* Section search stays on this device; render all indexed content as text. */
 (() => {
-  const form = document.querySelector('.docs-search');
-  const input = document.getElementById('docs-query');
+  const form = document.querySelector('.nav-search');
+  const input = document.getElementById('site-search');
+  const panel = document.querySelector('[data-docs-search-results]');
   const status = document.getElementById('search-status');
   const results = document.getElementById('search-results');
-  if (!form || !input) return;
+  if (!form || !input || !panel || !status || !results) return;
   const root = new URL(`${document.body.dataset.root}/`, location.href);
   const normalize = (text) => text.toLowerCase().replace(/[-_]/g, ' ');
   function excerptAroundMatch(prose, terms, limit = 260) {
@@ -52,12 +53,14 @@
     history.replaceState(null, '', url);
     results.replaceChildren();
     if (!query) {
-      status.textContent = 'Browse the index below, or search across the documentation.';
+      panel.hidden = true;
+      status.textContent = '';
       return;
     }
+    panel.hidden = false;
     status.textContent = 'Searching…';
     try {
-      indexPromise ||= fetch(form.dataset.searchIndex).then((response) => {
+      indexPromise ||= fetch(panel.dataset.searchIndex).then((response) => {
         if (!response.ok) throw new Error('Index unavailable');
         return response.json();
       }).catch((error) => { indexPromise = undefined; throw error; });
@@ -79,7 +82,7 @@
             + (normalize(entry.excerpt || '').includes(phrase) ? 3 : 0) };
         })
         .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title));
-      status.textContent = matches.length ? `${matches.length} matching sections${matches.length > 20 ? ' · showing the first 20' : ''}` : 'No matching sections. Try a command, crate, or shorter term, or browse below.';
+      status.textContent = matches.length ? `${matches.length} matching sections${matches.length > 20 ? ' · showing the first 20' : ''}` : 'No matching sections. Try a command, crate, or shorter term.';
       for (const entry of matches.slice(0, 20)) {
         const item = document.createElement('li');
         const breadcrumb = document.createElement('p');
@@ -96,12 +99,14 @@
         results.append(item);
       }
     } catch {
-      if (request === revision) status.textContent = 'Search is unavailable. Browse the index below or submit your query again to retry.';
+      if (request === revision) status.textContent = 'Search is unavailable. Use the documentation navigation or submit your query again to retry.';
     }
   }
   form.addEventListener('submit', (event) => { event.preventDefault(); clearTimeout(timer); search(); });
   let timer;
   input.addEventListener('input', () => { ++revision; clearTimeout(timer); timer = setTimeout(search, 150); });
   input.value = new URL(location.href).searchParams.get('q') || '';
-  if (input.value) search();
+  if (input.value) search().then(() => {
+    if (location.hash === '#documentation-search') panel.scrollIntoView();
+  });
 })();
