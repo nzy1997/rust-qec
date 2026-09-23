@@ -50,7 +50,9 @@ Detector error models must be decomposed into graphlike components before
 passing them to a matching decoder that only accepts one- and two-detector
 errors.
 
-See the [getting-started guide](doc/getting_started.md), the repository's
+See the [getting-started guide](doc/getting_started.md), the
+[experimental near-Clifford backend contract](doc/near-clifford.md),
+the repository's
 [complete external-consumer example](https://github.com/nzy1997/rust-qec/blob/master/examples/rust-consumer/src/main.rs),
 and the [rmatching decoder](https://github.com/nzy1997/rust-qec/tree/master/rmatching).
 The full API reference is available on [docs.rs](https://docs.rs/rstim).
