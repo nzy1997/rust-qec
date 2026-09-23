@@ -52,26 +52,28 @@ fn pure_clifford_route_is_preserved() {
 }
 
 #[test]
-fn unsupported_rotation_and_existing_reset_name_are_explicit() {
+fn unsupported_rotation_and_existing_reset_name_are_distinct() {
     let error =
         NearCliffordExecutor::compile_text("H 0\nROT_Z(0.4487989505128276) 0\nM 0").unwrap_err();
     assert!(error.contains("unsupported gate ROT_Z"), "{error}");
-    let error = NearCliffordExecutor::compile_text("RZ 0\nM 0").unwrap_err();
-    assert!(error.contains("unsupported gate RZ"), "{error}");
+    let reset = NearCliffordExecutor::compile_text("H 0\nRZ 0\nM 0").unwrap();
+    let mut rng = StdRng::seed_from_u64(3);
+    assert_eq!(reset.run(&mut rng).unwrap().measurements, [false]);
     let error = NearCliffordExecutor::compile_text("T(0.2) 0").unwrap_err();
     assert!(error.contains("takes no arguments"), "{error}");
 }
 
 #[test]
-fn terminal_boundary_and_invalid_targets_are_rejected_before_run() {
-    let error = NearCliffordExecutor::compile_text("M 0\nT 0").unwrap_err();
-    assert!(error.contains("follows terminal measurement"), "{error}");
+fn mid_circuit_measurement_and_invalid_targets() {
+    let circuit = NearCliffordExecutor::compile_text("M 0\nT 0\nM 0").unwrap();
+    let mut rng = StdRng::seed_from_u64(3);
+    assert_eq!(circuit.run(&mut rng).unwrap().measurements, [false, false]);
     let error = NearCliffordExecutor::compile_text("CX 0").unwrap_err();
     assert!(error.contains("requires qubit pairs"), "{error}");
     let error = NearCliffordExecutor::compile_text("T !0").unwrap_err();
     assert!(error.contains("requires qubit targets"), "{error}");
-    let error = NearCliffordExecutor::compile_text("REPEAT 2 {\n  M 0\n}").unwrap_err();
-    assert!(error.contains("repeated terminal measurement"), "{error}");
+    let repeated = NearCliffordExecutor::compile_text("REPEAT 2 {\n  M 0\n}").unwrap();
+    assert_eq!(repeated.run(&mut rng).unwrap().measurements, [false, false]);
 }
 
 #[test]
