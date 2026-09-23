@@ -3,7 +3,7 @@ mod oracle;
 
 use oracle::{Amp, DenseOracle};
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use rstim::near_clifford::{ActiveState, CliffordGate, ComplexAmp};
+use rstim::near_clifford::{ActiveState, CliffordGate, ComplexAmp, MeasurementBasis};
 
 fn assert_close(actual: ComplexAmp, expected: Amp) {
     let error = ((actual.re - expected.re).powi(2) + (actual.im - expected.im).powi(2)).sqrt();
@@ -214,4 +214,35 @@ fn clifford_target_errors_leave_state_unchanged() {
     assert!(state.apply_clifford(CliffordGate::Swap(0, 2)).is_err());
     assert_eq!(state.frame_snapshot(), before);
     assert_eq!(state.active_rank(), 0);
+}
+
+#[test]
+fn dense_axes_remain_active_while_a_cancelled_axis_retires() {
+    let mut active = ActiveState::new(4, 4);
+    let mut oracle = DenseOracle::new(4);
+    for q in 0..4 {
+        active.apply_clifford(CliffordGate::H(q)).unwrap();
+        oracle.h(q);
+        active.t(q).unwrap();
+        oracle.t(q);
+    }
+    assert_eq!(active.active_rank(), 4);
+    assert_eq!(active.retire_fixed_axes(), 0);
+    assert_eq!(active.active_rank(), 4);
+
+    active.t_dag(1).unwrap();
+    oracle.t_dag(1);
+    assert_eq!(active.retire_fixed_axes(), 1);
+    assert_eq!(active.active_rank(), 3);
+    for q in 0..4 {
+        for (basis, letter) in [
+            (MeasurementBasis::X, 'X'),
+            (MeasurementBasis::Y, 'Y'),
+            (MeasurementBasis::Z, 'Z'),
+        ] {
+            let (zero, one) = active.measurement_probabilities(q, basis).unwrap();
+            assert!((zero - oracle.measurement_probability(q, letter, false)).abs() < 1e-12);
+            assert!((one - oracle.measurement_probability(q, letter, true)).abs() < 1e-12);
+        }
+    }
 }
