@@ -45,10 +45,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 The circuit API accepts the basic single-qubit Clifford generators,
-`CX`/`CNOT`/`ZCX`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT`, mid-circuit
-`M`/`MZ`/`MX`/`MY`, and `R`/`RZ`/`RX`/`RY` and
-`MR`/`MRZ`/`MRX`/`MRY` resets. Additional Clifford aliases,
-feedback, noise, and annotations are delivered in later PRs.
+`CX`/`CNOT`/`ZCX`, `CY`/`ZCY`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT`,
+mid-circuit `M`/`MZ`/`MX`/`MY`, and `R`/`RZ`/`RX`/`RY` and
+`MR`/`MRZ`/`MRX`/`MRY` resets. It also accepts `X_ERROR`, `Y_ERROR`,
+`Z_ERROR`, `DEPOLARIZE1`, and `DEPOLARIZE2`, each with an explicit probability
+in `[0,1]`. The Pauli error branch is sampled per target or pair.
+
+The first control of `CX`/`CY`/`CZ` may be `rec[-k]` or `sweep[k]` to apply
+an X/Y/Z correction to the second qubit. `run_with_sweep` and
+`sample_with_sweep` take explicit sweep bits; `run` and `sample` use all-zero
+sweep input, and missing sweep bits are zero. `DETECTOR` reports the XOR of
+its relative measurement-record targets. `OBSERVABLE_INCLUDE(index)` emits
+an `(index, parity)` event for each instruction, in circuit order; repeated
+indices are not folded in `NearCliffordShot`. `TICK`, `QUBIT_COORDS`, and
+`SHIFT_COORDS` are accepted metadata with no effect on shot bits. Record
+references outside the measurements already produced fail explicitly.
 The default active-rank limit is 16; `compile_with_limit` lets callers choose a
 different limit. Reaching the limit returns an error. The circuit entry point
 also rejects more than 4096 physical qubits before allocating a tableau.
@@ -82,6 +93,11 @@ Set `c=cos(pi/8)` and `s=sin(pi/8)`. In the coordinate order
 With standard `T`, the physical amplitudes in computational order
 `|00>,|01>,|10>,|11>` are
 `[1/2, exp(i*pi/4)/2, exp(i*pi/4)/2, -i/2]`.
+The backend stores coefficients in the virtual computational basis `U|ab>`.
+For this circuit `U|11> = -Z1 Z0|phi>`, so its raw fourth coefficient is
+`+s²`; canonicalizing to the sign-sector basis above multiplies that entry
+by `-1`. The exact acceptance test checks both bases against an independent
+dense-state projection.
 
 This example has uniform computational-basis measurement probabilities. It
 therefore cannot by itself distinguish a coherent state from a classical
@@ -103,8 +119,10 @@ virtual bit is retained in the `origin` coordinate, so later gates see the
 correct Pauli sign. Other measurements can leave a non-minimal active basis;
 the configured rank limit still applies and reports an error if exceeded.
 
-The small-qubit test oracle is an independent dense state-vector simulator. It
-does not share the production frame or branch update code. A tableau without
-an amplitude phase for each weighted term is insufficient as a coherent oracle:
-the phase omitted by a single stabilizer state becomes a relative phase when
-terms are added.
+Small-qubit tests use an independent dense state-vector simulator and an
+explicit `T = e^(i*pi/8)(cos(pi/8) I - i sin(pi/8) Z)` weighted-tableau
+expansion. Each expanded term has a tableau plus a dense phase witness;
+the test checks every stabilizer generator against its witness before terms
+are coherently summed. A tableau without an amplitude phase for each weighted
+term is insufficient as a coherent oracle: the phase omitted by a single
+stabilizer state becomes a relative phase when terms are added.

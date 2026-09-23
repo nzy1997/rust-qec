@@ -3,6 +3,8 @@
 //! than sharing any production stabilizer/frame update code.
 #![allow(dead_code)]
 
+use rstim::sim::tableau::StabilizerState;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Amp {
     pub re: f64,
@@ -51,6 +53,125 @@ impl std::ops::Mul<f64> for Amp {
     type Output = Self;
     fn mul(self, rhs: f64) -> Self {
         Self::new(self.re * rhs, self.im * rhs)
+    }
+}
+
+/// Explicit T = a I + b Z stabilizer-term expansion for small test circuits.
+/// The tableau identifies each term's stabilizer state, while an independent
+/// dense witness retains the global phase that a tableau alone cannot store.
+#[derive(Clone)]
+pub struct WeightedTableauOracle {
+    terms: Vec<WeightedTerm>,
+    num_qubits: usize,
+}
+
+#[derive(Clone)]
+struct WeightedTerm {
+    weight: Amp,
+    tableau: StabilizerState,
+    phase_witness: DenseOracle,
+}
+
+impl WeightedTableauOracle {
+    pub fn new(num_qubits: usize) -> Self {
+        Self {
+            terms: vec![WeightedTerm {
+                weight: Amp::new(1.0, 0.0),
+                tableau: StabilizerState::new(num_qubits),
+                phase_witness: DenseOracle::new(num_qubits),
+            }],
+            num_qubits,
+        }
+    }
+
+    pub fn h(&mut self, q: usize) {
+        for term in &mut self.terms {
+            term.tableau.h(q);
+            term.phase_witness.h(q);
+        }
+    }
+
+    pub fn cx(&mut self, control: usize, target: usize) {
+        for term in &mut self.terms {
+            term.tableau.cx(control, target);
+            term.phase_witness.cx(control, target);
+        }
+    }
+
+    pub fn t(&mut self, q: usize) {
+        let angle = std::f64::consts::PI / 8.0;
+        let common = Amp::new(angle.cos(), angle.sin());
+        let identity_weight = common * Amp::new(angle.cos(), 0.0);
+        let z_weight = common * Amp::new(0.0, -angle.sin());
+        let mut expanded = Vec::with_capacity(self.terms.len() * 2);
+        for term in self.terms.drain(..) {
+            let mut z_term = term.clone();
+            z_term.weight = z_term.weight * z_weight;
+            z_term.tableau.z_gate(q);
+            z_term.phase_witness.z(q);
+            let mut identity_term = term;
+            identity_term.weight = identity_term.weight * identity_weight;
+            expanded.push(identity_term);
+            expanded.push(z_term);
+        }
+        self.terms = expanded;
+    }
+
+    pub fn term_count(&self) -> usize {
+        self.terms.len()
+    }
+
+    pub fn assert_stabilizer_witnesses(&self) {
+        for term in &self.terms {
+            let snapshot = term.tableau.canonical_snapshot();
+            let amplitudes = term.phase_witness.amplitudes();
+            for row in self.num_qubits..2 * self.num_qubits {
+                let mut x_mask = 0;
+                let mut z_mask = 0;
+                let mut y_count = 0;
+                for q in 0..self.num_qubits {
+                    let mask = 1 << (self.num_qubits - q - 1);
+                    if snapshot.x[row][q] {
+                        x_mask |= mask;
+                    }
+                    if snapshot.z[row][q] {
+                        z_mask |= mask;
+                    }
+                    if snapshot.x[row][q] && snapshot.z[row][q] {
+                        y_count += 1;
+                    }
+                }
+                let phase = match (usize::from(snapshot.phase[row]) + y_count) % 4 {
+                    0 => Amp::new(1.0, 0.0),
+                    1 => Amp::new(0.0, 1.0),
+                    2 => Amp::new(-1.0, 0.0),
+                    _ => Amp::new(0.0, -1.0),
+                };
+                let mut transformed = vec![Amp::default(); amplitudes.len()];
+                for (index, amplitude) in amplitudes.iter().enumerate() {
+                    let sign = if (index & z_mask).count_ones() % 2 == 0 {
+                        1.0
+                    } else {
+                        -1.0
+                    };
+                    transformed[index ^ x_mask] = *amplitude * phase * sign;
+                }
+                for (actual, expected) in transformed.iter().zip(amplitudes) {
+                    assert!((actual.re - expected.re).abs() < 1e-12);
+                    assert!((actual.im - expected.im).abs() < 1e-12);
+                }
+            }
+        }
+    }
+
+    pub fn amplitudes(&self) -> Vec<Amp> {
+        let mut combined = vec![Amp::default(); 1 << self.num_qubits];
+        for term in &self.terms {
+            for (combined, amplitude) in combined.iter_mut().zip(term.phase_witness.amplitudes()) {
+                *combined = *combined + term.weight * *amplitude;
+            }
+        }
+        combined
     }
 }
 
