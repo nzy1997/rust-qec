@@ -195,3 +195,46 @@ fn measurement_rank_limit_does_not_consume_randomness_or_mutate_state() {
     assert_eq!(state.active_rank(), 1);
     assert_eq!(rng.r#gen::<u64>(), untouched_rng.r#gen::<u64>());
 }
+
+#[test]
+fn wide_tableau_pauli_rows_match_two_qubit_oracle_across_measurements() {
+    fn prepare(n: usize, a: usize, b: usize) -> ActiveState {
+        let mut state = ActiveState::new(n, 8);
+        state.apply_clifford(CliffordGate::H(a)).unwrap();
+        state.apply_clifford(CliffordGate::CX(a, b)).unwrap();
+        state.apply_clifford(CliffordGate::S(b)).unwrap();
+        state.t(a).unwrap();
+        state.apply_clifford(CliffordGate::H(b)).unwrap();
+        state.t_dag(b).unwrap();
+        state
+    }
+    let mut wide = prepare(130, 63, 129);
+    let mut narrow = prepare(2, 0, 1);
+    let mut wide_rng = StdRng::seed_from_u64(739);
+    let mut narrow_rng = StdRng::seed_from_u64(739);
+    for (wide_q, narrow_q, basis) in [
+        (129, 1, MeasurementBasis::Y),
+        (63, 0, MeasurementBasis::X),
+        (129, 1, MeasurementBasis::Z),
+    ] {
+        for (wq, nq) in [(63, 0), (129, 1)] {
+            for check_basis in [
+                MeasurementBasis::X,
+                MeasurementBasis::Y,
+                MeasurementBasis::Z,
+            ] {
+                let actual = wide.measurement_probabilities(wq, check_basis).unwrap();
+                let expected = narrow.measurement_probabilities(nq, check_basis).unwrap();
+                assert!((actual.0 - expected.0).abs() < 1e-12);
+                assert!((actual.1 - expected.1).abs() < 1e-12);
+            }
+        }
+        assert_eq!(
+            wide.measure(wide_q, basis, &mut wide_rng).unwrap(),
+            narrow.measure(narrow_q, basis, &mut narrow_rng).unwrap()
+        );
+        wide.retire_fixed_axes();
+        narrow.retire_fixed_axes();
+    }
+    assert_eq!(wide_rng.r#gen::<u64>(), narrow_rng.r#gen::<u64>());
+}
