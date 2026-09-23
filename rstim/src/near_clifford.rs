@@ -187,9 +187,9 @@ impl ActiveState {
         let c = (std::f64::consts::PI / 8.0).cos();
         let s = (std::f64::consts::PI / 8.0).sin();
         let rotation = ComplexAmp::new(0.0, if dagger { s } else { -s });
+        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
         for (index, amplitude) in old.iter().copied().enumerate() {
-            let virtual_bits = self.virtual_bits(index);
-            let sign = if dot(&pauli.z, &virtual_bits) {
+            let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
                 -1.0
             } else {
                 1.0
@@ -216,6 +216,7 @@ impl ActiveState {
     ) -> Result<(f64, f64), String> {
         let pauli = self.single_qubit_pauli(q, basis)?;
         let (mask, independent) = self.coordinate_mask(&pauli.x);
+        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
         let expectation = if independent {
             0.0
         } else {
@@ -223,8 +224,7 @@ impl ActiveState {
                 .iter()
                 .enumerate()
                 .map(|(index, amplitude)| {
-                    let virtual_bits = self.virtual_bits(index);
-                    let sign = if dot(&pauli.z, &virtual_bits) {
+                    let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
                         -1.0
                     } else {
                         1.0
@@ -287,9 +287,9 @@ impl ActiveState {
         let eigenvalue = if outcome { -1.0 } else { 1.0 };
         let old = self.coefficients.clone();
         let mut next = vec![ComplexAmp::default(); old.len()];
+        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
         for (index, amplitude) in old.iter().copied().enumerate() {
-            let virtual_bits = self.virtual_bits(index);
-            let sign = if dot(&pauli.z, &virtual_bits) {
+            let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
                 -1.0
             } else {
                 1.0
@@ -451,14 +451,13 @@ impl ActiveState {
         Ok(expanded_len / 2)
     }
 
-    fn virtual_bits(&self, index: usize) -> Vec<bool> {
-        let mut bits = self.origin.clone();
-        for (axis_index, axis) in self.axes.iter().enumerate() {
-            if index & (1 << axis_index) != 0 {
-                xor(&mut bits, axis);
-            }
-        }
-        bits
+    fn sign_coordinates(&self, z: &[bool]) -> (bool, usize) {
+        let mask = self
+            .axes
+            .iter()
+            .enumerate()
+            .fold(0, |mask, (i, axis)| mask | ((dot(z, axis) as usize) << i));
+        (dot(z, &self.origin), mask)
     }
 
     fn coordinate_mask(&self, x: &[bool]) -> (usize, bool) {
