@@ -86,3 +86,38 @@ fn pure_clifford_resets_do_not_consume_active_rank() {
     let shot = circuit.run(&mut rng).unwrap();
     assert_eq!(shot.measurements, vec![false; 24]);
 }
+
+#[test]
+fn pure_clifford_y_measurement_and_retired_origin_rebase() {
+    let mut pure = ActiveState::new(1, 0);
+    pure.apply_clifford(CliffordGate::H(0)).unwrap();
+    pure.apply_clifford(CliffordGate::S(0)).unwrap();
+    let mut rng = StdRng::seed_from_u64(739);
+    assert!(!pure.measure(0, MeasurementBasis::Y, &mut rng).unwrap());
+    assert!(!pure.measure(0, MeasurementBasis::Y, &mut rng).unwrap());
+
+    for rotate_to_y in [false, true] {
+        let mut found_negative_x = false;
+        for seed in 0..64 {
+            let mut state = ActiveState::new(2, 1);
+            state.apply_clifford(CliffordGate::H(0)).unwrap();
+            state.t(0).unwrap();
+            let mut rng = StdRng::seed_from_u64(seed);
+            if !state.measure(0, MeasurementBasis::X, &mut rng).unwrap() {
+                continue;
+            }
+            assert_eq!(state.retire_fixed_axes(), 1);
+            assert_eq!(state.origin(), &[true, false]);
+            state.apply_clifford(CliffordGate::H(0)).unwrap();
+            if rotate_to_y {
+                state.apply_clifford(CliffordGate::S(0)).unwrap();
+            }
+            assert!(!state.measure(1, MeasurementBasis::Z, &mut rng).unwrap());
+            assert_eq!(state.origin(), &[false, false]);
+            assert!(state.measure(0, MeasurementBasis::Z, &mut rng).unwrap());
+            found_negative_x = true;
+            break;
+        }
+        assert!(found_negative_x);
+    }
+}
