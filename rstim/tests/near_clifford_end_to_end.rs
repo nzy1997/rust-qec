@@ -3,6 +3,7 @@ mod oracle;
 
 use oracle::{DenseOracle, WeightedTableauOracle};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+use rstim::ir::{StimInstr, StimTarget};
 use rstim::near_clifford::{ActiveState, CliffordGate, MeasurementBasis, NearCliffordExecutor};
 
 #[test]
@@ -134,6 +135,9 @@ fn sweep_feedback_and_observable_events_follow_stim_record_order() {
     assert_eq!(one.measurements, [true]);
     assert_eq!(one.detectors, [true]);
     assert_eq!(one.observables, [(3, true), (3, true)]);
+    for shot in circuit.sample_with_sweep(3, &[true], &mut rng).unwrap() {
+        assert_eq!(shot, one);
+    }
 }
 
 #[test]
@@ -203,6 +207,10 @@ fn malformed_noise_feedback_and_records_fail_explicitly() {
         "DETECTOR rec[-1]",
         "H 0\nM 0\nCX rec[-2] 0",
         "REPEAT 2 {\n  DETECTOR rec[-1]\n  M 0\n}",
+        "CX 0 rec[-1]",
+        "CX 0 0",
+        "TICK 0",
+        "T",
     ] {
         assert!(
             NearCliffordExecutor::compile_text(circuit).is_err(),
@@ -214,4 +222,20 @@ fn malformed_noise_feedback_and_records_fail_explicitly() {
             .unwrap();
     let mut rng = StdRng::seed_from_u64(739);
     assert_eq!(circuit.run(&mut rng).unwrap().detectors, [false, false]);
+    assert!(
+        NearCliffordExecutor::compile(vec![
+            StimInstr::new("SHIFT_COORDS", vec![f64::NAN], vec![],)
+        ])
+        .is_err()
+    );
+    assert!(
+        NearCliffordExecutor::compile(vec![
+            StimInstr::new("M", vec![], vec![StimTarget::Qubit(0)]),
+            StimInstr::Repeat {
+                count: u64::MAX,
+                body: vec![StimInstr::new("M", vec![], vec![StimTarget::Qubit(0)])],
+            },
+        ])
+        .is_err()
+    );
 }
