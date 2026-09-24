@@ -77,6 +77,19 @@ fn terminal_cache_budget_preserves_long_batch_and_rng_state() {
 }
 
 #[test]
+fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
+    let inactive_targets = vec!["0"; 256].join(" ");
+    let inactive =
+        NearCliffordExecutor::compile_text(&format!("H 0\nM {inactive_targets}")).unwrap();
+    assert_matches_individual_runs(&inactive, 64, &[]);
+
+    let active_targets = vec!["1"; 70].join(" ");
+    let active =
+        NearCliffordExecutor::compile_text(&format!("H 0\nT 0\nH 0\nM {active_targets}")).unwrap();
+    assert_matches_individual_runs(&active, 128, &[]);
+}
+
+#[test]
 fn terminal_rank_limit_error_does_not_advance_rng() {
     let circuit =
         NearCliffordExecutor::compile_with_limit(parse_lines("H 0\nH 1\nT 0\nM 1").unwrap(), 1)
