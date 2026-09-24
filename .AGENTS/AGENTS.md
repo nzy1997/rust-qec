@@ -39,3 +39,5 @@ Every behavior change should update or add an integration test in the owning cra
 
 ## Commit & Pull Request Guidelines
 Recent commits use short imperative subjects, sometimes with prefixes such as `feat:`, `fix:`, or `docs:`. Follow that pattern and keep commits scoped to one subsystem when possible; avoid mixing `rstim` logic changes with `qp101-viz` asset churn unless they are directly linked. Pull requests should summarize behavior changes, list the exact verification commands run, and include a screenshot or generated PNG/PDF when renderer output changes.
+
+All pull requests targeting `master` must use GitHub's **Squash and merge** option. Do not use **Create a merge commit** or **Rebase and merge**. If you are responsible for merging a pull request, confirm the merge method before completing it.
