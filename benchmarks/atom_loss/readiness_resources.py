@@ -41,7 +41,7 @@ import tempfile
 import time
 import numpy as np
 
-from . import chain_reference, decoder_reference
+from . import chain_reference, decoder_reference, retained_source
 from .output_rules import evaluate_run
 from .run import ROOT, save, digest
 
@@ -431,6 +431,8 @@ def recommended_ranges(records):
 
 
 def run_campaign(binary, matrix_path, profile, out_path):
+    revision = checkout_revision()
+    source_inputs = retained_source.clean_inventory(ROOT, revision) if profile == 'full' else None
     matrix = json.loads(Path(matrix_path).read_text())
     require(matrix.get('schema_version') == 'rustqec.envelope-support.v1',
             'resources campaign requires the envelope support matrix schema')
@@ -445,6 +447,8 @@ def run_campaign(binary, matrix_path, profile, out_path):
             records.append(measure_case(binary, work, case))
         records += failure_cases(binary, work)
     total_wall = time.perf_counter() - started
+    if profile == 'full' and retained_source.clean_inventory(ROOT, revision) != source_inputs:
+        raise ValueError('Measurement source inputs changed during campaign')
     problems = []
     for record in records:
         problems += [f"{record['id']}: {p}" for p in record['output_rule_problems']]
@@ -463,7 +467,7 @@ def run_campaign(binary, matrix_path, profile, out_path):
     result = {
         'schema_version': SCHEMA,
         'profile': profile,
-        'checkout_revision': checkout_revision(),
+        'checkout_revision': revision,
         'generated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         'machine': machine_identity(),
         'build': build_identity(binary),
@@ -478,6 +482,7 @@ def run_campaign(binary, matrix_path, profile, out_path):
         'status': 'pass' if not problems else 'fail',
     }
     if profile == 'full':
+        result['source_inputs'] = source_inputs
         write_retained_report(result, out_path)
     else:
         save(out_path, result)
@@ -514,6 +519,7 @@ def write_retained_report(result, out_dir):
         'generated_by': 'python3 -m benchmarks.atom_loss.readiness_resources --profile full',
         'generated_at': result['generated_at'],
         'checkout_revision': result.get('checkout_revision'),
+        'source_inputs': result['source_inputs'],
         'machine': result['machine'], 'build': result['build'], 'matrix': result['matrix'],
         'stress_budget': result['stress_budget'],
         'total_wall_seconds': result['total_wall_seconds'],
@@ -606,11 +612,27 @@ def verify_manifest(manifest_path):
     require(manifest.get('schema_version') == MANIFEST_SCHEMA,
             f"unsupported manifest schema: {manifest.get('schema_version')!r}")
     root = manifest_path.parent
-    for field in ('machine', 'build', 'stress_budget', 'recommended', 'cases'):
+    for field in ('machine', 'build', 'stress_budget', 'recommended', 'cases',
+                  'checkout_revision', 'source_inputs'):
         if field not in manifest:
             problems.append(f'manifest missing {field}')
     if problems:
         return problems
+    revision = manifest['checkout_revision']
+    if (not isinstance(revision, str) or len(revision) != 40
+            or any(char not in '0123456789abcdef' for char in revision)
+            or set(revision) == {'0'}):
+        problems.append('invalid retained measurement source revision')
+    try:
+        if manifest['source_inputs'] != retained_source.inventory(ROOT, 'HEAD'):
+            problems.append('retained measurement source inputs differ from current checkout')
+        if not problems and subprocess.run(
+                ['git', '-C', str(ROOT), 'cat-file', '-e', revision+'^{commit}'],
+                capture_output=True, check=False).returncode == 0:
+            if manifest['source_inputs'] != retained_source.inventory(ROOT, revision):
+                problems.append('retained measurement source inputs differ from measured revision')
+    except (subprocess.CalledProcessError, ValueError):
+        problems.append('cannot verify retained measurement source inputs')
     if not manifest['stress_budget'].get('declared_before_run'):
         problems.append('stress budget was not declared before the run')
     if not manifest['build'].get('sha256') or not manifest['machine'].get('platform'):

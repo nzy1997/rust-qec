@@ -34,11 +34,15 @@ to contain its own commit hash would be circular. The verifier independently
 reconstructs the complete input inventory from Git and Cargo workspace members.
 All files in every workspace member, benchmark code/fixtures/requirements,
 workspace manifests/lockfile, toolchain/configuration and the evidence CI workflow
-must match S at the current checkout. New, missing or changed inputs fail; only
-changes outside that declared source scope, such as site artifacts, can follow S
-without invalidating evidence. Source S must be an ancestor of the current HEAD.
-This deliberately conservative inventory can require regeneration even for
-non-computational changes within a workspace member.
+must match the recorded inventory at the current checkout. New, missing or
+changed inputs fail; only changes outside that declared source scope, such as
+site artifacts, can follow S without invalidating evidence. Squash merging may
+remove S from the current checkout's ancestry or object database; when the
+object is available, the verifier also checks its tree against the recorded
+inventory. If the object is absent, the verifier checks current source-content
+equivalence, not the historical identity of S. This deliberately conservative
+inventory can require regeneration
+even for non-computational changes within a workspace member.
 
 `source-manifest.json` records S, the complete Git blob/mode inventory and digest,
 exact build commands, compiler/Cargo versions and all five measured binary hashes.

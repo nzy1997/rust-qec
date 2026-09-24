@@ -49,6 +49,7 @@ if str(REPO_ROOT) not in sys.path:
 from tools import check_envelope_support as support  # noqa: E402
 from tools import envelope_mle_scope as mle_scope  # noqa: E402
 from benchmarks.atom_loss import mle_candidate_resources as mle_resource_campaign  # noqa: E402
+from benchmarks.atom_loss import retained_source  # noqa: E402
 
 SCHEMA_VERSION = "rustqec.envelope-release-report.v1"
 EQUIVALENCE_SCHEMA = "rustqec.source-equivalence.v1"
@@ -340,28 +341,7 @@ MLE_FAILURE_CODES = {
 # and circuit generation, dataset packaging, workload execution), the input
 # fixtures the workloads consume, and the build configuration that affects
 # the measured performance.
-RETAINED_EQUIVALENCE_PATHS = (
-    "benchmarks/atom_loss/readiness_resources.py",
-    "benchmarks/atom_loss/chain_reference.py",
-    "benchmarks/atom_loss/decoder_reference.py",
-    "benchmarks/atom_loss/run.py",
-    "benchmarks/atom_loss/reference.py",
-    "benchmarks/atom_loss/artifacts.py",
-    "benchmarks/atom_loss/correctness.py",
-    "benchmarks/atom_loss/shot_data.py",
-    "benchmarks/atom_loss/fixtures",
-    "benchmarks/atom_loss/requirements.txt",
-    "rustqec-cli/tests/fixtures/current_rstim_atom_loss",
-    "docs/envelope-support.json",
-    "Cargo.toml",
-    "Cargo.lock",
-    ".cargo",
-    "rustqec-cli/src", "rustqec-cli/Cargo.toml",
-    "renvelope/src", "renvelope/Cargo.toml",
-    "rmatching/src", "rmatching/Cargo.toml",
-    "qec-ilp-core/src", "qec-ilp-core/Cargo.toml",
-    "rstim/src", "rstim/Cargo.toml",
-)
+RETAINED_EQUIVALENCE_PATHS = retained_source.PATHS
 
 
 def measurement_matrix_projection(matrix: dict[str, Any]) -> dict[str, Any]:
@@ -631,9 +611,9 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
                           repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     """Bind the committed full resource report to the candidate's sources.
 
-    The report is a committed artifact, so it cannot name its own commit; the
-    gate instead requires its measurement revision to be an ancestor of the
-    candidate with zero changes in measurement-relevant sources since then.
+    The measured commit may be absent after a squash merge. The retained Git
+    input inventory must still match the candidate exactly, and the measured
+    commit's tree is checked too whenever that object is available.
     """
     record: dict[str, Any] = {"path": str(path)}
     if not path.is_file():
@@ -652,31 +632,36 @@ def check_retained_report(path: Path, candidate: str, gaps: list[str],
         gaps.append("retained resource report does not record a passing campaign")
     revision = manifest.get("checkout_revision")
     record["checkout_revision"] = revision
-    if not revision:
-        gaps.append("retained resource report does not record its checkout revision")
+    if (not isinstance(revision, str) or len(revision) != 40
+            or any(char not in "0123456789abcdef" for char in revision)
+            or set(revision) == {"0"}):
+        gaps.append("retained resource report revision is missing or invalid")
         record["binding"] = "missing"
         return record
-    decision = is_ancestor(str(revision), candidate, repo_root)
-    if decision is not True:
-        gaps.append(
-            f"retained resource report revision {revision} is not an ancestor of the "
-            f"candidate {candidate}"
-        )
-        record["binding"] = "not-an-ancestor"
+    measured_inputs = manifest.get("source_inputs")
+    if not isinstance(measured_inputs, dict) or not measured_inputs:
+        gaps.append("retained resource report source inventory is missing")
+        record["binding"] = "missing-inventory"
         return record
-    diff = subprocess.run(
-        ["git", "diff", "--name-only", str(revision), candidate, "--",
-         *RETAINED_EQUIVALENCE_PATHS],
-        capture_output=True, text=True, cwd=repo_root, check=False,
-    )
-    if diff.returncode:
-        gaps.append("cannot verify retained-report source equivalence (git diff failed)")
+    source_available = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-e", revision + "^{commit}"],
+        capture_output=True, check=False,
+    ).returncode == 0
+    try:
+        if source_available and retained_source.inventory(repo_root, revision) != measured_inputs:
+            gaps.append("retained resource report source inventory differs from measured revision")
+            record["binding"] = "invalid-inventory"
+            return record
+        candidate_inputs = retained_source.inventory(repo_root, candidate)
+    except (subprocess.CalledProcessError, ValueError):
+        gaps.append("cannot verify retained-report source equivalence (git inventory failed)")
         record["binding"] = "unverifiable"
         return record
-    changed = [line for line in diff.stdout.splitlines() if line]
+    changed = [name for name in sorted(measured_inputs.keys() | candidate_inputs.keys())
+               if measured_inputs.get(name) != candidate_inputs.get(name)]
     matrix_path = "docs/envelope-support.json"
     if matrix_path in changed:
-        measured_matrix = git_json(str(revision), matrix_path, repo_root)
+        measured_matrix = git_json(str(revision), matrix_path, repo_root) if source_available else None
         candidate_matrix = git_json(candidate, matrix_path, repo_root)
         if (measured_matrix is not None and candidate_matrix is not None
                 and measurement_matrix_projection(measured_matrix)
@@ -1222,6 +1207,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
                 "schema_version": RETAINED_MANIFEST_SCHEMA,
                 "status": "pass",
                 "checkout_revision": measured,
+                "source_inputs": retained_source.inventory(repo, measured),
             }) + "\n", encoding="utf-8")
             mutated_gaps: list[str] = []
             mutated = check_retained_report(manifest_path, candidate_head,
@@ -1244,6 +1230,75 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         "mutation": "helper-source-change-invalidates-retained-report",
         "rejected": eleventh,
         "detail": "decoder_reference.py edit must flip the binding to sources-differ",
+    })
+
+    def squash_source_equivalence() -> bool:
+        with tempfile.TemporaryDirectory(prefix="envelope-squash-selftest-") as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            repo.mkdir()
+
+            def git(directory: Path, *args: str) -> str:
+                return subprocess.check_output(
+                    ["git", "-C", str(directory), "-c", "user.name=selftest", "-c",
+                     "user.email=selftest@example.invalid", *args], text=True,
+                ).strip()
+
+            git(repo, "init", "-q")
+            helper = repo / "benchmarks/atom_loss/decoder_reference.py"
+            helper.parent.mkdir(parents=True)
+            helper.write_text("# measured helper\n")
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "measured")
+            measured = git(repo, "rev-parse", "HEAD")
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({
+                "schema_version": RETAINED_MANIFEST_SCHEMA,
+                "status": "pass",
+                "checkout_revision": measured,
+                "source_inputs": retained_source.inventory(repo, measured),
+            }))
+            git(repo, "checkout", "--orphan", "squashed")
+            git(repo, "add", ".")
+            git(repo, "commit", "-qm", "squashed content")
+            clone = root / "clone"
+            subprocess.run(["git", "clone", "-q", "--no-local", "--depth", "1",
+                            "--single-branch", "--branch", "squashed", str(repo),
+                            str(clone)], check=True)
+            if subprocess.run(["git", "-C", str(clone), "cat-file", "-e",
+                               measured + "^{commit}"], capture_output=True).returncode == 0:
+                return False
+            gaps: list[str] = []
+            clean = check_retained_report(manifest, git(clone, "rev-parse", "HEAD"),
+                                          gaps, clone)
+            helper = clone / "benchmarks/atom_loss/decoder_reference.py"
+            helper.write_text("# changed helper\n")
+            git(clone, "add", ".")
+            git(clone, "commit", "-qm", "changed content")
+            changed_gaps: list[str] = []
+            changed = check_retained_report(manifest, git(clone, "rev-parse", "HEAD"),
+                                            changed_gaps, clone)
+            helper.write_text("# measured helper\n")
+            added_helper = clone / "benchmarks/atom_loss/new_measurement_helper.py"
+            added_helper.write_text("# newly added input\n")
+            git(clone, "add", ".")
+            git(clone, "commit", "-qm", "added helper")
+            added_gaps: list[str] = []
+            added = check_retained_report(manifest, git(clone, "rev-parse", "HEAD"),
+                                          added_gaps, clone)
+            return (clean["binding"] == "source-equivalent" and not gaps
+                    and changed["binding"] == "sources-differ"
+                    and any("measurement-relevant sources changed" in gap
+                            for gap in changed_gaps)
+                    and added["binding"] == "sources-differ"
+                    and "benchmarks/atom_loss/new_measurement_helper.py"
+                    in added["changed_equivalence_paths"])
+
+    squash_checked = squash_source_equivalence()
+    observations.append({
+        "mutation": "squash-missing-source-object-still-checks-inputs",
+        "rejected": squash_checked,
+        "detail": "squash checkout accepts equal inputs and rejects changed inputs",
     })
 
     def remove_mle_real_circuit_case(clone: Path, temporary: Path) -> Path | None:
@@ -1419,7 +1474,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
     })
 
     passed = all([first, second, third, fourth, fifth, sixth, seventh, eighth,
-                  ninth, tenth, eleventh, twelfth, thirteenth, fourteenth,
+                  ninth, tenth, eleventh, squash_checked, twelfth, thirteenth, fourteenth,
                   identity_bound, fifteenth, sixteenth, seventeenth, eighteenth, nineteenth,
                   twentieth, twenty_first, twenty_second])
     print(json.dumps({"self_test_mutations": observations}, indent=2))

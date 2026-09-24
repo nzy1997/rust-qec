@@ -44,6 +44,27 @@ class SourceContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Current source/build inputs differ'):
             verify_source(self.record, self.repo)
 
+    def test_squash_merge_preserves_binding_even_without_source_commit_object(self):
+        source_commit = self.record['source_commit']
+        self.git('checkout', '--orphan', 'squashed')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'squashed source')
+        self.assertEqual(verify_source(self.record, self.repo), source_commit)
+        with tempfile.TemporaryDirectory() as tmp:
+            clone = Path(tmp)/'clone'
+            subprocess.run(['git', 'clone', '-q', '--no-local', '--depth', '1', '--single-branch',
+                            '--branch', 'squashed', str(self.repo), str(clone)], check=True)
+            missing = subprocess.run(['git', '-C', str(clone), 'cat-file', '-e',
+                                      source_commit+'^{commit}'], capture_output=True)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertEqual(verify_source(self.record, clone), source_commit)
+            (clone/'decoder/src/lib.rs').write_text('// different decoder\n')
+            subprocess.run(['git', '-C', str(clone), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(clone), '-c', 'user.email=test@example.invalid',
+                            '-c', 'user.name=Source test', 'commit', '-qm', 'changed source'], check=True)
+            with self.assertRaisesRegex(ValueError, 'Current source/build inputs differ'):
+                verify_source(self.record, clone)
+
     def test_missing_inventory_and_new_build_input_rejected(self):
         record = copy.deepcopy(self.record); del record['inputs']['decoder/build.rs']
         with self.assertRaisesRegex(ValueError, 'source inventory'):
@@ -63,6 +84,19 @@ class SourceContractTests(unittest.TestCase):
         self.write('.cargo/config.toml', '[build]\nrustflags = []\n')
         with self.assertRaisesRegex(ValueError, 'Uncommitted source input'):
             verify_source(self.record, self.repo)
+
+    def test_retained_campaign_rejects_dirty_or_new_measurement_input(self):
+        from .retained_source import clean_inventory
+
+        revision = self.record['source_commit']
+        self.assertTrue(clean_inventory(self.repo, revision))
+        self.write('benchmarks/atom_loss/run.py', '# changed harness\n')
+        with self.assertRaisesRegex(ValueError, 'checkout is dirty'):
+            clean_inventory(self.repo, revision)
+        self.write('benchmarks/atom_loss/run.py', '# measured harness\n')
+        self.write('benchmarks/atom_loss/new_helper.py', '# new source\n')
+        with self.assertRaisesRegex(ValueError, 'checkout is dirty'):
+            clean_inventory(self.repo, revision)
 
     def test_ignored_local_cargo_config_is_rejected(self):
         from .source_contract import build_environment
