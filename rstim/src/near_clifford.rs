@@ -225,20 +225,44 @@ impl ActiveState {
             0.0
         } else {
             let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
-            self.coefficients
-                .iter()
-                .enumerate()
-                .map(|(index, amplitude)| {
-                    let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
-                        -1.0
-                    } else {
-                        1.0
-                    };
-                    let image = i_pow(pauli.phase) * (*amplitude * sign);
-                    let conjugate = self.coefficients[index ^ mask].conj();
-                    (conjugate * image).re
-                })
-                .sum::<f64>()
+            let phase = i_pow(pauli.phase);
+            if mask == 0 {
+                self.coefficients
+                    .iter()
+                    .enumerate()
+                    .map(|(index, amplitude)| {
+                        let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
+                            -1.0
+                        } else {
+                            1.0
+                        };
+                        (amplitude.conj() * (phase * (*amplitude * sign))).re
+                    })
+                    .sum::<f64>()
+            } else {
+                // A Hermitian Pauli contributes the same real expectation
+                // from both sides of each coordinate pair.
+                debug_assert_eq!(
+                    (mask & sign_mask).count_ones() & 1,
+                    (pauli.phase % 2) as u32
+                );
+                let pivot = 1usize << (usize::BITS - 1 - mask.leading_zeros());
+                let mut expectation = 0.0;
+                for block in (0..self.coefficients.len()).step_by(pivot * 2) {
+                    for offset in 0..pivot {
+                        let index = block + offset;
+                        let partner = index ^ mask;
+                        let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
+                            -1.0
+                        } else {
+                            1.0
+                        };
+                        let image = phase * (self.coefficients[index] * sign);
+                        expectation += 2.0 * (self.coefficients[partner].conj() * image).re;
+                    }
+                }
+                expectation
+            }
         };
         ((1.0 + expectation) / 2.0).clamp(0.0, 1.0)
     }
@@ -275,11 +299,15 @@ impl ActiveState {
             return Ok(outcome != 0);
         }
         let pauli = self.single_qubit_pauli(q, basis)?;
+        self.measure_active_pauli(&pauli, rng)
+    }
+
+    fn measure_active_pauli(&mut self, pauli: &Pauli, rng: &mut impl Rng) -> Result<bool, String> {
         let (mask, independent) = self.coordinate_mask(&pauli.x);
-        let probability_zero = self.pauli_probability_zero(&pauli, mask, independent);
+        let probability_zero = self.pauli_probability_zero(pauli, mask, independent);
         let mask = self.ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
         let outcome = rng.r#gen::<f64>() >= probability_zero;
-        self.collapse_pauli_measurement(&pauli, mask, outcome)?;
+        self.collapse_pauli_measurement(pauli, mask, outcome, probability_zero)?;
         Ok(outcome)
     }
 
@@ -288,9 +316,22 @@ impl ActiveState {
         pauli: &Pauli,
         mask: usize,
         outcome: bool,
+        probability_zero: f64,
     ) -> Result<(), String> {
         let eigenvalue = if outcome { -1.0 } else { 1.0 };
-        let old = self.coefficients.clone();
+        // The two entries of each Pauli orbit can be updated together. Keep a
+        // rollback copy only for a numerically tiny outcome, where the
+        // projection could still be rejected as zero probability.
+        let selected_probability = if outcome {
+            1.0 - probability_zero
+        } else {
+            probability_zero
+        };
+        let backup = if selected_probability <= 1e-12 || !selected_probability.is_finite() {
+            Some(self.coefficients.clone())
+        } else {
+            None
+        };
         let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
         let phase = i_pow(pauli.phase);
         let image = |index: usize, amplitude: ComplexAmp| {
@@ -301,30 +342,34 @@ impl ActiveState {
             };
             phase * (amplitude * (sign * eigenvalue))
         };
+        let mut norm_sqr = 0.0;
         if mask == 0 {
-            for (index, amplitude) in old.iter().copied().enumerate() {
-                self.coefficients[index] = amplitude * 0.5 + image(index, amplitude) * 0.5;
+            for (index, coefficient) in self.coefficients.iter_mut().enumerate() {
+                let amplitude = *coefficient;
+                *coefficient = amplitude * 0.5 + image(index, amplitude) * 0.5;
+                norm_sqr += coefficient.norm_sqr();
             }
         } else {
             // The Pauli action pairs each coordinate with index ^ mask.
-            for index in 0..self.coefficients.len() {
-                let partner = index ^ mask;
-                if index < partner {
-                    let left = old[index];
-                    let right = old[partner];
+            let pivot = 1usize << (usize::BITS - 1 - mask.leading_zeros());
+            for block in (0..self.coefficients.len()).step_by(pivot * 2) {
+                for offset in 0..pivot {
+                    let index = block + offset;
+                    let partner = index ^ mask;
+                    let left = self.coefficients[index];
+                    let right = self.coefficients[partner];
                     self.coefficients[index] = left * 0.5 + image(partner, right) * 0.5;
                     self.coefficients[partner] = image(index, left) * 0.5 + right * 0.5;
+                    norm_sqr += self.coefficients[index].norm_sqr();
+                    norm_sqr += self.coefficients[partner].norm_sqr();
                 }
             }
         }
-        let norm = self
-            .coefficients
-            .iter()
-            .map(|amplitude| amplitude.norm_sqr())
-            .sum::<f64>()
-            .sqrt();
+        let norm = norm_sqr.sqrt();
         if norm <= 1e-15 {
-            self.coefficients = old;
+            if let Some(backup) = backup {
+                self.coefficients = backup;
+            }
             return Err("near-Clifford measurement selected zero-probability outcome".into());
         }
         for amplitude in &mut self.coefficients {
@@ -431,12 +476,16 @@ impl ActiveState {
     pub fn retire_fixed_axes(&mut self) -> usize {
         let mut retired = 0;
         let mut axis_index = 0;
+        let mut witness = self
+            .coefficients
+            .iter()
+            .position(|coefficient| coefficient.norm_sqr() >= 1e-24);
         while axis_index < self.axes.len() {
-            // A single significant coefficient in each half proves that this
-            // coordinate is not fixed. Check one entry from each half before
-            // scanning the entire dense vector for high-index axes.
-            if self.coefficients[0].norm_sqr() >= 1e-24
-                && self.coefficients[1 << axis_index].norm_sqr() >= 1e-24
+            // A significant pair differing in this bit proves the axis is not
+            // fixed. The first live coefficient need not be coordinate zero
+            // after a projection, so use it as the witness for every axis.
+            if let Some(witness) = witness
+                && self.coefficients[witness ^ (1 << axis_index)].norm_sqr() >= 1e-24
             {
                 axis_index += 1;
                 continue;
@@ -471,6 +520,10 @@ impl ActiveState {
                     .collect();
                 self.coefficients = reduced;
                 retired += 1;
+                witness = self
+                    .coefficients
+                    .iter()
+                    .position(|coefficient| coefficient.norm_sqr() >= 1e-24);
             } else {
                 axis_index += 1;
             }
@@ -858,6 +911,25 @@ impl TerminalMeasurementNode {
     }
 }
 
+const MAX_CACHED_TERMINAL_PAULIS: usize = 64;
+
+fn cached_terminal_pauli<'a>(
+    cache: &'a mut Vec<Option<Pauli>>,
+    state: &ActiveState,
+    index: usize,
+    q: usize,
+    basis: MeasurementBasis,
+) -> Result<&'a Pauli, String> {
+    debug_assert!(index < MAX_CACHED_TERMINAL_PAULIS);
+    if cache.len() <= index {
+        cache.resize_with(index + 1, || None);
+    }
+    if cache[index].is_none() {
+        cache[index] = Some(state.single_qubit_pauli(q, basis)?);
+    }
+    Ok(cache[index].as_ref().unwrap())
+}
+
 fn sample_cached_terminal_measurements(
     prepared: ActiveState,
     targets: &[StimTarget],
@@ -880,6 +952,10 @@ fn sample_cached_terminal_measurements_with_limit(
     // many possible outcomes must not grow the cache with the shot count.
     debug_assert!(max_cached_nodes > 0);
     let cached_depth = targets.len().min(16);
+    // Terminal measurements do not change the Clifford frame while active
+    // coordinates remain. Convert reached physical Paulis only once per
+    // batch, with a fixed cache bound for long target lists.
+    let mut terminal_paulis = Vec::new();
     let mut root = TerminalMeasurementNode::new(prepared);
     let mut cached_nodes = 1;
     let mut results = Vec::with_capacity(shots);
@@ -892,9 +968,11 @@ fn sample_cached_terminal_measurements_with_limit(
             && !node.state.axes.is_empty()
             && node.state.coefficients.len() <= 1024
         {
-            let q = targets[depth].qubit_index().unwrap() as usize;
             if node.measurement.is_none() {
-                let pauli = node.state.single_qubit_pauli(q, basis)?;
+                let q = targets[depth].qubit_index().unwrap() as usize;
+                let pauli =
+                    cached_terminal_pauli(&mut terminal_paulis, &node.state, depth, q, basis)?
+                        .clone();
                 let (mask, independent) = node.state.coordinate_mask(&pauli.x);
                 let probability_zero = node.state.pauli_probability_zero(&pauli, mask, independent);
                 // Match measure(): a rank-limit error happens before the RNG draw.
@@ -908,7 +986,7 @@ fn sample_cached_terminal_measurements_with_limit(
             let branch = usize::from(outcome);
             if node.children[branch].is_none() {
                 let mut state = node.state.clone();
-                state.collapse_pauli_measurement(pauli, *mask, outcome)?;
+                state.collapse_pauli_measurement(pauli, *mask, outcome, *probability_zero)?;
                 state.retire_fixed_axes();
                 if cached_nodes == max_cached_nodes {
                     measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
@@ -924,9 +1002,15 @@ fn sample_cached_terminal_measurements_with_limit(
             depth += 1;
         }
         let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
-        for target in &targets[depth..] {
+        for (offset, target) in targets[depth..].iter().enumerate() {
             let q = target.qubit_index().unwrap() as usize;
-            let outcome = state.measure(q, basis, rng)?;
+            let outcome = if state.axes.is_empty() || depth + offset >= MAX_CACHED_TERMINAL_PAULIS {
+                state.measure(q, basis, rng)?
+            } else {
+                let pauli =
+                    cached_terminal_pauli(&mut terminal_paulis, &state, depth + offset, q, basis)?;
+                state.measure_active_pauli(pauli, rng)?
+            };
             state.retire_fixed_axes();
             measurements.push(outcome ^ matches!(target, StimTarget::QubitInv(_)));
         }
@@ -1366,7 +1450,7 @@ mod tests {
         let mut state = ActiveState::new(1, 1);
         let before = state.coefficients.clone();
         let error = state
-            .collapse_pauli_measurement(&Pauli::identity(1), 0, true)
+            .collapse_pauli_measurement(&Pauli::identity(1), 0, true, 1.0)
             .unwrap_err();
         assert!(error.contains("zero-probability"));
         assert_eq!(state.coefficients, before);

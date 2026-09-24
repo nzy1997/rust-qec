@@ -190,6 +190,47 @@ fn three_active_axes_preserve_pauli_probabilities_through_sequential_measurement
 }
 
 #[test]
+fn long_mixed_measurement_sequence_preserves_normalization_and_oracle_probabilities() {
+    let mut active = ActiveState::new(3, 8);
+    let mut oracle = DenseOracle::new(3);
+    let mut rng = StdRng::seed_from_u64(739);
+    for q in 0..3 {
+        active.apply_clifford(CliffordGate::H(q)).unwrap();
+        oracle.h(q);
+    }
+    for step in 0..96 {
+        let q = step % 3;
+        if step % 2 == 0 {
+            active.t(q).unwrap();
+            oracle.t(q);
+        } else {
+            active.t_dag(q).unwrap();
+            oracle.t_dag(q);
+        }
+        if step % 4 == 0 {
+            active.apply_clifford(CliffordGate::H(q)).unwrap();
+            oracle.h(q);
+        }
+        let (basis, letter) = match step % 3 {
+            0 => (MeasurementBasis::X, 'X'),
+            1 => (MeasurementBasis::Y, 'Y'),
+            _ => (MeasurementBasis::Z, 'Z'),
+        };
+        let (zero, one) = active.measurement_probabilities(q, basis).unwrap();
+        assert!((zero - oracle.measurement_probability(q, letter, false)).abs() < 1e-10);
+        assert!((one - oracle.measurement_probability(q, letter, true)).abs() < 1e-10);
+        let outcome = active.measure(q, basis, &mut rng).unwrap();
+        oracle.collapse(q, letter, outcome);
+        let norm = active
+            .coefficients()
+            .iter()
+            .map(|coefficient| coefficient.norm_sqr())
+            .sum::<f64>();
+        assert!((norm - 1.0).abs() < 1e-10, "step={step} norm={norm}");
+    }
+}
+
+#[test]
 fn sequential_terminal_x_measurements_preserve_interference() {
     let (mut active, mut oracle) = setup_two_t();
     let mut rng = StdRng::seed_from_u64(739);
