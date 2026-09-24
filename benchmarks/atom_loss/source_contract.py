@@ -1,4 +1,4 @@
-"""Bind evidence to a clean source commit, allowing a later artifact-only commit.
+"""Bind evidence to clean source inputs, including after a squash merge.
 
 The inventory is derived from Git and Cargo workspace membership, never from a
 bundle's own list. Historical timing is not revalidated by prediction replay.
@@ -122,15 +122,23 @@ def verify_source(record, repo=ROOT):
         raise ValueError('Missing clean source provenance')
     if len(commit) != 40 or any(c not in '0123456789abcdef' for c in commit):
         raise ValueError('Invalid source commit')
-    subprocess.run(['git', '-C', str(repo), 'merge-base', '--is-ancestor', commit, 'HEAD'], check=True)
-    expected = inventory(repo, commit)
-    if record['inputs'] != expected or record['input_digest'] != input_digest(expected):
+    current = inventory(repo, 'HEAD')
+    if record['input_digest'] != input_digest(record['inputs']):
+        raise ValueError('Incomplete or altered source inventory')
+    # Squash merging preserves source files but not the measured commit's
+    # ancestry. A fresh checkout may not even have that commit object. When it
+    # is available, still verify its tree against the recorded inventory.
+    source_available = subprocess.run(
+        ['git', '-C', str(repo), 'cat-file', '-e', commit+'^{commit}'],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    ).returncode == 0
+    if source_available and inventory(repo, commit) != record['inputs']:
         raise ValueError('Incomplete or altered source inventory')
     if record.get('build_policy') != BUILD_POLICY:
         raise ValueError('Unexpected clean-build environment policy')
     if record['build_commands'] != BUILD_COMMANDS:
         raise ValueError('Unexpected evidence build commands')
-    if inventory(repo, 'HEAD') != expected:
+    if current != record['inputs']:
         raise ValueError('Current source/build inputs differ from measured source commit; regenerate evidence')
     # Catch newly staged/untracked build inputs before a local verification too.
     members = tomllib.loads(git(repo, 'show', 'HEAD:Cargo.toml').decode())['workspace']['members']
@@ -140,7 +148,7 @@ def verify_source(record, repo=ROOT):
         if name and (name.startswith(prefixes) or name in {'rust-toolchain', 'rust-toolchain.toml', 'build.rs'}):
             raise ValueError('Uncommitted source input: '+name)
     verify_local_cargo_config(repo)
-    check_worktree(repo, expected)
+    check_worktree(repo, current)
     return commit
 
 

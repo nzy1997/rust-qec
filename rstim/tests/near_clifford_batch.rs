@@ -71,6 +71,12 @@ fn terminal_cache_handles_inverted_targets_and_other_measurement_bases() {
 }
 
 #[test]
+fn terminal_cache_budget_preserves_long_batch_and_rng_state() {
+    let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
+    assert_matches_individual_runs(&benchmark, 2048, &[]);
+}
+
+#[test]
 fn terminal_rank_limit_error_does_not_advance_rng() {
     let circuit =
         NearCliffordExecutor::compile_with_limit(parse_lines("H 0\nH 1\nT 0\nM 1").unwrap(), 1)
