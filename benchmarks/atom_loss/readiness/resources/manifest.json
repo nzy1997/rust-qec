@@ -1,18 +1,764 @@
 {
   "schema_version": "rustqec.envelope-resources-manifest.v1",
   "generated_by": "python3 -m benchmarks.atom_loss.readiness_resources --profile full",
-  "generated_at": "2026-09-24T01:34:06Z",
-  "checkout_revision": "18825181d8ffe4a73cd7cc2bc8f795dcd01e815c",
+  "generated_at": "2026-09-24T03:06:50Z",
+  "checkout_revision": "32135d36649c682af95f5643d7bc9ff1ec453965",
+  "source_inputs": {
+    "Cargo.lock": {
+      "mode": "100644",
+      "git_blob": "6b88edb5b93d0f23af0a64c9d608ba56953e5e3c"
+    },
+    "Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "34673dff8de043e9e1d27d7d210f50b829042444"
+    },
+    "benchmarks/atom_loss/accuracy_seeds.py": {
+      "mode": "100644",
+      "git_blob": "43212758bb7893d078eaf4355eed6c6e74c139d6"
+    },
+    "benchmarks/atom_loss/artifacts.py": {
+      "mode": "100644",
+      "git_blob": "4237abb70f3518ef13a9ac5babfeaa91550fba21"
+    },
+    "benchmarks/atom_loss/chain_contract.py": {
+      "mode": "100644",
+      "git_blob": "f9606ba2d7aaa1c416923402a77baccfcec86fe4"
+    },
+    "benchmarks/atom_loss/chain_reference.py": {
+      "mode": "100644",
+      "git_blob": "1ca4d3b231a36834bfcdb08d34a4daae68291362"
+    },
+    "benchmarks/atom_loss/channel_probes.py": {
+      "mode": "100644",
+      "git_blob": "f6afcf7f734a2e614521c7dc477c534a3b0afe86"
+    },
+    "benchmarks/atom_loss/correctness.py": {
+      "mode": "100644",
+      "git_blob": "7fabddcfe7c5d3e53396ea2eed42f31b50a89940"
+    },
+    "benchmarks/atom_loss/decoder_contract.py": {
+      "mode": "100644",
+      "git_blob": "4951cbc5292f0d8bf774200719fe4741f7d6c6a0"
+    },
+    "benchmarks/atom_loss/decoder_reference.py": {
+      "mode": "100644",
+      "git_blob": "13ae8753533d8e4759c6706a0cfc557178590f46"
+    },
+    "benchmarks/atom_loss/decoder_replay.py": {
+      "mode": "100644",
+      "git_blob": "0c1e4911989091d0b55d2119909b48407054e200"
+    },
+    "benchmarks/atom_loss/evidence_run.py": {
+      "mode": "100644",
+      "git_blob": "494b0290bd918649da663315b545f4762edc01c0"
+    },
+    "benchmarks/atom_loss/figure_contract.py": {
+      "mode": "100644",
+      "git_blob": "9d7ffa5c99940217b902fec650280cbda843e4df"
+    },
+    "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": {
+      "mode": "100644",
+      "git_blob": "db61c193d903f7e1aa9a265092283c08292c6323"
+    },
+    "benchmarks/atom_loss/low_probability.py": {
+      "mode": "100644",
+      "git_blob": "29920a6b4ecf6cce20524adf7e767648cf5d678d"
+    },
+    "benchmarks/atom_loss/mle_candidate_resources.py": {
+      "mode": "100644",
+      "git_blob": "4bacc88f17ea17a27125ef352edb36c5ed93f329"
+    },
+    "benchmarks/atom_loss/noise_controls.py": {
+      "mode": "100644",
+      "git_blob": "9c9371608dddf5ac02daf43a6214265b78222fb7"
+    },
+    "benchmarks/atom_loss/output_rules.py": {
+      "mode": "100644",
+      "git_blob": "381f163b6a6eecc500842df82224a4fe80e77bfb"
+    },
+    "benchmarks/atom_loss/plot.py": {
+      "mode": "100644",
+      "git_blob": "933010a5f2e36a35f2ab4914ddc5cdb71cbad6d2"
+    },
+    "benchmarks/atom_loss/probe_specs.py": {
+      "mode": "100644",
+      "git_blob": "b9a67c91ac86d27d1b94580e0c83f063ca6eb9dc"
+    },
+    "benchmarks/atom_loss/publish.py": {
+      "mode": "100644",
+      "git_blob": "724eaae5699f9e2fdce06b5b190307f6d10b3889"
+    },
+    "benchmarks/atom_loss/readiness_correctness.py": {
+      "mode": "100644",
+      "git_blob": "791b065a19e0226a4badcfe4afcff5c6468c092a"
+    },
+    "benchmarks/atom_loss/readiness_resources.py": {
+      "mode": "100644",
+      "git_blob": "196e52981f93481d4af5ef37ac8ded118f25b05d"
+    },
+    "benchmarks/atom_loss/reference.py": {
+      "mode": "100644",
+      "git_blob": "820d01f5b31133fe5dddf698f758ddc4860a4c79"
+    },
+    "benchmarks/atom_loss/remeasure.py": {
+      "mode": "100644",
+      "git_blob": "5599ad66625d2cbf1449843b308df85ccdb2a33c"
+    },
+    "benchmarks/atom_loss/replay.py": {
+      "mode": "100644",
+      "git_blob": "c5a5b8345c1cccc7825ee57a6f92618d5f0438df"
+    },
+    "benchmarks/atom_loss/report_contract.py": {
+      "mode": "100644",
+      "git_blob": "a24aa297d8962de84d4c811e5a4a2a1212b5a60a"
+    },
+    "benchmarks/atom_loss/requirements.txt": {
+      "mode": "100644",
+      "git_blob": "85408164f3c34eb6ee00a89eb1e3912da986d18b"
+    },
+    "benchmarks/atom_loss/retained_source.py": {
+      "mode": "100644",
+      "git_blob": "f73454c7117270bb514e1c188904d300d57fbd39"
+    },
+    "benchmarks/atom_loss/run.py": {
+      "mode": "100644",
+      "git_blob": "4924a32e348bceed3c76da36a2d9bee846e30246"
+    },
+    "benchmarks/atom_loss/shot_data.py": {
+      "mode": "100644",
+      "git_blob": "9e4bc19bdbfd977be6744d95fac2b862723e73ee"
+    },
+    "benchmarks/atom_loss/source_contract.py": {
+      "mode": "100644",
+      "git_blob": "0ab38bf40afbf90c5af64eaabe644af4d64d2f14"
+    },
+    "benchmarks/atom_loss/test_chain_reference.py": {
+      "mode": "100644",
+      "git_blob": "3e09729754ce83703d687f1579cce3725fd54664"
+    },
+    "benchmarks/atom_loss/test_decoder_contract.py": {
+      "mode": "100644",
+      "git_blob": "e66ced90786e8afcf00b13736a8034450681e3ed"
+    },
+    "benchmarks/atom_loss/test_figure_contract.py": {
+      "mode": "100644",
+      "git_blob": "54eb9e966f66fe31ab8a8f62fcd87628f6c254de"
+    },
+    "benchmarks/atom_loss/test_reference.py": {
+      "mode": "100644",
+      "git_blob": "1a6445f0589999c68bf226ce29e5903293fa3596"
+    },
+    "benchmarks/atom_loss/test_sampler_mutations.py": {
+      "mode": "100644",
+      "git_blob": "0787d156c7965f6e3b6dd3869ea3464b5260d775"
+    },
+    "benchmarks/atom_loss/test_source_contract.py": {
+      "mode": "100644",
+      "git_blob": "471fc3dc85281b58af571192110fa15afe51b049"
+    },
+    "benchmarks/atom_loss/test_standalone_contract.py": {
+      "mode": "100644",
+      "git_blob": "615317c9c1b15b5486b5986d81fa422dfb44b23d"
+    },
+    "benchmarks/atom_loss/test_workload_contract.py": {
+      "mode": "100644",
+      "git_blob": "a50178bffcbe31df95286f1343f75680296a6d09"
+    },
+    "benchmarks/atom_loss/verify.py": {
+      "mode": "100644",
+      "git_blob": "2d4632c4ae80bd698a3fd6449b4afe1518b0e33c"
+    },
+    "benchmarks/atom_loss/workload_contract.py": {
+      "mode": "100644",
+      "git_blob": "bbc9eb536c0ff36748ad3486d22a66da415584da"
+    },
+    "docs/envelope-support.json": {
+      "mode": "100644",
+      "git_blob": "0be0a21a7fd79ffb87e13f769ada117b1586ceff"
+    },
+    "qec-ilp-core/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "622aba773c41acb2e1e3572f9771d99ac731fc04"
+    },
+    "qec-ilp-core/src/backend/gurobi.rs": {
+      "mode": "100644",
+      "git_blob": "c84ea61d812ebfc241666705338165da34b5f489"
+    },
+    "qec-ilp-core/src/backend/highs.rs": {
+      "mode": "100644",
+      "git_blob": "52262f56b484331a4c4d3a568a6488d9b496b76e"
+    },
+    "qec-ilp-core/src/backend/mod.rs": {
+      "mode": "100644",
+      "git_blob": "a22581227f7a34145dbaff27a47f620a56580748"
+    },
+    "qec-ilp-core/src/config.rs": {
+      "mode": "100644",
+      "git_blob": "18a45a6dbdcb1c8af46eb212ddc2d42c60de4c3e"
+    },
+    "qec-ilp-core/src/error.rs": {
+      "mode": "100644",
+      "git_blob": "961e81cdde9b15f48040de5cd573db2789d81a0c"
+    },
+    "qec-ilp-core/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "e2d6d5e33b9c249cc9484177dc469c905979c033"
+    },
+    "qec-ilp-core/src/model.rs": {
+      "mode": "100644",
+      "git_blob": "c31102d4d3423fd9d9bf010046e44524b51e900c"
+    },
+    "renvelope/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "bfb9ebb97fe479a1379ff1fd03dbab8240940e7f"
+    },
+    "renvelope/src/decode.rs": {
+      "mode": "100644",
+      "git_blob": "078cf3418d08c31c0d11603ed26ff8e2cf5730a6"
+    },
+    "renvelope/src/error.rs": {
+      "mode": "100644",
+      "git_blob": "87faf316d79dc3dcddc245373973950b7bf0ddfc"
+    },
+    "renvelope/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "d4be4aa2a0c07ed1a4dfa8dc4c7ab558c2474b7e"
+    },
+    "renvelope/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "8c63ec52e3508072fd9f8fbff016d25229d93042"
+    },
+    "renvelope/src/matching.rs": {
+      "mode": "100644",
+      "git_blob": "c62a2fca4b12b53d0e43583e3f271260e1730092"
+    },
+    "renvelope/src/prepare.rs": {
+      "mode": "100644",
+      "git_blob": "a5b7bb5841d868aa4701f690b8d08d117393ec03"
+    },
+    "renvelope/src/schema.rs": {
+      "mode": "100644",
+      "git_blob": "974b83f4df1d970788717dd9c5a809ceac1d8a7e"
+    },
+    "rmatching/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "9d76ab3378283d97e26ebc3b43df842f235d4a5a"
+    },
+    "rmatching/src/bin/rmatching_cli.rs": {
+      "mode": "100644",
+      "git_blob": "a71a659299dcf22eeefdb378d85a5f7e4c4f65c6"
+    },
+    "rmatching/src/driver/decoding.rs": {
+      "mode": "100644",
+      "git_blob": "3520c46769d5cc7f2a1089cad8aeb6a08d54a002"
+    },
+    "rmatching/src/driver/dem_parse.rs": {
+      "mode": "100644",
+      "git_blob": "a6c1f2ba44901ac74331d545bea6031ba52fce74"
+    },
+    "rmatching/src/driver/mod.rs": {
+      "mode": "100644",
+      "git_blob": "ed93cff59f4d20b06026415b93cb8d28c615d7f5"
+    },
+    "rmatching/src/driver/user_graph.rs": {
+      "mode": "100644",
+      "git_blob": "f8be3323b6a9ccefab6a0dff71fe6acc9600a1f7"
+    },
+    "rmatching/src/flooder/detector_node.rs": {
+      "mode": "100644",
+      "git_blob": "499eff9c063a2b3ed2c75952b4dd68a597579ad5"
+    },
+    "rmatching/src/flooder/fill_region.rs": {
+      "mode": "100644",
+      "git_blob": "da6ab830f80ed0b14decda65e1d4c935d9cfb574"
+    },
+    "rmatching/src/flooder/graph.rs": {
+      "mode": "100644",
+      "git_blob": "cc225140a346cd3ea01f669d6b8b43b2c512f868"
+    },
+    "rmatching/src/flooder/graph_flooder.rs": {
+      "mode": "100644",
+      "git_blob": "2f8855a57ea216975c69ab925671b86558986fe2"
+    },
+    "rmatching/src/flooder/mod.rs": {
+      "mode": "100644",
+      "git_blob": "f7132695daafeedbb1aac9e75eec1b0b26f63c1a"
+    },
+    "rmatching/src/interop/compressed_edge.rs": {
+      "mode": "100644",
+      "git_blob": "b0da40530c85584bf67e82d19ec8ea5761ab73b1"
+    },
+    "rmatching/src/interop/event.rs": {
+      "mode": "100644",
+      "git_blob": "cfa25099700676ef391e80ec3308a1529e7bfa18"
+    },
+    "rmatching/src/interop/flood_check_event.rs": {
+      "mode": "100644",
+      "git_blob": "c50797a299422c62103ae75baff758930fa905eb"
+    },
+    "rmatching/src/interop/mod.rs": {
+      "mode": "100644",
+      "git_blob": "e96002fcfe7de32f021cc9ac134f327bc16924bb"
+    },
+    "rmatching/src/interop/queued_event_tracker.rs": {
+      "mode": "100644",
+      "git_blob": "5c3a737cac8b8ef4365341e5df33e2e0b787cc18"
+    },
+    "rmatching/src/interop/region_edge.rs": {
+      "mode": "100644",
+      "git_blob": "36a3afaa435c9bb7e63b74540b8092892835960c"
+    },
+    "rmatching/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "fe5909c9c9a666a3294c0b3f8682979c31432a66"
+    },
+    "rmatching/src/matcher/alt_tree.rs": {
+      "mode": "100644",
+      "git_blob": "de87e7169615382b2586b91b10f987c757f48e2f"
+    },
+    "rmatching/src/matcher/mod.rs": {
+      "mode": "100644",
+      "git_blob": "70d970033672324397192dd3da94b2f9231aed2c"
+    },
+    "rmatching/src/matcher/mwpm.rs": {
+      "mode": "100644",
+      "git_blob": "f531d6f23a246437b88e79195df04e16b3360795"
+    },
+    "rmatching/src/search/mod.rs": {
+      "mode": "100644",
+      "git_blob": "212748d82f220fdc917abfe09bc4947a0b708800"
+    },
+    "rmatching/src/search/search_flooder.rs": {
+      "mode": "100644",
+      "git_blob": "13eb5e6c78674f069e705ab45e114b06c90d367c"
+    },
+    "rmatching/src/search/search_graph.rs": {
+      "mode": "100644",
+      "git_blob": "8e3290dec65e8035ce59d8e15e3ded304be2d91e"
+    },
+    "rmatching/src/test_alloc.rs": {
+      "mode": "100644",
+      "git_blob": "53db043d2a896664d88ab68850dca65d66a095ce"
+    },
+    "rmatching/src/types.rs": {
+      "mode": "100644",
+      "git_blob": "f4ddebc20f5e2fbe2639aeed1401c43d37e0986f"
+    },
+    "rmatching/src/util/arena.rs": {
+      "mode": "100644",
+      "git_blob": "be551c4c0b6b8589ee4a3dbd972e946ce2a8c909"
+    },
+    "rmatching/src/util/mod.rs": {
+      "mode": "100644",
+      "git_blob": "3e7d1ac71679a3c99759b5c7dba0d4c3c9670a7e"
+    },
+    "rmatching/src/util/radix_heap.rs": {
+      "mode": "100644",
+      "git_blob": "b56ad07e9f0e499cd9f05a0122c126604f448b34"
+    },
+    "rmatching/src/util/varying.rs": {
+      "mode": "100644",
+      "git_blob": "11c8340e28214ff74f403f388b95a9d7077817d7"
+    },
+    "rstim/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "093ff4a46c2f9730868f5abaf63e88b55d6eaf31"
+    },
+    "rstim/src/bin/rstim_compiled_steady_worker.rs": {
+      "mode": "100644",
+      "git_blob": "a6aa4c95b2b9d5991b2db52e3b883d743bed5e0f"
+    },
+    "rstim/src/bin/rstim_reference_build_worker.rs": {
+      "mode": "100644",
+      "git_blob": "6eedacdfbbcbc0ada328551713d39343b48f32ba"
+    },
+    "rstim/src/circuit_gen.rs": {
+      "mode": "100644",
+      "git_blob": "a1d3669e142ac1dfb23738ff57209029e6026ca6"
+    },
+    "rstim/src/cli.rs": {
+      "mode": "100644",
+      "git_blob": "e63dfba5d9ade3cabb216459d2e34475a85c6503"
+    },
+    "rstim/src/codegen/color_code.rs": {
+      "mode": "100644",
+      "git_blob": "e12a52810aef471dd872b823021bd7d8e0c8df70"
+    },
+    "rstim/src/codegen/css.rs": {
+      "mode": "100644",
+      "git_blob": "98e32327aa711f0a6da827be1ddcfbed966f6743"
+    },
+    "rstim/src/codegen/midswap.rs": {
+      "mode": "100644",
+      "git_blob": "a058c284adfd5dd211dfcb136c3f8f89535caf44"
+    },
+    "rstim/src/codegen/mod.rs": {
+      "mode": "100644",
+      "git_blob": "b712a3dc0c4118b4179a0f7e5f6f773d7322d603"
+    },
+    "rstim/src/codegen/noise_params.rs": {
+      "mode": "100644",
+      "git_blob": "63747570f58b7777e404874968d4d17bad5ec081"
+    },
+    "rstim/src/codegen/rep_code.rs": {
+      "mode": "100644",
+      "git_blob": "0a750e692c994ffc2972c1f2836cb4009da85bfc"
+    },
+    "rstim/src/codegen/surface_code.rs": {
+      "mode": "100644",
+      "git_blob": "fd1398a102c11ae96f0f7800245c4c3fe658715a"
+    },
+    "rstim/src/compiled/analyzer.rs": {
+      "mode": "100644",
+      "git_blob": "2d25a2b5b5841bb11158ee112b88b63d65efc169"
+    },
+    "rstim/src/compiled/circuit.rs": {
+      "mode": "100644",
+      "git_blob": "358645217fb158c5bfa0ff0b0d6a1e5f4b7c094e"
+    },
+    "rstim/src/compiled/mod.rs": {
+      "mode": "100644",
+      "git_blob": "50bbc00e75d92a62f47ca7324ebc92a97f288c68"
+    },
+    "rstim/src/compiled/path.rs": {
+      "mode": "100644",
+      "git_blob": "5e0d8bf8cc6a0c46900330cde125484a51f576ce"
+    },
+    "rstim/src/compiled/sampler.rs": {
+      "mode": "100644",
+      "git_blob": "e24500d24429f8275345be5ef572d0543b8a6551"
+    },
+    "rstim/src/coords.rs": {
+      "mode": "100644",
+      "git_blob": "75df242c3fd02e76bc060ffa955855709b2bcb13"
+    },
+    "rstim/src/data_path.rs": {
+      "mode": "100644",
+      "git_blob": "928eaa3c7ca0842af2a73a115c4acbef9e12ba6e"
+    },
+    "rstim/src/decoder_dataset.rs": {
+      "mode": "100644",
+      "git_blob": "1038248291f2b8c3948b1d4bbcd4f9ec23368d7c"
+    },
+    "rstim/src/dem.rs": {
+      "mode": "100644",
+      "git_blob": "1633972c6b40e643c07cd590c9a15ad252d0d01c"
+    },
+    "rstim/src/dem_provenance.rs": {
+      "mode": "100644",
+      "git_blob": "d79000bb3bc017249c3dd8f8fd5b717bcbbf8541"
+    },
+    "rstim/src/detect_trace.rs": {
+      "mode": "100644",
+      "git_blob": "53d24ef79411f9ff65ec155f69bda4f193b71c1d"
+    },
+    "rstim/src/error_analyzer.rs": {
+      "mode": "100644",
+      "git_blob": "9caa130009d77fdf809428333c47132fd291b4e7"
+    },
+    "rstim/src/executor.rs": {
+      "mode": "100644",
+      "git_blob": "f2929af8720e524a934fbfd454a76657c9974fc4"
+    },
+    "rstim/src/explain_errors.rs": {
+      "mode": "100644",
+      "git_blob": "742abb78e6e42f46be55fdc566a1b6974c20d71b"
+    },
+    "rstim/src/interactive_shot.rs": {
+      "mode": "100644",
+      "git_blob": "9f42a4b29a77d0201d98b7a57ee0d1b93098ded8"
+    },
+    "rstim/src/ir.rs": {
+      "mode": "100644",
+      "git_blob": "e44509a0bb9e79489205e9051731b3861fe73dfa"
+    },
+    "rstim/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "50bda7b0f3d1b85cac618cf9d72b8028a4b97053"
+    },
+    "rstim/src/loss_sampler.rs": {
+      "mode": "100644",
+      "git_blob": "4553339f6b935e5d0f48e7f20b6a627c1e8f9664"
+    },
+    "rstim/src/m2d.rs": {
+      "mode": "100644",
+      "git_blob": "4f6f076e2e200dfb6e25a273e801938b983ab6e1"
+    },
+    "rstim/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "66b51638fe608af040899cba08bcd8b2effe69f5"
+    },
+    "rstim/src/measurement_transform.rs": {
+      "mode": "100644",
+      "git_blob": "a9e734187ba072747b5d1afa4a529efdba04c31e"
+    },
+    "rstim/src/near_clifford.rs": {
+      "mode": "100644",
+      "git_blob": "bd2a8d4496a3d0b193857856ff522ba3cabccfb6"
+    },
+    "rstim/src/operations.rs": {
+      "mode": "100644",
+      "git_blob": "9b7ea804d26eaf3f6117900c561c4a91e7f83b47"
+    },
+    "rstim/src/output.rs": {
+      "mode": "100644",
+      "git_blob": "92d67f9b246cf40b6e8a0133b9cb552aa387bcc9"
+    },
+    "rstim/src/parser.rs": {
+      "mode": "100644",
+      "git_blob": "925b0ae59145d28391d648d8d6493d9d96c47095"
+    },
+    "rstim/src/perf.rs": {
+      "mode": "100644",
+      "git_blob": "25c8c6632bb512e8d2233af443e2375e10ab5726"
+    },
+    "rstim/src/perf/cases.rs": {
+      "mode": "100644",
+      "git_blob": "b45855b298c2f62ffd8338267ddcd45c52600b8e"
+    },
+    "rstim/src/perf/gate.rs": {
+      "mode": "100644",
+      "git_blob": "c00b74f5b85cc1758b7533f941197d0b7e407192"
+    },
+    "rstim/src/perf/record.rs": {
+      "mode": "100644",
+      "git_blob": "502d4b3dad413fe39a29b6f4f994e3b85a39edc4"
+    },
+    "rstim/src/perf/report.rs": {
+      "mode": "100644",
+      "git_blob": "9b85bb232f49bfd79ffaf7b482c25b4c7612d3f1"
+    },
+    "rstim/src/perf/runner.rs": {
+      "mode": "100644",
+      "git_blob": "a13550aed90f141539c0dd6c768f77b91696ee56"
+    },
+    "rstim/src/perf/summary.rs": {
+      "mode": "100644",
+      "git_blob": "3135250f5e69812d9067625ac12ea23d038a91c4"
+    },
+    "rstim/src/qp101.rs": {
+      "mode": "100644",
+      "git_blob": "5ca489da130a22fe35e96e55af353f8af6855fac"
+    },
+    "rstim/src/qp101_svg.rs": {
+      "mode": "100644",
+      "git_blob": "04ac85f447e25d6fdcdea48cde8ad53c644c556a"
+    },
+    "rstim/src/rare_error_iterator.rs": {
+      "mode": "100644",
+      "git_blob": "3cb6204654698606ba6a3c8104a0c2a6bfa297a9"
+    },
+    "rstim/src/recorder.rs": {
+      "mode": "100644",
+      "git_blob": "b580f41dfe8edf160b5b4f096ebd178ff14209de"
+    },
+    "rstim/src/reference_sample_tree.rs": {
+      "mode": "100644",
+      "git_blob": "8b212ee9663d80b668e4d894b800e886761e59a8"
+    },
+    "rstim/src/result_stream.rs": {
+      "mode": "100644",
+      "git_blob": "99d7760b233dd84d149a9025f1d44eec106e905b"
+    },
+    "rstim/src/sample_archive/corruption_corpus.rs": {
+      "mode": "100644",
+      "git_blob": "df531b2ef9a5f62fc17d0ccac2c8e25cae7e703c"
+    },
+    "rstim/src/sample_archive/dense.rs": {
+      "mode": "100644",
+      "git_blob": "134b6c275ca164dfadfcf1cc108774baa5977ed6"
+    },
+    "rstim/src/sample_archive/format.rs": {
+      "mode": "100644",
+      "git_blob": "178b7d606d6d7314a6d434f86ea9a89b9a12d039"
+    },
+    "rstim/src/sample_archive/integrity.rs": {
+      "mode": "100644",
+      "git_blob": "bf67adef8f42cab01e6be046359265d4d82ddc62"
+    },
+    "rstim/src/sample_archive/limits.rs": {
+      "mode": "100644",
+      "git_blob": "4f506aecb5c31b53786bbe494b36c735c6ecfc51"
+    },
+    "rstim/src/sample_archive/mod.rs": {
+      "mode": "100644",
+      "git_blob": "cab29b4737bb6c5bde6108a3a27bf66c10a2a9b8"
+    },
+    "rstim/src/sample_archive/reader.rs": {
+      "mode": "100644",
+      "git_blob": "c97ea4a3541a50abb589df1cb37f430f1b70b972"
+    },
+    "rstim/src/sample_archive/syndrome.rs": {
+      "mode": "100644",
+      "git_blob": "0ba7a0ac65a47db09894a50a5d8f8c15d796668f"
+    },
+    "rstim/src/sample_archive/telemetry.rs": {
+      "mode": "100644",
+      "git_blob": "25d6c85b00979c25778fd5b4b175b9b2b9894a2f"
+    },
+    "rstim/src/sample_archive/writer.rs": {
+      "mode": "100644",
+      "git_blob": "e9d8831792dd19139b66f959f421f72cd232192c"
+    },
+    "rstim/src/sample_archive/zstd_frame.rs": {
+      "mode": "100644",
+      "git_blob": "f51f17d26b305c3657bb5615d275b074b9ecade2"
+    },
+    "rstim/src/sample_trace.rs": {
+      "mode": "100644",
+      "git_blob": "c871b217c5bb57abfac2cade0d8af41beb410a0f"
+    },
+    "rstim/src/sampler.rs": {
+      "mode": "100644",
+      "git_blob": "c9deb040c06a6e80dccdfc627a2fea7be13fe0ea"
+    },
+    "rstim/src/shot_viewer.rs": {
+      "mode": "100644",
+      "git_blob": "e69faa8b0a5cddfa1bb5db623feeee8f99dcfbfd"
+    },
+    "rstim/src/showcase.rs": {
+      "mode": "100644",
+      "git_blob": "e0401b55921e3310390de44d7520af09eeedfe5e"
+    },
+    "rstim/src/sim/bit_table.rs": {
+      "mode": "100644",
+      "git_blob": "69e816334228648f56fb09bc1556a4705e88a155"
+    },
+    "rstim/src/sim/bit_transpose.rs": {
+      "mode": "100644",
+      "git_blob": "738e4ba61eae4749ee8ef4ceebb8ee1e92dcf6f5"
+    },
+    "rstim/src/sim/frame.rs": {
+      "mode": "100644",
+      "git_blob": "1bb5f50d97f56e01bf8d99057480f5541aa119f4"
+    },
+    "rstim/src/sim/measure_record_batch.rs": {
+      "mode": "100644",
+      "git_blob": "bccaabc5a5558d40f3957ee38e54ec14771dee66"
+    },
+    "rstim/src/sim/mod.rs": {
+      "mode": "100644",
+      "git_blob": "ea9948a5cd6bb19a303fce1005c7665ecbf7f3e9"
+    },
+    "rstim/src/sim/packed_inverse_tableau.rs": {
+      "mode": "100644",
+      "git_blob": "56039f3db411a0105afddcd52eb1e36ca00c84a9"
+    },
+    "rstim/src/sim/tableau.rs": {
+      "mode": "100644",
+      "git_blob": "05ea5d93cc1aba719b1042510300d8866decd8b0"
+    },
+    "rstim/src/stats.rs": {
+      "mode": "100644",
+      "git_blob": "a0227c40eb189cd7fe629b8f17e9b9998fd58f7b"
+    },
+    "rstim/src/transforms.rs": {
+      "mode": "100644",
+      "git_blob": "77debeaa98e43f2a5b23ab4e4b8d874f31427eb5"
+    },
+    "rstim/src/validation.rs": {
+      "mode": "100644",
+      "git_blob": "ca0e0cebe41121474fa34fb644e7ac4dcc8223d3"
+    },
+    "rustqec-cli/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "c0f03f95e465c61265416da518eb092c068d02ae"
+    },
+    "rustqec-cli/src/decode.rs": {
+      "mode": "100644",
+      "git_blob": "d769e5c90a1f877e89a65a3a289423098f479653"
+    },
+    "rustqec-cli/src/decode/benchmark.rs": {
+      "mode": "100644",
+      "git_blob": "820e862a03ee021eb51f7365fca3f26ec151a937"
+    },
+    "rustqec-cli/src/decode/compiler.rs": {
+      "mode": "100644",
+      "git_blob": "f2f8d411f3b823cc45dc2aad84c483172159fb09"
+    },
+    "rustqec-cli/src/decode/dataset.rs": {
+      "mode": "100644",
+      "git_blob": "59b3725519d8de31250167ee5a3715bd33ae616f"
+    },
+    "rustqec-cli/src/decode/matching.rs": {
+      "mode": "100644",
+      "git_blob": "350dc746d7cab1558332259b26be08b08335b6d8"
+    },
+    "rustqec-cli/src/decode/mle.rs": {
+      "mode": "100644",
+      "git_blob": "a48c351b68b5c6a2ba11b5fbf1b566c05839b8f2"
+    },
+    "rustqec-cli/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "5d640e4d374d0a58a2e1b8728ddb288386a23c80"
+    },
+    "rustqec-cli/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "aca857500dddd2f356c06fc3b85d37da626464d8"
+    },
+    "rustqec-cli/src/pipeline.rs": {
+      "mode": "100644",
+      "git_blob": "be98b90e684f34050d9d898cb10327b74094c0e8"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "7fb82c41085ff45af54d744e5cb0dd8cc76699c6"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/manifest.json": {
+      "mode": "100644",
+      "git_blob": "6ba39e31485f47ce0381258e432fecf6eca1e005"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/shots.b8": {
+      "mode": "100644",
+      "git_blob": "1585a74028dd98ec18c315649206a3565ac0c6c4"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "7f9903212e7c681c92216bef75041cb5d03fdb6b"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/manifest.json": {
+      "mode": "100644",
+      "git_blob": "fc9350b3761e17a8938222aa85a9612b8b7c1e53"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/shots.b8": {
+      "mode": "100644",
+      "git_blob": "30b3526f6688be5f9ac9d167bb9472dade58dc98"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "e826b63adb86d5cc7021380659688cbe20d0b1ee"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/manifest.json": {
+      "mode": "100644",
+      "git_blob": "2a912361f4080111f57759259ae13235af7b684b"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/provenance.json": {
+      "mode": "100644",
+      "git_blob": "786d3a9aca8796d26ea16080d4ddbcae7bb5bb30"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/reference_cases.json.zst": {
+      "mode": "100644",
+      "git_blob": "1c80d414b7648f48d126a3ac26ab0c0ed1ac87c1"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/shots.b8": {
+      "mode": "100644",
+      "git_blob": "56f1dda4be0f649a804cf4dc0bd1b28811e5ee49"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/unsupported_non_metadata.stim": {
+      "mode": "100644",
+      "git_blob": "2fbd677c4316adaf33427e010990acb8ca29c75d"
+    }
+  },
   "machine": {
-    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "platform": "macOS-27.0-arm64-arm-64bit",
     "machine": "arm64",
-    "python": "3.14.7",
+    "python": "3.12.13",
     "cpu_count": 10,
     "memory_bytes": 34359738368
   },
   "build": {
-    "path": "/Users/nzy/rcode/rstim/target/release/rustqec",
-    "sha256": "2a85d0a97f6c3ed3e128319fd1905b764d00df87c12a6fb0ab586abfa929a1d5",
+    "path": "/private/tmp/near-clifford-pr752-squash-source/target/release/rustqec",
+    "sha256": "721a41c4a5f6154c3dbb94bd11e4be6014df2ef0c2c53ea2af6df7cba1a5270e",
     "version": "rustqec 0.3.3",
     "advertised_decoders": [
       "envelope-matching",
@@ -32,7 +778,7 @@
       "peak_rss_bytes": 4294967296
     }
   },
-  "total_wall_seconds": 55.88595945798443,
+  "total_wall_seconds": 56.37309054101934,
   "cases": [
     {
       "id": "matching-d3r2-p002-b1024",
@@ -43,11 +789,11 @@
       "seed": 715247,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.008820957998977974,
-      "compile_seconds": 0.001018541,
-      "decode_seconds": 0.001728459,
+      "wall_seconds": 0.008363125001778826,
+      "compile_seconds": 0.001025833,
+      "decode_seconds": 0.001743333,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 7733248,
+      "peak_rss_watermark_bytes": 7929856,
       "observed_pattern_count": 49,
       "cache": {
         "builds": 49,
@@ -56,7 +802,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p002-b1024.json",
-      "raw_sha256": "b495fb65043ef251de6035bbb0b9ab8fcaa7f95ed95133a3d3611740307e1cf8",
+      "raw_sha256": "c92a1ebd64cddc9822a7e19d35a8b7367c16e0cef3627571b5494aa9ebc0698d",
       "output_rule_problems": []
     },
     {
@@ -68,11 +814,11 @@
       "seed": 715652,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.024282416998175904,
-      "compile_seconds": 0.000920417,
-      "decode_seconds": 0.017511042,
+      "wall_seconds": 0.025731624977197498,
+      "compile_seconds": 0.000988958,
+      "decode_seconds": 0.017877584,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 13615104,
+      "peak_rss_watermark_bytes": 13828096,
       "observed_pattern_count": 245,
       "cache": {
         "builds": 245,
@@ -81,7 +827,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p002-b16384.json",
-      "raw_sha256": "343491e2d315101de5d116ef487208634b5a01a1a88a6521642fd7ba3322d484",
+      "raw_sha256": "81eca31c08437164c7dd16b5615f7367ea15de87b4dc5b032c0370e8f2d14a9f",
       "output_rule_problems": []
     },
     {
@@ -93,11 +839,11 @@
       "seed": 715951,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.07233658398035914,
-      "compile_seconds": 0.000974917,
-      "decode_seconds": 0.064023208,
+      "wall_seconds": 0.07044216600479558,
+      "compile_seconds": 0.0009615,
+      "decode_seconds": 0.062637375,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 18006016,
+      "peak_rss_watermark_bytes": 18071552,
       "observed_pattern_count": 433,
       "cache": {
         "builds": 433,
@@ -106,7 +852,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p002-b65536.json",
-      "raw_sha256": "f57f15c087bed4f9f0fa8c4ce2ac63560eafe7fc61f8841c886f4ffcbf0e284c",
+      "raw_sha256": "92aa1b57c8dd41a82a178a9d2ae39a0faa01680db925769e0bc3f40f30d6bd06",
       "output_rule_problems": []
     },
     {
@@ -118,11 +864,11 @@
       "seed": 715427,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.018320165982004255,
-      "compile_seconds": 0.000969958,
-      "decode_seconds": 0.011042791,
+      "wall_seconds": 0.01825125000323169,
+      "compile_seconds": 0.000986625,
+      "decode_seconds": 0.01069625,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 23363584,
+      "peak_rss_watermark_bytes": 23494656,
       "observed_pattern_count": 598,
       "cache": {
         "builds": 598,
@@ -131,7 +877,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p020-b1024.json",
-      "raw_sha256": "39443a96d94f4b3a707aecc8c535fe4fedc4d3cdadb094657958bfbde4c29a44",
+      "raw_sha256": "8b62a36d4ac64bdf96bcf2a1fdafac7ad3ed41a00cb36b54fade7f3634f33ccb",
       "output_rule_problems": []
     },
     {
@@ -143,11 +889,11 @@
       "seed": 715832,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.14723520798725076,
-      "compile_seconds": 0.000985083,
-      "decode_seconds": 0.137933667,
+      "wall_seconds": 0.15000983298523352,
+      "compile_seconds": 0.000979625,
+      "decode_seconds": 0.140615791,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 43958272,
+      "peak_rss_watermark_bytes": 44187648,
       "observed_pattern_count": 4684,
       "cache": {
         "builds": 7219,
@@ -156,7 +902,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p020-b16384.json",
-      "raw_sha256": "92d2c115cc051457aa6f6a24d16271390f966dff96940f5c2e86d828e951adf5",
+      "raw_sha256": "e8fa8a1708c994f27e854d700c048412d93189b5a5d665c15b5ace1c3a9b1d73",
       "output_rule_problems": []
     },
     {
@@ -168,11 +914,11 @@
       "seed": 716131,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.5463089999975637,
-      "compile_seconds": 0.00092675,
-      "decode_seconds": 0.536370791,
+      "wall_seconds": 0.5586132080061361,
+      "compile_seconds": 0.00098225,
+      "decode_seconds": 0.547541291,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44122112,
+      "peak_rss_watermark_bytes": 44285952,
       "observed_pattern_count": 11669,
       "cache": {
         "builds": 28107,
@@ -181,7 +927,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p020-b65536.json",
-      "raw_sha256": "cd70a50dac00b7e83c80639ac4257bdc677610e0665f0dd81f91c352c8915fae",
+      "raw_sha256": "52ea980374ba73f89356d3369136ca4ae774330c9eea3ed5dcdc103e61527dd0",
       "output_rule_problems": []
     },
     {
@@ -193,11 +939,11 @@
       "seed": 716227,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.032431499974336475,
-      "compile_seconds": 0.000963,
-      "decode_seconds": 0.023216666,
+      "wall_seconds": 0.03259433398488909,
+      "compile_seconds": 0.000963708,
+      "decode_seconds": 0.023341875,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44122112,
+      "peak_rss_watermark_bytes": 44285952,
       "observed_pattern_count": 1024,
       "cache": {
         "builds": 1024,
@@ -206,7 +952,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p100-b1024.json",
-      "raw_sha256": "f9c7ae95df7c84cb64b1a8177bfb3d0a75dabb0791b539dd88a37f4dacb67cf5",
+      "raw_sha256": "ae34f0b584dfbab1d6b441231d998c4f8895b50a55785d2060cd1d3f3ab3d666",
       "output_rule_problems": []
     },
     {
@@ -218,11 +964,11 @@
       "seed": 716632,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.3752391670132056,
-      "compile_seconds": 0.001182541,
-      "decode_seconds": 0.364961583,
+      "wall_seconds": 0.3828503330005333,
+      "compile_seconds": 0.001005709,
+      "decode_seconds": 0.37265575,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 45875200,
+      "peak_rss_watermark_bytes": 46104576,
       "observed_pattern_count": 16244,
       "cache": {
         "builds": 16381,
@@ -231,7 +977,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p100-b16384.json",
-      "raw_sha256": "8dad16b5b6d3ab432614407fe165cced99e29cb5cc144e3ce89d527a380ff60b",
+      "raw_sha256": "4fdc056b2c8327ae6306cab9b4756e00015b27b776e161718b4ede1538dd4bc3",
       "output_rule_problems": []
     },
     {
@@ -243,11 +989,11 @@
       "seed": 716931,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 1.4708769999851938,
-      "compile_seconds": 0.000977,
-      "decode_seconds": 1.458804458,
+      "wall_seconds": 1.4996388330182526,
+      "compile_seconds": 0.0010045,
+      "decode_seconds": 1.489604875,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 45940736,
+      "peak_rss_watermark_bytes": 46284800,
       "observed_pattern_count": 65536,
       "cache": {
         "builds": 65519,
@@ -256,7 +1002,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p100-b65536.json",
-      "raw_sha256": "13c194f4a8517eb6bbcbdc245079df68efa31813a569e328b9bb5eb0e14801d0",
+      "raw_sha256": "b4acdd8a17670c16d80f92ef0de04a3fcf7fdc661dc6d36cbd40cfdd58638edb",
       "output_rule_problems": []
     },
     {
@@ -268,11 +1014,11 @@
       "seed": 715301,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.44313299999339506,
-      "compile_seconds": 0.001548292,
-      "decode_seconds": 0.430626583,
+      "wall_seconds": 0.44393079201108776,
+      "compile_seconds": 0.00149025,
+      "decode_seconds": 0.431516292,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 71483392,
+      "peak_rss_watermark_bytes": 71696384,
       "observed_pattern_count": 9059,
       "cache": {
         "builds": 12326,
@@ -281,7 +1027,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r3-p020-b16384.json",
-      "raw_sha256": "f8e7f0fa96f7ffb19f4a9626ef8f40ce406de9aff57d70d81bcd08e18feafa20",
+      "raw_sha256": "5c06f726d9c5d494248558c85b3e2e18b111fe2caf162aafa4e76bff93c54ecb",
       "output_rule_problems": []
     },
     {
@@ -293,11 +1039,11 @@
       "seed": 715302,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 1.8936110410140827,
-      "compile_seconds": 0.004409917,
-      "decode_seconds": 1.8667465829999998,
+      "wall_seconds": 1.9541435000137426,
+      "compile_seconds": 0.004603208,
+      "decode_seconds": 1.927118708,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": 16314,
       "cache": {
         "builds": 16384,
@@ -306,7 +1052,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d5r3-p020-b16384.json",
-      "raw_sha256": "aef23f97bc8ea4d56e79bea373ab34a1f4be0e1f6123466ac74ed99178ab5033",
+      "raw_sha256": "effd745305c0ef0bd41c16fb947f39e39d4bf57689b157cd0addf546d2b877d2",
       "output_rule_problems": []
     },
     {
@@ -318,11 +1064,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.014812000008532777,
-      "compile_seconds": 0.000266083,
-      "decode_seconds": 0.007325583,
+      "wall_seconds": 0.014791207999223843,
+      "compile_seconds": 0.00027825,
+      "decode_seconds": 0.007315833,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -331,7 +1077,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/matching-eviction-wires24.json",
-      "raw_sha256": "b9cb7b0a32f4d244befdabe74e0834eb8a010ae0ed615f9faa58bda383402fd8",
+      "raw_sha256": "bcfe621bd25e75853cc1cf59513095015d627dd4508319ffda50477fd063fe82",
       "output_rule_problems": []
     },
     {
@@ -343,11 +1089,11 @@
       "seed": 715401,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 2.156135249999352,
-      "compile_seconds": 0.002359334,
-      "decode_seconds": 2.147746666,
+      "wall_seconds": 2.2063602499838453,
+      "compile_seconds": 0.002403417,
+      "decode_seconds": 2.197993375,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": 45,
       "cache": {
         "builds": 45,
@@ -356,7 +1102,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/mle-d3r2-p002-b1024.json",
-      "raw_sha256": "82ffdf71efc339d5b85057a1deb9e279f00fffd6d88754a19b06bb4b3682039c",
+      "raw_sha256": "214ffb84b2ba9308ed4be94600d5a2b47ab1ec04487e378a65596a4e8e056292",
       "output_rule_problems": []
     },
     {
@@ -368,11 +1114,11 @@
       "seed": 715402,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 35.09186170899193,
-      "compile_seconds": 0.002548875,
-      "decode_seconds": 35.079533208,
+      "wall_seconds": 35.08043479200569,
+      "compile_seconds": 0.002425084,
+      "decode_seconds": 35.069338375,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": 267,
       "cache": {
         "builds": 267,
@@ -381,7 +1127,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/mle-d3r2-p002-b16384.json",
-      "raw_sha256": "2116ca6c22c17012c2bea83e95976f3045d1f625f6a32fce3d1679660bec1b3a",
+      "raw_sha256": "76f1ab01ea1d69e27774216caa2d469e0f9b7b8d7c020603688eb31938d9afee",
       "output_rule_problems": []
     },
     {
@@ -393,11 +1139,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.9374911250197329,
-      "compile_seconds": 0.00027275,
-      "decode_seconds": 0.919386041,
+      "wall_seconds": 0.938023707974935,
+      "compile_seconds": 0.000257583,
+      "decode_seconds": 0.922448209,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -406,7 +1152,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/mle-eviction-wires24.json",
-      "raw_sha256": "18800626712d79691a17af9d61024768c1cb2c32f2d46efc801f3b9965eb28b1",
+      "raw_sha256": "3753666b617ab2ce94fb5967a57889f71af26d5a6957bb09e164df8be0fbd0f0",
       "output_rule_problems": []
     },
     {
@@ -418,16 +1164,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "unsupported_circuit",
-      "wall_seconds": 0.16854279101244174,
+      "wall_seconds": 0.16371254198020324,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-candidate-limit.json",
-      "raw_sha256": "d0f2937229246453847a918fdd099efdfc603b5a7618ce0f272de38da0425202",
+      "raw_sha256": "f3c7861bcb9c4ad2c4c5349a0f582c2b42adbd750aa3148c5a0f0cf16c0d2dec",
       "output_rule_problems": []
     },
     {
@@ -439,16 +1185,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_timeout",
-      "wall_seconds": 0.006462582998210564,
-      "compile_seconds": 0.000111834,
+      "wall_seconds": 0.005356249981559813,
+      "compile_seconds": 0.000103208,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-solve-timeout.json",
-      "raw_sha256": "f83cf9cc485620b8e92e64fbe5d4f75636c3ea2ff14bced5116de849c7edcf95",
+      "raw_sha256": "29bdbac6566e8e5f60667a4828e1447258f58acd147cbd384da5dfb98295e8b4",
       "output_rule_problems": []
     },
     {
@@ -460,16 +1206,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_infeasible",
-      "wall_seconds": 0.006099499994888902,
-      "compile_seconds": 9.8875e-05,
+      "wall_seconds": 0.005496500001754612,
+      "compile_seconds": 0.000100708,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-infeasible.json",
-      "raw_sha256": "b4c002b346a2335175b0e9e53c156ad417eb5f76579f2e7eb906fdccaa01e05c",
+      "raw_sha256": "9a5b9b141d95ad6821191c47e7a7289ae6ea6ae3c517b5ca745c3740e16ef07d",
       "output_rule_problems": []
     },
     {
@@ -481,16 +1227,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "output_error",
-      "wall_seconds": 0.00473337501171045,
+      "wall_seconds": 0.004459374991711229,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 211058688,
+      "peak_rss_watermark_bytes": 213090304,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-stale-output-overwrite.json",
-      "raw_sha256": "01761b6cf774c254e0348413e5710965ccfc23e91f7b6dbb267c60b67240ae62",
+      "raw_sha256": "30bdc6309f1479d8a5a956ac76b1a640343f5132c6a8801fbeb6ab6313160c30",
       "output_rule_problems": []
     }
   ],
