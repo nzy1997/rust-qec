@@ -291,30 +291,45 @@ impl ActiveState {
     ) -> Result<(), String> {
         let eigenvalue = if outcome { -1.0 } else { 1.0 };
         let old = self.coefficients.clone();
-        let mut next = vec![ComplexAmp::default(); old.len()];
         let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
-        for (index, amplitude) in old.iter().copied().enumerate() {
+        let phase = i_pow(pauli.phase);
+        let image = |index: usize, amplitude: ComplexAmp| {
             let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
                 -1.0
             } else {
                 1.0
             };
-            let image = i_pow(pauli.phase) * (amplitude * (sign * eigenvalue));
-            next[index] = next[index] + amplitude * 0.5;
-            next[index ^ mask] = next[index ^ mask] + image * 0.5;
+            phase * (amplitude * (sign * eigenvalue))
+        };
+        if mask == 0 {
+            for (index, amplitude) in old.iter().copied().enumerate() {
+                self.coefficients[index] = amplitude * 0.5 + image(index, amplitude) * 0.5;
+            }
+        } else {
+            // The Pauli action pairs each coordinate with index ^ mask.
+            for index in 0..self.coefficients.len() {
+                let partner = index ^ mask;
+                if index < partner {
+                    let left = old[index];
+                    let right = old[partner];
+                    self.coefficients[index] = left * 0.5 + image(partner, right) * 0.5;
+                    self.coefficients[partner] = image(index, left) * 0.5 + right * 0.5;
+                }
+            }
         }
-        let norm = next
+        let norm = self
+            .coefficients
             .iter()
             .map(|amplitude| amplitude.norm_sqr())
             .sum::<f64>()
             .sqrt();
         if norm <= 1e-15 {
+            self.coefficients = old;
             return Err("near-Clifford measurement selected zero-probability outcome".into());
         }
-        for amplitude in &mut next {
+        for amplitude in &mut self.coefficients {
             *amplitude = *amplitude * (1.0 / norm);
         }
-        self.coefficients = next;
         if mask == 0 && sign_mask != 0 {
             // A diagonal Pauli projection fixes the parity of these active
             // coordinates. Change the affine basis so that the parity becomes
@@ -417,6 +432,15 @@ impl ActiveState {
         let mut retired = 0;
         let mut axis_index = 0;
         while axis_index < self.axes.len() {
+            // A single significant coefficient in each half proves that this
+            // coordinate is not fixed. Check one entry from each half before
+            // scanning the entire dense vector for high-index axes.
+            if self.coefficients[0].norm_sqr() >= 1e-24
+                && self.coefficients[1 << axis_index].norm_sqr() >= 1e-24
+            {
+                axis_index += 1;
+                continue;
+            }
             let mut half_norm = [0.0, 0.0];
             for (index, coefficient) in self.coefficients.iter().enumerate() {
                 half_norm[(index >> axis_index) & 1] += coefficient.norm_sqr();
@@ -841,15 +865,29 @@ fn sample_cached_terminal_measurements(
     shots: usize,
     rng: &mut impl Rng,
 ) -> Result<Vec<NearCliffordShot>, String> {
-    // Bound the cache to at most 2^9 branches. Later measurements continue
-    // through the ordinary sampler from the cached collapsed state.
-    let cached_depth = targets.len().min(9);
+    sample_cached_terminal_measurements_with_limit(prepared, targets, basis, shots, 1024, rng)
+}
+
+fn sample_cached_terminal_measurements_with_limit(
+    prepared: ActiveState,
+    targets: &[StimTarget],
+    basis: MeasurementBasis,
+    shots: usize,
+    max_cached_nodes: usize,
+    rng: &mut impl Rng,
+) -> Result<Vec<NearCliffordShot>, String> {
+    // Bound both tree depth and the number of cached states. A circuit with
+    // many possible outcomes must not grow the cache with the shot count.
+    debug_assert!(max_cached_nodes > 0);
+    let cached_depth = targets.len().min(16);
     let mut root = TerminalMeasurementNode::new(prepared);
+    let mut cached_nodes = 1;
     let mut results = Vec::with_capacity(shots);
     for _ in 0..shots {
         let mut node = &mut root;
         let mut measurements = Vec::with_capacity(targets.len());
         let mut depth = 0;
+        let mut uncached_state = None;
         while depth < cached_depth
             && !node.state.axes.is_empty()
             && node.state.coefficients.len() <= 1024
@@ -872,13 +910,20 @@ fn sample_cached_terminal_measurements(
                 let mut state = node.state.clone();
                 state.collapse_pauli_measurement(pauli, *mask, outcome)?;
                 state.retire_fixed_axes();
+                if cached_nodes == max_cached_nodes {
+                    measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
+                    depth += 1;
+                    uncached_state = Some(state);
+                    break;
+                }
                 node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
+                cached_nodes += 1;
             }
             measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
             node = node.children[branch].as_mut().unwrap();
             depth += 1;
         }
-        let mut state = node.state.clone();
+        let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
         for target in &targets[depth..] {
             let q = target.qubit_index().unwrap() as usize;
             let outcome = state.measure(q, basis, rng)?;
@@ -1278,5 +1323,52 @@ fn apply_near_pair(state: &mut ActiveState, name: &str, a: usize, b: usize) -> R
             state.apply_clifford(CliffordGate::S(b))
         }
         _ => unreachable!("validated near-Clifford pair gate"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn terminal_cache_limit_falls_back_without_changing_shots_or_rng() {
+        let circuit = NearCliffordExecutor::compile_text("H 0\nT 0\nH 0\nH 1\nM 0 1").unwrap();
+        let mut prepared = ActiveState::new(2, 16);
+        prepared.apply_clifford(CliffordGate::H(0)).unwrap();
+        prepared.t(0).unwrap();
+        prepared.apply_clifford(CliffordGate::H(0)).unwrap();
+        prepared.apply_clifford(CliffordGate::H(1)).unwrap();
+        let targets = [StimTarget::Qubit(0), StimTarget::Qubit(1)];
+
+        for max_cached_nodes in [1, 2, 3] {
+            let mut batch_rng = StdRng::seed_from_u64(739);
+            let mut reference_rng = StdRng::seed_from_u64(739);
+            let batch = sample_cached_terminal_measurements_with_limit(
+                prepared.clone(),
+                &targets,
+                MeasurementBasis::Z,
+                512,
+                max_cached_nodes,
+                &mut batch_rng,
+            )
+            .unwrap();
+            let reference = (0..512)
+                .map(|_| circuit.run(&mut reference_rng).unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(batch, reference, "max_cached_nodes={max_cached_nodes}");
+            assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
+        }
+    }
+
+    #[test]
+    fn zero_probability_collapse_leaves_coefficients_unchanged() {
+        let mut state = ActiveState::new(1, 1);
+        let before = state.coefficients.clone();
+        let error = state
+            .collapse_pauli_measurement(&Pauli::identity(1), 0, true)
+            .unwrap_err();
+        assert!(error.contains("zero-probability"));
+        assert_eq!(state.coefficients, before);
     }
 }
