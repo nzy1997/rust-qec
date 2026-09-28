@@ -21,6 +21,55 @@ fn assert_matches_individual_runs(circuit: &NearCliffordExecutor, shots: usize, 
     assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
 }
 
+fn assert_prepared_batches_match_individual_runs(
+    circuit: &NearCliffordExecutor,
+    batches: &[usize],
+    sweeps: &[&[bool]],
+) {
+    let mut sampler = circuit.prepare_sampler().unwrap();
+    let mut batch_rng = StdRng::seed_from_u64(739);
+    let mut reference_rng = StdRng::seed_from_u64(739);
+    for (&shots, &sweep) in batches.iter().zip(sweeps) {
+        let batch = sampler
+            .sample_with_sweep(shots, sweep, &mut batch_rng)
+            .unwrap();
+        let reference = (0..shots)
+            .map(|_| circuit.run_with_sweep(sweep, &mut reference_rng).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(batch, reference, "shots={shots}, sweep={sweep:?}");
+    }
+    assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
+}
+
+#[test]
+fn prepared_sampler_reuses_terminal_cache_across_batches_without_changing_rng() {
+    let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
+    let entangled = NearCliffordExecutor::compile_text(
+        "H 0\nCX 0 1\nT 0\nH 2\nCX 1 2\nM !0\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-3]",
+    )
+    .unwrap();
+    for circuit in [&benchmark, &entangled] {
+        let batches = [1, 0, 63, 64, 128, 512, 1];
+        let no_sweep: &[bool] = &[];
+        assert_prepared_batches_match_individual_runs(circuit, &batches, &[no_sweep; 7]);
+    }
+}
+
+#[test]
+fn prepared_sampler_preserves_sweep_and_feedback_across_batches() {
+    let circuit =
+        NearCliffordExecutor::compile_text("H 0\nT 0\nCX sweep[0] 0\nM 0\nCX rec[-1] 1\nMX 1")
+            .unwrap();
+    let batches = [64, 2, 128, 0, 65];
+    let zero = [false];
+    let one = [true];
+    assert_prepared_batches_match_individual_runs(
+        &circuit,
+        &batches,
+        &[&zero, &one, &zero, &one, &one],
+    );
+}
+
 #[test]
 fn terminal_batch_matches_individual_runs_and_rng_state() {
     let two_t = NearCliffordExecutor::compile_text("H 0\nCX 0 1\nT 0\nH 0\nT 0\nMX 0 1").unwrap();
