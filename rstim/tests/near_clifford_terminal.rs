@@ -21,24 +21,74 @@ fn setup_two_t() -> (ActiveState, DenseOracle) {
     (active, oracle)
 }
 
-fn compare_after_unframing(active: &ActiveState, oracle: &mut DenseOracle) {
-    oracle.h(0);
-    oracle.cx(0, 1);
-    oracle.h(0);
-    let mut virtual_state = vec![ComplexAmp::default(); 4];
-    for (index, coefficient) in active.coefficients().iter().enumerate() {
-        let mut bits = 0;
-        for (axis_number, axis) in active.active_axes().iter().enumerate() {
-            if index & (1 << axis_number) != 0 {
-                bits ^= (axis[0] as usize) << 1 | axis[1] as usize;
+fn assert_matches_dense_oracle(active: &ActiveState, oracle: &DenseOracle) {
+    let n = active.num_qubits();
+    assert!(n <= 3);
+    // Every Pauli-string expectation determines the density matrix. Checking
+    // the whole set also catches relative-phase errors hidden by Z samples.
+    for word in 1..4usize.pow(n as u32) {
+        let mut x_mask = 0;
+        let mut z_mask = 0;
+        let mut y_count = 0;
+        let mut pivot = None;
+        let mut transformed = active.clone();
+        for q in 0..n {
+            let basis = (word >> (2 * q)) & 3;
+            let bit = 1 << (n - q - 1);
+            match basis {
+                0 => continue,
+                1 => {
+                    x_mask |= bit;
+                    transformed.apply_clifford(CliffordGate::H(q)).unwrap();
+                }
+                2 => {
+                    x_mask |= bit;
+                    z_mask |= bit;
+                    y_count += 1;
+                    transformed.apply_clifford(CliffordGate::SDag(q)).unwrap();
+                    transformed.apply_clifford(CliffordGate::H(q)).unwrap();
+                }
+                3 => z_mask |= bit,
+                _ => unreachable!(),
+            }
+            pivot.get_or_insert(q);
+        }
+        let pivot = pivot.unwrap();
+        for q in 0..n {
+            if q != pivot && (word >> (2 * q)) & 3 != 0 {
+                transformed
+                    .apply_clifford(CliffordGate::CX(q, pivot))
+                    .unwrap();
             }
         }
-        virtual_state[bits] = virtual_state[bits] + *coefficient * active.global_phase();
-    }
-    for (actual, expected) in virtual_state.into_iter().zip(oracle.amplitudes()) {
-        let Amp { re, im } = *expected;
-        assert!((actual.re - re).abs() < 1e-12, "{actual:?} != {expected:?}");
-        assert!((actual.im - im).abs() < 1e-12, "{actual:?} != {expected:?}");
+        let actual = transformed
+            .measurement_probabilities(pivot, MeasurementBasis::Z)
+            .unwrap()
+            .0;
+        let phase = match y_count % 4 {
+            0 => Amp::new(1.0, 0.0),
+            1 => Amp::new(0.0, 1.0),
+            2 => Amp::new(-1.0, 0.0),
+            _ => Amp::new(0.0, -1.0),
+        };
+        let expectation = oracle
+            .amplitudes()
+            .iter()
+            .enumerate()
+            .map(|(index, &amplitude)| {
+                let sign = if (index & z_mask).count_ones() & 1 != 0 {
+                    -1.0
+                } else {
+                    1.0
+                };
+                (oracle.amplitudes()[index ^ x_mask].conj() * (phase * amplitude * sign)).re
+            })
+            .sum::<f64>();
+        let expected = (1.0 + expectation) * 0.5;
+        assert!(
+            (actual - expected).abs() < 1e-10,
+            "n={n} word={word} {actual} != {expected}"
+        );
     }
 }
 
@@ -211,6 +261,12 @@ fn long_mixed_measurement_sequence_preserves_normalization_and_oracle_probabilit
             active.apply_clifford(CliffordGate::H(q)).unwrap();
             oracle.h(q);
         }
+        if step % 5 == 0 {
+            active
+                .apply_clifford(CliffordGate::CX(q, (q + 1) % 3))
+                .unwrap();
+            oracle.cx(q, (q + 1) % 3);
+        }
         let (basis, letter) = match step % 3 {
             0 => (MeasurementBasis::X, 'X'),
             1 => (MeasurementBasis::Y, 'Y'),
@@ -227,6 +283,9 @@ fn long_mixed_measurement_sequence_preserves_normalization_and_oracle_probabilit
             .map(|coefficient| coefficient.norm_sqr())
             .sum::<f64>();
         assert!((norm - 1.0).abs() < 1e-10, "step={step} norm={norm}");
+        if step % 12 == 0 {
+            assert_matches_dense_oracle(&active, &oracle);
+        }
     }
 }
 
@@ -243,7 +302,7 @@ fn sequential_terminal_x_measurements_preserve_interference() {
     assert!((p1 - oracle.measurement_probability(1, 'X', true)).abs() < 1e-12);
     let second = active.measure(1, MeasurementBasis::X, &mut rng).unwrap();
     oracle.collapse(1, 'X', second);
-    compare_after_unframing(&active, &mut oracle);
+    assert_matches_dense_oracle(&active, &oracle);
     let (repeat_zero, repeat_one) = active
         .measurement_probabilities(1, MeasurementBasis::X)
         .unwrap();
@@ -257,7 +316,7 @@ fn terminal_y_and_z_collapse_match_oracle() {
         let mut rng = StdRng::seed_from_u64(42);
         let outcome = active.measure(1, basis, &mut rng).unwrap();
         oracle.collapse(1, letter, outcome);
-        compare_after_unframing(&active, &mut oracle);
+        assert_matches_dense_oracle(&active, &oracle);
     }
 }
 
@@ -291,27 +350,29 @@ fn two_t_sampled_x_parity_detects_interference() {
 }
 
 #[test]
-fn measurement_rank_limit_does_not_consume_randomness_or_mutate_state() {
+fn independent_measurement_preserves_active_rank_and_magic_state() {
     let mut state = ActiveState::new(2, 1);
     state.apply_clifford(CliffordGate::H(0)).unwrap();
     state.t(0).unwrap();
     state.apply_clifford(CliffordGate::H(1)).unwrap();
-    let before = state.coefficients().to_vec();
     let mut rng = StdRng::seed_from_u64(739);
-    let mut untouched_rng = StdRng::seed_from_u64(739);
-    assert!(
-        state
-            .measure(1, MeasurementBasis::Z, &mut rng)
-            .unwrap_err()
-            .contains("active-state limit")
-    );
-    assert_eq!(state.coefficients(), before);
+    let outcome = state.measure(1, MeasurementBasis::Z, &mut rng).unwrap();
     assert_eq!(state.active_rank(), 1);
-    assert_eq!(rng.r#gen::<u64>(), untouched_rng.r#gen::<u64>());
+    assert!(
+        (state
+            .measurement_probabilities(1, MeasurementBasis::Z)
+            .unwrap()
+            .0
+            - f64::from(!outcome))
+        .abs()
+            < 1e-12
+    );
+    state.t_dag(0).unwrap();
+    assert_eq!(state.active_rank(), 1);
 }
 
 #[test]
-fn wide_tableau_pauli_rows_match_two_qubit_oracle_across_measurements() {
+fn packed_and_wide_tableau_pauli_rows_match_two_qubit_oracle_across_measurements() {
     fn prepare(n: usize, a: usize, b: usize) -> ActiveState {
         let mut state = ActiveState::new(n, 8);
         state.apply_clifford(CliffordGate::H(a)).unwrap();
@@ -322,33 +383,35 @@ fn wide_tableau_pauli_rows_match_two_qubit_oracle_across_measurements() {
         state.t_dag(b).unwrap();
         state
     }
-    let mut wide = prepare(130, 63, 129);
-    let mut narrow = prepare(2, 0, 1);
-    let mut wide_rng = StdRng::seed_from_u64(739);
-    let mut narrow_rng = StdRng::seed_from_u64(739);
-    for (wide_q, narrow_q, basis) in [
-        (129, 1, MeasurementBasis::Y),
-        (63, 0, MeasurementBasis::X),
-        (129, 1, MeasurementBasis::Z),
-    ] {
-        for (wq, nq) in [(63, 0), (129, 1)] {
-            for check_basis in [
-                MeasurementBasis::X,
-                MeasurementBasis::Y,
-                MeasurementBasis::Z,
-            ] {
-                let actual = wide.measurement_probabilities(wq, check_basis).unwrap();
-                let expected = narrow.measurement_probabilities(nq, check_basis).unwrap();
-                assert!((actual.0 - expected.0).abs() < 1e-12);
-                assert!((actual.1 - expected.1).abs() < 1e-12);
+    for (n, a, b) in [(64, 0, 63), (65, 0, 64), (130, 63, 129)] {
+        let mut wide = prepare(n, a, b);
+        let mut narrow = prepare(2, 0, 1);
+        let mut wide_rng = StdRng::seed_from_u64(739);
+        let mut narrow_rng = StdRng::seed_from_u64(739);
+        for (wide_q, narrow_q, basis) in [
+            (b, 1, MeasurementBasis::Y),
+            (a, 0, MeasurementBasis::X),
+            (b, 1, MeasurementBasis::Z),
+        ] {
+            for (wq, nq) in [(a, 0), (b, 1)] {
+                for check_basis in [
+                    MeasurementBasis::X,
+                    MeasurementBasis::Y,
+                    MeasurementBasis::Z,
+                ] {
+                    let actual = wide.measurement_probabilities(wq, check_basis).unwrap();
+                    let expected = narrow.measurement_probabilities(nq, check_basis).unwrap();
+                    assert!((actual.0 - expected.0).abs() < 1e-12);
+                    assert!((actual.1 - expected.1).abs() < 1e-12);
+                }
             }
+            assert_eq!(
+                wide.measure(wide_q, basis, &mut wide_rng).unwrap(),
+                narrow.measure(narrow_q, basis, &mut narrow_rng).unwrap()
+            );
+            wide.retire_fixed_axes();
+            narrow.retire_fixed_axes();
         }
-        assert_eq!(
-            wide.measure(wide_q, basis, &mut wide_rng).unwrap(),
-            narrow.measure(narrow_q, basis, &mut narrow_rng).unwrap()
-        );
-        wide.retire_fixed_axes();
-        narrow.retire_fixed_axes();
+        assert_eq!(wide_rng.r#gen::<u64>(), narrow_rng.r#gen::<u64>());
     }
-    assert_eq!(wide_rng.r#gen::<u64>(), narrow_rng.r#gen::<u64>());
 }
