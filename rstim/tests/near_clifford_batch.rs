@@ -190,6 +190,8 @@ fn reordered_entangled_mixed_basis_measurements_match_dense_joint_distribution()
         "H 0\nCX 0 1\nT 0\nH 0\nH 2\nCX 1 2\nT_DAG 2\nS 1\nMX 1\nM 0\nMY 2\nDETECTOR rec[-1] rec[-3]",
     )
     .unwrap();
+    let no_sweep: &[bool] = &[];
+    assert_prepared_batches_match_individual_runs(&circuit, &[1, 63, 256], &[no_sweep; 3]);
     let mut oracle = DenseOracle::new(3);
     oracle.h(0);
     oracle.cx(0, 1);

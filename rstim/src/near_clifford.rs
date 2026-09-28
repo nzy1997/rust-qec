@@ -1310,6 +1310,7 @@ impl NearCliffordExecutor {
             let max_cached_nodes = terminal_cache_node_limit(prepared.num_qubits, ordered.len());
             PreparedTerminalSampler {
                 cached: CachedTerminalSampler::new(prepared.clone(), &ordered, max_cached_nodes),
+                record_order_swaps: record_order_swaps(&ordered),
                 ordered,
             }
         });
@@ -1331,6 +1332,23 @@ pub struct NearCliffordSampler<'a> {
 struct PreparedTerminalSampler {
     ordered: Vec<TerminalMeasurement>,
     cached: CachedTerminalSampler,
+    record_order_swaps: Vec<(usize, usize)>,
+}
+
+fn record_order_swaps(ordered: &[TerminalMeasurement]) -> Vec<(usize, usize)> {
+    let mut destinations = ordered
+        .iter()
+        .map(|measurement| measurement.record_index)
+        .collect::<Vec<_>>();
+    let mut swaps = Vec::new();
+    for index in 0..destinations.len() {
+        while destinations[index] != index {
+            let target = destinations[index];
+            destinations.swap(index, target);
+            swaps.push((index, target));
+        }
+    }
+    swaps
 }
 
 impl NearCliffordSampler<'_> {
@@ -1352,7 +1370,9 @@ impl NearCliffordSampler<'_> {
             let mut results = terminal.cached.sample(&terminal.ordered, shots, rng)?;
             let plan = self.executor.terminal_plan.as_ref().unwrap();
             for result in &mut results {
-                plan.restore_record_order(result, &terminal.ordered);
+                for &(left, right) in &terminal.record_order_swaps {
+                    result.measurements.swap(left, right);
+                }
                 plan.add_outputs(result);
             }
             return Ok(results);
@@ -2070,6 +2090,21 @@ fn apply_near_pair(state: &mut ActiveState, name: &str, a: usize, b: usize) -> R
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn record_order_swaps_restore_nontrivial_cycle_in_place() {
+        let ordered = [2, 0, 1].map(|record_index| TerminalMeasurement {
+            q: record_index,
+            basis: MeasurementBasis::Z,
+            inverted: false,
+            record_index,
+        });
+        let mut bits = vec![true, false, false];
+        for (left, right) in record_order_swaps(&ordered) {
+            bits.swap(left, right);
+        }
+        assert_eq!(bits, [false, false, true]);
+    }
 
     #[test]
     fn symbolic_suffix_rebases_multiple_virtual_origin_bits() {
