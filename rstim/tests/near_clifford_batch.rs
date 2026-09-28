@@ -1,3 +1,7 @@
+#[path = "support/near_clifford_oracle.rs"]
+mod oracle;
+
+use oracle::DenseOracle;
 use rand::{RngCore, SeedableRng, rngs::StdRng};
 use rstim::near_clifford::NearCliffordExecutor;
 use rstim::parser::parse_lines;
@@ -71,6 +75,31 @@ fn terminal_cache_handles_inverted_targets_and_other_measurement_bases() {
 }
 
 #[test]
+fn terminal_plan_handles_split_measurements_metadata_and_annotations() {
+    for text in [
+        "H 0\nCX 0 1\nT 0\nH 0\nM !0\nTICK\nM 1\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(2) rec[-1]\nSHIFT_COORDS(1,2)\n",
+        "H 0\nT 0\nMX 0\nMY 1\nM !2\nDETECTOR rec[-1] rec[-3]\n",
+        "REPEAT 2 {\nH 0\nT 0\nH 0\n}\nREPEAT 2 {\nM 0\nDETECTOR rec[-1]\nTICK\n}\nOBSERVABLE_INCLUDE(3) rec[-2]",
+        "H 0\nT 0\nM 0 64\nDETECTOR rec[-1] rec[-2]",
+    ] {
+        let circuit = NearCliffordExecutor::compile_text(text).unwrap();
+        assert_matches_individual_runs(&circuit, 128, &[]);
+    }
+}
+
+#[test]
+fn symbolic_clifford_suffix_preserves_correlations_and_rng() {
+    for text in [
+        "H 0\nCX 0 1\nS 1\nM 0\nMX 1\nMY 2\nM 1\nDETECTOR rec[-1] rec[-4]",
+        "H 0\nCX 0 1\nCX 1 2\nM 0 1 2\nM 0 1 2",
+        "H 0\nT 0\nM 0\nH 1\nCX 1 2\nM 1 2\nMX 2",
+    ] {
+        let circuit = NearCliffordExecutor::compile_text(text).unwrap();
+        assert_matches_individual_runs(&circuit, 512, &[]);
+    }
+}
+
+#[test]
 fn terminal_cache_budget_preserves_long_batch_and_rng_state() {
     let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
     assert_matches_individual_runs(&benchmark, 2048, &[]);
@@ -87,18 +116,73 @@ fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
     let active =
         NearCliffordExecutor::compile_text(&format!("H 0\nT 0\nH 0\nM {active_targets}")).unwrap();
     assert_matches_individual_runs(&active, 128, &[]);
+
+    let wide_prefix = (0..65)
+        .map(|q| format!("H {q}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let wide_targets = (0..65).map(|q| q.to_string()).collect::<Vec<_>>().join(" ");
+    let wide =
+        NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}")).unwrap();
+    assert_matches_individual_runs(&wide, 64, &[]);
 }
 
 #[test]
-fn terminal_rank_limit_error_does_not_advance_rng() {
+fn independent_terminal_measurement_does_not_use_an_active_axis() {
     let circuit =
         NearCliffordExecutor::compile_with_limit(parse_lines("H 0\nH 1\nT 0\nM 1").unwrap(), 1)
             .unwrap();
-    let mut batch_rng = StdRng::seed_from_u64(739);
-    let mut run_rng = StdRng::seed_from_u64(739);
-    let batch_error = circuit.sample(64, &mut batch_rng).unwrap_err();
-    let run_error = circuit.run(&mut run_rng).unwrap_err();
-    assert_eq!(batch_error, run_error);
-    assert!(batch_error.contains("rank 2"), "{batch_error}");
-    assert_eq!(batch_rng.next_u64(), run_rng.next_u64());
+    assert_matches_individual_runs(&circuit, 64, &[]);
+}
+
+#[test]
+fn reordered_entangled_mixed_basis_measurements_match_dense_joint_distribution() {
+    let circuit = NearCliffordExecutor::compile_text(
+        "H 0\nCX 0 1\nT 0\nH 0\nH 2\nCX 1 2\nT_DAG 2\nS 1\nMX 1\nM 0\nMY 2\nDETECTOR rec[-1] rec[-3]",
+    )
+    .unwrap();
+    let mut oracle = DenseOracle::new(3);
+    oracle.h(0);
+    oracle.cx(0, 1);
+    oracle.t(0);
+    oracle.h(0);
+    oracle.h(2);
+    oracle.cx(1, 2);
+    oracle.t_dag(2);
+    oracle.s(1);
+
+    let mut expected = [0.0; 8];
+    for (pattern, probability) in expected.iter_mut().enumerate() {
+        let mut state = oracle.clone();
+        *probability = 1.0;
+        for (index, (qubit, basis)) in [(1, 'X'), (0, 'Z'), (2, 'Y')].into_iter().enumerate() {
+            let outcome = pattern & (1 << index) != 0;
+            let conditional = state.measurement_probability(qubit, basis, outcome);
+            *probability *= conditional;
+            if conditional > 1e-14 {
+                state.collapse(qubit, basis, outcome);
+            }
+        }
+    }
+
+    let mut rng = StdRng::seed_from_u64(739);
+    let shots = circuit.sample(10_000, &mut rng).unwrap();
+    let mut counts = [0usize; 8];
+    for shot in shots {
+        let pattern = shot
+            .measurements
+            .iter()
+            .enumerate()
+            .fold(0, |pattern, (index, bit)| {
+                pattern | (usize::from(*bit) << index)
+            });
+        counts[pattern] += 1;
+        assert_eq!(
+            shot.detectors,
+            vec![shot.measurements[0] ^ shot.measurements[2]]
+        );
+    }
+    for (count, probability) in counts.into_iter().zip(expected) {
+        assert!((count as f64 / 10_000.0 - probability).abs() < 0.025);
+    }
 }
