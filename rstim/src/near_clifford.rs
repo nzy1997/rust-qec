@@ -10,6 +10,7 @@ use crate::ir::{StimInstr, StimTarget};
 use crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot;
 use crate::sim::tableau::StabilizerState;
 use rand::Rng;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ComplexAmp {
@@ -81,7 +82,7 @@ pub enum MeasurementBasis {
 #[derive(Clone, Debug)]
 pub struct ActiveState {
     num_qubits: usize,
-    frame: StabilizerState,
+    frame: Arc<StabilizerState>,
     origin: Vec<bool>,
     axes: Vec<Vec<bool>>,
     coefficients: Vec<ComplexAmp>,
@@ -93,7 +94,7 @@ impl ActiveState {
     pub fn new(num_qubits: usize, max_active_qubits: usize) -> Self {
         Self {
             num_qubits,
-            frame: StabilizerState::new(num_qubits),
+            frame: Arc::new(StabilizerState::new(num_qubits)),
             origin: vec![false; num_qubits],
             axes: Vec::new(),
             coefficients: vec![ComplexAmp::new(1.0, 0.0)],
@@ -152,15 +153,15 @@ impl ActiveState {
             }
         }
         match gate {
-            H(q) => self.frame.h(q),
-            S(q) => self.frame.s(q),
-            SDag(q) => self.frame.s_dag(q),
-            X(q) => self.frame.x_gate(q),
-            Y(q) => self.frame.y_gate(q),
-            Z(q) => self.frame.z_gate(q),
-            CX(a, b) => self.frame.cx(a, b),
-            CZ(a, b) => self.frame.cz(a, b),
-            Swap(a, b) => self.frame.swap(a, b),
+            H(q) => Arc::make_mut(&mut self.frame).h(q),
+            S(q) => Arc::make_mut(&mut self.frame).s(q),
+            SDag(q) => Arc::make_mut(&mut self.frame).s_dag(q),
+            X(q) => Arc::make_mut(&mut self.frame).x_gate(q),
+            Y(q) => Arc::make_mut(&mut self.frame).y_gate(q),
+            Z(q) => Arc::make_mut(&mut self.frame).z_gate(q),
+            CX(a, b) => Arc::make_mut(&mut self.frame).cx(a, b),
+            CZ(a, b) => Arc::make_mut(&mut self.frame).cz(a, b),
+            Swap(a, b) => Arc::make_mut(&mut self.frame).swap(a, b),
         }
         Ok(())
     }
@@ -280,35 +281,222 @@ impl ActiveState {
         if self.axes.is_empty() {
             self.rebase_origin_into_frame();
             let outcome = match basis {
-                MeasurementBasis::Z => self.frame.measure_z(q, rng).0,
+                MeasurementBasis::Z => Arc::make_mut(&mut self.frame).measure_z(q, rng).0,
                 MeasurementBasis::X => {
-                    self.frame.h(q);
-                    let bit = self.frame.measure_z(q, rng).0;
-                    self.frame.h(q);
+                    Arc::make_mut(&mut self.frame).h(q);
+                    let bit = Arc::make_mut(&mut self.frame).measure_z(q, rng).0;
+                    Arc::make_mut(&mut self.frame).h(q);
                     bit
                 }
                 MeasurementBasis::Y => {
-                    self.frame.s_dag(q);
-                    self.frame.h(q);
-                    let bit = self.frame.measure_z(q, rng).0;
-                    self.frame.h(q);
-                    self.frame.s(q);
+                    Arc::make_mut(&mut self.frame).s_dag(q);
+                    Arc::make_mut(&mut self.frame).h(q);
+                    let bit = Arc::make_mut(&mut self.frame).measure_z(q, rng).0;
+                    Arc::make_mut(&mut self.frame).h(q);
+                    Arc::make_mut(&mut self.frame).s(q);
                     bit
                 }
             };
             return Ok(outcome != 0);
         }
         let pauli = self.single_qubit_pauli(q, basis)?;
-        self.measure_active_pauli(&pauli, rng)
+        self.measure_active_pauli(q, basis, &pauli, rng)
     }
 
-    fn measure_active_pauli(&mut self, pauli: &Pauli, rng: &mut impl Rng) -> Result<bool, String> {
+    fn measure_clifford_forced(&mut self, q: usize, basis: MeasurementBasis, outcome: bool) {
+        debug_assert!(self.axes.is_empty());
+        self.rebase_origin_into_frame();
+        let frame = Arc::make_mut(&mut self.frame);
+        match basis {
+            MeasurementBasis::Z => {}
+            MeasurementBasis::X => frame.h(q),
+            MeasurementBasis::Y => {
+                frame.s_dag(q);
+                frame.h(q);
+            }
+        }
+        let (actual, _) = frame.measure_z_with_forced_random_outcome(q, u8::from(outcome));
+        match basis {
+            MeasurementBasis::Z => {}
+            MeasurementBasis::X => frame.h(q),
+            MeasurementBasis::Y => {
+                frame.h(q);
+                frame.s(q);
+            }
+        }
+        debug_assert_eq!(actual != 0, outcome);
+    }
+
+    fn measure_forced(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        outcome: bool,
+    ) -> Result<(), String> {
+        if self.axes.is_empty() {
+            self.measure_clifford_forced(q, basis, outcome);
+        } else {
+            let pauli = self.single_qubit_pauli(q, basis)?;
+            let (mask, independent) = self.coordinate_mask(&pauli.x);
+            if independent {
+                self.absorb_independent_measurement(q, basis, outcome)?;
+            } else {
+                let probability_zero = self.pauli_probability_zero(&pauli, mask, false);
+                self.collapse_pauli_measurement(&pauli, mask, outcome, probability_zero)?;
+                if mask != 0 {
+                    self.retire_nondiagonal_measurement(q, basis)?;
+                }
+            }
+            self.retire_fixed_axes();
+        }
+        Ok(())
+    }
+
+    fn measure_active_pauli(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        pauli: &Pauli,
+        rng: &mut impl Rng,
+    ) -> Result<bool, String> {
         let (mask, independent) = self.coordinate_mask(&pauli.x);
         let probability_zero = self.pauli_probability_zero(pauli, mask, independent);
+        if independent {
+            let outcome = rng.r#gen::<f64>() >= probability_zero;
+            self.absorb_independent_measurement(q, basis, outcome)?;
+            return Ok(outcome);
+        }
         let mask = self.ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
         let outcome = rng.r#gen::<f64>() >= probability_zero;
         self.collapse_pauli_measurement(pauli, mask, outcome, probability_zero)?;
+        if mask != 0 {
+            self.retire_nondiagonal_measurement(q, basis)?;
+        }
         Ok(outcome)
+    }
+
+    fn canonicalize_active_axes(&mut self) -> Vec<usize> {
+        self.rebase_origin_into_frame();
+        let mut pivots = Vec::with_capacity(self.axes.len());
+        for axis_index in 0..self.axes.len() {
+            let pivot = (0..self.num_qubits)
+                .find(|&bit| self.axes[axis_index][bit] && !pivots.contains(&bit))
+                .expect("active axes remain independent");
+            for bit in 0..self.num_qubits {
+                if bit != pivot && self.axes[axis_index][bit] {
+                    Arc::make_mut(&mut self.frame).right_cx(pivot, bit);
+                    for axis in &mut self.axes {
+                        axis[bit] ^= axis[pivot];
+                    }
+                }
+            }
+            pivots.push(pivot);
+        }
+        pivots
+    }
+
+    /// An independent Pauli has an X component on a dormant virtual qubit.
+    /// Its two outcomes are equally likely. Move the existing active axes to
+    /// singleton virtual bits, then prepare the measured eigenstate by a
+    /// Clifford change of frame on a dormant pivot. Coefficients do not move.
+    fn absorb_independent_measurement(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        outcome: bool,
+    ) -> Result<(), String> {
+        let pivots = self.canonicalize_active_axes();
+        let pauli = self.single_qubit_pauli(q, basis)?;
+        let dormant = (0..self.num_qubits)
+            .find(|&bit| pauli.x[bit] && !pivots.contains(&bit))
+            .expect("independent Pauli has a dormant X pivot");
+        let frame = Arc::make_mut(&mut self.frame);
+        // Composition is on the right, so append the preparation gates in
+        // reverse execution order: controlled X, controlled Z, S, then H.
+        for bit in 0..self.num_qubits {
+            if bit != dormant && pauli.x[bit] {
+                frame.right_cx(dormant, bit);
+            }
+        }
+        for &bit in &pivots {
+            if pauli.z[bit] {
+                frame.right_cz(dormant, bit);
+            }
+        }
+        for _ in 0..((pauli.phase + if outcome { 2 } else { 0 }) % 4) {
+            frame.right_s(dormant);
+        }
+        frame.right_h(dormant);
+        Ok(())
+    }
+
+    /// A measured Pauli supported on the active state fixes one logical
+    /// coordinate. Diagonalize that Pauli within the active axes and discard
+    /// the fixed coordinate after projection.
+    fn retire_nondiagonal_measurement(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+    ) -> Result<(), String> {
+        let pivots = self.canonicalize_active_axes();
+        let mut pauli = self.single_qubit_pauli(q, basis)?;
+        let pivot_index = pivots
+            .iter()
+            .position(|&bit| pauli.x[bit])
+            .expect("non-diagonal active Pauli has an X pivot");
+        let pivot = pivots[pivot_index];
+        let pivot_mask = 1usize << pivot_index;
+        for (index, &bit) in pivots.iter().enumerate() {
+            if bit == pivot || !pauli.x[bit] {
+                continue;
+            }
+            let other_mask = 1usize << index;
+            for coefficient in 0..self.coefficients.len() {
+                if coefficient & pivot_mask != 0 && coefficient & other_mask == 0 {
+                    self.coefficients
+                        .swap(coefficient, coefficient ^ other_mask);
+                }
+            }
+            Arc::make_mut(&mut self.frame).right_cx(pivot, bit);
+            pauli.x[bit] = false;
+            pauli.z[pivot] ^= pauli.z[bit];
+        }
+        for (index, &bit) in pivots.iter().enumerate() {
+            if bit == pivot || !pauli.z[bit] {
+                continue;
+            }
+            let other_mask = 1usize << index;
+            for coefficient in 0..self.coefficients.len() {
+                if coefficient & pivot_mask != 0 && coefficient & other_mask != 0 {
+                    self.coefficients[coefficient] = self.coefficients[coefficient] * -1.0;
+                }
+            }
+            Arc::make_mut(&mut self.frame).right_cz(pivot, bit);
+            pauli.z[bit] = false;
+        }
+        if pauli.z[pivot] {
+            for coefficient in 0..self.coefficients.len() {
+                if coefficient & pivot_mask != 0 {
+                    let old = self.coefficients[coefficient];
+                    self.coefficients[coefficient] = ComplexAmp::new(old.im, -old.re);
+                }
+            }
+            Arc::make_mut(&mut self.frame).right_s(pivot);
+        }
+        let scale = std::f64::consts::FRAC_1_SQRT_2;
+        for coefficient in 0..self.coefficients.len() {
+            if coefficient & pivot_mask == 0 {
+                let partner = coefficient ^ pivot_mask;
+                let zero = self.coefficients[coefficient];
+                let one = self.coefficients[partner];
+                self.coefficients[coefficient] = (zero + one) * scale;
+                self.coefficients[partner] =
+                    ComplexAmp::new(zero.re - one.re, zero.im - one.im) * scale;
+            }
+        }
+        Arc::make_mut(&mut self.frame).right_h(pivot);
+        self.retire_fixed_axes();
+        Ok(())
     }
 
     fn collapse_pauli_measurement(
@@ -430,9 +618,9 @@ impl ActiveState {
                 self.global_phase = self.global_phase * i_pow((pauli.phase + 4 - y_count % 4) % 4);
                 for (physical_q, (&x, &z)) in pauli.x.iter().zip(&pauli.z).enumerate() {
                     match (x, z) {
-                        (true, true) => self.frame.y_gate(physical_q),
-                        (true, false) => self.frame.x_gate(physical_q),
-                        (false, true) => self.frame.z_gate(physical_q),
+                        (true, true) => Arc::make_mut(&mut self.frame).y_gate(physical_q),
+                        (true, false) => Arc::make_mut(&mut self.frame).x_gate(physical_q),
+                        (false, true) => Arc::make_mut(&mut self.frame).z_gate(physical_q),
                         (false, false) => {}
                     }
                 }
@@ -588,6 +776,41 @@ impl ActiveState {
     }
 
     fn coordinate_mask(&self, x: &[bool]) -> (usize, bool) {
+        if x.len() <= 64 {
+            let pack = |bits: &[bool]| {
+                bits.iter()
+                    .enumerate()
+                    .fold(0u64, |word, (i, &b)| word | ((b as u64) << i))
+            };
+            let mut rows = [0u64; 64];
+            let mut masks = [0usize; 64];
+            for (index, axis) in self.axes.iter().enumerate() {
+                let mut row = pack(axis);
+                let mut mask = 1usize << index;
+                while row != 0 {
+                    let pivot = row.trailing_zeros() as usize;
+                    if rows[pivot] != 0 {
+                        row ^= rows[pivot];
+                        mask ^= masks[pivot];
+                    } else {
+                        rows[pivot] = row;
+                        masks[pivot] = mask;
+                        break;
+                    }
+                }
+            }
+            let mut row = pack(x);
+            let mut mask = 0usize;
+            while row != 0 {
+                let pivot = row.trailing_zeros() as usize;
+                if rows[pivot] == 0 {
+                    return (0, true);
+                }
+                row ^= rows[pivot];
+                mask ^= masks[pivot];
+            }
+            return (mask, false);
+        }
         let n = x.len();
         let mut pivots: Vec<Option<(Vec<bool>, usize)>> = vec![None; n];
         for (index, axis) in self.axes.iter().enumerate() {
@@ -629,12 +852,12 @@ impl ActiveState {
         let mut product = Pauli::identity(n);
         for (i, &selected) in virtual_x.iter().enumerate() {
             if selected {
-                product.multiply(&Pauli::from_tableau_row(&self.frame, i));
+                product.multiply_tableau_row(&self.frame, i);
             }
         }
         for (i, &selected) in virtual_z.iter().enumerate() {
             if selected {
-                product.multiply(&Pauli::from_tableau_row(&self.frame, n + i));
+                product.multiply_tableau_row(&self.frame, n + i);
             }
         }
         if product.x != physical_x || product.z != physical_z {
@@ -685,21 +908,13 @@ impl Pauli {
         }
     }
 
-    fn from_tableau_row(frame: &StabilizerState, row: usize) -> Self {
+    fn multiply_tableau_row(&mut self, frame: &StabilizerState, row: usize) {
         let (x, z, phase) = frame.canonical_row(row);
-        let y_count = x.iter().zip(z).filter(|(x, z)| **x && **z).count();
-        Self {
-            x: x.to_vec(),
-            z: z.to_vec(),
-            phase: (phase + (y_count % 4) as u8) % 4,
-        }
-    }
-
-    fn multiply(&mut self, rhs: &Pauli) {
-        let sign = if dot(&self.z, &rhs.x) { 2 } else { 0 };
-        self.phase = (self.phase + rhs.phase + sign) % 4;
-        xor(&mut self.x, &rhs.x);
-        xor(&mut self.z, &rhs.z);
+        let y_count = (x.iter().zip(z).filter(|(x, z)| **x && **z).count() % 4) as u8;
+        let sign = if dot(&self.z, x) { 2 } else { 0 };
+        self.phase = (self.phase + phase + y_count + sign) % 4;
+        xor(&mut self.x, x);
+        xor(&mut self.z, z);
     }
 }
 
@@ -731,6 +946,189 @@ pub struct NearCliffordExecutor {
     instructions: Vec<StimInstr>,
     num_qubits: usize,
     max_active_qubits: usize,
+    prefix_len: usize,
+    terminal_plan: Option<TerminalPlan>,
+}
+
+#[derive(Clone, Debug)]
+struct TerminalMeasurement {
+    q: usize,
+    basis: MeasurementBasis,
+    inverted: bool,
+    record_index: usize,
+}
+
+#[derive(Clone, Debug)]
+enum TerminalOutput {
+    Detector(Vec<usize>),
+    Observable(u32, Vec<usize>),
+}
+
+#[derive(Clone, Debug, Default)]
+struct TerminalPlan {
+    measurements: Vec<TerminalMeasurement>,
+    outputs: Vec<TerminalOutput>,
+    schedule: OnceLock<Vec<usize>>,
+}
+
+impl TerminalPlan {
+    const MAX_ACTIONS: usize = 65_536;
+
+    fn from_instructions(instructions: &[StimInstr]) -> Option<Self> {
+        let mut plan = Self::default();
+        let mut budget = Self::MAX_ACTIONS;
+        plan.append(instructions, &mut budget)?;
+        (!plan.measurements.is_empty()).then_some(plan)
+    }
+
+    fn append(&mut self, instructions: &[StimInstr], budget: &mut usize) -> Option<()> {
+        for instruction in instructions {
+            *budget = (*budget).checked_sub(1)?;
+            match instruction {
+                StimInstr::Repeat { count, body } => {
+                    if *count > Self::MAX_ACTIONS as u64 {
+                        return None;
+                    }
+                    for _ in 0..*count {
+                        *budget = (*budget).checked_sub(1)?;
+                        self.append(body, budget)?;
+                    }
+                }
+                StimInstr::Op {
+                    name,
+                    args,
+                    targets,
+                    ..
+                } => match name.as_str() {
+                    "M" | "MZ" | "MX" | "MY" => {
+                        let basis = match name.as_str() {
+                            "MX" => MeasurementBasis::X,
+                            "MY" => MeasurementBasis::Y,
+                            _ => MeasurementBasis::Z,
+                        };
+                        for target in targets {
+                            self.measurements.push(TerminalMeasurement {
+                                q: target.qubit_index()? as usize,
+                                basis,
+                                inverted: matches!(target, StimTarget::QubitInv(_)),
+                                record_index: self.measurements.len(),
+                            });
+                        }
+                    }
+                    "DETECTOR" | "OBSERVABLE_INCLUDE" => {
+                        let available = self.measurements.len();
+                        let mut positions = Vec::with_capacity(targets.len());
+                        for target in targets {
+                            let StimTarget::Rec(offset) = target else {
+                                return None;
+                            };
+                            let distance = usize::try_from(offset.unsigned_abs()).ok()?;
+                            if *offset >= 0 || distance == 0 || distance > available {
+                                return None;
+                            }
+                            positions.push(available - distance);
+                        }
+                        if name == "DETECTOR" {
+                            self.outputs.push(TerminalOutput::Detector(positions));
+                        } else {
+                            self.outputs
+                                .push(TerminalOutput::Observable(args[0] as u32, positions));
+                        }
+                    }
+                    "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => {}
+                    _ => return None,
+                },
+            }
+            if self.measurements.len() + self.outputs.len() > Self::MAX_ACTIONS {
+                return None;
+            }
+        }
+        Some(())
+    }
+
+    fn add_outputs(&self, shot: &mut NearCliffordShot) {
+        for output in &self.outputs {
+            let (positions, observable) = match output {
+                TerminalOutput::Detector(positions) => (positions, None),
+                TerminalOutput::Observable(index, positions) => (positions, Some(*index)),
+            };
+            let parity = positions.iter().fold(false, |parity, &position| {
+                parity ^ shot.measurements[position]
+            });
+            if let Some(index) = observable {
+                shot.observables.push((index, parity));
+            } else {
+                shot.detectors.push(parity);
+            }
+        }
+    }
+
+    fn ordered_measurements(&self, prepared: &ActiveState) -> Vec<TerminalMeasurement> {
+        let order = self.schedule.get_or_init(|| self.plan_order(prepared));
+        order
+            .iter()
+            .map(|&index| self.measurements[index].clone())
+            .collect()
+    }
+
+    fn plan_order(&self, prepared: &ActiveState) -> Vec<usize> {
+        let identity = || (0..self.measurements.len()).collect::<Vec<_>>();
+        // One Pauli measurement per physical qubit makes every pair commute.
+        // Repeated targets can have incompatible bases, so keep their order.
+        // Bound planning work; long suffixes still use the terminal cache.
+        if self.measurements.len() > 64 {
+            return identity();
+        }
+        let mut seen = vec![false; prepared.num_qubits];
+        for measurement in &self.measurements {
+            if seen[measurement.q] {
+                return identity();
+            }
+            seen[measurement.q] = true;
+        }
+        let mut state = prepared.clone();
+        let mut remaining = identity();
+        let mut order = Vec::with_capacity(remaining.len());
+        while !remaining.is_empty() {
+            // Retire active coordinates early. The planning trajectory follows
+            // the more likely branch; other branches remain exact at runtime.
+            let next = remaining
+                .iter()
+                .position(|&index| {
+                    let measurement = &self.measurements[index];
+                    let Ok(pauli) = state.single_qubit_pauli(measurement.q, measurement.basis)
+                    else {
+                        return false;
+                    };
+                    let (mask, independent) = state.coordinate_mask(&pauli.x);
+                    !independent && (mask != 0 || state.sign_coordinates(&pauli.z).1 != 0)
+                })
+                .unwrap_or(0);
+            let index = remaining.remove(next);
+            let measurement = &self.measurements[index];
+            let Ok((probability_zero, _)) =
+                state.measurement_probabilities(measurement.q, measurement.basis)
+            else {
+                return identity();
+            };
+            if state
+                .measure_forced(measurement.q, measurement.basis, probability_zero < 0.5)
+                .is_err()
+            {
+                return identity();
+            }
+            order.push(index);
+        }
+        order
+    }
+
+    fn restore_record_order(&self, shot: &mut NearCliffordShot, ordered: &[TerminalMeasurement]) {
+        let mut original = vec![false; ordered.len()];
+        for (bit, measurement) in shot.measurements.iter().zip(ordered) {
+            original[measurement.record_index] = *bit;
+        }
+        shot.measurements = original;
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -775,10 +1173,17 @@ impl NearCliffordExecutor {
                 "near-Clifford circuit exceeds {MAX_NEAR_CLIFFORD_QUBITS} physical qubits"
             ));
         }
+        let prefix_len = instructions
+            .iter()
+            .take_while(|instruction| is_deterministic_near_instruction(instruction))
+            .count();
+        let terminal_plan = TerminalPlan::from_instructions(&instructions[prefix_len..]);
         Ok(Self {
             instructions,
             num_qubits,
             max_active_qubits,
+            prefix_len,
+            terminal_plan,
         })
     }
 
@@ -793,6 +1198,31 @@ impl NearCliffordExecutor {
         rng: &mut impl Rng,
     ) -> Result<NearCliffordShot, String> {
         let mut state = ActiveState::new(self.num_qubits, self.max_active_qubits);
+        if let Some(plan) = &self.terminal_plan {
+            run_near_block(
+                &self.instructions[..self.prefix_len],
+                &mut state,
+                &mut Vec::new(),
+                &mut Vec::new(),
+                &mut Vec::new(),
+                sweep_bits,
+                rng,
+            )?;
+            let ordered = plan.ordered_measurements(&state);
+            let mut shot = NearCliffordShot {
+                measurements: Vec::with_capacity(ordered.len()),
+                detectors: Vec::new(),
+                observables: Vec::new(),
+            };
+            for target in &ordered {
+                let bit = state.measure(target.q, target.basis, rng)?;
+                state.retire_fixed_axes();
+                shot.measurements.push(bit ^ target.inverted);
+            }
+            plan.restore_record_order(&mut shot, &ordered);
+            plan.add_outputs(&mut shot);
+            return Ok(shot);
+        }
         let mut measurements = Vec::new();
         let mut detectors = Vec::new();
         let mut observables = Vec::new();
@@ -832,12 +1262,8 @@ impl NearCliffordExecutor {
                 .collect();
         }
 
-        let prefix_len = self
-            .instructions
-            .iter()
-            .take_while(|instruction| is_deterministic_near_instruction(instruction))
-            .count();
-        if prefix_len == 0 {
+        let prefix_len = self.prefix_len;
+        if prefix_len == 0 && self.terminal_plan.is_none() {
             return (0..shots)
                 .map(|_| self.run_with_sweep(sweep_bits, rng))
                 .collect();
@@ -854,20 +1280,14 @@ impl NearCliffordExecutor {
             rng,
         )?;
 
-        if self.num_qubits <= 64
-            && let [StimInstr::Op { name, targets, .. }] = &self.instructions[prefix_len..]
-            && matches!(name.as_str(), "M" | "MZ" | "MX" | "MY")
-            && !targets.is_empty()
-            && targets
-                .iter()
-                .all(|target| matches!(target, StimTarget::Qubit(_) | StimTarget::QubitInv(_)))
-        {
-            let basis = match name.as_str() {
-                "MX" => MeasurementBasis::X,
-                "MY" => MeasurementBasis::Y,
-                _ => MeasurementBasis::Z,
-            };
-            return sample_cached_terminal_measurements(prepared, targets, basis, shots, rng);
+        if let Some(plan) = &self.terminal_plan {
+            let ordered = plan.ordered_measurements(&prepared);
+            let mut results = sample_cached_terminal_measurements(prepared, &ordered, shots, rng)?;
+            for result in &mut results {
+                plan.restore_record_order(result, &ordered);
+                plan.add_outputs(result);
+            }
+            return Ok(results);
         }
 
         (0..shots)
@@ -897,8 +1317,115 @@ impl NearCliffordExecutor {
 
 struct TerminalMeasurementNode {
     state: ActiveState,
-    measurement: Option<(f64, Pauli, usize)>,
+    measurement: Option<PreparedTerminalMeasurement>,
+    symbolic_suffix: Option<Option<CliffordSuffixPlan>>,
     children: [Option<Box<TerminalMeasurementNode>>; 2],
+}
+
+struct SymbolicStabilizerState {
+    frame: StabilizerState,
+    signs: Vec<u64>,
+    random_count: usize,
+}
+
+struct SymbolicMeasurement {
+    mask: u64,
+    constant: bool,
+    random: bool,
+}
+
+impl SymbolicStabilizerState {
+    fn new(frame: StabilizerState) -> Self {
+        Self {
+            signs: vec![0; frame.num_qubits() * 2],
+            frame,
+            random_count: 0,
+        }
+    }
+
+    fn h(&mut self, q: usize) {
+        self.frame.h(q);
+    }
+
+    fn s(&mut self, q: usize) {
+        self.frame.s(q);
+    }
+
+    fn s_dag(&mut self, q: usize) {
+        self.frame.s_dag(q);
+    }
+
+    fn measure_z(&mut self, q: usize) -> Option<SymbolicMeasurement> {
+        let (mask, constant, random) =
+            self.frame
+                .measure_z_symbolic(&mut self.signs, &mut self.random_count, q)?;
+        Some(SymbolicMeasurement {
+            mask,
+            constant,
+            random,
+        })
+    }
+}
+
+struct CliffordSuffixPlan {
+    steps: Vec<SymbolicMeasurement>,
+}
+
+impl CliffordSuffixPlan {
+    fn from_state(state: &ActiveState, targets: &[TerminalMeasurement]) -> Option<Self> {
+        let mut state = state.clone();
+        state.rebase_origin_into_frame();
+        let mut symbolic = SymbolicStabilizerState::new((*state.frame).clone());
+        let mut steps = Vec::with_capacity(targets.len());
+        for target in targets {
+            match target.basis {
+                MeasurementBasis::Z => {}
+                MeasurementBasis::X => symbolic.h(target.q),
+                MeasurementBasis::Y => {
+                    symbolic.s_dag(target.q);
+                    symbolic.h(target.q);
+                }
+            }
+            steps.push(symbolic.measure_z(target.q)?);
+            match target.basis {
+                MeasurementBasis::Z => {}
+                MeasurementBasis::X => symbolic.h(target.q),
+                MeasurementBasis::Y => {
+                    symbolic.h(target.q);
+                    symbolic.s(target.q);
+                }
+            }
+        }
+        Some(Self { steps })
+    }
+
+    fn sample(
+        &self,
+        targets: &[TerminalMeasurement],
+        measurements: &mut Vec<bool>,
+        rng: &mut impl Rng,
+    ) {
+        let mut random_bits = 0u64;
+        for (step, target) in self.steps.iter().zip(targets) {
+            if step.random && rng.r#gen::<bool>() {
+                random_bits |= step.mask;
+            }
+            let outcome = step.constant ^ ((random_bits & step.mask).count_ones() & 1 != 0);
+            measurements.push(outcome ^ target.inverted);
+        }
+    }
+}
+
+enum PreparedTerminalMeasurement {
+    Active {
+        probability_zero: f64,
+        pauli: Pauli,
+        mask: usize,
+        independent: bool,
+    },
+    Clifford {
+        probability_zero: f64,
+    },
 }
 
 impl TerminalMeasurementNode {
@@ -906,44 +1433,38 @@ impl TerminalMeasurementNode {
         Self {
             state,
             measurement: None,
+            symbolic_suffix: None,
             children: [None, None],
         }
     }
 }
 
-const MAX_CACHED_TERMINAL_PAULIS: usize = 64;
-
-fn cached_terminal_pauli<'a>(
-    cache: &'a mut Vec<Option<Pauli>>,
-    state: &ActiveState,
-    index: usize,
-    q: usize,
-    basis: MeasurementBasis,
-) -> Result<&'a Pauli, String> {
-    debug_assert!(index < MAX_CACHED_TERMINAL_PAULIS);
-    if cache.len() <= index {
-        cache.resize_with(index + 1, || None);
-    }
-    if cache[index].is_none() {
-        cache[index] = Some(state.single_qubit_pauli(q, basis)?);
-    }
-    Ok(cache[index].as_ref().unwrap())
-}
-
 fn sample_cached_terminal_measurements(
     prepared: ActiveState,
-    targets: &[StimTarget],
-    basis: MeasurementBasis,
+    targets: &[TerminalMeasurement],
     shots: usize,
     rng: &mut impl Rng,
 ) -> Result<Vec<NearCliffordShot>, String> {
-    sample_cached_terminal_measurements_with_limit(prepared, targets, basis, shots, 1024, rng)
+    let max_cached_nodes = terminal_cache_node_limit(prepared.num_qubits, targets.len());
+    sample_cached_terminal_measurements_with_limit(prepared, targets, shots, max_cached_nodes, rng)
+}
+
+fn terminal_cache_node_limit(num_qubits: usize, target_count: usize) -> usize {
+    const MAX_CACHE_BYTES: usize = 64 * 1024 * 1024;
+    // Independent Pauli branches can each own a distinct frame. Account for
+    // both 2n-row Boolean matrices, their row headers and active-state data.
+    let worst_case_bytes = num_qubits
+        .saturating_mul(num_qubits)
+        .saturating_mul(4)
+        .saturating_add(num_qubits.saturating_mul(128))
+        .saturating_add(target_count.saturating_mul(std::mem::size_of::<SymbolicMeasurement>()))
+        .saturating_add(16 * 1024);
+    (MAX_CACHE_BYTES / worst_case_bytes).clamp(1, 1024)
 }
 
 fn sample_cached_terminal_measurements_with_limit(
     prepared: ActiveState,
-    targets: &[StimTarget],
-    basis: MeasurementBasis,
+    targets: &[TerminalMeasurement],
     shots: usize,
     max_cached_nodes: usize,
     rng: &mut impl Rng,
@@ -952,10 +1473,6 @@ fn sample_cached_terminal_measurements_with_limit(
     // many possible outcomes must not grow the cache with the shot count.
     debug_assert!(max_cached_nodes > 0);
     let cached_depth = targets.len().min(16);
-    // Terminal measurements do not change the Clifford frame while active
-    // coordinates remain. Convert reached physical Paulis only once per
-    // batch, with a fixed cache bound for long target lists.
-    let mut terminal_paulis = Vec::new();
     let mut root = TerminalMeasurementNode::new(prepared);
     let mut cached_nodes = 1;
     let mut results = Vec::with_capacity(shots);
@@ -964,32 +1481,84 @@ fn sample_cached_terminal_measurements_with_limit(
         let mut measurements = Vec::with_capacity(targets.len());
         let mut depth = 0;
         let mut uncached_state = None;
-        while depth < cached_depth
-            && !node.state.axes.is_empty()
-            && node.state.coefficients.len() <= 1024
-        {
-            if node.measurement.is_none() {
-                let q = targets[depth].qubit_index().unwrap() as usize;
-                let pauli =
-                    cached_terminal_pauli(&mut terminal_paulis, &node.state, depth, q, basis)?
-                        .clone();
-                let (mask, independent) = node.state.coordinate_mask(&pauli.x);
-                let probability_zero = node.state.pauli_probability_zero(&pauli, mask, independent);
-                // Match measure(): a rank-limit error happens before the RNG draw.
-                let mask = node
-                    .state
-                    .ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
-                node.measurement = Some((probability_zero, pauli, mask));
+        while depth < cached_depth && node.state.coefficients.len() <= 1024 {
+            if node.state.axes.is_empty() {
+                if node.symbolic_suffix.is_none() {
+                    node.symbolic_suffix = Some(CliffordSuffixPlan::from_state(
+                        &node.state,
+                        &targets[depth..],
+                    ));
+                }
+                if let Some(plan) = node.symbolic_suffix.as_ref().unwrap() {
+                    plan.sample(&targets[depth..], &mut measurements, rng);
+                    depth = targets.len();
+                    break;
+                }
             }
-            let (probability_zero, pauli, mask) = node.measurement.as_ref().unwrap();
-            let outcome = rng.r#gen::<f64>() >= *probability_zero;
+            let TerminalMeasurement {
+                q, basis, inverted, ..
+            } = &targets[depth];
+            let (q, basis, inverted) = (*q, *basis, *inverted);
+            if node.measurement.is_none() {
+                node.measurement = Some(if node.state.axes.is_empty() {
+                    let probability_zero = node.state.measurement_probabilities(q, basis)?.0;
+                    PreparedTerminalMeasurement::Clifford { probability_zero }
+                } else {
+                    let pauli = node.state.single_qubit_pauli(q, basis)?;
+                    let (mask, independent) = node.state.coordinate_mask(&pauli.x);
+                    let probability_zero =
+                        node.state.pauli_probability_zero(&pauli, mask, independent);
+                    PreparedTerminalMeasurement::Active {
+                        probability_zero,
+                        pauli,
+                        mask,
+                        independent,
+                    }
+                });
+            }
+            let outcome = match node.measurement.as_ref().unwrap() {
+                PreparedTerminalMeasurement::Active {
+                    probability_zero, ..
+                } => rng.r#gen::<f64>() >= *probability_zero,
+                PreparedTerminalMeasurement::Clifford { probability_zero } => {
+                    if *probability_zero == 0.5 {
+                        rng.r#gen::<bool>()
+                    } else {
+                        *probability_zero < 0.5
+                    }
+                }
+            };
             let branch = usize::from(outcome);
             if node.children[branch].is_none() {
                 let mut state = node.state.clone();
-                state.collapse_pauli_measurement(pauli, *mask, outcome, *probability_zero)?;
+                match node.measurement.as_ref().unwrap() {
+                    PreparedTerminalMeasurement::Clifford { .. } => {
+                        state.measure_clifford_forced(q, basis, outcome);
+                    }
+                    PreparedTerminalMeasurement::Active {
+                        probability_zero,
+                        pauli,
+                        mask,
+                        independent,
+                    } => {
+                        if *independent {
+                            state.absorb_independent_measurement(q, basis, outcome)?;
+                        } else {
+                            state.collapse_pauli_measurement(
+                                pauli,
+                                *mask,
+                                outcome,
+                                *probability_zero,
+                            )?;
+                            if *mask != 0 {
+                                state.retire_nondiagonal_measurement(q, basis)?;
+                            }
+                        }
+                    }
+                }
                 state.retire_fixed_axes();
                 if cached_nodes == max_cached_nodes {
-                    measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
+                    measurements.push(outcome ^ inverted);
                     depth += 1;
                     uncached_state = Some(state);
                     break;
@@ -997,22 +1566,17 @@ fn sample_cached_terminal_measurements_with_limit(
                 node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
                 cached_nodes += 1;
             }
-            measurements.push(outcome ^ matches!(targets[depth], StimTarget::QubitInv(_)));
+            measurements.push(outcome ^ inverted);
             node = node.children[branch].as_mut().unwrap();
             depth += 1;
         }
-        let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
-        for (offset, target) in targets[depth..].iter().enumerate() {
-            let q = target.qubit_index().unwrap() as usize;
-            let outcome = if state.axes.is_empty() || depth + offset >= MAX_CACHED_TERMINAL_PAULIS {
-                state.measure(q, basis, rng)?
-            } else {
-                let pauli =
-                    cached_terminal_pauli(&mut terminal_paulis, &state, depth + offset, q, basis)?;
-                state.measure_active_pauli(pauli, rng)?
-            };
-            state.retire_fixed_axes();
-            measurements.push(outcome ^ matches!(target, StimTarget::QubitInv(_)));
+        if depth < targets.len() {
+            let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
+            for target in &targets[depth..] {
+                let outcome = state.measure(target.q, target.basis, rng)?;
+                state.retire_fixed_axes();
+                measurements.push(outcome ^ target.inverted);
+            }
         }
         results.push(NearCliffordShot {
             measurements,
@@ -1024,11 +1588,12 @@ fn sample_cached_terminal_measurements_with_limit(
 }
 
 // Only these instructions are independent of both the RNG and sweep inputs.
-// A REPEAT remains a boundary so its nested instruction tree needs no separate
-// classification or partial unrolling.
 fn is_deterministic_near_instruction(instruction: &StimInstr) -> bool {
     let StimInstr::Op { name, targets, .. } = instruction else {
-        return false;
+        let StimInstr::Repeat { body, .. } = instruction else {
+            unreachable!()
+        };
+        return body.iter().all(is_deterministic_near_instruction);
     };
     match name.as_str() {
         "I" | "H" | "S" | "SQRT_Z" | "S_DAG" | "SQRT_Z_DAG" | "X" | "Y" | "Z" | "T" | "T_DAG"
@@ -1416,6 +1981,97 @@ mod tests {
     use rand::{RngCore, SeedableRng, rngs::StdRng};
 
     #[test]
+    fn terminal_cache_caps_distinct_wide_frames_and_long_symbolic_plans() {
+        assert_eq!(terminal_cache_node_limit(20, 20), 1024);
+        assert_eq!(terminal_cache_node_limit(4096, 20), 1);
+        assert!(terminal_cache_node_limit(512, 20) < 1024);
+        assert!(terminal_cache_node_limit(20, 65_536) < 128);
+    }
+
+    #[test]
+    fn terminal_plan_bounds_nested_metadata_expansion() {
+        let instructions =
+            crate::parser::parse_lines("M 0\nREPEAT 65536 {\nREPEAT 65536 {\nTICK\n}\n}").unwrap();
+        assert!(TerminalPlan::from_instructions(&instructions).is_none());
+    }
+
+    #[test]
+    fn wide_tableau_row_y_phase_does_not_overflow() {
+        let n = 260;
+        let mut frame = StabilizerState::new(n);
+        frame.h(0);
+        for q in 1..n {
+            frame.cx(0, q);
+        }
+        for q in 0..n {
+            frame.s(q);
+        }
+        let (_, _, row_phase) = frame.canonical_row(n);
+        let mut product = Pauli::identity(n);
+        product.multiply_tableau_row(&frame, n);
+        assert!(product.x.iter().all(|&bit| bit));
+        assert!(product.z.iter().all(|&bit| bit));
+        assert_eq!(product.phase, (row_phase + (n % 4) as u8) % 4);
+    }
+
+    #[test]
+    fn forced_tableau_measurement_matches_legacy_branch() {
+        let mut state = StabilizerState::new(3);
+        for step in 0..18 {
+            match step % 6 {
+                0 => state.h(step % 3),
+                1 => state.cx(0, 1),
+                2 => state.s(1),
+                3 => state.cx(1, 2),
+                4 => state.h(2),
+                _ => state.cz(0, 2),
+            }
+            for q in 0..3 {
+                let mut rng = StdRng::seed_from_u64((step * 3 + q) as u64);
+                let mut reference = state.clone();
+                let mut forced = state.clone();
+                let expected = reference.measure_z(q, &mut rng);
+                let actual = forced.measure_z_with_forced_random_outcome(q, expected.0);
+                assert_eq!(actual, expected);
+                assert_eq!(forced.canonical_snapshot(), reference.canonical_snapshot());
+            }
+        }
+    }
+
+    #[test]
+    fn terminal_schedule_retires_active_axis_and_preserves_record_references() {
+        let circuit = NearCliffordExecutor::compile_text(
+            "H 0\nT 0\nH 0\nH 1\nM 1 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-2]",
+        )
+        .unwrap();
+        let mut prepared = ActiveState::new(2, 16);
+        let mut rng = StdRng::seed_from_u64(17);
+        run_near_block(
+            &circuit.instructions[..circuit.prefix_len],
+            &mut prepared,
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &mut Vec::new(),
+            &[],
+            &mut rng,
+        )
+        .unwrap();
+        assert_eq!(
+            circuit
+                .terminal_plan
+                .as_ref()
+                .unwrap()
+                .plan_order(&prepared),
+            vec![1, 0]
+        );
+        let shots = circuit.sample(512, &mut rng).unwrap();
+        for shot in shots {
+            assert_eq!(shot.detectors, vec![shot.measurements[1]]);
+            assert_eq!(shot.observables, vec![(2, shot.measurements[0])]);
+        }
+    }
+
+    #[test]
     fn terminal_cache_limit_falls_back_without_changing_shots_or_rng() {
         let circuit = NearCliffordExecutor::compile_text("H 0\nT 0\nH 0\nH 1\nM 0 1").unwrap();
         let mut prepared = ActiveState::new(2, 16);
@@ -1423,7 +2079,12 @@ mod tests {
         prepared.t(0).unwrap();
         prepared.apply_clifford(CliffordGate::H(0)).unwrap();
         prepared.apply_clifford(CliffordGate::H(1)).unwrap();
-        let targets = [StimTarget::Qubit(0), StimTarget::Qubit(1)];
+        let targets = [0, 1].map(|q| TerminalMeasurement {
+            q,
+            basis: MeasurementBasis::Z,
+            inverted: false,
+            record_index: q,
+        });
 
         for max_cached_nodes in [1, 2, 3] {
             let mut batch_rng = StdRng::seed_from_u64(739);
@@ -1431,7 +2092,6 @@ mod tests {
             let batch = sample_cached_terminal_measurements_with_limit(
                 prepared.clone(),
                 &targets,
-                MeasurementBasis::Z,
                 512,
                 max_cached_nodes,
                 &mut batch_rng,
