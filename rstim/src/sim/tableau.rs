@@ -35,6 +35,100 @@ impl StabilizerState {
         (&self.x[row], &self.z[row], self.phase[row])
     }
     // END issue-456 read-only snapshot accessor
+    // BEGIN near-clifford tableau extensions
+    pub(crate) fn num_qubits(&self) -> usize {
+        self.n
+    }
+    // Right composition changes the virtual basis, not the physical state.
+    pub(crate) fn right_h(&mut self, q: usize) {
+        self.x.swap(q, self.n + q);
+        self.z.swap(q, self.n + q);
+        self.phase.swap(q, self.n + q);
+    }
+
+    pub(crate) fn right_s(&mut self, q: usize) {
+        self.row_mult(q, self.n + q);
+        self.phase[q] = (self.phase[q] + 1) % 4;
+    }
+
+    pub(crate) fn right_cx(&mut self, control: usize, target: usize) {
+        self.row_mult(control, target);
+        self.row_mult(self.n + target, self.n + control);
+    }
+
+    pub(crate) fn right_cz(&mut self, a: usize, b: usize) {
+        self.right_h(b);
+        self.right_cx(a, b);
+        self.right_h(b);
+    }
+
+    /// Apply a sampled branch without drawing from the caller's RNG. The
+    /// original measure_z below stays byte-for-byte pinned as a legacy oracle.
+    pub(crate) fn measure_z_with_forced_random_outcome(
+        &mut self,
+        q: usize,
+        sampled: u8,
+    ) -> (u8, bool) {
+        let pivot = (self.n..2 * self.n).find(|&row| self.x[row][q]);
+        if let Some(p) = pivot {
+            for row in 0..2 * self.n {
+                if row != p && self.x[row][q] {
+                    self.row_mult(row, p);
+                }
+            }
+            self.copy_row(p, p - self.n);
+            self.x[p].fill(false);
+            self.z[p].fill(false);
+            self.z[p][q] = true;
+            self.phase[p] = if sampled == 0 { 0 } else { 2 };
+            return (sampled, true);
+        }
+
+        let mut temp_x = vec![false; self.n];
+        let mut temp_z = vec![false; self.n];
+        temp_z[q] = true;
+        let mut temp_phase = 0;
+        for row in 0..self.n {
+            if self.x[row][q] {
+                self.row_mult_temp(&mut temp_x, &mut temp_z, &mut temp_phase, row + self.n);
+            }
+        }
+        (u8::from(temp_phase % 4 == 2), false)
+    }
+
+    /// Compile one measurement with affine row-sign dependencies. The returned
+    /// tuple is (random-bit mask, fixed sign, draws a fresh random bit).
+    pub(crate) fn measure_z_symbolic(
+        &mut self,
+        signs: &mut [u64],
+        random_count: &mut usize,
+        q: usize,
+    ) -> Option<(u64, bool, bool)> {
+        let n = self.n;
+        if let Some(pivot) = (n..2 * n).find(|&row| self.x[row][q]) {
+            if *random_count == 64 {
+                return None;
+            }
+            let random_mask = 1u64 << *random_count;
+            *random_count += 1;
+            for row in 0..2 * n {
+                if row != pivot && self.x[row][q] {
+                    signs[row] ^= signs[pivot];
+                }
+            }
+            signs[pivot - n] = signs[pivot];
+            signs[pivot] = random_mask;
+            self.measure_z_with_forced_random_outcome(q, 0);
+            Some((random_mask, false, true))
+        } else {
+            let mask = (0..n)
+                .filter(|&row| self.x[row][q])
+                .fold(0, |mask, row| mask ^ signs[n + row]);
+            let (outcome, _) = self.measure_z_with_forced_random_outcome(q, 0);
+            Some((mask, outcome != 0, false))
+        }
+    }
+    // END near-clifford tableau extensions
     pub fn h(&mut self, q: usize) {
         for i in 0..2 * self.n {
             if self.x[i][q] && self.z[i][q] {
