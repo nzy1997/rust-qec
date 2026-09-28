@@ -5,9 +5,11 @@ analyzing quantum error-correcting codes. Its dependency-facing APIs include:
 
 - CSS matrix validation and construction;
 - exact distance through optional HiGHS or Gurobi ILP backends;
-- randomized CSS distance upper bounds; and
+- randomized CSS distance upper bounds;
 - packed GF(2) row operations, reduced row spaces, and reusable kernel
-  workspaces under `qec_code::packed_gf2`.
+  workspaces under `qec_code::packed_gf2`; and
+- exact Pauli phases, signed stabilizer groups, and caller-supplied logical
+  bases under `qec_code::phased_pauli`.
 
 ## Installation
 
@@ -61,3 +63,16 @@ assert!(space.contains(&target)?);
 
 The public wrappers intentionally hide the packed storage layout so internal
 elimination code can evolve without breaking downstream crates.
+
+## Signed stabilizer algebra
+
+`phased_pauli` represents `i^phase X^x Z^z`, with `Y = i XZ`. Its
+`SignedStabilizerGroup` checks generator signs as well as X/Z support, accepts
+consistent redundant checks, and returns original-generator product witnesses
+for exact membership. `validate_logical_basis` retains the caller's ordered,
+signed logical representatives. See
+[`examples/signed_stabilizer.rs`](examples/signed_stabilizer.rs) for a public
+API example that needs no CLI or solver feature.
+
+These checks establish algebraic code and basis validity and signed group
+membership. They do not establish correctness of an entire compiled circuit.
