@@ -21,6 +21,10 @@ fn exact_phase_identities_and_adjoint_hold() {
     let x = single('X');
     let y = single('Y');
     let z = single('Z');
+    assert_eq!(
+        y.clone().into_support(),
+        Pauli::from_xz_bits(vec![1], vec![1]).unwrap()
+    );
     assert_eq!(x.multiply(&y).unwrap(), pauli(&[0], &[1], Phase::PlusI));
     assert_eq!(y.multiply(&x).unwrap(), pauli(&[0], &[1], Phase::MinusI));
     assert_eq!(y.multiply(&y).unwrap(), PhasedPauli::identity(1));
@@ -35,6 +39,13 @@ fn exact_phase_identities_and_adjoint_hold() {
             actual: 2,
         })
     );
+    assert_eq!(
+        x.commutes_with(&PhasedPauli::identity(2)),
+        Err(PhaseAlgebraError::WidthMismatch {
+            expected: 1,
+            actual: 2,
+        })
+    );
 }
 
 #[test]
@@ -43,7 +54,15 @@ fn signed_bell_group_membership_and_witness_are_exact() {
     let zz = pauli(&[0, 0], &[1, 1], Phase::PlusOne);
     let minus_yy = pauli(&[1, 1], &[1, 1], Phase::PlusOne);
     let group = SignedStabilizerGroup::new(2, vec![xx.clone(), zz.clone()]).unwrap();
+    assert_eq!(group.n(), 2);
     assert_eq!(group.rank(), 2);
+    assert_eq!(
+        group.contains_with_witness(&PhasedPauli::identity(1)),
+        Err(PhaseAlgebraError::WidthMismatch {
+            expected: 2,
+            actual: 1,
+        })
+    );
     for expected in [
         PhasedPauli::identity(2),
         xx.clone(),
@@ -79,6 +98,21 @@ fn signed_bell_group_membership_and_witness_are_exact() {
     assert_eq!(
         group.product_from_indices(&[2]),
         Err(PhaseAlgebraError::WitnessIndex { index: 2, count: 2 })
+    );
+}
+
+#[test]
+fn echelon_witness_cancels_shared_generator_indices() {
+    let zzi = pauli(&[0, 0, 0], &[1, 1, 0], Phase::PlusOne);
+    let ziz = pauli(&[0, 0, 0], &[1, 0, 1], Phase::PlusOne);
+    let group = SignedStabilizerGroup::new(3, vec![zzi, ziz.clone()]).unwrap();
+    let witness = group.contains_with_witness(&ziz).unwrap().unwrap();
+    assert_eq!(witness.generator_indices(), &[1]);
+    assert_eq!(
+        group
+            .product_from_indices(witness.generator_indices())
+            .unwrap(),
+        ziz
     );
 }
 

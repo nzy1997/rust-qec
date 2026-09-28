@@ -6,7 +6,6 @@
 //! always requires an explicit method call.
 
 use crate::Pauli;
-use crate::binary::try_binary_rank;
 use thiserror::Error;
 
 /// The scalar multiplying an ordered `X^x Z^z` Pauli product.
@@ -188,10 +187,6 @@ pub enum PhaseAlgebraError {
         right_index: usize,
         expected_anticommutation: bool,
     },
-    #[error(
-        "logical operators are incomplete modulo stabilizers: rank {actual}, expected {expected}"
-    )]
-    IncompleteLogicalBasis { actual: usize, expected: usize },
     #[error("generator witness index {index} is out of range for {count} generators")]
     WitnessIndex { index: usize, count: usize },
 }
@@ -388,18 +383,10 @@ impl SignedStabilizerGroup {
             }
         }
 
-        let rows: Vec<Vec<u8>> = self
-            .generators
-            .iter()
-            .chain(&logical_x)
-            .chain(&logical_z)
-            .map(|operator| operator.support().to_symplectic_row())
-            .collect();
-        let actual = try_binary_rank(&rows).expect("validated Pauli rows have equal widths");
-        let expected = self.rank() + 2 * k;
-        if actual != expected {
-            return Err(PhaseAlgebraError::IncompleteLogicalBasis { actual, expected });
-        }
+        // Canonical commutation and exactly k pairs imply independence modulo
+        // stabilizers: a product in the stabilizer group commutes with every
+        // logical, so pairing it with each X/Z forces every logical exponent
+        // to vanish. There are 2k such independent quotient representatives.
 
         Ok(ValidatedLogicalBasis {
             logical_x,
