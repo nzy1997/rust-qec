@@ -67,6 +67,15 @@ the cache fills lazily as outcomes occur and is reused by later batches. A sampl
 is used by one thread at a time; concurrent workers can prepare separate
 samplers from the same circuit. Its shots and RNG consumption match repeated
 `run_with_sweep` calls for the same inputs.
+For measurement-only bulk workloads, the prepared sampler also offers
+`sample_measurements_u8` and `sample_measurements_u8_with_sweep`. They return a
+`NearCliffordMeasurementBatch` whose `measurements` are zero-or-one bytes in
+shot-major record order; `measurements_per_shot` gives the row width. This
+path avoids a separate measurement vector for every shot when the circuit has
+a terminal measurement plan. It omits detector and observable outputs, which
+remain available through `sample`. For the same RNG and seed, its measurement
+values and RNG continuation match `sample`. The choice of RNG can materially
+affect throughput; compare simulators using similar RNGs and output layouts.
 The default active-rank limit is 16; `compile_with_limit` lets callers choose a
 different limit. Reaching the limit returns an error. The circuit entry point
 also rejects more than 4096 physical qubits before allocating a tableau.

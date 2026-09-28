@@ -945,6 +945,7 @@ fn i_pow(exponent: u8) -> ComplexAmp {
 pub struct NearCliffordExecutor {
     instructions: Vec<StimInstr>,
     num_qubits: usize,
+    measurement_count: usize,
     max_active_qubits: usize,
     prefix_len: usize,
     terminal_plan: Option<TerminalPlan>,
@@ -1139,6 +1140,18 @@ pub struct NearCliffordShot {
     pub observables: Vec<(u32, bool)>,
 }
 
+/// Measurement records from a batch, stored as row-major bytes (zero or one).
+///
+/// Row `shot` occupies `measurements[shot * measurements_per_shot..][..measurements_per_shot]`.
+/// Detector and observable records are available through [`NearCliffordSampler::sample`]
+/// when those outputs are needed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NearCliffordMeasurementBatch {
+    pub shots: usize,
+    pub measurements_per_shot: usize,
+    pub measurements: Vec<u8>,
+}
+
 const MAX_NEAR_CLIFFORD_QUBITS: usize = 4096;
 
 impl NearCliffordExecutor {
@@ -1156,7 +1169,10 @@ impl NearCliffordExecutor {
         max_active_qubits: usize,
     ) -> Result<Self, String> {
         let mut max_qubit = None;
-        validate_near_block(&instructions, &mut max_qubit, &mut 0)?;
+        let mut records = 0;
+        validate_near_block(&instructions, &mut max_qubit, &mut records)?;
+        let measurement_count = usize::try_from(records)
+            .map_err(|_| "near-Clifford measurement count exceeds platform capacity")?;
         let num_qubits = max_qubit
             .map(|q| {
                 usize::try_from(q)
@@ -1181,6 +1197,7 @@ impl NearCliffordExecutor {
         Ok(Self {
             instructions,
             num_qubits,
+            measurement_count,
             max_active_qubits,
             prefix_len,
             terminal_plan,
@@ -1378,27 +1395,89 @@ impl NearCliffordSampler<'_> {
             return Ok(results);
         }
         (0..shots)
-            .map(|_| {
-                let mut state = self.prepared.clone();
-                let mut measurements = Vec::new();
-                let mut detectors = Vec::new();
-                let mut observables = Vec::new();
-                run_near_block(
-                    &self.executor.instructions[self.executor.prefix_len..],
-                    &mut state,
-                    &mut measurements,
-                    &mut detectors,
-                    &mut observables,
-                    sweep_bits,
-                    rng,
-                )?;
-                Ok(NearCliffordShot {
-                    measurements,
-                    detectors,
-                    observables,
-                })
-            })
+            .map(|_| self.run_unplanned_shot_with_sweep(sweep_bits, rng))
             .collect()
+    }
+
+    fn run_unplanned_shot_with_sweep(
+        &self,
+        sweep_bits: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordShot, String> {
+        let mut state = self.prepared.clone();
+        let mut measurements = Vec::new();
+        let mut detectors = Vec::new();
+        let mut observables = Vec::new();
+        run_near_block(
+            &self.executor.instructions[self.executor.prefix_len..],
+            &mut state,
+            &mut measurements,
+            &mut detectors,
+            &mut observables,
+            sweep_bits,
+            rng,
+        )?;
+        Ok(NearCliffordShot {
+            measurements,
+            detectors,
+            observables,
+        })
+    }
+
+    /// Samples only measurement records into one row-major byte buffer.
+    ///
+    /// Each byte is zero or one, and every row follows the circuit's record
+    /// order. This avoids per-shot result allocations for terminal-measurement
+    /// circuits. Detector and observable values are omitted; use [`Self::sample`]
+    /// when those outputs are needed. The RNG stream and measurement values
+    /// match `sample` for the same prepared sampler and seed.
+    pub fn sample_measurements_u8(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        self.sample_measurements_u8_with_sweep(shots, &[], rng)
+    }
+
+    /// Like [`Self::sample_measurements_u8`], with explicit sweep inputs.
+    pub fn sample_measurements_u8_with_sweep(
+        &mut self,
+        shots: usize,
+        sweep_bits: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        let width = self.executor.measurement_count;
+        let capacity = shots
+            .checked_mul(width)
+            .ok_or("near-Clifford measurement batch size overflow")?;
+        let measurements = if let Some(terminal) = &mut self.terminal {
+            debug_assert_eq!(terminal.ordered.len(), width);
+            let mut measurements = terminal.cached.sample_flat(&terminal.ordered, shots, rng)?;
+            if measurements.len() != capacity {
+                return Err("near-Clifford terminal measurement count changed".into());
+            }
+            for row in measurements.chunks_exact_mut(width) {
+                for &(left, right) in &terminal.record_order_swaps {
+                    row.swap(left, right);
+                }
+            }
+            measurements
+        } else {
+            let mut measurements = Vec::with_capacity(capacity);
+            for _ in 0..shots {
+                let shot = self.run_unplanned_shot_with_sweep(sweep_bits, rng)?;
+                if shot.measurements.len() != width {
+                    return Err("near-Clifford measurement count changed between shots".into());
+                }
+                measurements.extend(shot.measurements.into_iter().map(u8::from));
+            }
+            measurements
+        };
+        Ok(NearCliffordMeasurementBatch {
+            shots,
+            measurements_per_shot: width,
+            measurements,
+        })
     }
 }
 
@@ -1524,10 +1603,12 @@ impl CliffordSuffixPlan {
         Some(Self { steps })
     }
 
+    // Keep the bool and byte output paths specialized at the call site.
+    #[inline(always)]
     fn sample(
         &self,
         targets: &[TerminalMeasurement],
-        measurements: &mut Vec<bool>,
+        mut push: impl FnMut(bool),
         rng: &mut impl Rng,
     ) {
         let mut random_bits = 0u64;
@@ -1536,7 +1617,7 @@ impl CliffordSuffixPlan {
                 random_bits |= step.mask;
             }
             let outcome = step.constant ^ ((random_bits & step.mask).count_ones() & 1 != 0);
-            measurements.push(outcome ^ target.inverted);
+            push(outcome ^ target.inverted);
         }
     }
 }
@@ -1584,110 +1665,10 @@ impl CachedTerminalSampler {
         shots: usize,
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
-        // Bound both tree depth and the number of cached states across batches.
         let mut results = Vec::with_capacity(shots);
         for _ in 0..shots {
-            let mut node = &mut self.root;
             let mut measurements = Vec::with_capacity(targets.len());
-            let mut depth = 0;
-            let mut uncached_state = None;
-            while depth < self.cached_depth && node.state.coefficients.len() <= 1024 {
-                if node.state.axes.is_empty() {
-                    if node.symbolic_suffix.is_none() {
-                        node.symbolic_suffix = Some(CliffordSuffixPlan::from_state(
-                            &node.state,
-                            &targets[depth..],
-                        ));
-                    }
-                    if let Some(plan) = node.symbolic_suffix.as_ref().unwrap() {
-                        plan.sample(&targets[depth..], &mut measurements, rng);
-                        depth = targets.len();
-                        break;
-                    }
-                }
-                let TerminalMeasurement {
-                    q, basis, inverted, ..
-                } = &targets[depth];
-                let (q, basis, inverted) = (*q, *basis, *inverted);
-                if node.measurement.is_none() {
-                    node.measurement = Some(if node.state.axes.is_empty() {
-                        let probability_zero = node.state.measurement_probabilities(q, basis)?.0;
-                        PreparedTerminalMeasurement::Clifford { probability_zero }
-                    } else {
-                        let pauli = node.state.single_qubit_pauli(q, basis)?;
-                        let (mask, independent) = node.state.coordinate_mask(&pauli.x);
-                        let probability_zero =
-                            node.state.pauli_probability_zero(&pauli, mask, independent);
-                        PreparedTerminalMeasurement::Active {
-                            probability_zero,
-                            pauli,
-                            mask,
-                            independent,
-                        }
-                    });
-                }
-                let outcome = match node.measurement.as_ref().unwrap() {
-                    PreparedTerminalMeasurement::Active {
-                        probability_zero, ..
-                    } => rng.r#gen::<f64>() >= *probability_zero,
-                    PreparedTerminalMeasurement::Clifford { probability_zero } => {
-                        if *probability_zero == 0.5 {
-                            rng.r#gen::<bool>()
-                        } else {
-                            *probability_zero < 0.5
-                        }
-                    }
-                };
-                let branch = usize::from(outcome);
-                if node.children[branch].is_none() {
-                    let mut state = node.state.clone();
-                    match node.measurement.as_ref().unwrap() {
-                        PreparedTerminalMeasurement::Clifford { .. } => {
-                            state.measure_clifford_forced(q, basis, outcome);
-                        }
-                        PreparedTerminalMeasurement::Active {
-                            probability_zero,
-                            pauli,
-                            mask,
-                            independent,
-                        } => {
-                            if *independent {
-                                state.absorb_independent_measurement(q, basis, outcome)?;
-                            } else {
-                                state.collapse_pauli_measurement(
-                                    pauli,
-                                    *mask,
-                                    outcome,
-                                    *probability_zero,
-                                )?;
-                                if *mask != 0 {
-                                    state.retire_nondiagonal_measurement(q, basis)?;
-                                }
-                            }
-                        }
-                    }
-                    state.retire_fixed_axes();
-                    if self.cached_nodes == self.max_cached_nodes {
-                        measurements.push(outcome ^ inverted);
-                        depth += 1;
-                        uncached_state = Some(state);
-                        break;
-                    }
-                    node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
-                    self.cached_nodes += 1;
-                }
-                measurements.push(outcome ^ inverted);
-                node = node.children[branch].as_mut().unwrap();
-                depth += 1;
-            }
-            if depth < targets.len() {
-                let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
-                for target in &targets[depth..] {
-                    let outcome = state.measure(target.q, target.basis, rng)?;
-                    state.retire_fixed_axes();
-                    measurements.push(outcome ^ target.inverted);
-                }
-            }
+            self.sample_one(targets, |bit| measurements.push(bit), rng)?;
             results.push(NearCliffordShot {
                 measurements,
                 detectors: Vec::new(),
@@ -1695,6 +1676,134 @@ impl CachedTerminalSampler {
             });
         }
         Ok(results)
+    }
+
+    fn sample_flat(
+        &mut self,
+        targets: &[TerminalMeasurement],
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<Vec<u8>, String> {
+        let capacity = shots
+            .checked_mul(targets.len())
+            .ok_or("near-Clifford measurement batch size overflow")?;
+        let mut measurements = Vec::with_capacity(capacity);
+        for _ in 0..shots {
+            self.sample_one(targets, |bit| measurements.push(u8::from(bit)), rng)?;
+        }
+        Ok(measurements)
+    }
+
+    // Keep the bool and byte output paths specialized at the call site.
+    #[inline(always)]
+    fn sample_one(
+        &mut self,
+        targets: &[TerminalMeasurement],
+        mut push: impl FnMut(bool),
+        rng: &mut impl Rng,
+    ) -> Result<(), String> {
+        // Bound both tree depth and the number of cached states across batches.
+        let mut node = &mut self.root;
+        let mut depth = 0;
+        let mut uncached_state = None;
+        while depth < self.cached_depth && node.state.coefficients.len() <= 1024 {
+            if node.state.axes.is_empty() {
+                if node.symbolic_suffix.is_none() {
+                    node.symbolic_suffix = Some(CliffordSuffixPlan::from_state(
+                        &node.state,
+                        &targets[depth..],
+                    ));
+                }
+                if let Some(plan) = node.symbolic_suffix.as_ref().unwrap() {
+                    plan.sample(&targets[depth..], &mut push, rng);
+                    depth = targets.len();
+                    break;
+                }
+            }
+            let TerminalMeasurement {
+                q, basis, inverted, ..
+            } = &targets[depth];
+            let (q, basis, inverted) = (*q, *basis, *inverted);
+            if node.measurement.is_none() {
+                node.measurement = Some(if node.state.axes.is_empty() {
+                    let probability_zero = node.state.measurement_probabilities(q, basis)?.0;
+                    PreparedTerminalMeasurement::Clifford { probability_zero }
+                } else {
+                    let pauli = node.state.single_qubit_pauli(q, basis)?;
+                    let (mask, independent) = node.state.coordinate_mask(&pauli.x);
+                    let probability_zero =
+                        node.state.pauli_probability_zero(&pauli, mask, independent);
+                    PreparedTerminalMeasurement::Active {
+                        probability_zero,
+                        pauli,
+                        mask,
+                        independent,
+                    }
+                });
+            }
+            let outcome = match node.measurement.as_ref().unwrap() {
+                PreparedTerminalMeasurement::Active {
+                    probability_zero, ..
+                } => rng.r#gen::<f64>() >= *probability_zero,
+                PreparedTerminalMeasurement::Clifford { probability_zero } => {
+                    if *probability_zero == 0.5 {
+                        rng.r#gen::<bool>()
+                    } else {
+                        *probability_zero < 0.5
+                    }
+                }
+            };
+            let branch = usize::from(outcome);
+            if node.children[branch].is_none() {
+                let mut state = node.state.clone();
+                match node.measurement.as_ref().unwrap() {
+                    PreparedTerminalMeasurement::Clifford { .. } => {
+                        state.measure_clifford_forced(q, basis, outcome);
+                    }
+                    PreparedTerminalMeasurement::Active {
+                        probability_zero,
+                        pauli,
+                        mask,
+                        independent,
+                    } => {
+                        if *independent {
+                            state.absorb_independent_measurement(q, basis, outcome)?;
+                        } else {
+                            state.collapse_pauli_measurement(
+                                pauli,
+                                *mask,
+                                outcome,
+                                *probability_zero,
+                            )?;
+                            if *mask != 0 {
+                                state.retire_nondiagonal_measurement(q, basis)?;
+                            }
+                        }
+                    }
+                }
+                state.retire_fixed_axes();
+                if self.cached_nodes == self.max_cached_nodes {
+                    push(outcome ^ inverted);
+                    depth += 1;
+                    uncached_state = Some(state);
+                    break;
+                }
+                node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
+                self.cached_nodes += 1;
+            }
+            push(outcome ^ inverted);
+            node = node.children[branch].as_mut().unwrap();
+            depth += 1;
+        }
+        if depth < targets.len() {
+            let mut state = uncached_state.unwrap_or_else(|| node.state.clone());
+            for target in &targets[depth..] {
+                let outcome = state.measure(target.q, target.basis, rng)?;
+                state.retire_fixed_axes();
+                push(outcome ^ target.inverted);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -2141,7 +2250,7 @@ mod tests {
                 let mut symbolic_rng = StdRng::seed_from_u64(seed);
                 let mut reference_rng = StdRng::seed_from_u64(seed);
                 let mut actual = Vec::new();
-                plan.sample(&targets, &mut actual, &mut symbolic_rng);
+                plan.sample(&targets, |bit| actual.push(bit), &mut symbolic_rng);
                 let mut reference_state = state.clone();
                 let expected = targets
                     .iter()
