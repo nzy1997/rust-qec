@@ -60,6 +60,13 @@ an `(index, parity)` event for each instruction, in circuit order; repeated
 indices are not folded in `NearCliffordShot`. `TICK`, `QUBIT_COORDS`, and
 `SHIFT_COORDS` are accepted metadata with no effect on shot bits. Record
 references outside the measurements already produced fail explicitly.
+For repeated batches, `circuit.prepare_sampler()?` returns a mutable sampler
+with `sample` and `sample_with_sweep` methods. It prepares the deterministic
+prefix once and retains a bounded cache of terminal measurement branches;
+the cache fills lazily as outcomes occur and is reused by later batches. A sampler
+is used by one thread at a time; concurrent workers can prepare separate
+samplers from the same circuit. Its shots and RNG consumption match repeated
+`run_with_sweep` calls for the same inputs.
 The default active-rank limit is 16; `compile_with_limit` lets callers choose a
 different limit. Reaching the limit returns an error. The circuit entry point
 also rejects more than 4096 physical qubits before allocating a tableau.
