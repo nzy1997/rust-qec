@@ -41,6 +41,81 @@ fn assert_prepared_batches_match_individual_runs(
     assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
 }
 
+fn assert_flat_measurements_match_shots(
+    circuit: &NearCliffordExecutor,
+    batches: &[usize],
+    sweeps: &[&[bool]],
+) {
+    let mut flat_sampler = circuit.prepare_sampler().unwrap();
+    let mut shot_sampler = circuit.prepare_sampler().unwrap();
+    let mut flat_rng = StdRng::seed_from_u64(739);
+    let mut shot_rng = StdRng::seed_from_u64(739);
+    for (&shots, &sweep) in batches.iter().zip(sweeps) {
+        let flat = flat_sampler
+            .sample_measurements_u8_with_sweep(shots, sweep, &mut flat_rng)
+            .unwrap();
+        let individual = shot_sampler
+            .sample_with_sweep(shots, sweep, &mut shot_rng)
+            .unwrap();
+        assert_eq!(flat.shots, shots);
+        assert_eq!(flat.measurements.len(), shots * flat.measurements_per_shot);
+        let expected = individual
+            .iter()
+            .flat_map(|shot| shot.measurements.iter().map(|&bit| u8::from(bit)))
+            .collect::<Vec<_>>();
+        assert_eq!(flat.measurements, expected);
+    }
+    assert_eq!(flat_rng.next_u64(), shot_rng.next_u64());
+}
+
+#[test]
+fn flat_measurement_batches_match_shots_and_rng_across_sampling_paths() {
+    let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
+    let reordered = NearCliffordExecutor::compile_text(
+        "H 0\nCX 0 1\nT 0\nH 2\nCX 1 2\nMX 1\nM !0\nMY 2\nDETECTOR rec[-1] rec[-3]",
+    )
+    .unwrap();
+    let no_records = NearCliffordExecutor::compile_text("H 0\nT 0").unwrap();
+    let no_sweep: &[bool] = &[];
+    for circuit in [&benchmark, &reordered, &no_records] {
+        assert_flat_measurements_match_shots(circuit, &[0, 1, 63, 64, 256], &[no_sweep; 5]);
+    }
+
+    let feedback =
+        NearCliffordExecutor::compile_text("H 0\nT 0\nCX sweep[0] 0\nM 0\nCX rec[-1] 1\nMX 1")
+            .unwrap();
+    let zero = [false];
+    let one = [true];
+    assert_flat_measurements_match_shots(&feedback, &[0, 1, 64, 128], &[&zero, &one, &zero, &one]);
+}
+
+#[test]
+fn flat_and_structured_batches_share_terminal_cache_without_changing_rng() {
+    let circuit = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
+    let mut mixed = circuit.prepare_sampler().unwrap();
+    let mut structured = circuit.prepare_sampler().unwrap();
+    let mut mixed_rng = StdRng::seed_from_u64(739);
+    let mut structured_rng = StdRng::seed_from_u64(739);
+
+    let flat = mixed.sample_measurements_u8(128, &mut mixed_rng).unwrap();
+    let reference = structured.sample(128, &mut structured_rng).unwrap();
+    assert_eq!(flat.shots, reference.len());
+    assert_eq!(flat.measurements_per_shot, 20);
+    assert_eq!(
+        flat.measurements,
+        reference
+            .iter()
+            .flat_map(|shot| shot.measurements.iter().map(|&bit| u8::from(bit)))
+            .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        mixed.sample(256, &mut mixed_rng).unwrap(),
+        structured.sample(256, &mut structured_rng).unwrap()
+    );
+    assert_eq!(mixed_rng.next_u64(), structured_rng.next_u64());
+}
+
 #[test]
 fn prepared_sampler_reuses_terminal_cache_across_batches_without_changing_rng() {
     let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
