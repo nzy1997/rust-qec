@@ -11,6 +11,9 @@ It writes raw repetitions and a readable report to the ignored `drafts/near-clif
 directory. `--group p0` or `--group p1` limits the matrix; `--quick` runs a smoke
 measurement, not a publishable performance result.
 
+The [Apple M4 measurement and analysis](results/apple-m4-2026-09-29.md) and its
+[raw JSON](results/apple-m4-2026-09-29.json) are retained for this matrix.
+
 P0 separates compilation, preparation, the first prepared call, and a retained
 sampler, for structured and flat output across shot counts. It includes a
 terminal fixture, repeated terminal measurements, stochastic mid-circuit
@@ -26,4 +29,6 @@ runtime reached that peak active rank.
 Every result records the exact circuit text, source revision, platform, Rust
 version, raw timing repetitions, and process peak RSS. Use paired runs on one
 quiet machine to compare code revisions. Times exclude process launch and
-result destruction; the Clifft comparison in PR #764 used a separate harness.
+result destruction. This matrix uses `StdRng`; the Clifft comparison in PR #764
+used a separate harness with `SmallRng`, so its absolute times are not directly
+comparable to this report.
