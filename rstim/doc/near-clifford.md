@@ -76,6 +76,8 @@ a terminal measurement plan. It omits detector and observable outputs, which
 remain available through `sample`. For the same RNG and seed, its measurement
 values and RNG continuation match `sample`. The choice of RNG can materially
 affect throughput; compare simulators using similar RNGs and output layouts.
+Terminal measurement planning can change exact seeded rows between rstim
+versions; compare distributions when evaluating different versions.
 The default active-rank limit is 16; `compile_with_limit` lets callers choose a
 different limit. Reaching the limit returns an error. The circuit entry point
 also rejects more than 4096 physical qubits before allocating a tableau.
