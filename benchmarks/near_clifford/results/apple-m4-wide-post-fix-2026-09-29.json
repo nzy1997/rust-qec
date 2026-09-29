@@ -1,0 +1,95 @@
+{
+  "source_revision": "12dde03c64cd645c6275fc46f4ffb4cc73fe42d7",
+  "binary_sha256": "c31a0f991072258384004134e03bd0ecd3221e15e33277ab93f4329694e84cbd",
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "rustc": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)",
+  "created_utc": "2026-09-29T08:12:07.186511+00:00",
+  "shots": 1000,
+  "internal_repetitions": 9,
+  "rows": [
+    {
+      "width": 128,
+      "repeat": 0,
+      "first_flat_ns": 707125,
+      "warm_flat_ns": 600208,
+      "peak_rss_bytes": 3342336
+    },
+    {
+      "width": 128,
+      "repeat": 1,
+      "first_flat_ns": 720333,
+      "warm_flat_ns": 602208,
+      "peak_rss_bytes": 3407872
+    },
+    {
+      "width": 128,
+      "repeat": 2,
+      "first_flat_ns": 707333,
+      "warm_flat_ns": 600167,
+      "peak_rss_bytes": 3342336
+    },
+    {
+      "width": 128,
+      "repeat": 3,
+      "first_flat_ns": 712500,
+      "warm_flat_ns": 599458,
+      "peak_rss_bytes": 3358720
+    },
+    {
+      "width": 129,
+      "repeat": 0,
+      "first_flat_ns": 1341958,
+      "warm_flat_ns": 1137000,
+      "peak_rss_bytes": 3702784
+    },
+    {
+      "width": 129,
+      "repeat": 1,
+      "first_flat_ns": 1319708,
+      "warm_flat_ns": 1131875,
+      "peak_rss_bytes": 3653632
+    },
+    {
+      "width": 129,
+      "repeat": 2,
+      "first_flat_ns": 1319834,
+      "warm_flat_ns": 1137750,
+      "peak_rss_bytes": 3670016
+    },
+    {
+      "width": 129,
+      "repeat": 3,
+      "first_flat_ns": 1336042,
+      "warm_flat_ns": 1138083,
+      "peak_rss_bytes": 3702784
+    },
+    {
+      "width": 193,
+      "repeat": 0,
+      "first_flat_ns": 2073458,
+      "warm_flat_ns": 1754500,
+      "peak_rss_bytes": 4243456
+    },
+    {
+      "width": 193,
+      "repeat": 1,
+      "first_flat_ns": 2037458,
+      "warm_flat_ns": 1736500,
+      "peak_rss_bytes": 4227072
+    },
+    {
+      "width": 193,
+      "repeat": 2,
+      "first_flat_ns": 2064000,
+      "warm_flat_ns": 1732291,
+      "peak_rss_bytes": 4210688
+    },
+    {
+      "width": 193,
+      "repeat": 3,
+      "first_flat_ns": 2055833,
+      "warm_flat_ns": 1743000,
+      "peak_rss_bytes": 4227072
+    }
+  ]
+}
