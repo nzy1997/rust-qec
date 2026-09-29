@@ -1529,7 +1529,6 @@ struct SymbolicStabilizerState {
 struct SymbolicMeasurement {
     mask: u64,
     constant: bool,
-    random: bool,
 }
 
 impl SymbolicStabilizerState {
@@ -1554,19 +1553,16 @@ impl SymbolicStabilizerState {
     }
 
     fn measure_z(&mut self, q: usize) -> Option<SymbolicMeasurement> {
-        let (mask, constant, random) =
+        let (mask, constant, _) =
             self.frame
                 .measure_z_symbolic(&mut self.signs, &mut self.random_count, q)?;
-        Some(SymbolicMeasurement {
-            mask,
-            constant,
-            random,
-        })
+        Some(SymbolicMeasurement { mask, constant })
     }
 }
 
 struct CliffordSuffixPlan {
     steps: Vec<SymbolicMeasurement>,
+    random_count: usize,
 }
 
 impl CliffordSuffixPlan {
@@ -1609,7 +1605,10 @@ impl CliffordSuffixPlan {
                 }
             }
         }
-        Some(Self { steps })
+        Some(Self {
+            steps,
+            random_count: symbolic.random_count,
+        })
     }
 
     // Keep the bool and byte output paths specialized at the call site.
@@ -1620,11 +1619,15 @@ impl CliffordSuffixPlan {
         mut push: impl FnMut(bool),
         rng: &mut impl Rng,
     ) {
+        // A suffix draws no randomness outside symbolic measurements. Draw its
+        // bits up front so the output loop needs only parity and a byte write.
         let mut random_bits = 0u64;
-        for (step, target) in self.steps.iter().zip(targets) {
-            if step.random && rng.r#gen::<bool>() {
-                random_bits |= step.mask;
+        for index in 0..self.random_count {
+            if rng.r#gen::<bool>() {
+                random_bits |= 1u64 << index;
             }
+        }
+        for (step, target) in self.steps.iter().zip(targets) {
             let outcome = step.constant ^ ((random_bits & step.mask).count_ones() & 1 != 0);
             push(outcome ^ target.inverted);
         }
@@ -2290,6 +2293,43 @@ mod tests {
                 assert_eq!(actual, expected, "origin={origin:?}, seed={seed}");
                 assert_eq!(symbolic_rng.next_u64(), reference_rng.next_u64());
             }
+        }
+    }
+
+    #[test]
+    fn symbolic_suffix_preserves_rng_at_64_random_bits() {
+        let mut state = ActiveState::new(64, 16);
+        for q in 0..64 {
+            state.apply_clifford(CliffordGate::H(q)).unwrap();
+        }
+        let targets = (0..64)
+            .chain([63, 0])
+            .enumerate()
+            .map(|(record_index, q)| TerminalMeasurement {
+                q,
+                basis: MeasurementBasis::Z,
+                inverted: false,
+                record_index,
+            })
+            .collect::<Vec<_>>();
+        let plan = CliffordSuffixPlan::from_state(&state, &targets).unwrap();
+        assert_eq!(plan.random_count, 64);
+        for seed in [0, 17, 739] {
+            let mut symbolic_rng = StdRng::seed_from_u64(seed);
+            let mut reference_rng = StdRng::seed_from_u64(seed);
+            let mut actual = Vec::new();
+            plan.sample(&targets, |bit| actual.push(bit), &mut symbolic_rng);
+            let mut reference_state = state.clone();
+            let expected = targets
+                .iter()
+                .map(|target| {
+                    reference_state
+                        .measure(target.q, target.basis, &mut reference_rng)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "seed={seed}");
+            assert_eq!(symbolic_rng.next_u64(), reference_rng.next_u64());
         }
     }
 
