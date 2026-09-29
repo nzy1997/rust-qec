@@ -4,7 +4,10 @@
 use rand::{RngCore, SeedableRng, rngs::StdRng};
 use rstim::near_clifford::{NearCliffordExecutor, NearCliffordSampler};
 use serde_json::{Value, json};
-use std::{hint::black_box, time::Instant};
+use std::{
+    hint::black_box,
+    time::{Duration, Instant},
+};
 
 const TERMINAL_20Q: &str = include_str!("../tests/fixtures/near_clifford_batch_20q_8t.stim");
 const REPEATED_20Q: &str =
@@ -249,6 +252,33 @@ fn main() -> Result<(), String> {
     let name = args
         .next()
         .ok_or("usage: near_clifford_matrix_bench FIXTURE [--quick]")?;
+    if let Some(rank) = name.strip_prefix("profile_rank_") {
+        let seconds: u64 = args
+            .next()
+            .ok_or("profile_rank_N requires a duration in seconds")?
+            .parse()
+            .map_err(|_| "profile duration must be an integer")?;
+        if seconds == 0 || seconds > 120 {
+            return Err("profile duration must be in 1..=120 seconds".into());
+        }
+        let text = circuit(&format!("rank_{rank}"))?;
+        let executor = NearCliffordExecutor::compile_text(&text)?;
+        let mut sampler = executor.prepare_sampler()?;
+        let mut rng = StdRng::seed_from_u64(739);
+        black_box(sampler.sample_measurements_u8(64, &mut rng)?);
+        println!("profiling rank {rank}, pid {}", std::process::id());
+        let start = Instant::now();
+        let mut batches = 0usize;
+        while start.elapsed() < Duration::from_secs(seconds) {
+            black_box(sampler.sample_measurements_u8(1_000, &mut rng)?);
+            batches += 1;
+        }
+        println!(
+            "rank={rank}, batches={batches}, elapsed_s={:.3}",
+            start.elapsed().as_secs_f64()
+        );
+        return Ok(());
+    }
     let quick = match args.next().as_deref() {
         None => false,
         Some("--quick") => true,
