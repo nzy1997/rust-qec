@@ -369,7 +369,9 @@ fn effects_and_edges_from_dem(
             observables: observables.clone(),
             weight,
         });
-        for component in split_components(targets) {
+        let components = split_components(targets);
+        let independent_mechanism = components.len() == 1;
+        for component in components {
             let (component_detectors, component_observables) = symptoms(component);
             if component_detectors.is_empty() {
                 if !component_observables.is_empty() {
@@ -417,6 +419,7 @@ fn effects_and_edges_from_dem(
                 observables: component_observables,
                 weight,
                 kind,
+                independent_mechanism,
             });
         }
     }
@@ -964,6 +967,7 @@ mod tests {
         let (effects, edges) = effects_and_edges_from_dem(&dem).unwrap();
         assert_eq!(effects.len(), 1);
         assert_eq!(edges.len(), 3);
+        assert!(edges.iter().all(|edge| !edge.independent_mechanism));
         assert_eq!(edges[0].kind, EdgeKind::TimeLike);
         assert_eq!(edges[1].kind, EdgeKind::SpaceLike);
         assert_eq!(edges[2].kind, EdgeKind::Boundary);
@@ -979,6 +983,7 @@ mod tests {
                 observables: vec![0],
                 weight: 1.0,
                 kind: EdgeKind::Boundary,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 1,
@@ -986,6 +991,7 @@ mod tests {
                 observables: Vec::new(),
                 weight: 1.0,
                 kind: EdgeKind::Boundary,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 1,
@@ -993,6 +999,7 @@ mod tests {
                 observables: Vec::new(),
                 weight: 1.0,
                 kind: EdgeKind::SpaceLike,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 1,
@@ -1000,6 +1007,7 @@ mod tests {
                 observables: Vec::new(),
                 weight: 1.0,
                 kind: EdgeKind::SpaceLike,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 1,
@@ -1007,6 +1015,7 @@ mod tests {
                 observables: vec![1],
                 weight: 1.0,
                 kind: EdgeKind::Boundary,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 3,
@@ -1014,6 +1023,7 @@ mod tests {
                 observables: vec![1],
                 weight: 1.0,
                 kind: EdgeKind::Boundary,
+                independent_mechanism: true,
             },
         ];
         let index = GraphEdgeIndex::new(&edges);
