@@ -37,7 +37,7 @@ tempfile = { version = "3", optional = true }
 zstd = "0.13"
 toml = "0.8"
 csv = { version = "1", optional = true }
-plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "full_palette", "ttf"], optional = true }
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "full_palette"], optional = true }
 
 [dev-dependencies]
 proptest = "1"
@@ -186,6 +186,30 @@ required-features = ["cli"]
 [[test]]
 name = "stim_parity_showcase"
 required-features = ["cli"]
+
+[[test]]
+name = "unified_cli"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_dataset_import"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_decode"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_external_fixtures"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_matching"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_pipeline"
+required-features = ["unified-cli"]
 
 
 [[test]]

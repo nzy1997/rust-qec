@@ -156,8 +156,8 @@ Physical Error Rate
 <circle cx="434" cy="242" r="4" opacity="0.9" fill="#3052B4" stroke="none" stroke-width="1"/>
 <circle cx="569" cy="181" r="4" opacity="0.9" fill="#3052B4" stroke="none" stroke-width="1"/>
 <circle cx="704" cy="119" r="4" opacity="0.9" fill="#3052B4" stroke="none" stroke-width="1"/>
-<rect x="115" y="45" width="142" height="59" opacity="0.8" fill="#FFFFFF" stroke="none"/>
-<rect x="115" y="45" width="142" height="59" opacity="1" fill="none" stroke="#000000"/>
+<rect x="115" y="45" width="165" height="60" opacity="0.8" fill="#FFFFFF" stroke="none"/>
+<rect x="115" y="45" width="165" height="60" opacity="1" fill="none" stroke="#000000"/>
 <text x="155" y="55" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="9.67741935483871" opacity="1" fill="#000000">
 distance 3, rounds 9
 </text>
@@ -167,7 +167,7 @@ distance 5, rounds 15
 <text x="155" y="85" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="9.67741935483871" opacity="1" fill="#000000">
 distance 7, rounds 21
 </text>
-<polyline fill="none" opacity="0.9" stroke="#BF374F" stroke-width="2" points="125,59 145,59 "/>
-<polyline fill="none" opacity="0.9" stroke="#188262" stroke-width="2" points="125,74 145,74 "/>
-<polyline fill="none" opacity="0.9" stroke="#3052B4" stroke-width="2" points="125,89 145,89 "/>
+<polyline fill="none" opacity="0.9" stroke="#BF374F" stroke-width="2" points="125,60 145,60 "/>
+<polyline fill="none" opacity="0.9" stroke="#188262" stroke-width="2" points="125,75 145,75 "/>
+<polyline fill="none" opacity="0.9" stroke="#3052B4" stroke-width="2" points="125,90 145,90 "/>
 </svg>

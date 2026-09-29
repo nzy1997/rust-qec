@@ -78,7 +78,7 @@ class ReleaseGateCheckerTest(unittest.TestCase):
     def evaluate_series(self, snapshot):
         return checker.evaluate_snapshot(snapshot, self.policy, self.required_checks, self.tag_policy)
 
-    def test_first_public_series_requires_all_eight_versions(self):
+    def test_first_public_series_requires_all_seven_versions(self):
         snapshot = self.series_snapshot()
         self.assertTrue(self.evaluate_series(snapshot).passed)
         snapshot["packages"]["rilpqec"]["version"] = "0.1.0"
