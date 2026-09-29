@@ -7,6 +7,8 @@ use rstim::near_clifford::NearCliffordExecutor;
 use rstim::parser::parse_lines;
 
 const BENCHMARK_CIRCUIT: &str = include_str!("fixtures/near_clifford_batch_20q_8t.stim");
+const REPEATED_BENCHMARK_CIRCUIT: &str =
+    include_str!("fixtures/near_clifford_batch_20q_8t_repeated.stim");
 
 fn assert_matches_individual_runs(circuit: &NearCliffordExecutor, shots: usize, sweep: &[bool]) {
     let mut batch_rng = StdRng::seed_from_u64(739);
@@ -75,9 +77,10 @@ fn flat_measurement_batches_match_shots_and_rng_across_sampling_paths() {
         "H 0\nCX 0 1\nT 0\nH 2\nCX 1 2\nMX 1\nM !0\nMY 2\nDETECTOR rec[-1] rec[-3]",
     )
     .unwrap();
+    let in_record_order = NearCliffordExecutor::compile_text("H 0 1 2\nM 0 1 2").unwrap();
     let no_records = NearCliffordExecutor::compile_text("H 0\nT 0").unwrap();
     let no_sweep: &[bool] = &[];
-    for circuit in [&benchmark, &reordered, &no_records] {
+    for circuit in [&benchmark, &reordered, &in_record_order, &no_records] {
         assert_flat_measurements_match_shots(circuit, &[0, 1, 63, 64, 256], &[no_sweep; 5]);
     }
 
@@ -114,6 +117,53 @@ fn flat_and_structured_batches_share_terminal_cache_without_changing_rng() {
         structured.sample(256, &mut structured_rng).unwrap()
     );
     assert_eq!(mixed_rng.next_u64(), structured_rng.next_u64());
+}
+
+#[test]
+fn repeated_terminal_measurements_preserve_shots_records_and_rng() {
+    let second_round = (0..20)
+        .map(|q| {
+            if q % 2 == 0 {
+                format!("!{q}")
+            } else {
+                q.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let repeated = NearCliffordExecutor::compile_text(&format!(
+        "{BENCHMARK_CIRCUIT}M {second_round}\nDETECTOR rec[-1] rec[-21]\n"
+    ))
+    .unwrap();
+    let changed_basis = NearCliffordExecutor::compile_text(
+        "H 0\nT 0\nH 0\nM !0 1\nM 1 !0\nMX 0\nMX !0\nM 0\nDETECTOR rec[-1] rec[-2]",
+    )
+    .unwrap();
+    let no_sweep: &[bool] = &[];
+    for circuit in [&repeated, &changed_basis] {
+        assert_matches_individual_runs(circuit, 512, no_sweep);
+        assert_flat_measurements_match_shots(circuit, &[0, 1, 64, 512], &[no_sweep; 4]);
+    }
+    let plain = NearCliffordExecutor::compile_text(REPEATED_BENCHMARK_CIRCUIT).unwrap();
+    assert_matches_individual_runs(&plain, 2048, no_sweep);
+    let mut rng = StdRng::seed_from_u64(739);
+    for shot in plain.sample(512, &mut rng).unwrap() {
+        assert_eq!(&shot.measurements[..20], &shot.measurements[20..]);
+    }
+    let mut rng = StdRng::seed_from_u64(739);
+    for shot in repeated.sample(512, &mut rng).unwrap() {
+        assert_eq!(shot.detectors, [false]);
+        for q in 0..20 {
+            assert_eq!(
+                shot.measurements[20 + q],
+                shot.measurements[q] ^ (q % 2 == 0)
+            );
+        }
+    }
+
+    let new_qubit_after_repeat =
+        NearCliffordExecutor::compile_text("H 0 1\nT 0\nM 0\nM 0\nM 1").unwrap();
+    assert_matches_individual_runs(&new_qubit_after_repeat, 512, no_sweep);
 }
 
 #[test]
@@ -241,14 +291,19 @@ fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
         NearCliffordExecutor::compile_text(&format!("H 0\nT 0\nH 0\nM {active_targets}")).unwrap();
     assert_matches_individual_runs(&active, 128, &[]);
 
-    let wide_prefix = (0..65)
-        .map(|q| format!("H {q}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let wide_targets = (0..65).map(|q| q.to_string()).collect::<Vec<_>>().join(" ");
-    let wide =
-        NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}")).unwrap();
-    assert_matches_individual_runs(&wide, 64, &[]);
+    for width in [64, 65] {
+        let wide_prefix = (0..width)
+            .map(|q| format!("H {q}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let wide_targets = (0..width)
+            .map(|q| q.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let wide = NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}"))
+            .unwrap();
+        assert_matches_individual_runs(&wide, 64, &[]);
+    }
 }
 
 #[test]

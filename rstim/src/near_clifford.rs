@@ -1074,22 +1074,32 @@ impl TerminalPlan {
 
     fn plan_order(&self, prepared: &ActiveState) -> Vec<usize> {
         let identity = || (0..self.measurements.len()).collect::<Vec<_>>();
-        // One Pauli measurement per physical qubit makes every pair commute.
-        // Repeated targets can have incompatible bases, so keep their order.
-        // Bound planning work; long suffixes still use the terminal cache.
+        // Plan the first measurement of each physical qubit. A later same-basis
+        // repetition is deterministic and can stay after the first pass;
+        // incompatible bases or a new qubit after repetitions retain circuit
+        // order. Bound planning work; long suffixes use the terminal cache.
         if self.measurements.len() > 64 {
             return identity();
         }
-        let mut seen = vec![false; prepared.num_qubits];
-        for measurement in &self.measurements {
-            if seen[measurement.q] {
-                return identity();
+        let mut seen = vec![None; prepared.num_qubits];
+        let mut first_repeat = None;
+        for (index, measurement) in self.measurements.iter().enumerate() {
+            if let Some(basis) = seen[measurement.q] {
+                if basis != measurement.basis {
+                    return identity();
+                }
+                first_repeat.get_or_insert(index);
+            } else {
+                if first_repeat.is_some() {
+                    return identity();
+                }
+                seen[measurement.q] = Some(measurement.basis);
             }
-            seen[measurement.q] = true;
         }
+        let first_pass_len = first_repeat.unwrap_or(self.measurements.len());
         let mut state = prepared.clone();
-        let mut remaining = identity();
-        let mut order = Vec::with_capacity(remaining.len());
+        let mut remaining = (0..first_pass_len).collect::<Vec<_>>();
+        let mut order = Vec::with_capacity(self.measurements.len());
         while !remaining.is_empty() {
             // Retire active coordinates early. The planning trajectory follows
             // the more likely branch; other branches remain exact at runtime.
@@ -1120,6 +1130,7 @@ impl TerminalPlan {
             }
             order.push(index);
         }
+        order.extend(first_pass_len..self.measurements.len());
         order
     }
 
@@ -1452,14 +1463,12 @@ impl NearCliffordSampler<'_> {
             .ok_or("near-Clifford measurement batch size overflow")?;
         let measurements = if let Some(terminal) = &mut self.terminal {
             debug_assert_eq!(terminal.ordered.len(), width);
-            let mut measurements = terminal.cached.sample_flat(&terminal.ordered, shots, rng)?;
+            let in_record_order = terminal.record_order_swaps.is_empty();
+            let ordered = &terminal.ordered;
+            let cached = &mut terminal.cached;
+            let measurements = cached.sample_flat(ordered, in_record_order, shots, rng)?;
             if measurements.len() != capacity {
                 return Err("near-Clifford terminal measurement count changed".into());
-            }
-            for row in measurements.chunks_exact_mut(width) {
-                for &(left, right) in &terminal.record_order_swaps {
-                    row.swap(left, right);
-                }
             }
             measurements
         } else {
@@ -1520,7 +1529,6 @@ struct SymbolicStabilizerState {
 struct SymbolicMeasurement {
     mask: u64,
     constant: bool,
-    random: bool,
 }
 
 impl SymbolicStabilizerState {
@@ -1545,19 +1553,16 @@ impl SymbolicStabilizerState {
     }
 
     fn measure_z(&mut self, q: usize) -> Option<SymbolicMeasurement> {
-        let (mask, constant, random) =
+        let (mask, constant, _) =
             self.frame
                 .measure_z_symbolic(&mut self.signs, &mut self.random_count, q)?;
-        Some(SymbolicMeasurement {
-            mask,
-            constant,
-            random,
-        })
+        Some(SymbolicMeasurement { mask, constant })
     }
 }
 
 struct CliffordSuffixPlan {
     steps: Vec<SymbolicMeasurement>,
+    random_count: usize,
 }
 
 impl CliffordSuffixPlan {
@@ -1600,7 +1605,10 @@ impl CliffordSuffixPlan {
                 }
             }
         }
-        Some(Self { steps })
+        Some(Self {
+            steps,
+            random_count: symbolic.random_count,
+        })
     }
 
     // Keep the bool and byte output paths specialized at the call site.
@@ -1611,11 +1619,15 @@ impl CliffordSuffixPlan {
         mut push: impl FnMut(bool),
         rng: &mut impl Rng,
     ) {
+        // A suffix draws no randomness outside symbolic measurements. Draw its
+        // bits up front so the output loop needs only parity and a byte write.
         let mut random_bits = 0u64;
-        for (step, target) in self.steps.iter().zip(targets) {
-            if step.random && rng.r#gen::<bool>() {
-                random_bits |= step.mask;
+        for index in 0..self.random_count {
+            if rng.r#gen::<bool>() {
+                random_bits |= 1u64 << index;
             }
+        }
+        for (step, target) in self.steps.iter().zip(targets) {
             let outcome = step.constant ^ ((random_bits & step.mask).count_ones() & 1 != 0);
             push(outcome ^ target.inverted);
         }
@@ -1681,15 +1693,33 @@ impl CachedTerminalSampler {
     fn sample_flat(
         &mut self,
         targets: &[TerminalMeasurement],
+        in_record_order: bool,
         shots: usize,
         rng: &mut impl Rng,
     ) -> Result<Vec<u8>, String> {
         let capacity = shots
             .checked_mul(targets.len())
             .ok_or("near-Clifford measurement batch size overflow")?;
-        let mut measurements = Vec::with_capacity(capacity);
-        for _ in 0..shots {
-            self.sample_one(targets, |bit| measurements.push(u8::from(bit)), rng)?;
+        if in_record_order {
+            let mut measurements = Vec::with_capacity(capacity);
+            for _ in 0..shots {
+                self.sample_one(targets, |bit| measurements.push(u8::from(bit)), rng)?;
+            }
+            return Ok(measurements);
+        }
+        let mut measurements = vec![0u8; capacity];
+        for shot in 0..shots {
+            let row_start = shot * targets.len();
+            let mut target_index = 0;
+            let mut write_bit = |bit| {
+                let record_index = targets[target_index].record_index;
+                measurements[row_start + record_index] = u8::from(bit);
+                target_index += 1;
+            };
+            self.sample_one(targets, &mut write_bit, rng)?;
+            if target_index != targets.len() {
+                return Err("near-Clifford terminal measurement count changed".into());
+            }
         }
         Ok(measurements)
     }
@@ -2267,6 +2297,43 @@ mod tests {
     }
 
     #[test]
+    fn symbolic_suffix_preserves_rng_at_64_random_bits() {
+        let mut state = ActiveState::new(64, 16);
+        for q in 0..64 {
+            state.apply_clifford(CliffordGate::H(q)).unwrap();
+        }
+        let targets = (0..64)
+            .chain([63, 0])
+            .enumerate()
+            .map(|(record_index, q)| TerminalMeasurement {
+                q,
+                basis: MeasurementBasis::Z,
+                inverted: false,
+                record_index,
+            })
+            .collect::<Vec<_>>();
+        let plan = CliffordSuffixPlan::from_state(&state, &targets).unwrap();
+        assert_eq!(plan.random_count, 64);
+        for seed in [0, 17, 739] {
+            let mut symbolic_rng = StdRng::seed_from_u64(seed);
+            let mut reference_rng = StdRng::seed_from_u64(seed);
+            let mut actual = Vec::new();
+            plan.sample(&targets, |bit| actual.push(bit), &mut symbolic_rng);
+            let mut reference_state = state.clone();
+            let expected = targets
+                .iter()
+                .map(|target| {
+                    reference_state
+                        .measure(target.q, target.basis, &mut reference_rng)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "seed={seed}");
+            assert_eq!(symbolic_rng.next_u64(), reference_rng.next_u64());
+        }
+    }
+
+    #[test]
     fn terminal_cache_caps_distinct_wide_frames_and_long_symbolic_plans() {
         assert_eq!(terminal_cache_node_limit(20, 20), 1024);
         assert_eq!(terminal_cache_node_limit(4096, 20), 1);
@@ -2355,6 +2422,33 @@ mod tests {
             assert_eq!(shot.detectors, vec![shot.measurements[1]]);
             assert_eq!(shot.observables, vec![(2, shot.measurements[0])]);
         }
+    }
+
+    #[test]
+    fn repeated_terminal_schedule_reorders_first_pass_only() {
+        fn order(source: &str) -> Vec<usize> {
+            let circuit = NearCliffordExecutor::compile_text(source).unwrap();
+            let sampler = circuit.prepare_sampler().unwrap();
+            circuit
+                .terminal_plan
+                .as_ref()
+                .unwrap()
+                .plan_order(&sampler.prepared)
+        }
+
+        let first_pass = order(include_str!(
+            "../tests/fixtures/near_clifford_batch_20q_8t.stim"
+        ));
+        assert_ne!(first_pass, (0..20).collect::<Vec<_>>());
+
+        let repeated = order(include_str!(
+            "../tests/fixtures/near_clifford_batch_20q_8t_repeated.stim"
+        ));
+        assert_eq!(&repeated[..20], first_pass);
+        assert_eq!(&repeated[20..], (20..40).collect::<Vec<_>>());
+
+        assert_eq!(order("H 0\nT 0\nM 0\nMX 0"), vec![0, 1]);
+        assert_eq!(order("H 0 1\nT 0\nM 0\nM 0\nM 1"), vec![0, 1, 2]);
     }
 
     #[test]
