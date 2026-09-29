@@ -7,6 +7,8 @@ use rstim::near_clifford::NearCliffordExecutor;
 use rstim::parser::parse_lines;
 
 const BENCHMARK_CIRCUIT: &str = include_str!("fixtures/near_clifford_batch_20q_8t.stim");
+const REPEATED_BENCHMARK_CIRCUIT: &str =
+    include_str!("fixtures/near_clifford_batch_20q_8t_repeated.stim");
 
 fn assert_matches_individual_runs(circuit: &NearCliffordExecutor, shots: usize, sweep: &[bool]) {
     let mut batch_rng = StdRng::seed_from_u64(739);
@@ -114,6 +116,53 @@ fn flat_and_structured_batches_share_terminal_cache_without_changing_rng() {
         structured.sample(256, &mut structured_rng).unwrap()
     );
     assert_eq!(mixed_rng.next_u64(), structured_rng.next_u64());
+}
+
+#[test]
+fn repeated_terminal_measurements_preserve_shots_records_and_rng() {
+    let second_round = (0..20)
+        .map(|q| {
+            if q % 2 == 0 {
+                format!("!{q}")
+            } else {
+                q.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    let repeated = NearCliffordExecutor::compile_text(&format!(
+        "{BENCHMARK_CIRCUIT}M {second_round}\nDETECTOR rec[-1] rec[-21]\n"
+    ))
+    .unwrap();
+    let changed_basis = NearCliffordExecutor::compile_text(
+        "H 0\nT 0\nH 0\nM !0 1\nM 1 !0\nMX 0\nMX !0\nM 0\nDETECTOR rec[-1] rec[-2]",
+    )
+    .unwrap();
+    let no_sweep: &[bool] = &[];
+    for circuit in [&repeated, &changed_basis] {
+        assert_matches_individual_runs(circuit, 512, no_sweep);
+        assert_flat_measurements_match_shots(circuit, &[0, 1, 64, 512], &[no_sweep; 4]);
+    }
+    let plain = NearCliffordExecutor::compile_text(REPEATED_BENCHMARK_CIRCUIT).unwrap();
+    assert_matches_individual_runs(&plain, 2048, no_sweep);
+    let mut rng = StdRng::seed_from_u64(739);
+    for shot in plain.sample(512, &mut rng).unwrap() {
+        assert_eq!(&shot.measurements[..20], &shot.measurements[20..]);
+    }
+    let mut rng = StdRng::seed_from_u64(739);
+    for shot in repeated.sample(512, &mut rng).unwrap() {
+        assert_eq!(shot.detectors, [false]);
+        for q in 0..20 {
+            assert_eq!(
+                shot.measurements[20 + q],
+                shot.measurements[q] ^ (q % 2 == 0)
+            );
+        }
+    }
+
+    let new_qubit_after_repeat =
+        NearCliffordExecutor::compile_text("H 0 1\nT 0\nM 0\nM 0\nM 1").unwrap();
+    assert_matches_individual_runs(&new_qubit_after_repeat, 512, no_sweep);
 }
 
 #[test]
