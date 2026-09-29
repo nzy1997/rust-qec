@@ -200,7 +200,7 @@ fn terminal_batch_matches_individual_runs_and_rng_state() {
     let two_t = NearCliffordExecutor::compile_text("H 0\nCX 0 1\nT 0\nH 0\nT 0\nMX 0 1").unwrap();
     let benchmark = NearCliffordExecutor::compile_text(BENCHMARK_CIRCUIT).unwrap();
     for circuit in [&two_t, &benchmark] {
-        for shots in [0, 1, 512] {
+        for shots in [0, 1, 2, 3, 63, 64, 512] {
             assert_matches_individual_runs(circuit, shots, &[]);
         }
     }
@@ -291,7 +291,7 @@ fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
         NearCliffordExecutor::compile_text(&format!("H 0\nT 0\nH 0\nM {active_targets}")).unwrap();
     assert_matches_individual_runs(&active, 128, &[]);
 
-    for width in [64, 65] {
+    for width in [64, 65, 74, 80, 128, 129, 193] {
         let wide_prefix = (0..width)
             .map(|q| format!("H {q}"))
             .collect::<Vec<_>>()
@@ -302,8 +302,43 @@ fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
             .join(" ");
         let wide = NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}"))
             .unwrap();
-        assert_matches_individual_runs(&wide, 64, &[]);
+        let shots = if width <= 80 { 64 } else { 8 };
+        assert_matches_individual_runs(&wide, shots, &[]);
+        assert_prepared_batches_match_individual_runs(&wide, &[1, shots], &[&[], &[]]);
     }
+}
+
+#[test]
+fn wide_symbolic_suffix_preserves_cross_word_correlations_and_rng() {
+    let prefix = (0..129)
+        .map(|q| format!("H {q}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let random_targets = (0..129)
+        .map(|q| q.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let circuit = NearCliffordExecutor::compile_text(&format!(
+        "{prefix}\nCX 63 129\nCX 64 129\nCX 127 130\nCX 128 130\nM {random_targets} 129 130 63 64 127 128"
+    ))
+    .unwrap();
+    let no_sweep: &[bool] = &[];
+    assert_prepared_batches_match_individual_runs(&circuit, &[1, 8], &[no_sweep; 2]);
+    assert_flat_measurements_match_shots(&circuit, &[1, 8], &[no_sweep; 2]);
+}
+
+#[test]
+fn rank_eleven_cache_matches_individual_sampling() {
+    let prefix = (0..11)
+        .map(|q| format!("H {q}\nT {q}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let circuit =
+        NearCliffordExecutor::compile_text(&format!("{prefix}\nMX 0 1 2 3 4 5 6 7 8 9 10"))
+            .unwrap();
+    let no_sweep: &[bool] = &[];
+    assert_prepared_batches_match_individual_runs(&circuit, &[1, 8, 32], &[no_sweep; 3]);
+    assert_flat_measurements_match_shots(&circuit, &[1, 8, 32], &[no_sweep; 3]);
 }
 
 #[test]
