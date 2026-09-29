@@ -8,6 +8,7 @@
 
 use crate::ir::{StimInstr, StimTarget};
 use crate::sim::packed_inverse_tableau::CanonicalTableauSnapshot;
+use crate::sim::symbolic_mask::SymbolicMask;
 use crate::sim::tableau::StabilizerState;
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::sync::{Arc, OnceLock};
@@ -1284,7 +1285,7 @@ impl NearCliffordExecutor {
         sweep_bits: &[bool],
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
-        if shots < 64 {
+        if shots <= 1 {
             return (0..shots)
                 .map(|_| self.run_with_sweep(sweep_bits, rng))
                 .collect();
@@ -1520,23 +1521,25 @@ impl CachedTerminalSampler {
     }
 }
 
-struct SymbolicStabilizerState {
+struct SymbolicStabilizerState<M: SymbolicMask> {
     frame: StabilizerState,
-    signs: Vec<u64>,
+    signs: Vec<M>,
     random_count: usize,
+    words: usize,
 }
 
-struct SymbolicMeasurement {
-    mask: u64,
+struct SymbolicMeasurement<M: SymbolicMask> {
+    mask: M,
     constant: bool,
 }
 
-impl SymbolicStabilizerState {
-    fn new(frame: StabilizerState) -> Self {
+impl<M: SymbolicMask> SymbolicStabilizerState<M> {
+    fn new(frame: StabilizerState, words: usize) -> Self {
         Self {
-            signs: vec![0; frame.num_qubits() * 2],
+            signs: vec![M::zero(words); frame.num_qubits() * 2],
             frame,
             random_count: 0,
+            words,
         }
     }
 
@@ -1552,20 +1555,30 @@ impl SymbolicStabilizerState {
         self.frame.s_dag(q);
     }
 
-    fn measure_z(&mut self, q: usize) -> Option<SymbolicMeasurement> {
-        let (mask, constant, _) =
-            self.frame
-                .measure_z_symbolic(&mut self.signs, &mut self.random_count, q)?;
+    fn measure_z(&mut self, q: usize) -> Option<SymbolicMeasurement<M>> {
+        let (mask, constant, _) = self.frame.measure_z_symbolic(
+            &mut self.signs,
+            &mut self.random_count,
+            self.words,
+            q,
+        )?;
         Some(SymbolicMeasurement { mask, constant })
     }
 }
 
-struct CliffordSuffixPlan {
-    steps: Vec<SymbolicMeasurement>,
+struct CliffordSuffixPlanImpl<M: SymbolicMask> {
+    steps: Vec<SymbolicMeasurement<M>>,
     random_count: usize,
+    words: usize,
 }
 
-impl CliffordSuffixPlan {
+enum CliffordSuffixPlan {
+    Compact(CliffordSuffixPlanImpl<u64>),
+    DoubleWord(CliffordSuffixPlanImpl<u128>),
+    Wide(CliffordSuffixPlanImpl<Vec<u64>>),
+}
+
+impl<M: SymbolicMask> CliffordSuffixPlanImpl<M> {
     fn from_state(state: &ActiveState, targets: &[TerminalMeasurement]) -> Option<Self> {
         // A suffix only needs the frame. Rebase virtual origin bits on the
         // single frame copy used by symbolic measurement, without cloning the
@@ -1584,7 +1597,8 @@ impl CliffordSuffixPlan {
                 }
             }
         }
-        let mut symbolic = SymbolicStabilizerState::new(frame);
+        let words = targets.len().div_ceil(64);
+        let mut symbolic = SymbolicStabilizerState::<M>::new(frame, words);
         let mut steps = Vec::with_capacity(targets.len());
         for target in targets {
             match target.basis {
@@ -1608,6 +1622,7 @@ impl CliffordSuffixPlan {
         Some(Self {
             steps,
             random_count: symbolic.random_count,
+            words,
         })
     }
 
@@ -1621,15 +1636,45 @@ impl CliffordSuffixPlan {
     ) {
         // A suffix draws no randomness outside symbolic measurements. Draw its
         // bits up front so the output loop needs only parity and a byte write.
-        let mut random_bits = 0u64;
+        let mut random_bits = M::zero(self.words);
         for index in 0..self.random_count {
             if rng.r#gen::<bool>() {
-                random_bits |= 1u64 << index;
+                random_bits.set_bit(index);
             }
         }
         for (step, target) in self.steps.iter().zip(targets) {
-            let outcome = step.constant ^ ((random_bits & step.mask).count_ones() & 1 != 0);
+            let outcome = step.constant ^ step.mask.parity_with(&random_bits);
             push(outcome ^ target.inverted);
+        }
+    }
+}
+
+impl CliffordSuffixPlan {
+    fn from_state(state: &ActiveState, targets: &[TerminalMeasurement]) -> Option<Self> {
+        CliffordSuffixPlanImpl::<u64>::from_state(state, targets)
+            .map(Self::Compact)
+            .or_else(|| {
+                CliffordSuffixPlanImpl::<u128>::from_state(state, targets).map(Self::DoubleWord)
+            })
+            .or_else(|| {
+                CliffordSuffixPlanImpl::<Vec<u64>>::from_state(state, targets).map(Self::Wide)
+            })
+    }
+
+    #[cfg(test)]
+    fn random_count(&self) -> usize {
+        match self {
+            Self::Compact(plan) => plan.random_count,
+            Self::DoubleWord(plan) => plan.random_count,
+            Self::Wide(plan) => plan.random_count,
+        }
+    }
+
+    fn sample(&self, targets: &[TerminalMeasurement], push: impl FnMut(bool), rng: &mut impl Rng) {
+        match self {
+            Self::Compact(plan) => plan.sample(targets, push, rng),
+            Self::DoubleWord(plan) => plan.sample(targets, push, rng),
+            Self::Wide(plan) => plan.sample(targets, push, rng),
         }
     }
 }
@@ -1657,16 +1702,23 @@ impl TerminalMeasurementNode {
     }
 }
 
+const MAX_CACHED_COEFFICIENTS: usize = 2048;
+
 fn terminal_cache_node_limit(num_qubits: usize, target_count: usize) -> usize {
     const MAX_CACHE_BYTES: usize = 64 * 1024 * 1024;
     // Independent Pauli branches can each own a distinct frame. Account for
-    // both 2n-row Boolean matrices, their row headers and active-state data.
+    // both 2n-row Boolean matrices, their row headers, the largest accepted
+    // coefficient vector, and a wide symbolic suffix at each cached node.
+    let wide_words = target_count.div_ceil(64);
+    let symbolic_step_bytes = std::mem::size_of::<SymbolicMeasurement<Vec<u64>>>()
+        .saturating_add(wide_words.saturating_mul(std::mem::size_of::<u64>()));
     let worst_case_bytes = num_qubits
         .saturating_mul(num_qubits)
         .saturating_mul(4)
-        .saturating_add(num_qubits.saturating_mul(128))
-        .saturating_add(target_count.saturating_mul(std::mem::size_of::<SymbolicMeasurement>()))
-        .saturating_add(16 * 1024);
+        .saturating_add(num_qubits.saturating_mul(256))
+        .saturating_add(MAX_CACHED_COEFFICIENTS.saturating_mul(std::mem::size_of::<ComplexAmp>()))
+        .saturating_add(target_count.saturating_mul(symbolic_step_bytes))
+        .saturating_add(std::mem::size_of::<TerminalMeasurementNode>());
     (MAX_CACHE_BYTES / worst_case_bytes).clamp(1, 1024)
 }
 
@@ -1736,7 +1788,8 @@ impl CachedTerminalSampler {
         let mut node = &mut self.root;
         let mut depth = 0;
         let mut uncached_state = None;
-        while depth < self.cached_depth && node.state.coefficients.len() <= 1024 {
+        while depth < self.cached_depth && node.state.coefficients.len() <= MAX_CACHED_COEFFICIENTS
+        {
             if node.state.axes.is_empty() {
                 if node.symbolic_suffix.is_none() {
                     node.symbolic_suffix = Some(CliffordSuffixPlan::from_state(
@@ -1812,7 +1865,9 @@ impl CachedTerminalSampler {
                     }
                 }
                 state.retire_fixed_axes();
-                if self.cached_nodes == self.max_cached_nodes {
+                if self.cached_nodes == self.max_cached_nodes
+                    || state.coefficients.len() > MAX_CACHED_COEFFICIENTS
+                {
                     push(outcome ^ inverted);
                     depth += 1;
                     uncached_state = Some(state);
@@ -2313,7 +2368,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let plan = CliffordSuffixPlan::from_state(&state, &targets).unwrap();
-        assert_eq!(plan.random_count, 64);
+        assert_eq!(plan.random_count(), 64);
+        assert!(matches!(plan, CliffordSuffixPlan::Compact(_)));
         for seed in [0, 17, 739] {
             let mut symbolic_rng = StdRng::seed_from_u64(seed);
             let mut reference_rng = StdRng::seed_from_u64(seed);
@@ -2321,6 +2377,77 @@ mod tests {
             plan.sample(&targets, |bit| actual.push(bit), &mut symbolic_rng);
             let mut reference_state = state.clone();
             let expected = targets
+                .iter()
+                .map(|target| {
+                    reference_state
+                        .measure(target.q, target.basis, &mut reference_rng)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "seed={seed}");
+            assert_eq!(symbolic_rng.next_u64(), reference_rng.next_u64());
+        }
+    }
+
+    #[test]
+    fn symbolic_suffix_preserves_cross_word_correlations_at_128_random_bits() {
+        let mut state = ActiveState::new(130, 16);
+        for q in 0..128 {
+            state.apply_clifford(CliffordGate::H(q)).unwrap();
+        }
+        state.apply_clifford(CliffordGate::CX(63, 128)).unwrap();
+        state.apply_clifford(CliffordGate::CX(64, 128)).unwrap();
+        let targets = (0..129)
+            .chain([63, 64, 127])
+            .enumerate()
+            .map(|(record_index, q)| TerminalMeasurement {
+                q,
+                basis: MeasurementBasis::Z,
+                inverted: false,
+                record_index,
+            })
+            .collect::<Vec<_>>();
+        let plan = CliffordSuffixPlan::from_state(&state, &targets).unwrap();
+        assert_eq!(plan.random_count(), 128);
+        assert!(matches!(plan, CliffordSuffixPlan::DoubleWord(_)));
+        for seed in [0, 17, 739] {
+            let mut symbolic_rng = StdRng::seed_from_u64(seed);
+            let mut reference_rng = StdRng::seed_from_u64(seed);
+            let mut actual = Vec::new();
+            plan.sample(&targets, |bit| actual.push(bit), &mut symbolic_rng);
+            let mut reference_state = state.clone();
+            let expected = targets
+                .iter()
+                .map(|target| {
+                    reference_state
+                        .measure(target.q, target.basis, &mut reference_rng)
+                        .unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "seed={seed}");
+            assert_eq!(actual[128], actual[63] ^ actual[64]);
+            assert_eq!(symbolic_rng.next_u64(), reference_rng.next_u64());
+        }
+
+        state.apply_clifford(CliffordGate::H(129)).unwrap();
+        let extra = TerminalMeasurement {
+            q: 129,
+            basis: MeasurementBasis::Z,
+            inverted: false,
+            record_index: targets.len(),
+        };
+        let mut too_wide = targets;
+        too_wide.insert(128, extra);
+        let wide_plan = CliffordSuffixPlan::from_state(&state, &too_wide).unwrap();
+        assert_eq!(wide_plan.random_count(), 129);
+        assert!(matches!(wide_plan, CliffordSuffixPlan::Wide(_)));
+        for seed in [0, 17, 739] {
+            let mut symbolic_rng = StdRng::seed_from_u64(seed);
+            let mut reference_rng = StdRng::seed_from_u64(seed);
+            let mut actual = Vec::new();
+            wide_plan.sample(&too_wide, |bit| actual.push(bit), &mut symbolic_rng);
+            let mut reference_state = state.clone();
+            let expected = too_wide
                 .iter()
                 .map(|target| {
                     reference_state
