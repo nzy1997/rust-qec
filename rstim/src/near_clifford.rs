@@ -1463,14 +1463,12 @@ impl NearCliffordSampler<'_> {
             .ok_or("near-Clifford measurement batch size overflow")?;
         let measurements = if let Some(terminal) = &mut self.terminal {
             debug_assert_eq!(terminal.ordered.len(), width);
-            let mut measurements = terminal.cached.sample_flat(&terminal.ordered, shots, rng)?;
+            let in_record_order = terminal.record_order_swaps.is_empty();
+            let ordered = &terminal.ordered;
+            let cached = &mut terminal.cached;
+            let measurements = cached.sample_flat(ordered, in_record_order, shots, rng)?;
             if measurements.len() != capacity {
                 return Err("near-Clifford terminal measurement count changed".into());
-            }
-            for row in measurements.chunks_exact_mut(width) {
-                for &(left, right) in &terminal.record_order_swaps {
-                    row.swap(left, right);
-                }
             }
             measurements
         } else {
@@ -1692,15 +1690,33 @@ impl CachedTerminalSampler {
     fn sample_flat(
         &mut self,
         targets: &[TerminalMeasurement],
+        in_record_order: bool,
         shots: usize,
         rng: &mut impl Rng,
     ) -> Result<Vec<u8>, String> {
         let capacity = shots
             .checked_mul(targets.len())
             .ok_or("near-Clifford measurement batch size overflow")?;
-        let mut measurements = Vec::with_capacity(capacity);
-        for _ in 0..shots {
-            self.sample_one(targets, |bit| measurements.push(u8::from(bit)), rng)?;
+        if in_record_order {
+            let mut measurements = Vec::with_capacity(capacity);
+            for _ in 0..shots {
+                self.sample_one(targets, |bit| measurements.push(u8::from(bit)), rng)?;
+            }
+            return Ok(measurements);
+        }
+        let mut measurements = vec![0u8; capacity];
+        for shot in 0..shots {
+            let row_start = shot * targets.len();
+            let mut target_index = 0;
+            let mut write_bit = |bit| {
+                let record_index = targets[target_index].record_index;
+                measurements[row_start + record_index] = u8::from(bit);
+                target_index += 1;
+            };
+            self.sample_one(targets, &mut write_bit, rng)?;
+            if target_index != targets.len() {
+                return Err("near-Clifford terminal measurement count changed".into());
+            }
         }
         Ok(measurements)
     }

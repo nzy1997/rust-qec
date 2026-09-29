@@ -77,9 +77,10 @@ fn flat_measurement_batches_match_shots_and_rng_across_sampling_paths() {
         "H 0\nCX 0 1\nT 0\nH 2\nCX 1 2\nMX 1\nM !0\nMY 2\nDETECTOR rec[-1] rec[-3]",
     )
     .unwrap();
+    let in_record_order = NearCliffordExecutor::compile_text("H 0 1 2\nM 0 1 2").unwrap();
     let no_records = NearCliffordExecutor::compile_text("H 0\nT 0").unwrap();
     let no_sweep: &[bool] = &[];
-    for circuit in [&benchmark, &reordered, &no_records] {
+    for circuit in [&benchmark, &reordered, &in_record_order, &no_records] {
         assert_flat_measurements_match_shots(circuit, &[0, 1, 63, 64, 256], &[no_sweep; 5]);
     }
 
