@@ -113,7 +113,11 @@ The `matching` subcommand accepts an explicit MWPM graph, stable loss-to-edge
 memberships, and one or more shots. For every distinct observed-loss set it
 builds one `rmatching` graph, assigns affected time-like edges `0.25` times the
 global mean base weight, assigns affected space-like or boundary edges `0.5`
-times that mean, and decodes the corresponding syndromes as a batch.
+times that mean, and decodes the corresponding syndromes as a batch. The mean
+uses the original edge list. After reweighting each original edge for a loss
+pattern, independent parallel mechanisms with the same detector endpoints and
+observable parity are combined by their odd-parity probability.
+This lets a loss activate one member without activating the others.
 
 ```sh
 cargo run -q -p renvelope -- matching \
@@ -134,7 +138,12 @@ The input fields are:
 
 - `num_detectors` and `num_observables` (`0..=64` observables);
 - `edges`, each with a unique `id`, detector `node1`, optional `node2`,
-  observable indices, non-negative finite base `weight`, and `kind`;
+  observable indices, non-negative finite base `weight`, and `kind`. The optional
+  `independent_mechanism` flag must be `true` to combine parallel edges. An
+  omitted flag defaults to `false`, preserving the behavior of saved v0 cases
+  whose mechanism provenance is unknown. `prepare` marks single-component DEM
+  mechanisms as independent and leaves decomposed, correlated components
+  unmarked;
 - `loss_edge_map`, containing stable loss IDs and their affected edge IDs; and
 - one or more `shots`, each listing observed detectors and loss IDs.
 

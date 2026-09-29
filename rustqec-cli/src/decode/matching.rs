@@ -22,6 +22,7 @@ pub(super) struct GraphEdge {
     pub(super) observables: Vec<usize>,
     pub(super) weight: f64,
     pub(super) kind: EdgeKind,
+    pub(super) independent_mechanism: bool,
 }
 
 pub(super) struct CompiledMatching {
@@ -244,6 +245,8 @@ fn build_canonical_matching(
     let scale = edges.iter().map(|edge| edge.weight).fold(1.0f64, f64::max);
     let mut matching = Matching::new();
     let mut reachable_detectors = vec![false; detector_count];
+    let mut merged = Vec::<(&GraphEdge, f64)>::new();
+    let mut indices = HashMap::<(usize, Option<usize>, Vec<usize>), usize>::new();
     for (index, edge) in edges.iter().enumerate() {
         if edge.node1 >= detector_count || edge.node2.is_some_and(|node| node >= detector_count) {
             return Err(ShotFailure::Other(format!(
@@ -257,11 +260,37 @@ fn build_canonical_matching(
             }
         } else {
             edge.weight
-        } / scale;
-        let probability = 1.0 / (1.0 + weight.exp());
+        };
         reachable_detectors[edge.node1] = true;
         if let Some(node2) = edge.node2 {
             reachable_detectors[node2] = true;
+        }
+        let key = (
+            edge.node1.min(edge.node2.unwrap_or(edge.node1)),
+            edge.node2.map(|node| edge.node1.max(node)),
+            edge.observables.clone(),
+        );
+        if edge.independent_mechanism {
+            if let Some(&merged_index) = indices.get(&key) {
+                let previous = &mut merged[merged_index].1;
+                let p = 1.0 / (1.0 + previous.exp());
+                let q = 1.0 / (1.0 + weight.exp());
+                let odd = p * (1.0 - q) + q * (1.0 - p);
+                *previous = if odd == 0.0 {
+                    (*previous).min(weight)
+                } else {
+                    ((1.0 - odd) / odd).ln()
+                };
+                continue;
+            }
+            indices.insert(key, merged.len());
+        }
+        merged.push((edge, weight));
+    }
+    for (edge, base_weight) in merged {
+        let weight = base_weight / scale;
+        let probability = 1.0 / (1.0 + weight.exp());
+        if let Some(node2) = edge.node2 {
             matching.add_edge(edge.node1, node2, weight, &edge.observables, probability);
         } else {
             matching.add_boundary_edge(edge.node1, weight, &edge.observables, probability);
@@ -350,6 +379,46 @@ fn validate_reachable_detectors(
 mod tests {
     use super::*;
 
+    fn parallel_edge(a: usize, b: usize, weight: f64, logical: bool) -> GraphEdge {
+        GraphEdge {
+            node1: a,
+            node2: Some(b),
+            observables: if logical { vec![0] } else { vec![] },
+            weight,
+            kind: EdgeKind::SpaceLike,
+            independent_mechanism: true,
+        }
+    }
+
+    #[test]
+    fn canonical_matching_merges_independent_parallel_edges_after_loss_reweighting() {
+        let mut edges = vec![
+            parallel_edge(0, 1, (9.0_f64).ln(), true),
+            parallel_edge(1, 0, (4.0_f64).ln(), true),
+            parallel_edge(0, 2, 0.6, false),
+            parallel_edge(2, 1, 0.6, false),
+        ];
+        let mean = edges.iter().map(|edge| edge.weight).sum::<f64>() / 4.0;
+        let syndrome = [1, 1, 0];
+        let decode = |edges: &[GraphEdge], losses: &[Vec<usize>], active: &[usize], mean| {
+            build_canonical_matching(edges, losses, mean, 3, active, 20)
+                .unwrap()
+                .matching
+                .decode(&syndrome)
+        };
+        assert_eq!(decode(&edges, &[], &[], mean), vec![1]);
+        let single = vec![edges[1].clone(), edges[2].clone(), edges[3].clone()];
+        assert_eq!(decode(&single, &[], &[], mean), vec![0]);
+
+        edges[2].weight = 0.175;
+        edges[3].weight = 0.175;
+        let mean = edges.iter().map(|edge| edge.weight).sum::<f64>() / 4.0;
+        assert_eq!(decode(&edges, &[vec![0]], &[0], mean), vec![1]);
+        assert_eq!(decode(&edges, &[vec![1]], &[0], mean), vec![0]);
+        edges[0].independent_mechanism = false;
+        assert_eq!(decode(&edges, &[], &[], mean), vec![0]);
+    }
+
     fn boundary_edge() -> GraphEdge {
         GraphEdge {
             node1: 0,
@@ -357,6 +426,7 @@ mod tests {
             observables: Vec::new(),
             weight: 1.0,
             kind: EdgeKind::Boundary,
+            independent_mechanism: true,
         }
     }
 
@@ -378,6 +448,7 @@ mod tests {
                     observables: Vec::new(),
                     weight: 2.0,
                     kind: EdgeKind::TimeLike,
+                    independent_mechanism: true,
                 },
                 GraphEdge {
                     node1: 1,
@@ -385,6 +456,7 @@ mod tests {
                     observables: Vec::new(),
                     weight: 3.0,
                     kind: EdgeKind::SpaceLike,
+                    independent_mechanism: true,
                 },
                 GraphEdge {
                     node1: 0,
@@ -392,6 +464,7 @@ mod tests {
                     observables: vec![0],
                     weight: 4.0,
                     kind: EdgeKind::Boundary,
+                    independent_mechanism: true,
                 },
             ],
             loss_edges: vec![vec![0, 1, 2]],
