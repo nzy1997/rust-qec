@@ -48,8 +48,9 @@ The development checkout combines all public commands in one executable.
 Install it with `cargo install --locked --path rstim --force`. This combined release
 has not yet been published to crates.io. A smaller simulator-only CLI can be
 built with `--no-default-features --features cli`.
-After installation, run `rstim surface-code-ler --shots 2000 --out-dir .` from
-any working directory to produce the Get started guide's CSV and SVG plot.
+After installation, run `rstim surface-code-ler --distances 3,5,7 --rounds 9,15,21
+--physical-error-rates 0.008,0.009,0.01,0.011,0.012 --shots 2000 --out-dir .`
+from any working directory to produce a CSV and SVG plot.
 Detector error models must be decomposed into graphlike components before
 passing them to a matching decoder that only accepts one- and two-detector
 errors.

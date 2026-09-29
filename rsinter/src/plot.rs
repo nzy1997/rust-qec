@@ -393,6 +393,19 @@ mod enabled {
 
             std::fs::write(
                 &input,
+                "distance,physical_error_rate,shots,logical_failures,seed\n\
+                 3,0.005,2000,310,386\n\
+                 5,0.005,2000,23,586\n\
+                 3,0.01,2000,111,387\n\
+                 5,0.01,2000,184,587\n",
+            )
+            .unwrap();
+            let changed_output = dir.path().join("changed-rates.svg");
+            plot_error_rate_csv(&input, &changed_output).unwrap();
+            assert_ne!(svg, std::fs::read_to_string(changed_output).unwrap());
+
+            std::fs::write(
+                &input,
                 "distance,physical_error_rate,shots,logical_failures\n3,0.01,10,11\n",
             )
             .unwrap();

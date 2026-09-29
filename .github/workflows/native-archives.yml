@@ -91,6 +91,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - run: python3 -m unittest tools.test_build_release_archive
       - run: python3 -m unittest tools.test_verify_release_archive
       - run: python3 -m unittest tools.test_check_envelope_publication
       - name: Regress against the immutable v0.3.2 publication defect
@@ -241,29 +242,41 @@ jobs:
         run: |
           tar -xzf rebuilt-shot-assets/rebuilt-shot-lab-assets.tar.gz -C source
           python3 source/tools/shot_viewer_assets.py
-      - name: Build the native CLI from the locked source
+      - name: Build the native CLIs from the locked source
         run: |
           # Enable all CLI capabilities declared by the tagged source.
           full_features=()
-          for capability in rstim/ilp rstim/cli rstim/codegen-css rstim/shot-viewer; do
+          for capability in rustqec-cli/ilp rstim/ilp rstim/cli rstim/codegen-css rstim/shot-viewer; do
             package="${capability%%/*}"
             feature="${capability#*/}"
-            if python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1], "rb")); raise SystemExit(0 if sys.argv[2] in d.get("features", {}) else 1)' "source/$package/Cargo.toml" "$feature"; then
+            if [ -f "source/$package/Cargo.toml" ] && python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1], "rb")); raise SystemExit(0 if sys.argv[2] in d.get("features", {}) else 1)' "source/$package/Cargo.toml" "$feature"; then
               full_features+=(--features "$capability")
             fi
           done
+          binaries=(-p rstim --bin rstim)
+          if [ -f source/rustqec-cli/Cargo.toml ]; then
+            binaries+=(-p rustqec-cli --bin rustqec)
+          fi
           "$CARGO" build --locked --release \
             --manifest-path source/Cargo.toml \
-            -p rstim --bin rstim "${full_features[@]}"
+            "${binaries[@]}" "${full_features[@]}"
       - name: Record native runtime linkage
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             {
+              if [ -f source/target/release/rustqec ]; then
+                echo "rustqec:"
+                ldd source/target/release/rustqec | sed -E 's/ \(0x[0-9a-f]+\)//g'
+              fi
               echo "rstim:"
               ldd source/target/release/rstim | sed -E 's/ \(0x[0-9a-f]+\)//g'
             } > runtime-linkage.txt
           else
             {
+              if [ -f source/target/release/rustqec ]; then
+                echo "rustqec:"
+                otool -L source/target/release/rustqec
+              fi
               echo "rstim:"
               otool -L source/target/release/rstim
             } > runtime-linkage.txt
@@ -272,6 +285,10 @@ jobs:
       - name: Package the target archive
         run: |
           mkdir -p staged-target
+          legacy_binary=()
+          if [ -f source/rustqec-cli/Cargo.toml ]; then
+            legacy_binary=(--rustqec source/target/release/rustqec)
+          fi
           python3 tooling/tools/build_release_archive.py package \
             --repo-root source \
             --out-dir staged-target \
@@ -281,7 +298,8 @@ jobs:
             --cargo "$CARGO" \
             --rustc "$RUSTC" \
             --rstim source/target/release/rstim \
-            --runtime-linkage runtime-linkage.txt
+            --runtime-linkage runtime-linkage.txt \
+            "${legacy_binary[@]}"
       - name: Upload the target staging artifact
         uses: actions/upload-artifact@v4
         with:
@@ -297,7 +315,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: tooling
-      - name: Checkout the frozen installed-quickstart contract
+      - name: Checkout the frozen legacy installed-quickstart contract
         uses: actions/checkout@v4
         with:
           ref: f5dc754f73d2eb54459c1dffc282e717fd02d610
@@ -318,7 +336,8 @@ jobs:
             --tag "${{ needs.prepare.outputs.tag }}" \
             --source-sha "${{ needs.prepare.outputs.source_sha }}"
           cp tooling/tools/verify_release_archive.py staged-release/
-          cp quickstart-tooling/tools/check_installed_quickstart.py staged-release/
+          cp tooling/tools/check_installed_quickstart.py staged-release/
+          cp quickstart-tooling/tools/check_installed_quickstart.py staged-release/check_installed_quickstart_legacy.py
       - name: Upload the complete staging bundle
         uses: actions/upload-artifact@v4
         with:
@@ -616,7 +635,9 @@ jobs:
           from verify_release_archive import safe_extract
           safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
           PY
-          PATH='' /usr/bin/python3 staged-release/check_installed_quickstart.py \
+          quickstart=check_installed_quickstart.py
+          if [ -f "extracted/$root/bin/rustqec" ]; then quickstart=check_installed_quickstart_legacy.py; fi
+          PATH='' /usr/bin/python3 "staged-release/$quickstart" \
             --bin-dir "$PWD/extracted/$root/bin" | tee linux-quickstart.log
           mkdir tampered
           cp "$archive" "tampered/$(basename "$archive")"
@@ -680,7 +701,9 @@ jobs:
           from verify_release_archive import safe_extract
           safe_extract(Path(sys.argv[1]), Path("extracted"), sys.argv[2])
           PY
-          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" staged-release/check_installed_quickstart.py \
+          quickstart=check_installed_quickstart.py
+          if [ -f "extracted/$root/bin/rustqec" ]; then quickstart=check_installed_quickstart_legacy.py; fi
+          DEVELOPER_DIR="$developer_stub" PATH='' "$python_bin" "staged-release/$quickstart" \
             --bin-dir "$PWD/extracted/$root/bin" | tee macos-quickstart.log
           mkdir tampered
           cp "$archive" "tampered/$(basename "$archive")"

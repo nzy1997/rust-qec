@@ -1446,7 +1446,7 @@ mod tests {
         // same code path as built-in-generator circuits and agree with the
         // explicit renvelope reference kernels shot by shot.
         const FIXTURE: &str =
-            include_str!("../tests/fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
+            include_str!("../../tests/fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
         let circuit = compiled(FIXTURE);
         assert_eq!(circuit.envelopes.len(), 25);
         assert!(

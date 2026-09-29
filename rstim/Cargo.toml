@@ -42,6 +42,7 @@ plotters = { version = "0.3", default-features = false, features = ["svg_backend
 [dev-dependencies]
 proptest = "1"
 tempfile = "3"
+renvelope = { path = "../renvelope" }
 
 [[bin]]
 name = "rstim"

@@ -1253,6 +1253,7 @@ dependencies = [
  "qec-code",
  "qec-ilp-core",
  "rand 0.8.7",
+ "renvelope",
  "rmatching",
  "serde",
  "serde_json",
