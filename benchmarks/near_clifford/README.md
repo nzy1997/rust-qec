@@ -13,6 +13,8 @@ measurement, not a publishable performance result.
 
 The [Apple M4 measurement and analysis](results/apple-m4-2026-09-29.md) and its
 [raw JSON](results/apple-m4-2026-09-29.json) are retained for this matrix.
+The subsequent [boundary validation and CPU profile](results/apple-m4-boundary-validation-2026-09-29.md)
+include paired raw data for the symbolic-width and rank-cache experiments.
 
 P0 separates compilation, preparation, the first prepared call, and a retained
 sampler, for structured and flat output across shot counts. It includes a
