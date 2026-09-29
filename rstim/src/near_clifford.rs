@@ -1463,12 +1463,10 @@ impl NearCliffordSampler<'_> {
             .ok_or("near-Clifford measurement batch size overflow")?;
         let measurements = if let Some(terminal) = &mut self.terminal {
             debug_assert_eq!(terminal.ordered.len(), width);
-            let measurements = terminal.cached.sample_flat(
-                &terminal.ordered,
-                terminal.record_order_swaps.is_empty(),
-                shots,
-                rng,
-            )?;
+            let in_record_order = terminal.record_order_swaps.is_empty();
+            let ordered = &terminal.ordered;
+            let cached = &mut terminal.cached;
+            let measurements = cached.sample_flat(ordered, in_record_order, shots, rng)?;
             if measurements.len() != capacity {
                 return Err("near-Clifford terminal measurement count changed".into());
             }
@@ -1710,15 +1708,12 @@ impl CachedTerminalSampler {
         for shot in 0..shots {
             let row_start = shot * targets.len();
             let mut target_index = 0;
-            self.sample_one(
-                targets,
-                |bit| {
-                    let record_index = targets[target_index].record_index;
-                    measurements[row_start + record_index] = u8::from(bit);
-                    target_index += 1;
-                },
-                rng,
-            )?;
+            let mut write_bit = |bit| {
+                let record_index = targets[target_index].record_index;
+                measurements[row_start + record_index] = u8::from(bit);
+                target_index += 1;
+            };
+            self.sample_one(targets, &mut write_bit, rng)?;
             if target_index != targets.len() {
                 return Err("near-Clifford terminal measurement count changed".into());
             }
