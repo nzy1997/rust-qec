@@ -273,14 +273,11 @@ fn build_canonical_matching(
         if edge.independent_mechanism {
             if let Some(&merged_index) = indices.get(&key) {
                 let previous = &mut merged[merged_index].1;
-                let p = 1.0 / (1.0 + previous.exp());
-                let q = 1.0 / (1.0 + weight.exp());
-                let odd = p * (1.0 - q) + q * (1.0 - p);
-                *previous = if odd == 0.0 {
-                    (*previous).min(weight)
-                } else {
-                    ((1.0 - odd) / odd).ln()
-                };
+                let smaller = (*previous).min(weight);
+                let larger = (*previous).max(weight);
+                // Odd-parity log odds, evaluated without exponentiating a large weight.
+                *previous = smaller + (-(smaller + larger)).exp().ln_1p()
+                    - (smaller - larger).exp().ln_1p();
                 continue;
             }
             indices.insert(key, merged.len());
@@ -417,6 +414,18 @@ mod tests {
         assert_eq!(decode(&edges, &[vec![1]], &[0], mean), vec![0]);
         edges[0].independent_mechanism = false;
         assert_eq!(decode(&edges, &[], &[], mean), vec![0]);
+    }
+
+    #[test]
+    fn canonical_matching_preserves_extreme_parallel_odd_parity_gain() {
+        let edges = vec![
+            parallel_edge(0, 1, 710.0, true),
+            parallel_edge(1, 0, 710.0, true),
+            parallel_edge(0, 2, 354.8, false),
+            parallel_edge(2, 1, 354.8, false),
+        ];
+        let mut matching = build_canonical_matching(&edges, &[], 1.0, 3, &[], 20).unwrap();
+        assert_eq!(matching.matching.decode(&[1, 1, 0]), vec![1]);
     }
 
     fn boundary_edge() -> GraphEdge {

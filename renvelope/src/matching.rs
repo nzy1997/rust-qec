@@ -408,14 +408,11 @@ fn build_matching(
         if edge.independent_mechanism {
             if let Some(&index) = indices.get(&key) {
                 let previous = &mut merged[index].1;
-                let p = 1.0 / (1.0 + previous.exp());
-                let q = 1.0 / (1.0 + weight.exp());
-                let odd = p * (1.0 - q) + q * (1.0 - p);
-                *previous = if odd == 0.0 {
-                    (*previous).min(weight)
-                } else {
-                    ((1.0 - odd) / odd).ln()
-                };
+                let smaller = (*previous).min(weight);
+                let larger = (*previous).max(weight);
+                // Odd-parity log odds, evaluated without exponentiating a large weight.
+                *previous = smaller + (-(smaller + larger)).exp().ln_1p()
+                    - (smaller - larger).exp().ln_1p();
                 continue;
             }
             indices.insert(key, merged.len());
