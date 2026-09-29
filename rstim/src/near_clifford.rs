@@ -1074,22 +1074,32 @@ impl TerminalPlan {
 
     fn plan_order(&self, prepared: &ActiveState) -> Vec<usize> {
         let identity = || (0..self.measurements.len()).collect::<Vec<_>>();
-        // One Pauli measurement per physical qubit makes every pair commute.
-        // Repeated targets can have incompatible bases, so keep their order.
-        // Bound planning work; long suffixes still use the terminal cache.
+        // Plan the first measurement of each physical qubit. A later same-basis
+        // repetition is deterministic and can stay after the first pass;
+        // incompatible bases or a new qubit after repetitions retain circuit
+        // order. Bound planning work; long suffixes use the terminal cache.
         if self.measurements.len() > 64 {
             return identity();
         }
-        let mut seen = vec![false; prepared.num_qubits];
-        for measurement in &self.measurements {
-            if seen[measurement.q] {
-                return identity();
+        let mut seen = vec![None; prepared.num_qubits];
+        let mut first_repeat = None;
+        for (index, measurement) in self.measurements.iter().enumerate() {
+            if let Some(basis) = seen[measurement.q] {
+                if basis != measurement.basis {
+                    return identity();
+                }
+                first_repeat.get_or_insert(index);
+            } else {
+                if first_repeat.is_some() {
+                    return identity();
+                }
+                seen[measurement.q] = Some(measurement.basis);
             }
-            seen[measurement.q] = true;
         }
+        let first_pass_len = first_repeat.unwrap_or(self.measurements.len());
         let mut state = prepared.clone();
-        let mut remaining = identity();
-        let mut order = Vec::with_capacity(remaining.len());
+        let mut remaining = (0..first_pass_len).collect::<Vec<_>>();
+        let mut order = Vec::with_capacity(self.measurements.len());
         while !remaining.is_empty() {
             // Retire active coordinates early. The planning trajectory follows
             // the more likely branch; other branches remain exact at runtime.
@@ -1120,6 +1130,7 @@ impl TerminalPlan {
             }
             order.push(index);
         }
+        order.extend(first_pass_len..self.measurements.len());
         order
     }
 
@@ -2355,6 +2366,33 @@ mod tests {
             assert_eq!(shot.detectors, vec![shot.measurements[1]]);
             assert_eq!(shot.observables, vec![(2, shot.measurements[0])]);
         }
+    }
+
+    #[test]
+    fn repeated_terminal_schedule_reorders_first_pass_only() {
+        fn order(source: &str) -> Vec<usize> {
+            let circuit = NearCliffordExecutor::compile_text(source).unwrap();
+            let sampler = circuit.prepare_sampler().unwrap();
+            circuit
+                .terminal_plan
+                .as_ref()
+                .unwrap()
+                .plan_order(&sampler.prepared)
+        }
+
+        let first_pass = order(include_str!(
+            "../tests/fixtures/near_clifford_batch_20q_8t.stim"
+        ));
+        assert_ne!(first_pass, (0..20).collect::<Vec<_>>());
+
+        let repeated = order(include_str!(
+            "../tests/fixtures/near_clifford_batch_20q_8t_repeated.stim"
+        ));
+        assert_eq!(&repeated[..20], first_pass);
+        assert_eq!(&repeated[20..], (20..40).collect::<Vec<_>>());
+
+        assert_eq!(order("H 0\nT 0\nM 0\nMX 0"), vec![0, 1]);
+        assert_eq!(order("H 0 1\nT 0\nM 0\nM 0\nM 1"), vec![0, 1, 2]);
     }
 
     #[test]
