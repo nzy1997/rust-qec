@@ -291,14 +291,19 @@ fn long_terminal_target_lists_preserve_active_and_clifford_sampling() {
         NearCliffordExecutor::compile_text(&format!("H 0\nT 0\nH 0\nM {active_targets}")).unwrap();
     assert_matches_individual_runs(&active, 128, &[]);
 
-    let wide_prefix = (0..65)
-        .map(|q| format!("H {q}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let wide_targets = (0..65).map(|q| q.to_string()).collect::<Vec<_>>().join(" ");
-    let wide =
-        NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}")).unwrap();
-    assert_matches_individual_runs(&wide, 64, &[]);
+    for width in [64, 65] {
+        let wide_prefix = (0..width)
+            .map(|q| format!("H {q}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let wide_targets = (0..width)
+            .map(|q| q.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let wide = NearCliffordExecutor::compile_text(&format!("{wide_prefix}\nM {wide_targets}"))
+            .unwrap();
+        assert_matches_individual_runs(&wide, 64, &[]);
+    }
 }
 
 #[test]
