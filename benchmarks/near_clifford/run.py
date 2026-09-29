@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import subprocess
@@ -31,10 +32,14 @@ def ms(value: dict) -> float:
 
 
 def report(result: dict) -> str:
+    source = f"`{result['git_sha']}`" if result["git_sha"] else "unverified (`--no-build`)"
+    if result["git_sha"] and result["git_dirty"]:
+        source += " with local changes"
     lines = [
         "# Near-Clifford P0/P1 benchmark",
         "",
-        f"Source: `{result['git_sha']}`; {result['platform']}; Rust `{result['rustc']}`.",
+        f"Source: {source}; binary SHA-256 `{result['binary_sha256']}`;",
+        f"{result['platform']}; Rust `{result['rustc']}`.",
         f"Run: {result['created_utc']}; quick={result['quick']}. All values are median milliseconds.",
         "Each fixture ran in a separate process. Compile and prepare are timed separately.",
         "Cold includes prepare; first excludes prepare but has no cache warmup; warm uses",
@@ -96,8 +101,9 @@ def main() -> None:
     names = P0 if args.group == "p0" else P1 if args.group == "p1" else P0 + P1
     result = {
         "schema": 1,
-        "git_sha": command_output("git", "rev-parse", "HEAD"),
+        "git_sha": None if args.no_build else command_output("git", "rev-parse", "HEAD"),
         "git_dirty": bool(command_output("git", "status", "--porcelain")),
+        "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
         "rustc": command_output("rustc", "--version"),
         "platform": platform.platform(),
         "python": sys.version.split()[0],
