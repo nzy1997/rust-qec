@@ -10,7 +10,7 @@ Add the simulator library from crates.io:
 ```toml
 [dependencies]
 rand = "0.8"
-rstim = "0.3.0"
+rstim = { version = "0.3.0", default-features = false }
 ```
 
 `rstim`'s sampling APIs accept RNGs from `rand` 0.8, so downstream crates that
@@ -29,23 +29,27 @@ for shot in 0..8 {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-No optional feature is required for the simulator library API. Reusable
-file-independent command operations live in `rstim::operations`.
+No optional feature is required for the simulator library API. Library-only
+consumers can disable the default CLI features with `default-features = false`.
+Reusable file-independent command operations live in `rstim::operations`.
 
 Optional features are intentionally additive:
 
-- `cli` builds the compatibility `rstim` executable and argument parser.
+- `unified-cli` adds structured circuit, dataset, decoding, and capability commands.
+- `cli` builds the simulator commands and `rstim` executable.
+- `ilp` adds exact envelope MLE through HiGHS.
 - `codegen-css` enables CSS circuit generation backed by `qec-code`.
 - `shot-viewer` embeds the browser viewer and exposes its loopback server API.
-- `benchmark-tools` builds benchmark worker binaries and only adds their
-  argument parser dependency; it does not enable the compatibility CLI, CSS
-  generation, or the viewer.
+- `plotting` adds the self-contained `rstim surface-code-ler` experiment and SVG plot.
+- `benchmark-tools` builds benchmark workers and examples.
 - `benchmark-telemetry` enables internal benchmark instrumentation.
 
-For example, install the complete compatibility executable with
-`cargo install rstim --version 0.3.0 --features cli,codegen-css,shot-viewer`.
-A smaller CLI can be installed with only `--features cli`; unavailable optional
-subcommands are omitted or report the feature needed to enable them.
+The development checkout combines all public commands in one executable.
+Install it with `cargo install --locked --path rstim --force`. This combined release
+has not yet been published to crates.io. A smaller simulator-only CLI can be
+built with `--no-default-features --features cli`.
+After installation, run `rstim surface-code-ler --shots 2000 --out-dir .` from
+any working directory to produce the Get started guide's CSV and SVG plot.
 Detector error models must be decomposed into graphlike components before
 passing them to a matching decoder that only accepts one- and two-detector
 errors.

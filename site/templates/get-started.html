@@ -1,121 +1,138 @@
 {% extends "base.html" %}
 {% block title %}Get started — RustQEC{% endblock title %}
-{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Get started</p><h1>Your first detector event</h1><p class="hero-copy">Install the CLI, run a complete circuit, and check a deterministic result.</p></div>{% endblock hero %}
+{% block hero %}<div class="hero compact-hero"><h1>Get started</h1><p class="hero-copy">Start with two qubits, then measure and decode a surface-code memory circuit.</p></div>{% endblock hero %}
 {% block main %}
-{# Native installer source contract markers retained for repository tests; rendered copy is concise and archive URLs use docs_version: rustqec-v0.3.3-; You do not need Rust or a source checkout #}
 <section id="documentation-search" class="task-section" data-docs-search-results data-search-index="{{ root }}/data/docs-search.json" hidden>
 <h2>Search results</h2>
 <p id="search-status" role="status"></p>
 <ul id="search-results" class="search-results"></ul>
 </section>
-<section class="task-section" aria-labelledby="install"><h2 id="install">1. Install with Cargo</h2>
-<p class="doc-note">Requires Rust and Cargo. <a href="https://www.rust-lang.org/tools/install">Install Rust</a> or use the <a href="#native-install">native package</a>.</p>
-<pre data-language="Shell"><code>cargo install --locked rustqec-cli</code></pre>
-<p>Cargo installs the latest stable <code>rustqec-cli</code> package and places <code>rustqec</code> in <code>~/.cargo/bin</code> by default. Open a new terminal after installing Rust so this directory is on PATH. For a reproducible build, use the exact package version shown in <a href="#versions">Version and support boundaries</a>.</p>
-<pre data-language="Shell"><code>rustqec --version</code></pre>
-<pre data-output="true" data-language="Installed version"><code>rustqec {{ docs_version.packages.rustqec_cli.version }}</code></pre>
-<p>The version command completed successfully. Continue to <a href="#first-circuit">create your circuit</a>; use <code>rustqec --help</code> whenever you need to discover the available subcommands.</p>
-<details id="native-install"><summary>Alternative: install native binaries without Rust</summary>
-<p>Validated runtime environments: <strong>Ubuntu 24.04 x86_64</strong> and <strong>macOS 15 Apple silicon</strong>. Other platforms are outside the tested support matrix. Each archive contains <code>rustqec</code> and <code>rstim</code>.</p>
-<div class="content-links"><a href="https://github.com/nzy1997/rust-qec/releases/download/v{{ docs_version.native_release }}/rustqec-v{{ docs_version.native_release }}-x86_64-unknown-linux-gnu.tar.gz">Linux x86_64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/download/v{{ docs_version.native_release }}/rustqec-v{{ docs_version.native_release }}-aarch64-apple-darwin.tar.gz">macOS arm64 archive</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v{{ docs_version.native_release }}">Checksums and release manifest</a></div>
-<p>The installer downloads the prebuilt <code>rustqec</code> and <code>rstim</code> binaries, checks their pinned SHA-256, and installs them into <code>~/.local/bin</code>. This path does not require Rust.</p>
-<pre data-language="Shell"><code>curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh</code></pre>
-<p>If <code>~/.local/bin</code> is not already in your PATH, run this once in the terminal you will use for the examples:</p>
-<pre data-language="Shell"><code>export PATH="$HOME/.local/bin:$PATH"</code></pre>
-<p>The installer prints the installation location and any required PATH setup. It does not use <code>sudo</code> or edit your shell configuration. Use an empty working directory for the circuit files in step 2.</p>
-<div class="content-links"><a href="../install.sh">Inspect the installer</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v{{ docs_version.native_release }}">Download an archive manually</a></div>
-<details><summary>Manual download and checksum verification</summary>
-<p>Use an empty working directory. This alternative downloads and checks the archive manually, then adds the extracted binaries to this terminal's PATH.</p>
-<pre data-language="Shell"><code>set -eu
-case "$(uname -s)-$(uname -m)" in
-  Linux-x86_64) target=x86_64-unknown-linux-gnu ;;
-  Darwin-arm64) target=aarch64-apple-darwin ;;
-  *) echo "No validated native archive for this platform" &gt;&amp;2; exit 1 ;;
-esac
-base=https://github.com/nzy1997/rust-qec/releases/download/v{{ docs_version.native_release }}
-archive="rustqec-v{{ docs_version.native_release }}-${target}.tar.gz"
-curl -fLO "$base/$archive" -O "$base/SHA256SUMS" -O "$base/release-manifest.json"
-awk -v archive="$archive" '$2 == archive { n++; record=$0 } END { if(n != 1) exit 1; print record }' SHA256SUMS &gt; "$archive.sha256"
-if command -v sha256sum &gt;/dev/null; then
-  sha256sum -c "$archive.sha256"
-else
-  shasum -a 256 -c "$archive.sha256"
-fi
-tar -xzf "$archive"
-export PATH="$(pwd)/${archive%.tar.gz}/bin:$PATH"</code></pre>
-<p><strong>Success:</strong> the checksum command reports <code>OK</code>. If a checksum fails, stop and download a fresh archive.</p>
-</details>
-<pre data-language="Shell"><code>rustqec --version</code></pre>
-<p><strong>Success:</strong> the command prints the installed version. The example below uses <code>rstim</code> for SVG rendering and <code>rustqec</code> for circuit inspection.</p>
-</details>
+<section class="task-section" aria-labelledby="install"><h2 id="install">1. Install rstim</h2>
+<p class="start-requirements">Requires Rust and Cargo. <a href="https://www.rust-lang.org/tools/install">Install Rust</a> first.</p>
+<p>Install this development version from a repository checkout once. After installation, the commands below work from any directory:</p>
+<pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
+<p>This install includes all <code>rstim</code> commands used below.</p>
+<p>After installation, restart your terminal and check that it works:</p>
+<pre data-language="Shell"><code>rstim --version</code></pre>
+<pre data-output="true"><code>rstim {{ docs_version.packages.rstim.version }}</code></pre>
 </section>
-<section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Create and inspect a circuit</h2>
+<section class="task-section" aria-labelledby="first-circuit"><h2 id="first-circuit">2. Define the circuit</h2>
 {% include "partials/example-circuit.html" %}
-<p>Render the circuit as an SVG with the companion <code>rstim</code> CLI:</p>
+<p>Render the circuit:</p>
 <pre data-language="Shell"><code>rstim render_svg --in circuit.stim --out circuit.svg</code></pre>
-<p>Native archives include both <code>rustqec</code> and <code>rstim</code>. If you installed only <code>rustqec-cli</code> with Cargo, install the renderer separately with <code>cargo install --locked rstim --bin rstim --features cli,codegen-css</code>.</p>
 <figure class="result-plot">
-<a href="../examples/getting-started.svg" data-figure-viewer><img src="../examples/getting-started.svg" alt="One-qubit circuit with reset, a probability-one X error, Z-basis measurement, detector D0, and logical observable L0"></a>
-<figcaption class="result-plot-caption"><span>The X error always flips the qubit before measurement, so the detector and logical observable both fire in step 3.</span><span><a href="../examples/getting-started.svg">Open SVG</a> · <a href="../examples/getting-started.stim">Download circuit</a></span></figcaption>
+<a href="../examples/getting-started-circuit.svg" data-figure-viewer><img src="../examples/getting-started-circuit.svg" alt="Two-qubit circuit definition with two possible X errors before the CNOT, two measurements, two detectors, and one logical observable"></a>
 </figure>
-<pre data-language="Shell"><code>rustqec circuit stats --in circuit.stim</code></pre>
-<pre data-output="true" data-language="Expected output"><code>instruction_count: 5
+<p>This drawing shows the circuit definition, including both possible error locations; it does not show a sampled result. <code>R</code> resets <code>q0</code> and <code>q1</code>. Each <code>XE</code> marks an X error with probability <code>0.1</code> before the CNOT. <code>M</code> labels the measurements <code>m1</code> and <code>m2</code>; <code>rec[-2]</code> and <code>rec[-1]</code> refer to those results. <code>DETECTOR</code> defines <code>D0</code> from <code>m1</code> and <code>D1</code> from <code>m2</code>; <code>OBSERVABLE_INCLUDE(0)</code> defines the logical observable <code>L0 = m1 ⊕ m2</code>.</p>
+</section>
+<section class="task-section" aria-labelledby="detector-output"><h2 id="detector-output">3. Analyze and sample errors</h2>
+<p>Extract the detector error model (DEM), which lists the effect of each possible error:</p>
+<pre data-language="Shell"><code>rstim circuit dem --in circuit.stim --out model.dem &gt; /dev/null &amp;&amp; cat model.dem</code></pre>
+<pre data-output="true"><code>error(0.1) D0 D1
+error(0.1) D1 L0</code></pre>
+<p>The first row is the effect of an X error on <code>q0</code>; the second is the effect of an X error on <code>q1</code>. The DEM lists only labels that flip, so <code>L0</code> is absent from the first row because it stays 0.</p>
+<p>Sample 10 shots. Each three-bit row is always <code>D0 D1 L0</code>:</p>
+<pre data-language="Shell"><code>rstim circuit detect \
+  --in circuit.stim \
+  --shots 10 \
+  --seed 86 \
+  --out-format 01 \
+  --append-observables \
+  --out events.01 &gt; /dev/null &amp;&amp; cat events.01</code></pre>
+<pre data-output="true"><code>000
+000
+110
+000
+000
+011
+000
+000
+000
+000</code></pre>
+<p><code>110</code> is the <code>q0</code>-only error; <code>011</code> is the <code>q1</code>-only error. A <code>0</code> means that detector or observable did not flip.</p>
+<p>Render a shot with only the <code>q0</code> error, matching <code>110</code> above:</p>
+<pre data-language="Shell"><code>rstim render_svg --sample_shot --seed 86 --in circuit.stim --out shot.svg</code></pre>
+<figure class="result-plot">
+<a href="../examples/getting-started.svg" data-figure-viewer><img src="../examples/getting-started.svg" alt="Sampled two-qubit circuit: only q0 has an X error, both measurements are 1, D0 and D1 fire, and L0 stays 0"></a>
+</figure>
+<p>The red <code>X</code> marks the error on <code>q0</code>; there is no red <code>X</code> on <code>q1</code>. Both measurements are <code>1</code>, so <code>D0</code> and <code>D1</code> fire (blue). Their parity is <code>1 ⊕ 1 = 0</code>, so <code>L0</code> stays 0.</p>
+</section>
+<section class="task-section" aria-labelledby="surface-code"><h2 id="surface-code">4. Generate a surface-code measurement circuit</h2>
+<p>Now use a rotated surface-code memory experiment. Distance <code>3</code> gives nine data qubits and eight measurement qubits. The checks are measured for three rounds; the final data measurements define one logical observable, <code>L0</code>.</p>
+<pre data-language="Shell"><code>rstim circuit gen \
+  --code surface_code --task rotated_memory_z \
+  --distance 3 --rounds 3 \
+  --after-clifford-depolarization 0.02 \
+  --before-round-data-depolarization 0.02 \
+  --after-reset-flip-probability 0.02 \
+  --before-measure-flip-probability 0.02 \
+  --out surface.stim &gt; /dev/null
+rstim circuit stats --in surface.stim</code></pre>
+<pre data-output="true"><code>instruction_count: 289
 repeat_blocks: 0
 max_repeat_depth: 0
-num_qubits: 1
-num_measurements: 1
-num_detectors: 1
+num_qubits: 17
+num_measurements: 33
+num_detectors: 24
 num_observables: 1
-num_ticks: 0
+num_ticks: 22
 num_sweep_bits: 0</code></pre>
-<p>The circuit contains one qubit, one measurement, one detector, and one logical observable.</p>
+<p>The four <code>0.02</code> values set error probabilities at different points in the circuit:</p>
+<ul>
+  <li><code>--after-clifford-depolarization</code>: depolarizing errors after Clifford gates.</li>
+  <li><code>--before-round-data-depolarization</code>: depolarizing errors on data qubits at the start of each round.</li>
+  <li><code>--after-reset-flip-probability</code>: bit flips after resets.</li>
+  <li><code>--before-measure-flip-probability</code>: bit flips before measurements.</li>
+</ul>
 </section>
-<section class="task-section" aria-labelledby="detector-output"><h2 id="detector-output">3. Sample and verify a detector event</h2>
-<pre data-language="Shell"><code>rustqec circuit detect \
-  --in circuit.stim \
-  --shots 1 \
-  --out-format dets \
-  --append-observables \
-  --out events.dets
-rustqec circuit dem --in circuit.stim --out model.dem</code></pre>
-<pre data-output="true" data-language="events.dets"><code>shot D0 L0</code></pre>
-<pre data-output="true" data-language="model.dem"><code>error(1) D0 L0</code></pre>
-<p>The X error has probability 1. The detector stream therefore contains D0 and logical observable L0; the DEM records the same probability-1 event. This small example verifies installation and the command path; it is not a numerical-performance benchmark.</p>
-<p class="doc-note"><strong>Before decoding:</strong> this probability-1 model is intentionally deterministic, while <code>rmatching</code> accepts error probabilities in the range <code>0 ≤ p &lt; 1</code>. The decoding tutorial therefore creates a separate probability-0.1 model and explains the change before it runs the decoder.</p>
-<div class="content-links"><a href="../decoding/#first-decode">Next: decode a compatible detector row</a><a href="../simulator/">Sample more circuits</a><a href="../sampling-data/">Prepare training data</a><a href="../interactive/">Explore this circuit visually</a></div>
+<section class="task-section" aria-labelledby="surface-sample"><h2 id="surface-sample">5. Sample the measurement circuit</h2>
+<p>Sample one run of the circuit. Save the detector events and actual logical flip separately; the next step uses only the detector events to predict the flip:</p>
+<pre data-language="Shell"><code>rstim circuit detect \
+  --in surface.stim --shots 1 --seed 0 \
+  --out-format 01 --out surface-detectors.01 \
+  --obs-out surface-actual.01 --obs-out-format 01 &gt; /dev/null
+paste surface-detectors.01 surface-actual.01</code></pre>
+<pre data-output="true"><code>010010100000010000000000	1</code></pre>
+<p>The 24 bits on the left are detector events (<code>1</code> means a detector fired); the <code>1</code> on the right is the actual <code>L0</code> flip.</p>
 </section>
-<section class="task-section" aria-labelledby="tools"><h2 id="tools">Which command should I use?</h2>
-<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Role</th><th>Setup</th></tr></thead><tbody><tr><td><code>rustqec</code></td><td>Unified capability discovery, structured circuit and dataset commands</td><td>Native archive or <code>cargo install --locked rustqec-cli</code></td></tr><tr><td><code>rstim</code></td><td>Simulator, DEM and circuit rendering commands</td><td>Native archive or feature-selected Cargo install</td></tr><tr><td><code>qec-code</code></td><td>Code construction and distance checks</td><td><code>cargo install --locked qec-code --features cli</code></td></tr><tr><td><code>rsinter</code></td><td>Sampling, decoder replay, and experiment collection</td><td><code>cargo install --locked rsinter --features rbposd-runner,rmatching-runner</code></td></tr><tr><td><code>make</code> workflows</td><td>Repository tests, benchmarks, and checked evidence</td><td>Source checkout and workflow-specific dependencies</td></tr></tbody></table></div>
+<section class="task-section" aria-labelledby="decode"><h2 id="decode">6. Decode the detector results</h2>
+<p>A decoder predicts whether <code>L0</code> flipped from the detector events, without seeing the actual <code>L0</code> bit. Here <code>--decoder rmatching</code> selects the included matching decoder. First derive a detector error model (DEM) from <code>surface.stim</code>; it describes which detector and logical bits each possible fault can flip:</p>
+<pre data-language="Shell"><code>rstim circuit dem --in surface.stim --decompose-errors --out surface.dem &gt; /dev/null
+rstim circuit decode \
+  --decoder rmatching \
+  --dem surface.dem --in surface-detectors.01 \
+  --out surface-predictions.01 &gt; /dev/null
+cat surface-predictions.01</code></pre>
+<pre data-output="true"><code>1</code></pre>
+<p>The prediction is <code>1</code>, matching the actual <code>L0</code> flip shown above. A logical failure occurs when they differ.</p>
+<p><code>rmatching</code> accepts DEM error components involving at most two detectors. <code>--decompose-errors</code> splits larger components where possible; a remaining component involving three or more detectors (a hyperedge) is rejected.</p>
 </section>
-<section class="task-section" aria-labelledby="cargo-install"><h2 id="cargo-install">Add optional CLI features</h2>
-<pre data-language="Shell"><code>cargo install --locked rustqec-cli --features ilp</code></pre>
-<p>The default install already includes circuit and dataset tools plus envelope matching. Use this optional reinstall for exact envelope MLE, after installing the <a href="#source-build">native solver build prerequisites</a>. Official native archives include ILP and the viewer. For automated capability checks, <code>rustqec capabilities --format json</code> provides machine-readable metadata.</p>
-<p>For the complete Stim-style compatibility command, install <code>rstim</code> separately with <code>cargo install --locked rstim --bin rstim --features cli,codegen-css,shot-viewer</code>. Internal benchmark workers are not installed by default. <code>rilpqec</code> always includes HiGHS; enabling its Gurobi feature adds a separately configured backend. See the <a href="https://github.com/nzy1997/rust-qec/blob/master/docs/crates-io.md">crate publishing and feature guide</a>.</p></section>
-<section class="task-section" aria-labelledby="source-build"><h2 id="source-build">Build the development version from source</h2>
-<p>Guides that require a repository checkout use the source below. To reproduce the coordinated RustQEC {{ docs_version.release_line }} release, use the <a href="#stable-source">v{{ docs_version.native_release }} source instructions</a> instead. Current development builds are tested with Rust 1.88.0 (MSRV) and stable on the two native targets above. Install Rust and the platform's native build dependencies before building.</p>
-<details><summary>Ubuntu 24.04 build prerequisites</summary><pre data-language="Shell"><code>sudo apt-get update
-sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv</code></pre></details>
-<details><summary>macOS 15 build prerequisites</summary><pre data-language="Shell"><code>xcode-select --install
-brew install cmake fontconfig pkg-config python</code></pre><p>Homebrew must already be installed.</p></details>
-<pre data-language="Shell"><code>git clone --branch master --depth 1 https://github.com/nzy1997/rust-qec.git
-cd rust-qec
-cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,rustqec-cli/ilp
-export PATH="$(pwd)/target/debug:$PATH"</code></pre>
-<details id="stable-source"><summary>Frozen source: v{{ docs_version.native_release }}</summary>
-<p>Use this separate checkout for release reproduction. Development-only guides require <code>master</code> above.</p>
-<pre data-language="Shell"><code>git clone --branch v{{ docs_version.native_release }} --depth 1 https://github.com/nzy1997/rust-qec.git rust-qec-v{{ docs_version.native_release }}
-cd rust-qec-v{{ docs_version.native_release }}
-cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,rustqec-cli/ilp
-export PATH="$(pwd)/target/debug:$PATH"</code></pre></details>
-<p>You can now run the same circuit example. Benchmark workflows may additionally need Python dependencies; use the setup guide linked from each workflow. The <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">development build guide</a> describes test prerequisites.</p>
-</section>
-<section class="task-section" aria-labelledby="versions"><h2 id="versions">Version and support boundaries</h2><p>This is <strong>RustQEC {{ docs_version.release_line }} · {{ docs_version.channel | title }}</strong> documentation. RustQEC {{ docs_version.release_line }} names the coordinated repository release line; each published crate can receive its own compatible patch update. A package requirement is shown only when a guide depends on that package.</p>
-<div class="table-wrap"><table><thead><tr><th>Package</th><th>Version in this source</th><th>Use</th></tr></thead><tbody>
-<tr><td><code>rustqec-cli</code></td><td>{{ docs_version.packages.rustqec_cli.version }}</td><td>Unified <code>rustqec</code> command</td></tr>
-<tr><td><code>rstim</code></td><td>{{ docs_version.packages.rstim.version }}</td><td>Simulator, DEM, and diagram CLI/API</td></tr>
-<tr><td><code>rmatching</code></td><td>{{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM library</td></tr>
-<tr><td><code>qec-code</code></td><td>{{ docs_version.packages.qec_code.version }}</td><td>CSS construction and distance CLI/API</td></tr>
+<section class="task-section" aria-labelledby="logical-error-rate"><h2 id="logical-error-rate">7. Plot the logical error rate</h2>
+<p>Repeat the same generate → sample → decode → compare workflow at several physical error probabilities <code>p</code>. A prediction that differs from the actual <code>L0</code> is one logical failure.</p>
+<p>Use the installed <code>rstim</code> command to generate, sample, decode, compare predictions with the actual <code>L0</code>, and write the CSV and SVG plot:</p>
+<pre data-language="Shell"><code>rstim surface-code-ler \
+  --distances 3,5,7 --rounds 9,15,21 \
+  --physical-error-rates 0.008,0.009,0.01,0.011,0.012 \
+  --shots 10000 --seed 86 --out-dir .</code></pre>
+<p>The distance and round values pair by position: each circuit runs for three times its distance in rounds. For each <code>p</code>, the command sets all four noise probabilities shown above to <code>p</code>. It samples 10,000 shots per point.</p>
+<p>The plot shows an equivalent <strong>logical error rate per round</strong>. This converts each full-run failure rate to a one-round estimate so circuits of different lengths can be compared.</p>
+<div class="table-wrap result-table"><table><thead><tr><th>Physical error probability <code>p</code></th><th>Distance 3</th><th>Distance 5</th><th>Distance 7</th></tr></thead><tbody>
+<tr><td>0.008</td><td>1.24%</td><td>1.14%</td><td>0.90%</td></tr>
+<tr><td>0.009</td><td>1.60%</td><td>1.48%</td><td>1.29%</td></tr>
+<tr><td>0.010</td><td>1.99%</td><td>1.88%</td><td>1.87%</td></tr>
+<tr><td>0.011</td><td>2.38%</td><td>2.47%</td><td>2.39%</td></tr>
+<tr><td>0.012</td><td>2.77%</td><td>2.94%</td><td>3.07%</td></tr>
 </tbody></table></div>
-<p>The primary Cargo commands install the latest stable package. To reproduce this checkout exactly, use <code>cargo install --locked rustqec-cli --version {{ docs_version.packages.rustqec_cli.version }}</code>. For the newest compatible patch in the {{ docs_version.release_line }} line, use <code>--version '~{{ docs_version.release_line }}'</code>. Native archives remain tied to the coordinated <a href="https://github.com/nzy1997/rust-qec/releases/tag/v{{ docs_version.native_release }}">v{{ docs_version.native_release }} repository release</a>.</p><p>Feature maturity belongs to the package that exposes the feature. Envelope matching and Envelope MLE have separate, version-bound support evidence and limited scopes; a decoder remains Beta until its release evidence passes publication verification. This does not change the RustQEC {{ docs_version.release_line }} documentation line. Read the <a href="../support/">support and migration contract</a> and <a href="../validation/">evidence guide</a> before applying results to another circuit.</p></section>
+<figure class="result-plot">
+<a href="../examples/surface-code-ler.svg?v=4" data-figure-viewer><img src="../examples/surface-code-ler.svg?v=4" alt="Logical error rate per round versus physical error probability for rotated surface-code memory Z at distances 3, 5, and 7; the curves cross near p equals 0.011"></a>
+</figure>
+</section>
+<section class="task-section" aria-labelledby="continue-rustqec"><h2 id="continue-rustqec">Continue with RustQEC</h2>
+<nav aria-label="More RustQEC guides"><p>To continue this workflow, use <a href="../simulator/">Circuit simulation</a> to generate and sample other circuits, then <a href="../detector-models/">Detector error models</a> to see how faults produce detector events. <a href="../decoding/">Decoding</a> goes further into predicting logical flips and comparing decoders. For a closer look at the circuit itself, <a href="../qp101/">Circuit diagrams</a> explains its visual notation and rendering tools.</p></nav>
+</section>
+<section class="task-section" aria-labelledby="further-learning"><h2 id="further-learning">Further learning</h2>
+<p><code>rstim</code> is inspired by <a href="https://github.com/quantumlib/Stim">Stim</a>, especially its way of representing circuits and detector error models. It reads Stim-style circuits and implements simulation, sampling, and DEM extraction in Rust so these steps connect with the other tools in this repository.</p>
+<p>For more on the matching decoder, see <a href="https://github.com/oscarhiggott/PyMatching">PyMatching</a>. For the code behind the experiment, the Error Correction Zoo introduces the <a href="https://errorcorrectionzoo.org/c/rotated_surface">rotated surface code</a>, and <a href="https://arxiv.org/abs/1208.0928">Surface codes: Towards practical large-scale quantum computation</a> provides a broader review.</p>
+</section>
 {% endblock main %}
 {% block scripts %}<script src="{{ root }}/js/search.js" defer></script>{% endblock scripts %}

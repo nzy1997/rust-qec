@@ -19,13 +19,13 @@
   </div>
   {% include "partials/installed-example.html" %}
   <pre class="quick-command"><code>rstim detect --in circuit.stim --shots 1 --out_format dets</code></pre>
-  <p><strong>Expected output:</strong> <code>shot D0 L0</code>.</p>
-  <details><summary>From a source checkout</summary><p>After <a href="../get-started/#source-build">building the workspace</a>, use the same input from the repository root:</p><pre data-language="Shell · repository root"><code>cargo run --locked -p rstim --features cli --bin rstim -- detect --in circuit.stim --shots 1 --out_format dets</code></pre></details>
+  <p><strong>Output:</strong> <code>shot D0 L0</code>.</p>
+  <details><summary>From a source checkout</summary><p>After <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">building the workspace</a>, use the same input from the repository root:</p><pre data-language="Shell · repository root"><code>cargo run --locked -p rstim --features cli --bin rstim -- detect --in circuit.stim --shots 1 --out_format dets</code></pre></details>
   <h3 id="save-samples">Save measurements or detector events</h3>
   <p><code>sample</code> stores raw measurement bits; <code>detect</code> stores changes relative to the circuit's detector reference. Use a readable format first, then switch to <a href="../sampling-data/#b8-title">b8</a> for larger batches.</p>
   <pre data-language="Shell"><code>rstim sample --in circuit.stim --shots 1 --out_format 01 --out measurements.01
 cat measurements.01</code></pre>
-  <pre data-output="true" data-language="Expected output"><code>1</code></pre>
+  <pre data-output="true" data-language="Example output"><code>10</code></pre>
   <p><strong>Troubleshooting:</strong> if <code>rstim</code> is not found, install it with the command above and check your Cargo bin directory is on PATH. If the output differs, check that the input still contains <code>X_ERROR(1)</code>.</p>
   <div class="content-links"><a href="../sampling-data/">How to save shots for decoding and neural-network training</a></div>
 </section>

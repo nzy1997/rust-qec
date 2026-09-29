@@ -1246,10 +1246,14 @@ name = "rstim"
 version = "0.3.0"
 dependencies = [
  "clap",
+ "csv",
  "libc",
+ "plotters",
  "proptest",
  "qec-code",
+ "qec-ilp-core",
  "rand 0.8.7",
+ "rmatching",
  "serde",
  "serde_json",
  "sha2",
@@ -1294,22 +1298,6 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys",
-]
-
-[[package]]
-name = "rustqec-cli"
-version = "0.3.3"
-dependencies = [
- "clap",
- "qec-ilp-core",
- "renvelope",
- "rmatching",
- "rstim",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "zstd",
 ]
 
 [[package]]

@@ -146,7 +146,7 @@ def synchronize_version_navigation(primary: Path, snapshot: Path, version: dict)
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
-      <a href="{root}/get-started/#versions">About these docs</a>
+      <a href="{root}/reference/#reference-boundary">About these docs</a>
     </div></div>\n''')
         if version.get("channel") == "stable" and 'id="docs-edition-notice"' not in html:
             release_line = escape(version["release_line"])

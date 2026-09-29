@@ -126,9 +126,9 @@
         if (terminal?.classList.contains('terminal-block')) {
           const result = document.createElement('div');
           result.className = 'terminal-output';
-          label.className = 'terminal-output-label';
           pre.before(result);
-          result.append(label, pre);
+          result.append(pre);
+          terminal.classList.add('has-output');
           terminal.append(result);
           return;
         }

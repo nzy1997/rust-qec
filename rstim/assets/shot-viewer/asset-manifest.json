@@ -1,13 +1,13 @@
 {
   "files": {
     "app.js": {
-      "sha256": "8c4ed7f64ec491cd99d836c6d9e4704230ba6d04e6e0e93f68017df6cc67df35"
+      "sha256": "4b23333631f6b2f12a125ea816177a3f2d1253c13bb4f9150f78cfd74a90faff"
     },
     "index.html": {
       "sha256": "f8f545e8766c893d47bb1ed67fd66c55a1f604cd8186aaeb61ffdfc23ebda91f"
     },
     "pkg/rstim_shot_web_bg.wasm": {
-      "sha256": "eff84ef7d48fabc8bc7ba0c80ae82eda2860ff9b0b5d6a17bdc693559c60b0a7"
+      "sha256": "895b94216c78c5ad06393e5222a4499df812f790bc4461277fc78275001447f0"
     },
     "shot-viewer.css": {
       "sha256": "e23b6d1843ab590875e08a7959c75b8db4412ad3affe6de8acd895d841d68c9a"

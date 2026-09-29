@@ -13,12 +13,15 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]
-default = []
+default = ["unified-cli", "codegen-css", "shot-viewer", "plotting"]
 benchmark-telemetry = []
-benchmark-tools = ["dep:clap"]
+benchmark-tools = ["unified-cli"]
 cli = ["dep:clap"]
+unified-cli = ["cli", "dep:rmatching", "dep:tempfile"]
+ilp = ["unified-cli", "dep:qec-ilp-core", "qec-ilp-core/highs"]
 codegen-css = ["dep:qec-code"]
 shot-viewer = []
+plotting = ["dep:csv", "dep:plotters", "dep:tempfile"]
 
 [dependencies]
 rand = "0.8"
@@ -28,8 +31,13 @@ serde_json = "1"
 sha2 = "0.10"
 libc = "0.2"
 qec-code = { version = "0.3.0", path = "../qec-code", optional = true }
+rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
+qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
+tempfile = { version = "3", optional = true }
 zstd = "0.13"
 toml = "0.8"
+csv = { version = "1", optional = true }
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "full_palette", "ttf"], optional = true }
 
 [dev-dependencies]
 proptest = "1"
@@ -48,6 +56,18 @@ required-features = ["benchmark-tools"]
 [[bin]]
 name = "rstim_reference_build_worker"
 path = "src/bin/rstim_reference_build_worker.rs"
+required-features = ["benchmark-tools"]
+
+[[example]]
+name = "export_matching_benchmark"
+required-features = ["benchmark-tools"]
+
+[[example]]
+name = "export_decoder_oracle"
+required-features = ["benchmark-tools"]
+
+[[example]]
+name = "offline_matching_benchmark"
 required-features = ["benchmark-tools"]
 
 [[test]]
@@ -113,6 +133,10 @@ required-features = ["cli"]
 [[test]]
 name = "cli_sample_dem"
 required-features = ["cli"]
+
+[[test]]
+name = "cli_surface_code_ler"
+required-features = ["cli", "unified-cli", "codegen-css", "plotting"]
 
 [[test]]
 name = "cli_shot_viewer"

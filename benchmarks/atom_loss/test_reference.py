@@ -37,7 +37,7 @@ class ReferenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             work=Path(tmp)
             text=(ROOT/'benchmarks/atom_loss/fixtures/midswap_d3_r2.stim').read_text()
-            low_probability.export_rows(ROOT/'target/release/rustqec',text,10017,119,work)
+            low_probability.export_rows(ROOT/'target/release/rstim',text,10017,119,work)
             manifest=json.loads((work/'private/manifest.json').read_text())
             self.assertEqual((work/'private/masks.b8').read_bytes(),generated_masks(119,10017,manifest['generation']['batch_shots']))
 
@@ -157,7 +157,7 @@ class ReferenceTests(unittest.TestCase):
 
     def test_actual_ignore_conditioning_mutation_fails_oracle(self):
         with patch('benchmarks.atom_loss.decoder_reference.build_matching', side_effect=lambda graph, losses: build_matching(graph,[])):
-            result=decoder_reference.run(ROOT/'target/release/rustqec',ROOT/'target/release/examples/export_matching_benchmark')
+            result=decoder_reference.run(ROOT/'target/release/rstim',ROOT/'target/release/examples/export_matching_benchmark')
         self.assertEqual(result['status'],'FAIL')
         five=result['cases'][1]
         self.assertEqual(five['rejected_rows']['native'],[])
@@ -311,7 +311,7 @@ class ReferenceTests(unittest.TestCase):
             affected.append(count)
             return original(binary,changed,shots,seed,work)
         with patch('benchmarks.atom_loss.correctness.rust_rows',side_effect=defective):
-            report = correctness.run(ROOT/'target/release/rustqec')
+            report = correctness.run(ROOT/'target/release/rstim')
         self.assertGreater(sum(affected),0)
         self.assertEqual(report['status'],'FAIL')
         self.assertEqual(report['low_probability_controls']['analytic']['status'],'FAIL')
@@ -325,7 +325,7 @@ class ReferenceTests(unittest.TestCase):
         def defective(binary,text,shots,seed,work):
             changed,_ = low_probability.remove_low_noise(text,'pauli')
             return low_probability.export_rows(binary,changed,shots,seed,work)
-        report = low_probability.real_circuit(ROOT/'target/release/rustqec',65536,exporter=defective)
+        report = low_probability.real_circuit(ROOT/'target/release/rstim',65536,exporter=defective)
         self.assertEqual(report['status'],'FAIL')
         self.assertTrue(any('/no_visible_loss/' in e for e in report['comparison']['failed_events']))
 
@@ -382,7 +382,7 @@ class ReferenceTests(unittest.TestCase):
             manifest['answers_file']['sha256']=hashlib.sha256(path.read_bytes()).hexdigest();meta.write_text(json.dumps(manifest))
             return rows,masks
         with self.assertRaisesRegex(ValueError,'scoring answer'):
-            low_probability.real_circuit(ROOT/'target/release/rustqec',65536,exporter=broken)
+            low_probability.real_circuit(ROOT/'target/release/rstim',65536,exporter=broken)
 
     def test_resealed_incomplete_or_contradictory_reports_are_rejected(self):
         source=ROOT/'site/static/data/atom-loss'
@@ -471,14 +471,14 @@ class ReferenceTests(unittest.TestCase):
                 expected = np.tile(syndromes[first]+syndromes[second], (16,1))
                 with self.subTest(pauli=first+second):
                     np.testing.assert_array_equal(reference.sample(text,16), expected)
-                    np.testing.assert_array_equal(correctness.rust_rows(ROOT/'target/release/rustqec', text,16,7,Path(tmp)), expected)
+                    np.testing.assert_array_equal(correctness.rust_rows(ROOT/'target/release/rstim', text,16,7,Path(tmp)), expected)
 
     def test_ix_only_channel_fails_overall_sampling_report(self):
         original = correctness.rust_rows
         def defective(binary,text,shots,seed,work):
             return original(binary, channel_probes.replace_channel(text,'DEPOLARIZE2_ix_only'), shots,seed,work)
         with patch('benchmarks.atom_loss.correctness.rust_rows', side_effect=defective):
-            report = correctness.run(ROOT/'target/release/rustqec')
+            report = correctness.run(ROOT/'target/release/rstim')
         self.assertEqual(report['status'], 'FAIL')
         probes = report['analytic_noise_controls']['distribution_probes']
         self.assertEqual(probes['status'], 'FAIL')
@@ -497,7 +497,7 @@ class ReferenceTests(unittest.TestCase):
             text='\n'.join(line for line in text.splitlines() if not line.startswith('DEPOLARIZE2('))
             return original(binary,text,shots,seed,work)
         with patch('benchmarks.atom_loss.correctness.rust_rows',side_effect=defective):
-            report=correctness.run(ROOT/'target/release/rustqec')
+            report=correctness.run(ROOT/'target/release/rstim')
         self.assertEqual(report['status'],'FAIL')
         analytic=report['analytic_noise_controls']
         case=next(r for r in analytic['cases'] if r['case']=='DEPOLARIZE2_alive')

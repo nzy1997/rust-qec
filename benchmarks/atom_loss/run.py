@@ -49,7 +49,7 @@ def checked(args):
 
 def generate(binary, path, distance, rounds, loss, pauli=.001):
     checked([binary, 'circuit', 'gen', '--code', 'surface_code', '--task', 'rotated_memory_z_midswap',
-             '--distance', distance, '--rounds', rounds, '--noise', pauli,
+             '--distance', distance, '--rounds', rounds, '--after-clifford-depolarization', pauli,
              '--operation-loss-probability', loss, '--measurement-loss-probability', loss, '--out', path])
 
 

@@ -288,7 +288,7 @@ def main() -> int:
     parser.add_argument("--no-expect-ilp", action="store_true",
                         help="assert the default/no-ILP artifact contract instead")
     parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("--binary", type=Path, default=Path("target/release/rustqec"),
+    parser.add_argument("--binary", type=Path, default=Path("target/release/rstim"),
                         help="real binary used by --self-test shims")
     args = parser.parse_args()
 

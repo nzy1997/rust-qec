@@ -19,7 +19,7 @@
   },
   "domain": {
     "circuit_family": "midswap",
-    "generator": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap (and the pinned fixtures derived from it)",
+    "generator": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap (and the pinned fixtures derived from it)",
     "readout_basis": "Z basis only: ML/MZL (terminal) and MRL/MRZL (resetting) loss-visible readouts; X/Y-basis loss readouts are rejected as unsupported_circuit",
     "observables": "1..=64",
     "sweep_bits": 0,
@@ -153,10 +153,10 @@
       "suite": "benchmarks/atom_loss/readiness_correctness.py",
       "case_name": "midswap-d3-r2-p002-generated",
       "evidence_level": "independent-end-to-end",
-      "input": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (randomized differential seed 721000)",
+      "input": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (randomized differential seed 721000)",
       "oracle": "independent Stim oracle: private loss histories, Stim-derived DEM and Pauli fault propagation, exact min-plus enumeration of allowed optima; never cached native predictions",
       "evidence_identity": {
-        "source": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "4b2c2c55fe0006c28f7d2f68fb83c25252a26c64d4bdddce797510cd7f413671",
         "seed": 721000
       },
@@ -172,10 +172,10 @@
       "suite": "benchmarks/atom_loss/readiness_correctness.py",
       "case_name": "midswap-d3-r1-generated",
       "evidence_level": "independent-end-to-end",
-      "input": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (seed 714002)",
+      "input": "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (seed 714002)",
       "oracle": "independent Stim oracle (as above)",
       "evidence_identity": {
-        "source": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "c5174231fa98f8e114213365f8a396d63c99d4c3991f74ce33226c4733902424",
         "seed": 714002
       },
@@ -191,11 +191,11 @@
       "suite": "benchmarks/atom_loss/readiness_correctness.py",
       "case_name": "midswap-d3-r3-generated",
       "evidence_level": "compiler-output-only",
-      "input": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 (seed 714003)",
+      "input": "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 (seed 714003)",
       "oracle": "independent compiler-output validation only; supporting evidence that never satisfies an end-to-end requirement",
       "counts_toward_domain": false,
       "evidence_identity": {
-        "source": "rustqec circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 3 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 3 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "c0ae5986a12921e830316fafc275fd1145aeeac22ed7c58365b6fa91c4213aec",
         "seed": 714003
       },
@@ -210,7 +210,7 @@
       "kind": "support-control",
       "matrix_control": "mini-circuit-known-answer",
       "input": "inline circuit in docs/envelope-support.json",
-      "oracle": "hand-computed known answers pinned by rustqec-cli/tests/decode.rs (EXPECTED_PREDICTIONS)"
+      "oracle": "hand-computed known answers pinned by rstim/tests/unified_decode.rs (EXPECTED_PREDICTIONS)"
     },
     {
       "id": "control:lost-value-placeholder-invariance",
@@ -223,14 +223,14 @@
       "id": "control:midswap-canonical-mle-known-answer",
       "kind": "support-control",
       "matrix_control": "midswap-canonical-mle-known-answer",
-      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle (pinned)",
+      "input": "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle (pinned)",
       "oracle": "independently derived expected observables (renvelope exact solver, issue #679 provenance.json, reference_cases.json.zst sha256 80d39123d29836059acf45575031b07d29ed919a46f63426bbc96ce7af9cd1a4)"
     },
     {
       "id": "control:midswap-fixture-mle-acceptance",
       "kind": "support-control",
       "matrix_control": "midswap-fixture-mle-acceptance",
-      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap (pinned d=5/r=15)",
+      "input": "rstim/tests/fixtures/current_rstim_atom_loss/midswap (pinned d=5/r=15)",
       "oracle": "pinned prediction hash and statistics; regression control only, not a domain promise",
       "counts_toward_domain": false
     },
@@ -238,7 +238,7 @@
       "id": "control:conventional-mle-candidate-explosion-rejection",
       "kind": "support-control",
       "matrix_control": "conventional-mle-candidate-explosion-rejection",
-      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional (pinned)",
+      "input": "rstim/tests/fixtures/current_rstim_atom_loss/conventional (pinned)",
       "oracle": "structured rejection contract: unsupported_circuit, exit 2, no prediction or statistics files"
     },
     {
@@ -338,7 +338,7 @@
       "kind": "failure-semantics",
       "workload_id": "fail-mle-candidate-limit",
       "expected": "unsupported_circuit, exit 2, no prediction or statistics files",
-      "input": "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional (pinned), --shot-timeout-ms 2000"
+      "input": "rstim/tests/fixtures/current_rstim_atom_loss/conventional (pinned), --shot-timeout-ms 2000"
     },
     {
       "id": "failure:fail-mle-solve-timeout",

@@ -131,7 +131,7 @@ def run(binary, exporter):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser()
-    p.add_argument('--binary',type=Path,default=Path('target/release/rustqec'))
+    p.add_argument('--binary',type=Path,default=Path('target/release/rstim'))
     p.add_argument('--exporter',type=Path,default=Path('target/release/examples/export_matching_benchmark'))
     p.add_argument('--out',type=Path,default=Path('site/static/data/atom-loss/decoder-correctness.json'))
     p.add_argument('--compare',type=Path,help='Validate published observations against the same hand-derived oracle')

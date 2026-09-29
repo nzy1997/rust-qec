@@ -12,12 +12,12 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILD_COMMANDS = [
-    ['cargo', 'build', '--release', '--locked', '-p', 'rustqec-cli', '--features',
-     'benchmark-tools,ilp', '--bin', 'rustqec', '--example', 'export_matching_benchmark',
+    ['cargo', 'build', '--release', '--locked', '-p', 'rstim', '--features',
+     'benchmark-tools,ilp', '--bin', 'rstim', '--example', 'export_matching_benchmark',
      '--example', 'export_decoder_oracle', '--example', 'offline_matching_benchmark'],
     ['cargo', 'build', '--release', '--locked', '-p', 'rstim', '--example', 'atom_loss_sampling_benchmark'],
 ]
-BINARIES = ['target/release/rustqec'] + ['target/release/examples/'+name for name in
+BINARIES = ['target/release/rstim'] + ['target/release/examples/'+name for name in
     ['export_matching_benchmark', 'export_decoder_oracle', 'offline_matching_benchmark', 'atom_loss_sampling_benchmark']]
 
 

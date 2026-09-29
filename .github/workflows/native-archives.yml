@@ -241,11 +241,11 @@ jobs:
         run: |
           tar -xzf rebuilt-shot-assets/rebuilt-shot-lab-assets.tar.gz -C source
           python3 source/tools/shot_viewer_assets.py
-      - name: Build the two native CLIs from the locked source
+      - name: Build the native CLI from the locked source
         run: |
-          # Enable full CLI capabilities when present; immutable older tags have no such features.
+          # Enable all CLI capabilities declared by the tagged source.
           full_features=()
-          for capability in rustqec-cli/ilp rstim/cli rstim/codegen-css rstim/shot-viewer; do
+          for capability in rstim/ilp rstim/cli rstim/codegen-css rstim/shot-viewer; do
             package="${capability%%/*}"
             feature="${capability#*/}"
             if python3 -c 'import sys,tomllib; d=tomllib.load(open(sys.argv[1], "rb")); raise SystemExit(0 if sys.argv[2] in d.get("features", {}) else 1)' "source/$package/Cargo.toml" "$feature"; then
@@ -254,21 +254,16 @@ jobs:
           done
           "$CARGO" build --locked --release \
             --manifest-path source/Cargo.toml \
-            -p rustqec-cli --bin rustqec \
             -p rstim --bin rstim "${full_features[@]}"
       - name: Record native runtime linkage
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             {
-              echo "rustqec:"
-              ldd source/target/release/rustqec | sed -E 's/ \(0x[0-9a-f]+\)//g'
               echo "rstim:"
               ldd source/target/release/rstim | sed -E 's/ \(0x[0-9a-f]+\)//g'
             } > runtime-linkage.txt
           else
             {
-              echo "rustqec:"
-              otool -L source/target/release/rustqec
               echo "rstim:"
               otool -L source/target/release/rstim
             } > runtime-linkage.txt
@@ -285,7 +280,6 @@ jobs:
             --target "$RELEASE_TARGET" \
             --cargo "$CARGO" \
             --rustc "$RUSTC" \
-            --rustqec source/target/release/rustqec \
             --rstim source/target/release/rstim \
             --runtime-linkage runtime-linkage.txt
       - name: Upload the target staging artifact
@@ -421,7 +415,7 @@ jobs:
       - run: pip install -r source/benchmarks/atom_loss/requirements.txt
       - name: Build the envelope CLI from the candidate revision
         working-directory: source
-        run: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp --bin rustqec --example export_matching_benchmark --example export_decoder_oracle
+        run: cargo build --release --locked -p rstim --features benchmark-tools,ilp --bin rstim --example export_matching_benchmark --example export_decoder_oracle
       - name: Generate the revision-bound evidence bundle
         working-directory: source
         run: |
@@ -429,23 +423,23 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           mkdir -p envelope-evidence
           python3 tools/check_envelope_support.py \
-            --binary target/release/rustqec \
+            --binary target/release/rstim \
             --matrix docs/envelope-support.json \
             --out envelope-evidence/support.json
           python3 -m benchmarks.atom_loss.readiness_correctness \
-            --binary target/release/rustqec \
+            --binary target/release/rstim \
             --matrix docs/envelope-support.json \
             --profile full \
             --out envelope-evidence/correctness.json
           python3 -m benchmarks.atom_loss.readiness_resources \
-            --binary target/release/rustqec \
+            --binary target/release/rstim \
             --matrix docs/envelope-support.json \
             --profile smoke \
             --out envelope-evidence/resources.json
           python3 -m benchmarks.atom_loss.readiness_resources \
             --verify benchmarks/atom_loss/readiness/resources/manifest.json
           python3 -m benchmarks.atom_loss.mle_candidate_resources \
-            --binary target/release/rustqec \
+            --binary target/release/rstim \
             --plan docs/envelope-mle-scope.json \
             --out envelope-evidence/mle-resources.json
           python3 -m benchmarks.atom_loss.mle_candidate_resources \

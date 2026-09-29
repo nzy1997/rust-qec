@@ -92,7 +92,7 @@ class CrateConsumerCheckerTest(unittest.TestCase):
             if command[1] == "metadata":
                 manifest = Path(command[command.index("--manifest-path") + 1]).resolve()
                 output = json.dumps(
-                    {"packages": [{"name": "rustqec-cli", "manifest_path": str(manifest)}]}
+                    {"packages": [{"name": "rstim", "manifest_path": str(manifest)}]}
                 )
                 return checker.subprocess.CompletedProcess(command, 0, output, "")
             install_root = Path(command[command.index("--root") + 1])
@@ -106,11 +106,11 @@ class CrateConsumerCheckerTest(unittest.TestCase):
             checker, "run", side_effect=fake_run
         ):
             root = Path(temporary)
-            cli = root / "rustqec-cli"
+            cli = root / "rstim"
             cli.mkdir()
-            (cli / "Cargo.toml").write_text("[package]\nname='rustqec-cli'\n", encoding="utf-8")
+            (cli / "Cargo.toml").write_text("[package]\nname='rstim'\n", encoding="utf-8")
             with self.assertRaisesRegex(checker.ConsumerCheckError, "installed binary set differs"):
-                checker.exercise_installed_cli(root / "target", {"rustqec-cli": cli}, root / "work")
+                checker.exercise_installed_cli(root / "target", {"rstim": cli}, root / "work")
 
 
 if __name__ == "__main__":

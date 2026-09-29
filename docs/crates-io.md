@@ -1,80 +1,44 @@
 # Crates.io publication and user installation
 
-The **v0.3.0** release published the first eight workspace crates to crates.io.
-`rustqec-cli` 0.3.3 is the current verified Envelope CLI; the other seven
-crates remain at 0.3.0. See the [v0.3.3 release notes](releases/v0.3.3.md).
-The website installer uses the v0.3.3 native archives. Historical v0.2.1
-release assets remain available from GitHub.
-
-## One task, one installation entry
-
-The introductory workflow uses only `rustqec`: capability discovery, circuit
-stats, detector sampling, and DEM generation. Install the published command:
+The v0.3.3 release published the previous `rustqec` CLI and a separate `rstim`
+CLI. The development checkout combines both command sets in the `rstim`
+package. The unified CLI has not yet been published to crates.io, so install
+it from this checkout:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.3.3
+cargo install --locked --path rstim --force
 ```
 
-The default build includes envelope matching but not the native HiGHS solver.
-To add exact envelope MLE, install the native solver build prerequisites in the
-root README and use `--features ilp`. Official native archives deliberately build
-with ILP enabled. The binary's `capabilities --format json` output reflects its
-compiled features. From a development checkout, replace the package and version
-with `--path rustqec-cli`.
-
-For existing Stim-style workflows, install the separate executable:
-
-```sh
-cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer
-```
-
-Installing a library dependency never implicitly installs that library's bins.
-Internal `rstim` worker bins require `benchmark-tools`. Matching benchmark bins
-live in the private `rmatching-bench-tools` workspace package; they are not part
-of the published `rmatching` package. Compatibility CLI bins in `rstim` and
-`qec-code` require `cli`.
-
-From a development checkout, replace the package and version with `--path rstim`.
+The install creates one executable, `rstim`. It includes circuit simulation,
+SVG rendering, structured circuit and dataset operations, decoding, capability
+discovery, and the Shot Lab viewer by default. Add `--features ilp --force`
+for exact envelope MLE after installing native solver build prerequisites.
 
 ## Package boundaries
 
-The checked publication allowlist is `tools/crates_io_packages.json`. The first
-batch uses this dependency order:
+The publication allowlist is `tools/crates_io_packages.json`. Its dependency
+order places `qec-ilp-core`, `qec-code`, and `rmatching` before `rstim`, which
+has optional dependencies on them. Independent decoder and experiment crates
+follow. `rustqec-cli` is no longer a workspace or publication package.
 
-1. `qec-ilp-core` — solver/model infrastructure, 0.3.0.
-2. `qec-code` — code construction, 0.3.0.
-3. `rstim` — simulator and its compatibility CLI, 0.3.0.
-4. `rmatching` — standalone MWPM library, 0.3.0.
-5. `rbposd` — standalone BP+OSD and BP+LSD decoders, 0.3.0.
-6. `rilpqec` — DEM ILP decoder with HiGHS, 0.3.0.
-7. `rsinter` — sampling harness and opt-in decoder/replay CLI, 0.3.0.
-8. `rustqec-cli` — primary `rustqec` application, 0.3.0.
-
-`qec-code`'s ILP dependency and `rstim`'s CSS generation dependency are optional
-for compilation but still form registry publication dependencies. First-batch
-packages have versioned path dependencies: local development uses the path,
-published packages resolve the specified registry version.
-
-`renvelope` remains deferred with `publish = false`: it is a separate research
-API, and none of the published packages requires it as a runtime dependency. The WebAssembly UI
-adapter, benchmark bridge, and matching benchmark tools also remain unpublished. A workspace is not one
-registry package; consumers select the library they need or install the CLI.
+`renvelope` remains a separate research API with `publish = false`. The
+WebAssembly UI adapter, benchmark bridge, and matching benchmark tools are also
+unpublished. Rust library consumers can select the narrow feature set they need
+with `default-features = false`.
 
 For a complete Rust library example, see
-[`examples/rust-consumer`](../examples/rust-consumer/README.md). It is an independent
-Cargo workspace with registry dependency declarations. The package check copies
-it outside this repository and uses unpacked local artifacts before the first
-registry versions exist; that is not proof of a registry upload.
+[`examples/rust-consumer`](../examples/rust-consumer/README.md).
 
 ## Library feature boundaries
 
-The simulator, code/model libraries, and standalone decoders keep their narrow
-defaults. `rsinter` installs its harness CLI but requires explicit decoder
+The code/model libraries and standalone decoders keep narrow defaults. `rstim` enables its CLI by default; library-only consumers can use `default-features = false`. `rsinter` installs its harness CLI but requires explicit decoder
 features; `rilpqec` always builds HiGHS. Choose optional capabilities explicitly:
 
 | Package | Feature | Enables |
 | --- | --- | --- |
-| `rstim` | `cli` | Compatibility command-line parsing and executable |
+| `rstim` | `unified-cli` | Structured circuit, dataset, decoding, and capability commands |
+| `rstim` | `cli` | Simulator commands and executable |
+| `rstim` | `ilp` | Exact envelope MLE with HiGHS |
 | `rstim` | `codegen-css` | CSS circuit generation using `qec-code` |
 | `rstim` | `shot-viewer` | Local viewer server and embedded web resources |
 | `qec-code` | `cli` | Command-line parsing and executable |
@@ -87,11 +51,9 @@ features; `rilpqec` always builds HiGHS. Choose optional capabilities explicitly
 | `rsinter` | `plotting` | Plot generation |
 | `rilpqec` | `gurobi` | Adds Gurobi support; HiGHS remains included |
 
-`rustqec-cli` selects CSS generation explicitly and calls `rstim::operations`;
-it does not require `rstim::cli` or the viewer. Its `ilp` feature selects HiGHS.
-The native archives select `cli,codegen-css,shot-viewer` for `rstim`, retaining
-the existing complete installation experience. Library users can call shared
-operations without command-line argument parsing.
+The default `rstim` installation enables `unified-cli`, `codegen-css`, and
+`shot-viewer`. Library users can call shared operations without command-line
+argument parsing by disabling default features.
 
 Viewer files remain in the `.crate` archive so the optional feature works after
 installation; disabling the feature prevents compiling the viewer module, not
@@ -174,7 +136,7 @@ together, including compilation of their packaged sources:
 ```sh
 cargo publish --dry-run --locked \
   -p qec-ilp-core -p qec-code -p rstim -p rmatching \
-  -p rbposd -p rilpqec -p rsinter -p rustqec-cli
+  -p rbposd -p rilpqec -p rsinter -p rstim
 ```
 
 Selecting the packages together lets Cargo verify their unpublished dependencies

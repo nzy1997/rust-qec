@@ -17,8 +17,8 @@ class StatsContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
-            rustqec = bin_dir / "rustqec"
-            rustqec.write_text(
+            rstim = bin_dir / "rstim"
+            rstim.write_text(
                 "#!/bin/sh\n"
                 "if [ \"$1\" = capabilities ]; then\n"
                 "  printf '%s\\n' '{\"commands\":[{\"name\":\"circuit.stats\",\"argv\":[\"circuit\",\"stats\"],\"formats\":[\"human\",\"json\"]}]}'\n"
@@ -27,9 +27,6 @@ class StatsContractTest(unittest.TestCase):
                 "fi\n",
                 encoding="utf-8",
             )
-            rstim = bin_dir / "rstim"
-            rstim.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
-            rustqec.chmod(0o755)
             rstim.chmod(0o755)
             result = subprocess.run([sys.executable, str(CHECKER), "--bin-dir", str(bin_dir)], cwd=REPO_ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
         self.assertNotEqual(result.returncode, 0)
@@ -56,7 +53,7 @@ class InstalledQuickstartCheckerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
-            for name in ("rustqec", "rstim"):
+            for name in ("rstim",):
                 binary = bin_dir / name
                 binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
                 binary.chmod(0o755)

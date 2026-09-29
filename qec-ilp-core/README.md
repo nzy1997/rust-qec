@@ -2,7 +2,7 @@
 
 Binary ILP model types, validation, and solver adapters shared by RustQEC code
 distance checks and exact decoders. Most users should start with `qec-code` or
-`rustqec-cli`; this package is useful when integrating directly with their ILP
+`rstim`; this package is useful when integrating directly with their ILP
 models.
 
 Add the model-only library with `qec-ilp-core = "0.3.0"`.

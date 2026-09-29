@@ -18,7 +18,7 @@ from .chain_contract import ROWS, compare_reports, verify_chain
 class ChainContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.report = chain_reference.run(run.ROOT/'target/release/rustqec',
+        cls.report = chain_reference.run(run.ROOT/'target/release/rstim',
                                         run.ROOT/'target/release/examples/export_matching_benchmark')
 
     def reject(self, change):
@@ -108,7 +108,7 @@ class ChainContractTests(unittest.TestCase):
         def wrong(graph, conditioned):
             return np.zeros(len(graph['syndromes']), dtype=np.uint8), {}
         with patch.object(run, 'python_decode', wrong):
-            report = chain_reference.run(run.ROOT/'target/release/rustqec',
+            report = chain_reference.run(run.ROOT/'target/release/rstim',
                                          run.ROOT/'target/release/examples/export_matching_benchmark')
         self.assertEqual(report['status'], 'FAIL')
         self.assertGreater(len(report['backends']['pymatching-envelope']['rejected_rows']), 0)

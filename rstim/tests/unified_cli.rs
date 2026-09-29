@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
 fn rustqec_cmd() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_rustqec"))
+    Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
 fn run_with_stdin(args: &[&str], input: &str) -> std::process::Output {
@@ -226,16 +226,17 @@ fn json_intent_wraps_command_line_parse_errors() {
 fn capabilities_output_errors_follow_the_requested_error_channel() {
     for (error_format, expect_json) in [(None, true), (Some("json"), true), (Some("human"), false)]
     {
-        let mut args = vec!["rustqec"];
+        let mut args = vec!["rstim"];
         if let Some(error_format) = error_format {
             args.extend(["--error-format", error_format]);
         }
         args.extend(["capabilities", "--format", "json"]);
 
-        let error = rustqec_cli::run(args, &mut io::empty(), &mut FailingWriter).unwrap_err();
+        let error =
+            rstim::unified_cli::run(args, &mut io::empty(), &mut FailingWriter).unwrap_err();
         let mut stdout = Vec::new();
         let mut stderr = Vec::new();
-        rustqec_cli::write_error(&error, &mut stdout, &mut stderr);
+        rstim::unified_cli::write_error(&error, &mut stdout, &mut stderr);
 
         assert!(stdout.is_empty());
         if expect_json {

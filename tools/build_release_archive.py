@@ -150,7 +150,7 @@ def package(args: argparse.Namespace) -> None:
         raise BuildError("source SHA must be a full lowercase Git commit ID")
     verify_source(repo_root, tag, args.source_sha)
 
-    for binary in (args.rustqec, args.rstim):
+    for binary in (args.rstim,):
         if not binary.is_file() or binary.is_symlink():
             raise BuildError(f"missing regular release binary: {binary}")
     if not args.runtime_linkage.is_file():
@@ -162,14 +162,13 @@ def package(args: argparse.Namespace) -> None:
         f"RustQEC native command-line archive\n\n"
         f"Tag: {tag}\nSource commit: {args.source_sha}\nTarget: {target}\n"
         f"Runtime baseline: {TARGETS[target]}\n\n"
-        "Binaries:\n  bin/rustqec\n  bin/rstim\n\n"
+        "Binary:\n  bin/rstim\n\n"
         "Verify this archive with release-manifest.json, SHA256SUMS, and "
         "verify_release_archive.py before running it.\n\n"
         "Recorded dynamic linkage from the build host:\n"
         + args.runtime_linkage.read_text()
     ).encode()
     files = [
-        ("bin/rustqec", args.rustqec.read_bytes(), 0o755),
         ("bin/rstim", args.rstim.read_bytes(), 0o755),
         ("LICENSE", (repo_root / "LICENSE").read_bytes(), 0o644),
         ("RUNTIME.md", runtime, 0o644),
@@ -263,7 +262,6 @@ def main() -> int:
     package_parser.add_argument("--target", required=True)
     package_parser.add_argument("--cargo", type=Path, required=True)
     package_parser.add_argument("--rustc", type=Path, required=True)
-    package_parser.add_argument("--rustqec", type=Path, required=True)
     package_parser.add_argument("--rstim", type=Path, required=True)
     package_parser.add_argument("--runtime-linkage", type=Path, required=True)
     package_parser.set_defaults(handler=package)

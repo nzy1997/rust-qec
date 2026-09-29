@@ -72,9 +72,8 @@ PAGE_REQUIRED_ANCHORS = {
         "install",
         "first-circuit",
         "detector-output",
-        "tools",
-        "source-build",
-        "versions",
+        "continue-rustqec",
+        "further-learning",
     ),
     "support/index.html": (
         "support-and-compatibility-contract",
@@ -1035,9 +1034,8 @@ def make_fixture_site() -> SiteFixture:
   <section id="install"><a href="../support/">support</a></section>
   <section id="first-circuit"></section>
   <section id="detector-output"></section>
-  <section id="tools"></section>
-  <section id="source-build"></section>
-  <section id="versions"><a href="../validation/">evidence guide</a></section>
+  <section id="continue-rustqec"></section>
+  <section id="further-learning"></section>
 </body>
 </html>
 """,

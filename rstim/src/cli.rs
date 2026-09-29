@@ -5,41 +5,51 @@ use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
 
+use crate::codegen::NoiseParams;
 #[cfg(feature = "codegen-css")]
 use crate::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
 };
-use crate::codegen::NoiseParams;
 use crate::dem::DetectorErrorModel;
 use crate::error_analyzer::ErrorAnalyzer;
 use crate::executor::Executor;
-use crate::m2d::{measurements_to_detections_with_options, M2dOptions};
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 #[cfg(test)]
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
-use crate::output::{write_shots_dets, OutputFormat};
 #[cfg(test)]
 use crate::output::write_shots_b8;
+use crate::output::{OutputFormat, write_shots_dets};
 use crate::parser::parse_lines;
 use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
-    format::SampleArchiveErrorCode, ArchiveLimits, SampleArchiveOptions, SampleArchiveReader,
-    SampleArchiveWriter,
+    ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
+    format::SampleArchiveErrorCode,
 };
 use crate::sim::bit_table::BitTable;
 
+#[cfg(test)]
+pub(crate) use crate::operations::generate_common_circuit_text;
 pub use crate::operations::{
     make_rng, run_analyze_errors_with_flags, run_detect, run_detect_with_obs,
     run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip,
     run_export_decoder_dataset_with_logical_flip_in_batches, run_gen, run_gen_with_params,
     run_sample, sample_cli_options, try_merge_detections_observables, write_format,
 };
-#[cfg(test)]
-pub(crate) use crate::operations::generate_common_circuit_text;
 
 #[derive(Parser)]
-#[command(name = "rstim", version, about = "Rust stabilizer circuit simulator")]
+#[command(
+    name = "rstim",
+    version,
+    about = "Circuit simulation and quantum error correction tools"
+)]
+#[cfg_attr(
+    feature = "unified-cli",
+    command(
+        after_help = "Additional command groups:\n  circuit       Structured circuit operations\n  dataset       Import and export decoder datasets\n  decode        Decode a detector dataset\n  capabilities  Print the machine-readable CLI contract"
+    )
+)]
 pub struct Cli {
     #[arg(long = "benchmark-telemetry-json", global = true)]
     pub benchmark_telemetry_json: Option<String>,
@@ -356,6 +366,25 @@ pub enum Commands {
         #[arg(long = "out")]
         out: Option<String>,
     },
+    /// Sample, decode, and plot a surface-code logical error rate curve
+    #[cfg(feature = "plotting")]
+    SurfaceCodeLer {
+        /// Increasing code distances, comma-separated
+        #[arg(long, value_delimiter = ',', required = true)]
+        distances: Vec<u64>,
+        /// Measurement rounds paired with distances, comma-separated
+        #[arg(long, value_delimiter = ',', required = true)]
+        rounds: Vec<u64>,
+        /// Increasing physical error probabilities, comma-separated
+        #[arg(long, value_delimiter = ',', required = true)]
+        physical_error_rates: Vec<f64>,
+        #[arg(long, default_value_t = 2000)]
+        shots: u64,
+        #[arg(long, default_value_t = 86)]
+        seed: u64,
+        #[arg(long, default_value = ".")]
+        out_dir: PathBuf,
+    },
     /// Run performance evidence workflows
     Perf {
         #[command(subcommand)]
@@ -462,6 +491,22 @@ pub fn run(cli: Cli) -> Result<(), String> {
 
 fn run_command(command: Option<Commands>) -> Result<(), String> {
     match command {
+        #[cfg(feature = "plotting")]
+        Some(Commands::SurfaceCodeLer {
+            distances,
+            rounds,
+            physical_error_rates,
+            shots,
+            seed,
+            out_dir,
+        }) => crate::surface_code_ler::run(&crate::surface_code_ler::SurfaceCodeLerOptions {
+            distances,
+            rounds,
+            physical_error_rates,
+            shots,
+            seed,
+            out_dir,
+        }),
         Some(Commands::Stats { r#in, out, json }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
@@ -589,24 +634,16 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                     "before_measure_flip_probability",
                     before_measure_flip_probability,
                 ),
-                (
-                    "after_reset_flip_probability",
-                    after_reset_flip_probability,
-                ),
+                ("after_reset_flip_probability", after_reset_flip_probability),
                 (
                     "after_clifford_loss_probability",
                     after_clifford_loss_probability,
                 ),
                 ("operation_loss_probability", operation_loss_probability),
-                (
-                    "measurement_loss_probability",
-                    measurement_loss_probability,
-                ),
+                ("measurement_loss_probability", measurement_loss_probability),
             ] {
                 if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                    return Err(format!(
-                        "{name} must be finite and in [0, 1], got {value}"
-                    ));
+                    return Err(format!("{name} must be finite and in [0, 1], got {value}"));
                 }
             }
             let params = NoiseParams {
@@ -632,8 +669,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 }
                 let distance = distance
                     .ok_or_else(|| "distance is required for common generators".to_string())?;
-                let circuit = crate::codegen::rotated_memory_z_midswap(
-                    crate::codegen::MidSwapConfig {
+                let circuit =
+                    crate::codegen::rotated_memory_z_midswap(crate::codegen::MidSwapConfig {
                         distance,
                         rounds,
                         before_round_data_depolarization,
@@ -643,9 +680,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                         after_reset_flip_probability,
                         operation_loss_probability,
                         measurement_loss_probability,
-                    },
-                )
-                .map_err(|error| error.to_string())?;
+                    })
+                    .map_err(|error| error.to_string())?;
                 let mut writer = open_output(out.as_deref())?;
                 return writer
                     .write_all(circuit.as_bytes())
@@ -689,21 +725,21 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
                 );
                 #[cfg(feature = "codegen-css")]
                 {
-                let mut buffer = Vec::new();
-                run_css_gen(
-                    &task,
-                    hx.as_deref(),
-                    hz.as_deref(),
-                    basis.as_deref(),
-                    rounds,
-                    params,
-                    &schedule,
-                    observables.as_deref(),
-                    &mut buffer,
-                )?;
-                let mut w = open_output(out.as_deref())?;
-                w.write_all(&buffer)
-                    .map_err(|error| format!("write error: {error}"))
+                    let mut buffer = Vec::new();
+                    run_css_gen(
+                        &task,
+                        hx.as_deref(),
+                        hz.as_deref(),
+                        basis.as_deref(),
+                        rounds,
+                        params,
+                        &schedule,
+                        observables.as_deref(),
+                        &mut buffer,
+                    )?;
+                    let mut w = open_output(out.as_deref())?;
+                    w.write_all(&buffer)
+                        .map_err(|error| format!("write error: {error}"))
                 }
             } else {
                 let distance = distance
@@ -884,10 +920,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             seed,
             error_trace,
         }) => {
-            let logical_flip = parse_cli_logical_flip(
-                logical_x_qubits.as_deref(),
-                logical_z_qubits.as_deref(),
-            )?;
+            let logical_flip =
+                parse_cli_logical_flip(logical_x_qubits.as_deref(), logical_z_qubits.as_deref())?;
             run_export_decoder_dataset_with_logical_flip_in_batches(
                 &circuit,
                 shots,
@@ -3708,9 +3742,11 @@ mod tests {
 
         assert!(!gate_err.starts_with("InfrastructureFailure"));
         assert!(gate_err.contains("RegressionFailure") || gate_err.contains("exceeds threshold"));
-        assert!(std::fs::read_to_string(gate_out_dir.join("summary.json"))
-            .unwrap()
-            .contains("\"cases\""));
+        assert!(
+            std::fs::read_to_string(gate_out_dir.join("summary.json"))
+                .unwrap()
+                .contains("\"cases\"")
+        );
 
         unsafe {
             std::env::set_var("RSTIM_TEST_PERF_CI_RAW", &missing_raw_path);
@@ -3927,9 +3963,11 @@ mod tests {
             ("surface_code", "unrotated_memory_z", 1),
             ("color_code", "memory_xyz", 2),
         ] {
-            assert!(generate_common_circuit_text(code, task, 3, rounds, 0.0)
-                .unwrap()
-                .contains("QUBIT_COORDS"));
+            assert!(
+                generate_common_circuit_text(code, task, 3, rounds, 0.0)
+                    .unwrap()
+                    .contains("QUBIT_COORDS")
+            );
         }
         assert!(
             generate_common_circuit_text("surface_code", "unknown", 3, 1, 0.0)
