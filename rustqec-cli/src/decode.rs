@@ -951,6 +951,7 @@ mod tests {
                         EdgeKind::SpaceLike => ReferenceEdgeKind::SpaceLike,
                         EdgeKind::Boundary => ReferenceEdgeKind::Boundary,
                     },
+                    independent_mechanism: edge.independent_mechanism,
                 })
                 .collect(),
             loss_edge_map: circuit
@@ -1231,6 +1232,7 @@ mod tests {
                 observables: Vec::new(),
                 weight: 1.0,
                 kind: EdgeKind::Boundary,
+                independent_mechanism: true,
             }],
             loss_edges: Vec::new(),
             mean_weight: 1.0,
@@ -1314,6 +1316,7 @@ mod tests {
                 observables: vec![0],
                 weight: 1.0,
                 kind: EdgeKind::SpaceLike,
+                independent_mechanism: true,
             },
             GraphEdge {
                 node1: 1,
@@ -1321,6 +1324,7 @@ mod tests {
                 observables: vec![0],
                 weight: 2.0,
                 kind: EdgeKind::SpaceLike,
+                independent_mechanism: true,
             },
         ];
         assert!(validate_unambiguous_parallel_edges(&compatible).is_ok());
@@ -1368,6 +1372,7 @@ mod tests {
                 observables: vec![0],
                 weight: 2.0,
                 kind: EdgeKind::TimeLike,
+                independent_mechanism: true,
             }],
             loss_edges: vec![vec![0]],
             mean_weight: 2.0,
