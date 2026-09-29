@@ -16,7 +16,8 @@ P0 = ["terminal_20q", "repeated_20q", "mid_feedback", "qec_rounds"]
 P1 = [
     "records_64", "records_65", "records_128", "records_256",
     "random_64", "random_65", "random_66", "random_72", "random_73",
-    "random_78", "random_79", "random_80",
+    "random_74", "random_75", "random_76", "random_77", "random_78",
+    "random_79", "random_80",
     "rank_8", "rank_9", "rank_10", "rank_11",
 ]
 
