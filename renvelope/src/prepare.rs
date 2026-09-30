@@ -572,6 +572,7 @@ fn dem_artifacts(dem: &DetectorErrorModel) -> Result<DemArtifacts, String> {
                 observable_indices: observables,
                 weight,
                 kind,
+                independent_mechanism: component_count == 1,
             });
         }
     }
@@ -958,6 +959,7 @@ mod tests {
             observable_indices: vec![],
             weight: 1.0,
             kind: EdgeKind::SpaceLike,
+            independent_mechanism: true,
         }];
 
         assert!(
@@ -986,6 +988,7 @@ mod tests {
                 observable_indices: vec![],
                 weight: 1.0,
                 kind: EdgeKind::SpaceLike,
+                independent_mechanism: true,
             })
             .collect::<Vec<_>>();
 
@@ -1160,6 +1163,12 @@ mod tests {
         let artifacts = dem_artifacts(&dem).unwrap();
         assert_eq!(artifacts.independent_effects.len(), 2);
         assert_eq!(artifacts.edges.len(), 4);
+        assert!(
+            artifacts
+                .edges
+                .iter()
+                .all(|edge| !edge.independent_mechanism)
+        );
         assert_eq!(
             artifacts
                 .edges

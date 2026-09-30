@@ -98,32 +98,34 @@ impl StabilizerState {
 
     /// Compile one measurement with affine row-sign dependencies. The returned
     /// tuple is (random-bit mask, fixed sign, draws a fresh random bit).
-    pub(crate) fn measure_z_symbolic(
+    pub(crate) fn measure_z_symbolic<M: crate::sim::symbolic_mask::SymbolicMask>(
         &mut self,
-        signs: &mut [u64],
+        signs: &mut [M],
         random_count: &mut usize,
+        words: usize,
         q: usize,
-    ) -> Option<(u64, bool, bool)> {
+    ) -> Option<(M, bool, bool)> {
         let n = self.n;
         if let Some(pivot) = (n..2 * n).find(|&row| self.x[row][q]) {
-            if *random_count == 64 {
-                return None;
-            }
-            let random_mask = 1u64 << *random_count;
+            let random_mask = M::fresh_bit(*random_count, words)?;
             *random_count += 1;
+            let pivot_sign = signs[pivot].clone();
             for row in 0..2 * n {
                 if row != pivot && self.x[row][q] {
-                    signs[row] ^= signs[pivot];
+                    signs[row].xor_assign(&pivot_sign);
                 }
             }
-            signs[pivot - n] = signs[pivot];
+            signs[pivot - n] = pivot_sign;
             signs[pivot] = random_mask;
             self.measure_z_with_forced_random_outcome(q, 0);
-            Some((random_mask, false, true))
+            Some((signs[pivot].clone(), false, true))
         } else {
-            let mask = (0..n)
-                .filter(|&row| self.x[row][q])
-                .fold(0, |mask, row| mask ^ signs[n + row]);
+            let mut mask = M::zero(words);
+            for row in 0..n {
+                if self.x[row][q] {
+                    mask.xor_assign(&signs[n + row]);
+                }
+            }
             let (outcome, _) = self.measure_z_with_forced_random_outcome(q, 0);
             Some((mask, outcome != 0, false))
         }

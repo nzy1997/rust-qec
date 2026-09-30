@@ -27,6 +27,13 @@ pub struct EnvelopeMatchingEdge {
     pub observable_indices: Vec<usize>,
     pub weight: f64,
     pub kind: EdgeKind,
+    /// True only for an independent, single-component DEM mechanism.
+    #[serde(default, skip_serializing_if = "is_correlated_mechanism")]
+    pub independent_mechanism: bool,
+}
+
+fn is_correlated_mechanism(value: &bool) -> bool {
+    !*value
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -385,9 +392,35 @@ fn build_matching(
         .map(|edge| edge.weight)
         .fold(0.0, f64::max)
         .max(1.0);
+    // Reweight each primitive first. A loss may activate only some members of a
+    // parallel class; their independent odd-parity probability is then combined.
+    let mut merged = Vec::<(&EnvelopeMatchingEdge, f64)>::new();
+    let mut indices = HashMap::<(usize, Option<usize>, u64), usize>::new();
     for (edge_index, edge) in case.edges.iter().enumerate() {
-        let weight =
-            effective_weight(edge, mean_weight, active_edges.contains(&edge_index)) / weight_scale;
+        let weight = effective_weight(edge, mean_weight, active_edges.contains(&edge_index));
+        let key = (
+            edge.node1.min(edge.node2.unwrap_or(edge.node1)),
+            edge.node2.map(|node| edge.node1.max(node)),
+            edge.observable_indices
+                .iter()
+                .fold(0u64, |mask, &index| mask ^ (1u64 << index)),
+        );
+        if edge.independent_mechanism {
+            if let Some(&index) = indices.get(&key) {
+                let previous = &mut merged[index].1;
+                let smaller = (*previous).min(weight);
+                let larger = (*previous).max(weight);
+                // Odd-parity log odds, evaluated without exponentiating a large weight.
+                *previous = smaller + (-(smaller + larger)).exp().ln_1p()
+                    - (smaller - larger).exp().ln_1p();
+                continue;
+            }
+            indices.insert(key, merged.len());
+        }
+        merged.push((edge, weight));
+    }
+    for (edge, base_weight) in merged {
+        let weight = base_weight / weight_scale;
         let probability = 1.0 / (1.0 + weight.exp());
         if let Some(node2) = edge.node2 {
             matching.add_edge(
@@ -425,6 +458,141 @@ fn bits_to_mask(bits: &[u8]) -> u64 {
 mod tests {
     use super::*;
 
+    fn parallel_edge(
+        id: &str,
+        a: usize,
+        b: usize,
+        probability: f64,
+        logical: bool,
+    ) -> EnvelopeMatchingEdge {
+        EnvelopeMatchingEdge {
+            id: id.to_string(),
+            node1: a,
+            node2: Some(b),
+            observable_indices: if logical { vec![0] } else { vec![] },
+            weight: ((1.0 - probability) / probability).ln(),
+            kind: EdgeKind::SpaceLike,
+            independent_mechanism: true,
+        }
+    }
+
+    fn parallel_case(path_weight: f64) -> EnvelopeMatchingCase {
+        EnvelopeMatchingCase {
+            schema_version: MATCHING_INPUT_SCHEMA_VERSION.to_string(),
+            num_detectors: 3,
+            num_observables: 1,
+            edges: vec![
+                parallel_edge("direct-0.1", 0, 1, 0.1, true),
+                parallel_edge("direct-0.2", 1, 0, 0.2, true),
+                parallel_edge(
+                    "via-0",
+                    0,
+                    2,
+                    1.0 / (1.0 + (path_weight / 2.0).exp()),
+                    false,
+                ),
+                parallel_edge(
+                    "via-1",
+                    2,
+                    1,
+                    1.0 / (1.0 + (path_weight / 2.0).exp()),
+                    false,
+                ),
+            ],
+            loss_edge_map: vec![],
+            shots: vec![EnvelopeMatchingShot {
+                observed_detectors: vec![0, 1],
+                observed_losses: vec![],
+            }],
+        }
+    }
+
+    #[test]
+    fn independent_parallel_dem_edges_use_odd_parity_probability() {
+        let mut case = parallel_case(1.2);
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![1]);
+        case.edges[1].kind = EdgeKind::TimeLike;
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![1]);
+        case.edges[1].kind = EdgeKind::SpaceLike;
+        case.edges.remove(0);
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0]);
+        case.edges[0].weight = ((1.0_f64 - 0.26) / 0.26).ln();
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![1]);
+    }
+
+    #[test]
+    fn loss_reweights_each_primitive_before_parallel_aggregation() {
+        let mut case = parallel_case(0.35);
+        case.loss_edge_map = vec![LossEdgeMap {
+            loss_id: "loss-0".to_string(),
+            edge_ids: vec!["direct-0.1".to_string()],
+        }];
+        case.shots.push(EnvelopeMatchingShot {
+            observed_detectors: vec![0, 1],
+            observed_losses: vec!["loss-0".to_string()],
+        });
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0, 1]);
+        case.loss_edge_map[0].edge_ids = vec!["direct-0.2".to_string()];
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0, 0]);
+        case.loss_edge_map[0].edge_ids = vec!["direct-0.1".to_string(), "direct-0.2".to_string()];
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0, 1]);
+    }
+
+    #[test]
+    fn correlated_or_differently_labeled_parallel_edges_are_not_merged() {
+        let mut case = parallel_case(1.2);
+        case.edges[0].independent_mechanism = false;
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0]);
+        case.edges[0].independent_mechanism = true;
+        case.edges[1].observable_indices.clear();
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![0]);
+    }
+
+    #[test]
+    fn independent_parallel_boundary_edges_are_merged() {
+        let mut case = known_answer();
+        case.edges[0].weight = (9.0_f64).ln();
+        case.edges[0].observable_indices = vec![0];
+        case.edges[1].weight = (4.0_f64).ln();
+        case.edges.push(EnvelopeMatchingEdge {
+            id: "alternative".to_string(),
+            node1: 0,
+            node2: None,
+            observable_indices: vec![],
+            weight: 1.2,
+            kind: EdgeKind::Boundary,
+            independent_mechanism: true,
+        });
+        case.shots.truncate(1);
+        assert_eq!(decode_matching(&case).unwrap().predictions, vec![1]);
+    }
+
+    #[test]
+    fn omitted_independence_flag_keeps_legacy_edges_unmerged() {
+        let mut edge = known_answer().edges.remove(0);
+        edge.independent_mechanism = false;
+        let serialized = serde_json::to_value(&edge).unwrap();
+        assert!(serialized.get("independent_mechanism").is_none());
+        let legacy: EnvelopeMatchingEdge = serde_json::from_value(serialized).unwrap();
+        assert!(!legacy.independent_mechanism);
+        let mut independent = legacy;
+        independent.independent_mechanism = true;
+        assert_eq!(
+            serde_json::to_value(independent).unwrap()["independent_mechanism"],
+            true
+        );
+        let mut case = parallel_case(1.2);
+        case.edges[0].independent_mechanism = false;
+        let legacy_json = serde_json::to_value(&case).unwrap();
+        assert!(
+            legacy_json["edges"][0]
+                .get("independent_mechanism")
+                .is_none()
+        );
+        let restored: EnvelopeMatchingCase = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(decode_matching(&restored).unwrap().predictions, vec![0]);
+    }
+
     fn known_answer() -> EnvelopeMatchingCase {
         EnvelopeMatchingCase {
             schema_version: MATCHING_INPUT_SCHEMA_VERSION.to_string(),
@@ -438,6 +606,7 @@ mod tests {
                     observable_indices: vec![],
                     weight: 2.0,
                     kind: EdgeKind::Boundary,
+                    independent_mechanism: true,
                 },
                 EnvelopeMatchingEdge {
                     id: "loss-compatible".to_string(),
@@ -446,6 +615,7 @@ mod tests {
                     observable_indices: vec![0],
                     weight: 4.0,
                     kind: EdgeKind::Boundary,
+                    independent_mechanism: true,
                 },
             ],
             loss_edge_map: vec![LossEdgeMap {
@@ -524,6 +694,7 @@ mod tests {
             observable_indices: vec![],
             weight: 1.0,
             kind: EdgeKind::SpaceLike,
+            independent_mechanism: true,
         }];
         case.loss_edge_map.clear();
         case.shots = vec![EnvelopeMatchingShot {
@@ -704,6 +875,7 @@ mod tests {
             observable_indices: vec![],
             weight: 1.0,
             kind: EdgeKind::SpaceLike,
+            independent_mechanism: true,
         }];
         case.loss_edge_map.clear();
         case.shots = vec![EnvelopeMatchingShot {

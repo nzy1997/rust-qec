@@ -1,20 +1,20 @@
 {
   "schema_version": "rustqec.envelope-resources-manifest.v1",
   "generated_by": "python3 -m benchmarks.atom_loss.readiness_resources --profile full",
-  "generated_at": "2026-09-29T07:57:23Z",
-  "checkout_revision": "2a2c5c63fa4fb0a683c99d422c0fd237b5f3d7db",
+  "generated_at": "2026-09-29T08:38:11Z",
+  "checkout_revision": "0b89d0d5ea5f43e03be688d4b73aff0360986aaa",
   "source_inputs": {
     "Cargo.lock": {
       "mode": "100644",
-      "git_blob": "1ee9a6be8c4a2049d08bb9055257650a0d305169"
+      "git_blob": "6b88edb5b93d0f23af0a64c9d608ba56953e5e3c"
     },
     "Cargo.toml": {
       "mode": "100644",
-      "git_blob": "c63f51a2f2c44e110bf5701617f44b02ac0c338e"
+      "git_blob": "34673dff8de043e9e1d27d7d210f50b829042444"
     },
     "benchmarks/atom_loss/accuracy_seeds.py": {
       "mode": "100644",
-      "git_blob": "9b68a862702a5cd7e4d6b73da0665402b27b3124"
+      "git_blob": "43212758bb7893d078eaf4355eed6c6e74c139d6"
     },
     "benchmarks/atom_loss/artifacts.py": {
       "mode": "100644",
@@ -26,7 +26,7 @@
     },
     "benchmarks/atom_loss/chain_reference.py": {
       "mode": "100644",
-      "git_blob": "c26e20e174fbf388f8d38d3f429cd943f3d1303f"
+      "git_blob": "1ca4d3b231a36834bfcdb08d34a4daae68291362"
     },
     "benchmarks/atom_loss/channel_probes.py": {
       "mode": "100644",
@@ -42,11 +42,11 @@
     },
     "benchmarks/atom_loss/decoder_reference.py": {
       "mode": "100644",
-      "git_blob": "de07e71ce921a7cb0804c3420aca9e0e601d7f1b"
+      "git_blob": "13ae8753533d8e4759c6706a0cfc557178590f46"
     },
     "benchmarks/atom_loss/decoder_replay.py": {
       "mode": "100644",
-      "git_blob": "ee36452369eea3758610c50121b162ba6b546cb7"
+      "git_blob": "0c1e4911989091d0b55d2119909b48407054e200"
     },
     "benchmarks/atom_loss/evidence_run.py": {
       "mode": "100644",
@@ -66,7 +66,7 @@
     },
     "benchmarks/atom_loss/mle_candidate_resources.py": {
       "mode": "100644",
-      "git_blob": "9ca5b99f68e14e8d577f069d3a5e49fa00bbb919"
+      "git_blob": "4bacc88f17ea17a27125ef352edb36c5ed93f329"
     },
     "benchmarks/atom_loss/noise_controls.py": {
       "mode": "100644",
@@ -90,11 +90,11 @@
     },
     "benchmarks/atom_loss/readiness_correctness.py": {
       "mode": "100644",
-      "git_blob": "738f9f643b1b61bb9a35ccd703f9f7b5f031853e"
+      "git_blob": "791b065a19e0226a4badcfe4afcff5c6468c092a"
     },
     "benchmarks/atom_loss/readiness_resources.py": {
       "mode": "100644",
-      "git_blob": "f4c19639e6abe1a91a2f2dd4c067ee4019f7b0ae"
+      "git_blob": "196e52981f93481d4af5ef37ac8ded118f25b05d"
     },
     "benchmarks/atom_loss/reference.py": {
       "mode": "100644",
@@ -102,11 +102,11 @@
     },
     "benchmarks/atom_loss/remeasure.py": {
       "mode": "100644",
-      "git_blob": "aa6ed42c480b8269910e3adb97df256282aa66e7"
+      "git_blob": "5599ad66625d2cbf1449843b308df85ccdb2a33c"
     },
     "benchmarks/atom_loss/replay.py": {
       "mode": "100644",
-      "git_blob": "60b64e808e4d640397b63a80494321ed4bc3f371"
+      "git_blob": "c5a5b8345c1cccc7825ee57a6f92618d5f0438df"
     },
     "benchmarks/atom_loss/report_contract.py": {
       "mode": "100644",
@@ -118,11 +118,11 @@
     },
     "benchmarks/atom_loss/retained_source.py": {
       "mode": "100644",
-      "git_blob": "f807fd9e591e1500fa69182abf934c1443f3ebb1"
+      "git_blob": "f73454c7117270bb514e1c188904d300d57fbd39"
     },
     "benchmarks/atom_loss/run.py": {
       "mode": "100644",
-      "git_blob": "106a9de6a544fb0502ce6d06af44a86a9f281801"
+      "git_blob": "4924a32e348bceed3c76da36a2d9bee846e30246"
     },
     "benchmarks/atom_loss/shot_data.py": {
       "mode": "100644",
@@ -130,15 +130,15 @@
     },
     "benchmarks/atom_loss/source_contract.py": {
       "mode": "100644",
-      "git_blob": "93588c63881d0e609d979c49a13ce808e7a2fda5"
+      "git_blob": "0ab38bf40afbf90c5af64eaabe644af4d64d2f14"
     },
     "benchmarks/atom_loss/test_chain_reference.py": {
       "mode": "100644",
-      "git_blob": "70ed3e5bd51417693cfdf229527cf05c608e9bf6"
+      "git_blob": "3e09729754ce83703d687f1579cce3725fd54664"
     },
     "benchmarks/atom_loss/test_decoder_contract.py": {
       "mode": "100644",
-      "git_blob": "1517944e3cec9174d4fb9d5b6173c7c83ad2bd87"
+      "git_blob": "e66ced90786e8afcf00b13736a8034450681e3ed"
     },
     "benchmarks/atom_loss/test_figure_contract.py": {
       "mode": "100644",
@@ -146,15 +146,15 @@
     },
     "benchmarks/atom_loss/test_reference.py": {
       "mode": "100644",
-      "git_blob": "1cf956a2966ec623cb5fd134831f7591ce99c375"
+      "git_blob": "1a6445f0589999c68bf226ce29e5903293fa3596"
     },
     "benchmarks/atom_loss/test_sampler_mutations.py": {
       "mode": "100644",
-      "git_blob": "99e4d611aa45b2ed3fffe7b6d4604a07cedb693f"
+      "git_blob": "0787d156c7965f6e3b6dd3869ea3464b5260d775"
     },
     "benchmarks/atom_loss/test_source_contract.py": {
       "mode": "100644",
-      "git_blob": "fc6f7fdf665f0e259c52026a338350d983e1f3df"
+      "git_blob": "471fc3dc85281b58af571192110fa15afe51b049"
     },
     "benchmarks/atom_loss/test_standalone_contract.py": {
       "mode": "100644",
@@ -174,7 +174,7 @@
     },
     "docs/envelope-support.json": {
       "mode": "100644",
-      "git_blob": "7d2d9a5eb05d62916b8c664223b0fdf750059859"
+      "git_blob": "0be0a21a7fd79ffb87e13f769ada117b1586ceff"
     },
     "qec-ilp-core/Cargo.toml": {
       "mode": "100644",
@@ -210,7 +210,7 @@
     },
     "renvelope/Cargo.toml": {
       "mode": "100644",
-      "git_blob": "950dc0c10b3ea4cc579bc67ab869a3528fe52499"
+      "git_blob": "bfb9ebb97fe479a1379ff1fd03dbab8240940e7f"
     },
     "renvelope/src/decode.rs": {
       "mode": "100644",
@@ -230,11 +230,11 @@
     },
     "renvelope/src/matching.rs": {
       "mode": "100644",
-      "git_blob": "c62a2fca4b12b53d0e43583e3f271260e1730092"
+      "git_blob": "f3fbe1abb96e8868d8dc7f175aab50eef300f59a"
     },
     "renvelope/src/prepare.rs": {
       "mode": "100644",
-      "git_blob": "a5b7bb5841d868aa4701f690b8d08d117393ec03"
+      "git_blob": "cc6e722b6bcd25061da3c8c8b753b394a18e6f8a"
     },
     "renvelope/src/schema.rs": {
       "mode": "100644",
@@ -242,7 +242,7 @@
     },
     "rmatching/Cargo.toml": {
       "mode": "100644",
-      "git_blob": "d686ab7840ac4c42c28fe421e45c6d5ce7f3091a"
+      "git_blob": "9d76ab3378283d97e26ebc3b43df842f235d4a5a"
     },
     "rmatching/src/bin/rmatching_cli.rs": {
       "mode": "100644",
@@ -250,7 +250,7 @@
     },
     "rmatching/src/driver/decoding.rs": {
       "mode": "100644",
-      "git_blob": "2a7fee34801ee824fe112ace24944f8bd545b5cd"
+      "git_blob": "3520c46769d5cc7f2a1089cad8aeb6a08d54a002"
     },
     "rmatching/src/driver/dem_parse.rs": {
       "mode": "100644",
@@ -362,7 +362,7 @@
     },
     "rstim/Cargo.toml": {
       "mode": "100644",
-      "git_blob": "b2f17cd7a90a8cf89637bb6ed16c39fe7e59a532"
+      "git_blob": "093ff4a46c2f9730868f5abaf63e88b55d6eaf31"
     },
     "rstim/src/bin/rstim_compiled_steady_worker.rs": {
       "mode": "100644",
@@ -378,7 +378,7 @@
     },
     "rstim/src/cli.rs": {
       "mode": "100644",
-      "git_blob": "4d034a1817132d3481191cb99aef0daeb00abb0a"
+      "git_blob": "e63dfba5d9ade3cabb216459d2e34475a85c6503"
     },
     "rstim/src/codegen/color_code.rs": {
       "mode": "100644",
@@ -474,7 +474,7 @@
     },
     "rstim/src/lib.rs": {
       "mode": "100644",
-      "git_blob": "4dc9cdca87bdfb1f2349441c5a4d8103721c250c"
+      "git_blob": "50bda7b0f3d1b85cac618cf9d72b8028a4b97053"
     },
     "rstim/src/loss_sampler.rs": {
       "mode": "100644",
@@ -486,7 +486,7 @@
     },
     "rstim/src/main.rs": {
       "mode": "100644",
-      "git_blob": "e605ea687b6ddd5244204500ef76bd25f96ec08c"
+      "git_blob": "66b51638fe608af040899cba08bcd8b2effe69f5"
     },
     "rstim/src/measurement_transform.rs": {
       "mode": "100644",
@@ -494,7 +494,7 @@
     },
     "rstim/src/near_clifford.rs": {
       "mode": "100644",
-      "git_blob": "505afc767f0fce805ea402f1ce5a62bfd7bc7f9a"
+      "git_blob": "8e8c809b269f396e30befffd7a7dd77fa3afae7b"
     },
     "rstim/src/operations.rs": {
       "mode": "100644",
@@ -542,7 +542,7 @@
     },
     "rstim/src/qp101_svg.rs": {
       "mode": "100644",
-      "git_blob": "c1c637b4555135ddba8b9a6cfea9f9778a71d2bf"
+      "git_blob": "04ac85f447e25d6fdcdea48cde8ad53c644c556a"
     },
     "rstim/src/rare_error_iterator.rs": {
       "mode": "100644",
@@ -638,113 +638,117 @@
     },
     "rstim/src/sim/mod.rs": {
       "mode": "100644",
-      "git_blob": "ea9948a5cd6bb19a303fce1005c7665ecbf7f3e9"
+      "git_blob": "d2b1fa65740ea303b56de17a48a3a7c8c384b50a"
     },
     "rstim/src/sim/packed_inverse_tableau.rs": {
       "mode": "100644",
       "git_blob": "56039f3db411a0105afddcd52eb1e36ca00c84a9"
     },
+    "rstim/src/sim/symbolic_mask.rs": {
+      "mode": "100644",
+      "git_blob": "aa558efe9fadcf2a9dfb2ad2208e91a3d82cef6f"
+    },
     "rstim/src/sim/tableau.rs": {
       "mode": "100644",
-      "git_blob": "8f57e331a23c2065a08f72c7fb2ceb5a52a7d342"
+      "git_blob": "149e9f047babfc9cb4942592b082cc791704bf68"
     },
     "rstim/src/stats.rs": {
       "mode": "100644",
       "git_blob": "a0227c40eb189cd7fe629b8f17e9b9998fd58f7b"
     },
-    "rstim/src/surface_code_ler.rs": {
-      "mode": "100644",
-      "git_blob": "362b2b2dbb930d24648e69d2d18b607cfb6be8b0"
-    },
     "rstim/src/transforms.rs": {
       "mode": "100644",
       "git_blob": "77debeaa98e43f2a5b23ab4e4b8d874f31427eb5"
-    },
-    "rstim/src/unified_cli/decode.rs": {
-      "mode": "100644",
-      "git_blob": "f59bad1ffa5b71f953560c82a7e289706a794381"
-    },
-    "rstim/src/unified_cli/decode/benchmark.rs": {
-      "mode": "100644",
-      "git_blob": "820e862a03ee021eb51f7365fca3f26ec151a937"
-    },
-    "rstim/src/unified_cli/decode/compiler.rs": {
-      "mode": "100644",
-      "git_blob": "f2f8d411f3b823cc45dc2aad84c483172159fb09"
-    },
-    "rstim/src/unified_cli/decode/dataset.rs": {
-      "mode": "100644",
-      "git_blob": "59b3725519d8de31250167ee5a3715bd33ae616f"
-    },
-    "rstim/src/unified_cli/decode/matching.rs": {
-      "mode": "100644",
-      "git_blob": "350dc746d7cab1558332259b26be08b08335b6d8"
-    },
-    "rstim/src/unified_cli/decode/mle.rs": {
-      "mode": "100644",
-      "git_blob": "a48c351b68b5c6a2ba11b5fbf1b566c05839b8f2"
-    },
-    "rstim/src/unified_cli/matching.rs": {
-      "mode": "100644",
-      "git_blob": "2ee2fb6153186bd54c551cb264adac6a064dc8b5"
-    },
-    "rstim/src/unified_cli/mod.rs": {
-      "mode": "100644",
-      "git_blob": "dfda67aa1d4d50f1cf099151d69d9e74a3ef37d5"
-    },
-    "rstim/src/unified_cli/pipeline.rs": {
-      "mode": "100644",
-      "git_blob": "94b583512e54f56f1362330f5cf652ea50d9c2ca"
     },
     "rstim/src/validation.rs": {
       "mode": "100644",
       "git_blob": "ca0e0cebe41121474fa34fb644e7ac4dcc8223d3"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/circuit.stim": {
+    "rustqec-cli/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "c0f03f95e465c61265416da518eb092c068d02ae"
+    },
+    "rustqec-cli/src/decode.rs": {
+      "mode": "100644",
+      "git_blob": "1fba06457684bac50985677accc53ec4f9fe36cd"
+    },
+    "rustqec-cli/src/decode/benchmark.rs": {
+      "mode": "100644",
+      "git_blob": "820e862a03ee021eb51f7365fca3f26ec151a937"
+    },
+    "rustqec-cli/src/decode/compiler.rs": {
+      "mode": "100644",
+      "git_blob": "bd8373b5586309b5b2152e698bd83dc401cd5006"
+    },
+    "rustqec-cli/src/decode/dataset.rs": {
+      "mode": "100644",
+      "git_blob": "59b3725519d8de31250167ee5a3715bd33ae616f"
+    },
+    "rustqec-cli/src/decode/matching.rs": {
+      "mode": "100644",
+      "git_blob": "d1efe1f82af1234e77650771962c98ae284f2ca1"
+    },
+    "rustqec-cli/src/decode/mle.rs": {
+      "mode": "100644",
+      "git_blob": "a48c351b68b5c6a2ba11b5fbf1b566c05839b8f2"
+    },
+    "rustqec-cli/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "5d640e4d374d0a58a2e1b8728ddb288386a23c80"
+    },
+    "rustqec-cli/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "aca857500dddd2f356c06fc3b85d37da626464d8"
+    },
+    "rustqec-cli/src/pipeline.rs": {
+      "mode": "100644",
+      "git_blob": "be98b90e684f34050d9d898cb10327b74094c0e8"
+    },
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/circuit.stim": {
       "mode": "100644",
       "git_blob": "7fb82c41085ff45af54d744e5cb0dd8cc76699c6"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/manifest.json": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/manifest.json": {
       "mode": "100644",
       "git_blob": "6ba39e31485f47ce0381258e432fecf6eca1e005"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/shots.b8": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional/shots.b8": {
       "mode": "100644",
       "git_blob": "1585a74028dd98ec18c315649206a3565ac0c6c4"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/circuit.stim": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/circuit.stim": {
       "mode": "100644",
       "git_blob": "7f9903212e7c681c92216bef75041cb5d03fdb6b"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/manifest.json": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/manifest.json": {
       "mode": "100644",
       "git_blob": "fc9350b3761e17a8938222aa85a9612b8b7c1e53"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/shots.b8": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap/shots.b8": {
       "mode": "100644",
       "git_blob": "30b3526f6688be5f9ac9d167bb9472dade58dc98"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/circuit.stim": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/circuit.stim": {
       "mode": "100644",
       "git_blob": "e826b63adb86d5cc7021380659688cbe20d0b1ee"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/manifest.json": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/manifest.json": {
       "mode": "100644",
       "git_blob": "2a912361f4080111f57759259ae13235af7b684b"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/provenance.json": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/provenance.json": {
       "mode": "100644",
-      "git_blob": "aac447b96966d826a3e212c1a46b46a3f1afd6cf"
+      "git_blob": "786d3a9aca8796d26ea16080d4ddbcae7bb5bb30"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/reference_cases.json.zst": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/reference_cases.json.zst": {
       "mode": "100644",
       "git_blob": "1c80d414b7648f48d126a3ac26ab0c0ed1ac87c1"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/shots.b8": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/shots.b8": {
       "mode": "100644",
       "git_blob": "56f1dda4be0f649a804cf4dc0bd1b28811e5ee49"
     },
-    "rstim/tests/fixtures/current_rstim_atom_loss/unsupported_non_metadata.stim": {
+    "rustqec-cli/tests/fixtures/current_rstim_atom_loss/unsupported_non_metadata.stim": {
       "mode": "100644",
       "git_blob": "2fbd677c4316adaf33427e010990acb8ca29c75d"
     }
@@ -757,9 +761,9 @@
     "memory_bytes": 34359738368
   },
   "build": {
-    "path": "/Users/nzy/rcode/rstim/target/release/rstim",
-    "sha256": "928bf43b075ba662ae10d8bbbffe4f112431fea2bcef03a77e2c32a174df59eb",
-    "version": "rstim 0.3.0",
+    "path": "/Users/nzy/.codex/worktrees/near-clifford-symbolic-probe/rstim/target/release/rustqec",
+    "sha256": "dda66565852896760dd66672d42e3d846a3be6eb7a825205819831ac900b1a48",
+    "version": "rustqec 0.3.3",
     "advertised_decoders": [
       "envelope-matching",
       "envelope-mle"
@@ -767,7 +771,7 @@
   },
   "matrix": {
     "path": "docs/envelope-support.json",
-    "sha256": "c5ff1cf5fa54452fcde40ff31a7ed0d3de6c194e822b2feecd987f0aa9ee92c0",
+    "sha256": "eedaef650bd8245e940385b89ea673a55a1dfdf9d5be9eba93eebdd70ed29788",
     "source_revision": "f8ed9348da62dba72205e24a826ce75965f3c2b2"
   },
   "stress_budget": {
@@ -778,7 +782,7 @@
       "peak_rss_bytes": 4294967296
     }
   },
-  "total_wall_seconds": 114.61361679201946,
+  "total_wall_seconds": 74.98096858395729,
   "cases": [
     {
       "id": "matching-d3r2-p002-b1024",
@@ -789,11 +793,11 @@
       "seed": 715247,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.014363708905875683,
-      "compile_seconds": 0.00118475,
-      "decode_seconds": 0.001772292,
+      "wall_seconds": 0.01136716699693352,
+      "compile_seconds": 0.001123667,
+      "decode_seconds": 0.001985125,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 8634368,
+      "peak_rss_watermark_bytes": 7913472,
       "observed_pattern_count": 49,
       "cache": {
         "builds": 49,
@@ -802,7 +806,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p002-b1024.json",
-      "raw_sha256": "98eab40c1229ccda53bcae2acadcb7fb81a6bbab38fe4ca5cc9664399f9352c0",
+      "raw_sha256": "0058bb31ac565d73be1aeb340f458e8d16c304854543dc763952b779cf1678fb",
       "output_rule_problems": []
     },
     {
@@ -814,11 +818,11 @@
       "seed": 715652,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.042130458052270114,
-      "compile_seconds": 0.002083333,
-      "decode_seconds": 0.029081542,
+      "wall_seconds": 0.036872041993774474,
+      "compile_seconds": 0.001828125,
+      "decode_seconds": 0.025231917,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 14630912,
+      "peak_rss_watermark_bytes": 14057472,
       "observed_pattern_count": 245,
       "cache": {
         "builds": 245,
@@ -827,7 +831,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p002-b16384.json",
-      "raw_sha256": "6a925d6fe6dfde835c796cc9e9c3c65948de4952c3f14789b9e55c1a32fc5468",
+      "raw_sha256": "a84df2a8500f6f9acdb02426666f542ce0f483a5653a1fa19574bc2315f2b68b",
       "output_rule_problems": []
     },
     {
@@ -839,11 +843,11 @@
       "seed": 715951,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.1351728750159964,
-      "compile_seconds": 0.001403666,
-      "decode_seconds": 0.113753833,
+      "wall_seconds": 0.0888730000006035,
+      "compile_seconds": 0.001989208,
+      "decode_seconds": 0.075983791,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 18857984,
+      "peak_rss_watermark_bytes": 18350080,
       "observed_pattern_count": 433,
       "cache": {
         "builds": 433,
@@ -852,7 +856,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p002-b65536.json",
-      "raw_sha256": "8836912d324c12ff517aece953b245d285016b8dbc6f14c481a25b64dfbf0339",
+      "raw_sha256": "a4d11f2916f153e43b17ac92f33f088814858303575b8816abc4d033c6e1bad0",
       "output_rule_problems": []
     },
     {
@@ -864,11 +868,11 @@
       "seed": 715427,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.037869667052291334,
-      "compile_seconds": 0.002144584,
-      "decode_seconds": 0.021688291,
+      "wall_seconds": 0.024611250031739473,
+      "compile_seconds": 0.001023083,
+      "decode_seconds": 0.0159225,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 24264704,
+      "peak_rss_watermark_bytes": 23461888,
       "observed_pattern_count": 598,
       "cache": {
         "builds": 598,
@@ -877,7 +881,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p020-b1024.json",
-      "raw_sha256": "79ee708f4f16b7af3d5aacac89c23c73e3a8075e3ca3f49e058453ae34a5063f",
+      "raw_sha256": "022ca91e148b68943d86d1249d96534ef0fcc6a61660e41a6a28408b45064a58",
       "output_rule_problems": []
     },
     {
@@ -889,11 +893,11 @@
       "seed": 715832,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.38326000003144145,
-      "compile_seconds": 0.002522292,
-      "decode_seconds": 0.35575975,
+      "wall_seconds": 0.2420524579938501,
+      "compile_seconds": 0.001044958,
+      "decode_seconds": 0.227499041,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44007424,
+      "peak_rss_watermark_bytes": 44236800,
       "observed_pattern_count": 4684,
       "cache": {
         "builds": 7219,
@@ -902,7 +906,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p020-b16384.json",
-      "raw_sha256": "bfddf9a145018188115fbdd09fe17bc95af1015754469c9356e6d24c9868cea2",
+      "raw_sha256": "01c480203ae934b028b41438804cdc3dbb593aa0c2b90f61055cbadac72facff",
       "output_rule_problems": []
     },
     {
@@ -914,11 +918,11 @@
       "seed": 716131,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.9801440420560539,
-      "compile_seconds": 0.001916167,
-      "decode_seconds": 0.959236833,
+      "wall_seconds": 0.8151074580382556,
+      "compile_seconds": 0.001055416,
+      "decode_seconds": 0.803791667,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44253184,
+      "peak_rss_watermark_bytes": 44580864,
       "observed_pattern_count": 11669,
       "cache": {
         "builds": 28107,
@@ -927,7 +931,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p020-b65536.json",
-      "raw_sha256": "61e93b029741bdafdef997fe5467d2f742368a65f72493f9938c7a203e311ac1",
+      "raw_sha256": "1807e349591570b1754b545d7b82ab3c9ad86296120c3ae3e18837ccd571ee9f",
       "output_rule_problems": []
     },
     {
@@ -939,11 +943,11 @@
       "seed": 716227,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.0543178750667721,
-      "compile_seconds": 0.001098542,
-      "decode_seconds": 0.0394795,
+      "wall_seconds": 0.04043820803053677,
+      "compile_seconds": 0.001059833,
+      "decode_seconds": 0.029238,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44253184,
+      "peak_rss_watermark_bytes": 44580864,
       "observed_pattern_count": 1024,
       "cache": {
         "builds": 1024,
@@ -952,7 +956,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p100-b1024.json",
-      "raw_sha256": "6b55af8f096fdd88e4c25d43f5a3b28ce05bb7a270fe1962a68878e897bb6f10",
+      "raw_sha256": "d318bc9c0fd49d740c7d8a072c34ef6febf0f7a449eae27f9e6e4b818de0cd9e",
       "output_rule_problems": []
     },
     {
@@ -964,11 +968,11 @@
       "seed": 716632,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.634816583013162,
-      "compile_seconds": 0.001431875,
-      "decode_seconds": 0.620914583,
+      "wall_seconds": 0.540411249967292,
+      "compile_seconds": 0.001143917,
+      "decode_seconds": 0.528226584,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 46153728,
+      "peak_rss_watermark_bytes": 45776896,
       "observed_pattern_count": 16244,
       "cache": {
         "builds": 16381,
@@ -977,7 +981,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p100-b16384.json",
-      "raw_sha256": "6c8a88681ca061af942a6f0cb7f8d3ae719cb91d1797fa5677575e38469f1212",
+      "raw_sha256": "5b64297410c387d76c7ae50cc31ddce77ba4737aa1be1763d00481a7a01be9f5",
       "output_rule_problems": []
     },
     {
@@ -989,11 +993,11 @@
       "seed": 716931,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 2.645721709006466,
-      "compile_seconds": 0.001067958,
-      "decode_seconds": 2.62743825,
+      "wall_seconds": 2.0707678749458864,
+      "compile_seconds": 0.00105275,
+      "decode_seconds": 2.057324375,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 46186496,
+      "peak_rss_watermark_bytes": 46399488,
       "observed_pattern_count": 65536,
       "cache": {
         "builds": 65519,
@@ -1002,7 +1006,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p100-b65536.json",
-      "raw_sha256": "c6109f70c2c5a37f1a11db31346a075e944d62d3a797bca6f52c78bb0cff93ec",
+      "raw_sha256": "381c48ca2f7b2ba692ff4b1a4ca61bf9a5a7639eee8c747eb1d4e0b05cf76c3c",
       "output_rule_problems": []
     },
     {
@@ -1014,11 +1018,11 @@
       "seed": 715301,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.7673941249959171,
-      "compile_seconds": 0.001619875,
-      "decode_seconds": 0.749864583,
+      "wall_seconds": 0.8186879580607638,
+      "compile_seconds": 0.001566292,
+      "decode_seconds": 0.803237125,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 100302848,
+      "peak_rss_watermark_bytes": 101580800,
       "observed_pattern_count": 9059,
       "cache": {
         "builds": 12326,
@@ -1027,7 +1031,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r3-p020-b16384.json",
-      "raw_sha256": "80dc2b0f2b33c1363b2531fefa0aa579dd263998aac3e25213d8b1b5dcfcb6a3",
+      "raw_sha256": "d7b191d3a08315bd8e186fee4f76b1b8783721f5cb76e8e759174ac2a0af3777",
       "output_rule_problems": []
     },
     {
@@ -1039,11 +1043,11 @@
       "seed": 715302,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 2.6564227920025587,
-      "compile_seconds": 0.005016041,
-      "decode_seconds": 2.615682042,
+      "wall_seconds": 2.428463082993403,
+      "compile_seconds": 0.004586292,
+      "decode_seconds": 2.400896458,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": 16314,
       "cache": {
         "builds": 16384,
@@ -1052,7 +1056,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d5r3-p020-b16384.json",
-      "raw_sha256": "1ae34a7b2ff1f9bc301bb8954fe58b043475ba969410fe5f3f7b78913ac344ed",
+      "raw_sha256": "bea172f48aa55d10e27b367405e42a30b19bb6d3d225e71465ad608a370f17d9",
       "output_rule_problems": []
     },
     {
@@ -1064,11 +1068,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.0241679159225896,
-      "compile_seconds": 0.000363375,
-      "decode_seconds": 0.011626167,
+      "wall_seconds": 0.017956916941329837,
+      "compile_seconds": 0.000249333,
+      "decode_seconds": 0.00995175,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -1077,7 +1081,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/matching-eviction-wires24.json",
-      "raw_sha256": "3de53206602a0c0da5b89ed1dce0895354c5d3c6ac08ebc590382081251dc283",
+      "raw_sha256": "10daee332673a950dc35d27d8a912a6c55f61d7bc2ebba91bffc0d6fd91e5975",
       "output_rule_problems": []
     },
     {
@@ -1089,11 +1093,11 @@
       "seed": 715401,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 3.652118334081024,
-      "compile_seconds": 0.002932917,
-      "decode_seconds": 3.6402066250000003,
+      "wall_seconds": 2.28074125002604,
+      "compile_seconds": 0.002601833,
+      "decode_seconds": 2.271457417,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": 45,
       "cache": {
         "builds": 45,
@@ -1102,7 +1106,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/mle-d3r2-p002-b1024.json",
-      "raw_sha256": "e04189df5e4d7d289af92d2b024b7274cfe3b727fb8a7ec7636a17ae5a09ca4c",
+      "raw_sha256": "429fcc9a05143bbb24eac56005b2ec458e1f5ebad350af111de2c709a78ef0c5",
       "output_rule_problems": []
     },
     {
@@ -1114,11 +1118,11 @@
       "seed": 715402,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 80.1643234170042,
-      "compile_seconds": 0.003047416,
-      "decode_seconds": 80.144400083,
+      "wall_seconds": 50.9321034590248,
+      "compile_seconds": 0.002551334,
+      "decode_seconds": 50.916255917,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": 267,
       "cache": {
         "builds": 267,
@@ -1127,7 +1131,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/mle-d3r2-p002-b16384.json",
-      "raw_sha256": "b59748c4eab400bd556fc57cf09701b01e90aecd3dc8127ad3387ce38a7f3bd8",
+      "raw_sha256": "27e62da3b695e4272f15ef395de0e226074f839313d73c636a22ef2dfb8b78eb",
       "output_rule_problems": []
     },
     {
@@ -1139,11 +1143,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 1.7785159579943866,
-      "compile_seconds": 0.000327834,
-      "decode_seconds": 1.746292458,
+      "wall_seconds": 1.1030392500106245,
+      "compile_seconds": 0.000567583,
+      "decode_seconds": 1.0798429999999999,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -1152,7 +1156,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/mle-eviction-wires24.json",
-      "raw_sha256": "03e1048c2e41a392c25447c1dab7cef319652f6a3aca93be5a31643e57c2c8c7",
+      "raw_sha256": "9cb1230d5779c09030b9ae036dc702d6667e32654b4ad95bdbb36c06df3afc89",
       "output_rule_problems": []
     },
     {
@@ -1164,16 +1168,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "unsupported_circuit",
-      "wall_seconds": 0.2514907500008121,
+      "wall_seconds": 0.1859161249594763,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-candidate-limit.json",
-      "raw_sha256": "72d9419a04fc163f4b48459f9d0849db65e3096a049d2e07424635fb5cf1904a",
+      "raw_sha256": "14cc1056d35e81f3e9da0ee7e425308959c39f14dd50ee6cb63742a5a34646ba",
       "output_rule_problems": []
     },
     {
@@ -1185,16 +1189,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_timeout",
-      "wall_seconds": 0.013897667056880891,
-      "compile_seconds": 0.000120541,
+      "wall_seconds": 0.006330124917440116,
+      "compile_seconds": 0.000130042,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-solve-timeout.json",
-      "raw_sha256": "20acf63a8e02ee9a647a9add3b24845b4e77c9ba62d1f20e5afcf13340b2accc",
+      "raw_sha256": "4942e18bdc29a232cdc57337fa670eae5df77d6157517b6fd5f419e2d3c89ae3",
       "output_rule_problems": []
     },
     {
@@ -1206,16 +1210,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_infeasible",
-      "wall_seconds": 0.015095290960744023,
-      "compile_seconds": 0.000204917,
+      "wall_seconds": 0.0073286250699311495,
+      "compile_seconds": 0.000118292,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-infeasible.json",
-      "raw_sha256": "5c48e5b18b2632f456aa9def0a1c4fe54f0cb868fe1494d4fef552f47be6e9e3",
+      "raw_sha256": "1325703eefb13324635cee5dbebdf8519f904eff6c8318feff242f0adc0fe29d",
       "output_rule_problems": []
     },
     {
@@ -1227,16 +1231,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "output_error",
-      "wall_seconds": 0.014486458036117256,
+      "wall_seconds": 0.00537175009958446,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 247070720,
+      "peak_rss_watermark_bytes": 212287488,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-stale-output-overwrite.json",
-      "raw_sha256": "f4ba7d90ada004f51aa058836358f4d592a60eb0e493b93bbbf3f3e1a24b9d09",
+      "raw_sha256": "78f6fdf63aba90f69aacd8bc9bc456177cdac9b076c1af36695be02da4e9ca2f",
       "output_rule_problems": []
     }
   ],
@@ -1261,11 +1265,11 @@
       "max_loss_rate_measured": 0.1,
       "circuits_measured": [
         "benchmarks.atom_loss.decoder_reference.circuit_for(24)",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.1 --measurement-loss-probability 0.1 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 5 --rounds 3 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.1 --measurement-loss-probability 0.1 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 --noise 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 5 --rounds 3 --noise 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
       ],
       "scale_note": "decode stays near-linear in shots at fixed pattern count; cache eviction rebuilds were measured and remained within budget"
     },
@@ -1274,7 +1278,7 @@
       "max_loss_rate_measured": 0.002,
       "circuits_measured": [
         "benchmarks.atom_loss.decoder_reference.circuit_for(24)",
-        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
+        "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
       ],
       "scale_note": "cost is dominated by ILP build+solve per distinct loss pattern; use --shot-timeout-ms so a slow pattern stops the batch with decode_timeout instead of running unbounded"
     },
