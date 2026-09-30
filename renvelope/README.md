@@ -11,7 +11,7 @@ or numerical results.
 `renvelope` is the reference layer of the atom-loss decoding stack: it decodes
 explicit, versioned `AtomLossCase` envelopes through an exact MLE backend and a
 matching approximation, and ships a standalone CLI for prepared loss bundles.
-The production batched decoder in `rustqec-cli` (`rustqec decode`) compiles the
+The production batched decoder in `rstim` (`rstim decode`) compiles the
 public dataset contract (`manifest.json`, `circuit.stim`, `shots.b8`) directly
 and cross-validates its compiled MLE and matching paths against this crate in
 its test suite. Correctness claims for the production path therefore trace back

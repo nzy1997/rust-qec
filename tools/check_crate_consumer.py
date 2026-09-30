@@ -285,24 +285,10 @@ def exercise_viewer(binary: Path, expected_html: bytes) -> None:
                 process.communicate()
 
 
-def exercise_compatibility_cli(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
-    rstim = unpacked["rstim"]
-    append_patches(rstim / "Cargo.toml", unpacked)
-    features = "cli,codegen-css,shot-viewer"
-    validate_resolved_sources(rstim / "Cargo.toml", unpacked, features=features)
-    install_root = work / "compatibility-install"
-    run(["cargo", "install", "--locked", "--path", str(rstim), "--features", features,
-         "--root", str(install_root), "--target-dir", str(target_dir), "-j", "4"], cwd=work)
-    bins = sorted(path.name for path in (install_root / "bin").iterdir() if path.is_file())
-    if bins != ["rstim"]:
-        raise ConsumerCheckError(f"compatibility install exposed unexpected binaries: {bins}")
-    exercise_viewer(install_root / "bin/rstim", (rstim / "assets/shot-viewer/index.html").read_bytes())
-
-
 def exercise_installed_cli(target_dir: Path, unpacked: dict[str, Path], work: Path) -> None:
-    cli = unpacked.get("rustqec-cli")
+    cli = unpacked.get("rstim")
     if cli is None:
-        raise ConsumerCheckError("publish order must include rustqec-cli")
+        raise ConsumerCheckError("publish order must include rstim")
     append_patches(cli / "Cargo.toml", unpacked)
     validate_resolved_sources(cli / "Cargo.toml", unpacked)
     install_root = work / "install"
@@ -324,8 +310,8 @@ def exercise_installed_cli(target_dir: Path, unpacked: dict[str, Path], work: Pa
     )
     bin_dir = install_root / "bin"
     installed = sorted(path.name for path in bin_dir.iterdir() if path.is_file())
-    if installed != ["rustqec"]:
-        raise ConsumerCheckError(f"installed binary set differs: expected ['rustqec'], got {installed}")
+    if installed != ["rstim"]:
+        raise ConsumerCheckError(f"installed binary set differs: expected ['rstim'], got {installed}")
 
     repo_root = Path(__file__).resolve().parents[1]
     if str(repo_root) not in sys.path:
@@ -335,10 +321,11 @@ def exercise_installed_cli(target_dir: Path, unpacked: dict[str, Path], work: Pa
     try:
         validate(bin_dir)
     except (QuickstartError, OSError) as error:
-        raise ConsumerCheckError(f"installed rustqec quickstart failed: {error}") from error
+        raise ConsumerCheckError(f"installed rstim quickstart failed: {error}") from error
 
-    # Validate the remaining published dependency through the opt-in solver path.
-    # The installed binary above intentionally remains the default lightweight build.
+    exercise_viewer(bin_dir / "rstim", (cli / "assets/shot-viewer/index.html").read_bytes())
+
+    # Validate the optional native solver path without changing the default install.
     validate_resolved_sources(cli / "Cargo.toml", unpacked, features="ilp")
     run(["cargo", "check", "--locked", "--manifest-path", str(cli / "Cargo.toml"),
          "--features", "ilp", "--target-dir", str(target_dir), "-j", "4"], cwd=work)
@@ -437,7 +424,6 @@ def check(repo_root: Path, target_dir: Path, policy: Path) -> None:
             shutil.move(backup, assets)
         exercise_model_consumer(target_dir, unpacked, work)
         exercise_installed_cli(target_dir, unpacked, work)
-        exercise_compatibility_cli(target_dir, unpacked, work)
         exercise_decoder_packages(target_dir, unpacked, work)
 
 

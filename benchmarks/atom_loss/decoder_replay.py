@@ -119,7 +119,7 @@ def replay(archive, binary, exporter):
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
     p.add_argument('--root', type=Path, default=ROOT/'site/static/data/atom-loss')
-    p.add_argument('--binary', type=Path, default=ROOT/'target/release/rustqec')
+    p.add_argument('--binary', type=Path, default=ROOT/'target/release/rstim')
     p.add_argument('--exporter', type=Path, default=ROOT/'target/release/examples/export_matching_benchmark')
     a = p.parse_args()
     from .verify import verify

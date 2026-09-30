@@ -3,12 +3,11 @@
   "publish_order": [
     "qec-ilp-core",
     "qec-code",
-    "rstim",
     "rmatching",
+    "rstim",
     "rbposd",
     "rilpqec",
-    "rsinter",
-    "rustqec-cli"
+    "rsinter"
   ],
   "deferred": [
     "renvelope",

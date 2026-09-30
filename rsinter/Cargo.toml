@@ -22,7 +22,7 @@ full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
 gurobi = ["ilp-runner", "rilpqec/gurobi"]
 
 [dependencies]
-rstim = { version = "0.3.0", path = "../rstim", features = ["codegen-css"] }
+rstim = { version = "0.3.0", path = "../rstim", default-features = false, features = ["codegen-css"] }
 rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
 rbposd = { version = "0.3.0", path = "../rbposd", optional = true }
 rilpqec = { version = "0.3.0", path = "../rilpqec", optional = true }

@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class DecoderContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.report = decoder_reference.run(ROOT/'target/release/rustqec',
+        cls.report = decoder_reference.run(ROOT/'target/release/rstim',
                                           ROOT/'target/release/examples/export_matching_benchmark')
 
     def reject(self, change):

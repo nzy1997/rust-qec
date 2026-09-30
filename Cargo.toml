@@ -3,7 +3,6 @@ members = [
     "qec-ilp-core",
     "qec-code",
     "renvelope",
-    "rustqec-cli",
     "rstim",
     "rstim-shot-web",
     "rsinter",

@@ -84,7 +84,7 @@ test('atom-loss evidence exposes sampling costs, figures and downloadable measur
   const provenance = await (await page.request.get('/data/atom-loss/provenance-all.json')).json();
   expect(source.working_tree_dirty).toBe(false);
   expect(provenance.source_commit).toBe(source.source_commit);
-  expect(source.inputs['rustqec-cli/src/decode.rs']).toBeDefined();
+  expect(source.inputs['rstim/src/unified_cli/decode.rs']).toBeDefined();
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download result table (CSV)' }).click();
   expect((await downloadPromise).suggestedFilename()).toBe('summary.csv');

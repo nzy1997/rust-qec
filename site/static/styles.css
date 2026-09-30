@@ -1293,9 +1293,8 @@ pre { max-width: 100%; }
 .terminal-block > pre code::before { content: '$'; position: absolute; left: 0; color: #d17a59; font-weight: 750; }
 .terminal-block .code-copy-button { top: 2.8rem; right: .75rem; border-color: #5d554f; background: #332f2b; color: #ddd4cd; }
 .terminal-block .code-copy-button:hover { border-color: #81766e; background: #403a35; color: #fff; }
-.terminal-output { border-top: 1px dashed #554d47; }
-.terminal-output-label { display: block; padding: .75rem 1.5rem 0; color: #968b82; font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.terminal-output pre[data-output="true"] { margin: 0; border: 0; border-radius: 0; background: transparent; color: #b9d8c5; padding: .45rem 1.5rem 1.15rem; }
+.terminal-block.has-output > pre { padding-bottom: .2rem; }
+.terminal-output pre[data-output="true"] { margin: 0; border: 0; border-radius: 0; background: transparent; color: #c9c2bc; padding: 0 1.05rem 1.2rem calc(1.05rem + 1.4em); }
 .terminal-output pre[data-output="true"] code { padding: 0; }
 .evidence-status-summary { color: var(--muted); font-size: .86rem; }
 .evidence-details { margin-top: .75rem; }
@@ -1350,6 +1349,8 @@ pre[data-output="true"] { background: #edf6f2; color: #183f32; border: 1px solid
 .result-takeaway { font-weight: 600; }
 .result-plot-caption { display: block; }
 .result-plot-caption a { display: inline-block; margin: .5rem .8rem .2rem 0; }
+.quickstart-figure-caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem; }
+.quickstart-figure-caption a { margin: 0; }
 .figure-dialog { width: min(96vw, 1600px); max-width: 96vw; max-height: 94dvh; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; }
 .figure-dialog::backdrop { background: rgb(10 20 30 / 70%); }
 .figure-dialog-bar { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; margin-bottom: .75rem; }

@@ -487,7 +487,7 @@ Primary implementation sources:
   official `decode_batch` interface for reducing per-shot Python overhead;
   the pinned package version is in `requirements.txt` and the run provenance.
 - `rstim/src/codegen/midswap.rs`, `rstim/src/executor.rs`,
-  `rustqec-cli/src/decode/compiler.rs`, `rustqec-cli/src/decode/matching.rs`:
+  `rstim/src/decode/compiler.rs`, `rstim/src/decode/matching.rs`:
   generated workload and the production semantics being tested.
 
 

@@ -24,13 +24,13 @@ listed here is not part of the frozen promise.
 The following arguments, their names, value domains, and exit-code conventions
 are frozen for the envelope decode path:
 
-- `rustqec decode --decoder <name> --dataset <dir> --out <file> --stats-out <file>`
-- `rustqec decode --shot-timeout-ms <ms>` — MLE solve path only; passing it to
+- `rstim decode --decoder <name> --dataset <dir> --out <file> --stats-out <file>`
+- `rstim decode --shot-timeout-ms <ms>` — MLE solve path only; passing it to
   `envelope-matching` is rejected with `invalid_arguments`.
-- `rustqec capabilities --format json` — must list every decoder the binary
+- `rstim capabilities --format json` — must list every decoder the binary
   can execute under `commands[].decoders`; a decoder that cannot execute must
   not be advertised.
-- `rustqec circuit stats --format json --in <file>`
+- `rstim circuit stats --format json --in <file>`
 
 Exit-code convention: `0` success; `2` argument/dataset/compile/output errors;
 `3` per-shot decode failures (`decode_timeout`, `decode_infeasible`). Successful

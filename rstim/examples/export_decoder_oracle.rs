@@ -4,9 +4,9 @@ fn main() {
     assert_eq!(
         args.len(),
         3,
-        "usage: export_matching_benchmark DATASET OUTPUT.json"
+        "usage: export_decoder_oracle DATASET OUTPUT.json"
     );
-    let data = rustqec_cli::export_matching_dataset(Path::new(&args[1]))
+    let data = rstim::unified_cli::export_decoder_oracle_dataset(Path::new(&args[1]))
         .expect("public benchmark dataset");
     std::fs::write(&args[2], serde_json::to_vec(&data).unwrap()).unwrap();
 }

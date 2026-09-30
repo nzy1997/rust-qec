@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand, ValueEnum, error::ErrorKind};
 use serde::Serialize;
 
 mod decode;
+mod matching;
 #[cfg(feature = "benchmark-tools")]
 #[doc(hidden)]
 pub use decode::benchmark::{export_decoder_oracle_dataset, export_matching_dataset};
@@ -17,9 +18,9 @@ const CIRCUIT_STATS_COMMAND: &str = "circuit.stats";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "rustqec",
+    name = "rstim",
     version,
-    about = "Unified RustQEC command line interface"
+    about = "Circuit simulation and quantum error correction tools"
 )]
 pub struct Cli {
     /// Select the error channel independently of command output
@@ -150,8 +151,12 @@ enum CircuitCommand {
         #[arg(long)]
         rounds: usize,
         /// After-Clifford depolarization probability
-        #[arg(long, default_value = "0")]
-        noise: f64,
+        #[arg(
+            long,
+            visible_alias = "after_clifford_depolarization",
+            default_value = "0"
+        )]
+        after_clifford_depolarization: f64,
         /// Depolarization applied to data qubits at the start of each round
         #[arg(long, default_value = "0")]
         before_round_data_depolarization: f64,
@@ -259,6 +264,24 @@ enum CircuitCommand {
         #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
         format: pipeline::PipelineFormat,
     },
+    /// Decode detector rows from a DEM with a selected decoder
+    Decode {
+        /// Decoder to use; rmatching requires a graphlike DEM and rejects hyperedges
+        #[arg(long, value_enum)]
+        decoder: CircuitDecoder,
+        /// Detector error model file
+        #[arg(long)]
+        dem: PathBuf,
+        /// Input 01 file containing detector bits only, one shot per line
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// Destination 01 file containing observable predictions
+        #[arg(long)]
+        out: PathBuf,
+        /// Select human-readable or versioned JSON output
+        #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
+        format: pipeline::PipelineFormat,
+    },
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -283,6 +306,11 @@ enum DecodeDecoder {
     EnvelopeMatching,
     #[cfg(feature = "ilp")]
     EnvelopeMle,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CircuitDecoder {
+    Rmatching,
 }
 
 impl From<DecodeDecoder> for decode::DecoderKind {
@@ -421,7 +449,7 @@ where
                     task,
                     distance,
                     rounds,
-                    noise,
+                    after_clifford_depolarization,
                     before_round_data_depolarization,
                     before_round_data_loss_probability,
                     before_measure_flip_probability,
@@ -438,7 +466,7 @@ where
                 task,
                 distance,
                 rounds,
-                noise,
+                after_clifford_depolarization,
                 before_round_data_depolarization,
                 before_round_data_loss_probability,
                 before_measure_flip_probability,
@@ -564,6 +592,40 @@ where
                 .and_then(|result| {
                     write_pipeline_success(
                         pipeline::CIRCUIT_DEM_COMMAND,
+                        &result,
+                        artifacts,
+                        format,
+                        error_format,
+                        stdout,
+                    )
+                })
+                .map_err(RunError::Command)
+        }
+        Command::Circuit {
+            command:
+                CircuitCommand::Decode {
+                    decoder,
+                    dem,
+                    input,
+                    out,
+                    format,
+                },
+        } => {
+            let artifacts = vec![out.display().to_string()];
+            let result = match decoder {
+                CircuitDecoder::Rmatching => matching::run(&dem, &input, &out),
+            };
+            result
+                .map_err(|failure| CommandError {
+                    command: matching::COMMAND,
+                    code: failure.code,
+                    message: failure.message,
+                    json: format.is_json(error_format),
+                    exit_code: 2,
+                })
+                .and_then(|result| {
+                    write_pipeline_success(
+                        matching::COMMAND,
                         &result,
                         artifacts,
                         format,
@@ -911,8 +973,8 @@ fn write_capabilities(
                             default: None,
                         },
                         ArgumentCapability {
-                            name: "noise",
-                            flag: "--noise",
+                            name: "after_clifford_depolarization",
+                            flag: "--after-clifford-depolarization",
                             required: false,
                             values: vec!["probability"],
                             default: Some("0"),
@@ -1289,6 +1351,84 @@ fn write_capabilities(
                         name: "detector_error_model",
                         flag: "--out",
                         format: "dem",
+                    }],
+                },
+                Capability {
+                    name: matching::COMMAND,
+                    argv: vec!["circuit", "decode"],
+                    input_sources: vec!["file"],
+                    formats: vec!["human", "json"],
+                    output_schema: SCHEMA_VERSION,
+                    arguments: vec![
+                        ArgumentCapability {
+                            name: "decoder",
+                            flag: "--decoder",
+                            required: true,
+                            values: vec!["rmatching"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "dem",
+                            flag: "--dem",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "input",
+                            flag: "--in",
+                            required: true,
+                            values: vec!["01_detector_rows"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "out",
+                            flag: "--out",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "format",
+                            flag: "--format",
+                            required: false,
+                            values: vec!["human", "json"],
+                            default: Some("json"),
+                        },
+                    ],
+                    success_exit_code: 0,
+                    errors: vec![
+                        ErrorCapability {
+                            code: "invalid_arguments",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_dem",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "invalid_detector_row",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "input_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                        ErrorCapability {
+                            code: "output_error",
+                            exit_code: 2,
+                            channel: "stderr",
+                        },
+                    ],
+                    decoders: vec!["rmatching"],
+                    artifacts: vec![ArtifactCapability {
+                        name: "observable_predictions",
+                        flag: "--out",
+                        format: "01",
                     }],
                 },
                 Capability {
@@ -1688,17 +1828,20 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let is_stats = command_words
         .windows(2)
         .any(|pair| pair[0] == "circuit" && pair[1] == "stats");
-    let pipeline_command = ["gen", "sample", "detect", "dem"].iter().find_map(|verb| {
-        command_words
-            .windows(2)
-            .any(|pair| pair[0] == "circuit" && pair[1] == *verb)
-            .then_some(match *verb {
-                "gen" => pipeline::CIRCUIT_GEN_COMMAND,
-                "sample" => pipeline::CIRCUIT_SAMPLE_COMMAND,
-                "detect" => pipeline::CIRCUIT_DETECT_COMMAND,
-                _ => pipeline::CIRCUIT_DEM_COMMAND,
-            })
-    });
+    let pipeline_command = ["gen", "sample", "detect", "dem", "decode"]
+        .iter()
+        .find_map(|verb| {
+            command_words
+                .windows(2)
+                .any(|pair| pair[0] == "circuit" && pair[1] == *verb)
+                .then_some(match *verb {
+                    "gen" => pipeline::CIRCUIT_GEN_COMMAND,
+                    "sample" => pipeline::CIRCUIT_SAMPLE_COMMAND,
+                    "detect" => pipeline::CIRCUIT_DETECT_COMMAND,
+                    "dem" => pipeline::CIRCUIT_DEM_COMMAND,
+                    _ => matching::COMMAND,
+                })
+        });
     let is_dataset_export = command_words
         .windows(2)
         .any(|pair| pair[0] == "dataset" && pair[1] == "export");
@@ -1715,7 +1858,7 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     } else if is_decode {
         decode::COMMAND
     } else {
-        "rustqec"
+        "rstim"
     };
 
     let explicit_error_format = option_value(&words, "--error-format");

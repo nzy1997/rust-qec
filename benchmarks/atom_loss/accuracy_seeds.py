@@ -32,7 +32,7 @@ def capture_sources(out):
 
 def run(work,out):
     capture_sources(out)
-    binary=ROOT/'target/release/rustqec';exporter=ROOT/'target/release/examples/export_matching_benchmark'
+    binary=ROOT/'target/release/rstim';exporter=ROOT/'target/release/examples/export_matching_benchmark'
     report={'seeds':SEEDS,'shots_per_seed':5000,'cases':[]}
     settings=[(f'd{d}-p{p}',d,d,p) for d in [3,5,7] for p in [.0001,.0003,.001,.003,.01]]+[('tradeoff',3,2,.003)]
     for label,d,rounds,p in settings:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the installed rustqec quickstart without Cargo or PATH."""
+"""Exercise the installed rstim quickstart without Cargo or PATH."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ def run(binary: Path, *args: str, cwd: Path) -> subprocess.CompletedProcess[str]
 
 
 def validate(bin_dir: Path) -> None:
-    rustqec = bin_dir / "rustqec"
-    for binary in (rustqec,):
+    rstim = bin_dir / "rstim"
+    for binary in (rstim,):
         if not binary.is_file() or not binary.stat().st_mode & 0o111:
             raise QuickstartError(f"missing executable: {binary}")
     with tempfile.TemporaryDirectory(prefix="installed-quickstart-") as temporary:
@@ -35,7 +35,7 @@ def validate(bin_dir: Path) -> None:
         circuit, dem, bad = work / "pipeline.stim", work / "pipeline.dem", work / "bad-repeat.stim"
         circuit.write_text(CIRCUIT, encoding="utf-8")
         bad.write_text(BAD_REPEAT, encoding="utf-8")
-        capabilities = run(rustqec, "capabilities", "--format", "json", cwd=work)
+        capabilities = run(rstim, "capabilities", "--format", "json", cwd=work)
         if capabilities.returncode:
             raise QuickstartError(f"capabilities failed: {capabilities.stderr.strip()}")
         try:
@@ -45,7 +45,7 @@ def validate(bin_dir: Path) -> None:
         stats_capability = next((command for command in commands if command.get("name") == "circuit.stats"), None)
         if stats_capability is None or stats_capability.get("argv") != ["circuit", "stats"] or "json" not in stats_capability.get("formats", []):
             raise QuickstartError("capabilities does not advertise circuit.stats")
-        stats = run(rustqec, "circuit", "stats", "--format", "json", "--in", str(circuit), cwd=work)
+        stats = run(rstim, "circuit", "stats", "--format", "json", "--in", str(circuit), cwd=work)
         try:
             observed_stats = json.loads(stats.stdout)
         except json.JSONDecodeError:
@@ -54,14 +54,14 @@ def validate(bin_dir: Path) -> None:
         if stats.returncode or {key: observed_result.get(key) for key in EXPECTED_STATS} != EXPECTED_STATS:
             raise QuickstartError(f"stats did not match the showcase: {stats.stderr.strip() or stats.stdout.strip()}")
         events = work / "events.dets"
-        detect = run(rustqec, "circuit", "detect", "--shots", "1", "--out-format", "dets",
+        detect = run(rstim, "circuit", "detect", "--shots", "1", "--out-format", "dets",
                      "--append-observables", "--in", str(circuit), "--out", str(events), cwd=work)
         if detect.returncode or not events.is_file() or events.read_text().strip() != EVENT:
             raise QuickstartError("detect did not produce 'shot D0 L0'")
-        analyze = run(rustqec, "circuit", "dem", "--in", str(circuit), "--out", str(dem), cwd=work)
+        analyze = run(rstim, "circuit", "dem", "--in", str(circuit), "--out", str(dem), cwd=work)
         if analyze.returncode or not dem.is_file() or dem.read_text().strip() != "error(1) D0 L0":
             raise QuickstartError("dem did not produce 'error(1) D0 L0'")
-        rejected = run(rustqec, "circuit", "stats", "--in", str(bad), "--error-format", "json", cwd=work)
+        rejected = run(rstim, "circuit", "stats", "--in", str(bad), "--error-format", "json", cwd=work)
         try:
             error = json.loads(rejected.stderr)
         except json.JSONDecodeError:

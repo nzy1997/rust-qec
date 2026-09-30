@@ -1,7 +1,7 @@
 # Delayed-Erasure Conditioned Decoding v1
 
 Status: **experimental decoder contract**. This document specifies how the
-native `rustqec decode` path combines delayed atom-loss envelopes with the
+native `rstim decode` path combines delayed atom-loss envelopes with the
 loss-aware detector basis from
 [`loss-aware-detectors-v1.md`](loss-aware-detectors-v1.md).
 

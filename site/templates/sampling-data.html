@@ -12,7 +12,7 @@
     values, loss information, and private labels aligned from simulation to
     decoder training.
   </p>
-  <p class="doc-note"><strong>Advanced guide.</strong> The commands below use a <a href="../get-started/#source-build">configured repository checkout</a> and its Python loader. New users should begin with the <a href="../get-started/">installed CLI tutorial</a>.</p>
+  <p class="doc-note"><strong>Advanced guide.</strong> The commands below use a <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">configured repository checkout</a> and its Python loader. New users should begin with the <a href="../get-started/">installed CLI tutorial</a>.</p>
   <div class="data-pipeline" aria-label="Sampling data flow">
     <span><small>1</small><strong>circuit.stim</strong><em>experiment</em></span>
     <span><small>2</small><strong>sample</strong><em>seeded shots</em></span>
@@ -53,18 +53,18 @@
     <h2 id="sample-title">Generate a loss-visible circuit and inspect four shots</h2>
     <p class="section-copy">Run from the repository root. The first command creates a d=3 Mid-SWAP Z-memory circuit whose loss-visible measurements are stored as interleaved <code>flag,value</code> records.</p>
   </div>
-  <p class="doc-note">Run from a <a href="../get-started/#source-build">configured repository checkout</a>. These commands are not included in the two-binary native archive. This advanced guide uses the development CLI and a repository Python loader; start with the <a href="../get-started/">installed CLI example</a> if you are new to RustQEC.</p>
-<pre class="quick-command"><code>cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+  <p class="doc-note">Run from a <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">configured repository checkout</a>. This advanced guide uses the development CLI and a repository Python loader; start with the <a href="../get-started/">installed CLI example</a> if you are new to RustQEC.</p>
+<pre class="quick-command"><code>cargo run --release --locked -p rstim --bin rstim -- \
   circuit gen \
   --code surface_code \
   --task rotated_memory_z_midswap \
   --distance 3 --rounds 2 \
-  --noise 0.002 \
+  --after-clifford-depolarization 0.002 \
   --operation-loss-probability 0.002 \
   --measurement-loss-probability 0.003 \
   --out circuit.stim
 
-cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+cargo run --release --locked -p rstim --bin rstim -- \
   circuit sample \
   --in circuit.stim --shots 4 --seed 7 \
   --out raw-shots.01 --out-format 01</code></pre>
@@ -92,7 +92,7 @@ cargo run --release --locked -p rustqec-cli --bin rustqec -- \
   <p class="section-copy">For the generated d=3 Mid-SWAP example, <code>1,8,15</code> is a verified logical-X representative. Do not copy that support to a different circuit: the exporter checks that the requested Pauli preserves detector references and flips observable 0.</p>
   <pre class="quick-command"><code>mkdir -p data
 
-cargo run --release --locked -p rustqec-cli --bin rustqec -- \
+cargo run --release --locked -p rstim --bin rstim -- \
   dataset export \
   --circuit circuit.stim --shots 100000 --seed 7 \
   --mode measurements_blinded \
