@@ -270,6 +270,15 @@ impl ActiveState {
 
     fn single_axis_expectation<const NEGATIVE: bool>(&self, pivot: usize) -> f64 {
         let mut expectation = 0.0;
+        if pivot == 1 {
+            for pair in self.coefficients.chunks_exact(2) {
+                let zero = pair[0].norm_sqr();
+                let one = pair[1].norm_sqr();
+                expectation += if NEGATIVE { -zero } else { zero };
+                expectation += if NEGATIVE { one } else { -one };
+            }
+            return expectation;
+        }
         for block in self.coefficients.chunks_exact(pivot * 2) {
             let (zero, one) = block.split_at(pivot);
             // Keep the original coefficient accumulation order. Reducing
