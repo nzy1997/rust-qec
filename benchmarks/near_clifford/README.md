@@ -59,3 +59,8 @@ The [probability-arithmetic campaign after #768](results/apple-m4-probability-an
 retains the same 43 configurations and six modes. Rank 12–16 warm-flat improves
 1.22–1.27× while preserving the previous probability rounding order; rank-16
 oracle and bitwise differential tests cover the new paths.
+
+The [28-case entangled workload campaign](results/apple-m4-entangled-analysis-2026-09-30.md)
+extends validation to multilayer entanglement, long-range parity and repeated
+measurement/reset/feedback. Reduced independent dense-oracle coverage is explicit;
+wide-workload profiles identify independent-measurement absorption/tableau work.
