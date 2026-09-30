@@ -1,5 +1,7 @@
 # Fused projection and canonical-axis reuse
 
+The [final campaign on the merged unified CLI baseline](apple-m4-projection-synced-analysis-2026-09-30.md) supersedes the measurements below for the final PR. This earlier matched campaign remains independently reproducible.
+
 Against merged #767 (`7fd765e3`), implementation `85dbff62` improves warm flat
 sampling at ranks 12–16 by 1.57–1.68× and rank/random-prefix combinations by
 1.39–1.61×. Canonical axes use a lightweight boolean validity flag; projection

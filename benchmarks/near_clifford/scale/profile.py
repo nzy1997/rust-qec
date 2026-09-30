@@ -23,12 +23,21 @@ def main():
     if platform.system()!='Darwin': parser.error('this driver requires macOS sample')
     result=json.loads(args.results.read_text())
     if 'completed_utc' not in result: parser.error('finish timing before profiling')
+    if 'campaign_entry' in result or 'campaign_entry_sha256' in result:
+        entry = result.get('campaign_entry')
+        if entry not in ['run_pair.py', 'run_unified.py']:
+            parser.error('unknown campaign entry')
+        if sha(HERE/entry) != result.get('campaign_entry_sha256'):
+            parser.error('campaign entry hash differs')
     source=args.scratch.resolve()/'candidate/source'
     if sha(source/'rstim/src/near_clifford.rs')!=result['sources']['candidate']['near_clifford_source_sha256']:
         parser.error('candidate source differs from campaign')
     crate=args.scratch.resolve()/'profile-harness';crate.mkdir(exist_ok=True)
     (crate/'main.rs').write_bytes((HERE/'profile.rs').read_bytes())
-    (crate/'Cargo.lock').write_bytes((HERE/'Cargo.lock').read_bytes())
+    lock = 'Cargo.unified.lock' if result.get('campaign_entry') == 'run_unified.py' else 'Cargo.lock'
+    if sha(HERE/lock) != result['sources']['candidate']['lock_sha256']:
+        parser.error('retained lock differs from campaign')
+    (crate/'Cargo.lock').write_bytes((HERE/lock).read_bytes())
     (crate/'Cargo.toml').write_text('''[package]
 name = "near-clifford-scale"
 version = "0.1.0"
