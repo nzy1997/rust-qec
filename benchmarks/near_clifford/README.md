@@ -54,3 +54,8 @@ and discloses the small pure-Clifford warm regressions alongside high-rank gains
 
 The [final unified-CLI baseline campaign](results/apple-m4-projection-synced-analysis-2026-09-30.md)
 revalidates that optimization after merged #765 with a separate dependency lock.
+
+The [probability-arithmetic campaign after #768](results/apple-m4-probability-analysis-2026-09-30.md)
+retains the same 43 configurations and six modes. Rank 12–16 warm-flat improves
+1.22–1.27× while preserving the previous probability rounding order; rank-16
+oracle and bitwise differential tests cover the new paths.
