@@ -47,3 +47,7 @@ See the [scale harness](scale/README.md) for reproduction.
 The [single-qubit Pauli fast-path campaign](results/apple-m4-pauli-analysis-2026-09-30.md)
 compares the implementation with merged #766, checks the same 43 configurations,
 and profiles the remaining axis-canonicalization and high-rank projection costs.
+
+The [fused-projection and canonical-axis campaign](results/apple-m4-projection-analysis-2026-09-30.md)
+compares with merged #767, retains the same 43 configurations and final profiles,
+and discloses the small pure-Clifford warm regressions alongside high-rank gains.

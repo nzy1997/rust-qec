@@ -1,0 +1,28 @@
+{
+  "revision": "2fb8756dcd6732fd88137d6dd949e87d40230df2",
+  "binary_sha256": "fbe7e7249ee9a0cc4ffed888bd400eaac1179c4a40c73d829761b6f52e9885f5",
+  "driver_sha256": "0457a839ef800d5274dd7d944a16d7b16146c333e40ca7adb1a3b56d7a5ce59c",
+  "lock_sha256": "53e9a2e548be3cce2a0d0bf581d912de2d93c4959249de8de42c7da49fb5c13e",
+  "build": "cargo build --release --locked; release.debug=1; RUSTFLAGS=-Cforce-frame-pointers=yes",
+  "sample_command": "sample PID 8 1 -file OUTPUT",
+  "cases": [
+    {
+      "fixture": "combo_11_129",
+      "circuit_sha256": "2eb1d4d91763744e4d429219686d2f6658c27147ef118193fcfe8f3cc1200dca",
+      "profile_sha256": "c3e970def1599c81801ec12b69d1a68ce8d783ca2b67a3df801666aacd3febe5",
+      "output": "batches=723 shots_per_batch=64 elapsed_s=12.015"
+    },
+    {
+      "fixture": "rank_12",
+      "circuit_sha256": "8503c55612656630c34000b9107f5c04d12a40bc0dcf9d223f8d53266de7d0d4",
+      "profile_sha256": "477305e912b65b29ccf55e95abe6c1d0ae9c0f7ce2ffe6aa8a47ef503d46d201",
+      "output": "batches=10594 shots_per_batch=64 elapsed_s=12.001"
+    },
+    {
+      "fixture": "qec_32",
+      "circuit_sha256": "9d867fc76b43b9d9a0721d3d75835d3cbdda6ce04f589b376967012363616488",
+      "profile_sha256": "cf19dd6c6702d0d2c7d788b20edd3e57b8fe37807c23d347e23ac63e2a6b4ce1",
+      "output": "batches=8084 shots_per_batch=64 elapsed_s=12.001"
+    }
+  ]
+}
