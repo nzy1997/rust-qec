@@ -86,7 +86,7 @@ pub struct ActiveState {
     frame: Arc<StabilizerState>,
     origin: Vec<bool>,
     axes: Vec<Vec<bool>>,
-    canonical_pivots: Option<Vec<usize>>,
+    axes_are_canonical: bool,
     coefficients: Vec<ComplexAmp>,
     global_phase: ComplexAmp,
     max_active_qubits: usize,
@@ -99,7 +99,7 @@ impl ActiveState {
             frame: Arc::new(StabilizerState::new(num_qubits)),
             origin: vec![false; num_qubits],
             axes: Vec::new(),
-            canonical_pivots: Some(Vec::new()),
+            axes_are_canonical: true,
             coefficients: vec![ComplexAmp::new(1.0, 0.0)],
             global_phase: ComplexAmp::new(1.0, 0.0),
             max_active_qubits,
@@ -374,8 +374,16 @@ impl ActiveState {
 
     fn canonicalize_active_axes(&mut self) -> Vec<usize> {
         self.rebase_origin_into_frame();
-        if let Some(pivots) = &self.canonical_pivots {
-            return pivots.clone();
+        if self.axes_are_canonical {
+            return self
+                .axes
+                .iter()
+                .map(|axis| {
+                    axis.iter()
+                        .position(|&bit| bit)
+                        .expect("active axis is nonzero")
+                })
+                .collect();
         }
         let mut pivots = Vec::with_capacity(self.axes.len());
         let frame = Arc::make_mut(&mut self.frame);
@@ -409,15 +417,8 @@ impl ActiveState {
             axis[pivot] = true;
             pivots.push(pivot);
         }
-        self.canonical_pivots = Some(pivots.clone());
+        self.axes_are_canonical = true;
         pivots
-    }
-
-    fn remove_axis(&mut self, index: usize) -> Vec<bool> {
-        if let Some(pivots) = &mut self.canonical_pivots {
-            pivots.remove(index);
-        }
-        self.axes.remove(index)
     }
 
     /// Project directly into the surviving half of the active coordinates.
@@ -480,7 +481,7 @@ impl ActiveState {
                 frame.right_s(pivot);
             }
             frame.right_h(pivot);
-            self.remove_axis(pivot_index);
+            self.axes.remove(pivot_index);
             if fixed {
                 self.origin[pivot] ^= true;
             }
@@ -722,9 +723,9 @@ impl ActiveState {
     fn retire_parity_basis(&mut self, parity_mask: usize, fixed_parity: bool) {
         let pivot = parity_mask.trailing_zeros() as usize;
         let other_mask = parity_mask ^ (1 << pivot);
-        let pivot_axis = self.remove_axis(pivot);
+        let pivot_axis = self.axes.remove(pivot);
         if other_mask != 0 {
-            self.canonical_pivots = None;
+            self.axes_are_canonical = false;
         }
         if fixed_parity {
             xor(&mut self.origin, &pivot_axis);
@@ -847,7 +848,7 @@ impl ActiveState {
                 None
             };
             if let Some(fixed) = fixed {
-                let axis = self.remove_axis(axis_index);
+                let axis = self.axes.remove(axis_index);
                 if fixed == 1 {
                     xor(&mut self.origin, &axis);
                 }
@@ -943,18 +944,8 @@ impl ActiveState {
                 rank + 1
             ));
         }
-        if let Some(pivots) = &mut self.canonical_pivots {
-            let mut support = x
-                .iter()
-                .enumerate()
-                .filter(|(_, bit)| **bit)
-                .map(|(i, _)| i);
-            let pivot = support.next().expect("independent axis is nonzero");
-            if support.next().is_none() {
-                pivots.push(pivot);
-            } else {
-                self.canonical_pivots = None;
-            }
+        if self.axes_are_canonical {
+            self.axes_are_canonical = x.iter().filter(|&&bit| bit).take(2).count() == 1;
         }
         self.axes.push(x.to_vec());
         self.coefficients
@@ -2861,7 +2852,7 @@ mod tests {
     fn dense_coordinate_state(n: usize, rng: &mut StdRng) -> ActiveState {
         let rank = n.min(8);
         let mut state = ActiveState::new(n, rank);
-        state.canonical_pivots = None;
+        state.axes_are_canonical = false;
         for q in 0..rank {
             state.apply_clifford(CliffordGate::H(q)).unwrap();
             let mut axis = vec![false; n];
