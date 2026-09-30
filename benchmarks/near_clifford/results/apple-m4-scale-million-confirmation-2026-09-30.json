@@ -1,0 +1,959 @@
+{
+  "campaign_sha256": "ba29b4b273bd818fd4b16201dd13e36555301595f3930febaaf13bb8678ad925",
+  "fixture": "terminal_20q",
+  "shots": 1000000,
+  "sources": {
+    "baseline": {
+      "revision": "7cc2fa86525b75a9cef8858108be41336f3884ef",
+      "binary_sha256": "719a1c82753cd04ea2ff4b74d406a226f980d5294b5bb26fe5ea2d3df3d10edb",
+      "lock_sha256": "53e9a2e548be3cce2a0d0bf581d912de2d93c4959249de8de42c7da49fb5c13e",
+      "near_clifford_source_sha256": "cdaca9a63c9265efb2b3a4aa23b3f4497fa3540235ddf76566e936be9dd2d2d3",
+      "diagnostic": {
+        "revision": "7cc2fa86525b75a9cef8858108be41336f3884ef",
+        "binary_sha256": "6f7f8412c0eea92ee11dc4a2fd478a9e7857a06c5d52c62a3ac9f196781beb76",
+        "lock_sha256": "53e9a2e548be3cce2a0d0bf581d912de2d93c4959249de8de42c7da49fb5c13e",
+        "near_clifford_source_sha256": "0e287fba3b0174b9cc62e49cc253079909e3310752be4dae7b4e8250dbff3766"
+      }
+    },
+    "candidate": {
+      "revision": "f4b5966129aee3d617181414f805eb1250e1cc5d",
+      "binary_sha256": "df232591264422f66a9f772df8c22b1bab39346644a9c8d5fa83e0785bc1cc6e",
+      "lock_sha256": "53e9a2e548be3cce2a0d0bf581d912de2d93c4959249de8de42c7da49fb5c13e",
+      "near_clifford_source_sha256": "45ac1d5a89af0948d9a7dd026d408ef3d0b295f498e242f0813d1a50aa2be9c1",
+      "diagnostic": {
+        "revision": "f4b5966129aee3d617181414f805eb1250e1cc5d",
+        "binary_sha256": "125adb5096bee898ca51e445246954ca4e9f3554deee97f0a457df2ffcbbc39e",
+        "lock_sha256": "53e9a2e548be3cce2a0d0bf581d912de2d93c4959249de8de42c7da49fb5c13e",
+        "near_clifford_source_sha256": "8ebac26f00d5e862242d749f9eeb2647523965e37e2d298c2d6a859db5c9ee12"
+      }
+    }
+  },
+  "created_utc": "2026-09-30T01:34:02.999405+00:00",
+  "runs": [
+    {
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 19750,
+          "raw_ns": [
+            63042,
+            19750,
+            14958
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118442500,
+              "raw_ns": [
+                118748000,
+                117573334,
+                118442500
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 100940833,
+              "raw_ns": [
+                101645375,
+                100038292,
+                100940833
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 116974833,
+              "raw_ns": [
+                116974833,
+                116761000,
+                117787250
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119278208,
+              "raw_ns": [
+                123687708,
+                119278208,
+                117918917
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99522125,
+              "raw_ns": [
+                101131500,
+                99522125,
+                98994084
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116294000,
+              "raw_ns": [
+                117803208,
+                116286875,
+                116294000
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129368064,
+        "prepare": {
+          "median_ns": 100042,
+          "raw_ns": [
+            94417,
+            100042,
+            100667
+          ]
+        }
+      },
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 20250,
+          "raw_ns": [
+            63500,
+            20250,
+            15584
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 117395375,
+              "raw_ns": [
+                117294000,
+                117395375,
+                118171250
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 98454500,
+              "raw_ns": [
+                99562166,
+                98454500,
+                98154208
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 116419625,
+              "raw_ns": [
+                116593958,
+                116419625,
+                116311500
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 118284458,
+              "raw_ns": [
+                123824125,
+                118284458,
+                117624875
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 97721084,
+              "raw_ns": [
+                99142291,
+                97721084,
+                97463167
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116411459,
+              "raw_ns": [
+                117080125,
+                116411459,
+                115738708
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129351680,
+        "prepare": {
+          "median_ns": 101958,
+          "raw_ns": [
+            105042,
+            101958,
+            100958
+          ]
+        }
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 19500,
+          "raw_ns": [
+            37208,
+            19500,
+            15000
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118847625,
+              "raw_ns": [
+                119004209,
+                118735916,
+                118847625
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 105132334,
+              "raw_ns": [
+                103249375,
+                105132334,
+                108288042
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117302917,
+              "raw_ns": [
+                117302917,
+                117549125,
+                116719375
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119670667,
+              "raw_ns": [
+                126118958,
+                119670667,
+                118860750
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99128167,
+              "raw_ns": [
+                100498792,
+                99128167,
+                99006625
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116468625,
+              "raw_ns": [
+                175249500,
+                116468625,
+                116109917
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129400832,
+        "prepare": {
+          "median_ns": 100125,
+          "raw_ns": [
+            99917,
+            101334,
+            100125
+          ]
+        }
+      },
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 18167,
+          "raw_ns": [
+            37500,
+            18167,
+            15458
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118291625,
+              "raw_ns": [
+                118201625,
+                118291625,
+                118614291
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 100666625,
+              "raw_ns": [
+                102001916,
+                100666625,
+                100655875
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117108958,
+              "raw_ns": [
+                117108958,
+                116985250,
+                117458792
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 118753208,
+              "raw_ns": [
+                124672458,
+                118753208,
+                118456750
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99720125,
+              "raw_ns": [
+                100579792,
+                99657042,
+                99720125
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 117191750,
+              "raw_ns": [
+                118188875,
+                116639083,
+                117191750
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129351680,
+        "prepare": {
+          "median_ns": 102625,
+          "raw_ns": [
+            103917,
+            102625,
+            92708
+          ]
+        }
+      }
+    },
+    {
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 21666,
+          "raw_ns": [
+            33917,
+            21666,
+            15125
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118550250,
+              "raw_ns": [
+                118267541,
+                118550250,
+                118741041
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 100911500,
+              "raw_ns": [
+                101750208,
+                100911500,
+                100676084
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 118125708,
+              "raw_ns": [
+                120590167,
+                117290125,
+                118125708
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119213250,
+              "raw_ns": [
+                126294625,
+                118983375,
+                119213250
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 100964209,
+              "raw_ns": [
+                100964209,
+                100686667,
+                101782542
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116700417,
+              "raw_ns": [
+                118150667,
+                116700417,
+                116696666
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129368064,
+        "prepare": {
+          "median_ns": 98334,
+          "raw_ns": [
+            98334,
+            101125,
+            97416
+          ]
+        }
+      },
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 21250,
+          "raw_ns": [
+            36708,
+            21250,
+            15708
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118037083,
+              "raw_ns": [
+                118079667,
+                118037083,
+                117688041
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 98962208,
+              "raw_ns": [
+                100092375,
+                98962208,
+                98898917
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117234709,
+              "raw_ns": [
+                117047750,
+                117253834,
+                117234709
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119588459,
+              "raw_ns": [
+                123941291,
+                119588459,
+                118758583
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 98174250,
+              "raw_ns": [
+                99790042,
+                98174250,
+                97863709
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116686625,
+              "raw_ns": [
+                117720958,
+                116686625,
+                116546125
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129302528,
+        "prepare": {
+          "median_ns": 104334,
+          "raw_ns": [
+            104417,
+            104334,
+            95959
+          ]
+        }
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 19041,
+          "raw_ns": [
+            35584,
+            19041,
+            15042
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 117990625,
+              "raw_ns": [
+                118534000,
+                117867083,
+                117990625
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 99059166,
+              "raw_ns": [
+                100090125,
+                98993333,
+                99059166
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117184000,
+              "raw_ns": [
+                116996458,
+                117184000,
+                117203750
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 118862042,
+              "raw_ns": [
+                123862167,
+                118862042,
+                117854000
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 98210125,
+              "raw_ns": [
+                99424750,
+                98210125,
+                97876000
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116256792,
+              "raw_ns": [
+                117819375,
+                116256792,
+                116148333
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129351680,
+        "prepare": {
+          "median_ns": 96541,
+          "raw_ns": [
+            96541,
+            91333,
+            97250
+          ]
+        }
+      },
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 17167,
+          "raw_ns": [
+            38459,
+            17167,
+            14833
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118633542,
+              "raw_ns": [
+                118633542,
+                119548083,
+                118425500
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 100854917,
+              "raw_ns": [
+                102259042,
+                100854917,
+                100665500
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117335666,
+              "raw_ns": [
+                117372625,
+                117335666,
+                117234000
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119154458,
+              "raw_ns": [
+                125617125,
+                119154458,
+                118675292
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99739875,
+              "raw_ns": [
+                101216708,
+                99739875,
+                99478125
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116921000,
+              "raw_ns": [
+                117994292,
+                116780708,
+                116921000
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129335296,
+        "prepare": {
+          "median_ns": 101542,
+          "raw_ns": [
+            105083,
+            101542,
+            97917
+          ]
+        }
+      }
+    },
+    {
+      "order": [
+        "baseline",
+        "candidate"
+      ],
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 19750,
+          "raw_ns": [
+            37791,
+            19750,
+            15208
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118565750,
+              "raw_ns": [
+                118538500,
+                118949083,
+                118565750
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 100912208,
+              "raw_ns": [
+                102118500,
+                100774459,
+                100912208
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117591167,
+              "raw_ns": [
+                117591167,
+                117448041,
+                117918417
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 120718833,
+              "raw_ns": [
+                125763792,
+                120718833,
+                119434625
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99601250,
+              "raw_ns": [
+                100920666,
+                99601250,
+                99443959
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 117042375,
+              "raw_ns": [
+                118163791,
+                117042375,
+                116955083
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129368064,
+        "prepare": {
+          "median_ns": 101709,
+          "raw_ns": [
+            105042,
+            101709,
+            94166
+          ]
+        }
+      },
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 20125,
+          "raw_ns": [
+            36208,
+            20125,
+            15250
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118855292,
+              "raw_ns": [
+                118005458,
+                119986458,
+                118855292
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 99201917,
+              "raw_ns": [
+                100167625,
+                99094708,
+                99201917
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117216417,
+              "raw_ns": [
+                117216417,
+                117684292,
+                117070750
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119242167,
+              "raw_ns": [
+                124041584,
+                119242167,
+                118064000
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 98317000,
+              "raw_ns": [
+                99540375,
+                98123500,
+                98317000
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116663292,
+              "raw_ns": [
+                117918750,
+                116600166,
+                116663292
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129286144,
+        "prepare": {
+          "median_ns": 94916,
+          "raw_ns": [
+            103917,
+            94916,
+            90708
+          ]
+        }
+      }
+    },
+    {
+      "order": [
+        "candidate",
+        "baseline"
+      ],
+      "candidate": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 19875,
+          "raw_ns": [
+            34833,
+            19875,
+            15416
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 118325750,
+              "raw_ns": [
+                118249709,
+                118325750,
+                118516292
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 99337000,
+              "raw_ns": [
+                100362791,
+                99337000,
+                99058083
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117170500,
+              "raw_ns": [
+                117348500,
+                117081792,
+                117170500
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 119738459,
+              "raw_ns": [
+                124493250,
+                119233667,
+                119738459
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 98117250,
+              "raw_ns": [
+                99464416,
+                98117250,
+                97896041
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 116570125,
+              "raw_ns": [
+                118131708,
+                116570125,
+                116564208
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129253376,
+        "prepare": {
+          "median_ns": 95291,
+          "raw_ns": [
+            106750,
+            91958,
+            95291
+          ]
+        }
+      },
+      "baseline": {
+        "circuit": "H 0\nH 1\nH 2\nH 3\nH 4\nH 5\nH 6\nH 7\nH 8\nH 9\nH 10\nH 11\nH 12\nH 13\nH 14\nH 15\nH 16\nH 17\nH 18\nH 19\nCX 0 1\nCX 1 2\nCX 2 3\nCX 3 4\nCX 4 5\nCX 5 6\nCX 6 7\nCX 7 8\nCX 8 9\nCX 9 10\nCX 10 11\nCX 11 12\nCX 12 13\nCX 13 14\nCX 14 15\nCX 15 16\nCX 16 17\nCX 17 18\nCX 18 19\nT 1\nH 1\nCX 1 2\nT_DAG 4\nH 4\nCX 4 5\nT 7\nH 7\nCX 7 8\nT_DAG 10\nH 10\nCX 10 11\nT 13\nH 13\nCX 13 14\nT_DAG 16\nH 16\nCX 16 17\nT 19\nH 19\nCX 19 0\nT_DAG 2\nH 2\nCX 2 3\nH 0\nH 2\nH 4\nH 6\nH 8\nH 10\nH 12\nH 14\nH 16\nH 18\nM 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19\n",
+        "compile": {
+          "median_ns": 28417,
+          "raw_ns": [
+            42916,
+            28417,
+            15542
+          ]
+        },
+        "fixture": "terminal_20q",
+        "measurements": [
+          {
+            "cold_prepared_structured": {
+              "median_ns": 119270250,
+              "raw_ns": [
+                119270250,
+                119400500,
+                118900875
+              ]
+            },
+            "first_prepared_flat": {
+              "median_ns": 101366625,
+              "raw_ns": [
+                101921625,
+                100812708,
+                101366625
+              ]
+            },
+            "first_prepared_structured": {
+              "median_ns": 117465250,
+              "raw_ns": [
+                117465250,
+                117416416,
+                118066584
+              ]
+            },
+            "shots": 1000000,
+            "unprepared": {
+              "median_ns": 121669292,
+              "raw_ns": [
+                126916000,
+                121669292,
+                119744625
+              ]
+            },
+            "warm_prepared_flat": {
+              "median_ns": 99872667,
+              "raw_ns": [
+                101316625,
+                99812375,
+                99872667
+              ]
+            },
+            "warm_prepared_structured": {
+              "median_ns": 117332125,
+              "raw_ns": [
+                118644458,
+                117108125,
+                117332125
+              ]
+            }
+          }
+        ],
+        "peak_rss_bytes": 129368064,
+        "prepare": {
+          "median_ns": 100041,
+          "raw_ns": [
+            106542,
+            99500,
+            100041
+          ]
+        }
+      }
+    }
+  ],
+  "completed_utc": "2026-09-30T01:34:28.319394+00:00"
+}

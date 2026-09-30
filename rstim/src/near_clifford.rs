@@ -725,11 +725,40 @@ impl ActiveState {
         if q >= n {
             return Err(format!("qubit {q} outside near-Clifford state"));
         }
-        let mut x = vec![false; n];
-        let mut z = vec![false; n];
-        x[q] = matches!(basis, MeasurementBasis::X | MeasurementBasis::Y);
-        z[q] = matches!(basis, MeasurementBasis::Y | MeasurementBasis::Z);
-        self.physical_pauli(&x, &z)
+        let has_x = matches!(basis, MeasurementBasis::X | MeasurementBasis::Y);
+        let has_z = matches!(basis, MeasurementBasis::Y | MeasurementBasis::Z);
+        let mut virtual_x = vec![false; n];
+        let mut virtual_z = vec![false; n];
+        // The physical Pauli has support only at q. Its symplectic products
+        // select one tableau column instead of scanning two sparse n-bit rows.
+        for i in 0..n {
+            let (x, z, _) = self.frame.canonical_row(n + i);
+            virtual_x[i] = (has_x && z[q]) ^ (has_z && x[q]);
+            let (x, z, _) = self.frame.canonical_row(i);
+            virtual_z[i] = (has_x && z[q]) ^ (has_z && x[q]);
+        }
+        let product = self.reconstruct_physical_pauli(&virtual_x, &virtual_z);
+        if !product
+            .x
+            .iter()
+            .enumerate()
+            .all(|(i, &bit)| bit == (has_x && i == q))
+            || !product
+                .z
+                .iter()
+                .enumerate()
+                .all(|(i, &bit)| bit == (has_z && i == q))
+        {
+            return Err("Clifford frame failed to reconstruct physical Pauli".into());
+        }
+        // Y = iXZ; keep the same row multiplication order and phase convention
+        // as the general physical-Pauli conversion.
+        let desired_phase = u8::from(has_x && has_z);
+        Ok(Pauli {
+            x: virtual_x,
+            z: virtual_z,
+            phase: (desired_phase + 4 - product.phase) % 4,
+        })
     }
 
     fn ensure_axis(&mut self, x: &[bool]) -> Result<usize, String> {
@@ -850,17 +879,7 @@ impl ActiveState {
             let (x, z, _) = self.frame.canonical_row(i);
             virtual_z[i] = dot(physical_x, z) ^ dot(physical_z, x);
         }
-        let mut product = Pauli::identity(n);
-        for (i, &selected) in virtual_x.iter().enumerate() {
-            if selected {
-                product.multiply_tableau_row(&self.frame, i);
-            }
-        }
-        for (i, &selected) in virtual_z.iter().enumerate() {
-            if selected {
-                product.multiply_tableau_row(&self.frame, n + i);
-            }
-        }
+        let product = self.reconstruct_physical_pauli(&virtual_x, &virtual_z);
         if product.x != physical_x || product.z != physical_z {
             return Err("Clifford frame failed to reconstruct physical Pauli".into());
         }
@@ -876,6 +895,22 @@ impl ActiveState {
             z: virtual_z,
             phase,
         })
+    }
+
+    fn reconstruct_physical_pauli(&self, virtual_x: &[bool], virtual_z: &[bool]) -> Pauli {
+        let n = self.num_qubits();
+        let mut product = Pauli::identity(n);
+        for (i, &selected) in virtual_x.iter().enumerate() {
+            if selected {
+                product.multiply_tableau_row(&self.frame, i);
+            }
+        }
+        for (i, &selected) in virtual_z.iter().enumerate() {
+            if selected {
+                product.multiply_tableau_row(&self.frame, n + i);
+            }
+        }
+        product
     }
 }
 
@@ -2284,6 +2319,54 @@ fn apply_near_pair(state: &mut ActiveState, name: &str, a: usize, b: usize) -> R
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn single_qubit_coordinates_match_general_conversion_on_signed_entangled_frames() {
+        let mut rng = StdRng::seed_from_u64(20260930);
+        for n in [1, 4, 64, 65, 128, 129, 193] {
+            let mut state = ActiveState::new(n, 8);
+            for _ in 0..12 {
+                for _ in 0..24 {
+                    let q = rng.gen_range(0..n);
+                    let other = if n == 1 {
+                        q
+                    } else {
+                        (q + rng.gen_range(1..n)) % n
+                    };
+                    let gate = match rng.gen_range(0..6) {
+                        0 => CliffordGate::H(q),
+                        1 => CliffordGate::S(q),
+                        2 => CliffordGate::SDag(q),
+                        3 => CliffordGate::Y(q),
+                        4 if n > 1 => CliffordGate::CX(q, other),
+                        _ if n > 1 => CliffordGate::CZ(q, other),
+                        _ => CliffordGate::X(q),
+                    };
+                    state.apply_clifford(gate).unwrap();
+                }
+                for q in [0, n / 2, n - 1, rng.gen_range(0..n)] {
+                    for basis in [
+                        MeasurementBasis::X,
+                        MeasurementBasis::Y,
+                        MeasurementBasis::Z,
+                    ] {
+                        let mut x = vec![false; n];
+                        let mut z = vec![false; n];
+                        x[q] = matches!(basis, MeasurementBasis::X | MeasurementBasis::Y);
+                        z[q] = matches!(basis, MeasurementBasis::Y | MeasurementBasis::Z);
+                        let expected = state.physical_pauli(&x, &z).unwrap();
+                        let actual = state.single_qubit_pauli(q, basis).unwrap();
+                        assert_eq!(actual.x, expected.x, "n={n}, q={q}, basis={basis:?}");
+                        assert_eq!(actual.z, expected.z, "n={n}, q={q}, basis={basis:?}");
+                        assert_eq!(
+                            actual.phase, expected.phase,
+                            "n={n}, q={q}, basis={basis:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn record_order_swaps_restore_nontrivial_cycle_in_place() {
