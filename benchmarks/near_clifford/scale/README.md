@@ -77,3 +77,8 @@ python3 benchmarks/near_clifford/scale/run_pair.py \
 
 The wrapper defaults to a separate `drafts/near-clifford-pauli` build directory;
 its hash and selected source commits are retained alongside the original runner hash.
+
+Always use a fresh `--scratch` directory for a new source pair. Archive extraction
+restores tracked files but does not remove files deleted between revisions; directory
+reuse across different source pairs is unsupported. The retained current campaigns
+used separate task-owned directories and their source pairs have no deleted files.

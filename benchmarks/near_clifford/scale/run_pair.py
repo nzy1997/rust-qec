@@ -4,9 +4,30 @@ import hashlib
 from pathlib import Path
 import subprocess
 import sys
+import statistics
 import run as campaign
 
 HERE=Path(__file__).resolve().parent
+
+def report(result):
+    lines=['# Paired near-Clifford scale campaign','',
+           f"Host: {result['platform']}; {result['rustc']}; {result['created_utc']}",
+           f"Pristine baseline `{result['sources']['baseline']['revision']}` versus candidate `{result['sources']['candidate']['revision']}`.",
+           f"{result['pairs']} paired process invocations × {result['repetitions']} repetitions per mode.",
+           'Speedup = baseline / candidate; n/a means a duration was below clock resolution.',
+           'RSS includes validation, multiple live samplers and outputs; it is not single-cache memory.',
+           '', '| Fixture | Shots | Cold speedup | Warm flat speedup | Candidate warm flat ms | Candidate RSS MiB |',
+           '| --- | ---: | ---: | ---: | ---: | ---: |']
+    for case in result['cases']:
+        def med(label,mode):
+            return statistics.median([run[label]['measurements'][0][mode]['median_ns'] for run in case['runs']])
+        def ratio(mode):
+            baseline,candidate=med('baseline',mode),med('candidate',mode)
+            return f'{baseline/candidate:.2f}×' if baseline>0 and candidate>0 else 'n/a'
+        rss=statistics.median([run['candidate']['peak_rss_bytes'] for run in case['runs']])/1048576
+        lines.append(f"| {case['fixture']} | {case['shots']} | {ratio('cold_prepared_structured')} | {ratio('warm_prepared_flat')} | {med('candidate','warm_prepared_flat')/1e6:.4f} | {rss:.1f} |")
+    return '\n'.join(lines)+'\n'
+
 
 def main():
     parser=argparse.ArgumentParser(add_help=False)
@@ -23,6 +44,7 @@ def main():
         result['campaign_entry']='run_pair.py'
         save(path,result)
     campaign.atomic_save=save_with_entry
+    campaign.report=report
     sys.argv=[sys.argv[0],*remaining]
     campaign.main()
 
