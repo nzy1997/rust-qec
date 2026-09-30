@@ -43,3 +43,7 @@ The expanded [43-configuration M4 campaign and profiling](results/apple-m4-scale
 compares the merged #764/#766 revisions, includes rank/width combinations and mixed
 circuits, and retains diagnostic cache/fallback counters separately from timing.
 See the [scale harness](scale/README.md) for reproduction.
+
+The [single-qubit Pauli fast-path campaign](results/apple-m4-pauli-analysis-2026-09-30.md)
+compares the implementation with merged #766, checks the same 43 configurations,
+and profiles the remaining axis-canonicalization and high-rank projection costs.

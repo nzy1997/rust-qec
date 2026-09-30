@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('results',type=Path)
+    parser.add_argument('--title',help='override the figure title for selected revisions')
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();r=json.loads(args.results.read_text())
     if 'completed_utc' not in r: parser.error('campaign incomplete')
@@ -31,7 +32,7 @@ def main():
         ax.set_xlabel('rank / random width' if title.startswith('Random prefix') else 'width' if title.startswith('Independent random') else 'prepared rank')
         ax.spines[['top','right']].set_visible(False)
     axes[0].set_ylabel('Warm flat µs / shot (log scale)');axes[0].legend(frameon=False,fontsize=9)
-    fig.suptitle('#764 → #766 · Apple M4 · paired process medians',fontsize=12)
+    fig.suptitle(args.title or '#764 → #766 · Apple M4 · paired process medians',fontsize=12)
     fig.supxlabel('Shading: range of three process medians. Rank ≥12 uses 8–16 shots; combinations use 16–64.',fontsize=9)
     args.output.parent.mkdir(parents=True,exist_ok=True)
     fig.savefig(args.output.with_suffix('.svg'));fig.savefig(args.output.with_suffix('.png'),dpi=170)
