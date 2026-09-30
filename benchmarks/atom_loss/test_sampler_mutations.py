@@ -18,7 +18,7 @@ class SamplerMutationEvidenceTests(unittest.TestCase):
     def setUpClass(cls):
         # One executed experiment supplies every test; individual report mutations
         # never rerun sampling or substitute fabricated positive observations.
-        cls.report = correctness.run(ROOT/'target/release/rustqec')
+        cls.report = correctness.run(ROOT/'target/release/rstim')
         if cls.report['status'] != 'PASS':
             raise ValueError('Fresh sampling experiment failed')
 

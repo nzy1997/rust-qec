@@ -492,12 +492,22 @@ fn new_documentation_routes_use_canonical_sources() {
         .lines()
         .find_map(|line| line.strip_prefix("VERSION="))
         .expect("native installer must pin a release version");
-    let archive_marker = format!("rustqec-{installer_version}-");
+    assert_eq!(installer_version, "v0.3.3");
 
     assert_contains_all(
         &get_started,
-        &["id=\"install\"", &archive_marker, "id=\"source-build\""],
-        "versioned onboarding entry point",
+        &[
+            "id=\"install\"",
+            "cargo install --locked --path rstim --force",
+            "id=\"continue-rustqec\"",
+            "id=\"further-learning\"",
+        ],
+        "source-install onboarding entry point",
+    );
+    assert_contains_all(
+        &installer,
+        &["archive=rustqec-$VERSION-$target.tar.gz"],
+        "pinned historical installer",
     );
     assert_contains_all(
         &support,
@@ -536,6 +546,113 @@ fn new_documentation_routes_use_canonical_sources() {
 }
 
 #[test]
+fn get_started_uses_one_noisy_circuit_for_definition_and_sampling() {
+    let circuit = read_repo_file("site/static/examples/getting-started.stim");
+    let page = read_repo_file("site/templates/get-started.html");
+    let makefile = read_repo_file("Makefile");
+
+    assert_contains_all(
+        &circuit,
+        &["X_ERROR(0.1) 0", "X_ERROR(0.1) 1", "CX 0 1"],
+        "get-started circuit",
+    );
+    assert_contains_all(
+        &page,
+        &[
+            "rstim render_svg --in circuit.stim --out circuit.svg",
+            "rstim circuit dem --in circuit.stim",
+            "--in circuit.stim \\",
+            "rstim render_svg --sample_shot --seed 86 --in circuit.stim",
+            "id=\"surface-code\"",
+            "The four <code>0.02</code> values set error probabilities",
+            "<li><code>--after-clifford-depolarization</code>",
+            "depolarizing errors after Clifford gates",
+            "<li><code>--before-round-data-depolarization</code>",
+            "<li><code>--after-reset-flip-probability</code>",
+            "<li><code>--before-measure-flip-probability</code>",
+            "id=\"surface-sample\"",
+            "--in surface.stim --shots 1 --seed 0",
+            "010010100000010000000000\t1",
+            "id=\"decode\"",
+            "A decoder predicts whether <code>L0</code> flipped from the detector events",
+            "<code>--decoder rmatching</code> selects the included matching decoder",
+            "a remaining component involving three or more detectors (a hyperedge) is rejected",
+            "id=\"logical-error-rate\"",
+            "rstim circuit decode \\",
+            "--decoder rmatching \\",
+            "--dem surface.dem --in surface-detectors.01",
+            "cat surface-predictions.01</code></pre>\n<pre data-output=\"true\"><code>1</code></pre>",
+            "rstim surface-code-ler \\",
+            "--distances 3,5,7 --rounds 9,15,21 \\",
+            "--physical-error-rates 0.008,0.009,0.01,0.011,0.012 \\",
+            "--shots 10000 --seed 86 --out-dir .",
+            "logical error rate per round",
+            "Distance 7</th>",
+            "href=\"../simulator/\"",
+            "href=\"../detector-models/\"",
+            "href=\"../decoding/\"",
+            "href=\"../qp101/\"",
+            "https://github.com/quantumlib/Stim",
+            "https://github.com/oscarhiggott/PyMatching",
+            "https://errorcorrectionzoo.org/c/rotated_surface",
+            "https://arxiv.org/abs/1208.0928",
+        ],
+        "get-started commands",
+    );
+    assert!(
+        !page.contains("noisy.stim"),
+        "get-started page must not introduce a second circuit"
+    );
+    assert!(
+        !page.contains("grep -E '^(MR|DETECTOR)'"),
+        "get-started page must not confuse circuit instructions with DEM output"
+    );
+    assert!(
+        !page.contains("<code>surface.stim</code> is the circuit"),
+        "get-started page must not repeat circuit annotation details"
+    );
+    for removed_text in [
+        "A seeded example run",
+        "href=\"../examples/surface-code-ler.csv\"",
+        "Use rmatching from Rust",
+        "Sample more circuits",
+        "Prepare training data",
+        "Explore circuits visually",
+        "What is included?",
+        "Add optional CLI features",
+        "Build from source</h2>",
+    ] {
+        assert!(
+            !page.contains(removed_text),
+            "remove extra plot text: {removed_text}"
+        );
+    }
+    assert!(
+        page.find("A decoder predicts whether").unwrap()
+            < page.find("<code>--decoder rmatching</code>").unwrap(),
+        "get-started must define the decoder task before naming rmatching"
+    );
+    assert!(
+        !page.to_lowercase().contains("python"),
+        "get-started page should only show the Rust workflow"
+    );
+    assert!(
+        !page.contains("cargo run")
+            && !page.contains("rsinter")
+            && !page.contains("repository root"),
+        "get-started commands should use the installed rstim binary"
+    );
+    assert!(
+        makefile.contains("target/debug/rstim surface-code-ler --distances 3,5,7 --rounds 9,15,21 --physical-error-rates 0.008,0.009,0.01,0.011,0.012 --shots 10000 --seed 86"),
+        "site build should generate the plotted data with rstim"
+    );
+    assert!(
+        makefile.contains("--sample_shot --seed 86 --in site/static/examples/getting-started.stim"),
+        "sampled diagram must use the same circuit as the definition"
+    );
+}
+
+#[test]
 fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     let index = read_repo_file("site/templates/index.html");
     let get_started = read_repo_file("site/templates/get-started.html");
@@ -558,18 +675,15 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     assert_contains_all(
         &get_started,
         &[
-            "id=\"native-install\"",
+            "cargo install --locked --path rstim --force",
             "id=\"first-circuit\"",
-            "id=\"cargo-install\"",
+            "id=\"continue-rustqec\"",
             "https://www.rust-lang.org/tools/install",
-            "install.sh",
-            "You do not need Rust or a source checkout",
-            "Official native archives include ILP and the viewer",
-            "Ubuntu 24.04 x86_64",
-            "macOS 15 Apple silicon",
-            "Other platforms are outside the tested support matrix",
+            "rstim render_svg --in circuit.stim --out circuit.svg",
+            "rstim circuit detect \\",
+            "rstim render_svg --sample_shot --seed 86",
         ],
-        "linked installation instructions and native support boundary",
+        "linked unified installation instructions",
     );
     assert!(
         !index.contains("Download v0.3.0"),
@@ -598,16 +712,64 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
     assert_contains_all(
         &readme,
         &[
-            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
-            "From a source checkout",
-            "$(dirname \"$(command -v rustqec)\")",
+            "cargo install --locked --path rstim --force",
+            "rstim circuit stats",
+            "rstim capabilities --format json",
         ],
         "README installation section",
     );
     assert_contains_all(
         &styles,
-        &[".home-atom-loss", ".loss-workflow", ".loss-workflow-actions"],
+        &[
+            ".home-atom-loss",
+            ".loss-workflow",
+            ".loss-workflow-actions",
+        ],
         "homepage atom-loss feature styles",
+    );
+}
+
+#[test]
+fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
+    let index = read_repo_file("site/templates/index.html");
+    let get_started = read_repo_file("site/templates/get-started.html");
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"why-rstim\"",
+            "Why rstim alongside Stim?",
+            "Rust tools for code construction, atom-loss sampling, dataset export, and decoding",
+            "href=\"validation/\"",
+        ],
+        "homepage explanation of rstim and Stim",
+    );
+
+    let after_plot = get_started
+        .split_once("id=\"continue-rustqec\"")
+        .expect("tutorial must link to further documentation")
+        .1;
+    assert_contains_all(
+        after_plot,
+        &[
+            "href=\"../simulator/\"",
+            "href=\"../detector-models/\"",
+            "href=\"../decoding/\"",
+            "href=\"../qp101/\"",
+            "inspired by <a href=\"https://github.com/quantumlib/Stim\">Stim</a>",
+            "https://github.com/oscarhiggott/PyMatching",
+            "https://errorcorrectionzoo.org/c/rotated_surface",
+            "https://arxiv.org/abs/1208.0928",
+        ],
+        "tutorial continuation and further reading",
+    );
+    assert!(
+        !after_plot.contains("<ul") && !after_plot.contains("<li"),
+        "tutorial continuation should connect its links in prose",
+    );
+    assert!(
+        !after_plot.contains("getting_started.ipynb") && !after_plot.contains("follow that example"),
+        "further learning should describe the projects' relationship instead of attributing sweep parameters",
     );
 }
 
@@ -628,7 +790,7 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
             "id=\"loss-tensors\"",
             "id=\"marker-contract\"",
             "id=\"load-and-check\"",
-            "rustqec -- \\",
+            "rstim -- \\",
             "circuit sample",
             "dataset export",
             "mkdir -p data",
@@ -651,7 +813,10 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
     );
     assert_contains_all(
         &base,
-        &["href=\"{{ root }}/sampling-data/\"", ">Sampling &amp; training data</a>"],
+        &[
+            "href=\"{{ root }}/sampling-data/\"",
+            ">Sampling &amp; training data</a>",
+        ],
         "sampling-data navigation",
     );
     assert_contains_all(

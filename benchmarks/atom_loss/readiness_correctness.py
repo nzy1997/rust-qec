@@ -10,7 +10,7 @@ predictions. The decoder under test only sees the public
 Smoke profile (a few minutes after build):
 
     python3 -m benchmarks.atom_loss.readiness_correctness \
-      --binary target/release/rustqec \
+      --binary target/release/rstim \
       --matrix docs/envelope-support.json \
       --profile smoke \
       --out drafts/envelope-readiness/correctness.json
@@ -18,7 +18,7 @@ Smoke profile (a few minutes after build):
 The full profile widens fault injection and randomized differential sampling:
 
     python3 -m benchmarks.atom_loss.readiness_correctness \
-      --binary target/release/rustqec \
+      --binary target/release/rstim \
       --matrix docs/envelope-support.json \
       --profile full \
       --out drafts/envelope-readiness/correctness-full.json
@@ -83,8 +83,8 @@ def resolve_exporters(binary):
     missing = [str(p) for p in exporters.values() if not p.is_file()]
     require(not missing,
             'missing exporter example binaries: ' + ', '.join(missing) +
-            '; build with: cargo build --release --locked -p rustqec-cli --features benchmark-tools,ilp'
-            ' --bin rustqec --example export_matching_benchmark --example export_decoder_oracle')
+            '; build with: cargo build --release --locked -p rstim --features benchmark-tools,ilp'
+            ' --bin rstim --example export_matching_benchmark --example export_decoder_oracle')
     return exporters
 
 
@@ -373,17 +373,17 @@ def oracle_case(name, text, *, binary, exporters, work, seed, source,
 def generate_circuit(binary, work, distance, rounds, loss, pauli=0.001):
     path = work/f'midswap_d{distance}_r{rounds}.stim'
     generate(binary, path, distance, rounds, loss, pauli)
-    # Exercise the X_ERROR channel as well: --noise only sets depolarization.
+    # Exercise the X_ERROR channel as well: after-Clifford noise only sets depolarization.
     from .run import checked
     checked([binary, 'circuit', 'gen', '--code', 'surface_code', '--task',
              'rotated_memory_z_midswap', '--distance', distance, '--rounds', rounds,
-             '--noise', pauli, '--operation-loss-probability', loss,
+             '--after-clifford-depolarization', pauli, '--operation-loss-probability', loss,
              '--measurement-loss-probability', loss,
              '--before-measure-flip-probability', pauli,
              '--after-reset-flip-probability', pauli, '--out', path])
-    return path.read_text(), (f'rustqec circuit gen --code surface_code --task '
+    return path.read_text(), (f'rstim circuit gen --code surface_code --task '
                               f'rotated_memory_z_midswap --distance {distance} --rounds {rounds} '
-                              f'--noise {pauli} --operation-loss-probability {loss} '
+                              f'--after-clifford-depolarization {pauli} --operation-loss-probability {loss} '
                               f'--measurement-loss-probability {loss} '
                               f'--before-measure-flip-probability {pauli} '
                               f'--after-reset-flip-probability {pauli}')
@@ -611,7 +611,7 @@ def coverage_ok():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rustqec')
+    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rstim')
     parser.add_argument('--matrix', type=Path, default=MATRIX_PATH)
     parser.add_argument('--profile', default='smoke', choices=sorted(PROFILES))
     parser.add_argument('--out', type=Path)

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::interactive_shot::{CircuitDigest, NoiseEventId, NoiseSiteId};
 use crate::qp101::{
     Qp101Annotation, Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
@@ -78,6 +80,7 @@ struct RenderState {
     repeat_groups: Vec<RepeatGroupSpan>,
     repeat_depth: usize,
     next_observable_sequence: usize,
+    seen_observables: HashSet<u32>,
     interaction_digest: Option<CircuitDigest>,
 }
 
@@ -856,7 +859,12 @@ fn source_layer_item(
             );
             let source = source_label(sources, &state.measurements, num_qubits);
             let label = format!("OBS_INCLUDE({index})");
-            let source_text = format!("L{index} *= {}", source.text);
+            let operator = if state.seen_observables.insert(*index) {
+                "="
+            } else {
+                "*="
+            };
+            let source_text = format!("L{index} {operator} {}", source.text);
             let highlighted = source_block_highlighted(&annotations);
             Ok(SourceLayerItem {
                 lane: source.host_lane,
@@ -1511,6 +1519,10 @@ fn source_label(
     let mut fallback_lanes = Vec::new();
     let mut text = String::new();
     let mut needs_separator = false;
+    let measurement_parity = sources.len() > 1
+        && sources
+            .iter()
+            .all(|source| matches!(source, Qp101TargetRef::Rec { .. }));
 
     for source in sources {
         let resolved = resolve_source_ref(source, measurements);
@@ -1528,7 +1540,7 @@ fn source_label(
             }
             _ => {
                 if needs_separator {
-                    text.push('*');
+                    text.push_str(if measurement_parity { " ⊕ " } else { "*" });
                 }
                 text.push_str(&resolved.text);
                 needs_separator = true;

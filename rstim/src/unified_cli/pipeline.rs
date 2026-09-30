@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::{CommandError, ErrorFormat};
+use super::{CommandError, ErrorFormat};
 
 pub const CIRCUIT_GEN_COMMAND: &str = "circuit.gen";
 pub const CIRCUIT_SAMPLE_COMMAND: &str = "circuit.sample";
@@ -42,7 +42,7 @@ pub struct GenOptions {
     pub task: String,
     pub distance: usize,
     pub rounds: usize,
-    pub noise: f64,
+    pub after_clifford_depolarization: f64,
     pub before_round_data_depolarization: f64,
     pub before_round_data_loss_probability: f64,
     pub before_measure_flip_probability: f64,
@@ -207,10 +207,10 @@ pub fn run_dataset_import(
         )
     })?;
     let staged = (|| -> Result<Vec<usize>, CommandError> {
-        crate::decode::write_public_bundle(&staging, &text, &shots_b8, shots).map_err(
+        super::decode::write_public_bundle(&staging, &text, &shots_b8, shots).map_err(
             |failure| command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json),
         )?;
-        let loss_flags = crate::decode::validate_public_bundle(&staging).map_err(|failure| {
+        let loss_flags = super::decode::validate_public_bundle(&staging).map_err(|failure| {
             command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json)
         })?;
         if let Some(loss_log) = &options.loss_log {
@@ -529,7 +529,10 @@ pub fn run_gen(
 ) -> Result<GenResult, CommandError> {
     let json = options.format.is_json(error_format);
     for (name, value) in [
-        ("noise", options.noise),
+        (
+            "after_clifford_depolarization",
+            options.after_clifford_depolarization,
+        ),
         (
             "before_round_data_depolarization",
             options.before_round_data_depolarization,
@@ -595,7 +598,7 @@ pub fn run_gen(
             rounds: options.rounds,
             before_round_data_depolarization: options.before_round_data_depolarization,
             before_round_data_loss_probability: options.before_round_data_loss_probability,
-            after_clifford_depolarization: options.noise,
+            after_clifford_depolarization: options.after_clifford_depolarization,
             before_measure_flip_probability: options.before_measure_flip_probability,
             after_reset_flip_probability: options.after_reset_flip_probability,
             operation_loss_probability: options.operation_loss_probability,
@@ -619,7 +622,7 @@ pub fn run_gen(
             options.rounds,
             rstim::codegen::surface_code::RotatedMemoryZLossConfig {
                 before_round_data_depolarization: options.before_round_data_depolarization,
-                after_clifford_depolarization: options.noise,
+                after_clifford_depolarization: options.after_clifford_depolarization,
                 before_measure_flip_probability: options.before_measure_flip_probability,
                 after_reset_flip_probability: options.after_reset_flip_probability,
                 operation_loss_probability: options.operation_loss_probability,
@@ -644,7 +647,7 @@ pub fn run_gen(
         }
         let params = rstim::codegen::NoiseParams {
             before_round_data_depolarization: options.before_round_data_depolarization,
-            after_clifford_depolarization: options.noise,
+            after_clifford_depolarization: options.after_clifford_depolarization,
             before_measure_flip_probability: options.before_measure_flip_probability,
             after_reset_flip_probability: options.after_reset_flip_probability,
             after_clifford_loss_probability: options.after_clifford_loss_probability,

@@ -6,7 +6,7 @@
   <p class="eyebrow">ATOM LOSS <span class="loss-badge" data-decoder-badge="envelope-matching">Envelope matching · Beta</span></p>
   <h1>Decode with<br>atom loss.</h1>
   <p class="hero-copy">Run your first loss-aware decoding experiment.<br>One circuit, 64 shots, four steps from sample to score.</p>
-  <div class="loss-meta"><span>Requires rustqec-cli 0.3.3+</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
+  <div class="loss-meta"><span>Requires the current rstim source build</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
   <div class="actions"><a class="button primary" href="#model-loss">Start the tutorial <span aria-hidden="true">→</span></a><a class="button" href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
   <p class="loss-hero-note">This tutorial uses envelope matching, <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span>, within its verified Mid-SWAP scope. Envelope MLE is separately <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span>, with a declared scope limited to four exact measured points and requiring ILP; this walkthrough is one generated Mid-SWAP case. <a href="../atom-loss-concepts/#supported-circuits">Supported circuits →</a></p>
 </div>
@@ -24,18 +24,17 @@
   </ol>
   <p class="loss-inline-note"><strong>Data boundary</strong> Only public records enter the decoder. Private answers are used at the final scoring step.</p>
   <details class="loss-disclosure"><summary>Before you start: install &amp; working directory</summary>
-    <p>Install the CLI below, or use a <a href="../get-started/#native-install">native binary</a>. The default CLI includes envelope matching; no optional ILP solver is needed.</p>
-    <pre data-language="Shell"><code>cargo install --locked rustqec-cli</code></pre>
-    <p>Run the steps in order in a fresh directory, with <code>rustqec</code> on PATH and Python 3 installed. The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README; after extracting it, run <code>sh run.sh</code> to execute all four steps.</p>
-    <p>This site is <strong>{{ docs_version.label }}</strong>. The installation command selects the latest stable package; this guide requires <code>rustqec-cli</code> 0.3.3 or later in the 0.3 line. <a href="../get-started/#versions">Version details</a>.</p>
+    <p>Install the CLI from this repository checkout. The default CLI includes envelope matching; no optional ILP solver is needed.</p>
+    <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
+    <p>Run the steps in order in a fresh directory, with <code>rstim</code> on PATH and Python 3 installed. The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README; after extracting it, run <code>sh run.sh</code> to execute all four steps.</p>
   </details>
 </section>
 <section class="task-section loss-step" aria-labelledby="model-loss">
   <p class="eyebrow">STEP 01 / 04</p><h2 id="model-loss">Generate the circuit</h2>
   <p>Create a distance-3 Mid-SWAP memory circuit. Set Pauli noise and atom-loss probabilities separately.</p>
-<pre data-language="Shell" data-atom-loss-step="model"><code>rustqec circuit gen \
+<pre data-language="Shell" data-atom-loss-step="model"><code>rstim circuit gen \
   --code surface_code --task rotated_memory_z_midswap \
-  --distance 3 --rounds 2 --noise 0.002 \
+  --distance 3 --rounds 2 --after-clifford-depolarization 0.002 \
   --operation-loss-probability 0.002 \
   --measurement-loss-probability 0.003 \
   --out circuit.stim</code></pre>
@@ -45,7 +44,7 @@
   <p class="eyebrow">STEP 02 / 04</p><h2 id="sample-loss">Sample 64 shots</h2>
   <p>Export loss-visible measurements and keep the answer key in a separate bundle.</p>
 <pre data-language="Shell" data-atom-loss-step="sample"><code>mkdir -p data
-rustqec dataset export \
+rstim dataset export \
   --circuit circuit.stim --shots 64 --seed 7 \
   --mode measurements_blinded --logical-x-qubits 1,8,15 \
   --public-out data/public --private-out data/private</code></pre>
@@ -58,7 +57,7 @@ rustqec dataset export \
 <section class="task-section loss-step" aria-labelledby="decode-loss">
   <p class="eyebrow">STEP 03 / 04</p><h2 id="decode-loss">Decode public records</h2>
   <p>Envelope matching reads the public bundle and predicts one logical outcome per shot.</p>
-<pre data-language="Shell" data-atom-loss-step="decode"><code>rustqec decode --decoder envelope-matching \
+<pre data-language="Shell" data-atom-loss-step="decode"><code>rstim decode --decoder envelope-matching \
   --dataset data/public \
   --out predictions.b8 --stats-out decode-stats.json</code></pre>
   <p class="loss-output"><strong>Creates</strong> <code>predictions.b8</code> and <code>decode-stats.json</code>.</p>

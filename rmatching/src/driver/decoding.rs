@@ -59,6 +59,16 @@ impl Matching {
         })
     }
 
+    /// Number of detector bits expected by [`Self::decode`].
+    pub fn num_detectors(&self) -> usize {
+        self.user_graph.get_num_detectors()
+    }
+
+    /// Number of observable bits returned by [`Self::decode`].
+    pub fn num_observables(&self) -> usize {
+        self.user_graph.num_observables
+    }
+
     /// Create an empty `Matching` (edges added manually).
     pub fn new() -> Self {
         Matching {

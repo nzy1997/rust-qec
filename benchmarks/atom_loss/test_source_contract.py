@@ -211,7 +211,7 @@ class DecoderReplayTests(unittest.TestCase):
     def test_actual_wrong_decoder_with_unchanged_archive_is_rejected(self):
         from .decoder_replay import replay_case
         from .shot_data import cases_from
-        binary = ROOT/'target/release/rustqec'
+        binary = ROOT/'target/release/rstim'
         exporter = ROOT/'target/release/examples/export_matching_benchmark'
         with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(ROOT/'site/static/data/atom-loss/shot-data-v1.zip') as z:
             path = Path(tmp); label, case = cases_from(z.read)[0]
@@ -229,7 +229,7 @@ class DecoderReplayTests(unittest.TestCase):
     def test_current_workload_counters_are_replayed_without_historical_durations(self):
         from .decoder_replay import decode_current, verify_work_observations, replay_case
         from .shot_data import cases_from
-        binary=ROOT/'target/release/rustqec';exporter=ROOT/'target/release/examples/export_matching_benchmark'
+        binary=ROOT/'target/release/rstim';exporter=ROOT/'target/release/examples/export_matching_benchmark'
         with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(ROOT/'site/static/data/atom-loss/shot-data-v1.zip') as z:
             path=Path(tmp);label,case=cases_from(z.read)[0]
             public=path/'probe/public';public.mkdir(parents=True)
@@ -291,13 +291,13 @@ class BuildEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp); repo = base/'repo'; repo.mkdir()
             files = {
-                'Cargo.toml': '[workspace]\nmembers=["rustqec-cli"]\nresolver="2"\n',
-                'rustqec-cli/Cargo.toml': '[package]\nname="rustqec-cli"\nversion="0.1.0"\nedition="2021"\n[features]\nbenchmark-tools=[]\nilp=[]\n[[bin]]\nname="rustqec"\npath="src/main.rs"\n',
-                'rustqec-cli/src/main.rs': 'fn main(){println!("debug_assertions={}",cfg!(debug_assertions));}\n',
+                'Cargo.toml': '[workspace]\nmembers=["rstim"]\nresolver="2"\n',
+                'rstim/Cargo.toml': '[package]\nname="rstim"\nversion="0.1.0"\nedition="2021"\n[features]\nbenchmark-tools=[]\nilp=[]\n[[bin]]\nname="rstim"\npath="src/main.rs"\n',
+                'rstim/src/main.rs': 'fn main(){println!("debug_assertions={}",cfg!(debug_assertions));}\n',
                 'benchmarks/atom_loss/requirements.txt': '',
             }
             for name in ['export_matching_benchmark','export_decoder_oracle','offline_matching_benchmark']:
-                files[f'rustqec-cli/examples/{name}.rs'] = 'fn main(){}\n'
+                files[f'rstim/examples/{name}.rs'] = 'fn main(){}\n'
             for name, data in files.items():
                 path = repo/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(data)
             real_run(['cargo','generate-lockfile'], cwd=repo, check=True, capture_output=True)
@@ -308,7 +308,7 @@ class BuildEnvironmentTests(unittest.TestCase):
                 if list(args) == source_contract.BUILD_COMMANDS[0]:
                     result = real_run(args, **kwargs, capture_output=True, text=True)
                     self.assertIn('[optimized]', result.stderr)
-                    self.assertEqual(subprocess.check_output([repo/'target/release/rustqec'], text=True).strip(), 'debug_assertions=false')
+                    self.assertEqual(subprocess.check_output([repo/'target/release/rstim'], text=True).strip(), 'debug_assertions=false')
                     self.assertNotIn('CARGO_PROFILE_RELEASE_OPT_LEVEL', kwargs['env'])
                     self.assertNotIn('CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS', kwargs['env'])
                     raise BuildComplete
@@ -362,8 +362,8 @@ class WorkloadMetadataTests(unittest.TestCase):
         from .run import generate
         with tempfile.TemporaryDirectory() as tmp:
             low, high = Path(tmp)/'low.stim', Path(tmp)/'high.stim'
-            generate(ROOT/'target/release/rustqec',low,3,2,.003,.001)
-            generate(ROOT/'target/release/rustqec',high,3,2,.003,.5)
+            generate(ROOT/'target/release/rstim',low,3,2,.003,.001)
+            generate(ROOT/'target/release/rstim',high,3,2,.003,.5)
             self.assertNotEqual(low.read_bytes(),high.read_bytes())
             self.assertIn('DEPOLARIZE2(0.5)', high.read_text())
 

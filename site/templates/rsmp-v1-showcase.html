@@ -50,7 +50,7 @@
   <pre class="quick-command"><code>rstim sample --in circuit.stim --shots 4 --out_format b8 --out samples.b8
 rstim pack_samples --circuit circuit.stim --shots 4 --in samples.b8 --in_format b8 --out samples.rsmp
 rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only</code></pre>
-  <p><strong>Expected:</strong> <code>samples.b8</code> contains four one-bit rows (4 bytes); <code>samples.rsmp</code> is created and verification exits successfully. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
+  <p><strong>Expected:</strong> <code>samples.b8</code> contains four two-bit rows (4 bytes); <code>samples.rsmp</code> is created and verification exits successfully. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
 </section>
 
 <section id="rsmp-compression" class="rsmp-section" aria-labelledby="rsmp-compression-title">

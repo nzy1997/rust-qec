@@ -30,7 +30,7 @@ const LOSS_VISIBLE_CIRCUIT: &str =
     include_str!("fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
 
 fn rustqec() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_rustqec"))
+    Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
 fn available_decoders() -> &'static [&'static str] {

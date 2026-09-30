@@ -23,7 +23,7 @@ def main():
     args = parser.parse_args()
     args.work.mkdir(parents=True, exist_ok=False)
     args.out.mkdir(parents=True, exist_ok=True)
-    binary = ROOT/'target/release/rustqec'
+    binary = ROOT/'target/release/rstim'
     exporter = ROOT/'target/release/examples/export_matching_benchmark'
     from .source_contract import capture
     capture(args.out, 'timing', {'baseline_sha256': {name: digest(args.baseline/name)

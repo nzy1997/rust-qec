@@ -2,6 +2,11 @@ pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+extern crate self as rstim;
+
+#[cfg(feature = "unified-cli")]
+pub mod unified_cli;
+
 pub mod ir;
 mod loss_sampler;
 pub mod recorder;
@@ -24,6 +29,8 @@ pub mod result_stream;
 pub mod cli;
 pub mod operations;
 pub mod stats;
+#[cfg(feature = "plotting")]
+pub mod surface_code_ler;
 pub mod transforms;
 pub mod circuit_gen;
 pub mod codegen;

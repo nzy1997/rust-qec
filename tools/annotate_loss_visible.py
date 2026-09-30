@@ -2,7 +2,7 @@
 """Regenerate the Stim-derived loss-visible decoder fixtures.
 
 Produces the third-party-structured conformance fixtures under
-rustqec-cli/tests/fixtures/:
+rstim/tests/fixtures/:
 
 - stim_rotated_memory_z_d3_r2.stim: the unmodified, flattened circuit emitted
   by Google's Stim (pure Stim dialect).
@@ -42,7 +42,7 @@ PAULI_P = 0.001
 OPERATION_LOSS_P = 0.01
 MEASUREMENT_LOSS_P = 0.02
 
-FIXTURE_DIR = Path(__file__).resolve().parent.parent / "rustqec-cli" / "tests" / "fixtures"
+FIXTURE_DIR = Path(__file__).resolve().parent.parent / "rstim" / "tests" / "fixtures"
 BASE_NAME = f"stim_rotated_memory_z_d{DISTANCE}_r{ROUNDS}"
 
 REC_REF = re.compile(r"rec\[-(\d+)\]")

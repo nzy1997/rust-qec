@@ -1,6 +1,6 @@
 # Atom-loss tutorial
 
-Requires rustqec CLI (installation target: 0.3.0) on PATH and Python 3.
+Requires the unified `rstim` CLI from this repository on PATH and Python 3.
 Extract into a fresh directory, then run `sh run.sh`.
 Envelope decoding is beta; this example covers one generated Mid-SWAP case.
 

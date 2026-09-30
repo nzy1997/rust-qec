@@ -3,7 +3,7 @@
 Status: **stable contract** (versioned). Companion to
 `loss-visible-circuit-subset-v1.md`.
 
-`rustqec dataset import --loss-log <path>` accepts a JSON sidecar in which an
+`rstim dataset import --loss-log <path>` accepts a JSON sidecar in which an
 external producer declares, per shot, which loss-visible readouts heralded a
 loss. The importer cross-checks the declaration against the flag bits in the
 shot payload and rejects drift with `loss_log_mismatch` (exit 2).

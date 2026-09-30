@@ -49,7 +49,7 @@ def checked(args):
 
 def generate(binary, path, distance, rounds, loss, pauli=.001):
     checked([binary, 'circuit', 'gen', '--code', 'surface_code', '--task', 'rotated_memory_z_midswap',
-             '--distance', distance, '--rounds', rounds, '--noise', pauli,
+             '--distance', distance, '--rounds', rounds, '--after-clifford-depolarization', pauli,
              '--operation-loss-probability', loss, '--measurement-loss-probability', loss, '--out', path])
 
 
@@ -373,7 +373,7 @@ def main():
     args = parser.parse_args()
     if min(args.shots, args.sampling_shots, args.repeats) < 1:
         parser.error('shots, sampling-shots and repeats must be positive')
-    binary, exporter, sampler = [ROOT/'target/release'/p for p in ['rustqec','examples/export_matching_benchmark','examples/atom_loss_sampling_benchmark']]
+    binary, exporter, sampler = [ROOT/'target/release'/p for p in ['rstim','examples/export_matching_benchmark','examples/atom_loss_sampling_benchmark']]
     out, work = args.out.resolve(), args.work.resolve()
     out.mkdir(parents=True, exist_ok=True)
     from .source_contract import capture
