@@ -17,7 +17,7 @@ release coordinates the major/minor series of eight public crates:
 - `rbposd`
 - `rilpqec`
 - `rsinter`
-- `rustqec-cli`
+- `rstim`
 
 All eight start at 0.3.0. Within a major/minor series, patch releases may update
 individual crates: a v0.3.1 tag can contain `rilpqec 0.3.1` while the other crates

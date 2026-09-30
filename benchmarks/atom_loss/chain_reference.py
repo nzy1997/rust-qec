@@ -379,7 +379,7 @@ def run(binary,exporter):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--out',type=Path,default=Path('drafts/midswap-oracle.json'))
     p.add_argument('--compare', type=Path, help='Revalidate published observations against the freshly recomputed oracle')
-    a=p.parse_args();r=run(ROOT/'target/release/rustqec',ROOT/'target/release/examples/export_matching_benchmark');save(a.out,r)
+    a=p.parse_args();r=run(ROOT/'target/release/rstim',ROOT/'target/release/examples/export_matching_benchmark');save(a.out,r)
     if a.compare is not None:
         from .chain_contract import compare_reports
         compare_reports(r, json.loads(a.compare.read_text()))

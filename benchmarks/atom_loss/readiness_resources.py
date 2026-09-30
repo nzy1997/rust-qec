@@ -11,14 +11,14 @@ guarantees.
 Smoke (a few minutes after build):
 
     python3 -m benchmarks.atom_loss.readiness_resources \
-      --binary target/release/rustqec \
+      --binary target/release/rstim \
       --matrix docs/envelope-support.json \
       --profile smoke --out drafts/envelope-readiness/resources.json
 
 Full campaign (writes the versioned retained report):
 
     python3 -m benchmarks.atom_loss.readiness_resources \
-      --binary target/release/rustqec \
+      --binary target/release/rstim \
       --matrix docs/envelope-support.json \
       --profile full --out benchmarks/atom_loss/readiness/resources
 
@@ -49,7 +49,7 @@ SCHEMA = 'rustqec.envelope-readiness-resources.v1'
 MANIFEST_SCHEMA = 'rustqec.envelope-resources-manifest.v1'
 PASS_LINE = 'PASS envelope operating envelope'
 FIXTURE_D3R2 = ROOT/'benchmarks/atom_loss/fixtures/midswap_d3_r2.stim'
-CONVENTIONAL = ROOT/'rustqec-cli/tests/fixtures/current_rstim_atom_loss/conventional'
+CONVENTIONAL = ROOT/'rstim/tests/fixtures/current_rstim_atom_loss/conventional'
 MATRIX_PATH = ROOT/'docs/envelope-support.json'
 RESOURCES_DIR = ROOT/'benchmarks/atom_loss/readiness/resources'
 
@@ -160,22 +160,22 @@ def generate_corpus(binary, work, *, circuit_text, circuit_name, shots, seed):
     return public, {'shots': int(shots), 'seed': seed, 'rows_sha256':
                     __import__('hashlib').sha256(rows.tobytes()).hexdigest(),
                     'distinct_patterns_in_corpus': len(patterns),
-                    'sampler': f'rustqec circuit sample --shots {shots} --seed {seed} (workload generation)'}
+                    'sampler': f'rstim circuit sample --shots {shots} --seed {seed} (workload generation)'}
 
 
 def generated_circuit(binary, work, distance, rounds, loss):
     path = work/f'midswap_d{distance}_r{rounds}_p{loss}.stim'
     result = subprocess.run([str(binary), 'circuit', 'gen', '--code', 'surface_code', '--task',
                              'rotated_memory_z_midswap', '--distance', str(distance),
-                             '--rounds', str(rounds), '--noise', '0.001',
+                             '--rounds', str(rounds), '--after-clifford-depolarization', '0.001',
                              '--operation-loss-probability', str(loss),
                              '--measurement-loss-probability', str(loss),
                              '--before-measure-flip-probability', '0.001',
                              '--after-reset-flip-probability', '0.001',
                              '--out', str(path)], capture_output=True, text=True, check=False)
     require(result.returncode == 0, f'circuit gen failed: {result.stderr.strip()}')
-    return path.read_text(), (f'rustqec circuit gen --task rotated_memory_z_midswap '
-                              f'--distance {distance} --rounds {rounds} --noise 0.001 '
+    return path.read_text(), (f'rstim circuit gen --task rotated_memory_z_midswap '
+                              f'--distance {distance} --rounds {rounds} --after-clifford-depolarization 0.001 '
                               f'--operation-loss-probability {loss} '
                               f'--measurement-loss-probability {loss} '
                               f'--before-measure-flip-probability 0.001 '
@@ -837,7 +837,7 @@ def self_test(binary):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rustqec')
+    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rstim')
     parser.add_argument('--matrix', type=Path, default=MATRIX_PATH)
     parser.add_argument('--profile', default='smoke', choices=('smoke', 'full'))
     parser.add_argument('--out', type=Path)

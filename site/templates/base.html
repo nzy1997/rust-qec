@@ -57,7 +57,7 @@
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
-      <a href="{{ root }}/get-started/#versions">About these docs</a>
+      <a href="{{ root }}/reference/#reference-boundary">About these docs</a>
     </div></div>
     {% if docs_version.channel == "stable" %}<aside class="version-strip docs-edition-notice" id="docs-edition-notice" aria-label="Documentation edition"><div class="version-inner"><strong>Frozen stable edition:</strong> RustQEC {{ docs_version.release_line }}, coordinated release v{{ docs_version.native_release }}. Page text is preserved from that release; this edition banner defines its publication status.</div></aside>{% endif %}
     <div class="site-frame{% if current_nav not in ["home", "shot"] %} documentation-frame{% endif %}">
@@ -68,7 +68,7 @@
       {% endif %}
       <div class="page-content">
         <header class="site-header">
-          {% if current_nav not in ["home", "shot"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/get-started/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
+          {% if current_nav not in ["home", "shot", "start"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/get-started/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
           {% block hero %}{% endblock hero %}
         </header>
         <div class="reading-layout">

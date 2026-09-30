@@ -33,7 +33,7 @@ class BuildCliReferenceTest(unittest.TestCase):
     def test_normalizes_command_contract_for_templates(self):
         result = normalize(fixture())
         command = result["commands"][0]
-        self.assertEqual(command["command_line"], "rustqec circuit stats")
+        self.assertEqual(command["command_line"], "rstim circuit stats")
         self.assertEqual(command["anchor"], "command-circuit-stats")
         self.assertEqual([entry["value"] for entry in result["exit_codes"]], [0, 2])
         self.assertEqual(result["exit_codes"][1]["errors"], ["input_error"])
@@ -73,7 +73,7 @@ class BuildCliReferenceTest(unittest.TestCase):
             output = Path(temp) / "reference.json"
             write_reference(fixture(), output)
             value = json.loads(output.read_text())
-            self.assertEqual(value["source_command"], "rustqec capabilities --format json")
+            self.assertEqual(value["source_command"], "rstim capabilities --format json")
             self.assertTrue(output.read_text().endswith("\n"))
 
 

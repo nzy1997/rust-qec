@@ -109,7 +109,7 @@ def validate_manifest(manifest: dict[str, object], expected_tag: str) -> None:
     package_names = [package.get("name") for package in packages if isinstance(package, dict)]
     if len(package_names) != len(packages) or len(package_names) != len(set(package_names)):
         raise VerificationError("release manifest package identities are invalid")
-    if not {"rustqec-cli", "rstim"}.issubset(package_names):
+    if "rstim" not in package_names:
         raise VerificationError("release manifest omits a packaged CLI version")
     for package in packages:
         if not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?", str(package.get("version", ""))):
@@ -161,13 +161,14 @@ def validate_member(member: tarfile.TarInfo, root: str) -> None:
         raise VerificationError(f"unsupported archive member type: {member.name}")
 
 
-def safe_extract(archive_path: Path, destination: Path, root: str) -> Path:
+def safe_extract(archive_path: Path, destination: Path, root: str, *, legacy: bool = False) -> Path:
     expected = {
-        f"{root}/bin/rustqec",
         f"{root}/bin/rstim",
         f"{root}/LICENSE",
         f"{root}/RUNTIME.md",
     }
+    if legacy:
+        expected.add(f"{root}/bin/rustqec")
     with tarfile.open(archive_path, "r:gz") as archive:
         members = archive.getmembers()
         for member in members:
@@ -195,7 +196,7 @@ def safe_extract(archive_path: Path, destination: Path, root: str) -> Path:
             with output.open("wb") as handle:
                 while chunk := source.read(1024 * 1024):
                     handle.write(chunk)
-            output.chmod(0o755 if member.name.endswith(("/rustqec", "/rstim")) else 0o644)
+            output.chmod(0o755 if member.name.endswith("/rstim") or (legacy and member.name.endswith("/rustqec")) else 0o644)
     extracted = (destination / root).resolve()
     if destination.resolve() not in extracted.parents:
         raise VerificationError("archive extraction escaped the temporary directory")
@@ -305,8 +306,9 @@ def verify(args: argparse.Namespace) -> tuple[str, str]:
     root = archive_identity.get("root_directory")
     if root != archive_name.removesuffix(".tar.gz"):
         raise VerificationError("archive root directory does not match its filename")
+    legacy = any(package["name"] == "rustqec-cli" for package in manifest["packages"])
     with tempfile.TemporaryDirectory(prefix="rustqec-release-") as temporary:
-        extracted = safe_extract(args.archive, Path(temporary), root)
+        extracted = safe_extract(args.archive, Path(temporary), root, legacy=legacy)
         runtime_lines = (extracted / "RUNTIME.md").read_text().splitlines()
         expected_identity = [
             f"Tag: {args.expected_tag}",
@@ -315,16 +317,17 @@ def verify(args: argparse.Namespace) -> tuple[str, str]:
         ]
         if runtime_lines[2:5] != expected_identity:
             raise VerificationError("RUNTIME.md identity does not match the release manifest")
-        rustqec = extracted / "bin/rustqec"
         rstim = extracted / "bin/rstim"
-        check_linkage(rustqec, target)
         check_linkage(rstim, target)
+        unified = extracted / "bin/rustqec" if legacy else rstim
+        if legacy:
+            check_linkage(unified, target)
 
-        rustqec_result = run_binary(rustqec, ["circuit", "stats", "--format", "json"], stdin=FIXTURE)
-        if rustqec_result.returncode != 0 or rustqec_result.stderr or json.loads(rustqec_result.stdout) != RUSTQEC_OUTPUT:
+        unified_result = run_binary(unified, ["circuit", "stats", "--format", "json"], stdin=FIXTURE)
+        if unified_result.returncode != 0 or unified_result.stderr or json.loads(unified_result.stdout) != RUSTQEC_OUTPUT:
             raise VerificationError(
-                f"rustqec archive workflow failed: code={rustqec_result.returncode} "
-                f"stdout={rustqec_result.stdout!r} stderr={rustqec_result.stderr!r}"
+                f"rstim circuit archive workflow failed: code={unified_result.returncode} "
+                f"stdout={unified_result.stdout!r} stderr={unified_result.stderr!r}"
             )
         rstim_result = run_binary(rstim, ["stats", "--json"], stdin=FIXTURE)
         if rstim_result.returncode != 0 or rstim_result.stderr or json.loads(rstim_result.stdout) != RSTIM_OUTPUT:

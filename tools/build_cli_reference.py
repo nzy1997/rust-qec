@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the website CLI reference directly from ``rustqec capabilities``."""
+"""Generate the website CLI reference directly from ``rstim capabilities``."""
 from __future__ import annotations
 
 import argparse
@@ -151,7 +151,7 @@ def normalize(document: object) -> dict:
         normalized_commands.append({
             "name": name,
             "anchor": "command-" + name.replace(".", "-"),
-            "command_line": "rustqec " + " ".join(argv),
+            "command_line": "rstim " + " ".join(argv),
             "input_sources": _string_list(command.get("input_sources"), "input_sources", scope),
             "formats": _string_list(command.get("formats"), "formats", scope),
             "output_schema": _non_empty_string(command.get("output_schema"), "output_schema", scope),
@@ -174,7 +174,7 @@ def normalize(document: object) -> dict:
 
     return {
         "schema_version": SCHEMA,
-        "source_command": "rustqec capabilities --format json",
+        "source_command": "rstim capabilities --format json",
         "global_arguments": normalized_globals,
         "commands": normalized_commands,
         "exit_codes": normalized_exit_codes,
@@ -183,7 +183,7 @@ def normalize(document: object) -> dict:
 
 def capabilities(binary: Path | None, repo_root: Path) -> dict:
     command = ([str(binary), "capabilities", "--format", "json"] if binary else [
-        "cargo", "run", "--quiet", "--locked", "-p", "rustqec-cli", "--",
+        "cargo", "run", "--quiet", "--locked", "-p", "rstim", "--bin", "rstim", "--",
         "capabilities", "--format", "json",
     ])
     result = subprocess.run(command, cwd=repo_root, text=True, capture_output=True)

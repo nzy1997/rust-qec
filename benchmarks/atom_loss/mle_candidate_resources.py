@@ -11,7 +11,7 @@ mirrored by the release gate, which fails loudly when they drift.
 Campaign (a few minutes after build):
 
     python3 -m benchmarks.atom_loss.mle_candidate_resources \
-      --binary target/release/rustqec \
+      --binary target/release/rstim \
       --plan docs/envelope-mle-scope.json \
       --out drafts/envelope-mle-candidate/mle-resources.json
 
@@ -272,7 +272,7 @@ def verify_report(report_path, plan_path=PLAN_PATH):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rustqec')
+    parser.add_argument('--binary', type=Path, default=ROOT/'target/release/rstim')
     parser.add_argument('--plan', type=Path, default=PLAN_PATH)
     parser.add_argument('--out', type=Path)
     parser.add_argument('--verify', type=Path)

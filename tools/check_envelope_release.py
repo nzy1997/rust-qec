@@ -1169,7 +1169,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
              and "benchmarks/atom_loss/decoder_reference.py" in RETAINED_EQUIVALENCE_PATHS
              and "benchmarks/atom_loss/chain_reference.py" in RETAINED_EQUIVALENCE_PATHS
              and "benchmarks/atom_loss/fixtures" in RETAINED_EQUIVALENCE_PATHS
-             and "rustqec-cli/tests/fixtures/current_rstim_atom_loss"
+             and "rstim/tests/fixtures/current_rstim_atom_loss"
              in RETAINED_EQUIVALENCE_PATHS)
     observations.append({
         "mutation": "equivalence-paths-cover-build-config",

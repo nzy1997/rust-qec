@@ -61,7 +61,7 @@ class SiteVersionsTest(unittest.TestCase):
         html = (output / "versions/v1/index.html").read_text()
         self.assertIn('id="docs-version"', html)
         self.assertIn('Release v1', html)
-        self.assertIn('./get-started/#versions', html)
+        self.assertIn('./reference/#reference-boundary', html)
 
     def test_every_frozen_page_receives_authoritative_stable_identity(self):
         output = self.root / "published"

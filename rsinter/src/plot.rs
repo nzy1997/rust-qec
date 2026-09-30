@@ -1,5 +1,5 @@
 #[cfg(feature = "plotting")]
-pub use enabled::{plot_error_rate, plot_error_rate_per_piece};
+pub use enabled::{plot_error_rate, plot_error_rate_csv, plot_error_rate_per_piece};
 
 #[cfg(not(feature = "plotting"))]
 use std::path::Path;
@@ -11,6 +11,11 @@ pub fn plot_error_rate(
     _group_func: impl Fn(&crate::task_stats::TaskStats) -> String,
     _output: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    Err("requires Cargo feature 'plotting'".into())
+}
+
+#[cfg(not(feature = "plotting"))]
+pub fn plot_error_rate_csv(_input: &Path, _output: &Path) -> Result<(), String> {
     Err("requires Cargo feature 'plotting'".into())
 }
 
@@ -28,16 +33,69 @@ pub fn plot_error_rate_per_piece(
 #[cfg(feature = "plotting")]
 mod enabled {
     use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use std::path::Path;
 
     use plotters::prelude::*;
+    use serde::Deserialize;
 
+    use crate::failure::FailureKind;
     use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
     use crate::task_stats::TaskStats;
 
     const MAX_LIKELIHOOD_FACTOR: f64 = 9.0;
     const CANVAS_WIDTH: u32 = 800;
     const CANVAS_HEIGHT: u32 = 600;
+
+    #[derive(Deserialize)]
+    struct ErrorRateCsvRow {
+        distance: u64,
+        physical_error_rate: f64,
+        shots: u64,
+        logical_failures: u64,
+    }
+
+    /// Plot measured per-shot logical failure rates from a CSV with the four
+    /// columns above. Additional columns are ignored.
+    pub fn plot_error_rate_csv(input: &Path, output: &Path) -> Result<(), String> {
+        let mut reader = csv::Reader::from_path(input).map_err(|error| error.to_string())?;
+        let mut stats = Vec::new();
+        for (index, result) in reader.deserialize::<ErrorRateCsvRow>().enumerate() {
+            let row = result.map_err(|error| format!("CSV row {}: {error}", index + 2))?;
+            if row.distance == 0
+                || !row.physical_error_rate.is_finite()
+                || row.physical_error_rate <= 0.0
+                || row.shots == 0
+                || row.logical_failures > row.shots
+            {
+                return Err(format!("CSV row {} has invalid plot values", index + 2));
+            }
+            stats.push(TaskStats {
+                strong_id: String::new(),
+                decoder: String::new(),
+                metadata: serde_json::json!({"p": row.physical_error_rate, "d": row.distance}),
+                shots: row.shots,
+                errors: row.logical_failures,
+                discards: 0,
+                seconds: 0.0,
+                failure_kind: FailureKind::Ok,
+                custom_counts: HashMap::new(),
+            });
+        }
+        if stats.is_empty() {
+            return Err("CSV has no data rows".into());
+        }
+        if let Some(parent) = output.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        plot_error_rate(
+            &stats,
+            |stat| stat.metadata["p"].as_f64().unwrap(),
+            |stat| format!("distance {}", stat.metadata["d"].as_u64().unwrap()),
+            output,
+        )
+        .map_err(|error| error.to_string())
+    }
 
     fn identity_rate_transform(rate: f64, _stat: &TaskStats) -> f64 {
         rate
@@ -311,6 +369,47 @@ mod enabled {
             assert!(out.exists());
             let content = std::fs::read_to_string(&out).unwrap();
             assert!(content.contains("<svg"), "output should be SVG");
+        }
+
+        #[test]
+        fn plot_error_rate_csv_uses_measured_counts() {
+            let dir = tempdir().unwrap();
+            let input = dir.path().join("rates.csv");
+            let output = dir.path().join("rates.svg");
+            std::fs::write(
+                &input,
+                "distance,physical_error_rate,shots,logical_failures,seed\n\
+                 3,0.005,2000,31,386\n\
+                 5,0.005,2000,23,586\n\
+                 3,0.01,2000,111,387\n\
+                 5,0.01,2000,184,587\n",
+            )
+            .unwrap();
+            plot_error_rate_csv(&input, &output).unwrap();
+            let svg = std::fs::read_to_string(output).unwrap();
+            assert!(svg.contains("<svg"));
+            assert!(svg.contains("distance 3"));
+            assert!(svg.contains("distance 5"));
+
+            std::fs::write(
+                &input,
+                "distance,physical_error_rate,shots,logical_failures,seed\n\
+                 3,0.005,2000,310,386\n\
+                 5,0.005,2000,23,586\n\
+                 3,0.01,2000,111,387\n\
+                 5,0.01,2000,184,587\n",
+            )
+            .unwrap();
+            let changed_output = dir.path().join("changed-rates.svg");
+            plot_error_rate_csv(&input, &changed_output).unwrap();
+            assert_ne!(svg, std::fs::read_to_string(changed_output).unwrap());
+
+            std::fs::write(
+                &input,
+                "distance,physical_error_rate,shots,logical_failures\n3,0.01,10,11\n",
+            )
+            .unwrap();
+            assert!(plot_error_rate_csv(&input, &dir.path().join("invalid.svg")).is_err());
         }
 
         #[test]

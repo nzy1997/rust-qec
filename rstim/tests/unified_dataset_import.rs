@@ -1,4 +1,4 @@
-//! Integration tests for `rustqec dataset import`, the entry point for
+//! Integration tests for `rstim dataset import`, the entry point for
 //! datasets produced by third-party tooling: a circuit plus a shot payload
 //! (and optionally a loss sidecar) are packaged into a public decoder
 //! dataset only after passing the same validation `decode` performs.
@@ -33,7 +33,7 @@ const TINY_CIRCUIT: &str = concat!(
 );
 
 fn rustqec() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_rustqec"))
+    Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
 fn run_import(root: &Path, extra: &[&str]) -> std::process::Output {

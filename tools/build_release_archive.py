@@ -150,7 +150,13 @@ def package(args: argparse.Namespace) -> None:
         raise BuildError("source SHA must be a full lowercase Git commit ID")
     verify_source(repo_root, tag, args.source_sha)
 
-    for binary in (args.rustqec, args.rstim):
+    packages = package_versions(args.cargo.resolve(), repo_root)
+    legacy = any(package["name"] == "rustqec-cli" for package in packages)
+    if legacy != (args.rustqec is not None):
+        raise BuildError(
+            "rustqec binary must be supplied exactly when rustqec-cli is in the tagged workspace"
+        )
+    for binary in (args.rstim, *([args.rustqec] if legacy else [])):
         if not binary.is_file() or binary.is_symlink():
             raise BuildError(f"missing regular release binary: {binary}")
     if not args.runtime_linkage.is_file():
@@ -158,22 +164,26 @@ def package(args: argparse.Namespace) -> None:
 
     archive_root = f"rustqec-{tag}-{target}"
     archive_name = f"{archive_root}.tar.gz"
+    binary_listing = (
+        "Binaries:\n  bin/rustqec\n  bin/rstim\n\n" if legacy else "Binary:\n  bin/rstim\n\n"
+    )
     runtime = (
         f"RustQEC native command-line archive\n\n"
         f"Tag: {tag}\nSource commit: {args.source_sha}\nTarget: {target}\n"
         f"Runtime baseline: {TARGETS[target]}\n\n"
-        "Binaries:\n  bin/rustqec\n  bin/rstim\n\n"
-        "Verify this archive with release-manifest.json, SHA256SUMS, and "
+        + binary_listing
+        + "Verify this archive with release-manifest.json, SHA256SUMS, and "
         "verify_release_archive.py before running it.\n\n"
         "Recorded dynamic linkage from the build host:\n"
         + args.runtime_linkage.read_text()
     ).encode()
     files = [
-        ("bin/rustqec", args.rustqec.read_bytes(), 0o755),
         ("bin/rstim", args.rstim.read_bytes(), 0o755),
         ("LICENSE", (repo_root / "LICENSE").read_bytes(), 0o644),
         ("RUNTIME.md", runtime, 0o644),
     ]
+    if legacy:
+        files.insert(0, ("bin/rustqec", args.rustqec.read_bytes(), 0o755))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     archive_path = args.out_dir / archive_name
     write_archive(archive_path, archive_root, files)
@@ -189,7 +199,7 @@ def package(args: argparse.Namespace) -> None:
             "sha256": sha256(archive_path),
             "size": archive_path.stat().st_size,
         },
-        "packages": package_versions(args.cargo.resolve(), repo_root),
+        "packages": packages,
         "compiler": rustc_metadata(args.rustc.resolve(), target),
         "runtime": {
             "baseline": TARGETS[target],
@@ -263,8 +273,8 @@ def main() -> int:
     package_parser.add_argument("--target", required=True)
     package_parser.add_argument("--cargo", type=Path, required=True)
     package_parser.add_argument("--rustc", type=Path, required=True)
-    package_parser.add_argument("--rustqec", type=Path, required=True)
     package_parser.add_argument("--rstim", type=Path, required=True)
+    package_parser.add_argument("--rustqec", type=Path)
     package_parser.add_argument("--runtime-linkage", type=Path, required=True)
     package_parser.set_defaults(handler=package)
     assemble_parser = subparsers.add_parser("assemble")

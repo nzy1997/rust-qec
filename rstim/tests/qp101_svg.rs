@@ -321,7 +321,7 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
         "DETECTOR",
         "D0 = m1",
         "OBS_INCLUDE(7)",
-        "L7 *= m1",
+        "L7 = m1",
         "loop: round: body",
         "NOTE: A&amp;B&lt;test&gt;",
         "SWAP",
@@ -845,7 +845,7 @@ fn svg_renderer_resolves_detector_observable_sources() {
     let observable_svg =
         render_svg(&observable_doc).expect("observable source fixture should render");
 
-    for marker in [">OBS_INCLUDE(2)</text>", ">L2 *= m1</text>"] {
+    for marker in [">OBS_INCLUDE(2)</text>", ">L2 = m1</text>"] {
         assert!(
             observable_svg.contains(marker),
             "observable SVG should contain {marker}: {observable_svg}"
@@ -922,12 +922,48 @@ fn svg_renderer_resolves_detector_observable_sources() {
     for marker in [
         ">D0 = sweep[0]*!X1</text>",
         ">OBS_INCLUDE(3)</text>",
-        ">L3 *= !q1</text>",
+        ">L3 = !q1</text>",
     ] {
         assert!(
             hand_built_svg.contains(marker),
             "hand-built source SVG should contain {marker}: {hand_built_svg}"
         );
+    }
+}
+
+#[test]
+fn svg_renderer_assigns_first_observable_include_then_accumulates() {
+    let doc = export_qp101(
+        &parse_lines(
+            "M 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+        )
+        .expect("observable accumulation fixture should parse"),
+    )
+    .expect("observable accumulation fixture should export");
+    let svg = render_svg(&doc).expect("observable accumulation fixture should render");
+
+    for marker in [
+        ">L0 = m1</text>",
+        ">L0 *= m2</text>",
+        ">L1 = m2</text>",
+    ] {
+        assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
+    }
+}
+
+#[test]
+fn svg_renderer_uses_bit_parity_for_measurement_only_sources() {
+    let doc = export_qp101(
+        &parse_lines(
+            "M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
+        )
+        .expect("measurement parity fixture should parse"),
+    )
+    .expect("measurement parity fixture should export");
+    let svg = render_svg(&doc).expect("measurement parity fixture should render");
+
+    for marker in [">D0 = m1 ⊕ m2</text>", ">L0 = m1 ⊕ m2</text>"] {
+        assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
     }
 }
 
@@ -951,7 +987,7 @@ fn svg_renderer_covers_source_history_edge_cases() {
     let empty_source_svg =
         render_svg(&empty_source_doc).expect("empty source labels should render");
 
-    for marker in [">D0 = -</text>", ">L5 *= -</text>"] {
+    for marker in [">D0 = -</text>", ">L5 = -</text>"] {
         assert!(
             empty_source_svg.contains(marker),
             "empty source SVG should contain {marker}: {empty_source_svg}"

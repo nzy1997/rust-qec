@@ -17,9 +17,9 @@ python3 -m unittest tools.test_envelope_mle_scope
 Build the ILP-capable CLI before running the complete envelope support matrix:
 
 ```sh
-cargo build --release --locked -p rustqec-cli --features ilp
+cargo build --release --locked -p rstim --features ilp
 python3 tools/check_envelope_support.py \
-  --binary target/release/rustqec \
+  --binary target/release/rstim \
   --matrix docs/envelope-support.json \
   --out drafts/envelope-readiness/support.json
 ```
@@ -27,7 +27,7 @@ python3 tools/check_envelope_support.py \
 The pinned Mid-SWAP MLE positive control must decode successfully:
 
 ```sh
-cargo test --locked -p rustqec-cli --test external_fixtures \
+cargo test --locked -p rstim --test external_fixtures \
   current_rstim_atom_loss_midswap_envelope_mle_decodes_unmodified -- --exact
 ```
 
@@ -35,7 +35,7 @@ The conventional candidate-explosion fixture is outside the MLE support
 boundary and must fail before publishing predictions or statistics:
 
 ```sh
-cargo test --locked -p rustqec-cli --test external_fixtures \
+cargo test --locked -p rstim --test external_fixtures \
   current_rstim_atom_loss_conventional_envelope_mle_rejects_candidate_explosion -- --exact
 ```
 

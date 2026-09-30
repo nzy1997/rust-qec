@@ -54,6 +54,22 @@ LSB-first, byte-aligned row. See the full
 [replay workflow](https://github.com/nzy1997/rust-qec/blob/master/docs/rsinter-replay.md)
 for decoder configuration and output details.
 
+## Plot measured logical error rates
+
+With the `plotting` feature, `rsinter plot-error-rate-csv` reads a CSV containing
+`distance`, `physical_error_rate`, `shots`, and `logical_failures` columns. Other
+columns are allowed. It plots each distance as a separate series with
+likelihood-interval bands on logarithmic axes:
+
+```sh
+cargo run --locked -p rsinter --features plotting -- \
+  plot-error-rate-csv --input surface-code-ler.csv --out surface-code-ler.svg
+```
+
+The [Get started guide](https://nzy1997.github.io/rust-qec/get-started/#logical-error-rate)
+uses the installed `rstim surface-code-ler` command to produce its measured
+CSV and SVG without a repository checkout at run time.
+
 ## Features
 
 Commands remain visible in `--help` when their feature is disabled and report

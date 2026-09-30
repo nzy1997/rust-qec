@@ -300,7 +300,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
         DecoderKind::EnvelopeMle => {
             return Err(DecodeFailure::new(
                 "feature_disabled",
-                "envelope-mle requires the rustqec-cli `ilp` feature",
+                "envelope-mle requires the rstim `ilp` feature",
             ));
         }
     };
@@ -1447,11 +1447,11 @@ mod tests {
     #[test]
     fn stim_generated_fixture_compiles_and_matches_reference_kernels() {
         // The annotated Stim-generated conformance fixture (see
-        // rustqec-cli/tests/external_fixtures.rs) must compile through the
+        // rstim/tests/unified_external_fixtures.rs) must compile through the
         // same code path as built-in-generator circuits and agree with the
         // explicit renvelope reference kernels shot by shot.
         const FIXTURE: &str =
-            include_str!("../tests/fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
+            include_str!("../../tests/fixtures/stim_rotated_memory_z_d3_r2_loss_visible.stim");
         let circuit = compiled(FIXTURE);
         assert_eq!(circuit.envelopes.len(), 25);
         assert!(

@@ -59,8 +59,7 @@ With RustQEC you can:
 
 | Path | Role |
 | --- | --- |
-| `rustqec-cli/` | Unified automation-ready `rustqec` CLI and capability discovery |
-| `rstim/` | Simulator crate and `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, and QP101 export |
+| `rstim/` | Simulator crate and unified `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, dataset tools, decoding, and QP101 export |
 | `rstim/doc/` | Simulator getting-started guide, CLI reference, QP101 notes, and parity documentation |
 | `docs/showcases/` | Stable index for runnable workspace showcases |
 | `rsinter/` | Parallel collection and benchmark harness for decoder experiments |
@@ -73,39 +72,17 @@ With RustQEC you can:
 
 ## Quick Start
 
-If Rust and Cargo are already installed, use the crates.io CLI as the default
-entry point:
+The development checkout provides one CLI package and one executable. With Rust
+and Cargo installed, run from the repository root:
 
 ```sh
-cargo install --locked rustqec-cli --version 0.3.3
+cargo install --locked --path rstim --force
+rstim --version
 ```
 
-If Rust is not installed, get it from the official
-[rustup installation guide](https://www.rust-lang.org/tools/install), or run:
+Create a circuit and inspect its detector output:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-The native installer is the alternative when you want a self-contained binary
-with the complete native `rustqec`/`rstim` CLI feature set, including ILP and
-the full Shot Lab viewer. It requires no Rust or source checkout:
-
-```sh
-curl -fsSL https://nzy1997.github.io/rust-qec/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-The native archive path is validated on Ubuntu 24.04 x86_64 and macOS 15 Apple
-silicon. Windows, Intel macOS, and other platforms are outside its supported
-matrix. The installer verifies the archive's pinned checksum and does not edit
-shell profiles. [Inspect the installer](https://nzy1997.github.io/rust-qec/install.sh)
-or follow the [manual download instructions](https://nzy1997.github.io/rust-qec/get-started/#install).
-
-The complete introductory workflow uses only `rustqec`:
-
-```sh
-rustqec capabilities --format json
 cat > pipeline.stim <<'STIM'
 R 0
 X_ERROR(1) 0
@@ -113,41 +90,25 @@ M 0
 DETECTOR rec[-1]
 OBSERVABLE_INCLUDE(0) rec[-1]
 STIM
-rustqec circuit stats --format json --in pipeline.stim
-rustqec circuit detect --in pipeline.stim --shots 1 --out-format dets --append-observables --out events.dets
-rustqec circuit dem --in pipeline.stim --out pipeline.dem
+rstim circuit stats --format json --in pipeline.stim
+rstim circuit detect --in pipeline.stim --shots 1 --out-format dets --append-observables --out events.dets
+rstim circuit dem --in pipeline.stim --out pipeline.dem
 cat events.dets pipeline.dem
 ```
 
-The final two lines are `shot D0 L0` and `error(1) D0 L0`. Stats reports one
-qubit, measurement, detector, and observable, with five instructions. Those
-commands verify either installation path using only the installed `rustqec`
-binary. From a source checkout, automate the same checks plus malformed-input
-rejection with:
+The last two outputs are `shot D0 L0` and `error(1) D0 L0`. The same `rstim`
+executable also supports the simulator commands, including `render_svg`, and
+`rstim capabilities --format json` lists the structured command contract.
 
-```sh
-python3 tools/check_installed_quickstart.py --bin-dir "$(dirname "$(command -v rustqec)")"
-```
+The published v0.3.3 native installer still contains the previous two-command
+layout. A single-binary native archive will be available after the unified CLI
+release; until then, install this development build from source.
 
-### Cargo and Rust library users
+### Rust library users
 
-The library crates remain at 0.3.0, while `rustqec-cli` 0.3.3 is the
-current verified Envelope release; see the
-[release notes](docs/releases/v0.3.3.md). Install the basic CLI
-without the ILP solver:
-
-```sh
-cargo install --locked rustqec-cli --version 0.3.3
-```
-
-This installs `rustqec`, sufficient for the full example above. Add `--features ilp`
-for exact envelope MLE; the official native archives include ILP in `rustqec`
-and the full browser viewer in `rstim`. Stim-style compatibility commands remain available through
-`cargo install --locked rstim --version 0.3.0 --bin rstim --features cli,codegen-css,shot-viewer`.
-
-For Rust integration, start with the [independent consumer example](examples/rust-consumer/README.md)
-that samples a circuit and decodes it with MWPM. The [crate guide](docs/crates-io.md)
-explains package boundaries, features, and the checks required before registry publication.
+For direct library integration, see the [independent consumer example](examples/rust-consumer/README.md).
+The [crate guide](docs/crates-io.md) explains package boundaries, features, and
+registry publication checks.
 
 ## Build From Source
 
@@ -204,20 +165,20 @@ of the validated matrix.
 ```sh
 git clone https://github.com/nzy1997/rust-qec.git
 cd rust-qec
-cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools
+cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,rstim/ilp,rsinter/full,rstim/benchmark-tools
 ```
 
 Inspect a small circuit through the unified CLI:
 
 ```sh
 printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | \
-  cargo run -p rustqec-cli --bin rustqec -- circuit stats --format json
+  cargo run -p rstim --bin rstim -- circuit stats --format json
 ```
 
 Discover the currently implemented automation contract:
 
 ```sh
-cargo run -p rustqec-cli --bin rustqec -- capabilities --format json
+cargo run -p rstim --bin rstim -- capabilities --format json
 ```
 
 Automation clients can request structured errors independently of successful

@@ -25,9 +25,9 @@ class PublicationContractTest(unittest.TestCase):
         self.assertEqual(metadata_errors(self.packages, self.policy), [])
 
     def test_path_only_dependency_cannot_enter_publication(self):
-        packages, cli = self.altered("rustqec-cli")
-        next(dep for dep in cli["dependencies"] if dep["name"] == "rstim")["req"] = "*"
-        self.assertTrue(any("rstim needs a registry version" in error for error in metadata_errors(packages, self.policy)))
+        packages, cli = self.altered("rstim")
+        next(dep for dep in cli["dependencies"] if dep["name"] == "rmatching")["req"] = "*"
+        self.assertTrue(any("rmatching needs a registry version" in error for error in metadata_errors(packages, self.policy)))
 
     def test_optional_dependency_is_still_required_before_its_consumer(self):
         policy = copy.deepcopy(self.policy)
@@ -55,7 +55,7 @@ class PublicationContractTest(unittest.TestCase):
         self.assertTrue(any("simulator dependency" in error for error in metadata_errors(packages, self.policy)))
 
     def test_native_solver_and_cli_dependencies_are_rejected_in_minimal_libraries(self):
-        for name, extra in [("rstim", "qec-code"), ("qec-code", "clap"), ("qec-ilp-core", "highs-sys"), ("rmatching", "rstim"), ("rbposd", "rstim"), ("rsinter", "rilpqec"), ("rsinter", "plotters")]:
+        for name, extra in [("qec-code", "clap"), ("qec-ilp-core", "highs-sys"), ("rmatching", "rstim"), ("rbposd", "rstim"), ("rsinter", "rilpqec"), ("rsinter", "plotters")]:
             with self.subTest(name=name):
                 self.assertEqual(dependency_errors(name, f"{name} v0.1.0\n"), [])
                 self.assertTrue(dependency_errors(name, f"{name} v0.1.0\n{extra} v1.0.0\n"))

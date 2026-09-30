@@ -118,7 +118,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
 
         self.assertNotIn("FAIL", summary)
         for page, anchors in {
-            "get-started/index.html": ("install", "first-circuit", "detector-output", "source-build"),
+            "get-started/index.html": ("install", "first-circuit", "detector-output", "continue-rustqec", "further-learning"),
             "support/index.html": ("support-levels", "atom-loss-support-boundary"),
             "qp101/protocol/index.html": ("schema-identity", "validation-rules"),
             "validation/index.html": ("reading-results", "historical-results", "local-workflows"),

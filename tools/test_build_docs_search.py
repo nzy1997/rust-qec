@@ -22,10 +22,10 @@ class DocsSearchTest(unittest.TestCase):
         ])
 
     def test_dense_content_remains_searchable_but_never_becomes_the_prose_preview(self):
-        records = self.index('<title>Sampling</title><main><h2>Atom loss</h2><table><tr><td>16.775 ms</td><td>60,896 shots</td></tr></table><p>Preserve loss flags for the decoder.</p><pre>rustqec circuit detect</pre><p>Inspect the result.</p></main>')
+        records = self.index('<title>Sampling</title><main><h2>Atom loss</h2><table><tr><td>16.775 ms</td><td>60,896 shots</td></tr></table><p>Preserve loss flags for the decoder.</p><pre>rstim circuit detect</pre><p>Inspect the result.</p></main>')
         record = records[0]
         self.assertIn('16.775 ms', record['text'])
-        self.assertIn('rustqec circuit detect', record['text'])
+        self.assertIn('rstim circuit detect', record['text'])
         self.assertEqual(record['excerpt'], 'Preserve loss flags for the decoder. Inspect the result.')
         self.assertEqual(record['path'], 'qp101/protocol/#atom-loss')
 

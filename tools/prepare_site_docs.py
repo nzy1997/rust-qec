@@ -19,7 +19,6 @@ PUBLIC_PACKAGES = {
     'rmatching',
     'rsinter',
     'rstim',
-    'rustqec-cli',
 }
 
 

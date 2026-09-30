@@ -36,15 +36,26 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
                 errors.append(f"{name}: internal dependency {upstream} needs a registry version")
             if upstream not in order or order.index(upstream) >= order.index(name):
                 errors.append(f"{name}: {upstream} must be published earlier (including optional dependencies)")
-    expected_bins = {"rustqec-cli": {"rustqec"}, "rstim": set(), "qec-code": set(), "rmatching": {"rmatching_cli"}, "rbposd": set(), "rilpqec": set(), "rsinter": {"rsinter"}}
+    expected_bins = {"rstim": {"rstim"}, "qec-code": set(), "rmatching": {"rmatching_cli"}, "rbposd": set(), "rilpqec": set(), "rsinter": {"rsinter"}}
     for name, expected in expected_bins.items():
         if name not in members:
             continue
+        features = members[name]["features"]
+        enabled = set(features.get("default", []))
+        while True:
+            expanded = enabled | {
+                feature for selected in enabled for feature in features.get(selected, [])
+                if feature in features
+            }
+            if expanded == enabled:
+                break
+            enabled = expanded
         actual = {target["name"] for target in members[name]["targets"]
-                  if "bin" in target["kind"] and not target.get("required-features")}
+                  if "bin" in target["kind"]
+                  and set(target.get("required-features", [])) <= enabled}
         if actual != expected:
             errors.append(f"{name}: default installation exposes {sorted(actual)}, expected {sorted(expected)}")
-    for name in ("rstim", "qec-code"):
+    for name in ("qec-code",):
         bins = [target for target in members[name]["targets"] if "bin" in target["kind"] and target["name"] == name]
         if len(bins) != 1 or "cli" not in bins[0].get("required-features", []):
             errors.append(f"{name}: compatibility binary must require cli")
@@ -59,11 +70,9 @@ def metadata_errors(packages: list[dict], policy: dict) -> list[str]:
 MINIMAL_FORBIDDEN = {
     "rbposd": {"rstim", "clap", "qec-ilp-core", "highs", "highs-sys"},
     "rsinter": {"rbposd", "rmatching", "rilpqec", "qec-ilp-core", "highs", "highs-sys", "plotters"},
-    "rstim": {"qec-code", "qec-ilp-core", "clap", "highs", "highs-sys"},
     "qec-code": {"clap", "qec-ilp-core", "highs", "highs-sys"},
     "qec-ilp-core": {"highs", "highs-sys", "gurobi", "bindgen", "cmake"},
     "rmatching": {"rstim", "qec-code", "qec-ilp-core", "clap", "highs", "highs-sys"},
-    "rustqec-cli": {"highs", "highs-sys", "qec-ilp-core", "renvelope"},
 }
 
 

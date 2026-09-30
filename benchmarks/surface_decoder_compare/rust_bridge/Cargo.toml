@@ -15,7 +15,7 @@ rbposd = { path = "../../../rbposd" }
 qec-ilp-core = { path = "../../../qec-ilp-core", features = ["highs"] }
 rilpqec = { path = "../../../rilpqec" }
 rsinter = { path = "../../../rsinter", features = ["full"] }
-rstim = { path = "../../../rstim" }
+rstim = { path = "../../../rstim", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

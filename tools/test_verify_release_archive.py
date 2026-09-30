@@ -44,7 +44,8 @@ def thin_arm64_macho(*dependencies: str) -> bytes:
 
 
 class ReleaseFixture:
-    def __init__(self):
+    def __init__(self, *, legacy: bool = False):
+        self.legacy = legacy
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.target = host_target()
@@ -78,15 +79,23 @@ class ReleaseFixture:
         rstim = {"instruction_count": 2, "repeat_blocks": 0, "max_repeat_depth": 0,
                  "num_qubits": 1, "num_measurements": 1, "num_detectors": 1,
                  "num_observables": 0, "num_ticks": 0, "num_sweep_bits": 0}
+        unified_script = (
+            "#!/bin/sh\n"
+            "while IFS= read -r _line; do :; done\n"
+            f": > {self.marker!s}\n"
+            f"if [ \"$1\" = circuit ]; then printf '%s\\n' '{json.dumps(rustqec, separators=(',', ':'))}'; "
+            f"else printf '%s\\n' '{json.dumps(rstim, separators=(',', ':'))}'; fi\n"
+        ).encode()
         members = {
-            f"{archive_root}/bin/rustqec": (self.script(rustqec), 0o755),
-            f"{archive_root}/bin/rstim": (self.script(rstim), 0o755),
+            f"{archive_root}/bin/rstim": (unified_script, 0o755),
             f"{archive_root}/LICENSE": (b"test license\n", 0o644),
             f"{archive_root}/RUNTIME.md": (
                 f"RustQEC native command-line archive\n\nTag: {TAG}\n"
                 f"Source commit: {runtime_source}\nTarget: {self.target}\n".encode(), 0o644
             ),
         }
+        if self.legacy:
+            members[f"{archive_root}/bin/rustqec"] = (self.script(rustqec), 0o755)
         if unsafe:
             members["../escape"] = (b"escape\n", 0o644)
         with tarfile.open(self.archive, "w:gz") as archive:
@@ -117,9 +126,8 @@ class ReleaseFixture:
             "tag": TAG,
             "source_sha": SOURCE_SHA,
             "packages": [
-                {"name": "rustqec-cli", "version": "0.1.0", "rust_version": "1.88"},
                 {"name": "rstim", "version": "0.2.1", "rust_version": "1.88"},
-            ],
+            ] + ([{"name": "rustqec-cli", "version": "0.2.1", "rust_version": "1.88"}] if self.legacy else []),
             "shot_lab_assets": {
                 "rebuilt_from_tag": True,
                 "manifest_sha256": "4" * 64,
@@ -166,6 +174,12 @@ class VerifyReleaseArchiveTests(unittest.TestCase):
             self.assertEqual(verify(self.fixture.arguments()), (self.fixture.target, TAG))
         self.assertTrue(self.fixture.marker.exists())
 
+    def test_verifies_the_previous_two_binary_archive(self):
+        self.fixture.close()
+        self.fixture = ReleaseFixture(legacy=True)
+        with mock.patch("tools.verify_release_archive.check_linkage"):
+            self.assertEqual(verify(self.fixture.arguments()), (self.fixture.target, TAG))
+
     def test_rejects_tampered_archive_before_execution(self):
         with self.fixture.archive.open("ab") as handle:
             handle.write(b"tampered")
@@ -188,12 +202,12 @@ class VerifyReleaseArchiveTests(unittest.TestCase):
     def test_rejects_symlink_member_before_execution(self):
         archive_root = self.fixture.archive.name.removesuffix(".tar.gz")
         with tarfile.open(self.fixture.archive, "w:gz") as archive:
-            for relative in ("bin/rstim", "LICENSE", "RUNTIME.md"):
+            for relative in ("LICENSE", "RUNTIME.md"):
                 contents = b"placeholder"
                 info = tarfile.TarInfo(f"{archive_root}/{relative}")
                 info.size = len(contents)
                 archive.addfile(info, io.BytesIO(contents))
-            link = tarfile.TarInfo(f"{archive_root}/bin/rustqec")
+            link = tarfile.TarInfo(f"{archive_root}/bin/rstim")
             link.type = tarfile.SYMTYPE
             link.linkname = "/bin/sh"
             archive.addfile(link)

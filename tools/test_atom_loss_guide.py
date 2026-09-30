@@ -33,7 +33,7 @@ class GuideCommands(HTMLParser):
 
 class AtomLossGuideTest(unittest.TestCase):
     def test_page_runs_one_dataset_through_sampling_decoding_and_scoring(self):
-        subprocess.run(['cargo', 'build', '--quiet', '--locked', '-p', 'rustqec-cli'],
+        subprocess.run(['cargo', 'build', '--quiet', '--locked', '-p', 'rstim'],
                        cwd=REPO, check=True, timeout=240)
         target = Path(os.environ.get('CARGO_TARGET_DIR', REPO / 'target'))
         if not target.is_absolute():
@@ -61,7 +61,7 @@ class AtomLossGuideTest(unittest.TestCase):
             # The decoder must reject tampered public input instead of writing predictions.
             shots = work / 'data/public/shots.b8'
             shots.write_bytes(shots.read_bytes()[:-1])
-            bad_decode = run('rustqec decode --decoder envelope-matching --dataset data/public --out rejected.b8 --stats-out rejected.json')
+            bad_decode = run('rstim decode --decoder envelope-matching --dataset data/public --out rejected.b8 --stats-out rejected.json')
             self.assertNotEqual(bad_decode.returncode, 0)
             self.assertFalse((work / 'rejected.b8').exists())
             self.assertFalse((work / 'rejected.json').exists())
@@ -70,6 +70,8 @@ class AtomLossGuideTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='rustqec-loss-download-') as tmp:
             work = Path(tmp)
             with zipfile.ZipFile(REPO / 'site/static/examples/atom-loss/tutorial.zip') as archive:
+                self.assertIn('rstim dataset export', archive.read('run.sh').decode())
+                self.assertNotIn('rustqec ', archive.read('run.sh').decode())
                 archive.extractall(work)
             result = subprocess.run(['sh', 'run.sh'], cwd=work, env=env,
                                     text=True, capture_output=True, timeout=60)
