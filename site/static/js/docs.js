@@ -81,10 +81,11 @@
       for (let node = target; node; node = node.parentElement) {
         if (node.tagName === 'DETAILS') node.open = true;
       }
-      target.scrollIntoView();
+      target.scrollIntoView({ behavior: 'instant' });
     } catch { /* An invalid URL escape has no matching heading. */ }
   }
   requestAnimationFrame(revealFragment);
+  window.addEventListener('load', revealFragment, { once: true });
   window.addEventListener('hashchange', () => requestAnimationFrame(revealFragment));
   function languageFor(pre, code) {
     if (pre.dataset.language) return pre.dataset.language;
