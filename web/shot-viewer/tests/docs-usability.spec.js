@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const CIRCUIT_HEREDOC = `cat > circuit.stim <<'STIM'
 R 0 1
-X_ERROR(1) 0
-X_ERROR(1) 1
+X_ERROR(0.1) 0
+X_ERROR(0.1) 1
 CX 0 1
 M 0 1
 DETECTOR rec[-2]
@@ -21,7 +21,7 @@ test("home leads to the getting-started path", async ({ page }) => {
   await page.getByRole("link", { name: "Get started", exact: true }).first().click();
   await expect(page).toHaveURL(/\/get-started\/$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Get started");
-  await expect(page.getByRole("heading", { name: "2. Create and inspect a circuit" })).toBeAttached();
+  await expect(page.getByRole("heading", { name: "2. Define the circuit" })).toBeAttached();
 });
 
 test("home keeps one primary action, integrates atom loss, and presents Shot Lab visually", async ({ page }) => {
@@ -53,7 +53,7 @@ test('home routes first-time users to the workflow and docs links to the API ref
   ]);
   await page.getByRole('link', { name: 'Construct circuits' }).click();
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
-  await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
+  await expect(page.getByRole('heading', { name: '2. Define the circuit' })).toBeInViewport();
   await page.locator('.docs-sidebar').getByRole('link', { name: 'CLI & Rust APIs' }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
   await page.goto('/get-started/');
@@ -62,7 +62,7 @@ test('home routes first-time users to the workflow and docs links to the API ref
 
 test('CLI reference is generated from the executable capabilities contract', async ({ page }) => {
   await page.goto('/reference/');
-  await expect(page.locator('.reference-command')).toHaveCount(8);
+  await expect(page.locator('.reference-command')).toHaveCount(9);
   await expect(page.locator('#command-circuit-gen')).toContainText('rstim circuit gen');
   await expect(page.locator('#command-circuit-gen').locator('xpath=..')).toContainText('--before-round-data-loss-probability');
   await expect(page.locator('#command-decode').locator('xpath=..')).toContainText('decode_timeout');
@@ -250,7 +250,7 @@ test("search failure keeps the reference index usable", async ({ page }) => {
   await page.goto("/get-started/?q=rmatching#documentation-search");
   await failedIndex;
   await expect(page.locator("#search-status")).toContainText("Search is unavailable");
-  await expect(page.locator('main a[href="../decoding/#first-decode"]').first()).toBeVisible();
+  await expect(page.locator('main a[href="../decoding/"]').first()).toBeVisible();
 });
 
 test("protocol subsections have stable permalinks and active location feedback", async ({ page }) => {

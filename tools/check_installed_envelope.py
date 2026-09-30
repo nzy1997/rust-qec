@@ -64,24 +64,27 @@ def host_target() -> str:
 
 
 def locate_binary(bin_dir: Path) -> Path:
-    binary = bin_dir / "rustqec"
+    # Historical archives contain both binaries; their envelope commands lived
+    # in rustqec. Current archives expose those commands through rstim alone.
+    name = "rustqec" if (bin_dir / "rustqec").is_file() else "rstim"
+    binary = bin_dir / name
     if not binary.is_file():
         raise InstalledError(f"missing executable: {binary}")
     if not binary.stat().st_mode & stat.S_IXUSR:
         raise InstalledError(f"not executable: {binary}")
     resolved = binary.resolve()
-    path_binary = shutil_which_rustqec()
+    path_binary = path_executable(name)
     if path_binary is not None and resolved == path_binary:
         raise InstalledError(
-            "the bin-dir binary resolves to the PATH rustqec; test the extracted archive, "
+            f"the bin-dir binary resolves to the PATH {name}; test the extracted archive, "
             "not a conveniently available PATH binary"
         )
     return resolved
 
 
-def shutil_which_rustqec() -> Path | None:
+def path_executable(name: str) -> Path | None:
     for entry in os.environ.get("PATH", "").split(os.pathsep):
-        candidate = Path(entry) / "rustqec" if entry else None
+        candidate = Path(entry) / name if entry else None
         if candidate is not None and candidate.is_file() and os.access(candidate, os.X_OK):
             return candidate.resolve()
     return None
@@ -203,7 +206,7 @@ def self_test(real_binary: Path, matrix_path: Path) -> int:
 
     def make_shim(directory: Path, body: str) -> Path:
         directory.mkdir(parents=True, exist_ok=True)
-        shim = directory / "rustqec"
+        shim = directory / "rstim"
         shim.write_text(body, encoding="utf-8")
         shim.chmod(0o755)
         return shim
