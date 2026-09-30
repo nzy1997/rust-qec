@@ -225,50 +225,105 @@ impl ActiveState {
     }
 
     fn pauli_probability_zero(&self, pauli: &Pauli, mask: usize, independent: bool) -> f64 {
-        let expectation = if independent {
-            0.0
-        } else {
-            let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
-            let phase = i_pow(pauli.phase);
-            if mask == 0 {
+        if independent {
+            return 0.5;
+        }
+        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
+        let negative = sign_origin ^ (pauli.phase & 2 != 0);
+        let expectation = if mask == 0 {
+            debug_assert_eq!(pauli.phase % 2, 0);
+            if sign_mask.is_power_of_two() {
+                if negative {
+                    self.single_axis_expectation::<true>(sign_mask)
+                } else {
+                    self.single_axis_expectation::<false>(sign_mask)
+                }
+            } else {
                 self.coefficients
                     .iter()
                     .enumerate()
                     .map(|(index, amplitude)| {
-                        let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
-                            -1.0
+                        let norm = amplitude.norm_sqr();
+                        if negative ^ ((index & sign_mask).count_ones() & 1 != 0) {
+                            -norm
                         } else {
-                            1.0
-                        };
-                        (amplitude.conj() * (phase * (*amplitude * sign))).re
+                            norm
+                        }
                     })
                     .sum::<f64>()
+            }
+        } else {
+            // Hermiticity makes the two orbit contributions equal. Select
+            // the real or imaginary scalar product once, outside the loop.
+            debug_assert_eq!(
+                (mask & sign_mask).count_ones() & 1,
+                (pauli.phase % 2) as u32
+            );
+            if pauli.phase & 1 == 0 {
+                self.pauli_orbit_expectation::<false>(mask, sign_mask, negative)
             } else {
-                // A Hermitian Pauli contributes the same real expectation
-                // from both sides of each coordinate pair.
-                debug_assert_eq!(
-                    (mask & sign_mask).count_ones() & 1,
-                    (pauli.phase % 2) as u32
-                );
-                let pivot = 1usize << (usize::BITS - 1 - mask.leading_zeros());
-                let mut expectation = 0.0;
-                for block in (0..self.coefficients.len()).step_by(pivot * 2) {
-                    for offset in 0..pivot {
-                        let index = block + offset;
-                        let partner = index ^ mask;
-                        let sign = if sign_origin ^ ((index & sign_mask).count_ones() & 1 != 0) {
-                            -1.0
-                        } else {
-                            1.0
-                        };
-                        let image = phase * (self.coefficients[index] * sign);
-                        expectation += 2.0 * (self.coefficients[partner].conj() * image).re;
-                    }
-                }
-                expectation
+                self.pauli_orbit_expectation::<true>(mask, sign_mask, negative)
             }
         };
         ((1.0 + expectation) / 2.0).clamp(0.0, 1.0)
+    }
+
+    fn single_axis_expectation<const NEGATIVE: bool>(&self, pivot: usize) -> f64 {
+        let mut expectation = 0.0;
+        if pivot == 1 {
+            for pair in self.coefficients.chunks_exact(2) {
+                let zero = pair[0].norm_sqr();
+                let one = pair[1].norm_sqr();
+                expectation += if NEGATIVE { -zero } else { zero };
+                expectation += if NEGATIVE { one } else { -one };
+            }
+            return expectation;
+        }
+        for block in self.coefficients.chunks_exact(pivot * 2) {
+            let (zero, one) = block.split_at(pivot);
+            // Keep the original coefficient accumulation order. Reducing
+            // each half separately and subtracting would change rounding.
+            for amplitude in zero {
+                let norm = amplitude.norm_sqr();
+                expectation += if NEGATIVE { -norm } else { norm };
+            }
+            for amplitude in one {
+                let norm = amplitude.norm_sqr();
+                expectation += if NEGATIVE { norm } else { -norm };
+            }
+        }
+        expectation
+    }
+
+    fn pauli_orbit_expectation<const IMAGINARY: bool>(
+        &self,
+        mask: usize,
+        sign_mask: usize,
+        negative: bool,
+    ) -> f64 {
+        let pivot = 1usize << (usize::BITS - 1 - mask.leading_zeros());
+        let mut expectation = 0.0;
+        for block in (0..self.coefficients.len()).step_by(pivot * 2) {
+            for offset in 0..pivot {
+                let index = block + offset;
+                let left = self.coefficients[index];
+                let right = self.coefficients[index ^ mask];
+                // Re(conj(right) * left) for phases ±1; the real part of
+                // conj(right) * i*left for phases ±i. Keep the orbit order
+                // and per-orbit factor of two used by the general formula.
+                let value = if IMAGINARY {
+                    right.im * left.re - right.re * left.im
+                } else {
+                    right.re * left.re + right.im * left.im
+                };
+                expectation += if negative ^ ((index & sign_mask).count_ones() & 1 != 0) {
+                    -2.0 * value
+                } else {
+                    2.0 * value
+                };
+            }
+        }
+        expectation
     }
 
     /// Samples and collapses a Pauli-basis measurement. `true` is the -1 outcome.
@@ -2900,6 +2955,104 @@ mod tests {
             state.apply_clifford(gate).unwrap();
         }
         state
+    }
+
+    fn previous_pauli_probability(state: &ActiveState, pauli: &Pauli, mask: usize) -> f64 {
+        let (origin, signs) = state.sign_coordinates(&pauli.z);
+        let phase = i_pow(pauli.phase);
+        let image = |index: usize| {
+            let sign = if origin ^ ((index & signs).count_ones() & 1 != 0) {
+                -1.0
+            } else {
+                1.0
+            };
+            phase * (state.coefficients[index] * sign)
+        };
+        let expectation = if mask == 0 {
+            state
+                .coefficients
+                .iter()
+                .enumerate()
+                .map(|(index, amplitude)| (amplitude.conj() * image(index)).re)
+                .sum::<f64>()
+        } else {
+            let pivot = 1usize << (usize::BITS - 1 - mask.leading_zeros());
+            let mut expectation = 0.0;
+            for block in (0..state.coefficients.len()).step_by(pivot * 2) {
+                for offset in 0..pivot {
+                    let index = block + offset;
+                    expectation +=
+                        2.0 * (state.coefficients[index ^ mask].conj() * image(index)).re;
+                }
+            }
+            expectation
+        };
+        ((1.0 + expectation) / 2.0).clamp(0.0, 1.0)
+    }
+
+    #[test]
+    fn scalar_probability_preserves_general_formula_rounding_for_signed_pauli_orbits() {
+        let mut rng = StdRng::seed_from_u64(20261005);
+        for rank in [1, 2, 4, 8, 12, 16] {
+            let n = rank + 2;
+            let mut state = ActiveState::new(n, rank);
+            for q in 0..rank {
+                let mut axis = vec![false; n];
+                axis[q] = true;
+                state.axes.push(axis);
+            }
+            state.coefficients = (0..1 << rank)
+                .map(|index| match index % 17 {
+                    0 => ComplexAmp::new(-0.0, 0.0),
+                    1 => ComplexAmp::new(1e-160, -1e-160),
+                    _ => ComplexAmp::new(rng.r#gen::<f64>() - 0.5, rng.r#gen::<f64>() - 0.5),
+                })
+                .collect();
+            let norm = state
+                .coefficients
+                .iter()
+                .map(|a| a.norm_sqr())
+                .sum::<f64>()
+                .sqrt();
+            for a in &mut state.coefficients {
+                *a = *a * (1.0 / norm);
+            }
+            let mut masks: Vec<usize> = vec![0, (1 << rank) - 1];
+            masks.extend((0..rank).map(|q| 1 << q));
+            masks.extend((0..16).map(|_| rng.gen_range(0..1 << rank)));
+            for mask in masks {
+                for signs in [
+                    0usize,
+                    1,
+                    1 << (rank - 1),
+                    (1 << rank) - 1,
+                    rng.gen_range(0..1 << rank),
+                ] {
+                    let mut pauli = Pauli::identity(n);
+                    for q in 0..rank {
+                        pauli.x[q] = mask & (1 << q) != 0;
+                        pauli.z[q] = signs & (1 << q) != 0;
+                    }
+                    pauli.z[rank] = true;
+                    for origin in [false, true] {
+                        state.origin[rank] = origin;
+                        for negative in [false, true] {
+                            pauli.phase =
+                                ((mask & signs).count_ones() & 1) as u8 + 2 * u8::from(negative);
+                            let expected = previous_pauli_probability(&state, &pauli, mask);
+                            let actual = state.pauli_probability_zero(&pauli, mask, false);
+                            assert_eq!(
+                                actual.to_bits(),
+                                expected.to_bits(),
+                                "rank={rank} mask={mask} signs={signs} origin={origin} phase={}",
+                                pauli.phase
+                            );
+                            assert_eq!(state.pauli_probability_zero(&pauli, mask, true), 0.5);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     #[test]
