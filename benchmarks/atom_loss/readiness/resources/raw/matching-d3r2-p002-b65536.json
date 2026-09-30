@@ -6,7 +6,7 @@
     "outcome": "success"
   },
   "circuit": {
-    "source": "rustqec circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+    "source": "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
     "sha256": "4b2c2c55fe0006c28f7d2f68fb83c25252a26c64d4bdddce797510cd7f413671"
   },
   "loss_rate": 0.002,
@@ -17,13 +17,13 @@
     "seed": 715951,
     "rows_sha256": "628f086b6f2a15d78455759d8d81c74582e7267dbd752945cfb31a02ca8622a2",
     "distinct_patterns_in_corpus": 433,
-    "sampler": "rustqec circuit sample --shots 65536 --seed 715951 (workload generation)"
+    "sampler": "rstim circuit sample --shots 65536 --seed 715951 (workload generation)"
   },
   "exit_code": 0,
-  "wall_seconds": 0.0888730000006035,
-  "peak_rss_watermark_bytes": 18350080,
-  "compile_seconds": 0.001989208,
-  "decode_seconds": 0.075983791,
+  "wall_seconds": 0.10301458300091326,
+  "peak_rss_watermark_bytes": 18563072,
+  "compile_seconds": 0.002276417,
+  "decode_seconds": 0.081989167,
   "attempted_shots": 65536,
   "completed_shots": 65536,
   "observed_pattern_count": 433,
