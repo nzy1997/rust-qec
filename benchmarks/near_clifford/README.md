@@ -38,3 +38,8 @@ quiet machine to compare code revisions. Times exclude process launch and
 result destruction. This matrix uses `StdRng`; the Clifft comparison in PR #764
 used a separate harness with `SmallRng`, so its absolute times are not directly
 comparable to this report.
+
+The expanded [43-configuration M4 campaign and profiling](results/apple-m4-scale-analysis-2026-09-30.md)
+compares the merged #764/#766 revisions, includes rank/width combinations and mixed
+circuits, and retains diagnostic cache/fallback counters separately from timing.
+See the [scale harness](scale/README.md) for reproduction.
