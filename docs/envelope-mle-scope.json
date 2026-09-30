@@ -153,10 +153,10 @@
       "suite": "benchmarks/atom_loss/readiness_correctness.py",
       "case_name": "midswap-d3-r2-p002-generated",
       "evidence_level": "independent-end-to-end",
-      "input": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (randomized differential seed 721000)",
+      "input": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (randomized differential seed 721000)",
       "oracle": "independent Stim oracle: private loss histories, Stim-derived DEM and Pauli fault propagation, exact min-plus enumeration of allowed optima; never cached native predictions",
       "evidence_identity": {
-        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --noise 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "4b2c2c55fe0006c28f7d2f68fb83c25252a26c64d4bdddce797510cd7f413671",
         "seed": 721000
       },
@@ -172,10 +172,10 @@
       "suite": "benchmarks/atom_loss/readiness_correctness.py",
       "case_name": "midswap-d3-r1-generated",
       "evidence_level": "independent-end-to-end",
-      "input": "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (seed 714002)",
+      "input": "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 1 --after-clifford-depolarization 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001 (seed 714002)",
       "oracle": "independent Stim oracle (as above)",
       "evidence_identity": {
-        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 1 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 1 --after-clifford-depolarization 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "c5174231fa98f8e114213365f8a396d63c99d4c3991f74ce33226c4733902424",
         "seed": 714002
       },
@@ -195,7 +195,7 @@
       "oracle": "independent compiler-output validation only; supporting evidence that never satisfies an end-to-end requirement",
       "counts_toward_domain": false,
       "evidence_identity": {
-        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 3 --noise 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "source": "rstim circuit gen --code surface_code --task rotated_memory_z_midswap --distance 3 --rounds 3 --after-clifford-depolarization 0.001 --operation-loss-probability 0.01 --measurement-loss-probability 0.01 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
         "circuit_sha256": "c0ae5986a12921e830316fafc275fd1145aeeac22ed7c58365b6fa91c4213aec",
         "seed": 714003
       },
