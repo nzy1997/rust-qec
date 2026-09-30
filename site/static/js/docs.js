@@ -81,10 +81,11 @@
       for (let node = target; node; node = node.parentElement) {
         if (node.tagName === 'DETAILS') node.open = true;
       }
-      target.scrollIntoView();
+      target.scrollIntoView({ behavior: 'instant' });
     } catch { /* An invalid URL escape has no matching heading. */ }
   }
   requestAnimationFrame(revealFragment);
+  window.addEventListener('load', revealFragment, { once: true });
   window.addEventListener('hashchange', () => requestAnimationFrame(revealFragment));
   function languageFor(pre, code) {
     if (pre.dataset.language) return pre.dataset.language;
@@ -126,9 +127,9 @@
         if (terminal?.classList.contains('terminal-block')) {
           const result = document.createElement('div');
           result.className = 'terminal-output';
-          label.className = 'terminal-output-label';
           pre.before(result);
-          result.append(label, pre);
+          result.append(pre);
+          terminal.classList.add('has-output');
           terminal.append(result);
           return;
         }

@@ -1355,7 +1355,7 @@ def _fixture_installed(target: str, archive_name: str, archive_sha: str,
         "target": target,
         "bin_dir": f"/ci/work/extracted/{archive_name.removesuffix('.tar.gz')}/bin",
         "binary": {
-            "path": "/ci/work/extracted/bin/rustqec",
+            "path": "/ci/work/extracted/bin/rstim",
             "sha256": "c" * 64,
             "version": f"rustqec {SELFTEST_TAG[1:]}",
             "advertised_decoders": ["envelope-matching", "envelope-mle"],
@@ -1489,7 +1489,6 @@ def make_selftest_fixture(
         "tag": SELFTEST_TAG,
         "source_sha": SELFTEST_SHA,
         "packages": [
-            {"name": "rustqec-cli", "version": SELFTEST_TAG[1:], "rust_version": "1.88"},
             {"name": "rstim", "version": SELFTEST_TAG[1:], "rust_version": "1.88"},
         ],
         "shot_lab_assets": {

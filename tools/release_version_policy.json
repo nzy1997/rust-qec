@@ -35,10 +35,6 @@
       "path": "renvelope"
     },
     {
-      "name": "rustqec-cli",
-      "path": "rustqec-cli"
-    },
-    {
       "name": "rstim-shot-web",
       "path": "rstim-shot-web"
     },
@@ -64,8 +60,7 @@
       "rmatching",
       "rbposd",
       "rilpqec",
-      "rsinter",
-      "rustqec-cli"
+      "rsinter"
     ]
   }
 }

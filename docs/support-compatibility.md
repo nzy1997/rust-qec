@@ -4,7 +4,7 @@ This document defines the support contract for the RustQEC 0.3 release line.
 The documentation edition banner identifies whether a rendered copy follows
 the development branch or a frozen stable release.
 The coordinated repository release and individual crate patch versions are
-separate: a requirement such as `rustqec-cli >=0.3.1,<0.4.0` applies to that
+separate: a requirement such as `rstim >=0.3.1,<0.4.0` applies to that
 package without renaming the whole documentation set. A decoder maturity is
 binding only for a published package release whose evidence bundle verifies
 it. This is a contract for using the shipped interfaces, not a claim that every
@@ -15,7 +15,7 @@ publication-scale use.
 
 | Surface | Level | Supported boundary |
 | --- | --- | --- |
-| `rustqec` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rustqec capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
+| `rstim` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rstim capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
 | `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
 | Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta unless v0.3.3 publication verification succeeds</span> | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope. The v0.3.1 and v0.3.2 candidates did not complete consistent publication verification. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
 | Atom-loss `envelope-mle` decoder | <span data-decoder-support-copy="envelope-mle">Beta unless v0.3.3 publication verification succeeds</span> | Exactly four measured Mid-SWAP workload points declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json): d=3/r=2 at loss 0.002 and d=3/r=1 at loss 0.01, each at batches 1,024 and 16,384, with no interpolation. Requires the `ilp` feature or an official native archive; the conventional fixture and every unlisted size/loss/batch point are outside the Supported promise. |
@@ -148,7 +148,7 @@ metadata when reproducing an exact package version.
 ## Cargo features in the 0.3 release line
 
 The 0.3 source package defaults keep native solver dependencies optional.
-`rustqec-cli` needs `--features ilp` for `envelope-mle`; default builds advertise
+`rstim` needs `--features ilp` for `envelope-mle`; default builds advertise
 only the available decoder choices. Official native archives retain ILP support.
 `rsinter` needs explicit runner/plotting features, or `full` for the previous
 complete research setup. These changes do not alter immutable v0.2.1 archives.

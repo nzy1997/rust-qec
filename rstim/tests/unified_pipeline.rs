@@ -2,7 +2,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 fn rustqec_cmd() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_rustqec"))
+    Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
 fn run_with_stdin(args: &[&str], input: &str) -> std::process::Output {
@@ -52,7 +52,7 @@ fn circuit_gen_midswap_writes_a_loss_visible_circuit() {
             "3",
             "--rounds",
             "2",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.001",
             "--operation-loss-probability",
             "0.005",
@@ -152,7 +152,7 @@ fn circuit_gen_rotated_memory_z_with_loss_routes_to_loss_visible_builder() {
             "2",
             "--before-round-data-depolarization",
             "0.001",
-            "--noise",
+            "--after_clifford_depolarization",
             "0.002",
             "--before-measure-flip-probability",
             "0.003",
@@ -184,9 +184,9 @@ fn circuit_gen_rotated_memory_z_with_loss_routes_to_loss_visible_builder() {
 }
 
 #[test]
-fn circuit_gen_noise_flag_only_drives_the_after_clifford_channel() {
+fn circuit_gen_after_clifford_depolarization_only_drives_the_clifford_channel() {
     let dir = tempfile::tempdir().unwrap();
-    let out = dir.path().join("noise.stim");
+    let out = dir.path().join("after-clifford.stim");
     let output = rustqec_cmd()
         .args([
             "circuit",
@@ -199,7 +199,7 @@ fn circuit_gen_noise_flag_only_drives_the_after_clifford_channel() {
             "3",
             "--rounds",
             "2",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.1",
             "--out",
             out.to_str().unwrap(),
@@ -211,8 +211,36 @@ fn circuit_gen_noise_flag_only_drives_the_after_clifford_channel() {
     let circuit = std::fs::read_to_string(&out).unwrap();
     assert!(circuit.contains("DEPOLARIZE1(0.1)"));
     assert!(circuit.contains("DEPOLARIZE2(0.1)"));
-    // --noise must not broadcast into the reset/measurement flip channels.
+    // After-Clifford depolarization must not broadcast into the reset/measurement flip channels.
     assert!(!circuit.contains("X_ERROR(0.1)"));
+}
+
+#[test]
+fn circuit_gen_rejects_removed_noise_flag() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("circuit.stim");
+    let output = rustqec_cmd()
+        .args([
+            "circuit",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_z",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--noise",
+            "0.1",
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--noise"));
+    assert!(!out.exists());
 }
 
 #[test]
@@ -222,7 +250,7 @@ fn circuit_gen_rejects_out_of_range_probabilities() {
     for (flag, value) in [
         ("--before-measure-flip-probability", "2"),
         ("--before-round-data-loss-probability", "2"),
-        ("--noise", "nan"),
+        ("--after-clifford-depolarization", "nan"),
         ("--after-reset-flip-probability", "1.5"),
     ] {
         let output = rustqec_cmd()
@@ -272,7 +300,7 @@ fn circuit_gen_midswap_applies_the_explicit_noise_channel_flags() {
             "0.01",
             "--before-round-data-loss",
             "0.05",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.02",
             "--before-measure-flip-probability",
             "0.03",
@@ -464,7 +492,7 @@ fn dataset_export_then_decode_closes_the_midswap_loop() {
             "3",
             "--rounds",
             "2",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.001",
             "--operation-loss-probability",
             "0.005",
@@ -658,7 +686,7 @@ fn pipeline_commands_default_to_json_and_support_human() {
             "3",
             "--rounds",
             "2",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.01",
             "--out",
             out.to_str().unwrap(),
@@ -680,7 +708,7 @@ fn pipeline_commands_default_to_json_and_support_human() {
             "3",
             "--rounds",
             "2",
-            "--noise",
+            "--after-clifford-depolarization",
             "0.01",
             "--out",
             out.to_str().unwrap(),
@@ -746,6 +774,15 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         .find(|entry| entry["name"] == "circuit.gen")
         .unwrap();
     let gen_arguments = gen_entry["arguments"].as_array().unwrap();
+    assert!(gen_arguments.iter().any(|argument| {
+        argument["name"] == "after_clifford_depolarization"
+            && argument["flag"] == "--after-clifford-depolarization"
+    }));
+    assert!(
+        !gen_arguments
+            .iter()
+            .any(|argument| argument["flag"] == "--noise")
+    );
     for flag in [
         "--after-clifford-loss-probability",
         "--before-round-data-depolarization",
@@ -753,7 +790,9 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         "--after-reset-flip-probability",
     ] {
         assert!(
-            gen_arguments.iter().any(|argument| argument["flag"] == flag),
+            gen_arguments
+                .iter()
+                .any(|argument| argument["flag"] == flag),
             "circuit.gen must declare {flag}"
         );
     }

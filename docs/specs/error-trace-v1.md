@@ -1,9 +1,9 @@
 # Error-Trace Sidecar v1
 
 Status: **stable contract** (versioned). Companion to the decoder-dataset
-export (`rustqec dataset export` / `rstim export_decoder_dataset`).
+export (`rstim dataset export` / `rstim export_decoder_dataset`).
 
-`rustqec dataset export --error-trace` writes an additional file
+`rstim dataset export --error-trace` writes an additional file
 `trace.jsonl` into the **private** bundle. It records, for every shot, the
 complete noise realization that produced the shot: every Pauli error branch
 that fired and every atom-loss onset, in execution order. Together with the

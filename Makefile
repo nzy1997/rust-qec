@@ -43,7 +43,7 @@ help:
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
-	cargo test --locked --workspace --features rustqec-cli/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
+	cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
 
 check:
 	cargo check --locked --workspace
@@ -83,7 +83,9 @@ build-site: build-shot-viewer fetch-doc-artifacts
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
-	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --in site/static/examples/getting-started.stim --out _site/examples/getting-started.svg
+	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --in site/static/examples/getting-started.stim --out _site/examples/getting-started-circuit.svg
+	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --sample_shot --seed 86 --in site/static/examples/getting-started.stim --out _site/examples/getting-started.svg
+	target/debug/rstim surface-code-ler --distances 3,5,7 --rounds 9,15,21 --physical-error-rates 0.008,0.009,0.01,0.011,0.012 --shots 10000 --seed 86 --out-dir _site/examples
 	python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery
 	python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json
 	python3 tools/build_docs_search.py --site-root _site

@@ -7,9 +7,9 @@ use rbposd::OsdVariant;
 
 #[cfg(feature = "rbposd-runner")]
 use rsinter::bb_circuit_memory::{
-    export_bravyi_model_audit_for_code, export_comparison_case_for_code,
+    SimulationConfig, export_bravyi_model_audit_for_code, export_comparison_case_for_code,
     export_comparison_case_for_code_with_osd_variant, run_simulation_for_code,
-    run_simulation_for_code_with_osd_variant, SimulationConfig,
+    run_simulation_for_code_with_osd_variant,
 };
 #[cfg(feature = "plotting")]
 use rsinter::bench::bb_compare_csv::read_bb_compare_csv;
@@ -18,7 +18,7 @@ use rsinter::bench::merge::merge_result_rows;
 use rsinter::bench::plot::render_benchmark_plot;
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, write_results_jsonl};
-use rsinter::bench::run::{run_rust_benchmark_with_options, BenchRunOptions};
+use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
 #[cfg(feature = "plotting")]
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
@@ -38,6 +38,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Plot a CSV of measured logical failures by distance and physical error rate.
+    ///
+    /// Requires the plotting feature.
+    PlotErrorRateCsv {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Decode a detector dataset (requires a decoder runner feature).
     ///
     /// Requires one of: rbposd-runner, rmatching-runner, ilp-runner.
@@ -171,6 +180,9 @@ fn main() {
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::PlotErrorRateCsv { input, out } => {
+            rsinter::plot::plot_error_rate_csv(&input, &out)?;
+        }
         Commands::Replay {
             dem,
             dets,

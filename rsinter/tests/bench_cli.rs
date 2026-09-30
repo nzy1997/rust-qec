@@ -22,9 +22,13 @@ fn rsinter_cli_help_mentions_bench_subcommands() {
     assert!(stdout.contains("run"));
     assert!(stdout.contains("merge"));
     assert!(stdout.contains("plot"));
+    assert!(stdout.contains("plot-error-rate-csv"));
     assert!(stdout.contains("requires rbposd-runner"), "{stdout}");
     assert!(stdout.contains("plots require plotting"), "{stdout}");
-    assert!(stdout.contains("requires a decoder runner feature"), "{stdout}");
+    assert!(
+        stdout.contains("requires a decoder runner feature"),
+        "{stdout}"
+    );
 }
 
 #[test]
@@ -36,6 +40,39 @@ fn rsinter_bench_run_help_mentions_resume_flag() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("--resume"), "{stdout}");
+}
+
+#[test]
+#[cfg(feature = "plotting")]
+fn rsinter_plot_error_rate_csv_cli_plots_measured_counts() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("rates.csv");
+    let output = dir.path().join("rates.svg");
+    fs::write(
+        &input,
+        "distance,physical_error_rate,shots,logical_failures\n\
+         3,0.005,2000,31\n\
+         5,0.005,2000,23\n\
+         3,0.01,2000,111\n\
+         5,0.01,2000,184\n",
+    )
+    .unwrap();
+
+    let result = Command::new(env!("CARGO_BIN_EXE_rsinter"))
+        .args([
+            "plot-error-rate-csv",
+            "--input",
+            input.to_str().unwrap(),
+            "--out",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(result.status.success(), "{result:?}");
+    let svg = fs::read_to_string(output).unwrap();
+    assert!(svg.contains("<svg"));
+    assert!(svg.contains("distance 3"));
+    assert!(svg.contains("distance 5"));
 }
 
 #[test]

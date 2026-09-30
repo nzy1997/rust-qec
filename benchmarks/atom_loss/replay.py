@@ -35,5 +35,5 @@ def replay(archive, binary):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--archive',type=Path,default=ROOT/'site/static/data/atom-loss/shot-data-v1.zip')
-    p.add_argument('--binary',type=Path,default=ROOT/'target/release/rustqec');args=p.parse_args()
+    p.add_argument('--binary',type=Path,default=ROOT/'target/release/rstim');args=p.parse_args()
     print('PASS:',len(replay(args.archive,args.binary)),'corpora')

@@ -45,7 +45,7 @@ const PLACEHOLDER_INVARIANCE_CIRCUIT: &str = concat!(
 );
 
 fn rustqec() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_rustqec"))
+    Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
 
 fn available_decoders() -> &'static [&'static str] {

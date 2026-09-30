@@ -916,7 +916,7 @@ fn gen_rotated_memory_z_explicit_noise_and_loss() {
     assert!(!text.contains("SHUTTLE"));
     assert!(
         !text.contains("SHIFT_COORDS"),
-        "loss-visible circuits use explicit detector time coordinates so they stay inside the rustqec decode subset"
+        "loss-visible circuits use explicit detector time coordinates so they stay inside the rstim decode subset"
     );
     let lines: Vec<&str> = text.lines().collect();
     let data_reset = lines

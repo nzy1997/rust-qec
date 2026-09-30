@@ -19,7 +19,7 @@ class PrepareSiteDocsTests(unittest.TestCase):
             }))
             members = []
             for name in ('qec-ilp-core', 'qec-code', 'rbposd', 'rilpqec', 'rmatching',
-                         'rsinter', 'rstim', 'rustqec-cli'):
+                         'rsinter', 'rstim'):
                 members.append(name)
                 manifest = root / name / 'Cargo.toml'
                 manifest.parent.mkdir(parents=True)
@@ -37,7 +37,7 @@ class PrepareSiteDocsTests(unittest.TestCase):
             version = json.loads((root / 'site/generated/docs-version.json').read_text())
             self.assertEqual(version['id'], 'master')
             self.assertEqual(version['release_line'], '0.3')
-            self.assertEqual(version['packages']['rustqec_cli']['version'], '0.3.1')
+            self.assertEqual(version['packages']['rstim']['version'], '0.3.1')
             for source, target in pairs:
                 self.assertEqual((root / source).read_bytes(), (root / 'site/generated' / target).read_bytes())
                 (root / source).write_text('# Revised\n')

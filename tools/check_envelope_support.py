@@ -2,14 +2,14 @@
 """Verify the executable envelope-decoder support matrix against a real CLI.
 
 Runs every control declared in ``docs/envelope-support.json`` against the
-requested ``rustqec`` binary: acceptance controls must succeed with the pinned
+requested ``rstim`` binary: acceptance controls must succeed with the pinned
 predictions/statistics, rejection controls must fail with the declared
 structured error code, exit code and output-file rules. Missing ILP support in
 the tested binary fails the run instead of silently skipping MLE controls.
 
 Usage:
     python3 tools/check_envelope_support.py \
-        --binary target/release/rustqec \
+        --binary target/release/rstim \
         --matrix docs/envelope-support.json \
         --out drafts/envelope-readiness/support.json
     python3 tools/check_envelope_support.py --self-test
@@ -30,7 +30,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "rustqec.envelope-support.v1"
 RESULT_SCHEMA_VERSION = "rustqec.envelope-support-result.v1"
-DEFAULT_BINARY = Path("target/release/rustqec")
+DEFAULT_BINARY = Path("target/release/rstim")
 DEFAULT_MATRIX = Path("docs/envelope-support.json")
 
 # Structural completeness: every decoder must keep these controls. Removing

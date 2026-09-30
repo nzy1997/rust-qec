@@ -13,7 +13,7 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 description = "Rust minimum-weight perfect-matching decoder for detector-error-model workflows"
 
 [dev-dependencies]
-rstim = { version = "0.3.0", path = "../rstim" }
+rstim = { version = "0.3.0", path = "../rstim", default-features = false }
 
 [[bin]]
 name = "rmatching_cli"

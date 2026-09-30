@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 const CIRCUIT_HEREDOC = `cat > circuit.stim <<'STIM'
-R 0
-X_ERROR(1) 0
-M 0
+R 0 1
+X_ERROR(0.1) 0
+X_ERROR(0.1) 1
+CX 0 1
+M 0 1
+DETECTOR rec[-2]
 DETECTOR rec[-1]
-OBSERVABLE_INCLUDE(0) rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-2] rec[-1]
 STIM`;
 
 async function codeBlockFor(page, text) {
@@ -17,9 +20,8 @@ test("home leads to the getting-started path", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Get started", exact: true }).first().click();
   await expect(page).toHaveURL(/\/get-started\/$/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Your first detector event");
-  await page.getByRole("link", { name: "create your circuit", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "2. Create and inspect a circuit" })).toBeInViewport();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Get started");
+  await expect(page.getByRole("heading", { name: "2. Define the circuit" })).toBeAttached();
 });
 
 test("home keeps one primary action, integrates atom loss, and presents Shot Lab visually", async ({ page }) => {
@@ -51,23 +53,20 @@ test('home routes first-time users to the workflow and docs links to the API ref
   ]);
   await page.getByRole('link', { name: 'Construct circuits' }).click();
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
-  await expect(page.getByRole('heading', { name: '2. Create and inspect a circuit' })).toBeInViewport();
+  await expect(page.getByRole('heading', { name: '2. Define the circuit' })).toBeInViewport();
   await page.locator('.docs-sidebar').getByRole('link', { name: 'CLI & Rust APIs' }).click();
   await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
   await page.goto('/get-started/');
-  await page.getByRole('link', { name: 'native package', exact: true }).click();
-  await expect(page.locator('#native-install')).toHaveAttribute('open', '');
-  await expect(page.getByRole('link', { name: 'Linux x86_64 archive' })).toBeVisible();
-  await expect(page.locator('#native-install details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('section[aria-labelledby="install"]')).toContainText('cargo install --locked --path rstim');
 });
 
 test('CLI reference is generated from the executable capabilities contract', async ({ page }) => {
   await page.goto('/reference/');
-  await expect(page.locator('.reference-command')).toHaveCount(8);
-  await expect(page.locator('#command-circuit-gen')).toContainText('rustqec circuit gen');
+  await expect(page.locator('.reference-command')).toHaveCount(9);
+  await expect(page.locator('#command-circuit-gen')).toContainText('rstim circuit gen');
   await expect(page.locator('#command-circuit-gen').locator('xpath=..')).toContainText('--before-round-data-loss-probability');
   await expect(page.locator('#command-decode').locator('xpath=..')).toContainText('decode_timeout');
-  await expect(page.locator('main')).toContainText('rustqec capabilities --format json');
+  await expect(page.locator('main')).toContainText('rstim capabilities --format json');
 });
 
 test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
@@ -94,7 +93,7 @@ test('home skip link reaches the product introduction and preserves its next act
   await expect(page.getByRole('link', { name: 'Get started', exact: true }).last()).toBeFocused();
 });
 
-test("installation starts with one copyable command and keeps manual steps optional", async ({ page }) => {
+test("installation starts with one copyable command", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -103,18 +102,11 @@ test("installation starts with one copyable command and keeps manual steps optio
   });
   await page.goto("/get-started/");
   const installation = page.locator('section[aria-labelledby="install"]');
-  const native = installation.locator("#native-install");
-  const manual = native.locator("details");
-  await expect(manual).not.toHaveAttribute("open", "");
-  const installCommand = await codeBlockFor(installation, "cargo install --locked rustqec-cli");
+  const installCommand = await codeBlockFor(installation, "cargo install --locked --path rstim --force");
   await installCommand.getByRole("button", { name: "Copy Shell" }).click();
   await expect.poll(() => page.evaluate(() => window.__copiedText)).toBe(
-    "cargo install --locked rustqec-cli",
+    "cargo install --locked --path rstim --force",
   );
-  await native.locator("summary").first().click();
-  await expect(installation.getByRole("link", { name: "Inspect the installer" })).toHaveAttribute("href", "../install.sh");
-  await manual.locator("summary").click();
-  await expect(manual).toContainText("sha256sum -c");
 });
 
 test("copying preserves the complete circuit heredoc", async ({ page }) => {
@@ -191,7 +183,7 @@ test("dynamic evidence commands copy executable source-checkout commands", async
     });
   });
   await page.goto("/decoding/");
-  const reproduction = page.locator(".evidence-reproduction").first();
+  const reproduction = page.locator(".evidence-reproduction").filter({ hasText: "make surface-decoder-compare-full" });
   await reproduction.locator("summary").click();
   const block = await codeBlockFor(reproduction, "make surface-decoder-compare-full");
   await expect(block).toBeVisible();
@@ -258,7 +250,7 @@ test("search failure keeps the reference index usable", async ({ page }) => {
   await page.goto("/get-started/?q=rmatching#documentation-search");
   await failedIndex;
   await expect(page.locator("#search-status")).toContainText("Search is unavailable");
-  await expect(page.locator('main a[href="../decoding/#first-decode"]').first()).toBeVisible();
+  await expect(page.locator('main a[href="../decoding/"]').first()).toBeVisible();
 });
 
 test("protocol subsections have stable permalinks and active location feedback", async ({ page }) => {
@@ -272,24 +264,25 @@ test("protocol subsections have stable permalinks and active location feedback",
   await expect(page.locator('#noise .heading-anchor')).toHaveAttribute("href", /#noise$/);
 });
 
-test("output is labeled separately and never copied with the command", async ({ page }) => {
+test("terminal transcript keeps output out of copied commands", async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text) => { window.__copiedText = text; } } }));
   await page.goto("/get-started/#detector-output");
   const section = page.locator('section[aria-labelledby="detector-output"]');
-  const command = await codeBlockFor(section, "rustqec circuit detect");
-  await expect(command.locator(".terminal-output-label")).toHaveText(["events.dets", "model.dem"]);
+  const command = await codeBlockFor(section, "rstim circuit detect");
+  await expect(command.locator(".terminal-output pre")).toHaveText([
+    "000", "000", "110", "000", "000", "011", "000", "000", "000", "000",
+  ].join("\n"));
+  await expect(command.locator(".terminal-output-label")).toHaveCount(0);
   await expect(command.locator(".terminal-output button")).toHaveCount(0);
   await command.getByRole("button", { name: "Copy Shell" }).click();
-  await expect.poll(() => page.evaluate(() => window.__copiedText)).toContain("rustqec circuit detect");
-  expect(await page.evaluate(() => window.__copiedText)).not.toContain("shot D0 L0");
+  await expect.poll(() => page.evaluate(() => window.__copiedText)).toContain("rstim circuit detect");
+  expect(await page.evaluate(() => window.__copiedText)).not.toContain("110");
 });
 
-test("development guides point to a master checkout and stable checkout is explicit", async ({ page }) => {
+test("advanced guides point to the source checkout", async ({ page }) => {
   await page.goto("/sampling-data/");
   await page.getByRole("link", { name: "configured repository checkout" }).first().click();
-  await expect(page.locator("pre").filter({ hasText: "git clone --branch master" })).toBeVisible();
-  await page.locator("#stable-source summary").click();
-  await expect(page.locator("pre").filter({ hasText: "git clone --branch v0.3.3" })).toBeVisible();
+  await expect(page.locator("pre").filter({ hasText: "cargo build --locked --workspace" })).toBeVisible();
 });
 
 test("support table labels stay intact while the table, not the page, scrolls", async ({ page }) => {
@@ -395,8 +388,8 @@ test("QP101 navigation excludes transient schema headings before and after loadi
 for (const width of [768, 1050]) {
   test(`chapter destinations clear the sticky navigation at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/get-started/#source-build");
-    const target = page.locator("#source-build");
+    await page.goto("/get-started/#further-learning");
+    const target = page.locator("#further-learning");
     await expect(target).toBeInViewport({ ratio: 1 });
     await expect.poll(async () => {
       const heading = await target.boundingBox();
