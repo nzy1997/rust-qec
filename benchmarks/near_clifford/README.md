@@ -51,3 +51,6 @@ and profiles the remaining axis-canonicalization and high-rank projection costs.
 The [fused-projection and canonical-axis campaign](results/apple-m4-projection-analysis-2026-09-30.md)
 compares with merged #767, retains the same 43 configurations and final profiles,
 and discloses the small pure-Clifford warm regressions alongside high-rank gains.
+
+The [final unified-CLI baseline campaign](results/apple-m4-projection-synced-analysis-2026-09-30.md)
+revalidates that optimization after merged #765 with a separate dependency lock.
