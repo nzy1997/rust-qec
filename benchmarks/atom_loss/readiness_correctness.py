@@ -84,7 +84,7 @@ def resolve_exporters(binary):
     require(not missing,
             'missing exporter example binaries: ' + ', '.join(missing) +
             '; build with: cargo build --release --locked -p rstim --features benchmark-tools,ilp'
-            ' --bin rustqec --example export_matching_benchmark --example export_decoder_oracle')
+            ' --bin rstim --example export_matching_benchmark --example export_decoder_oracle')
     return exporters
 
 

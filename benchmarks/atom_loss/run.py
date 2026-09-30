@@ -373,7 +373,7 @@ def main():
     args = parser.parse_args()
     if min(args.shots, args.sampling_shots, args.repeats) < 1:
         parser.error('shots, sampling-shots and repeats must be positive')
-    binary, exporter, sampler = [ROOT/'target/release'/p for p in ['rustqec','examples/export_matching_benchmark','examples/atom_loss_sampling_benchmark']]
+    binary, exporter, sampler = [ROOT/'target/release'/p for p in ['rstim','examples/export_matching_benchmark','examples/atom_loss_sampling_benchmark']]
     out, work = args.out.resolve(), args.work.resolve()
     out.mkdir(parents=True, exist_ok=True)
     from .source_contract import capture
