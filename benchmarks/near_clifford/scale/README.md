@@ -82,3 +82,11 @@ Always use a fresh `--scratch` directory for a new source pair. Archive extracti
 restores tracked files but does not remove files deleted between revisions; directory
 reuse across different source pairs is unsupported. The retained current campaigns
 used separate task-owned directories and their source pairs have no deleted files.
+
+For revisions after the unified CLI merge (#765), use `run_unified.py` with explicit
+`--baseline`, `--candidate` and a fresh `--scratch` directory. It uses the separately
+retained `Cargo.unified.lock`, obtained by fresh dependency resolution; both sides
+use that identical lock. Some shared dependency versions also change relative to
+older campaigns. Historical `run.py`, `run_pair.py`, driver and `Cargo.lock` remain
+unchanged. Do not pool historical and unified-CLI samples. The verifier and profiler
+select the lock from a validated, hashed campaign entry.

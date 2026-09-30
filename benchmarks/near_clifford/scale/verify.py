@@ -21,9 +21,9 @@ def main():
     assert [(c['fixture'],c['shots']) for c in r['cases']]==[tuple(c) for c in r['matrix']]
     assert sha(HERE/'main.rs')==r['harness_sha256'], 'harness hash differs'
     assert sha(HERE/'run.py')==r['runner_sha256'], 'runner hash differs'
-    if 'campaign_entry_sha256' in r:
-        assert r['campaign_entry']=='run_pair.py', 'unknown campaign entry'
-        assert sha(HERE/'run_pair.py')==r['campaign_entry_sha256'], 'campaign entry hash differs'
+    if 'campaign_entry' in r or 'campaign_entry_sha256' in r:
+        assert r.get('campaign_entry') in ['run_pair.py', 'run_unified.py'], 'unknown campaign entry'
+        assert sha(HERE/r['campaign_entry'])==r.get('campaign_entry_sha256'), 'campaign entry hash differs'
     assert {p.name:sha(p) for p in (HERE/'fixtures').iterdir()}==r['fixtures_sha256']
     for label in ['baseline','candidate']:
         if a.git_sources:
@@ -31,7 +31,8 @@ def main():
             source=subprocess.check_output(['git','show',revision+':rstim/src/near_clifford.rs'],cwd=HERE)
             assert hashlib.sha256(source).hexdigest()==r['sources'][label]['near_clifford_source_sha256'], 'selected source hash differs'
         assert len(r['diagnostics'][label])==35
-        assert r['sources'][label]['lock_sha256']==sha(HERE/'Cargo.lock')
+        lock = 'Cargo.unified.lock' if r.get('campaign_entry') == 'run_unified.py' else 'Cargo.lock'
+        assert r['sources'][label]['lock_sha256']==sha(HERE/lock)
         assert all(x['semantic_verification']=='pass' for x in r['diagnostics'][label].values())
         for row in r['diagnostics'][label].values():
             assert len(row['counters'])==len(r['counter_names'])
