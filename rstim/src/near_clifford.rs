@@ -86,6 +86,7 @@ pub struct ActiveState {
     frame: Arc<StabilizerState>,
     origin: Vec<bool>,
     axes: Vec<Vec<bool>>,
+    axes_are_canonical: bool,
     coefficients: Vec<ComplexAmp>,
     global_phase: ComplexAmp,
     max_active_qubits: usize,
@@ -98,6 +99,7 @@ impl ActiveState {
             frame: Arc::new(StabilizerState::new(num_qubits)),
             origin: vec![false; num_qubits],
             axes: Vec::new(),
+            axes_are_canonical: true,
             coefficients: vec![ComplexAmp::new(1.0, 0.0)],
             global_phase: ComplexAmp::new(1.0, 0.0),
             max_active_qubits,
@@ -343,10 +345,7 @@ impl ActiveState {
                 self.absorb_independent_measurement(q, basis, outcome)?;
             } else {
                 let probability_zero = self.pauli_probability_zero(&pauli, mask, false);
-                self.collapse_pauli_measurement(&pauli, mask, outcome, probability_zero)?;
-                if mask != 0 {
-                    self.retire_nondiagonal_measurement(q, basis)?;
-                }
+                self.project_active_measurement(q, basis, &pauli, mask, outcome, probability_zero)?;
             }
             self.retire_fixed_axes();
         }
@@ -369,31 +368,177 @@ impl ActiveState {
         }
         let mask = self.ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
         let outcome = rng.r#gen::<f64>() >= probability_zero;
-        self.collapse_pauli_measurement(pauli, mask, outcome, probability_zero)?;
-        if mask != 0 {
-            self.retire_nondiagonal_measurement(q, basis)?;
-        }
+        self.project_active_measurement(q, basis, pauli, mask, outcome, probability_zero)?;
         Ok(outcome)
     }
 
     fn canonicalize_active_axes(&mut self) -> Vec<usize> {
         self.rebase_origin_into_frame();
+        if self.axes_are_canonical {
+            return self
+                .axes
+                .iter()
+                .map(|axis| {
+                    axis.iter()
+                        .position(|&bit| bit)
+                        .expect("active axis is nonzero")
+                })
+                .collect();
+        }
         let mut pivots = Vec::with_capacity(self.axes.len());
+        let frame = Arc::make_mut(&mut self.frame);
         for axis_index in 0..self.axes.len() {
             let pivot = (0..self.num_qubits)
                 .find(|&bit| self.axes[axis_index][bit] && !pivots.contains(&bit))
                 .expect("active axes remain independent");
-            for bit in 0..self.num_qubits {
-                if bit != pivot && self.axes[axis_index][bit] {
-                    Arc::make_mut(&mut self.frame).right_cx(pivot, bit);
-                    for axis in &mut self.axes {
-                        axis[bit] ^= axis[pivot];
-                    }
+            let mut changed = false;
+            for (bit, &selected) in self.axes[axis_index].iter().enumerate() {
+                if bit != pivot && selected {
+                    frame.right_cx(pivot, bit);
+                    changed = true;
                 }
             }
+            if !changed {
+                pivots.push(pivot);
+                continue;
+            }
+            // All these CNOTs share a control and commute. Update each later
+            // axis in one contiguous XOR; earlier axes are already singleton
+            // pivots and therefore have no support at this control.
+            let (processed, remaining) = self.axes.split_at_mut(axis_index + 1);
+            let axis = &mut processed[axis_index];
+            axis[pivot] = false;
+            for follower in remaining {
+                if follower[pivot] {
+                    xor(follower, axis);
+                }
+            }
+            axis.fill(false);
+            axis[pivot] = true;
             pivots.push(pivot);
         }
+        self.axes_are_canonical = true;
         pivots
+    }
+
+    /// Project directly into the surviving half of the active coordinates.
+    /// Keep the general path for tiny outcomes, including its rollback policy.
+    fn project_active_measurement(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        pauli: &Pauli,
+        mask: usize,
+        outcome: bool,
+        probability_zero: f64,
+    ) -> Result<(), String> {
+        let selected_probability = if outcome {
+            1.0 - probability_zero
+        } else {
+            probability_zero
+        };
+        let (sign_origin, sign_mask) = self.sign_coordinates(&pauli.z);
+        if selected_probability <= 1e-12
+            || !selected_probability.is_finite()
+            || (mask == 0 && sign_mask == 0)
+        {
+            self.collapse_pauli_measurement(pauli, mask, outcome, probability_zero)?;
+            if mask != 0 {
+                self.retire_nondiagonal_measurement(q, basis)?;
+            }
+            return Ok(());
+        }
+        let pivot_index = if mask == 0 {
+            sign_mask.trailing_zeros()
+        } else {
+            mask.trailing_zeros()
+        } as usize;
+        // CX folds Z parity onto the X pivot. S† removes a residual Y;
+        // rebasing the origin contributes its sign to the physical Pauli.
+        let pivot_z = (mask & sign_mask).count_ones() & 1 != 0;
+        let phase = (pauli.phase + 2 * u8::from(sign_origin) + 4 - u8::from(pivot_z)) % 4;
+        debug_assert_eq!(phase % 2, 0);
+        let fixed = outcome ^ (phase == 2);
+        let reduced =
+            self.project_reduced_coefficients(mask, sign_mask, pivot_index, pivot_z, fixed)?;
+        if mask == 0 {
+            self.retire_parity_basis(sign_mask, fixed);
+        } else {
+            let pivots = self.canonicalize_active_axes();
+            let pivot = pivots[pivot_index];
+            let frame = Arc::make_mut(&mut self.frame);
+            for (index, &bit) in pivots.iter().enumerate() {
+                if index != pivot_index && mask & (1 << index) != 0 {
+                    frame.right_cx(pivot, bit);
+                }
+            }
+            for (index, &bit) in pivots.iter().enumerate() {
+                if index != pivot_index && sign_mask & (1 << index) != 0 {
+                    frame.right_cz(pivot, bit);
+                }
+            }
+            if pivot_z {
+                frame.right_s(pivot);
+            }
+            frame.right_h(pivot);
+            self.axes.remove(pivot_index);
+            if fixed {
+                self.origin[pivot] ^= true;
+            }
+        }
+        self.coefficients = reduced;
+        if mask != 0 {
+            self.retire_fixed_axes();
+        }
+        Ok(())
+    }
+
+    fn project_reduced_coefficients(
+        &self,
+        mask: usize,
+        sign_mask: usize,
+        pivot_index: usize,
+        pivot_z: bool,
+        fixed: bool,
+    ) -> Result<Vec<ComplexAmp>, String> {
+        let pivot_mask = 1usize << pivot_index;
+        let low_mask = pivot_mask - 1;
+        let other_signs = sign_mask & !pivot_mask;
+        let mut reduced = Vec::with_capacity(self.coefficients.len() / 2);
+        let mut norm_sqr = 0.0;
+        for index in 0..self.coefficients.len() / 2 {
+            let without_pivot = (index & low_mask) | ((index & !low_mask) << 1);
+            let amplitude = if mask == 0 {
+                let pivot_value = fixed ^ ((without_pivot & other_signs).count_ones() & 1 != 0);
+                let amplitude =
+                    self.coefficients[without_pivot | (usize::from(pivot_value) << pivot_index)];
+                amplitude * 0.5 + amplitude * 0.5
+            } else {
+                let left = self.coefficients[without_pivot];
+                let right = self.coefficients[without_pivot ^ mask];
+                let sign = if fixed ^ ((without_pivot & other_signs).count_ones() & 1 != 0) {
+                    -1.0
+                } else {
+                    1.0
+                };
+                let right = if pivot_z {
+                    ComplexAmp::new(right.im, -right.re)
+                } else {
+                    right
+                };
+                (left + right * sign) * std::f64::consts::FRAC_1_SQRT_2
+            };
+            norm_sqr += amplitude.norm_sqr();
+            reduced.push(amplitude);
+        }
+        let norm = norm_sqr.sqrt();
+        if norm <= 1e-15 {
+            return Err("near-Clifford measurement selected zero-probability outcome".into());
+        }
+        for amplitude in &mut reduced {
+            *amplitude = *amplitude * (1.0 / norm);
+        }
+        Ok(reduced)
     }
 
     /// An independent Pauli has an X component on a dormant virtual qubit.
@@ -575,11 +720,13 @@ impl ActiveState {
         Ok(())
     }
 
-    fn retire_fixed_parity(&mut self, parity_mask: usize, fixed_parity: bool) {
+    fn retire_parity_basis(&mut self, parity_mask: usize, fixed_parity: bool) {
         let pivot = parity_mask.trailing_zeros() as usize;
-        let pivot_bit = 1 << pivot;
-        let other_mask = parity_mask ^ pivot_bit;
+        let other_mask = parity_mask ^ (1 << pivot);
         let pivot_axis = self.axes.remove(pivot);
+        if other_mask != 0 {
+            self.axes_are_canonical = false;
+        }
         if fixed_parity {
             xor(&mut self.origin, &pivot_axis);
         }
@@ -589,6 +736,13 @@ impl ActiveState {
                 xor(axis, &pivot_axis);
             }
         }
+    }
+
+    fn retire_fixed_parity(&mut self, parity_mask: usize, fixed_parity: bool) {
+        self.retire_parity_basis(parity_mask, fixed_parity);
+        let pivot = parity_mask.trailing_zeros() as usize;
+        let pivot_bit = 1 << pivot;
+        let other_mask = parity_mask ^ pivot_bit;
         let low_mask = pivot_bit - 1;
         self.coefficients = (0..self.coefficients.len() / 2)
             .map(|index| {
@@ -789,6 +943,9 @@ impl ActiveState {
                 "near-Clifford active-state limit exceeded at rank {}",
                 rank + 1
             ));
+        }
+        if self.axes_are_canonical {
+            self.axes_are_canonical = x.iter().filter(|&&bit| bit).take(2).count() == 1;
         }
         self.axes.push(x.to_vec());
         self.coefficients
@@ -1887,15 +2044,14 @@ impl CachedTerminalSampler {
                         if *independent {
                             state.absorb_independent_measurement(q, basis, outcome)?;
                         } else {
-                            state.collapse_pauli_measurement(
+                            state.project_active_measurement(
+                                q,
+                                basis,
                                 pauli,
                                 *mask,
                                 outcome,
                                 *probability_zero,
                             )?;
-                            if *mask != 0 {
-                                state.retire_nondiagonal_measurement(q, basis)?;
-                            }
                         }
                     }
                 }
@@ -2691,6 +2847,192 @@ mod tests {
             }
             assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
         }
+    }
+
+    fn dense_coordinate_state(n: usize, rng: &mut StdRng) -> ActiveState {
+        let rank = n.min(8);
+        let mut state = ActiveState::new(n, rank);
+        state.axes_are_canonical = false;
+        for q in 0..rank {
+            state.apply_clifford(CliffordGate::H(q)).unwrap();
+            let mut axis = vec![false; n];
+            axis[q] = true;
+            state.axes.push(axis);
+        }
+        state.coefficients = (0..1 << rank)
+            .map(|_| ComplexAmp::new(rng.r#gen::<f64>() - 0.5, rng.r#gen::<f64>() - 0.5))
+            .collect();
+        let norm = state
+            .coefficients
+            .iter()
+            .map(|a| a.norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        for amplitude in &mut state.coefficients {
+            *amplitude = *amplitude * (1.0 / norm);
+        }
+        for bit in &mut state.origin {
+            *bit = rng.r#gen();
+        }
+        // Change virtual coordinates without changing coefficients. This makes
+        // the independent axes dense across the physical-width boundaries.
+        for _ in 0..4 * n {
+            let control = rng.gen_range(0..n);
+            let target = (control + rng.gen_range(1..n)) % n;
+            Arc::make_mut(&mut state.frame).right_cx(control, target);
+            for axis in &mut state.axes {
+                axis[target] ^= axis[control];
+            }
+            state.origin[target] ^= state.origin[control];
+        }
+        for _ in 0..48 {
+            let q = rng.gen_range(0..rank);
+            let other = (q + rng.gen_range(1..rank)) % rank;
+            let gate = match rng.gen_range(0..7) {
+                0 => CliffordGate::H(q),
+                1 => CliffordGate::S(q),
+                2 => CliffordGate::SDag(q),
+                3 => CliffordGate::Y(q),
+                4 => CliffordGate::CX(q, other),
+                5 => CliffordGate::CZ(q, other),
+                _ => CliffordGate::X(q),
+            };
+            state.apply_clifford(gate).unwrap();
+        }
+        state
+    }
+
+    #[test]
+    fn bulk_axis_canonicalization_matches_sequential_cnot_updates() {
+        let mut rng = StdRng::seed_from_u64(20261001);
+        for n in [3, 8, 64, 65, 129, 193] {
+            for _ in 0..4 {
+                let mut actual = dense_coordinate_state(n, &mut rng);
+                let mut expected = actual.clone();
+                expected.rebase_origin_into_frame();
+                let mut pivots = Vec::new();
+                for index in 0..expected.axes.len() {
+                    let pivot = (0..n)
+                        .find(|&bit| expected.axes[index][bit] && !pivots.contains(&bit))
+                        .unwrap();
+                    for bit in 0..n {
+                        if bit != pivot && expected.axes[index][bit] {
+                            Arc::make_mut(&mut expected.frame).right_cx(pivot, bit);
+                            for axis in &mut expected.axes {
+                                axis[bit] ^= axis[pivot];
+                            }
+                        }
+                    }
+                    pivots.push(pivot);
+                }
+                assert_eq!(actual.canonicalize_active_axes(), pivots);
+                assert_eq!(actual.frame_snapshot(), expected.frame_snapshot());
+                assert_eq!(actual.axes, expected.axes);
+                assert_eq!(actual.origin, expected.origin);
+                assert_eq!(actual.coefficients, expected.coefficients);
+                assert_eq!(actual.global_phase, expected.global_phase);
+            }
+        }
+    }
+
+    #[test]
+    fn direct_projection_matches_general_projection_on_dense_signed_coordinates() {
+        let mut rng = StdRng::seed_from_u64(20261002);
+        let mut diagonal = 0;
+        let mut nondiagonal = 0;
+        let mut odd_phase = 0;
+        for n in [3, 8, 64, 65, 129, 193] {
+            for _ in 0..4 {
+                let state = dense_coordinate_state(n, &mut rng);
+                for q in 0..n.min(8) {
+                    for basis in [
+                        MeasurementBasis::X,
+                        MeasurementBasis::Y,
+                        MeasurementBasis::Z,
+                    ] {
+                        let pauli = state.single_qubit_pauli(q, basis).unwrap();
+                        let (mask, independent) = state.coordinate_mask(&pauli.x);
+                        assert!(!independent);
+                        if mask == 0 {
+                            diagonal += 1;
+                        } else {
+                            nondiagonal += 1;
+                        }
+                        odd_phase += usize::from(pauli.phase % 2 != 0);
+                        let probability = state.pauli_probability_zero(&pauli, mask, false);
+                        for outcome in [false, true] {
+                            let mut expected = state.clone();
+                            expected
+                                .collapse_pauli_measurement(&pauli, mask, outcome, probability)
+                                .unwrap();
+                            if mask != 0 {
+                                expected.retire_nondiagonal_measurement(q, basis).unwrap();
+                            }
+                            let mut actual = state.clone();
+                            actual
+                                .project_active_measurement(
+                                    q,
+                                    basis,
+                                    &pauli,
+                                    mask,
+                                    outcome,
+                                    probability,
+                                )
+                                .unwrap();
+                            assert_eq!(
+                                actual.frame_snapshot(),
+                                expected.frame_snapshot(),
+                                "n={n} q={q} basis={basis:?}"
+                            );
+                            assert_eq!(actual.axes, expected.axes);
+                            assert_eq!(actual.origin, expected.origin);
+                            assert_eq!(actual.global_phase, expected.global_phase);
+                            assert_eq!(actual.coefficients.len(), expected.coefficients.len());
+                            for (a, b) in actual.coefficients.iter().zip(&expected.coefficients) {
+                                assert!(
+                                    (a.re - b.re).abs() < 1e-12 && (a.im - b.im).abs() < 1e-12,
+                                    "{a:?} != {b:?}"
+                                );
+                            }
+                            assert!(
+                                (actual
+                                    .coefficients
+                                    .iter()
+                                    .map(|a| a.norm_sqr())
+                                    .sum::<f64>()
+                                    - 1.0)
+                                    .abs()
+                                    < 1e-12
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert!(diagonal > 0 && nondiagonal > 0 && odd_phase > 0);
+    }
+
+    #[test]
+    fn rejected_direct_projection_preserves_all_state_fields() {
+        let mut state = ActiveState::new(3, 3);
+        state.apply_clifford(CliffordGate::H(0)).unwrap();
+        state.t(0).unwrap();
+        state.coefficients[0] = ComplexAmp::new(1.0, 0.0);
+        state.coefficients[1] = ComplexAmp::new(1e-16, 0.0);
+        let before = state.clone();
+        let pauli = state.single_qubit_pauli(0, MeasurementBasis::X).unwrap();
+        let (mask, independent) = state.coordinate_mask(&pauli.x);
+        assert!(!independent);
+        let probability = state.pauli_probability_zero(&pauli, mask, false);
+        let error = state
+            .project_active_measurement(0, MeasurementBasis::X, &pauli, mask, true, probability)
+            .unwrap_err();
+        assert!(error.contains("zero-probability"));
+        assert_eq!(state.coefficients, before.coefficients);
+        assert_eq!(state.frame_snapshot(), before.frame_snapshot());
+        assert_eq!(state.axes, before.axes);
+        assert_eq!(state.origin, before.origin);
+        assert_eq!(state.global_phase, before.global_phase);
     }
 
     #[test]

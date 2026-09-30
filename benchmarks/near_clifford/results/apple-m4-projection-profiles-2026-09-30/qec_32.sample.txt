@@ -1,0 +1,1261 @@
+Analysis of sampling near-clifford-scale (pid 77736) every 1 millisecond
+Process:         near-clifford-scale [77736]
+Path:            /Users/USER/*/near-clifford-scale
+Load Address:    0x104c98000
+Identifier:      near-clifford-scale
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  Python [76967]
+Target Type:     live task
+
+Date/Time:       2026-09-30 12:39:44.914 +0800
+Launch Time:     2026-09-30 12:39:43.876 +0800
+OS Version:      macOS 27.0.1 (26A434)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         1568K
+Physical footprint (peak):  1568K
+Idle exit:                  untracked
+----
+
+Call graph:
+    5768 Thread_756737   DispatchQueue_1: com.apple.main-thread  (serial)
+      5616 start  (in dyld) + 6688  [0x1a02cbe80]
+      + 5616 main  (in near-clifford-scale) + 52  [0x104ca2668]
+      +   5616 std::rt::lang_start_internal::h2359c59178685e12  (in near-clifford-scale) + 140  [0x104cc445c]
+      +     5616 std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::he7de57b1c297b3a1  (in near-clifford-scale) + 28  [0x104ca325c]
+      +       5616 std::sys::backtrace::__rust_begin_short_backtrace::hb166ee72b246558a  (in near-clifford-scale) + 16  [0x104ca32fc]  backtrace.rs:160
+      +         5616 near_clifford_scale::main::hec954c5d8bc3a1a0  (in near-clifford-scale) + 1276  [0x104ca1910]  main.rs:28
+      +           5527 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 504  [0x104c9b71c]  near_clifford.rs:1670
+      +           ! 1947 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2612  [0x104c9af48]  near_clifford.rs:2413
+      +           ! : 1690 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 572  [0x104c9a394]  near_clifford.rs:287
+      +           ! : | 460 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5324  [0x104ca00c8]  tableau.rs:468
+      +           ! : | + 460 rstim::sim::tableau::StabilizerState::row_mult_temp::hf6c18c8af327414c  (in near-clifford-scale) + 296,240,...  [0x104cb6c3c,0x104cb6c04,...]
+      +           ! : | 392 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5392  [0x104ca010c]  tableau.rs:474
+      +           ! : | + 256 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | + ! 254 mach_absolute_time  (in libsystem_kernel.dylib) + 108,16,...  [0x1a065d0f8,0x1a065d09c,...]
+      +           ! : | + ! 2 DYLD-STUB$$mach_absolute_time  (in libsystem_malloc.dylib) + 12  [0x1a04de8ac]
+      +           ! : | + 76 _xzm_free_main  (in libsystem_malloc.dylib) + 392,28,...  [0x1a04c5044,0x1a04c4ed8,...]
+      +           ! : | + 45 _free  (in libsystem_malloc.dylib) + 0,44,...  [0x1a04c9110,0x1a04c913c,...]
+      +           ! : | + 15 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : | 170 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5136  [0x104ca000c]  tableau.rs:462
+      +           ! : | + 92 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244,16,...  [0x1a04bcb40,0x1a04bca5c,...]
+      +           ! : | + 29 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,288,...  [0x1a04c3864,0x1a04c3928,...]
+      +           ! : | + 29 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,104,...  [0x1a04c872c,0x1a04c8788,...]
+      +           ! : | + 8 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0,8  [0x104cbfa34,0x104cbfa3c]
+      +           ! : | + 8 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 12,8,...  [0x1a04c3328,0x1a04c3324,...]
+      +           ! : | + 4 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : | 157 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5084  [0x104c9ffd8]  tableau.rs:461
+      +           ! : | + 80 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244,404,...  [0x1a04bcb40,0x1a04bcbe0,...]
+      +           ! : | + 32 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : | + 25 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,64,...  [0x1a04c872c,0x1a04c8760,...]
+      +           ! : | + 10 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0,8  [0x104cbfa34,0x104cbfa3c]
+      +           ! : | + 6 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : | + 4 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 8,32  [0x1a04c3324,0x1a04c333c]
+      +           ! : | 132 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5288,108  [0x104ca00a4,0x104c9ec68]  tableau.rs:0
+      +           ! : | 104 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5376  [0x104ca00fc]  tableau.rs:474
+      +           ! : | + 65 _xzm_free_main  (in libsystem_malloc.dylib) + 684,892,...  [0x1a04c5168,0x1a04c5238,...]
+      +           ! : | + 27 _free  (in libsystem_malloc.dylib) + 76,0,...  [0x1a04c915c,0x1a04c9110,...]
+      +           ! : | + 11 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc13___rdl_dealloc  (in near-clifford-scale) + 0  [0x104cbf980]
+      +           ! : | 89 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5240,5276,...  [0x104ca0074,0x104ca0098,...]  tableau.rs:467
+      +           ! : | 50 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 96,48,...  [0x104c9ec5c,0x104c9ec2c,...]  tableau.rs:428
+      +           ! : | 43 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 124  [0x104c9ec78]  tableau.rs:429
+      +           ! : | 27 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5220  [0x104ca0060]  tableau.rs:466
+      +           ! : | 19 _xzm_free_main  (in libsystem_malloc.dylib) + 1080,1072  [0x1a04c52f4,0x1a04c52ec]
+      +           ! : | 14 rstim::sim::tableau::StabilizerState::row_mult_temp::hf6c18c8af327414c  (in near-clifford-scale) + 372,376  [0x104cb6c88,0x104cb6c8c]
+      +           ! : | 10 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5092,5116,...  [0x104c9ffe0,0x104c9fff8,...]  tableau.rs:462
+      +           ! : | 6 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5060,5084  [0x104c9ffc0,0x104c9ffd8]  tableau.rs:461
+      +           ! : | 5 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5164  [0x104ca0028]  tableau.rs:463
+      +           ! : | 4 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5068  [0x104c9ffc8]  tableau.rs:461
+      +           ! : | + 4 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : | 4 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5356  [0x104ca00e8]  tableau.rs:474
+      +           ! : | 3 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5124  [0x104ca0000]  tableau.rs:462
+      +           ! : | + 3 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : | 1 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5324  [0x104ca00c8]  tableau.rs:468
+      +           ! : 148 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 200  [0x104c9a220]  near_clifford.rs:285
+      +           ! : | 60 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 40,44,...  [0x104ca8a20,0x104ca8a24,...]
+      +           ! : | 50 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 76  [0x104ca8a44]
+      +           ! : | + 27 rstim::sim::tableau::StabilizerState::canonical_snapshot::h68f2dcfc7ec6bbcd  (in near-clifford-scale) + 44  [0x104cb6d64]
+      +           ! : | + ! 20 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | + ! : 6 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,44,...  [0x1a04c84fc,0x1a04c851c,...]
+      +           ! : | + ! : 5 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 288,92,...  [0x1a04c3928,0x1a04c3864,...]
+      +           ! : | + ! : 5 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764,88,...  [0x1a04bcd48,0x1a04bcaa4,...]
+      +           ! : | + ! : 3 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | + ! : 1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + ! 3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 208  [0x104ca4910]
+      +           ! : | + ! : 3 _platform_memmove  (in libsystem_platform.dylib) + 452,436  [0x1a06abf24,0x1a06abf14]
+      +           ! : | + ! 2 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 132,220  [0x104ca48c4,0x104ca491c]
+      +           ! : | + ! 1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 108  [0x104ca48ac]
+      +           ! : | + ! : 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 144  [0x1a04c3898]
+      +           ! : | + ! 1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 156  [0x104ca48dc]
+      +           ! : | + !   1 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : | + 23 rstim::sim::tableau::StabilizerState::canonical_snapshot::h68f2dcfc7ec6bbcd  (in near-clifford-scale) + 56  [0x104cb6d70]
+      +           ! : | +   17 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | +   : 7 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88,656,...  [0x1a04bcaa4,0x1a04bccdc,...]
+      +           ! : | +   : 5 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 44,12,...  [0x1a04c851c,0x1a04c84fc,...]
+      +           ! : | +   : 2 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | +   : 2 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | +   : 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 144  [0x1a04c3898]
+      +           ! : | +   3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 108,220,...  [0x104ca48ac,0x104ca491c,...]
+      +           ! : | +   2 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 208  [0x104ca4910]
+      +           ! : | +   : 2 _platform_memmove  (in libsystem_platform.dylib) + 436,460  [0x1a06abf14,0x1a06abf2c]
+      +           ! : | +   1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 108  [0x104ca48ac]
+      +           ! : | +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      +           ! : | 35 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 1240  [0x104ca8ed0]
+      +           ! : | + 14 core::ptr::drop_in_place$LT$rstim..sim..tableau..StabilizerState$GT$::he7579fbe7c286540  (in near-clifford-scale) + 148  [0x104ca56b4]
+      +           ! : | + ! 8 _xzm_free_main  (in libsystem_malloc.dylib) + 684,164,...  [0x1a04c5168,0x1a04c4f60,...]
+      +           ! : | + ! 3 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : | + ! 3 _free  (in libsystem_malloc.dylib) + 0  [0x1a04c9110]
+      +           ! : | + 11 core::ptr::drop_in_place$LT$rstim..sim..tableau..StabilizerState$GT$::he7579fbe7c286540  (in near-clifford-scale) + 68  [0x104ca5664]
+      +           ! : | + ! 7 _xzm_free_main  (in libsystem_malloc.dylib) + 112,200,...  [0x1a04c4f2c,0x1a04c4f84,...]
+      +           ! : | + ! 3 _free  (in libsystem_malloc.dylib) + 0,76  [0x1a04c9110,0x1a04c915c]
+      +           ! : | + ! 1 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : | + 3 _xzm_free_main  (in libsystem_malloc.dylib) + 1080  [0x1a04c52f4]
+      +           ! : | + 2 core::ptr::drop_in_place$LT$rstim..sim..tableau..StabilizerState$GT$::he7579fbe7c286540  (in near-clifford-scale) + 180  [0x104ca56d4]
+      +           ! : | + ! 2 _xzm_free_main  (in libsystem_malloc.dylib) + 332,420  [0x1a04c5008,0x1a04c5060]
+      +           ! : | + 2 core::ptr::drop_in_place$LT$rstim..sim..tableau..StabilizerState$GT$::he7579fbe7c286540  (in near-clifford-scale) + 152  [0x104ca56b8]
+      +           ! : | + 1 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : | + 1 _free  (in libsystem_malloc.dylib) + 44  [0x1a04c913c]
+      +           ! : | + 1 core::ptr::drop_in_place$LT$rstim..sim..tableau..StabilizerState$GT$::he7579fbe7c286540  (in near-clifford-scale) + 100  [0x104ca5684]
+      +           ! : | +   1 _xzm_free_main  (in libsystem_malloc.dylib) + 332  [0x1a04c5008]
+      +           ! : | 1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 452  [0x104ca8bbc]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | 1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 540  [0x104ca8c14]
+      +           ! : | + 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      +           ! : | 1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 1208  [0x104ca8eb0]
+      +           ! : |   1 _xzm_free_main  (in libsystem_malloc.dylib) + 256  [0x1a04c4fbc]
+      +           ! : 21 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 100  [0x104c9a1bc]  near_clifford.rs:305
+      +           ! : | 14 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 648  [0x104ca76e0]
+      +           ! : | + 6 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 332  [0x104caac54]
+      +           ! : | + ! 6 rstim::near_clifford::Pauli::multiply_tableau_row::h6f65aac5d329d261  (in near-clifford-scale) + 76,0,...  [0x104cb1b14,0x104cb1ac8,...]
+      +           ! : | + 4 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 128  [0x104caab88]
+      +           ! : | + ! 2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 180,232  [0x1a04bcb00,0x1a04bcb34]
+      +           ! : | + ! 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 0  [0x1a04c3808]
+      +           ! : | + ! 1 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12  [0x1a04c872c]
+      +           ! : | + 2 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 104  [0x104caab70]
+      +           ! : | + ! 2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 28,404  [0x1a04bca68,0x1a04bcbe0]
+      +           ! : | + 2 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 228  [0x104caabec]
+      +           ! : | +   2 rstim::near_clifford::Pauli::multiply_tableau_row::h6f65aac5d329d261  (in near-clifford-scale) + 528,616  [0x104cb1cd8,0x104cb1d30]
+      +           ! : | 3 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 768,496  [0x104ca7758,0x104ca7648]
+      +           ! : | 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 180  [0x104ca750c]
+      +           ! : | + 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 180  [0x104ca750c]
+      +           ! : | +   1 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 44  [0x1a04c874c]
+      +           ! : | 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 204  [0x104ca7524]
+      +           ! : | + 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 204  [0x104ca7524]
+      +           ! : | +   1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92  [0x1a04c3864]
+      +           ! : | 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 896  [0x104ca77d8]
+      +           ! : | + 1 _xzm_free_main  (in libsystem_malloc.dylib) + 392  [0x1a04c5044]
+      +           ! : | 1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 916  [0x104ca77ec]
+      +           ! : |   1 _xzm_free_main  (in libsystem_malloc.dylib) + 392  [0x1a04c5044]
+      +           ! : 20 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 208  [0x104c9a228]  near_clifford.rs:0
+      +           ! : | 16 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale) + 36  [0x104c9a004]  sync.rs:0
+      +           ! : | 4 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale) + 4  [0x104c99fe4]  sync.rs:2492
+      +           ! : 17 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale) + 132,136  [0x104c9a064,0x104c9a068]  sync.rs:2550
+      +           ! : 15 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 804  [0x104c9a47c]  near_clifford.rs:306
+      +           ! : | 4 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 784  [0x104ca946c]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + 1 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 120  [0x1a04c8568]
+      +           ! : | + 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      +           ! : | + 1 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 2672  [0x104ca9bcc]
+      +           ! : | 3 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 3324  [0x104ca9e58]
+      +           ! : | + 1 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : | + 1 _free  (in libsystem_malloc.dylib) + 0  [0x1a04c9110]
+      +           ! : | + 1 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | +   1 mach_absolute_time  (in libsystem_kernel.dylib) + 16  [0x1a065d09c]
+      +           ! : | 2 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 804  [0x104c9a47c]  near_clifford.rs:306
+      +           ! : | + 2 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 84,448  [0x104ca91b0,0x104ca931c]
+      +           ! : | 2 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 2692  [0x104ca9be0]
+      +           ! : | + 1 _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h287827243765c1dd  (in near-clifford-scale) + 72  [0x104ca3504]
+      +           ! : | + ! 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 336  [0x1a04c3958]
+      +           ! : | + 1 rstim::near_clifford::ActiveState::canonicalize_active_axes::h943c5adad4b78c82  (in near-clifford-scale) + 52  [0x104ca8498]
+      +           ! : | +   1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 44  [0x104ca8a24]
+      +           ! : | 2 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 2736  [0x104ca9c0c]
+      +           ! : | + 1 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 116  [0x104ca5c3c]
+      +           ! : | + 1 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 2956  [0x104ca9ce8]
+      +           ! : | 1 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 3168  [0x104ca9dbc]
+      +           ! : | + 1 _platform_memmove  (in libsystem_platform.dylib) + 436  [0x1a06abf14]
+      +           ! : | 1 rstim::near_clifford::ActiveState::project_active_measurement::h37864258ec2460fb  (in near-clifford-scale) + 3344  [0x104ca9e6c]
+      +           ! : |   1 rstim::near_clifford::ActiveState::retire_fixed_axes::h5816a4d4cfc94c24  (in near-clifford-scale) + 84  [0x104ca7020]
+      +           ! : 9 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 20  [0x104c9a16c]  near_clifford.rs:275
+      +           ! : 7 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 364  [0x104c9a2c4]  near_clifford.rs:306
+      +           ! : | 6 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 364  [0x104c9a2c4]  near_clifford.rs:306
+      +           ! : | + 6 rstim::near_clifford::ActiveState::coordinate_mask::h8103faf007a49712  (in near-clifford-scale) + 3192,104,...  [0x104ca6db4,0x104ca61a4,...]
+      +           ! : | 1 rstim::near_clifford::ActiveState::coordinate_mask::h8103faf007a49712  (in near-clifford-scale) + 3248  [0x104ca6dec]
+      +           ! : 7 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 1260  [0x104ca8ee4]
+      +           ! : 3 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 216  [0x104c9a230]  near_clifford.rs:286
+      +           ! : 3 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 572  [0x104c9a394]  near_clifford.rs:287
+      +           ! : 2 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 392  [0x104c9a2e0]  near_clifford.rs:306
+      +           ! : | 2 rstim::near_clifford::ActiveState::pauli_probability_zero::h822f4330221edd90  (in near-clifford-scale) + 204,348  [0x104ca7e38,0x104ca7ec8]
+      +           ! : 2 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 880  [0x104c9a4c8]  near_clifford.rs:307
+      +           ! : | 2 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : |   2 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1a065d0f8]
+      +           ! : 2 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5052  [0x104c9ffb8]  tableau.rs:474
+      +           ! : 1 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 752  [0x104c9a448]  near_clifford.rs:306
+      +           ! :   1 rand_core::block::BlockRng$LT$R$GT$::generate_and_set::h9cbf404e996bb411  (in near-clifford-scale) + 1844  [0x104ca0964]
+      +           ! 1690 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2976  [0x104c9b0b4]  near_clifford.rs:2375
+      +           ! : 591 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 696,1092,...  [0x104cabba0,0x104cabd2c,...]
+      +           ! : 263 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+      +           ! : | 59 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 104  [0x104caab70]
+      +           ! : | + 27 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104,404,...  [0x1a04bcab4,0x1a04bcbe0,...]
+      +           ! : | + 15 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 288,0,...  [0x1a04c3928,0x1a04c3808,...]
+      +           ! : | + 10 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,44,...  [0x1a04c872c,0x1a04c874c,...]
+      +           ! : | + 4 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : | + 2 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0  [0x104cbfa34]
+      +           ! : | + 1 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 8  [0x1a04c3324]
+      +           ! : | 52 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 128  [0x104caab88]
+      +           ! : | + 25 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 284,88,...  [0x1a04bcb68,0x1a04bcaa4,...]
+      +           ! : | + 15 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : | + 6 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 64,44,...  [0x1a04c8760,0x1a04c874c,...]
+      +           ! : | + 3 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 12  [0x1a04c3328]
+      +           ! : | + 2 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 8  [0x104cbfa3c]
+      +           ! : | + 1 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : | 52 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 332  [0x104caac54]
+      +           ! : | + 52 rstim::near_clifford::Pauli::multiply_tableau_row::h6f65aac5d329d261  (in near-clifford-scale) + 616,376,...  [0x104cb1d30,0x104cb1c40,...]
+      +           ! : | 48 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 296,192,...  [0x104caac30,0x104caabc8,...]
+      +           ! : | 29 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1248  [0x104cabdc8]
+      +           ! : | + 25 _platform_memcmp  (in libsystem_platform.dylib) + 260,140,...  [0x1a06a9274,0x1a06a91fc,...]
+      +           ! : | + 4 DYLD-STUB$$memcmp  (in near-clifford-scale) + 4  [0x104cfb110]
+      +           ! : | 23 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1284  [0x104cabdec]
+      +           ! : |   19 _platform_memcmp  (in libsystem_platform.dylib) + 260,168,...  [0x1a06a9274,0x1a06a9218,...]
+      +           ! : |   4 DYLD-STUB$$memcmp  (in near-clifford-scale) + 4  [0x104cfb110]
+      +           ! : 183 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 2388  [0x104cac23c]
+      +           ! : | 99 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | + 96 mach_absolute_time  (in libsystem_kernel.dylib) + 108,16,...  [0x1a065d0f8,0x1a065d09c,...]
+      +           ! : | + 3 DYLD-STUB$$mach_absolute_time  (in libsystem_malloc.dylib) + 12  [0x1a04de8ac]
+      +           ! : | 46 core::ptr::drop_in_place$LT$rstim..near_clifford..Pauli$GT$::h1739c4487b2de2be  (in near-clifford-scale) + 36  [0x104ca53b0]
+      +           ! : | + 27 _xzm_free_main  (in libsystem_malloc.dylib) + 684,892,...  [0x1a04c5168,0x1a04c5238,...]
+      +           ! : | + 15 _free  (in libsystem_malloc.dylib) + 0,44,...  [0x1a04c9110,0x1a04c913c,...]
+      +           ! : | + 4 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : | 19 _xzm_free_main  (in libsystem_malloc.dylib) + 240,1080,...  [0x1a04c4fac,0x1a04c52f4,...]
+      +           ! : | 10 _free  (in libsystem_malloc.dylib) + 0,76,...  [0x1a04c9110,0x1a04c915c,...]
+      +           ! : | 5 core::ptr::drop_in_place$LT$rstim..near_clifford..Pauli$GT$::h1739c4487b2de2be  (in near-clifford-scale) + 16  [0x104ca539c]
+      +           ! : | 4 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : 75 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1812  [0x104cabffc]
+      +           ! : | 56 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale) + 96  [0x104ca4804]
+      +           ! : | + 26 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764,656,...  [0x1a04bcd48,0x1a04bccdc,...]
+      +           ! : | + 17 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,120,...  [0x1a04c84fc,0x1a04c8568,...]
+      +           ! : | + 11 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,288,...  [0x1a04c3864,0x1a04c3928,...]
+      +           ! : | + 1 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | 11 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale) + 132  [0x104ca4828]
+      +           ! : | + 10 _platform_memmove  (in libsystem_platform.dylib) + 428,0,...  [0x1a06abf0c,0x1a06abd60,...]
+      +           ! : | + 1 DYLD-STUB$$memcpy  (in near-clifford-scale) + 4  [0x104cfb11c]
+      +           ! : | 5 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale) + 96,24,...  [0x104ca4804,0x104ca47bc,...]
+      +           ! : | 3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale) + 80  [0x104ca47f4]
+      +           ! : |   3 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 73 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1840  [0x104cac018]
+      +           ! : | 62 alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9cb04fe51f31ba3b  (in near-clifford-scale) + 176  [0x104cb292c]
+      +           ! : | + 25 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472,764,...  [0x1a04bcc24,0x1a04bcd48,...]
+      +           ! : | + 15 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,120,...  [0x1a04c84fc,0x1a04c8568,...]
+      +           ! : | + 11 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : | + 10 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + 1 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | 7 alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9cb04fe51f31ba3b  (in near-clifford-scale) + 36,12,...  [0x104cb28a0,0x104cb2888,...]
+      +           ! : | 4 alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9cb04fe51f31ba3b  (in near-clifford-scale) + 92  [0x104cb28d8]
+      +           ! : |   4 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 67 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1752  [0x104cabfc0]
+      +           ! : | 61 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1752  [0x104cabfc0]
+      +           ! : | + 61 rstim::near_clifford::ActiveState::coordinate_mask::h8103faf007a49712  (in near-clifford-scale) + 192,212,...  [0x104ca61fc,0x104ca6210,...]
+      +           ! : | 6 rstim::near_clifford::ActiveState::coordinate_mask::h8103faf007a49712  (in near-clifford-scale) + 3268,3284,...  [0x104ca6e00,0x104ca6e10,...]
+      +           ! : 47 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 2380  [0x104cac234]
+      +           ! : | 26 _xzm_free_main  (in libsystem_malloc.dylib) + 112,164,...  [0x1a04c4f2c,0x1a04c4f60,...]
+      +           ! : | 17 _free  (in libsystem_malloc.dylib) + 0,44,...  [0x1a04c9110,0x1a04c913c,...]
+      +           ! : | 4 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : 42 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1700  [0x104cabf8c]
+      +           ! : | 20 _xzm_free_main  (in libsystem_malloc.dylib) + 684,240,...  [0x1a04c5168,0x1a04c4fac,...]
+      +           ! : | 15 _free  (in libsystem_malloc.dylib) + 0,44,...  [0x1a04c9110,0x1a04c913c,...]
+      +           ! : | 7 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : 40 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +           ! : | 40 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +           ! : |   17 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : |   17 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,64,...  [0x1a04c872c,0x1a04c8760,...]
+      +           ! : |   3 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 8,0  [0x104cbfa3c,0x104cbfa34]
+      +           ! : |   3 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 12,8  [0x1a04c3328,0x1a04c3324]
+      +           ! : 38 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 2248  [0x104cac1b0]
+      +           ! : | 20 _xzm_free_main  (in libsystem_malloc.dylib) + 392,28,...  [0x1a04c5044,0x1a04c4ed8,...]
+      +           ! : | 11 _free  (in libsystem_malloc.dylib) + 36,0,...  [0x1a04c9134,0x1a04c9110,...]
+      +           ! : | 7 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : 35 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1736  [0x104cabfb0]
+      +           ! : | 15 _free  (in libsystem_malloc.dylib) + 108,0,...  [0x1a04c917c,0x1a04c9110,...]
+      +           ! : | 13 _xzm_free_main  (in libsystem_malloc.dylib) + 684,164,...  [0x1a04c5168,0x1a04c4f60,...]
+      +           ! : | 7 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : 34 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +           ! : | 34 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +           ! : |   11 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : |   10 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,64,...  [0x1a04c872c,0x1a04c8760,...]
+      +           ! : |   6 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0  [0x104cbfa34]
+      +           ! : |   6 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 8,32  [0x1a04c3324,0x1a04c333c]
+      +           ! : |   1 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : 34 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +           ! : | 34 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +           ! : |   11 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,44,...  [0x1a04c872c,0x1a04c874c,...]
+      +           ! : |   10 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : |   6 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 12,0,...  [0x1a04c3328,0x1a04c331c,...]
+      +           ! : |   4 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : |   3 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0,8  [0x104cbfa34,0x104cbfa3c]
+      +           ! : 34 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1680  [0x104cabf78]
+      +           ! : | 18 _xzm_free_main  (in libsystem_malloc.dylib) + 40,212,...  [0x1a04c4ee4,0x1a04c4f90,...]
+      +           ! : | 9 _free  (in libsystem_malloc.dylib) + 44,36,...  [0x1a04c913c,0x1a04c9134,...]
+      +           ! : | 7 DYLD-STUB$$free  (in near-clifford-scale) + 4,8  [0x104cfb0d4,0x104cfb0d8]
+      +           ! : 26 _xzm_free_main  (in libsystem_malloc.dylib) + 1080,1072  [0x1a04c52f4,0x1a04c52ec]
+      +           ! : 23 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +           ! : | 23 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +           ! : |   11 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : |   10 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,64,...  [0x1a04c872c,0x1a04c8760,...]
+      +           ! : |   1 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : |   1 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 8  [0x104cbfa3c]
+      +           ! : 23 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 2320  [0x104cac1f8]
+      +           ! : | 12 __sincos_stret  (in libsystem_m.dylib) + 372  [0x1b120ed94]
+      +           ! : | + 4 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x10a0  [0x1b120f0a0]
+      +           ! : | + 4 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x115c  [0x1b120f15c]
+      +           ! : | + 3 __sincos_stret  (in libsystem_m.dylib) + 372  [0x1b120ed94]
+      +           ! : | + ! 1 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x111c  [0x1b120f11c]
+      +           ! : | + ! 1 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x1134  [0x1b120f134]
+      +           ! : | + ! 1 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x1138  [0x1b120f138]
+      +           ! : | + 1 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x1088  [0x1b120f088]
+      +           ! : | 5 __sincos_stret  (in libsystem_m.dylib) + 36,4,...  [0x1b120ec44,0x1b120ec24,...]
+      +           ! : | 3 ???  (in libsystem_m.dylib)  load address 0x1b120e000 + 0x10b4  [0x1b120f0b4]
+      +           ! : | 3 DYLD-STUB$$__sincos_stret  (in near-clifford-scale) + 4  [0x104cfaff0]
+      +           ! : 16 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1920  [0x104cac068]
+      +           ! : | 16 rstim::near_clifford::ActiveState::sign_coordinates::h522e5de7360afdb6  (in near-clifford-scale) + 396,348,...  [0x104ca6fa0,0x104ca6f70,...]
+      +           ! : 14 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 2404  [0x104cac24c]
+      +           ! : | 8 _xzm_free_main  (in libsystem_malloc.dylib) + 8,128,...  [0x1a04c4ec4,0x1a04c4f3c,...]
+      +           ! : | 4 _free  (in libsystem_malloc.dylib) + 64,0,...  [0x1a04c9150,0x1a04c9110,...]
+      +           ! : | 2 free  (in libsystem_malloc.dylib) + 0  [0x1a048a6f0]
+      +           ! : 9 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1892  [0x104cac04c]
+      +           ! : | 9 alloc::vec::Vec$LT$T$C$A$GT$::extend_with::h6022c8732007cedb  (in near-clifford-scale) + 8,24,...  [0x104ca4184,0x104ca4194,...]
+      +           ! : 6 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 284,288  [0x104caac24,0x104caac28]
+      +           ! : 3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale) + 148  [0x104ca4838]
+      +           ! : 3 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 256  [0x104cab9e8]
+      +           ! : | 3 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 3 rstim::near_clifford::ActiveState::sign_coordinates::h522e5de7360afdb6  (in near-clifford-scale) + 432  [0x104ca6fc4]
+      +           ! : 2 alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9cb04fe51f31ba3b  (in near-clifford-scale) + 164  [0x104cb2920]
+      +           ! : 2 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 164  [0x104cab98c]
+      +           ! : | 2 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 1 alloc::vec::Vec$LT$T$C$A$GT$::extend_with::h6022c8732007cedb  (in near-clifford-scale) + 248  [0x104ca4274]
+      +           ! : 1 rstim::near_clifford::ActiveState::ensure_axis_with_coordinates::h3a999a1fe4ce5522  (in near-clifford-scale) + 148  [0x104caad40]
+      +           ! : 1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 196  [0x104cab9ac]
+      +           ! : | 1 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 284  [0x104caba04]
+      +           ! :   1 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! 1196 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1252  [0x104c9a9f8]  near_clifford.rs:2313
+      +           ! : 1152 rstim::near_clifford::apply_near_pair::h265a01b8a265de19  (in near-clifford-scale) + 420  [0x104cae658]
+      +           ! : | 890 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 596  [0x104ca5f94]
+      +           ! : | + 890 rstim::sim::tableau::StabilizerState::cx::h5e8e5e52b814cfeb  (in near-clifford-scale) + 172,48,...  [0x104cb7e28,0x104cb7dac,...]
+      +           ! : | 128 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 584  [0x104ca5f88]
+      +           ! : | + 77 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 80  [0x104ca5c18]
+      +           ! : | + ! 37 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 124  [0x104cb2418]
+      +           ! : | + ! : 27 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | + ! : | 15 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524,92,...  [0x1a04bcc58,0x1a04bcaa8,...]
+      +           ! : | + ! : | 4 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92,144,...  [0x1a04c3864,0x1a04c3898,...]
+      +           ! : | + ! : | 3 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + ! : | 3 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 12,44,...  [0x1a04c84fc,0x1a04c851c,...]
+      +           ! : | + ! : | 2 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | + ! : 4 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 208  [0x104ca4910]
+      +           ! : | + ! : | 4 _platform_memmove  (in libsystem_platform.dylib) + 12,452,...  [0x1a06abd6c,0x1a06abf24,...]
+      +           ! : | + ! : 3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 108  [0x104ca48ac]
+      +           ! : | + ! : | 2 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 64,80  [0x1a04c8530,0x1a04c8540]
+      +           ! : | + ! : | 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92  [0x1a04c3864]
+      +           ! : | + ! : 2 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 228  [0x104ca4924]
+      +           ! : | + ! : 1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 156  [0x104ca48dc]
+      +           ! : | + ! :   1 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : | + ! 36 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 136  [0x104cb2424]
+      +           ! : | + ! : 28 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | + ! : | 14 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404,256,...  [0x1a04bcbe0,0x1a04bcb4c,...]
+      +           ! : | + ! : | 6 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 80,12,...  [0x1a04c8540,0x1a04c84fc,...]
+      +           ! : | + ! : | 5 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 144,92,...  [0x1a04c3898,0x1a04c3864,...]
+      +           ! : | + ! : | 3 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + ! : 6 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 208  [0x104ca4910]
+      +           ! : | + ! : | 5 _platform_memmove  (in libsystem_platform.dylib) + 452,12  [0x1a06abf24,0x1a06abd6c]
+      +           ! : | + ! : | 1 DYLD-STUB$$memcpy  (in near-clifford-scale) + 4  [0x104cfb11c]
+      +           ! : | + ! : 2 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 108  [0x104ca48ac]
+      +           ! : | + ! :   1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + ! :   1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      +           ! : | + ! 2 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 192  [0x104cb245c]
+      +           ! : | + ! : 1 _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+      +           ! : | + ! : 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      +           ! : | + ! 1 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 40  [0x104cb23c4]
+      +           ! : | + ! : 1 alloc::sync::arcinner_layout_for_value_layout::h6d5b206f5997e9e4  (in near-clifford-scale) + 28  [0x104ced924]
+      +           ! : | + ! 1 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 68  [0x104cb23e0]
+      +           ! : | + !   1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      +           ! : | + 51 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 36,64  [0x104ca5bec,0x104ca5c08]
+      +           ! : | 115 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 44,284,...  [0x104ca5d6c,0x104ca5e5c,...]
+      +           ! : | 15 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 132  [0x104ca5c4c]
+      +           ! : | 4 rstim::sim::tableau::StabilizerState::cx::h5e8e5e52b814cfeb  (in near-clifford-scale) + 284  [0x104cb7e98]
+      +           ! : 32 rstim::near_clifford::apply_near_pair::h265a01b8a265de19  (in near-clifford-scale) + 16,40,...  [0x104cae4c4,0x104cae4dc,...]
+      +           ! : 12 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 904  [0x104ca60c8]
+      +           ! 195 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3052  [0x104c9b100]  near_clifford.rs:2378
+      +           ! : 195 rand_core::block::BlockRng$LT$R$GT$::generate_and_set::h9cbf404e996bb411  (in near-clifford-scale) + 736,1892,...  [0x104ca0510,0x104ca0994,...]
+      +           ! 55 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3436  [0x104c9b280]  near_clifford.rs:2402
+      +           ! : 51 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 572  [0x104c9a394]  near_clifford.rs:287
+      +           ! : | 10 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5084  [0x104c9ffd8]  tableau.rs:461
+      +           ! : | + 4 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 104,12,...  [0x1a04c8788,0x1a04c872c,...]
+      +           ! : | + 4 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832,404,...  [0x1a04bcd8c,0x1a04bcbe0,...]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0  [0x104cbfa34]
+      +           ! : | + 1 xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 8  [0x1a04c3324]
+      +           ! : | 8 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5136  [0x104ca000c]  tableau.rs:462
+      +           ! : | + 3 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      +           ! : | + 2 _malloc_zone_calloc  (in libsystem_malloc.dylib) + 12,104  [0x1a04c872c,0x1a04c8788]
+      +           ! : | + 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92  [0x1a04c3864]
+      +           ! : | + 1 DYLD-STUB$$calloc  (in near-clifford-scale) + 4  [0x104cfb050]
+      +           ! : | + 1 _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0  [0x104cbfa34]
+      +           ! : | 8 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5324  [0x104ca00c8]  tableau.rs:468
+      +           ! : | + 8 rstim::sim::tableau::StabilizerState::row_mult_temp::hf6c18c8af327414c  (in near-clifford-scale) + 208,240,...  [0x104cb6be4,0x104cb6c04,...]
+      +           ! : | 7 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5392  [0x104ca010c]  tableau.rs:474
+      +           ! : | + 3 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | + ! 3 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1a065d0f8]
+      +           ! : | + 3 _xzm_free_main  (in libsystem_malloc.dylib) + 684,240  [0x1a04c5168,0x1a04c4fac]
+      +           ! : | + 1 DYLD-STUB$$free  (in near-clifford-scale) + 4  [0x104cfb0d4]
+      +           ! : | 5 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5220  [0x104ca0060]  tableau.rs:466
+      +           ! : | 3 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 96  [0x104c9ec5c]  tableau.rs:428
+      +           ! : | 3 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5260,5268,...  [0x104ca0088,0x104ca0090,...]  tableau.rs:467
+      +           ! : | 2 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 124,144  [0x104c9ec78,0x104c9ec8c]  tableau.rs:429
+      +           ! : | 2 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5376  [0x104ca00fc]  tableau.rs:474
+      +           ! : | + 2 _xzm_free_main  (in libsystem_malloc.dylib) + 28,892  [0x1a04c4ed8,0x1a04c5238]
+      +           ! : | 1 _xzm_free_main  (in libsystem_malloc.dylib) + 1080  [0x1a04c52f4]
+      +           ! : | 1 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5288  [0x104ca00a4]  tableau.rs:0
+      +           ! : | 1 rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale) + 5124  [0x104ca0000]  tableau.rs:462
+      +           ! : |   1 _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 8  [0x104ca34b4]
+      +           ! : 2 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 208  [0x104c9a228]  near_clifford.rs:0
+      +           ! : | 1 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale) + 36  [0x104c9a004]  sync.rs:0
+      +           ! : | 1 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale) + 24  [0x104c99ff8]  sync.rs:2493
+      +           ! : 1 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 200  [0x104c9a220]  near_clifford.rs:285
+      +           ! : | 1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 40  [0x104ca8a20]
+      +           ! : 1 rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 1248  [0x104ca8ed8]
+      +           ! 52 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2672  [0x104c9af84]  near_clifford.rs:2413
+      +           ! : 50 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 696,672,...  [0x104ca5ff8,0x104ca5fe0,...]
+      +           ! : 2 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 128  [0x104ca5c48]
+      +           ! 40 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 392,920,...  [0x104c9a69c,0x104c9a8ac,...]  near_clifford.rs:2308
+      +           ! 36 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3676  [0x104c9b370]  near_clifford.rs:2356
+      +           ! : 33 alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h1519c2373fd36b04  (in near-clifford-scale) + 60  [0x104cf7dcc]
+      +           ! : | 26 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 108  [0x104cf7f9c]
+      +           ! : | + 23 _realloc  (in libsystem_malloc.dylib) + 456  [0x1a04c9358]
+      +           ! : | + ! 20 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x1a04c8b2c]
+      +           ! : | + ! : 12 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 296,856,...  [0x1a04b9138,0x1a04b9368,...]
+      +           ! : | + ! : 3 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 896  [0x1a04b9390]
+      +           ! : | + ! : | 3 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 296,524,...  [0x1a04bcb74,0x1a04bcc58,...]
+      +           ! : | + ! : 2 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 996  [0x1a04b93f4]
+      +           ! : | + ! : | 1 DYLD-STUB$$_platform_memmove  (in libsystem_malloc.dylib) + 12  [0x1a04de5ac]
+      +           ! : | + ! : | 1 _platform_memmove  (in libsystem_platform.dylib) + 460  [0x1a06abf2c]
+      +           ! : | + ! : 2 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 1028  [0x1a04b9414]
+      +           ! : | + ! : | 2 _xzm_free  (in libsystem_malloc.dylib) + 1040,1152  [0x1a04c0b10,0x1a04c0b80]
+      +           ! : | + ! : 1 default_zone_realloc  (in libsystem_malloc.dylib) + 4  [0x1a048ccfc]
+      +           ! : | + ! 3 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 100,124,...  [0x1a04c8afc,0x1a04c8b14,...]
+      +           ! : | + 2 _realloc  (in libsystem_malloc.dylib) + 252  [0x1a04c928c]
+      +           ! : | + ! 2 xzm_malloc_zone_size  (in libsystem_malloc.dylib) + 48,152  [0x1a04b8334,0x1a04b839c]
+      +           ! : | + 1 _realloc  (in libsystem_malloc.dylib) + 20  [0x1a04c91a4]
+      +           ! : | 4 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 136  [0x104cf7fb8]
+      +           ! : | + 2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404,524  [0x1a04bcbe0,0x1a04bcc58]
+      +           ! : | + 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 288  [0x1a04c3928]
+      +           ! : | + 1 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | 3 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 36,84  [0x104cf7f54,0x104cf7f84]
+      +           ! : 2 alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h1519c2373fd36b04  (in near-clifford-scale) + 60,72  [0x104cf7dcc,0x104cf7dd8]
+      +           ! : 1 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 188  [0x104cf7fec]
+      +           ! 31 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2732  [0x104c9afc0]  near_clifford.rs:2415
+      +           ! : 29 alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h1519c2373fd36b04  (in near-clifford-scale) + 60  [0x104cf7dcc]
+      +           ! : | 25 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 108  [0x104cf7f9c]
+      +           ! : | + 23 _realloc  (in libsystem_malloc.dylib) + 456  [0x1a04c9358]
+      +           ! : | + ! 20 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x1a04c8b2c]
+      +           ! : | + ! : 8 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 1028  [0x1a04b9414]
+      +           ! : | + ! : | 8 _xzm_free  (in libsystem_malloc.dylib) + 236,404,...  [0x1a04c07ec,0x1a04c0894,...]
+      +           ! : | + ! : 7 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 92,268,...  [0x1a04b906c,0x1a04b911c,...]
+      +           ! : | + ! : 4 xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib) + 996  [0x1a04b93f4]
+      +           ! : | + ! : | 4 _platform_memmove  (in libsystem_platform.dylib) + 24,428  [0x1a06abd78,0x1a06abf0c]
+      +           ! : | + ! : 1 _xzm_free  (in libsystem_malloc.dylib) + 1836  [0x1a04c0e2c]
+      +           ! : | + ! 3 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 144,8  [0x1a04c8b28,0x1a04c8aa0]
+      +           ! : | + 1 _realloc  (in libsystem_malloc.dylib) + 252  [0x1a04c928c]
+      +           ! : | + ! 1 xzm_malloc_zone_size  (in libsystem_malloc.dylib) + 200  [0x1a04b83cc]
+      +           ! : | + 1 _realloc  (in libsystem_malloc.dylib) + 96  [0x1a04c91f0]
+      +           ! : | 3 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 136  [0x104cf7fb8]
+      +           ! : | + 2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268,524  [0x1a04bcb58,0x1a04bcc58]
+      +           ! : | + 1 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 80  [0x1a04c8540]
+      +           ! : | 1 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale) + 36  [0x104cf7f54]
+      +           ! : 2 alloc::raw_vec::RawVec$LT$T$C$A$GT$::grow_one::h1519c2373fd36b04  (in near-clifford-scale) + 0,60  [0x104cf7d90,0x104cf7dcc]
+      +           ! 28 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1700,2060,...  [0x104c9abb8,0x104c9ad20,...]  near_clifford.rs:2368
+      +           ! 26 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 132,1032,...  [0x104c9a598,0x104c9a91c,...]  near_clifford.rs:0
+      +           ! 25 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1268,1192  [0x104c9aa08,0x104c9a9bc]  near_clifford.rs:2310
+      +           ! 20 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2328,2316,...  [0x104c9ae2c,0x104c9ae20,...]  near_clifford.rs:2378
+      +           ! 18 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 176,164  [0x104c9a5c4,0x104c9a5b8]  near_clifford.rs:2286
+      +           ! 14 rstim::near_clifford::apply_near_pair::h265a01b8a265de19  (in near-clifford-scale) + 432  [0x104cae664]
+      +           ! 13 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3668,3656,...  [0x104c9b368,0x104c9b35c,...]  near_clifford.rs:2356
+      +           ! 12 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1140,1144,...  [0x104c9a988,0x104c9a98c,...]  near_clifford.rs:2353
+      +           ! 12 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1672,1688  [0x104c9ab9c,0x104c9abac]  near_clifford.rs:2366
+      +           ! 11 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3388  [0x104c9b250]  near_clifford.rs:2385
+      +           ! : 10 rstim::near_clifford::apply_near_pauli::hb4c2cd92ba0d2845  (in near-clifford-scale) + 92  [0x104cae6cc]
+      +           ! : | 5 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 620  [0x104ca5fac]
+      +           ! : | + 5 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 80  [0x104ca5c18]
+      +           ! : | +   4 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 124  [0x104cb2418]
+      +           ! : | +   ! 4 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | +   !   2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16,104  [0x1a04bca5c,0x1a04bcab4]
+      +           ! : | +   !   1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 116  [0x1a04c387c]
+      +           ! : | +   !   1 _malloc_zone_malloc  (in libsystem_malloc.dylib) + 120  [0x1a04c8568]
+      +           ! : | +   1 alloc::sync::Arc$LT$T$C$A$GT$::clone_from_ref_in::h72894171cadafe1a  (in near-clifford-scale) + 136  [0x104cb2424]
+      +           ! : | +     1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+      +           ! : | +       1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      +           ! : | 4 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 44,656,...  [0x104ca5d6c,0x104ca5fd0,...]
+      +           ! : | 1 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 132  [0x104ca5c4c]
+      +           ! : 1 rstim::near_clifford::apply_near_pauli::hb4c2cd92ba0d2845  (in near-clifford-scale) + 4  [0x104cae674]
+      +           ! 11 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2148,2116  [0x104c9ad78,0x104c9ad58]  near_clifford.rs:2396
+      +           ! 11 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2696  [0x104c9af9c]  near_clifford.rs:2413
+      +           ! : 11 rstim::near_clifford::ActiveState::retire_fixed_axes::h5816a4d4cfc94c24  (in near-clifford-scale) + 80,0,...  [0x104ca701c,0x104ca6fcc,...]
+      +           ! 10 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1140  [0x104c9a988]  near_clifford.rs:2353
+      +           ! : 10 rstim::near_clifford::near_record::h3ab7b2e86f45e8da  (in near-clifford-scale) + 4,0,...  [0x104cac3f8,0x104cac3f4,...]
+      +           ! 10 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1640,3360  [0x104c9ab7c,0x104c9b234]  result.rs:0
+      +           ! 9 rstim::near_clifford::ActiveState::retire_fixed_axes::h5816a4d4cfc94c24  (in near-clifford-scale) + 1076,1080,...  [0x104ca7400,0x104ca7404,...]
+      +           ! 8 rstim::near_clifford::near_record::h3ab7b2e86f45e8da  (in near-clifford-scale) + 116,120  [0x104cac468,0x104cac46c]
+      +           ! 8 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2724,2736,...  [0x104c9afb8,0x104c9afc4,...]  near_clifford.rs:2415
+      +           ! 7 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2084  [0x104c9ad38]  near_clifford.rs:2388
+      +           ! 5 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2672,2616,...  [0x104c9af84,0x104c9af4c,...]  near_clifford.rs:2413
+      +           ! 4 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1280  [0x104c9aa14]  near_clifford.rs:2311
+      +           ! 4 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 2228  [0x104c9adc8]  near_clifford.rs:2377
+      +           ! 3 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1416  [0x104c9aa9c]  near_clifford.rs:0
+      +           ! : 3 rstim::near_clifford::apply_near_feedback::h1315b78126e110b8  (in near-clifford-scale) + 244  [0x104cafd18]
+      +           ! :   2 rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 696  [0x104ca5ff8]
+      +           ! :   1 alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 132  [0x104ca5c4c]
+      +           ! 3 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1300  [0x104c9aa28]  near_clifford.rs:2312
+      +           ! 3 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1388  [0x104c9aa80]  near_clifford.rs:2315
+      +           ! 2 rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale) + 920,924  [0x104c9a4f0,0x104c9a4f4]  near_clifford.rs:307
+      +           ! 2 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1436,1444  [0x104c9aab0,0x104c9aab8]  near_clifford.rs:2347
+      +           ! 1 rand_core::block::BlockRng$LT$R$GT$::generate_and_set::h9cbf404e996bb411  (in near-clifford-scale) + 4572  [0x104ca140c]
+      +           ! 1 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1224  [0x104c9a9dc]  near_clifford.rs:2313
+      +           ! 1 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1352  [0x104c9aa5c]  near_clifford.rs:2314
+      +           ! 1 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1368  [0x104c9aa6c]  near_clifford.rs:2315
+      +           ! : 1 rstim::near_clifford::near_record::h3ab7b2e86f45e8da  (in near-clifford-scale) + 4  [0x104cac3f8]
+      +           ! 1 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 1112  [0x104c9a96c]  near_clifford.rs:2350
+      +           ! 1 rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale) + 3464  [0x104c9b29c]  near_clifford.rs:2403
+      +           !   1 rstim::near_clifford::ActiveState::retire_fixed_axes::h5816a4d4cfc94c24  (in near-clifford-scale) + 84  [0x104ca7020]
+      +           67 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 624  [0x104c9b794]  near_clifford.rs:1670
+      +           ! 62 core::ptr::drop_in_place$LT$rstim..near_clifford..ActiveState$GT$::h16ebb10803898dd2  (in near-clifford-scale) + 48  [0x104c98b14]  mod.rs:805
+      +           ! : 29 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 72  [0x104cb2560]
+      +           ! : | 16 _xzm_free_main  (in libsystem_malloc.dylib) + 392,684,...  [0x1a04c5044,0x1a04c5168,...]
+      +           ! : | 7 _free  (in libsystem_malloc.dylib) + 36,0,...  [0x1a04c9134,0x1a04c9110,...]
+      +           ! : | 6 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : 14 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 156  [0x104cb25b4]
+      +           ! : | 9 _xzm_free_main  (in libsystem_malloc.dylib) + 240,28,...  [0x1a04c4fac,0x1a04c4ed8,...]
+      +           ! : | 3 DYLD-STUB$$free  (in near-clifford-scale) + 4,0  [0x104cfb0d4,0x104cfb0d0]
+      +           ! : | 2 _free  (in libsystem_malloc.dylib) + 0,36  [0x1a04c9110,0x1a04c9134]
+      +           ! : 9 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 188  [0x104cb25d4]
+      +           ! : | 4 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | + 4 mach_absolute_time  (in libsystem_kernel.dylib) + 108,16,...  [0x1a065d0f8,0x1a065d09c,...]
+      +           ! : | 4 _xzm_free_main  (in libsystem_malloc.dylib) + 572,268,...  [0x1a04c50f8,0x1a04c4fc8,...]
+      +           ! : | 1 _free  (in libsystem_malloc.dylib) + 44  [0x1a04c913c]
+      +           ! : 5 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 160,40  [0x104cb25b8,0x104cb2540]
+      +           ! : 2 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : | 2 mach_absolute_time  (in libsystem_kernel.dylib) + 16,108  [0x1a065d09c,0x1a065d0f8]
+      +           ! : 1 _xzm_free_main  (in libsystem_malloc.dylib) + 728  [0x1a04c5194]
+      +           ! : 1 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 104  [0x104cb2580]
+      +           ! : | 1 _free  (in libsystem_malloc.dylib) + 76  [0x1a04c915c]
+      +           ! : 1 alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale) + 208  [0x104cb25e8]
+      +           ! :   1 _xzm_free_main  (in libsystem_malloc.dylib) + 8  [0x1a04c4ec4]
+      +           ! 4 core::ptr::drop_in_place$LT$rstim..near_clifford..ActiveState$GT$::h16ebb10803898dd2  (in near-clifford-scale) + 152  [0x104c98b7c]  mod.rs:805
+      +           ! : 4 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! :   4 mach_absolute_time  (in libsystem_kernel.dylib) + 108,112  [0x1a065d0f8,0x1a065d0fc]
+      +           ! 1 _xzm_free_main  (in libsystem_malloc.dylib) + 1080  [0x1a04c52f4]
+      +           11 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 404  [0x104c9b6b8]  near_clifford.rs:1670
+      +           ! 9 _$LT$rstim..near_clifford..ActiveState$u20$as$u20$core..clone..Clone$GT$::clone::h74074d88e9cc5039  (in near-clifford-scale) + 160  [0x104c9d700]  near_clifford.rs:88
+      +           ! : 5 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf255bd876ebea9ef  (in near-clifford-scale) + 108  [0x104ca315c]  mod.rs:3608
+      +           ! : | 3 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92  [0x1a04c3864]
+      +           ! : | 1 DYLD-STUB$$malloc  (in near-clifford-scale) + 4  [0x104cfb104]
+      +           ! : | 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      +           ! : 3 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf255bd876ebea9ef  (in near-clifford-scale) + 168  [0x104ca3198]  mod.rs:3608
+      +           ! : | 2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92,472  [0x1a04bcaa8,0x1a04bcc24]
+      +           ! : | 1 <deduplicated_symbol>  (in libsystem_malloc.dylib) + 92  [0x1a04c3864]
+      +           ! : 1 _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::hf255bd876ebea9ef  (in near-clifford-scale) + 208  [0x104ca31c0]  mod.rs:3608
+      +           ! :   1 _platform_memmove  (in libsystem_platform.dylib) + 460  [0x1a06abf2c]
+      +           ! 1 _$LT$rstim..near_clifford..ActiveState$u20$as$u20$core..clone..Clone$GT$::clone::h74074d88e9cc5039  (in near-clifford-scale) + 116  [0x104c9d6d4]  near_clifford.rs:87
+      +           ! : 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 260  [0x1a04bcb50]
+      +           ! 1 _$LT$rstim..near_clifford..ActiveState$u20$as$u20$core..clone..Clone$GT$::clone::h74074d88e9cc5039  (in near-clifford-scale) + 148  [0x104c9d6f4]  near_clifford.rs:87
+      +           !   1 _platform_memmove  (in libsystem_platform.dylib) + 452  [0x1a06abf24]
+      +           5 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 788  [0x104c9b838]  near_clifford.rs:1675
+      +           ! 3 _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+      +           ! : 3 mach_absolute_time  (in libsystem_kernel.dylib) + 108  [0x1a065d0f8]
+      +           ! 2 _xzm_free_main  (in libsystem_malloc.dylib) + 184,444  [0x1a04c4f74,0x1a04c5078]
+      +           2 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 768  [0x104c9b824]  near_clifford.rs:1674
+      +           ! 1 DYLD-STUB$$free  (in near-clifford-scale) + 0  [0x104cfb0d0]
+      +           ! 1 _xzm_free_main  (in libsystem_malloc.dylib) + 28  [0x1a04c4ed8]
+      +           2 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 716,720  [0x104c9b7f0,0x104c9b7f4]  near_clifford.rs:1674
+      +           1 _xzm_free_main  (in libsystem_malloc.dylib) + 1080  [0x1a04c52f4]
+      +           1 rstim::near_clifford::NearCliffordSampler::sample_measurements_u8_with_sweep::h9371db564ed31aca  (in near-clifford-scale) + 504  [0x104c9b71c]  near_clifford.rs:1670
+      16 ???  (in libsystem_malloc.dylib)  load address 0x1a0489000 + 0x670bf000  [0x207548000]
+      + 6 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      + ! 6 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16,252,...  [0x1a04bca5c,0x1a04bcb48,...]
+      + 4 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      + ! 4 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104,244,...  [0x1a04bcab4,0x1a04bcb40,...]
+      + 4 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      + ! 4 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244,104,...  [0x1a04bcb40,0x1a04bcab4,...]
+      + 2 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +   2 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268,404  [0x1a04bcb58,0x1a04bcbe0]
+      6 ???  (in <unknown binary>)  [0x79c3400001]
+      + 6 ???  (in <unknown binary>)  [0x16b166090]
+      +   3 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +   ! 3 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244,404,...  [0x1a04bcb40,0x1a04bcbe0,...]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +   ! 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +   ! 1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      5 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 332  [0x104caac54]
+      + 5 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+      +   5 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 20,8  [0x104caab1c,0x104caab10]
+      1 ???  (in <unknown binary>)  [0x109920000]
+      + 1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+      +   1 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 20  [0x104caab1c]
+      1 ???  (in <unknown binary>)  [0x109920040]
+      + 1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+      +   1 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 20  [0x104caab1c]
+      1 ???  (in <unknown binary>)  [0x126047f8b15]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0x53e6fd45038]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0x63a2ce2d9b4]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0xc7cd4d430f1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xed2c3d32ed3]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0x14b3bd5df0dd]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 180  [0x1a04bcb00]
+      1 ???  (in <unknown binary>)  [0x163ad8a38a02]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0x1a04c5bdf7ef]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0x1a406ddd1545]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x1d69d040c018]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0x227b92f9b28c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0x24f139a5375c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0x2524b5a98397]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0x262cd0e53b9b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0x275b38cf1535]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0x27ca46296746]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 96  [0x1a04bcaac]
+      1 ???  (in <unknown binary>)  [0x299c0a9e5e05]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x2c043ed67355]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0x2d787f2f577f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0x32a61fbe3200]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0x32b00dc4864b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 456  [0x1a04bcc14]
+      1 ???  (in <unknown binary>)  [0x354972feb33c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      1 ???  (in <unknown binary>)  [0x35e7372e9700]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0x37709e9cdb41]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0x37f0f5d0c00e]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0x39842fde002c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0x3a4c3429070b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0x3c9193b3c86b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0x3d4417873ebb]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0x3e1cbc8d0630]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0x3e9aca682a36]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x3f76ada793c3]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0x3fabe1bcb24f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0x3fdb656d76fd]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0x4203edb8d857]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0x4871f27f3262]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0x48e4b28a3aaa]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x49c33ebbf864]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0x4c47e9a24f4b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x4c9b3031b303]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0x4ea7f3519dae]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x4feff20cd132]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0x579bfd534c12]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x597737c1fd38]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0x5a03a52295c5]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x5f3e31e3b9fd]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 428  [0x1a04bcbf8]
+      1 ???  (in <unknown binary>)  [0x6308239b7bdb]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0x66b938328549]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0x68ce9dbeb609]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x6a2078da3365]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0x6c4a88b60f95]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x6ed036774dcf]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x6f36c82cfd02]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0x6f9d129ece83]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      1 ???  (in <unknown binary>)  [0x71d0ba49612e]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0x728343d2d0dc]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0x756118e86c04]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 640  [0x1a04bcccc]
+      1 ???  (in <unknown binary>)  [0x7938c8e10ad1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0x7d71128d1871]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffff80cc9d860235]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xffff82951e531624]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0xffff82d807686a99]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffff84db26082d66]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 296  [0x1a04bcb74]
+      1 ???  (in <unknown binary>)  [0xffff8649109fa7a6]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0xffff87a64123233b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0xffff882a501af0f9]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffff8b570eb22ee1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0xffff8be30717e5be]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      1 ???  (in <unknown binary>)  [0xffff8e5bc45565c3]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0xffff8f8c82d99eb0]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0xffff90a8a9c92901]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0xffff919eecfbfe91]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffff99b3e719931e]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffff9a6e02e42648]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xffff9c648d559f58]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffff9cf1a748ae9f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      1 ???  (in <unknown binary>)  [0xffff9d0bb107e338]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffff9d8d2147ee87]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0xffffa0a4f4db41a4]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0xffffa13dd748f22d]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffffa1480afff60e]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffffabd35079b58a]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffffad7663e614c8]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0xffffad87098ec116]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0xffffae43db4d0a1f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xffffaeeed574e020]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0xffffafb87b393fd9]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0xffffb1cc598a5fd4]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffffb24343d5ebcb]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0xffffb2fe80fc85df]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0xffffb405394c8290]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0xffffb7a11d4d0698]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 656  [0x1a04bccdc]
+      1 ???  (in <unknown binary>)  [0xffffbba741bfae6d]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0xffffbcd76b6a5cc1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xffffc13568b6f109]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 472  [0x1a04bcc24]
+      1 ???  (in <unknown binary>)  [0xffffc19e444c8d85]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+      1 ???  (in <unknown binary>)  [0xffffc391fe47a843]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 764  [0x1a04bcd48]
+      1 ???  (in <unknown binary>)  [0xffffc49c0384950c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 252  [0x1a04bcb48]
+      1 ???  (in <unknown binary>)  [0xffffcc91bc32d39b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0xffffcf13552c24c1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0xffffd0028228f410]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 672  [0x1a04bccec]
+      1 ???  (in <unknown binary>)  [0xffffd04e4232c847]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 284  [0x1a04bcb68]
+      1 ???  (in <unknown binary>)  [0xffffd1ad61f07c6b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0xffffd30fca0fa2e5]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0xffffd64349dc23ba]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 104  [0x1a04bcab4]
+      1 ???  (in <unknown binary>)  [0xffffd73ea0e9f09c]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 284  [0x1a04bcb68]
+      1 ???  (in <unknown binary>)  [0xffffe271b1e2b0b3]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0xffffe2f9533e6857]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xffffe3a447bdf944]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 88  [0x1a04bcaa4]
+      1 ???  (in <unknown binary>)  [0xffffe4474119adb3]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xffffe6f9253afd3d]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 452  [0x1a04bcc10]
+      1 ???  (in <unknown binary>)  [0xffffe71cde7b7470]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xffffeb5552571137]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 92  [0x1a04bcaa8]
+      1 ???  (in <unknown binary>)  [0xffffeda7efbe9fe9]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 456  [0x1a04bcc14]
+      1 ???  (in <unknown binary>)  [0xffffee313d264626]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 404  [0x1a04bcbe0]
+      1 ???  (in <unknown binary>)  [0xfffff198f693aee1]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 16  [0x1a04bca5c]
+      1 ???  (in <unknown binary>)  [0xfffff4e685e74c3b]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 832  [0x1a04bcd8c]
+      1 ???  (in <unknown binary>)  [0xfffff5712f54c92e]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 296  [0x1a04bcb74]
+      1 ???  (in <unknown binary>)  [0xfffff64fe753251f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 244  [0x1a04bcb40]
+      1 ???  (in <unknown binary>)  [0xfffff706187d5994]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 524  [0x1a04bcc58]
+      1 ???  (in <unknown binary>)  [0xfffffce02d69581f]
+      + 1 ???  (in <unknown binary>)  [0x16b166090]
+      +   1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+      +     1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 28  [0x1a04bca68]
+      1 rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+      + 1 rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 0  [0x104caab08]
+      1 rstim::near_clifford::ActiveState::single_qubit_pauli::ha9ffe36958c1ee46  (in near-clifford-scale) + 204  [0x104ca7524]
+        1 _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 268  [0x1a04bcb58]
+
+Total number in stack (recursive counted multiple, when >=5):
+        158       _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib) + 0  [0x1a04bca4c]
+        122       ???  (in <unknown binary>)  [0x16b166090]
+        37       rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 180  [0x104cab99c]
+        34       rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 272  [0x104cab9f8]
+        34       rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 296  [0x104caba10]
+        32       _xzm_free_main  (in libsystem_malloc.dylib) + 0  [0x1a04c4ebc]
+        32       rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 208  [0x104cab9b8]
+        24       <deduplicated_symbol>  (in libsystem_malloc.dylib) + 0  [0x1a04c3808]
+        18       _free  (in libsystem_malloc.dylib) + 0  [0x1a04c9110]
+        17       DYLD-STUB$$free  (in near-clifford-scale) + 0  [0x104cfb0d0]
+        12       _malloc_zone_calloc  (in libsystem_malloc.dylib) + 0  [0x1a04c8720]
+        11       _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale) + 0  [0x104ca34ac]
+        10       _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale) + 0  [0x104cbf914]
+        10       _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale) + 0  [0x104cbfa34]
+        10       _malloc_zone_malloc  (in libsystem_malloc.dylib) + 0  [0x1a04c84f0]
+        10       _platform_memmove  (in libsystem_platform.dylib) + 0  [0x1a06abd60]
+        9       _xzm_free_main  (in libsystem_malloc.dylib) + 736  [0x1a04c519c]
+        9       mach_absolute_time  (in libsystem_kernel.dylib) + 0  [0x1a065d08c]
+        8       DYLD-STUB$$calloc  (in near-clifford-scale) + 0  [0x104cfb04c]
+        8       xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib) + 0  [0x1a04c331c]
+        7       DYLD-STUB$$malloc  (in near-clifford-scale) + 0  [0x104cfb100]
+        6       _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale) + 168  [0x104ca48e8]
+        6       alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale) + 0  [0x104ca5bc8]
+        6       rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale) + 0  [0x104caab08]
+        5       rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale) + 0  [0x104ca5d40]
+        5       rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale) + 0  [0x104ca89f8]
+        5       rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale) + 1216  [0x104cabda8]
+
+Sort by top of stack, same collapsed (when >= 5):
+        rstim::sim::tableau::StabilizerState::cx::h5e8e5e52b814cfeb  (in near-clifford-scale)        894
+        rstim::near_clifford::ActiveState::rotate_z::h2ad7ab46fbac4c9f  (in near-clifford-scale)        591
+        _xzm_xzone_malloc_tiny  (in libsystem_malloc.dylib)        491
+        rstim::sim::tableau::StabilizerState::row_mult_temp::hf6c18c8af327414c  (in near-clifford-scale)        482
+        _xzm_free_main  (in libsystem_malloc.dylib)        403
+        rstim::sim::tableau::StabilizerState::measure_z::hb19ab39bef646f63  (in near-clifford-scale)        383
+        mach_absolute_time  (in libsystem_kernel.dylib)        369
+        rstim::near_clifford::run_near_block::hb696de1eb243c633  (in near-clifford-scale)        254
+        rand_core::block::BlockRng$LT$R$GT$::generate_and_set::h9cbf404e996bb411  (in near-clifford-scale)        197
+        <deduplicated_symbol>  (in libsystem_malloc.dylib)        189
+        _free  (in libsystem_malloc.dylib)        187
+        rstim::near_clifford::ActiveState::apply_clifford::ha6d53e2617174b5c  (in near-clifford-scale)        183
+        _malloc_zone_calloc  (in libsystem_malloc.dylib)        126
+        DYLD-STUB$$free  (in near-clifford-scale)        83
+        rstim::near_clifford::ActiveState::coordinate_mask::h8103faf007a49712  (in near-clifford-scale)        74
+        alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h16d9fb3eca7e8cd5  (in near-clifford-scale)        71
+        rstim::near_clifford::ActiveState::rebase_origin_into_frame::h8100137fbe299733  (in near-clifford-scale)        70
+        rstim::near_clifford::ActiveState::reconstruct_physical_pauli::he8fd7ee1cc4febc1  (in near-clifford-scale)        62
+        rstim::near_clifford::Pauli::multiply_tableau_row::h6f65aac5d329d261  (in near-clifford-scale)        60
+        _malloc_zone_malloc  (in libsystem_malloc.dylib)        57
+        rstim::near_clifford::apply_near_pair::h265a01b8a265de19  (in near-clifford-scale)        46
+        _platform_memcmp  (in libsystem_platform.dylib)        44
+        alloc::sync::Arc$LT$T$C$A$GT$::make_mut::h896c98073e4043cd  (in near-clifford-scale)        39
+        _RNvCs5A4hkLM3k7S_7___rustc18___rdl_alloc_zeroed  (in near-clifford-scale)        37
+        _platform_memmove  (in libsystem_platform.dylib)        32
+        xzm_malloc_zone_malloc_type_calloc_main  (in libsystem_malloc.dylib)        32
+        _RNvCs5A4hkLM3k7S_7___rustc11___rdl_alloc  (in near-clifford-scale)        24
+        _RNvCs5A4hkLM3k7S_7___rustc35___rust_no_alloc_shim_is_unstable_v2  (in near-clifford-scale)        24
+        DYLD-STUB$$calloc  (in near-clifford-scale)        22
+        rstim::near_clifford::ActiveState::retire_fixed_axes::h5816a4d4cfc94c24  (in near-clifford-scale)        22
+        rstim::near_clifford::ActiveState::sign_coordinates::h522e5de7360afdb6  (in near-clifford-scale)        19
+        rstim::near_clifford::near_record::h3ab7b2e86f45e8da  (in near-clifford-scale)        19
+        xzm_malloc_zone_malloc_type_realloc  (in libsystem_malloc.dylib)        19
+        rstim::near_clifford::ActiveState::measure::h76b4418daf9afda3  (in near-clifford-scale)        17
+        DYLD-STUB$$malloc  (in near-clifford-scale)        11
+        _xzm_free  (in libsystem_malloc.dylib)        11
+        alloc::vec::Vec$LT$T$C$A$GT$::extend_with::h6022c8732007cedb  (in near-clifford-scale)        10
+        alloc::raw_vec::RawVecInner$LT$A$GT$::try_allocate_in::h9cb04fe51f31ba3b  (in near-clifford-scale)        9
+        DYLD-STUB$$memcmp  (in near-clifford-scale)        8
+        _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h87ee84dab826d5ed  (in near-clifford-scale)        8
+        _$LT$alloc..vec..Vec$LT$T$C$A$GT$$u20$as$u20$core..clone..Clone$GT$::clone::h915ee7071434facb  (in near-clifford-scale)        7
+        _malloc_zone_realloc  (in libsystem_malloc.dylib)        6
+        DYLD-STUB$$mach_absolute_time  (in libsystem_malloc.dylib)        5
+        __sincos_stret  (in libsystem_m.dylib)        5
+        alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::hc2d227d1e42dda3e  (in near-clifford-scale)        5
+        alloc::sync::Arc$LT$T$C$A$GT$::drop_slow::hb4364e28e28f6dba  (in near-clifford-scale)        5
+        core::ptr::drop_in_place$LT$rstim..near_clifford..Pauli$GT$::h1739c4487b2de2be  (in near-clifford-scale)        5
+
+Binary Images:
+       0x104c98000 -        0x104d16c73 +near-clifford-scale (0) <B20EA823-F664-3591-9EB7-6AEBE9445936> /Users/*/near-clifford-scale
+       0x1a0218000 -        0x1a02675f7  libobjc.A.dylib (973.1) <C0680DF6-9900-3C29-A071-95A031686EF8> /usr/lib/libobjc.A.dylib
+       0x1a0268000 -        0x1a027223f  libsharedcache.dylib (0) <BBF95357-BEBF-3D89-8900-2BBB14A667C5> /usr/lib/libsharedcache.dylib
+       0x1a0273000 -        0x1a0299d3b  libdyld.dylib (27062) <62863BCA-DD60-3D32-A9DB-89099BA6F3D7> /usr/lib/system/libdyld.dylib
+       0x1a029a000 -        0x1a03596e3  dyld (1.0.0 - 27062) <D341DDCB-7969-3A9C-8E03-0CF4751398A9> /usr/lib/dyld
+       0x1a035a000 -        0x1a035d01f  libsystem_blocks.dylib (98.1) <6F304731-D95D-3501-B4AD-F2934F7F2446> /usr/lib/system/libsystem_blocks.dylib
+       0x1a035e000 -        0x1a03b30df  libxpc.dylib (3298.1.1) <0791121F-B5FC-3F84-BF04-115E86D2D882> /usr/lib/system/libxpc.dylib
+       0x1a03b4000 -        0x1a03d3c13  libsystem_trace.dylib (1966.1.1) <B48A8E3E-A12A-3342-8321-428B555E965E> /usr/lib/system/libsystem_trace.dylib
+       0x1a03d4000 -        0x1a0488f27  libcorecrypto.dylib (2109.0.22) <807AA6C9-5D8A-3CA5-B4CE-FACE5296EF6A> /usr/lib/system/libcorecrypto.dylib
+       0x1a0489000 -        0x1a04dec5f  libsystem_malloc.dylib (886.0.8) <2339CB57-FE5A-3154-A206-A76059C749EB> /usr/lib/system/libsystem_malloc.dylib
+       0x1a04df000 -        0x1a052519f  libdispatch.dylib (1605.0.2) <022BF08F-0B3A-3225-9E65-16D1553CE90D> /usr/lib/system/libdispatch.dylib
+       0x1a0526000 -        0x1a0528d2b  libsystem_featureflags.dylib (108) <20C1CAB2-1F13-3426-8146-9CAE9FF2A33D> /usr/lib/system/libsystem_featureflags.dylib
+       0x1a0529000 -        0x1a05abca3  libsystem_c.dylib (1786.0.3) <FBA7B23E-AA60-3A90-9AA4-A7A2E0AD63EE> /usr/lib/system/libsystem_c.dylib
+       0x1a05ac000 -        0x1a0641033  libc++.1.dylib (2200.27) <1E9BA4AA-B5DA-3CF3-80AC-4B880049573F> /usr/lib/libc++.1.dylib
+       0x1a0642000 -        0x1a065beff  libc++abi.dylib (2200.27) <A21743EE-6E1C-3E74-97EA-7AF793DE4BDF> /usr/lib/libc++abi.dylib
+       0x1a065c000 -        0x1a069a9ab  libsystem_kernel.dylib (13432.1.9) <F63BF418-8F75-34A4-AAF1-8CAF2B9B6A05> /usr/lib/system/libsystem_kernel.dylib
+       0x1a069b000 -        0x1a06a791b  libsystem_pthread.dylib (553.0.1) <5A1828C3-CBC2-3B85-BD07-C8ED10021A41> /usr/lib/system/libsystem_pthread.dylib
+       0x1a06a8000 -        0x1a06b14f3  libsystem_platform.dylib (402.0.1.0.1) <080E4444-A0FB-3913-9756-4E470015F32F> /usr/lib/system/libsystem_platform.dylib
+       0x1a06b2000 -        0x1a06e0903  libsystem_info.dylib (603) <BC387AEB-1CEF-3513-92D7-D7F913596711> /usr/lib/system/libsystem_info.dylib
+       0x1a480a000 -        0x1a4813b13  libsystem_darwin.dylib (1786.0.3) <4E66C888-993C-3E6A-A8DA-A949C01C5B67> /usr/lib/system/libsystem_darwin.dylib
+       0x1a4c64000 -        0x1a4c75b8b  libsystem_notify.dylib (368) <58FD36D8-37A7-311C-80F2-8E64DD8710CF> /usr/lib/system/libsystem_notify.dylib
+       0x1a6dc1000 -        0x1a6ddbd93  libsystem_networkextension.dylib (2340.1.2) <22E1D190-486F-324F-ABA4-F36AB841BFE9> /usr/lib/system/libsystem_networkextension.dylib
+       0x1a6e69000 -        0x1a6e80247  libsystem_asl.dylib (409) <B4D449B7-A821-3A9A-8019-E917B291F10A> /usr/lib/system/libsystem_asl.dylib
+       0x1a7e14000 -        0x1a7e14f2f  libobjcMsgSend.dylib (973.1) <41179EDE-DC97-3BBE-8848-6400D12C1436> /usr/lib/objc/libobjcMsgSend.dylib
+       0x1a8f60000 -        0x1a8f67edf  libsystem_symptoms.dylib (2394.0.4) <60EE7884-9F4E-3184-A6AC-FA40A7A0297D> /usr/lib/system/libsystem_symptoms.dylib
+       0x1ad2f8000 -        0x1ad332aeb  libsystem_containermanager.dylib (833.0.8.0.1) <08A57205-555D-3792-8931-9D5B585AF326> /usr/lib/system/libsystem_containermanager.dylib
+       0x1ae94b000 -        0x1ae94f317  libsystem_configuration.dylib (1446) <F3EB66A7-7A24-3AE5-B6E8-9A37BB00F119> /usr/lib/system/libsystem_configuration.dylib
+       0x1ae950000 -        0x1ae956e03  libsystem_sandbox.dylib (3051.0.52) <1E892B56-092E-3832-BDE3-DCE356D7A4FA> /usr/lib/system/libsystem_sandbox.dylib
+       0x1afe14000 -        0x1afe14f2f  libobjcMsgSend1.dylib (973.1) <B40D9B2A-E1EE-37ED-8004-711A1F263DE1> /usr/lib/objc/libobjcMsgSend1.dylib
+       0x1b0534000 -        0x1b0536f93  libquarantine.dylib (217.0.4) <7FD4AE22-86EF-382B-83F5-ADF9336C1160> /usr/lib/system/libquarantine.dylib
+       0x1b0c46000 -        0x1b0c4c1e7  libsystem_coreservices.dylib (203) <57248E07-11A5-3857-918E-4A3A63B69FE8> /usr/lib/system/libsystem_coreservices.dylib
+       0x1b120e000 -        0x1b124bb27  libsystem_m.dylib (3326.0.1) <A3FB340F-3ED5-30F4-8B64-9D5860F64D35> /usr/lib/system/libsystem_m.dylib
+       0x1b124c000 -        0x1b124cb47  libcharset.1.dylib (121) <3C9B584E-740A-3664-A1B0-52E561EA4B0B> /usr/lib/libcharset.1.dylib
+       0x1b124d000 -        0x1b12504f7  libmacho.dylib (27062) <50DEADEC-3E99-3519-AFC3-4A3FEB3F14C3> /usr/lib/system/libmacho.dylib
+       0x1b126a000 -        0x1b1276707  libcommonCrypto.dylib (600041) <41C99F45-C5E6-39DB-B1F2-A1BEA9D242A4> /usr/lib/system/libcommonCrypto.dylib
+       0x1b1277000 -        0x1b1280c87  libunwind.dylib (2200.5) <3070AB81-B082-39E8-8A00-EF88DDE9AC47> /usr/lib/system/libunwind.dylib
+       0x1b1288000 -        0x1b12927eb  libcopyfile.dylib (260.0.3) <72D95AF9-BF5E-3A84-81A6-BCC5BDB99857> /usr/lib/system/libcopyfile.dylib
+       0x1b1293000 -        0x1b12968bf  libcompiler_rt.dylib (103.4) <DFB5CE7F-A36E-36AA-BECE-1392D3D43607> /usr/lib/system/libcompiler_rt.dylib
+       0x1b1297000 -        0x1b129c077  libsystem_collections.dylib (1786.0.3) <1E8022D4-5A37-3A7A-8936-603E6FA88358> /usr/lib/system/libsystem_collections.dylib
+       0x1b129d000 -        0x1b129ff1f  libsystem_secinit.dylib (182) <DE037464-4C5D-3E96-A33F-2A4557CC6A20> /usr/lib/system/libsystem_secinit.dylib
+       0x1b12a0000 -        0x1b12a297f  libremovefile.dylib (96) <E6E6DFCF-6B2C-3F30-A59D-816CAB1190CE> /usr/lib/system/libremovefile.dylib
+       0x1b12a3000 -        0x1b12a3e27  libkeymgr.dylib (31) <5EC997EF-3ADA-360B-9FCD-5F940C83FA4E> /usr/lib/system/libkeymgr.dylib
+       0x1b12a4000 -        0x1b12acaf7  libsystem_dnssd.dylib (3111.0.5.0.1) <DE22096F-1E5B-3D6E-8164-771582DD6391> /usr/lib/system/libsystem_dnssd.dylib
+       0x1b12ad000 -        0x1b12b1f1b  libcache.dylib (95) <80BAE197-E285-3F6E-A1EE-B77FE37D7E5D> /usr/lib/system/libcache.dylib
+       0x1b12b2000 -        0x1b12b38f3  libSystem.B.dylib (1359) <4FDC9AA6-B344-37FE-B8C6-A4C94A038F57> /usr/lib/libSystem.B.dylib
+       0x1b12ec000 -        0x1b12f30a3  libiconv.2.dylib (121) <C343D6F7-6932-30E8-8E8F-F756946D8413> /usr/lib/libiconv.2.dylib
+       0x1b7e14000 -        0x1b7e14f2f  libobjcMsgSend2.dylib (973.1) <BD27A84B-C9AE-3282-BBEA-3B6119837B5A> /usr/lib/objc/libobjcMsgSend2.dylib
+       0x1bfe14000 -        0x1bfe14f2f  libobjcMsgSend3.dylib (973.1) <C0860D68-DDFC-3BD7-8B06-DB0645CBBED4> /usr/lib/objc/libobjcMsgSend3.dylib
+       0x1c7e14000 -        0x1c7e14f2f  libobjcMsgSend4.dylib (973.1) <A6153BF5-622B-3B01-81B6-F64A365EF613> /usr/lib/objc/libobjcMsgSend4.dylib
+       0x1cfe14000 -        0x1cfe14f2f  libobjcMsgSend5.dylib (973.1) <3913A71C-B29A-3AEA-820B-BEC40AC1861A> /usr/lib/objc/libobjcMsgSend5.dylib
+       0x1d7e14000 -        0x1d7e14f2f  libobjcMsgSend6.dylib (973.1) <9BC523A3-E167-3F6C-8CAE-0F3EBA671791> /usr/lib/objc/libobjcMsgSend6.dylib
+       0x1dfe14000 -        0x1dfe14f2f  libobjcMsgSend7.dylib (973.1) <248B7BCE-5B4C-34C7-A340-43D5228628C5> /usr/lib/objc/libobjcMsgSend7.dylib
+       0x1e7e14000 -        0x1e7e14f2f  libobjcMsgSend8.dylib (973.1) <3E041BAD-A8E8-3069-B741-78CD1A45B176> /usr/lib/objc/libobjcMsgSend8.dylib
+       0x1efe14000 -        0x1efe14f2f  libobjcMsgSend9.dylib (973.1) <34A67969-21A0-39D6-BB81-8FDA5A2409DB> /usr/lib/objc/libobjcMsgSend9.dylib
+       0x1f7e14000 -        0x1f7e14f2f  libobjcMsgSend10.dylib (973.1) <678186C0-8EAD-3B35-8CBB-00285B41E4A0> /usr/lib/objc/libobjcMsgSend10.dylib
+       0x1ffe14000 -        0x1ffe14f2f  libobjcMsgSend11.dylib (973.1) <E05CB08C-E956-36FA-8967-AE8E346A8D2C> /usr/lib/objc/libobjcMsgSend11.dylib
+       0x227e14000 -        0x227e14f2f  libobjcMsgSend12.dylib (973.1) <10AB03AA-FF1F-3FDC-9DFB-BFC40042C501> /usr/lib/objc/libobjcMsgSend12.dylib
+       0x22fe14000 -        0x22fe14f2f  libobjcMsgSend13.dylib (973.1) <ABF53427-FA6F-3D0D-8F9D-7AD795CA5C92> /usr/lib/objc/libobjcMsgSend13.dylib
+       0x237e14000 -        0x237e14f2f  libobjcMsgSend14.dylib (973.1) <9A844C46-A6DA-34D4-8EBF-2AD775C30684> /usr/lib/objc/libobjcMsgSend14.dylib
+       0x23fe14000 -        0x23fe14f2f  libobjcMsgSend15.dylib (973.1) <7C995666-2B2D-3284-AA0A-EBF7C922838E> /usr/lib/objc/libobjcMsgSend15.dylib
+       0x247e14000 -        0x247e14f2f  libobjcMsgSend16.dylib (973.1) <B6C0E14B-53AE-3E22-9ED5-1729C49F46F2> /usr/lib/objc/libobjcMsgSend16.dylib
+       0x24fe14000 -        0x24fe14f2f  libobjcMsgSend17.dylib (973.1) <07B4CF85-251B-301B-832B-20B315A59E19> /usr/lib/objc/libobjcMsgSend17.dylib
+       0x257e14000 -        0x257e14f2f  libobjcMsgSend18.dylib (973.1) <43E575B7-04DB-3999-A633-1A3B638BA6E3> /usr/lib/objc/libobjcMsgSend18.dylib
+       0x25fe14000 -        0x25fe14f2f  libobjcMsgSend19.dylib (973.1) <736F4D85-76F7-3B28-8D87-C07E8F7A0EF4> /usr/lib/objc/libobjcMsgSend19.dylib
+       0x267e14000 -        0x267e14f2f  libobjcMsgSend20.dylib (973.1) <74E67C8B-6BCA-3184-A18E-A97F370052C6> /usr/lib/objc/libobjcMsgSend20.dylib
+       0x26fe14000 -        0x26fe14f2f  libobjcMsgSend21.dylib (973.1) <CC0D732F-98E7-3888-9E15-70984DA2FB04> /usr/lib/objc/libobjcMsgSend21.dylib
+       0x277e14000 -        0x277e14f2f  libobjcMsgSend22.dylib (973.1) <85A60286-5DE3-32BA-B18C-2A498B065C88> /usr/lib/objc/libobjcMsgSend22.dylib
+       0x27fe14000 -        0x27fe14f2f  libobjcMsgSend23.dylib (973.1) <5452A0D2-6B19-39BE-ADDD-80B7BCDE3A98> /usr/lib/objc/libobjcMsgSend23.dylib
+       0x287e14000 -        0x287e14f2f  libobjcMsgSend24.dylib (973.1) <94BBF2D6-722B-350D-8557-4D25A8E8D53A> /usr/lib/objc/libobjcMsgSend24.dylib
+       0x28fe14000 -        0x28fe14f2f  libobjcMsgSend25.dylib (973.1) <35481387-5A8E-3AE4-86A6-94CEB3CC8726> /usr/lib/objc/libobjcMsgSend25.dylib
+       0x2a7e14000 -        0x2a7e14f2f  libobjcMsgSend26.dylib (973.1) <9E0C8664-E7F4-39D1-AAFC-BD92B255E4E8> /usr/lib/objc/libobjcMsgSend26.dylib
+       0x2afe14000 -        0x2afe14f2f  libobjcMsgSend27.dylib (973.1) <FD424935-55A9-3650-955A-EED3441A1D19> /usr/lib/objc/libobjcMsgSend27.dylib
+       0x2b7e14000 -        0x2b7e14f2f  libobjcMsgSend28.dylib (973.1) <09BA7B97-7DF7-3C7F-932A-B6847662FC49> /usr/lib/objc/libobjcMsgSend28.dylib
+       0x2bfe14000 -        0x2bfe14f2f  libobjcMsgSend29.dylib (973.1) <36D5BA3F-2139-30B0-8558-556764BE9813> /usr/lib/objc/libobjcMsgSend29.dylib
+       0x2c7e14000 -        0x2c7e14f2f  libobjcMsgSend30.dylib (973.1) <9F05564A-9D12-372C-98FC-E9F0E6BE4F04> /usr/lib/objc/libobjcMsgSend30.dylib
+       0x2ccb2e000 -        0x2ccb34fe5  libRosetta.dylib (385) <E359944B-D230-33F9-A04E-0C3B17C3326E> /usr/lib/libRosetta.dylib
+       0x2cd51d000 -        0x2cd52075b  libsystem_darwindirectory.dylib (129.0.1) <61264923-2AA5-3658-B8C4-550C71E9D4B3> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x2cd521000 -        0x2cd52bd9b  libsystem_eligibility.dylib (446.1.3) <EDDE8E9C-A2CF-3931-BBB3-321CB852EB30> /usr/lib/system/libsystem_eligibility.dylib
+       0x2cd52c000 -        0x2cd53542b  libsystem_sanitizers.dylib (32) <7138ED99-7AA0-34EA-B35B-20EF6ADB1EED> /usr/lib/system/libsystem_sanitizers.dylib
+       0x2cd536000 -        0x2cd536a13  libsystem_trial.dylib (511) <6AE48824-EC44-3A8C-B501-BE57DBE892E7> /usr/lib/system/libsystem_trial.dylib
+       0x2cfe14000 -        0x2cfe14f2f  libobjcMsgSend31.dylib (973.1) <0985E20F-78C3-3466-A2B2-DBB95F7104A3> /usr/lib/objc/libobjcMsgSend31.dylib
+       0x2d7e14000 -        0x2d7e14f2f  libobjcMsgSend32.dylib (973.1) <0D309D58-D576-3E5D-AD4B-6D55AB491702> /usr/lib/objc/libobjcMsgSend32.dylib
+       0x2dfe14000 -        0x2dfe14f2f  libobjcMsgSend33.dylib (973.1) <346E0484-48FA-369B-8A64-93B5F5341CFE> /usr/lib/objc/libobjcMsgSend33.dylib
+       0x2e7e14000 -        0x2e7e14f2f  libobjcMsgSend34.dylib (973.1) <6A31F809-BCBE-3E01-A367-E91FDACCE324> /usr/lib/objc/libobjcMsgSend34.dylib
