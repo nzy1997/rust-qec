@@ -29,9 +29,11 @@ checks pass. `verify.py --git-sources --binaries` confirms the retained campaign
 
 ## Results
 
-Warm-flat milliseconds, median of three process medians:
+Warm-flat milliseconds, median of three process medians. Speedup is the ratio
+of those baseline/candidate medians; process pairing is used for the regression
+screen below:
 
-| Workload | Shots | #768 | Candidate | Paired speedup |
+| Workload | Shots | #768 | Candidate | Median-time speedup |
 | --- | ---: | ---: | ---: | ---: |
 | Rank 11 | 1000 | 0.1579 | 0.1569 | 1.01× |
 | Rank 12 | 16 | 0.2727 | 0.2155 | 1.27× |
@@ -57,7 +59,7 @@ outputs; it does not measure one cache's memory.
 
 [Profile metadata](apple-m4-probability-profiles-2026-09-30/metadata.json) retains
 the separate release/debug/frame-pointer binary and sample/circuit hashes.
-At rank 12, probability has 2191/6397 main samples (34.3%), versus 47.4% in the
+At rank 12, probability has 2194/6397 main samples (34.3%), versus 47.4% in the
 previous projection campaign. Projection accounts for 2710/6397 (42.4%), counting
 each inclusive stack once. Percentages describe the profiling build and are not
 pristine timing-build measurements or absolute function speedups. The prefix
