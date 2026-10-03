@@ -63,6 +63,12 @@ jobs:
           python3 benchmarks/near_clifford/entangled/verify.py benchmarks/near_clifford/results/apple-m4-entangled-2026-09-30.json --git-sources
           python3 benchmarks/near_clifford/entangled/test_contract.py
           python3 -O benchmarks/near_clifford/entangled/test_contract.py
+      - name: Check near-Clifford row-operation evidence
+        run: |
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-scale-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-entangled-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/test_contract.py
+          python3 -O benchmarks/near_clifford/row_ops/test_contract.py
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner

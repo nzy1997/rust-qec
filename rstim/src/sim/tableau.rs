@@ -39,6 +39,67 @@ impl StabilizerState {
     pub(crate) fn num_qubits(&self) -> usize {
         self.n
     }
+
+    /// Multiply distinct rows without the per-column Pauli-product match.
+    /// For P(x,z) = i^(xz) X^x Z^z, the product phase is
+    /// xh*zh + xi*zi + 2*zh*xi - (xh^xi)*(zh^zi), modulo four.
+    pub(crate) fn row_mult_near_clifford(&mut self, h: usize, i: usize) {
+        fn rows(rows: &mut [Vec<bool>], h: usize, i: usize) -> (&mut [bool], &[bool]) {
+            assert_ne!(h, i);
+            if h < i {
+                let (left, right) = rows.split_at_mut(i);
+                (&mut left[h], &right[0])
+            } else {
+                let (left, right) = rows.split_at_mut(h);
+                (&mut right[0], &left[i])
+            }
+        }
+        let (xh, xi) = rows(&mut self.x, h, i);
+        let (zh, zi) = rows(&mut self.z, h, i);
+        let mut phase = 0u32;
+        for (((xh, zh), &xi), &zi) in xh.iter_mut().zip(zh).zip(xi).zip(zi) {
+            let x = *xh ^ xi;
+            let z = *zh ^ zi;
+            phase += u32::from(*xh & *zh)
+                + u32::from(xi & zi)
+                + 2 * u32::from(*zh & xi)
+                + 3 * u32::from(x & z);
+            *xh = x;
+            *zh = z;
+        }
+        self.phase[h] = ((u32::from(self.phase[h]) + u32::from(self.phase[i]) + phase) & 3) as u8;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn row_mult_reference(&mut self, h: usize, i: usize) {
+        self.row_mult(h, i);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn check_near_clifford_local_products() {
+        for left in 0..4 {
+            for right in 0..4 {
+                for left_phase in 0..4 {
+                    for right_phase in 0..4 {
+                        for (h, i) in [(0, 1), (1, 0)] {
+                            let mut state = Self::new(1);
+                            state.x[h][0] = left & 1 != 0;
+                            state.z[h][0] = left & 2 != 0;
+                            state.x[i][0] = right & 1 != 0;
+                            state.z[i][0] = right & 2 != 0;
+                            state.phase[h] = left_phase;
+                            state.phase[i] = right_phase;
+                            let mut reference = state.clone();
+                            reference.row_mult(h, i);
+                            state.row_mult_near_clifford(h, i);
+                            assert_eq!(state.canonical_snapshot(), reference.canonical_snapshot());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Right composition changes the virtual basis, not the physical state.
     pub(crate) fn right_h(&mut self, q: usize) {
         self.x.swap(q, self.n + q);
@@ -47,13 +108,13 @@ impl StabilizerState {
     }
 
     pub(crate) fn right_s(&mut self, q: usize) {
-        self.row_mult(q, self.n + q);
+        self.row_mult_near_clifford(q, self.n + q);
         self.phase[q] = (self.phase[q] + 1) % 4;
     }
 
     pub(crate) fn right_cx(&mut self, control: usize, target: usize) {
-        self.row_mult(control, target);
-        self.row_mult(self.n + target, self.n + control);
+        self.row_mult_near_clifford(control, target);
+        self.row_mult_near_clifford(self.n + target, self.n + control);
     }
 
     pub(crate) fn right_cz(&mut self, a: usize, b: usize) {
@@ -73,7 +134,7 @@ impl StabilizerState {
         if let Some(p) = pivot {
             for row in 0..2 * self.n {
                 if row != p && self.x[row][q] {
-                    self.row_mult(row, p);
+                    self.row_mult_near_clifford(row, p);
                 }
             }
             self.copy_row(p, p - self.n);

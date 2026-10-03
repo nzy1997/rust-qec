@@ -2532,6 +2532,35 @@ mod tests {
     use rand::{RngCore, SeedableRng, rngs::StdRng};
 
     #[test]
+    fn near_clifford_row_products_match_legacy_phases_and_wide_rows() {
+        StabilizerState::check_near_clifford_local_products();
+        let mut rng = StdRng::seed_from_u64(20261003);
+        for width in [1, 2, 63, 64, 65, 127, 128, 129, 193, 4096] {
+            let mut state = StabilizerState::new(width);
+            for _ in 0..128 {
+                let q = rng.gen_range(0..width);
+                state.h(q);
+                state.s(q);
+                if rng.r#gen::<bool>() {
+                    state.x_gate(q);
+                }
+                if width > 1 {
+                    let target = (q + rng.gen_range(1..width)) % width;
+                    state.cx(q, target);
+                }
+            }
+            for _ in 0..if width == 4096 { 8 } else { 128 } {
+                let h = rng.gen_range(0..2 * width);
+                let i = (h + rng.gen_range(1..2 * width)) % (2 * width);
+                let mut reference = state.clone();
+                reference.row_mult_reference(h, i);
+                state.row_mult_near_clifford(h, i);
+                assert_eq!(state.canonical_snapshot(), reference.canonical_snapshot());
+            }
+        }
+    }
+
+    #[test]
     fn single_qubit_coordinates_match_general_conversion_on_signed_entangled_frames() {
         let mut rng = StdRng::seed_from_u64(20260930);
         for n in [1, 4, 64, 65, 128, 129, 193] {

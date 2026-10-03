@@ -20,10 +20,10 @@
     "sampler": "rstim circuit sample --shots 65536 --seed 716131 (workload generation)"
   },
   "exit_code": 0,
-  "wall_seconds": 0.6973854170064442,
+  "wall_seconds": 0.8003712500212714,
   "peak_rss_watermark_bytes": 45137920,
-  "compile_seconds": 0.001033041,
-  "decode_seconds": 0.686022333,
+  "compile_seconds": 0.001035375,
+  "decode_seconds": 0.789248042,
   "attempted_shots": 65536,
   "completed_shots": 65536,
   "observed_pattern_count": 11669,
