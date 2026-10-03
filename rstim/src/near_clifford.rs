@@ -1158,11 +1158,19 @@ impl Pauli {
 
     fn multiply_tableau_row(&mut self, frame: &StabilizerState, row: usize) {
         let (x, z, phase) = frame.canonical_row(row);
-        let y_count = (x.iter().zip(z).filter(|(x, z)| **x && **z).count() % 4) as u8;
-        let sign = if dot(&self.z, x) { 2 } else { 0 };
-        self.phase = (self.phase + phase + y_count + sign) % 4;
-        xor(&mut self.x, x);
-        xor(&mut self.z, z);
+        let mut exponent = u32::from(self.phase) + u32::from(phase);
+        for (((left_x, left_z), &right_x), &right_z) in
+            self.x.iter_mut().zip(&mut self.z).zip(x).zip(z)
+        {
+            // Canonical Y contributes iXZ; crossing the old left Z with
+            // the right X contributes -1. Only the residue modulo four
+            // matters, so wrapping accumulation is valid at any width.
+            exponent = exponent
+                .wrapping_add(u32::from(right_x & right_z) + 2 * u32::from(*left_z & right_x));
+            *left_x ^= right_x;
+            *left_z ^= right_z;
+        }
+        self.phase = (exponent & 3) as u8;
     }
 }
 
@@ -2530,6 +2538,94 @@ fn apply_near_pair(state: &mut ActiveState, name: &str, a: usize, b: usize) -> R
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    fn multiply_snapshot_row_reference(
+        product: &mut Pauli,
+        snapshot: &CanonicalTableauSnapshot,
+        row: usize,
+    ) {
+        // Retain the former separate-pass algorithm as a differential oracle.
+        let right = Pauli::from_snapshot_row(snapshot, row);
+        let sign = if dot(&product.z, &right.x) { 2 } else { 0 };
+        product.phase = (product.phase + right.phase + sign) % 4;
+        xor(&mut product.x, &right.x);
+        xor(&mut product.z, &right.z);
+    }
+
+    #[test]
+    fn pauli_row_products_preserve_signed_local_phases_and_wide_chains() {
+        for basis in [
+            MeasurementBasis::X,
+            MeasurementBasis::Y,
+            MeasurementBasis::Z,
+        ] {
+            for negative in [false, true] {
+                let mut frame = StabilizerState::new(1);
+                match basis {
+                    MeasurementBasis::X => {}
+                    MeasurementBasis::Y => frame.s(0),
+                    MeasurementBasis::Z => frame.h(0),
+                }
+                if negative {
+                    if basis == MeasurementBasis::Z {
+                        frame.x_gate(0);
+                    } else {
+                        frame.z_gate(0);
+                    }
+                }
+                let snapshot = frame.canonical_snapshot();
+                for left in 0..4 {
+                    for phase in 0..4 {
+                        let mut actual = Pauli {
+                            x: vec![left & 1 != 0],
+                            z: vec![left & 2 != 0],
+                            phase,
+                        };
+                        let mut expected = actual.clone();
+                        multiply_snapshot_row_reference(&mut expected, &snapshot, 0);
+                        actual.multiply_tableau_row(&frame, 0);
+                        assert_eq!(
+                            (actual.x, actual.z, actual.phase),
+                            (expected.x, expected.z, expected.phase)
+                        );
+                    }
+                }
+            }
+        }
+        let mut rng = StdRng::seed_from_u64(20261005);
+        for width in [1, 2, 63, 64, 65, 127, 128, 129, 193, 260, 4096] {
+            let mut frame = StabilizerState::new(width);
+            // Begin with dense Y support; widths 260/4096 exceed u8 phase sums.
+            frame.h(0);
+            for q in 1..width {
+                frame.cx(0, q);
+            }
+            for q in 0..width {
+                frame.s(q);
+            }
+            for _ in 0..64 {
+                let q = rng.gen_range(0..width);
+                frame.h(q);
+                frame.s(q);
+                frame.y_gate(q);
+                if width > 1 {
+                    let target = (q + rng.gen_range(1..width)) % width;
+                    frame.cx(q, target);
+                    frame.right_cz(q, target);
+                }
+            }
+            let snapshot = frame.canonical_snapshot();
+            let mut actual = Pauli::identity(width);
+            let mut expected = actual.clone();
+            for row in std::iter::once(width).chain((0..64).map(|_| rng.gen_range(0..2 * width))) {
+                multiply_snapshot_row_reference(&mut expected, &snapshot, row);
+                actual.multiply_tableau_row(&frame, row);
+                assert_eq!(actual.x, expected.x, "width={width}, row={row}");
+                assert_eq!(actual.z, expected.z, "width={width}, row={row}");
+                assert_eq!(actual.phase, expected.phase, "width={width}, row={row}");
+            }
+        }
+    }
 
     #[test]
     fn near_clifford_row_products_match_legacy_phases_and_wide_rows() {

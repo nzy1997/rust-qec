@@ -69,6 +69,15 @@ jobs:
           python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-entangled-2026-10-03.json --git-sources
           python3 benchmarks/near_clifford/row_ops/test_contract.py
           python3 -O benchmarks/near_clifford/row_ops/test_contract.py
+      - name: Check near-Clifford Pauli-product evidence
+        run: |
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-scale-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-entangled-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/pauli_products/verify.py benchmarks/near_clifford/results/apple-m4-pauli-support-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/pauli_products/test_contract.py
+          python3 -O benchmarks/near_clifford/pauli_products/test_contract.py
+          python3 benchmarks/near_clifford/pauli_products/test_report.py
+          python3 -O benchmarks/near_clifford/pauli_products/test_report.py
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner
