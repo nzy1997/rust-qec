@@ -35,8 +35,11 @@ builds. Verification checks exact source/overlay/oracle hashes, binary hashes,
 full semantic payload equality, RNG continuation, historical circuit identity,
 raw medians, alternating pair order and cache counters/budgets. If a source commit
 is unavailable in a clone after squash merging, `--git-sources` accepts a selected
-source input only when its bound hash matches that exact file in HEAD; a present
-source commit is always checked directly. This does not reproduce historical timing.
+source input only when its bound hash matches that exact path in HEAD or its
+ancestry. A present source commit is always checked directly, including requiring
+the path to exist. Unrelated branches and working-tree bytes cannot substitute.
+This verifies selected-file identity, not the unavailable original commit's full
+build tree, and does not reproduce historical timing.
 
 The entangled dense-oracle coverage remains 14 exact-width and 14 reduced family
 witnesses, with 2,682 conditional-probability comparisons per revision. Reduced
