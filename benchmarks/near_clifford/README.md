@@ -68,3 +68,7 @@ wide-workload profiles identify independent-measurement absorption/tableau work.
 The [tableau row-operation campaign](results/apple-m4-row-ops-analysis-2026-10-03.md)
 retains paired 43-case scale and 28-case entangled evidence after #770; its
 [new entry and verifier](row_ops/README.md) explicitly bind the changed tableau source.
+
+The [Pauli reconstruction follow-up](results/apple-m4-pauli-analysis-2026-10-03.md)
+repeats both matrices after #771 and adds [14 sparse/dense full-width GHZ controls](pauli_products/README.md)
+with untimed row-work counters and independent conditional Born checks.

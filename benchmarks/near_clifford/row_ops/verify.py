@@ -24,14 +24,24 @@ def sha(path):
 
 
 def source_bytes(revision, path, expected):
-    # A squash merge can remove the original implementation commit from a
-    # fresh clone. Accept HEAD only when this exact bound input is identical.
+    # Squash merging can remove a measured commit. Verify selected input
+    # identity against exact bytes in HEAD ancestry, not other branches or
+    # working-tree files. This does not prove the lost original commit/tree.
     result = subprocess.run(['git', 'show', revision + ':' + path], cwd=ROOT, capture_output=True)
     if result.returncode == 0:
+        require(hashlib.sha256(result.stdout).hexdigest() == expected, 'git source differs: ' + path)
         return result.stdout
-    current = subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=ROOT)
-    require(hashlib.sha256(current).hexdigest() == expected, 'unavailable source is not HEAD-equivalent: ' + path)
-    return current
+    present = subprocess.run(['git', 'cat-file', '-e', revision + '^{commit}'], cwd=ROOT, capture_output=True)
+    require(present.returncode != 0, 'available source is missing selected input: ' + path)
+    current = subprocess.run(['git', 'show', 'HEAD:' + path], cwd=ROOT, capture_output=True)
+    if current.returncode == 0 and hashlib.sha256(current.stdout).hexdigest() == expected:
+        return current.stdout
+    history = subprocess.check_output(['git', 'log', '--full-history', '--format=%H', 'HEAD', '--', path], cwd=ROOT, text=True)
+    for ancestor in history.splitlines():
+        raw = subprocess.run(['git', 'show', ancestor + ':' + path], cwd=ROOT, capture_output=True)
+        if raw.returncode == 0 and hashlib.sha256(raw.stdout).hexdigest() == expected:
+            return raw.stdout
+    raise ValueError('unavailable source has no exact input in HEAD ancestry: ' + path)
 
 
 def load(path, name):
