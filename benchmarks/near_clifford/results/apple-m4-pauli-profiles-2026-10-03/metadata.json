@@ -1,0 +1,32 @@
+{
+  "revision": "2538142f96c9009795aa1f1348ba45f3a16b4fc0",
+  "binary_sha256": "6473adc5832f153cedc747385b0a69c47b4630e757d326d7388de822ca379c15",
+  "driver_sha256": "0457a839ef800d5274dd7d944a16d7b16146c333e40ca7adb1a3b56d7a5ce59c",
+  "lock_sha256": "3385e80505450660611d94e7978453b9ad079cf81719dda9b11d598e7f591b99",
+  "build": "cargo build --release --locked; release.debug=1; RUSTFLAGS=-Cforce-frame-pointers=yes",
+  "sample_command": "sample PID 8 1 -file OUTPUT",
+  "cases": [
+    {
+      "fixture": "brick_16_16_3",
+      "circuit_sha256": "2703477fcdf0fd05cfb2058910e7dcf072f701e4ab707e77f3eb1b01064a30de",
+      "profile_sha256": "d891d98b5753cddc7ff6236c2fbd0a784d1020ff0dcf04e0a1f30e4e0a256b87",
+      "output": "batches=1039 shots_per_batch=64 elapsed_s=12.009"
+    },
+    {
+      "fixture": "parity_12_129_3",
+      "circuit_sha256": "a468819a6477ddfeb312e916060ae3e321a8118460cd65657d5f2db4f70cdfb7",
+      "profile_sha256": "946dce4c8ed8cab497922510ec80eec5cb6270f4b3378a52c22bcd63b00cca4a",
+      "output": "batches=395 shots_per_batch=64 elapsed_s=12.005"
+    },
+    {
+      "fixture": "rounds_8_129_4",
+      "circuit_sha256": "a1567afb199d2ffecf28f557a1c88bdf21d16f46777483699d8ec2a5b68453a6",
+      "profile_sha256": "a112d2b1d3029d37ecc7c7bc3600b22ade1af6ea7e0f0cae5388081e3073578a",
+      "output": "batches=197 shots_per_batch=64 elapsed_s=12.009"
+    }
+  ],
+  "entry_sha256": "4b08d92b13ce668998851be58060b7b4a04ff281c2adc2bd2066a14640b93f39",
+  "row_ops_entry_sha256": "19068edf5d9a36efe06244646b882ae9a79b97726af86878cdcd1fe0acfe581f",
+  "near_clifford_source_sha256": "38c6405e0a6f5a4339984e41bfe0f9d56804679b2de642fbb9de3e2f9e52334c",
+  "tableau_source_sha256": "e0961b88c8f2fc0dd9518c7388011f10a5a883225cd6622359d5e1d5853005fa"
+}

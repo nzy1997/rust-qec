@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 import hashlib
 import subprocess
+import tempfile
 from verify import verify, source_bytes, ROOT
 
 BASE = Path(__file__).resolve().parent.parent
@@ -80,7 +81,7 @@ class EvidenceContract(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'invalid measurement/detector bits'):
             verify(changed)
 
-    def test_missing_squashed_source_requires_exact_head_equivalence(self):
+    def test_missing_squashed_source_requires_exact_ancestry_equivalence(self):
         path = 'rstim/src/sim/tableau.rs'
         raw = subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=ROOT)
         expected = hashlib.sha256(raw).hexdigest()
@@ -91,8 +92,44 @@ class EvidenceContract(unittest.TestCase):
             return real_run(cmd, *args, **kwargs)
         with mock.patch('verify.subprocess.run', side_effect=missing_selected):
             self.assertEqual(source_bytes('missing', path, expected), raw)
-            with self.assertRaisesRegex(ValueError, 'not HEAD-equivalent'):
+            with self.assertRaisesRegex(ValueError, 'no exact input in HEAD ancestry'):
                 source_bytes('missing', path, '0' * 64)
+
+    def test_source_fallback_excludes_other_paths_branches_and_available_commits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.DEVNULL, text=True).strip()
+            def commit(text):
+                (root/'selected.rs').write_text(text)
+                git('add', '.')
+                git('commit', '-qm', 'fixture')
+                return git('rev-parse', 'HEAD')
+            git('init', '-q')
+            git('config', 'user.email', 'fixture@example.invalid')
+            git('config', 'user.name', 'Fixture')
+            old = commit('old bytes')
+            current = commit('current bytes')
+            git('checkout', '-qb', 'unrelated')
+            commit('other branch bytes')
+            git('checkout', '-q', current)
+            (root/'other.rs').write_text('other path bytes')
+            git('add', '.')
+            git('commit', '-qm', 'other path')
+            digest = lambda text: hashlib.sha256(text.encode()).hexdigest()
+            with mock.patch('verify.ROOT', root):
+                self.assertEqual(source_bytes('missing', 'selected.rs', digest('current bytes')), b'current bytes')
+                self.assertEqual(source_bytes('missing', 'selected.rs', digest('old bytes')), b'old bytes')
+                for text in ['other branch bytes', 'other path bytes', 'absent bytes']:
+                    with self.assertRaisesRegex(ValueError, 'no exact input'):
+                        source_bytes('missing', 'selected.rs', digest(text))
+                with self.assertRaisesRegex(ValueError, 'git source differs'):
+                    source_bytes(current, 'selected.rs', digest('old bytes'))
+                with self.assertRaisesRegex(ValueError, 'missing selected input'):
+                    source_bytes(old, 'other.rs', digest('other path bytes'))
+                with mock.patch('verify.subprocess.check_output', side_effect=subprocess.CalledProcessError(128, 'git log')):
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        source_bytes('missing', 'selected.rs', digest('old bytes'))
 
     def test_unknown_counters_and_unsafe_cache_are_rejected(self):
         self.rejects(lambda r: r.update(counter_names=['invalid'] * 8))
