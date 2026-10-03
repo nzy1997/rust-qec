@@ -64,3 +64,7 @@ The [28-case entangled workload campaign](results/apple-m4-entangled-analysis-20
 extends validation to multilayer entanglement, long-range parity and repeated
 measurement/reset/feedback. Reduced independent dense-oracle coverage is explicit;
 wide-workload profiles identify independent-measurement absorption/tableau work.
+
+The [tableau row-operation campaign](results/apple-m4-row-ops-analysis-2026-10-03.md)
+retains paired 43-case scale and 28-case entangled evidence after #770; its
+[new entry and verifier](row_ops/README.md) explicitly bind the changed tableau source.
