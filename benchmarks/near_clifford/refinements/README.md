@@ -12,7 +12,8 @@ python3 benchmarks/near_clifford/refinements/verify.py /absolute/fresh/drafts/ca
 
 Use `--only rank_11 rank_12 rank_16 brick_12_12_3 brick_16_16_3` for a targeted
 campaign; all shot counts for each selected fixture are retained. Selected
-matrices are recorded explicitly. Every measured case has three alternating
+matrices are recorded explicitly. The verifier requires `--allow-subset` for
+these campaigns and reports them as targeted; its default requires all 87 cases. Every measured case has three alternating
 process pairs and three repetitions; paired ranges are not confidence intervals.
 
 Pristine timing builds use the pinned unified lock with instrumentation disabled.
@@ -25,7 +26,9 @@ and optional profiling stay outside measurement windows.
 
 Results bind the entry, generated driver, historic timing driver, circuits,
 fixture generator, dense oracle overlay, dependency lock, production sources and
-all four binaries. The verifier rejects missing/reordered cases, altered medians,
+all four binaries. Git archive inventories bind every archived source file;
+on-disk checks also cover the complete harness, including its manifest, lock,
+fixture files and oracle overlay. The verifier rejects missing/reordered cases, altered medians,
 semantic disagreements and invalid cache reservations. It uses explicit exceptions
 and remains active with `python3 -O`.
 
