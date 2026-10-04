@@ -3339,7 +3339,6 @@ mod tests {
                     ActiveState::new(n, 2)
                 };
                 // Spread physical Y and signed rows over the full width,
-                // including rows whose Y counts wrap the legacy u8 count.
                 for q in 0..n {
                     state.apply_clifford(CliffordGate::S(q)).unwrap();
                     state.apply_clifford(CliffordGate::Y(q)).unwrap();
@@ -3418,6 +3417,15 @@ mod tests {
                 state.apply_clifford(CliffordGate::S(q)).unwrap();
             }
             state.apply_clifford(CliffordGate::Z(0)).unwrap();
+            let snapshot = state.frame_snapshot();
+            assert_eq!(
+                snapshot.x[0]
+                    .iter()
+                    .zip(&snapshot.z[0])
+                    .filter(|(x, z)| **x && **z)
+                    .count(),
+                n
+            );
             for mask in 0..1usize << n.min(4) {
                 let mut actual = state.clone();
                 for q in 0..n.min(4) {
