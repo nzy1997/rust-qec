@@ -144,3 +144,19 @@ the test checks every stabilizer generator against its witness before terms
 are coherently summed. A tableau without an amplitude phase for each weighted
 term is insufficient as a coherent oracle: the phase omitted by a single
 stabilizer state becomes a relative phase when terms are added.
+
+
+## Terminal measurement cache
+
+Prepared samplers retain at most 1024 measurement-tree nodes, with a depth limit
+of 16 and a conservative 64 MiB reservation per sampler. Each node reserves
+its coefficient capacity, a distinct frame, coordinate storage, and possible
+measurement and symbolic-suffix data. A mandatory prepared root can itself
+exceed this reservation; in that case optional caching is disabled. This is a
+cache allocation estimate, not a bound on total process RSS or transient state
+copies.
+
+Above 2048 coefficients, cached children must reduce the coefficient vector.
+This permits repeated high-rank projections without retaining large unchanged
+states for independent measurements. Reaching any cache limit falls back to
+ordinary sampling with the same measurement records and RNG continuation.

@@ -123,6 +123,29 @@ impl StabilizerState {
         self.right_h(b);
     }
 
+    /// Single-pass physical gates for the near-Clifford frame. Keep the
+    /// composed public gates below as independent differential references.
+    pub(crate) fn s_dag_near_clifford(&mut self, q: usize) {
+        for ((x, z), phase) in self.x.iter().zip(&mut self.z).zip(&mut self.phase) {
+            *phase = (*phase + 2 * u8::from(x[q] && !z[q])) & 3;
+            z[q] ^= x[q];
+        }
+    }
+
+    pub(crate) fn y_near_clifford(&mut self, q: usize) {
+        for ((x, z), phase) in self.x.iter().zip(&self.z).zip(&mut self.phase) {
+            *phase = (*phase + 2 * u8::from(x[q] ^ z[q])) & 3;
+        }
+    }
+
+    pub(crate) fn cz_near_clifford(&mut self, a: usize, b: usize) {
+        for ((x, z), phase) in self.x.iter().zip(&mut self.z).zip(&mut self.phase) {
+            *phase = (*phase + 2 * u8::from(x[a] && x[b] && (z[a] ^ z[b]))) & 3;
+            z[a] ^= x[b];
+            z[b] ^= x[a];
+        }
+    }
+
     /// Apply a sampled branch without drawing from the caller's RNG. The
     /// original measure_z below stays byte-for-byte pinned as a legacy oracle.
     pub(crate) fn measure_z_with_forced_random_outcome(
@@ -601,3 +624,80 @@ mod tests {
         assert_eq!(mul_pauli(false, true, true, false), (true, true, 1));
     }
 }
+// BEGIN near-clifford tableau tests
+
+#[cfg(test)]
+mod near_clifford_physical_gate_tests {
+    use super::StabilizerState;
+
+    #[test]
+    fn near_clifford_physical_gates_preserve_every_signed_local_pauli() {
+        for left in 0..4 {
+            for right in 0..4 {
+                for phase in 0..4 {
+                    let mut base = StabilizerState::new(2);
+                    for row in 0..4 {
+                        base.x[row] = vec![left & 1 != 0, right & 1 != 0];
+                        base.z[row] = vec![left & 2 != 0, right & 2 != 0];
+                        base.phase[row] = phase;
+                    }
+                    for reverse in [false, true] {
+                        let (a, b) = if reverse { (1, 0) } else { (0, 1) };
+                        for gate in 0..3 {
+                            let mut actual = base.clone();
+                            let mut expected = base.clone();
+                            match gate {
+                                0 => {
+                                    actual.s_dag_near_clifford(a);
+                                    expected.s_dag(a);
+                                }
+                                1 => {
+                                    actual.y_near_clifford(a);
+                                    expected.y_gate(a);
+                                }
+                                _ => {
+                                    actual.cz_near_clifford(a, b);
+                                    expected.cz(a, b);
+                                }
+                            }
+                            assert_eq!(
+                                actual.canonical_snapshot(),
+                                expected.canonical_snapshot(),
+                                "left={left} right={right} phase={phase} gate={gate} reverse={reverse}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn near_clifford_physical_gates_preserve_wide_frame_chains() {
+        for width in [3, 63, 64, 65, 127, 128, 129, 193, 4096] {
+            let mut actual = StabilizerState::new(width);
+            for q in 0..width {
+                actual.h(q);
+                if q % 2 == 0 {
+                    actual.s(q);
+                }
+                if q > 0 {
+                    actual.cx(q - 1, q);
+                }
+            }
+            let mut expected = actual.clone();
+            for step in 0..12 {
+                let a = step % width;
+                let b = (a + width - 1) % width;
+                actual.cz_near_clifford(a, b);
+                expected.cz(a, b);
+                actual.s_dag_near_clifford(b);
+                expected.s_dag(b);
+                actual.y_near_clifford(a);
+                expected.y_gate(a);
+                assert_eq!(actual.canonical_snapshot(), expected.canonical_snapshot());
+            }
+        }
+    }
+}
+// END near-clifford tableau tests
