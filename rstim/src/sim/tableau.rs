@@ -101,6 +101,10 @@ impl StabilizerState {
     }
 
     // Right composition changes the virtual basis, not the physical state.
+    pub(crate) fn right_x(&mut self, q: usize) {
+        self.phase[self.n + q] = (self.phase[self.n + q] + 2) & 3;
+    }
+
     pub(crate) fn right_h(&mut self, q: usize) {
         self.x.swap(q, self.n + q);
         self.z.swap(q, self.n + q);
