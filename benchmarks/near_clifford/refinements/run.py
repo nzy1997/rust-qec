@@ -8,6 +8,7 @@ from pathlib import Path
 import statistics
 import subprocess
 import sys
+import tarfile
 
 HERE = Path(__file__).resolve().parent
 BASE = HERE.parent
@@ -63,11 +64,11 @@ def driver():
         '        }',
         '        println!(',
     ]), 1)
-    verification = verification.replace('"continuation":rng.next_u64()', '"continuation":continuation,"physics":physics')
+    verification = verification.replace('"continuation":rng.next_u64()', '"continuation":continuation,"physics":physics,"circuit":text')
     raw = raw[:begin] + verification + raw[end:]
     anchor = '"counters":rstim::near_clifford::benchmark_counters()'
     if raw.count(anchor) != 1: raise ValueError('nonunique driver anchor')
-    return raw.replace(anchor, anchor + ',"cache_reservation":rstim::near_clifford::benchmark_cache_reservation()', 1)
+    return raw.replace(anchor, anchor + ',"cache_reservation":sampler.benchmark_cache_reservation()', 1)
 
 def instrument(raw):
     old = load(BASE / 'scale/run.py', 'refinement_overlay_inputs')
@@ -84,6 +85,56 @@ impl NearCliffordSampler<'_> {
     pub fn benchmark_cache_reservation(&self) -> Option<[usize; 4]> { ''' + body + ''' }
 }
 '''
+
+def inventory_digest(entries):
+    return hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest()
+
+def disk_inventory(folder):
+    entries = {}
+    for path in sorted(folder.rglob('*')):
+        name = str(path.relative_to(folder))
+        if path.is_symlink(): entries[name] = {'link': os.readlink(path)}
+        elif path.is_file(): entries[name] = {'sha256': sha(path), 'executable': bool(path.stat().st_mode & 0o111)}
+    return entries
+
+def archive_inventory(revision, diagnostic=False):
+    entries = {}
+    archive = subprocess.Popen(['git', 'archive', revision], cwd=ROOT, stdout=subprocess.PIPE)
+    with tarfile.open(fileobj=archive.stdout, mode='r|') as stream:
+        for member in stream:
+            if member.issym(): entries[member.name] = {'link': member.linkname}
+            elif member.isfile():
+                data = stream.extractfile(member).read()
+                if diagnostic and member.name == 'rstim/src/near_clifford.rs':
+                    data = instrument(data.decode().strip() + '\n').encode()
+                entries[member.name] = {'sha256': hashlib.sha256(data).hexdigest(), 'executable': bool(member.mode & 0o111)}
+            elif not member.isdir(): raise ValueError('unsupported archive input: ' + member.name)
+    archive.stdout.close()
+    if archive.wait(): raise ValueError('git archive failed')
+    return entries
+
+def harness_inputs(folder, oracle):
+    # Exact scale build manifest; the source path is the only varying field.
+    manifest = '''[package]
+name = "near-clifford-scale"
+version = "0.1.0"
+edition = "2024"
+[workspace]
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(diagnostics)'] }
+[[bin]]
+name = "near-clifford-scale"
+path = "main.rs"
+[dependencies]
+rand = "=0.8.7"
+serde_json = "1"
+libc = "0.2"
+''' + f'rstim = {{ path = "{folder.parent}/source/rstim" }}\n'
+    data = {'main.rs': driver().encode(), 'fixtures.rs': (BASE / 'entangled/fixtures.rs').read_bytes(),
+            'oracle.rs': oracle, 'Cargo.lock': (BASE / 'scale/Cargo.unified.lock').read_bytes(),
+            'Cargo.toml': manifest.encode()}
+    data.update({'fixtures/' + p.name: p.read_bytes() for p in (BASE / 'scale/fixtures').iterdir()})
+    return {name: {'sha256': hashlib.sha256(raw).hexdigest(), 'executable': False} for name, raw in data.items()}
 
 def report(result):
     lines = ['# Near-Clifford refinement campaign', '',
@@ -146,6 +197,11 @@ def main():
             env = {k: v for k, v in os.environ.items() if k not in ['RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS']}
             env.update(CARGO_TARGET_DIR=str(scratch / 'target'), RUSTFLAGS='')
             subprocess.run(['cargo', 'test', '--release', '--locked'], cwd=directory, env=env, check=True)
+        actual_source = disk_inventory(directory.parent / 'source')
+        if actual_source != archive_inventory(revision, diagnostic): raise ValueError('build changed archived inputs')
+        if disk_inventory(directory) != harness_inputs(directory, ent.adapt_oracle(oracle)): raise ValueError('build changed harness inputs')
+        metadata['source_inventory_sha256'] = inventory_digest(actual_source)
+        metadata['harness_inventory_sha256'] = inventory_digest(disk_inventory(directory))
         return binary, metadata
     campaign.build = bound_build
     payloads = {}
@@ -162,6 +218,7 @@ def main():
         result['entry_sha256'] = sha(Path(__file__))
         result['verification_results'] = payloads
         result['selected_matrix'] = cases
+        result['selection_names'] = args.only
         result['input_hashes'] = {str(path.relative_to(ROOT)): sha(path) for path in [
             BASE / 'scale/run.py', BASE / 'scale/main.rs', BASE / 'scale/Cargo.unified.lock',
             BASE / 'entangled/run.py', BASE / 'entangled/fixtures.rs']}
