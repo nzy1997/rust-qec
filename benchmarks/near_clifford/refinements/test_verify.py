@@ -118,7 +118,7 @@ class EvidenceTests(unittest.TestCase):
     def test_relative_binary_directory_and_resealed_lock_tampering(self):
         result = corpus()
         with tempfile.TemporaryDirectory() as temporary:
-            scratch = Path(temporary)
+            scratch = Path(temporary).resolve()
             for label, source in result['sources'].items():
                 for suffix, metadata in [('', source), ('-diagnostic', source['diagnostic'])]:
                     folder = scratch / (label + suffix)
