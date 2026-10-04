@@ -19,6 +19,7 @@ def require(condition, message):
     if not condition: raise ValueError(message)
 
 def verify(result, scratch=None, git_sources=False, allow_subset=False):
+    if scratch is not None: scratch = scratch.resolve()
     require(result.get('schema') == 'near-clifford.refinements.v1', 'wrong schema')
     require(result.get('completed_utc') and not result.get('quick'), 'incomplete/smoke run')
     require(result['pairs'] == result['repetitions'] == 3, 'wrong repeat counts')
