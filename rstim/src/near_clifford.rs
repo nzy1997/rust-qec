@@ -823,27 +823,18 @@ impl ActiveState {
         if !self.origin.contains(&true) {
             return;
         }
-        let snapshot = self.frame.canonical_snapshot();
+        // U X_origin is the new frame. Right composition by X_q leaves
+        // every row's X/Z bits and every destabilizer sign unchanged, and
+        // flips only the corresponding stabilizer sign.
+        let frame = Arc::make_mut(&mut self.frame);
         for (q, bit) in self.origin.iter_mut().enumerate() {
             if *bit {
-                // U X_q |0> = (U X_q U†) U |0>. Apply that physical Pauli
-                // to the frame so the virtual origin returns to zero.
-                let pauli = Pauli::from_snapshot_row(&snapshot, q);
-                let y_count = pauli
-                    .x
-                    .iter()
-                    .zip(&pauli.z)
-                    .filter(|(x, z)| **x && **z)
-                    .count() as u8;
-                self.global_phase = self.global_phase * i_pow((pauli.phase + 4 - y_count % 4) % 4);
-                for (physical_q, (&x, &z)) in pauli.x.iter().zip(&pauli.z).enumerate() {
-                    match (x, z) {
-                        (true, true) => Arc::make_mut(&mut self.frame).y_gate(physical_q),
-                        (true, false) => Arc::make_mut(&mut self.frame).x_gate(physical_q),
-                        (false, true) => Arc::make_mut(&mut self.frame).z_gate(physical_q),
-                        (false, false) => {}
-                    }
-                }
+                // The former physical-Pauli path adds the row's Y count
+                // when converting to i^phase XZ and subtracts it again
+                // here. Retain its per-qubit global-phase multiplication
+                // order, including floating-point signed-zero behavior.
+                self.global_phase = self.global_phase * i_pow(frame.canonical_row(q).2);
+                frame.right_x(q);
                 *bit = false;
             }
         }
@@ -1153,6 +1144,7 @@ impl Pauli {
         }
     }
 
+    #[cfg(test)]
     fn from_snapshot_row(snapshot: &CanonicalTableauSnapshot, row: usize) -> Self {
         let y_count = snapshot.x[row]
             .iter()
@@ -3278,6 +3270,173 @@ mod tests {
             state.apply_clifford(gate).unwrap();
         }
         state
+    }
+
+    fn rebase_origin_reference(state: &mut ActiveState) {
+        if !state.origin.contains(&true) {
+            return;
+        }
+        let snapshot = state.frame.canonical_snapshot();
+        for (q, bit) in state.origin.iter_mut().enumerate() {
+            if *bit {
+                // U X_q |0> = (U X_q U†) U |0>. Apply that physical Pauli
+                // to the frame so the virtual origin returns to zero.
+                let pauli = Pauli::from_snapshot_row(&snapshot, q);
+                let y_count = pauli
+                    .x
+                    .iter()
+                    .zip(&pauli.z)
+                    .filter(|(x, z)| **x && **z)
+                    .count() as u8;
+                state.global_phase =
+                    state.global_phase * i_pow((pauli.phase + 4 - y_count % 4) % 4);
+                for (physical_q, (&x, &z)) in pauli.x.iter().zip(&pauli.z).enumerate() {
+                    match (x, z) {
+                        (true, true) => Arc::make_mut(&mut state.frame).y_gate(physical_q),
+                        (true, false) => Arc::make_mut(&mut state.frame).x_gate(physical_q),
+                        (false, true) => Arc::make_mut(&mut state.frame).z_gate(physical_q),
+                        (false, false) => {}
+                    }
+                }
+                *bit = false;
+            }
+        }
+    }
+
+    fn assert_same_rebased_state(actual: &ActiveState, expected: &ActiveState) {
+        assert_eq!(actual.frame_snapshot(), expected.frame_snapshot());
+        assert_eq!(actual.origin, expected.origin);
+        assert_eq!(actual.axes, expected.axes);
+        assert_eq!(actual.axes_are_canonical, expected.axes_are_canonical);
+        assert_eq!(actual.num_qubits, expected.num_qubits);
+        assert_eq!(actual.max_active_qubits, expected.max_active_qubits);
+        let bits = |a: ComplexAmp| (a.re.to_bits(), a.im.to_bits());
+        assert_eq!(bits(actual.global_phase), bits(expected.global_phase));
+        assert_eq!(
+            actual
+                .coefficients
+                .iter()
+                .copied()
+                .map(bits)
+                .collect::<Vec<_>>(),
+            expected
+                .coefficients
+                .iter()
+                .copied()
+                .map(bits)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn origin_rebasing_matches_physical_paulis_on_signed_entangled_frames() {
+        let mut rng = StdRng::seed_from_u64(20261005);
+        for n in [0, 1, 3, 8, 63, 64, 65, 127, 128, 129, 193] {
+            for variant in 0..4 {
+                let mut state = if n >= 3 {
+                    dense_coordinate_state(n, &mut rng)
+                } else {
+                    ActiveState::new(n, 2)
+                };
+                // Spread physical Y and signed rows over the full width,
+                for q in 0..n {
+                    state.apply_clifford(CliffordGate::S(q)).unwrap();
+                    state.apply_clifford(CliffordGate::Y(q)).unwrap();
+                    if n > 1 {
+                        state
+                            .apply_clifford(CliffordGate::CX(q, (q + 1) % n))
+                            .unwrap();
+                    }
+                }
+                state.origin = (0..n)
+                    .map(|q| match variant {
+                        0 => false,
+                        1 => q == 0 || q == n - 1,
+                        2 => true,
+                        _ => rng.r#gen(),
+                    })
+                    .collect();
+                state.global_phase = match variant {
+                    0 => ComplexAmp::new(-0.0, 0.0),
+                    1 => ComplexAmp::new(0.0, -0.0),
+                    2 => ComplexAmp::new(-0.3, 0.4),
+                    _ => ComplexAmp::new(0.6, -0.8),
+                };
+                for shared in [false, true] {
+                    let mut actual = state.clone();
+                    let mut expected = state.clone();
+                    actual.frame = Arc::new((*actual.frame).clone());
+                    let fork = shared.then(|| actual.clone());
+                    let pointer = Arc::as_ptr(&actual.frame);
+                    actual.rebase_origin_into_frame();
+                    rebase_origin_reference(&mut expected);
+                    assert_same_rebased_state(&actual, &expected);
+                    if !state.origin.contains(&true) {
+                        assert_eq!(pointer, Arc::as_ptr(&actual.frame));
+                    }
+                    if let Some(fork) = fork {
+                        assert_same_rebased_state(&fork, &state);
+                        if state.origin.contains(&true) {
+                            assert!(!Arc::ptr_eq(&actual.frame, &fork.frame));
+                        }
+                    }
+                    actual.rebase_origin_into_frame();
+                    assert_same_rebased_state(&actual, &expected);
+                    if n > 0 && variant == 3 {
+                        let mut a = StdRng::seed_from_u64(711);
+                        let mut b = StdRng::seed_from_u64(711);
+                        for basis in [
+                            MeasurementBasis::X,
+                            MeasurementBasis::Y,
+                            MeasurementBasis::Z,
+                        ] {
+                            assert_eq!(
+                                actual.measure(n - 1, basis, &mut a),
+                                expected.measure(n - 1, basis, &mut b)
+                            );
+                            actual.t(0).unwrap();
+                            expected.t(0).unwrap();
+                            assert_same_rebased_state(&actual, &expected);
+                        }
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn origin_rebasing_preserves_all_small_bit_strings_and_large_y_counts() {
+        for n in [1, 2, 3, 4, 257] {
+            let mut state = ActiveState::new(n, 4);
+            // U maps X_0 to a Y string; n=257 crosses the old u8 Y count.
+            for q in 1..n {
+                state.apply_clifford(CliffordGate::CX(0, q)).unwrap();
+            }
+            for q in 0..n {
+                state.apply_clifford(CliffordGate::S(q)).unwrap();
+            }
+            state.apply_clifford(CliffordGate::Z(0)).unwrap();
+            let snapshot = state.frame_snapshot();
+            assert_eq!(
+                snapshot.x[0]
+                    .iter()
+                    .zip(&snapshot.z[0])
+                    .filter(|(x, z)| **x && **z)
+                    .count(),
+                n
+            );
+            for mask in 0..1usize << n.min(4) {
+                let mut actual = state.clone();
+                for q in 0..n.min(4) {
+                    actual.origin[q] = mask & (1 << q) != 0;
+                }
+                let mut expected = actual.clone();
+                actual.rebase_origin_into_frame();
+                rebase_origin_reference(&mut expected);
+                assert_same_rebased_state(&actual, &expected);
+            }
+        }
     }
 
     fn previous_pauli_probability(state: &ActiveState, pauli: &Pauli, mask: usize) -> f64 {

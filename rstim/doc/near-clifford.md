@@ -134,7 +134,11 @@ not find a globally minimal active basis.
 
 After measurement, an axis with one zero-amplitude half is removed. Its fixed
 virtual bit is retained in the `origin` coordinate, so later gates see the
-correct Pauli sign. Other measurements can leave a non-minimal active basis;
+correct Pauli sign. When rebasing that origin into the frame, right composition
+by the selected virtual X operators flips the corresponding stabilizer signs;
+the row bits and destabilizer signs stay unchanged. This avoids a full tableau
+snapshot and physical-Pauli sweeps. The global-phase multiplications retain their
+previous per-qubit order. Other measurements can leave a non-minimal active basis;
 the configured rank limit still applies and reports an error if exceeded.
 
 Small-qubit tests use an independent dense state-vector simulator and an
