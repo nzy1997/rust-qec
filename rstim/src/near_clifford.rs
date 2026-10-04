@@ -1758,6 +1758,7 @@ struct CachedTerminalSampler {
     cached_nodes: usize,
     max_cached_nodes: usize,
     cached_depth: usize,
+    reserved_cache_bytes: usize,
 }
 
 impl CachedTerminalSampler {
@@ -1767,11 +1768,13 @@ impl CachedTerminalSampler {
         max_cached_nodes: usize,
     ) -> Self {
         debug_assert!(max_cached_nodes > 0);
+        let reserved_cache_bytes = terminal_cache_state_bytes(&prepared, targets.len());
         Self {
             root: TerminalMeasurementNode::new(prepared),
             cached_nodes: 1,
             max_cached_nodes,
             cached_depth: targets.len().min(16),
+            reserved_cache_bytes,
         }
     }
 }
@@ -1957,24 +1960,56 @@ impl TerminalMeasurementNode {
     }
 }
 
+// Above this size, retain only branches that reduce the coefficient vector.
+// Independent measurements otherwise build wide trees of unchanged dense states.
 const MAX_CACHED_COEFFICIENTS: usize = 2048;
+const MAX_CACHE_BYTES: usize = 64 * 1024 * 1024;
 
-fn terminal_cache_node_limit(num_qubits: usize, target_count: usize) -> usize {
-    const MAX_CACHE_BYTES: usize = 64 * 1024 * 1024;
+fn terminal_cache_node_bytes(
+    num_qubits: usize,
+    target_count: usize,
+    coefficient_capacity: usize,
+) -> usize {
     // Independent Pauli branches can each own a distinct frame. Account for
     // both 2n-row Boolean matrices, their row headers, the largest accepted
     // coefficient vector, and a wide symbolic suffix at each cached node.
     let wide_words = target_count.div_ceil(64);
     let symbolic_step_bytes = std::mem::size_of::<SymbolicMeasurement<Vec<u64>>>()
         .saturating_add(wide_words.saturating_mul(std::mem::size_of::<u64>()));
-    let worst_case_bytes = num_qubits
+    num_qubits
         .saturating_mul(num_qubits)
         .saturating_mul(4)
         .saturating_add(num_qubits.saturating_mul(256))
-        .saturating_add(MAX_CACHED_COEFFICIENTS.saturating_mul(std::mem::size_of::<ComplexAmp>()))
+        .saturating_add(coefficient_capacity.saturating_mul(std::mem::size_of::<ComplexAmp>()))
         .saturating_add(target_count.saturating_mul(symbolic_step_bytes))
-        .saturating_add(std::mem::size_of::<TerminalMeasurementNode>());
-    (MAX_CACHE_BYTES / worst_case_bytes).clamp(1, 1024)
+        .saturating_add(std::mem::size_of::<TerminalMeasurementNode>())
+}
+
+fn terminal_cache_node_limit(num_qubits: usize, target_count: usize) -> usize {
+    // Preserve the low-rank node ceiling independently of high-rank admission.
+    (MAX_CACHE_BYTES / terminal_cache_node_bytes(num_qubits, target_count, MAX_CACHED_COEFFICIENTS))
+        .clamp(1, 1024)
+}
+
+fn terminal_cache_state_bytes(state: &ActiveState, target_count: usize) -> usize {
+    // Charge a distinct frame at every node, even when its Arc is shared.
+    // The reservation includes a future measurement and symbolic suffix.
+    // Extra axis/origin capacity is charged explicitly; allocator bookkeeping
+    // and tableau row headers fit inside the conservative per-qubit allowance.
+    let axes_bytes = state.axes.iter().fold(
+        state
+            .axes
+            .capacity()
+            .saturating_mul(std::mem::size_of::<Vec<bool>>()),
+        |sum, axis| sum.saturating_add(axis.capacity()),
+    );
+    terminal_cache_node_bytes(
+        state.num_qubits,
+        target_count,
+        state.coefficients.capacity(),
+    )
+    .saturating_add(axes_bytes)
+    .saturating_add(state.origin.capacity())
 }
 
 impl CachedTerminalSampler {
@@ -2043,8 +2078,9 @@ impl CachedTerminalSampler {
         let mut node = &mut self.root;
         let mut depth = 0;
         let mut uncached_state = None;
-        while depth < self.cached_depth && node.state.coefficients.len() <= MAX_CACHED_COEFFICIENTS
-        {
+        // The mandatory root can itself exceed the budget (e.g. a very wide
+        // frame). In that case retain no optional measurements or children.
+        while depth < self.cached_depth && self.reserved_cache_bytes <= MAX_CACHE_BYTES {
             if node.state.axes.is_empty() {
                 if node.symbolic_suffix.is_none() {
                     node.symbolic_suffix = Some(CliffordSuffixPlan::from_state(
@@ -2119,8 +2155,12 @@ impl CachedTerminalSampler {
                     }
                 }
                 state.retire_fixed_axes();
+                let child_bytes = terminal_cache_state_bytes(&state, targets.len() - depth - 1);
+                let retains_large_state = state.coefficients.len() > MAX_CACHED_COEFFICIENTS
+                    && state.coefficients.len() >= node.state.coefficients.len();
                 if self.cached_nodes == self.max_cached_nodes
-                    || state.coefficients.len() > MAX_CACHED_COEFFICIENTS
+                    || retains_large_state
+                    || child_bytes > MAX_CACHE_BYTES.saturating_sub(self.reserved_cache_bytes)
                 {
                     push(outcome ^ inverted);
                     depth += 1;
@@ -2129,6 +2169,7 @@ impl CachedTerminalSampler {
                 }
                 node.children[branch] = Some(Box::new(TerminalMeasurementNode::new(state)));
                 self.cached_nodes += 1;
+                self.reserved_cache_bytes += child_bytes;
             }
             push(outcome ^ inverted);
             node = node.children[branch].as_mut().unwrap();
@@ -2885,6 +2926,79 @@ mod tests {
         assert_eq!(terminal_cache_node_limit(4096, 20), 1);
         assert!(terminal_cache_node_limit(512, 20) < 1024);
         assert!(terminal_cache_node_limit(20, 65_536) < 128);
+    }
+
+    #[test]
+    fn high_rank_cache_respects_byte_budget_and_falls_back_with_identical_rng() {
+        let text = (0..12)
+            .map(|q| format!("H {q}\nT {q}\n"))
+            .collect::<String>()
+            + "MX 0 1 2 3 4 5 6 7 8 9 10 11";
+        let executor = NearCliffordExecutor::compile_text(&text).unwrap();
+        let prepared = executor.prepare_sampler().unwrap().prepared;
+        let targets = (0..12)
+            .map(|q| TerminalMeasurement {
+                q,
+                basis: MeasurementBasis::X,
+                inverted: false,
+                record_index: q,
+            })
+            .collect::<Vec<_>>();
+        let mut full = CachedTerminalSampler::new(prepared.clone(), &targets, 1024);
+        let mut bounded = CachedTerminalSampler::new(prepared, &targets, 1024);
+        // Leave room for one child, then force byte-budget fallback without
+        // conflating it with the node ceiling or depth bound.
+        let mut child = bounded.root.state.clone();
+        child
+            .measure(0, MeasurementBasis::X, &mut StdRng::seed_from_u64(739))
+            .unwrap();
+        child.retire_fixed_axes();
+        let reserve = terminal_cache_state_bytes(&child, 11);
+        bounded.reserved_cache_bytes = MAX_CACHE_BYTES - reserve;
+        let mut a = StdRng::seed_from_u64(739);
+        let mut b = StdRng::seed_from_u64(739);
+        for shots in [1, 0, 64, 256] {
+            assert_eq!(
+                full.sample(&targets, shots, &mut a).unwrap(),
+                bounded.sample(&targets, shots, &mut b).unwrap()
+            );
+            assert!(bounded.reserved_cache_bytes <= MAX_CACHE_BYTES);
+        }
+        assert_eq!(a.next_u64(), b.next_u64());
+        assert!(full.cached_nodes > 2);
+        assert_eq!(bounded.cached_nodes, 2);
+    }
+
+    #[test]
+    fn high_rank_independent_branches_do_not_retain_dense_children() {
+        let text = (0..12)
+            .map(|q| format!("H {q}\nT {q}\n"))
+            .collect::<String>()
+            + "H 12\nM 12\nMX 0 1 2 3 4 5 6 7 8 9 10 11";
+        let executor = NearCliffordExecutor::compile_text(&text).unwrap();
+        let prepared = executor.prepare_sampler().unwrap().prepared;
+        // Fix the target order: the executor may legally move the independent
+        // target behind the active projections during terminal planning.
+        let targets = std::iter::once(TerminalMeasurement {
+            q: 12,
+            basis: MeasurementBasis::Z,
+            inverted: false,
+            record_index: 0,
+        })
+        .chain((0..12).map(|q| TerminalMeasurement {
+            q,
+            basis: MeasurementBasis::X,
+            inverted: false,
+            record_index: q + 1,
+        }))
+        .collect::<Vec<_>>();
+        let mut cached = CachedTerminalSampler::new(prepared, &targets, 1024);
+        let mut rng = StdRng::seed_from_u64(739);
+        cached.sample(&targets, 256, &mut rng).unwrap();
+        assert_eq!(cached.cached_nodes, 1);
+        assert!(cached.root.measurement.is_some());
+        assert!(cached.root.children.iter().all(Option::is_none));
+        assert!(cached.reserved_cache_bytes < MAX_CACHE_BYTES);
     }
 
     #[test]

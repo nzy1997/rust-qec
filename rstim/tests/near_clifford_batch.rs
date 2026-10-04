@@ -402,3 +402,69 @@ fn reordered_entangled_mixed_basis_measurements_match_dense_joint_distribution()
         assert!((count as f64 / 10_000.0 - probability).abs() < 0.025);
     }
 }
+
+#[test]
+fn high_rank_terminal_cache_preserves_entangled_batches_and_rng() {
+    let no_sweep: &[bool] = &[];
+    for rank in [11, 12, 16] {
+        let mut text = (0..rank)
+            .map(|q| format!("H {q}\n{} {q}\n", if q % 2 == 0 { "T" } else { "T_DAG" }))
+            .collect::<String>();
+        for q in 0..rank - 1 {
+            text.push_str(&format!("CZ {q} {}\n", q + 1));
+        }
+        for q in (0..rank).step_by(2) {
+            text.push_str(&format!("H {q}\n"));
+        }
+        for q in (0..rank).rev() {
+            text.push_str(&format!(
+                "{} {}{q}\n",
+                ["MX", "MY", "M"][q % 3],
+                if q % 2 == 0 { "!" } else { "" }
+            ));
+        }
+        text.push_str("DETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-3]\n");
+        let executor = NearCliffordExecutor::compile_text(&text).unwrap();
+        assert_prepared_batches_match_individual_runs(&executor, &[0, 1, 16, 256], &[no_sweep; 4]);
+        assert_flat_measurements_match_shots(&executor, &[0, 1, 16, 256], &[no_sweep; 4]);
+    }
+}
+
+#[test]
+fn high_rank_cache_preserves_wide_independent_prefix_and_mixed_output_calls() {
+    let mut text = (0..12)
+        .map(|q| format!("H {q}\nT {q}\n"))
+        .collect::<String>();
+    for q in 12..141 {
+        text.push_str(&format!("H {q}\n"));
+    }
+    for q in 12..141 {
+        text.push_str(&format!("M {q}\n"));
+    }
+    text.push_str("MX 0 1 2 3 4 5 6 7 8 9 10 11\n");
+    let executor = NearCliffordExecutor::compile_text(&text).unwrap();
+    let mut mixed = executor.prepare_sampler().unwrap();
+    let mut reference = StdRng::seed_from_u64(1439);
+    let mut rng = StdRng::seed_from_u64(1439);
+    for (index, shots) in [1, 16, 0, 256].into_iter().enumerate() {
+        let expected = (0..shots)
+            .map(|_| executor.run(&mut reference).unwrap())
+            .collect::<Vec<_>>();
+        if index % 2 == 0 {
+            assert_eq!(mixed.sample(shots, &mut rng).unwrap(), expected);
+        } else {
+            let expected = expected
+                .iter()
+                .flat_map(|s| s.measurements.iter().map(|&v| u8::from(v)))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                mixed
+                    .sample_measurements_u8(shots, &mut rng)
+                    .unwrap()
+                    .measurements,
+                expected
+            );
+        }
+    }
+    assert_eq!(rng.next_u64(), reference.next_u64());
+}
