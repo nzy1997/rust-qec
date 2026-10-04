@@ -148,6 +148,11 @@ fn assert_legacy_oracle_only_has_marked_extensions() {
         "    // BEGIN near-clifford tableau extensions\n",
         "    // END near-clifford tableau extensions\n",
     );
+    let stripped = strip_marked_extension(
+        &stripped,
+        "// BEGIN near-clifford tableau tests\n",
+        "// END near-clifford tableau tests\n",
+    );
     assert_eq!(stripped.len(), AUDITED_TABLEAU_LEN);
     assert_eq!(fnv1a64(stripped.as_bytes()), AUDITED_TABLEAU_FNV1A64);
 }
