@@ -397,7 +397,7 @@ impl ActiveState {
             let pauli = self.single_qubit_pauli(q, basis)?;
             let (mask, independent) = self.coordinate_mask(&pauli.x);
             if independent {
-                self.absorb_independent_measurement(q, basis, outcome)?;
+                self.absorb_independent_measurement(q, basis, outcome, &pauli)?;
             } else {
                 let probability_zero = self.pauli_probability_zero(&pauli, mask, false);
                 self.project_active_measurement(q, basis, &pauli, mask, outcome, probability_zero)?;
@@ -418,7 +418,7 @@ impl ActiveState {
         let probability_zero = self.pauli_probability_zero(pauli, mask, independent);
         if independent {
             let outcome = rng.r#gen::<f64>() >= probability_zero;
-            self.absorb_independent_measurement(q, basis, outcome)?;
+            self.absorb_independent_measurement(q, basis, outcome, pauli)?;
             return Ok(outcome);
         }
         let mask = self.ensure_axis_with_coordinates(&pauli.x, mask, independent)?;
@@ -605,9 +605,19 @@ impl ActiveState {
         q: usize,
         basis: MeasurementBasis,
         outcome: bool,
+        measured_pauli: &Pauli,
     ) -> Result<(), String> {
+        // Canonicalization may change the virtual basis and rebase its origin.
+        // Only reuse the caller's Pauli when both operations are no-ops.
+        let unchanged_frame = self.axes_are_canonical && !self.origin.contains(&true);
         let pivots = self.canonicalize_active_axes();
-        let pauli = self.single_qubit_pauli(q, basis)?;
+        let transformed;
+        let pauli = if unchanged_frame {
+            measured_pauli
+        } else {
+            transformed = self.single_qubit_pauli(q, basis)?;
+            &transformed
+        };
         let dormant = (0..self.num_qubits)
             .find(|&bit| pauli.x[bit] && !pivots.contains(&bit))
             .expect("independent Pauli has a dormant X pivot");
@@ -2141,7 +2151,7 @@ impl CachedTerminalSampler {
                         independent,
                     } => {
                         if *independent {
-                            state.absorb_independent_measurement(q, basis, outcome)?;
+                            state.absorb_independent_measurement(q, basis, outcome, pauli)?;
                         } else {
                             state.project_active_measurement(
                                 q,
@@ -3140,6 +3150,80 @@ mod tests {
                 assert!(sampler.cached_nodes <= max_cached_nodes);
             }
             assert_eq!(batch_rng.next_u64(), reference_rng.next_u64());
+        }
+    }
+
+    #[test]
+    fn independent_measurement_reuses_pauli_only_in_the_unchanged_frame() {
+        let mut rng = StdRng::seed_from_u64(20261004);
+        for width in [16, 65, 129, 193] {
+            for mode in 0..4 {
+                let mut state = dense_coordinate_state(width, &mut rng);
+                if mode == 1 || mode == 2 {
+                    state.canonicalize_active_axes();
+                }
+                if mode == 0 {
+                    state.origin.fill(false);
+                }
+                if mode == 2 || mode == 3 {
+                    state.origin[0] = true;
+                }
+                let mut checked = 0;
+                for q in 0..width {
+                    for basis in [
+                        MeasurementBasis::X,
+                        MeasurementBasis::Y,
+                        MeasurementBasis::Z,
+                    ] {
+                        let pauli = state.single_qubit_pauli(q, basis).unwrap();
+                        if !state.coordinate_mask(&pauli.x).1 {
+                            continue;
+                        }
+                        for outcome in [false, true] {
+                            let mut actual = state.clone();
+                            let mut expected = state.clone();
+                            // Construct the physical Pauli after any basis/origin
+                            // transformation, independently of the reuse guard.
+                            let before = expected.frame_snapshot();
+                            expected.canonicalize_active_axes();
+                            if mode == 0 {
+                                assert_ne!(
+                                    before,
+                                    expected.frame_snapshot(),
+                                    "noncanonical axes must actually change the frame"
+                                );
+                            }
+                            let transformed = expected.single_qubit_pauli(q, basis).unwrap();
+                            expected
+                                .absorb_independent_measurement(q, basis, outcome, &transformed)
+                                .unwrap();
+                            actual
+                                .absorb_independent_measurement(q, basis, outcome, &pauli)
+                                .unwrap();
+                            assert_eq!(
+                                actual.frame_snapshot(),
+                                expected.frame_snapshot(),
+                                "width={width} mode={mode} q={q} basis={basis:?}"
+                            );
+                            assert_eq!(actual.origin, expected.origin);
+                            assert_eq!(actual.axes, expected.axes);
+                            assert_eq!(actual.coefficients, expected.coefficients);
+                            assert_eq!(actual.global_phase, expected.global_phase);
+                        }
+                        checked += 1;
+                        if checked == 6 {
+                            break;
+                        }
+                    }
+                    if checked == 6 {
+                        break;
+                    }
+                }
+                assert_eq!(
+                    checked, 6,
+                    "each frame must exercise independent measurements"
+                );
+            }
         }
     }
 
