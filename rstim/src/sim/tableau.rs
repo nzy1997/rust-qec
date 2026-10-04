@@ -614,7 +614,21 @@ fn mul_pauli(x1: bool, z1: bool, x2: bool, z2: bool) -> (bool, bool, u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::{StabilizerState, mul_pauli};
+    use super::mul_pauli;
+
+    #[test]
+    fn pauli_product_tracks_xz_and_zx_phases() {
+        // (x, z) selects the canonical Pauli I/X/Z/Y, while the returned
+        // phase is the exponent of i multiplying that Pauli.
+        assert_eq!(mul_pauli(true, false, false, true), (true, true, 3));
+        assert_eq!(mul_pauli(false, true, true, false), (true, true, 1));
+    }
+}
+// BEGIN near-clifford tableau tests
+
+#[cfg(test)]
+mod near_clifford_physical_gate_tests {
+    use super::StabilizerState;
 
     #[test]
     fn near_clifford_physical_gates_preserve_every_signed_local_pauli() {
@@ -685,14 +699,5 @@ mod tests {
             }
         }
     }
-
-
-
-    #[test]
-    fn pauli_product_tracks_xz_and_zx_phases() {
-        // (x, z) selects the canonical Pauli I/X/Z/Y, while the returned
-        // phase is the exponent of i multiplying that Pauli.
-        assert_eq!(mul_pauli(true, false, false, true), (true, true, 3));
-        assert_eq!(mul_pauli(false, true, true, false), (true, true, 1));
-    }
 }
+// END near-clifford tableau tests
