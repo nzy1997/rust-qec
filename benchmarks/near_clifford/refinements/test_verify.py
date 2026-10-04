@@ -3,6 +3,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -113,6 +114,40 @@ class EvidenceTests(unittest.TestCase):
             for name, digest in expected.items():
                 self.assertEqual(set(digest), {'sha256', 'executable'}, name)
             self.assertTrue({'Cargo.lock', 'Cargo.toml', 'fixtures.rs', 'oracle.rs', 'main.rs'} <= expected.keys())
+
+    def test_relative_binary_directory_and_resealed_lock_tampering(self):
+        result = corpus()
+        with tempfile.TemporaryDirectory() as temporary:
+            scratch = Path(temporary)
+            for label, source in result['sources'].items():
+                for suffix, metadata in [('', source), ('-diagnostic', source['diagnostic'])]:
+                    folder = scratch / (label + suffix)
+                    for name, raw in {'rstim/src/near_clifford.rs': b'near', 'rstim/src/sim/tableau.rs': b'tableau'}.items():
+                        path = folder / 'source' / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(raw)
+                    harness = folder / 'harness'; harness.mkdir()
+                    inputs = run.harness_inputs(harness, b'oracle')
+                    (harness / 'main.rs').write_text(run.driver())
+                    (harness / 'fixtures.rs').write_bytes((run.BASE / 'entangled/fixtures.rs').read_bytes())
+                    (harness / 'oracle.rs').write_bytes(b'oracle')
+                    (harness / 'Cargo.lock').write_bytes((run.BASE / 'scale/Cargo.unified.lock').read_bytes())
+                    scale = (run.BASE / 'scale/run.py').read_text()
+                    # Use the actual build template, not the verifier's expected hash.
+                    start = scale.index("manifest=\'\'\'") + len("manifest=\'\'\'")
+                    end = scale.index("\'\'\'+f", start)
+                    (harness / 'Cargo.toml').write_text(scale[start:end] + f'rstim = {{ path = "{folder}/source/rstim" }}\n')
+                    for path in (run.BASE / 'scale/fixtures').iterdir():
+                        out = harness / 'fixtures' / path.name; out.parent.mkdir(exist_ok=True); out.write_bytes(path.read_bytes())
+                    binary = folder / 'near-clifford-scale'; binary.write_bytes(b'synthetic binary')
+                    metadata.update(binary_sha256=run.sha(binary), near_clifford_source_sha256=run.sha(folder/'source/rstim/src/near_clifford.rs'),
+                        tableau_source_sha256=run.sha(folder/'source/rstim/src/sim/tableau.rs'), oracle_sha256=run.sha(harness/'oracle.rs'),
+                        source_inventory_sha256=run.inventory_digest(run.disk_inventory(folder/'source')),
+                        harness_inventory_sha256=run.inventory_digest(run.disk_inventory(harness)))
+                    self.assertEqual(run.disk_inventory(harness), inputs)
+            relative = Path(os.path.relpath(scratch))
+            self.assertIn('targeted', validator.verify(result, relative, allow_subset=True))
+            lock = scratch/'candidate/harness/Cargo.lock'; lock.write_text('resealed fake dependency lock')
+            result['sources']['candidate']['harness_inventory_sha256'] = run.inventory_digest(run.disk_inventory(lock.parent))
+            with self.assertRaisesRegex(ValueError, 'harness inputs'): validator.verify(result, relative, allow_subset=True)
 
     def test_diagnostic_driver_calls_sampler_accessor(self):
         self.assertIn('sampler.benchmark_cache_reservation()', run.driver())
