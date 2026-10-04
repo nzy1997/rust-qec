@@ -158,12 +158,12 @@ impl ActiveState {
         match gate {
             H(q) => Arc::make_mut(&mut self.frame).h(q),
             S(q) => Arc::make_mut(&mut self.frame).s(q),
-            SDag(q) => Arc::make_mut(&mut self.frame).s_dag(q),
+            SDag(q) => Arc::make_mut(&mut self.frame).s_dag_near_clifford(q),
             X(q) => Arc::make_mut(&mut self.frame).x_gate(q),
-            Y(q) => Arc::make_mut(&mut self.frame).y_gate(q),
+            Y(q) => Arc::make_mut(&mut self.frame).y_near_clifford(q),
             Z(q) => Arc::make_mut(&mut self.frame).z_gate(q),
             CX(a, b) => Arc::make_mut(&mut self.frame).cx(a, b),
-            CZ(a, b) => Arc::make_mut(&mut self.frame).cz(a, b),
+            CZ(a, b) => Arc::make_mut(&mut self.frame).cz_near_clifford(a, b),
             Swap(a, b) => Arc::make_mut(&mut self.frame).swap(a, b),
         }
         Ok(())
