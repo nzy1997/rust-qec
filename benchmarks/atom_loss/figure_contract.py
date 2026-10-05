@@ -2,8 +2,8 @@
 
 Checksums alone cannot reject an incorrectly generated but coherently resealed
 figure. Regenerate in temporary storage, never overwrite the evidence being
-checked. SVG permits only one serialization unit of absolute roundoff in path
-coordinates; all other bytes are exact. PNG compression is ignored but pixels
+checked. SVG permits only one serialization unit of absolute roundoff in anonymous path
+coordinates and marker-use positions; all other bytes are exact. PNG compression is ignored but pixels
 and metadata must match exactly. No perceptual image similarity tolerance.
 """
 from decimal import Decimal
@@ -19,10 +19,13 @@ from .artifacts import FIGURE_INPUTS, FIGURE_NAMES
 def same_svg(actual, expected):
     """Matplotlib writes six decimal places; platform libm can round a tie apart.
 
-    Only anonymous path d coordinates may differ by <= 0.000001 pt, absolutely.
+    Only anonymous path d coordinates and marker-use x/y positions may differ
+    by <= 0.000001 pt, absolutely.
     Commands, separators, number counts and every byte outside these coordinates
     remain exact. In particular no tolerance applies to transforms, text, style,
     viewBox, IDs/references or font glyph definitions (which have an id first).
+    Marker references use Matplotlib's m-prefixed ten-hex-digit IDs; text glyph
+    uses retain exact positions. PNG pixels are checked separately and exactly.
     """
     if actual == expected:
         return True
@@ -37,7 +40,19 @@ def same_svg(actual, expected):
             values = number.findall(match[1])
             coordinates.extend(Decimal(value.decode('ascii')) for value in values)
             return b'<path d="'+structure+b'"'
-        return re.sub(rb'<path d="([^"]*)"', path, data), coordinates
+        structure = re.sub(rb'<path d="([^"]*)"', path, data)
+        # Error-bar caps are <use> markers rather than anonymous paths. Their
+        # endpoints can round the same libm tie apart as the connecting path.
+        # Restrict this to canonical marker references and explicit x/y attrs;
+        # transforms, glyph positions, styles and every other byte remain exact.
+        marker = re.compile(
+            rb'(<use xlink:href="#m[0-9a-f]{10}" x=")(' + number.pattern
+            + rb')(" y=")(' + number.pattern + rb')(")'
+        )
+        def position(match):
+            coordinates.extend(Decimal(match[i].decode('ascii')) for i in [2, 4])
+            return match[1] + b'#' + match[3] + b'#' + match[5]
+        return marker.sub(position, structure), coordinates
     actual_structure, a = split(actual)
     expected_structure, b = split(expected)
     return (actual_structure == expected_structure and len(a) == len(b)

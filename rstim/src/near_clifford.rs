@@ -947,19 +947,28 @@ impl ActiveState {
             let (x, z, _) = self.frame.canonical_row(i);
             virtual_z[i] = (has_x && z[q]) ^ (has_z && x[q]);
         }
-        let product = self.reconstruct_physical_pauli(&virtual_x, &virtual_z);
-        if !product
-            .x
-            .iter()
-            .enumerate()
-            .all(|(i, &bit)| bit == (has_x && i == q))
-            || !product
-                .z
-                .iter()
-                .enumerate()
-                .all(|(i, &bit)| bit == (has_z && i == q))
+        let product_phase = self.reconstruct_physical_phase(&virtual_x, &virtual_z);
+        // A valid Clifford frame guarantees the reconstructed support. Keep
+        // the full check in debug builds without allocating or updating X in
+        // the production phase-only path.
+        #[cfg(debug_assertions)]
         {
-            return Err("Clifford frame failed to reconstruct physical Pauli".into());
+            let product = self.reconstruct_physical_pauli(&virtual_x, &virtual_z);
+            assert_eq!(product.phase, product_phase);
+            assert!(
+                product
+                    .x
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &bit)| bit == (has_x && i == q))
+            );
+            assert!(
+                product
+                    .z
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &bit)| bit == (has_z && i == q))
+            );
         }
         // Y = iXZ; keep the same row multiplication order and phase convention
         // as the general physical-Pauli conversion.
@@ -967,7 +976,7 @@ impl ActiveState {
         Ok(Pauli {
             x: virtual_x,
             z: virtual_z,
-            phase: (desired_phase + 4 - product.phase) % 4,
+            phase: (desired_phase + 4 - product_phase) % 4,
         })
     }
 
@@ -1108,6 +1117,28 @@ impl ActiveState {
             z: virtual_z,
             phase,
         })
+    }
+
+    fn reconstruct_physical_phase(&self, virtual_x: &[bool], virtual_z: &[bool]) -> u8 {
+        let n = self.num_qubits();
+        let mut left_z = vec![false; n];
+        let mut phase = 0u32;
+        // X bits do not affect phase: only the old left Z crosses right X.
+        // Preserve the general conversion's X-row then Z-row ordering.
+        for (i, &selected) in virtual_x.iter().chain(virtual_z).enumerate() {
+            if selected {
+                let (x, z, row_phase) = self.frame.canonical_row(i);
+                phase += u32::from(row_phase);
+                for ((left_z, &right_x), &right_z) in left_z.iter_mut().zip(x).zip(z) {
+                    phase = phase.wrapping_add(
+                        u32::from(right_x & right_z) + 2 * u32::from(*left_z & right_x),
+                    );
+                    *left_z ^= right_z;
+                }
+                phase &= 3;
+            }
+        }
+        phase as u8
     }
 
     fn reconstruct_physical_pauli(&self, virtual_x: &[bool], virtual_z: &[bool]) -> Pauli {
