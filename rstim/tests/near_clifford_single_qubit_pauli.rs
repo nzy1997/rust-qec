@@ -119,3 +119,55 @@ fn wide_single_qubit_measurements_preserve_phase_through_entanglement_reset_and_
         assert_eq!(active.frame_snapshot(), before);
     }
 }
+
+#[test]
+fn dense_signed_parity_rows_preserve_encoded_phase_after_decoding() {
+    // Encode one non-Clifford qubit across every physical column. Local S
+    // gates give a dense Y tableau row, including more than 255 Y factors.
+    // Decoding exposes the accumulated phase as a single-qubit observable.
+    for width in [3, 63, 64, 65, 127, 128, 129, 193, 260] {
+        let mut state = ActiveState::new(width, 2);
+        let mut oracle = DenseOracle::new(1);
+        state.apply_clifford(CliffordGate::H(0)).unwrap();
+        state.t(0).unwrap();
+        oracle.h(0);
+        oracle.t(0);
+        for q in 1..width {
+            state.apply_clifford(CliffordGate::CX(0, q)).unwrap();
+        }
+        for q in 0..width {
+            state.apply_clifford(CliffordGate::S(q)).unwrap();
+            oracle.s(0);
+            if q % 2 == 1 {
+                state.apply_clifford(CliffordGate::Z(q)).unwrap();
+                oracle.z(0);
+            }
+        }
+        // Every physical Z acts as the encoded logical Z, even at the last
+        // column. General T conversion must retain the same signed phase.
+        state.t_dag(width - 1).unwrap();
+        oracle.t_dag(0);
+        for q in (1..width).rev() {
+            state.apply_clifford(CliffordGate::CX(0, q)).unwrap();
+        }
+        for (basis, letter) in [
+            (MeasurementBasis::X, 'X'),
+            (MeasurementBasis::Y, 'Y'),
+            (MeasurementBasis::Z, 'Z'),
+        ] {
+            let expected = oracle.measurement_probability(0, letter, false);
+            let (zero, one) = state.measurement_probabilities(0, basis).unwrap();
+            assert!((zero - expected).abs() < 1e-10, "width={width}, {basis:?}");
+            assert!((one - (1.0 - expected)).abs() < 1e-10);
+        }
+        for q in [1, width / 2, width - 1] {
+            assert_eq!(
+                state
+                    .measurement_probabilities(q, MeasurementBasis::Z)
+                    .unwrap(),
+                (1.0, 0.0),
+                "decoded ancilla at width={width}, q={q}"
+            );
+        }
+    }
+}
