@@ -1160,19 +1160,14 @@ impl Pauli {
 
     fn multiply_tableau_row(&mut self, frame: &StabilizerState, row: usize) {
         let (x, z, phase) = frame.canonical_row(row);
-        let mut exponent = u32::from(self.phase) + u32::from(phase);
-        for (((left_x, left_z), &right_x), &right_z) in
-            self.x.iter_mut().zip(&mut self.z).zip(x).zip(z)
-        {
-            // Canonical Y contributes iXZ; crossing the old left Z with
-            // the right X contributes -1. Only the residue modulo four
-            // matters, so wrapping accumulation is valid at any width.
-            exponent = exponent
-                .wrapping_add(u32::from(right_x & right_z) + 2 * u32::from(*left_z & right_x));
-            *left_x ^= right_x;
-            *left_z ^= right_z;
-        }
-        self.phase = (exponent & 3) as u8;
+        // Phase uses the old left Z bits. Reducing it separately lets the
+        // XOR updates run as contiguous vectorizable loops, while preserving
+        // the ordered i^phase XZ product and full reconstruction validation.
+        let y_count = x.iter().zip(z).filter(|(x, z)| **x && **z).count();
+        let crossing = dot(&self.z, x);
+        self.phase = (self.phase + phase + (y_count & 3) as u8 + 2 * u8::from(crossing)) & 3;
+        xor(&mut self.x, x);
+        xor(&mut self.z, z);
     }
 }
 
