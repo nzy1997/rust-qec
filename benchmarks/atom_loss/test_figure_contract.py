@@ -41,6 +41,28 @@ class FigureTests(unittest.TestCase):
         arc = b'<svg><path d="M 0 0 A 1 1 0 0 1 2 2"/></svg>'
         self.assertFalse(same_svg(arc.replace(b'0 0 1 2', b'0 0 1.000001 2'), arc))
 
+    def test_marker_roundoff_is_absolute_and_excludes_glyphs_and_transforms(self):
+        expected = (b'<svg viewBox="0 0 100 100"><use xlink:href="#m0123456789" '
+                    b'x="581.196672" y="1000000000" style="fill: red"/></svg>')
+        self.assertTrue(same_svg(expected.replace(b'581.196672', b'581.196673'), expected))
+        self.assertTrue(same_svg(expected.replace(b'581.196672', b'581.196671'), expected))
+        self.assertTrue(same_svg(expected.replace(b'1000000000"', b'1000000000.000001"'), expected))
+        for old, new in [(b'581.196672', b'581.196674'),
+                         (b'1000000000"', b'1000000000.000002"'),
+                         (b'#m0123456789', b'#m012345678a'),
+                         (b'viewBox="0 0 100 100"', b'viewBox="0 0 100.000001 100"'),
+                         (b'fill: red', b'fill: blue'), (b'x="581.196672" ', b'')]:
+            with self.subTest(change=new):
+                self.assertFalse(same_svg(expected.replace(old, new), expected))
+        glyph = expected.replace(b'#m0123456789', b'#DejaVuSans-31')
+        self.assertFalse(same_svg(glyph.replace(b'581.196672', b'581.196673'), glyph))
+        transformed = expected.replace(b' style=', b' transform="scale(1)" style=')
+        self.assertFalse(same_svg(
+            transformed.replace(b'scale(1)', b'scale(1.000001)'), transformed))
+        # Definitions remain exact even when their IDs have the marker format.
+        definition = b'<svg><path id="m0123456789" d="M 1 2 L 3 4"/></svg>'
+        self.assertFalse(same_svg(definition.replace(b'M 1 ', b'M 1.000001 '), definition))
+
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
