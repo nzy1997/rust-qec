@@ -78,6 +78,15 @@ jobs:
           python3 -O benchmarks/near_clifford/pauli_products/test_contract.py
           python3 benchmarks/near_clifford/pauli_products/test_report.py
           python3 -O benchmarks/near_clifford/pauli_products/test_report.py
+      - name: Check current near-Clifford baseline protocol
+        run: |
+          python3 -m pip install numpy==2.4.6
+          cargo fmt --manifest-path benchmarks/near_clifford/sota/Cargo.toml --check
+          python3 benchmarks/near_clifford/sota/test_lowering.py
+          python3 -O benchmarks/near_clifford/sota/test_lowering.py
+          python3 benchmarks/near_clifford/sota/test_contract.py
+          python3 -O benchmarks/near_clifford/sota/test_contract.py
+          python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner
