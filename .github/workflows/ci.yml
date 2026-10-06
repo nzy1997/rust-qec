@@ -87,6 +87,12 @@ jobs:
           python3 benchmarks/near_clifford/sota/test_contract.py
           python3 -O benchmarks/near_clifford/sota/test_contract.py
           python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
+      - name: Check compiled near-Clifford native-input evidence
+        run: |
+          cargo fmt --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml --check
+          python3 benchmarks/near_clifford/compiled_sota/test_contract.py
+          python3 -O benchmarks/near_clifford/compiled_sota/test_contract.py
+          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json --git-sources
       - name: Minimal rsinter build, smoke, and dependency graph
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner
