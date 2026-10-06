@@ -319,6 +319,38 @@ impl DenseOracle {
         (1.0 + self.pauli_xx_expectation(a, b)) / 2.0
     }
 
+    /// Apply the physical projector (I + (-1)^one P)/2 directly to amplitudes.
+    /// Return its Born weight and normalize a nonzero conditional state.
+    /// This uses tensor-product 2x2 matrices, without a measurement lowering,
+    /// tableau, virtual coordinates, or the production Pauli representation.
+    pub fn project_pauli_product(&mut self, factors: &[(usize, char)], one: bool) -> f64 {
+        assert!(!factors.is_empty());
+        let mut image = self.clone();
+        let mut seen = vec![false; self.num_qubits];
+        for &(qubit, basis) in factors {
+            assert!(!seen[qubit], "repeated oracle product factor");
+            seen[qubit] = true;
+            match basis {
+                'X' => image.x(qubit),
+                'Y' => image.y(qubit),
+                'Z' => image.z(qubit),
+                _ => panic!("unsupported product basis {basis}"),
+            }
+        }
+        let sign = if one { -1. } else { 1. };
+        for (amplitude, &transformed) in self.amplitudes.iter_mut().zip(&image.amplitudes) {
+            *amplitude = (*amplitude + transformed * sign) * 0.5;
+        }
+        let probability = self.amplitudes.iter().map(|a| a.norm_sqr()).sum::<f64>();
+        if probability > 0. {
+            let scale = 1. / probability.sqrt();
+            for amplitude in &mut self.amplitudes {
+                *amplitude = *amplitude * scale;
+            }
+        }
+        probability
+    }
+
     pub fn measurement_probability(&self, qubit: usize, basis: char, one: bool) -> f64 {
         let mut copy = self.clone();
         copy.rotate_into_measurement_basis(qubit, basis);
