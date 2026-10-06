@@ -72,3 +72,11 @@ retains paired 43-case scale and 28-case entangled evidence after #770; its
 The [Pauli reconstruction follow-up](results/apple-m4-pauli-analysis-2026-10-03.md)
 repeats both matrices after #771 and adds [14 sparse/dense full-width GHZ controls](pauli_products/README.md)
 with untimed row-work counters and independent conditional Born checks.
+
+The [current CPU baseline protocol](sota/README.md) freezes Clifft 0.11.0 and the
+current SymFT source alongside seven raw-record workloads, including published
+magic-state cultivation circuits. It tunes peer batches independently and checks
+the exact timed calling paths. This additive comparison preserves the older
+matrices and makes no counts-only or GPU claim.
+The [complete post-#777 M4 baseline](results/apple-m4-current-sota-2026-10-07/analysis.md)
+retains all 21 configurations and the remaining architecture gap.
