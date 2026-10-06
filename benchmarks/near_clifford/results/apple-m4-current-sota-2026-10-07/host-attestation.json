@@ -1,0 +1,17 @@
+{
+  "kind": "post-campaign host attestation; hardware identity only, no peak-RSS claim",
+  "recorded_utc": "2026-10-06T18:47:50.677607+00:00",
+  "sysctl": {
+    "machdep.cpu.brand_string": "Apple M4",
+    "hw.physicalcpu": "10",
+    "hw.logicalcpu": "10",
+    "hw.memsize": "34359738368"
+  },
+  "thread_policy": {
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  }
+}
