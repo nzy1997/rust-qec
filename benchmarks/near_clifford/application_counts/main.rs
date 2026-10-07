@@ -1,5 +1,6 @@
 //! Original-circuit raw postselection with structured or native Rust counts.
-//! Both routes retain all draws; native scalar/fallback rows skip rejected physics.
+//! Native counts may lazily prepare an affine model; its cost is in first_ns.
+//! Fallback scalar/packed counts retain early rejection and every typed draw.
 use rand::{RngCore, SeedableRng, rngs::SmallRng};
 use rstim::near_clifford::{
     CompiledNearCliffordExecutor, CompiledRotationArithmetic, NearCliffordShot,
@@ -154,7 +155,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = json!({"backend":"rstim","status":"ok","arithmetic":args[4],
         "input_sha256":format!("{:x}",Sha256::digest(text.as_bytes())),
         "output_contract":"all-zero raw detector postselection; raw observable 0 counts; no reference normalization",
-        "execution":if native { "native raw postselected counts; scalar and packed early rejection" } else { "full structured records then filter; no early rejection" },
+        "execution":if native { "native raw postselected counts; optional affine model and scalar/packed early rejection" } else { "full structured records then filter; no early rejection" },
         "compile_ns":compile_ns,"prepare_ns":prepare_ns,"first_ns":first.0,
         "shots":shots,"observations":observations,"peak_rss_bytes":rss,
         "peak_active_rank":plan.peak_active_rank(),

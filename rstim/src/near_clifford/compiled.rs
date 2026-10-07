@@ -9,6 +9,10 @@ use coherent_packet::CoherentPacket;
 #[path = "random_event_runs.rs"]
 mod random_event_runs;
 use random_event_runs::RandomRunPlan;
+#[path = "linear_counts.rs"]
+mod linear_counts;
+use linear_counts::LinearCountsPlan;
+use std::sync::OnceLock;
 #[path = "independent_packet.rs"]
 mod independent_packet;
 use independent_packet::IndependentPacket;
@@ -86,6 +90,53 @@ impl<'a, R: Rng> RowRandom<'a, R> {
         }
     }
     #[inline]
+    fn take_independent(&mut self, maximum: usize) -> (u64, usize) {
+        debug_assert!(maximum != 0);
+        if self.bits_left == 0 {
+            self.bit_word = self.rng.r#gen::<u64>();
+            self.bits_left = 64;
+        }
+        let take = maximum.min(self.bits_left as usize);
+        let value = self.bit_word
+            & if take == 64 {
+                u64::MAX
+            } else {
+                (1u64 << take) - 1
+            };
+        self.bit_word = if take == 64 { 0 } else { self.bit_word >> take };
+        self.bits_left -= take as u8;
+        (value, take)
+    }
+    #[inline]
+    fn noise_choice(&mut self, choices: usize) -> u64 {
+        if choices == 1 {
+            1
+        } else {
+            (self.rng.gen_range(0..choices) + 1) as u64
+        }
+    }
+    // Return the next success inside this nonempty span, consuming all failures.
+    // Some(0) survives an exact boundary; a final success never prefetches.
+    #[inline]
+    fn sparse_hit(&mut self, remaining: usize) -> Option<usize> {
+        debug_assert!(remaining != 0);
+        let skip = self.noise_skip.get_or_insert_with(|| {
+            let u = self.rng.r#gen::<f64>();
+            if self.noise_log_failure == 0. {
+                self.noise_log_failure = (-f64::from_bits(self.noise_probability)).ln_1p();
+            }
+            ((-u).ln_1p() / self.noise_log_failure).floor() as usize
+        });
+        if *skip >= remaining {
+            *skip -= remaining;
+            None
+        } else {
+            let hit = *skip;
+            self.noise_skip = None;
+            Some(hit)
+        }
+    }
+    #[inline]
     fn draw(&mut self, kind: RandomKind) -> u64 {
         if let Some(tape) = self.tape {
             let value = tape[self.cursor];
@@ -93,16 +144,7 @@ impl<'a, R: Rng> RowRandom<'a, R> {
             value
         } else {
             match kind {
-                RandomKind::Independent => {
-                    if self.bits_left == 0 {
-                        self.bit_word = self.rng.r#gen::<u64>();
-                        self.bits_left = 64;
-                    }
-                    let bit = self.bit_word & 1;
-                    self.bit_word >>= 1;
-                    self.bits_left -= 1;
-                    bit
-                }
+                RandomKind::Independent => self.take_independent(1).0,
                 RandomKind::Noise {
                     probability,
                     choices,
@@ -116,25 +158,10 @@ impl<'a, R: Rng> RowRandom<'a, R> {
                         self.noise_probability = probability.to_bits();
                         self.noise_log_failure = 0.;
                     }
-                    let skip = self.noise_skip.get_or_insert_with(|| {
-                        let u = self.rng.r#gen::<f64>();
-                        // Cache only the deterministic denominator. Draw expression,
-                        // typed uniform and exact no-prefetch boundaries are unchanged.
-                        if self.noise_log_failure == 0. {
-                            self.noise_log_failure = (-probability).ln_1p();
-                        }
-                        ((-u).ln_1p() / self.noise_log_failure).floor() as usize
-                    });
-                    if *skip != 0 {
-                        *skip -= 1;
-                        0
+                    if self.sparse_hit(1).is_some() {
+                        self.noise_choice(choices)
                     } else {
-                        self.noise_skip = None;
-                        if choices == 1 {
-                            1
-                        } else {
-                            (self.rng.gen_range(0..choices) + 1) as u64
-                        }
+                        0
                     }
                 }
                 _ => kind.draw(self.rng),
@@ -946,6 +973,11 @@ pub enum CompiledRotationArithmetic {
 /// reserve at most 64 MiB and packet event/frame work buffers 16 MiB.
 /// Optional homogeneous random-event runs use at most 8 MiB within the plan budget; rejection
 /// retains the event-by-event generator with identical RNG and records.
+/// On the first nonempty counts call, a rotation-free plan may lazily build an affine
+/// detector/observable model within the remaining plan budget, including construction
+/// scratch. Oversized models retain the original path. This first-call cost is not
+/// hidden in compilation. Its reusable counts output workspace separately reserves
+/// at most 16 MiB. Structured and flat calls keep the physical executor.
 /// Batched coherent arithmetic separately reserves at most 64 MiB; larger
 /// structural ranks retain the scalar/cache path.
 /// These are conservative reservations, not RSS limits. Limits fail before sampling.
@@ -964,6 +996,8 @@ pub struct CompiledNearCliffordExecutor {
     noise_event_count: usize,
     independent_event_count: usize,
     scalar_basis: Option<Vec<Option<ScalarBasisProgram>>>,
+    linear_counts: Arc<OnceLock<Option<LinearCountsPlan>>>,
+    counts_plan_budget: usize,
 }
 struct Planner {
     state: CompileFrame,
@@ -1289,6 +1323,8 @@ impl CompiledNearCliffordExecutor {
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
+            linear_counts: Arc::new(OnceLock::new()),
+            counts_plan_budget: 0,
         };
         let annotation_count = plan
             .operations
@@ -1451,6 +1487,13 @@ impl CompiledNearCliffordExecutor {
             &plan.random_kinds,
             PLAN_BYTE_BUDGET.saturating_sub(planner.reserved_bytes),
         );
+        let run_bytes = plan
+            .random_runs
+            .as_ref()
+            .map_or(0, RandomRunPlan::reserved_bytes);
+        plan.counts_plan_budget = PLAN_BYTE_BUDGET
+            .saturating_sub(planner.reserved_bytes)
+            .saturating_sub(run_bytes);
         Ok(plan)
     }
     // The packet and dense paths keep the original gates. Direct test-only
@@ -1522,6 +1565,7 @@ impl CompiledNearCliffordExecutor {
             packet_noise_masks: Vec::new(),
             packet_independent: None,
             coherent: CoherentPacket::default(),
+            counts_outputs: Vec::new(),
         })
     }
     pub fn sample(
@@ -1563,6 +1607,7 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_noise_masks: Vec<u64>,
     packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
+    counts_outputs: Vec<u64>,
 }
 
 #[cfg(test)]
@@ -3437,6 +3482,45 @@ impl CompiledNearCliffordSampler<'_> {
                 "observable {observable_index} is absent from the compiled circuit"
             ));
         }
+        // The optional immutable model is shared by cloned plans. Construction
+        // occurs only on the first nonempty counts call, before drawing RNG. Its
+        // cost belongs to that first call; a declined model keeps the original path.
+        if shots != 0 {
+            if let Some(model) = self
+                .plan
+                .linear_counts
+                .get_or_init(|| LinearCountsPlan::build(self.plan, self.plan.counts_plan_budget))
+            {
+                if model
+                    .output_count()
+                    .checked_mul(size_of::<u64>())
+                    .is_some_and(|bytes| bytes <= PACKET_BYTE_BUDGET)
+                {
+                    let admitted = self.counts_outputs.capacity() >= model.output_count()
+                        || self
+                            .counts_outputs
+                            .try_reserve_exact(model.output_count() - self.counts_outputs.len())
+                            .is_ok();
+                    if admitted
+                        && self
+                            .counts_outputs
+                            .capacity()
+                            .checked_mul(size_of::<u64>())
+                            .is_some_and(|bytes| bytes <= PACKET_BYTE_BUDGET)
+                    {
+                        self.counts_outputs.resize(model.output_count(), 0);
+                        return Ok(model.sample(
+                            self.plan,
+                            &mut self.counts_outputs,
+                            shots,
+                            observable_index,
+                            sweep,
+                            rng,
+                        ));
+                    }
+                }
+            }
+        }
         let mut counts = NearCliffordPostselectedCounts {
             attempted: shots,
             ..Default::default()
@@ -3906,6 +3990,8 @@ mod tests {
                                     noise_event_count: 0,
                                     independent_event_count: 0,
                                     scalar_basis: None,
+                                    linear_counts: Arc::new(OnceLock::new()),
+                                    counts_plan_budget: 0,
                                     rotation_arithmetic: policy,
                                 };
                                 let mut sampler = plan.prepare_sampler().unwrap();
@@ -4608,6 +4694,8 @@ mod tests {
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
+            linear_counts: Arc::new(OnceLock::new()),
+            counts_plan_budget: 0,
         };
         let mut sampler = plan.prepare_sampler().unwrap();
         sampler.coefficients = vec![ComplexAmp::new(1., 0.), ComplexAmp::new(1e-16, 0.)];
