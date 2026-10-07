@@ -168,7 +168,7 @@ class FigureTests(unittest.TestCase):
                 for flags in [[], ['-O']]:
                     with self.subTest(defect=defect, flags=flags):
                         result = subprocess.run([sys.executable, *flags, '-m',
-                                                 'benchmarks.atom_loss.verify', str(root)],
+                                                 'benchmarks.atom_loss.verify', '--historical-source', str(root)],
                                                 cwd=ROOT, capture_output=True, text=True)
                         self.assertNotEqual(result.returncode, 0)
                         self.assertIn('ValueError', result.stderr)

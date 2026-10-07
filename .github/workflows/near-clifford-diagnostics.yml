@@ -91,6 +91,11 @@ jobs:
             python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --check
             python3 -O benchmarks/near_clifford/diagnostics/verify.py "$evidence" --git-sources
           done
+          for campaign in cache-lifetime boundary rank structure-incumbent; do
+            evidence="benchmarks/near_clifford/results/linux-vm-x86-diagnostics-${campaign}-2026-10-07"
+            python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --check
+            python3 -O benchmarks/near_clifford/diagnostics/verify.py "$evidence" --git-sources
+          done
           for host in apple-m4 linux-vm-x86; do
             evidence="benchmarks/near_clifford/results/${host}-application-counts-2026-10-07"
             python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
