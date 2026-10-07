@@ -6,7 +6,9 @@ const PROBES: usize = 8;
 // Amortize index construction only after the sampler has retained enough states.
 // Small caches keep ordinary admission without allocating the optional table.
 pub(super) const MIN_STATES: usize = 128;
-// Hashing is optional for small amplitudes; wide state vectors retain the old path.
+// Indexing small vectors cannot amortize filtering and construction. The old
+// admission path handles both small vectors and vectors beyond the work cap.
+pub(super) const MIN_COEFFICIENTS: usize = 32;
 pub(super) const MAX_COEFFICIENTS: usize = 4096;
 
 #[derive(Clone, Copy)]
@@ -182,12 +184,32 @@ mod tests {
     }
 
     #[test]
+    fn small_vectors_keep_ordinary_admission_without_constructing_an_index() {
+        let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMY 0\n").unwrap();
+        let mut cache = CoefficientCache::new(&plan, DEFAULT_CACHE_BYTE_BUDGET).unwrap();
+        let values = vec![ComplexAmp::new(0.5, -0.25); MIN_COEFFICIENTS / 2];
+        let initial = cache.reserved;
+        let charge = CoefficientCache::state_charge(&values).unwrap();
+        for node in 0..2 * MIN_STATES {
+            let id = cache.store(node, &values).unwrap();
+            assert_eq!(&*cache.states[id].coefficients, &values);
+            assert!(cache.intern.is_none());
+            assert!(!cache.intern_attempted);
+            assert_eq!(cache.reserved, initial + (node + 1) * charge);
+        }
+        let larger = vec![ComplexAmp::new(0.5, -0.25); MIN_COEFFICIENTS];
+        let id = cache.store(311, &larger).unwrap();
+        assert!(cache.intern.is_some());
+        assert_eq!(cache.store(311, &larger), Some(id));
+    }
+
+    #[test]
     fn lazy_interning_reuses_exact_states_until_admission_closes() {
         let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMY 0\n").unwrap();
         let mut cache = CoefficientCache::new(&plan, DEFAULT_CACHE_BYTE_BUDGET).unwrap();
         let initial = cache.reserved;
         assert!(cache.intern.is_none());
-        let values = [ComplexAmp::new(0.5, 0.0), ComplexAmp::new(0.25, 0.5)];
+        let values = vec![ComplexAmp::new(0.5, 0.25); MIN_COEFFICIENTS];
         let first_cold = cache.store(23, &values).unwrap();
         assert!(cache.intern.is_none());
         assert!(!cache.intern_attempted);

@@ -15,7 +15,7 @@ jobs:
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay'
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay' || github.head_ref == 'codex/near-clifford-cache-reconvergence-scout'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
