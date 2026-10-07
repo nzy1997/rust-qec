@@ -64,6 +64,25 @@ mod tests {
     }
 
     #[test]
+    fn unsampled_coefficient_difference_cannot_alias_a_sparse_fingerprint() {
+        let values = vec![ComplexAmp::new(0.25, -0.5); 64];
+        let mut different = values.clone();
+        different[11].im = f64::from_bits((-0.5f64).to_bits() + 1);
+        assert_eq!(
+            CoefficientIntern::fingerprint(29, &values),
+            CoefficientIntern::fingerprint(29, &different)
+        );
+        let states = vec![state(&values)];
+        let mut table = CoefficientIntern::new(usize::MAX).unwrap();
+        let (_, Some((slot, hash))) = table.find_or_slot(29, &values, &states) else {
+            panic!("empty index must offer a slot")
+        };
+        table.insert(slot, hash, 29, 0);
+        assert_eq!(table.find_or_slot(29, &values, &states).0, Some(0));
+        assert_eq!(table.find_or_slot(29, &different, &states).0, None);
+    }
+
+    #[test]
     fn index_capacity_is_charged_and_small_budget_declines() {
         assert!(CoefficientIntern::new(0).is_none());
         assert!(CoefficientIntern::new(SLOTS * size_of::<Entry>() - 1).is_none());
@@ -123,14 +142,31 @@ impl CoefficientIntern {
     }
     fn fingerprint(node: usize, coefficients: &[ComplexAmp]) -> u64 {
         let mut hash = (node as u64) ^ (coefficients.len() as u64).rotate_left(17);
-        for value in coefficients {
-            hash = (hash ^ value.re.to_bits())
-                .rotate_left(13)
-                .wrapping_mul(0x9e3779b185ebca87);
-            hash = (hash ^ value.im.to_bits())
-                .rotate_left(17)
-                .wrapping_mul(0xc2b2ae3d27d4eb4f);
+        // Sample coordinate axes and two mixed coordinates instead of scanning
+        // every amplitude on a cache miss. This fingerprint is only a filter:
+        // every possible alias still compares all FP64 bits below. Collisions
+        // can reduce optional reuse, never change sampled results.
+        let mut mix = |index: usize| {
+            if let Some(value) = coefficients.get(index) {
+                hash = (hash ^ value.re.to_bits())
+                    .rotate_left(13)
+                    .wrapping_mul(0x9e3779b185ebca87);
+                hash = (hash ^ value.im.to_bits())
+                    .rotate_left(17)
+                    .wrapping_mul(0xc2b2ae3d27d4eb4f);
+            }
+        };
+        mix(0);
+        for bit in 0..usize::BITS {
+            let index = 1usize << bit;
+            if index >= coefficients.len() {
+                break;
+            }
+            mix(index);
         }
+        mix(coefficients.len().saturating_sub(1));
+        mix(coefficients.len() / 3);
+        mix(2 * (coefficients.len() / 3));
         hash ^ (hash >> 29)
     }
     // A collision is checked against every FP64 bit. At most eight candidates
