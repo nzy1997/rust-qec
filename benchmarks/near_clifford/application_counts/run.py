@@ -62,7 +62,8 @@ def main():
         selected_names=args.only,selected_shots=args.shots,pairs=args.pairs,repetitions=args.repetitions,
         source_revision=revision,sources=sources,binary_sha256=binary_hashes,packages=packages,
         peer_loaded_files=identities,symft_source_revision=peer_revision,symft_sources=peer_sources,
-        environment_before=env,host=dict(platform=platform.platform(),machine=platform.machine(),cpus=os.cpu_count(),
+        environment_before=env,raw_reference_timeout_s=600,
+        host=dict(platform=platform.platform(),machine=platform.machine(),cpus=os.cpu_count(),
             affinity=sorted(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None,load=os.getloadavg()),
         compiler=subprocess.check_output(['rustc','-vV'],text=True),
         compiler_environment={key:os.environ.get(key) for key in
@@ -111,7 +112,7 @@ def main():
                 native.write_text(records_only(original.read_text()))
                 python=args.symft_python if backend=='symft' else args.python
                 raw=diag.invoke([str(python),'-I',str(HERE.parent/'compiled_sota/worker.py'),backend,str(native),str(shots),
-                    '--batch',str(batch),'--mode','dump','--dump-total',str(math.ceil(8192/shots)*shots)])
+                    '--batch',str(batch),'--mode','dump','--dump-total',str(math.ceil(8192/shots)*shots)],timeout=600)
                 raw_witnesses[(name,shots,backend)]=raw
                 record('raw-validation',id=case['id'],backend=backend,result=compact(raw) if 'measurements' in raw else raw)
         raw=rust(case,True)
