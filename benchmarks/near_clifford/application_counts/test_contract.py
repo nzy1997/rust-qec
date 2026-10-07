@@ -65,6 +65,32 @@ def main():
         del h['sources']['benchmarks/near_clifford/evidence_io.py']
     if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
         mutations.append(missing_helper_inventory)
+    def timing_field_control(name,key,value,backend='rstim'):
+        def mutate(e,h): next(v for v in e if v['kind']=='timing' and v['backend']==backend)['result'][key]=value
+        mutate.__name__=name
+        return mutate
+    mutations.extend([
+        timing_field_control('negative_first_call','first_ns',-1),
+        timing_field_control('boolean_peer_first_call','first_ns',True,'symft'),
+        timing_field_control('noninteger_compile_phase','compile_ns',0.5),
+        timing_field_control('negative_peer_prepare_phase','prepare_ns',-1,'symft'),
+        timing_field_control('noninteger_process_rss','peak_rss_bytes',0.5),
+        timing_field_control('noninteger_active_rank','peak_active_rank',0.5),
+        timing_field_control('oversized_cache_ledger','cache_reserved_bytes',64*1024*1024+1),
+    ])
+    def missing_first_call(e,h): del next(v for v in e if v['kind']=='timing')['result']['first_ns']
+    def fabricated_validation_first_call(e,h): next(v for v in e if v['kind']=='counts-validation' and v['backend']=='rstim')['result']['first_ns']=1
+    def fractional_observation_counts(e,h):
+        obs=next(v for v in e if v['kind']=='timing')['result']['observations'][0]
+        obs['accepted']+=0.5;obs['discarded']-=0.5
+    def negative_discarded_count(e,h):
+        obs=next(v for v in e if v['kind']=='timing')['result']['observations'][0]
+        obs['accepted']=obs['attempted']+1;obs['discarded']=-1
+    def noninteger_elapsed_time(e,h):
+        obs=next(v for v in e if v['kind']=='timing')['result']['observations'][0]
+        obs['elapsed_ns']=float(obs['elapsed_ns']);obs['ns_per_call']=obs['elapsed_ns']/obs['calls']
+    mutations.extend([missing_first_call,fabricated_validation_first_call,fractional_observation_counts,
+                      negative_discarded_count,noninteger_elapsed_time])
     for mutate in mutations:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
         if mutate is missing_helper_inventory: c['sources_after']=h['sources']
