@@ -2656,6 +2656,28 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         byte_budget: usize,
     ) -> Result<NearCliffordShot, String> {
+        self.row_with_scalar_tape_budget_mode::<false>(sweep, rng, byte_budget)
+    }
+
+    fn row_for_output(
+        &mut self,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &BatchOutput<'_>,
+    ) -> Result<NearCliffordShot, String> {
+        if matches!(output, BatchOutput::Counts { .. }) {
+            self.row_with_scalar_tape_budget_mode::<true>(sweep, rng, PACKET_BYTE_BUDGET)
+        } else {
+            self.row(sweep, rng)
+        }
+    }
+
+    fn row_with_scalar_tape_budget_mode<const POSTSELECT: bool>(
+        &mut self,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        byte_budget: usize,
+    ) -> Result<NearCliffordShot, String> {
         #[cfg(test)]
         {
             self.last_scalar_prepared = false;
@@ -2663,13 +2685,13 @@ impl CompiledNearCliffordSampler<'_> {
         let plan = self.plan;
         if plan.noise_event_count < MIN_SCALAR_PREPARED_NOISE_EVENTS || plan.random_kinds.is_empty()
         {
-            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
         }
         let Some(runs) = &plan.random_runs else {
-            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
         };
         if !self.try_prepare_scalar_tape(byte_budget) {
-            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
         }
         #[cfg(test)]
         {
@@ -2684,7 +2706,7 @@ impl CompiledNearCliffordSampler<'_> {
                 &mut tape[..count],
             );
             let mut replay = RowRandom::recorded(&tape[..count], &mut *rng);
-            let result = self.row_with_random(sweep, &mut replay);
+            let result = self.row_with_random_mode::<POSTSELECT>(sweep, &mut replay);
             debug_assert!(result.is_err() || replay.cursor == count);
             result
         };
@@ -2693,6 +2715,14 @@ impl CompiledNearCliffordSampler<'_> {
         result
     }
     fn row_with_random(
+        &mut self,
+        sweep: &[bool],
+        random: &mut RowRandom<'_, impl Rng>,
+    ) -> Result<NearCliffordShot, String> {
+        self.row_with_random_mode::<false>(sweep, random)
+    }
+
+    fn row_with_random_mode<const POSTSELECT: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut RowRandom<'_, impl Rng>,
@@ -2714,6 +2744,7 @@ impl CompiledNearCliffordSampler<'_> {
             observables: Vec::new(),
         };
         let plan = self.plan;
+        let mut event = 0;
         for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
             match op {
                 PlanOp::Basis(gates) => {
@@ -2728,6 +2759,7 @@ impl CompiledNearCliffordSampler<'_> {
                     probability,
                     choices,
                 } => {
+                    event += 1;
                     let value = random.draw(RandomKind::Noise {
                         probability: *probability,
                         choices: choices.len(),
@@ -2759,15 +2791,30 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                     match observable {
                         Some(k) => shot.observables.push((*k, bit)),
-                        None => shot.detectors.push(bit),
+                        None => {
+                            shot.detectors.push(bit);
+                            if POSTSELECT && bit {
+                                // Consume the remaining fixed typed draws, including sparse
+                                // run renewal and unused-bit boundaries, in their original
+                                // row order. Recorded fallback tapes require no new draws.
+                                for &kind in &plan.random_kinds[event..] {
+                                    random.draw(kind);
+                                }
+                                return Ok(shot);
+                            }
+                        }
                     }
                 }
                 PlanOp::Measure(m) => {
                     let anti = m.pauli.physical.anticommutes(&self.x, &self.z);
                     let branch = match m.projection {
                         Projection::Constant(bit) => bit,
-                        Projection::Independent { .. } => random.draw(RandomKind::Independent) != 0,
+                        Projection::Independent { .. } => {
+                            event += 1;
+                            random.draw(RandomKind::Independent) != 0
+                        }
                         Projection::Active { .. } => {
+                            event += 1;
                             f64::from_bits(random.draw(RandomKind::Active))
                                 >= self.cached_probability_zero(node, &m.pauli, state)?
                         }
@@ -2809,16 +2856,21 @@ impl CompiledNearCliffordSampler<'_> {
                         }
                     }
                     if let Some(index) = m.record {
-                        let error = m.readout > 0.
-                            && random.draw(RandomKind::Noise {
+                        let error = if m.readout > 0. {
+                            event += 1;
+                            random.draw(RandomKind::Noise {
                                 probability: m.readout,
                                 choices: 1,
-                            }) != 0;
+                            }) != 0
+                        } else {
+                            false
+                        };
                         shot.measurements[index] = physical ^ m.inverted ^ error;
                     }
                 }
             }
         }
+        debug_assert_eq!(event, plan.random_kinds.len());
         Ok(shot)
     }
     // All random draws depend only on the fixed plan, not the coherent state.
@@ -3228,7 +3280,12 @@ impl CompiledNearCliffordSampler<'_> {
                         &tape[lane * random_count..(lane + 1) * random_count],
                         &mut *rng,
                     );
-                    output.row(self.row_with_random(sweep, &mut random)?);
+                    let shot = if matches!(output, BatchOutput::Counts { .. }) {
+                        self.row_with_random_mode::<true>(sweep, &mut random)?
+                    } else {
+                        self.row_with_random(sweep, &mut random)?
+                    };
+                    output.row(shot);
                     debug_assert_eq!(random.cursor, random_count);
                 }
             }
@@ -3298,8 +3355,11 @@ impl CompiledNearCliffordSampler<'_> {
     /// Counts all-zero raw detector shots and their XOR-folded raw observable parity.
     ///
     /// The observable index must occur in the compiled circuit, even for zero shots.
-    /// No reference normalization or early rejection is performed. Sampling consumes
-    /// the same random events as [`Self::sample`], without materializing batch records.
+    /// No reference normalization is performed. Scalar and admission-fallback rows
+    /// skip remaining physics after a nonzero detector, while consuming all remaining
+    /// typed random events. Live packed rows complete their simulation. Sampling
+    /// preserves the random stream of [`Self::sample`] without batch output records.
+    /// Rejected scalar suffixes do not perform physics or its fallible allocations.
     pub fn sample_postselected_counts(
         &mut self,
         shots: usize,
@@ -3431,13 +3491,13 @@ impl CompiledNearCliffordSampler<'_> {
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
-                        output.row(self.row(sweep, rng)?);
+                        output.row(self.row_for_output(sweep, rng, output)?);
                     }
                 }
             }
         } else {
             for _ in 0..shots {
-                output.row(self.row(sweep, rng)?);
+                output.row(self.row_for_output(sweep, rng, output)?);
             }
         }
         Ok(())

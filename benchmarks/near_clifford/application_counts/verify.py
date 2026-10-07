@@ -20,8 +20,9 @@ def validate(out,git_sources=False,allow_smoke=False):
     header=json.loads((out/'header.json').read_text());closure=json.loads((out/'closure.json').read_text())
     data=read_event_bytes(out)
     events=[json.loads(line) for line in data.splitlines()]
-    require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2'],'wrong schema')
-    modern=header['schema']=='rstim.postselected-counts.v2'
+    require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2','rstim.postselected-counts.v3'],'wrong schema')
+    modern=header['schema']!='rstim.postselected-counts.v1'
+    scalar_rejection=header['schema']=='rstim.postselected-counts.v3'
     route=header.get('rust_route') if modern else header.get('rust_route','structured')
     require(route in ['structured','native'] if modern else route=='structured','Rust route differs')
     native_rust=route=='native'
@@ -52,7 +53,7 @@ def validate(out,git_sources=False,allow_smoke=False):
     if modern:
         native_producer_path='benchmarks/near_clifford/application_counts/run.py'
         producer_bytes=subprocess.check_output(['git','show',header['source_revision']+':'+native_producer_path],cwd=ROOT)
-        require(digest(producer_bytes)==header['sources'][native_producer_path] and b'rstim.postselected-counts.v2' in producer_bytes and b'--rust-route' in producer_bytes, 'native schema requires source-bound native producer')
+        require(digest(producer_bytes)==header['sources'][native_producer_path] and header['schema'].encode() in producer_bytes and b'--rust-route' in producer_bytes, 'native schema requires source-bound native producer')
     producer_path='benchmarks/near_clifford/diagnostics/run.py'
     helper_path='benchmarks/near_clifford/evidence_io.py'
     require(producer_path in header['sources'],'missing diagnostic producer source')
@@ -89,7 +90,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         require(result['input_sha256']==digest((records_only(texts[name]) if projected else texts[name]).encode()),'consumed input differs')
         if backend!='rstim': inc.bind_peer(result,backend,header['packages'],header['peer_loaded_files'])
         else:
-            expected_execution='native raw postselected counts; no early rejection' if native_rust else 'full structured records then filter; no early rejection'
+            expected_execution=('native raw postselected counts; scalar early rejection' if scalar_rejection else 'native raw postselected counts; no early rejection') if native_rust else 'full structured records then filter; no early rejection'
             require(result['execution']==expected_execution,'Rust execution route differs')
             if native_rust and 'measurements' in result:
                 require(result.get('exact_native_counts_rng') is True,'missing native exact counts/RNG witness')
