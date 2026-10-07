@@ -41,7 +41,12 @@ def main():
     def missing_capability(e,h): e.remove(next(v for v in e if v['kind']=='capability'))
     def wrong_input(e,h): next(v for v in e if v['kind']=='timing')['result']['input_sha256']='0'*64
     def zero_time(e,h): next(v for v in e if v['kind']=='timing')['result']['observations'][0]['elapsed_ns']=0
-    for mutate in [missing_timing,wrong_executor,wrong_counts,wrong_batch,optional_identity,missing_capability,wrong_input,zero_time]:
+    def fabricated_rejection(e,h):
+        id=next(v for v in e if v['kind']=='validation-check' and v['passed'])['id']
+        e[:]=[v for v in e if v.get('id')!=id or v['kind'] not in ['validation-check','timing']]
+        e.append(dict(kind='rejected',id=id,reason='counts finite witness disagreement'))
+    for mutate in [missing_timing,wrong_executor,wrong_counts,wrong_batch,optional_identity,
+                   missing_capability,wrong_input,zero_time,fabricated_rejection]:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
         for index,event in enumerate(e): event['index']=index
         data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()

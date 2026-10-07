@@ -43,6 +43,8 @@ def main():
     manifest=json.loads((HERE/'manifest.json').read_text())
     for value in manifest['inputs'].values():
         original=ROOT/value['path'];require(digest(original.read_bytes())==value['sha256'],'original input changed')
+    for path,value in manifest['licenses'].items():
+        require(digest((ROOT/path).read_bytes())==value['sha256'],'upstream license changed')
     sources=inventory()
     revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     for package in [HERE,HERE.parent/'diagnostics']:

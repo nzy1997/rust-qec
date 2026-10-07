@@ -39,6 +39,7 @@ def validate(out,git_sources=False,allow_smoke=False):
     manifest=json.loads((HERE/'manifest.json').read_text());require(manifest==header['manifest'],'original corpus changed')
     texts={name:(ROOT/value['path']).read_text() for name,value in manifest['inputs'].items()}
     for name,value in manifest['inputs'].items(): require(digest(texts[name].encode())==value['sha256'],'input changed')
+    for path,value in manifest['licenses'].items(): require(digest((ROOT/path).read_bytes())==value['sha256'],'license changed')
     required={'benchmarks/near_clifford/application_counts/'+name for name in
               ['.gitignore','Cargo.toml','Cargo.lock','main.rs','worker.py','common.py','run.py','verify.py','test_contract.py','README.md','manifest.json']}
     require(required<=set(header['sources']),'missing application harness sources')
@@ -57,7 +58,7 @@ def validate(out,git_sources=False,allow_smoke=False):
             if name.startswith('rstim/src/') or name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']:
                 baseline=subprocess.check_output(['git','show','3ef5030db205b3e9b2126e31b2602f760d4665cc:'+name],cwd=ROOT)
                 require(source==baseline,'production changed')
-    cases_by_id={case['id']:case for case in cases};tuning={};native={};raw={};rust={};checked={};timed={};capabilities={};failures=[];rejected=set()
+    cases_by_id={case['id']:case for case in cases};tuning={};native={};raw={};rust={};checked={};timed={};capabilities={};failures=[];rejected={}
     def bind(result,backend,name,projected=False):
         require(result['backend']==backend,'executor label differs')
         require(result['input_sha256']==digest((records_only(texts[name]) if projected else texts[name]).encode()),'consumed input differs')
@@ -118,13 +119,20 @@ def validate(out,git_sources=False,allow_smoke=False):
             if result.get('status')!='ok': failures.append(event);continue
             bind(result,backend,name);check_result(result,backend,shots,header['repetitions'],policy=policy,batch=tuning.get((name,shots,backend)))
         elif kind=='rejected':
-            require(event['id'] not in rejected,'duplicate rejected cell');rejected.add(event['id']);failures.append(event)
+            require(event['id'] not in rejected,'duplicate rejected cell');rejected[event['id']]=event['reason'];failures.append(event)
         else: raise ValueError('unknown event kind')
     require(set(capabilities)=={(n,p) for n in manifest['inputs'] for p in POLICIES},'missing capability observations')
     for case in cases:
         require(case['id'] in rust,'missing Rust counts witness')
         require(all((case['name'],case['shots'],backend) in tuning for backend in inc.BACKENDS[1:]),'missing peer tuning')
         require(checked.get(case['id']) is True or case['id'] in rejected,'cell disappeared without retained rejection')
+        if case['id'] in rejected:
+            executors_incomplete=(rust[case['id']].get('status')!='ok' or
+                any(tuning[(case['name'],case['shots'],backend)] is None for backend in inc.BACKENDS[1:]))
+            reason='counts executor unsupported or peers incomplete' if executors_incomplete else 'counts finite witness disagreement'
+            require(rejected[case['id']]==reason,'rejection reason differs from retained executor evidence')
+            require(executors_incomplete or checked.get(case['id']) is False,
+                    'rejection lacks failed finite validation evidence')
         if checked.get(case['id']):
             require(case['id'] not in rejected,'validated cell also rejected')
             for pair in range(header['pairs']):

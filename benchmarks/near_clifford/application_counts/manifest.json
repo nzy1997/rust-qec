@@ -90,5 +90,17 @@
       "license": "Apache-2.0",
       "physical_correctness": "upstream generated surface-code fixture; no new physics certification"
     }
+  },
+  "licenses": {
+    "benchmarks/near_clifford/application_counts/fixtures/LICENSE-Clifft-paper": {
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "LICENSE",
+      "sha256": "732c3e3adada5f0e13611858f277526076101e5b18318932c120fdda339565ea"
+    },
+    "benchmarks/near_clifford/application_counts/fixtures/LICENSE-SOFT": {
+      "source_revision": "c89b98514a919240b8afa53a271e08d926d3c987",
+      "source_path": "LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    }
   }
 }
