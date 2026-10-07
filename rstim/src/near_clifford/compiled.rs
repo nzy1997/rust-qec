@@ -501,32 +501,11 @@ impl BatchOutput<'_> {
             }
         }
     }
-    fn packet_counts(&mut self, plan: &CompiledNearCliffordExecutor, records: &[u64], live: u64) {
-        let Self::Counts {
-            observable_index,
-            counts,
-        } = self
-        else {
-            return;
-        };
-        let mut accepted = live;
-        let mut logical = 0;
-        for &position in &plan.annotation_positions {
-            if let PlanOp::Annotation {
-                offsets,
-                observable,
-            } = &plan.operations[position]
-            {
-                let parity = offsets.iter().fold(0, |bits, &index| bits ^ records[index]);
-                match observable {
-                    None => accepted &= !parity,
-                    Some(index) if index == observable_index => logical ^= parity,
-                    _ => {}
-                }
-            }
+    fn packet_counts_reduced(&mut self, live: u64, logical: u64) {
+        if let Self::Counts { counts, .. } = self {
+            counts.accepted += live.count_ones() as usize;
+            counts.logical_errors += (live & logical).count_ones() as usize;
         }
-        counts.accepted += accepted.count_ones() as usize;
-        counts.logical_errors += (accepted & logical).count_ones() as usize;
     }
     fn packet_row(&mut self, records: &[u64], lane: usize) {
         if let Self::Measurements(output) = self {
@@ -3018,6 +2997,17 @@ impl CompiledNearCliffordSampler<'_> {
             let mut noise_event = 0;
             let mut independent_event = 0;
             let mut record = 0;
+            let selected_observable = match output {
+                BatchOutput::Counts {
+                    observable_index, ..
+                } => Some(*observable_index),
+                _ => None,
+            };
+            let postselect = selected_observable.is_some();
+            let mut logical = 0u64;
+            // Rejected lanes must not be mistaken for cache-admission failures:
+            // their counts are already final and they need no scalar replay.
+            let mut rejected = 0u64;
             for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
                 match op {
                     PlanOp::Basis(gates) => {
@@ -3132,7 +3122,36 @@ impl CompiledNearCliffordSampler<'_> {
                         };
                         pauli.packet_apply(mask, &mut x, &mut z);
                     }
-                    PlanOp::Annotation { .. } => {} // Flat output has no annotation fields.
+                    PlanOp::Annotation {
+                        offsets,
+                        observable,
+                    } => {
+                        if let Some(selected) = selected_observable {
+                            // Deferred record corrections precede every original
+                            // reader. Reduce each final raw annotation only once.
+                            match observable {
+                                None => {
+                                    let parity = offsets
+                                        .iter()
+                                        .fold(0, |bits, &index| bits ^ records[index]);
+                                    let newly_rejected = live & parity;
+                                    rejected |= newly_rejected;
+                                    live &= !newly_rejected;
+                                    if live == 0 {
+                                        // Complete typed tape/sidecars were produced first.
+                                        // Admission failures still replay their own rows.
+                                        break;
+                                    }
+                                }
+                                Some(index) if *index == selected => {
+                                    logical ^= offsets
+                                        .iter()
+                                        .fold(0, |bits, &index| bits ^ records[index]);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     PlanOp::Measure(m) => {
                         let anti = m.pauli.physical.packet_anti(&x, &z);
                         let mut branch = 0;
@@ -3268,10 +3287,12 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                 }
             }
-            debug_assert_eq!(event, random_count);
-            debug_assert_eq!(noise_event, plan.noise_event_count);
-            debug_assert_eq!(independent_event, plan.independent_event_count);
-            debug_assert_eq!(record, plan.measurement_count);
+            if !postselect || live != 0 {
+                debug_assert_eq!(event, random_count);
+                debug_assert_eq!(noise_event, plan.noise_event_count);
+                debug_assert_eq!(independent_event, plan.independent_event_count);
+                debug_assert_eq!(record, plan.measurement_count);
+            }
             // When almost every row replays, scalar arithmetic avoids duplicated work.
             // This affects only execution strategy, never random-event or record order.
             #[cfg(test)]
@@ -3279,11 +3300,14 @@ impl CompiledNearCliffordSampler<'_> {
                 self.last_packet_live = (live & all).count_ones() as usize;
                 self.last_packet_live_mask = live & all;
             }
-            if (live & all).count_ones() as usize <= lanes / 4 {
+            if ((live | rejected) & all).count_ones() as usize <= lanes / 4 {
                 self.pack_enabled = false;
             }
-            output.packet_counts(plan, &records, live & all);
+            output.packet_counts_reduced(live & all, logical);
             for lane in 0..lanes {
+                if rejected >> lane & 1 != 0 {
+                    continue;
+                }
                 if live >> lane & 1 != 0 {
                     output.packet_row(&records, lane);
                 } else {
@@ -3384,7 +3408,8 @@ impl CompiledNearCliffordSampler<'_> {
     /// The observable index must occur in the compiled circuit, even for zero shots.
     /// No reference normalization is performed. Scalar and admission-fallback rows
     /// skip remaining physics after a nonzero detector, while consuming all remaining
-    /// typed random events. Live packed rows complete their simulation. Sampling
+    /// typed random events. Packed counts also reject lanes when a raw detector
+    /// is nonzero, and stop suffix physics once no live lanes remain. Sampling
     /// preserves the random stream of [`Self::sample`] without batch output records.
     /// Rejected scalar suffixes do not perform physics or its fallible allocations.
     pub fn sample_postselected_counts(
@@ -5559,6 +5584,137 @@ mod scalar_prepared_tape_tests {
                     assert_eq!(a.clone().next_u64(), c.clone().next_u64());
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod postselected_packet_tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn all_rejected_packets_skip_suffix_physics_without_disabling_admitted_cache() {
+        let text = "X 0\nM 0\nDETECTOR rec[-1]\nH 1 2 3 4\nT 1 2 3 4\nREPEAT 129 {\nDEPOLARIZE1(0.001) 1 2 3 4\nH 5\nM(0.003) 5\nR 5\n}\nMPP X1*Y2*X3*Y4\nM 1 2 3 4\nOBSERVABLE_INCLUDE(7) rec[-1]\n";
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            assert_eq!(plan.peak_active_rank, 4);
+            assert!(plan.independent_event_count >= 129);
+            for budget in [0, DEFAULT_CACHE_BYTE_BUDGET] {
+                let mut candidate = plan.clone();
+                if budget == 0 {
+                    // This coherent-only invalid suffix would fail if executed.
+                    // Compilation and the retained random inventory stay valid.
+                    let pauli = candidate
+                        .operations
+                        .iter_mut()
+                        .find_map(|op| {
+                            if let PlanOp::Rotate { pauli, .. } = op {
+                                Some(pauli)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap();
+                    pauli.physical.phase = 4;
+                }
+                let mut native = candidate.prepare_sampler_with_cache_budget(budget).unwrap();
+                let initial_states = native.cache.as_ref().map(|cache| cache.states.len());
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(719);
+                let mut b = a.clone();
+                for shots in [64, 65, 129, 64] {
+                    let rows = reference.sample(shots, &mut a).unwrap();
+                    assert!(rows.iter().all(|row| row.detectors.iter().any(|bit| *bit)));
+                    assert_eq!(
+                        native.sample_postselected_counts(shots, 7, &mut b).unwrap(),
+                        NearCliffordPostselectedCounts {
+                            attempted: shots,
+                            accepted: 0,
+                            logical_errors: 0
+                        }
+                    );
+                    assert_eq!(native.last_packet_live, 0);
+                    assert!(
+                        native.pack_enabled,
+                        "postselection must not look like failed cache admission"
+                    );
+                    assert_eq!(
+                        native.cache.as_ref().map(|cache| cache.states.len()),
+                        initial_states
+                    );
+                    if let Some(cache) = &native.cache {
+                        assert!(cache.nodes.iter().all(|op| matches!(op, CachedOp::None)));
+                    }
+                    assert!(native.packet_independent.is_some());
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn zero_live_postselection_still_replays_accepted_admission_failures() {
+        let text = "H 0 1\nT 0 1\nCX 0 1\nMY !0\nDETECTOR rec[-1]\nMPP X0*X1\nOBSERVABLE_INCLUDE(7) rec[-1]\n";
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            let mut native = plan
+                .prepare_sampler_with_cache_budget(initial + 288)
+                .unwrap();
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(583);
+            let mut b = a.clone();
+            for shots in [64, 64, 65, 129] {
+                let rows = reference.sample(shots, &mut a).unwrap();
+                let accepted: Vec<_> = rows
+                    .iter()
+                    .filter(|row| row.detectors.iter().all(|bit| !*bit))
+                    .collect();
+                let errors = accepted
+                    .iter()
+                    .filter(|row| {
+                        row.observables
+                            .iter()
+                            .filter(|(index, _)| *index == 7)
+                            .fold(false, |parity, (_, bit)| parity ^ bit)
+                    })
+                    .count();
+                let counts = native.sample_postselected_counts(shots, 7, &mut b).unwrap();
+                assert_eq!(
+                    counts,
+                    NearCliffordPostselectedCounts {
+                        attempted: shots,
+                        accepted: accepted.len(),
+                        logical_errors: errors
+                    }
+                );
+                assert!(counts.accepted > 0 && counts.accepted < shots);
+                assert_eq!(
+                    native.last_packet_live, 0,
+                    "accepted rows must come from admission-failure replay"
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+            let expected = reference.sample_measurements_u8(65, &mut a).unwrap();
+            let actual = native.sample_measurements_u8(65, &mut b).unwrap();
+            assert_eq!(actual, expected);
+            assert_eq!(a.next_u64(), b.next_u64());
         }
     }
 }

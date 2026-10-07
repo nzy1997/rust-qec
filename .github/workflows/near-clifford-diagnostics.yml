@@ -15,7 +15,7 @@ jobs:
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection'
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -53,7 +53,7 @@ jobs:
             --python "$PWD/drafts/ci-clifft/bin/python" \
             --symft-python "$PWD/drafts/ci-symft/bin/python" \
             --symft-source "$PWD/drafts/ci-soft" \
-            --only msc_d3_inject_cultivate_p1e-3 --shots 1 --pairs 1 --repetitions 1
+            --only msc_d3_inject_cultivate_p1e-3 --shots 1 64 --pairs 1 --repetitions 1
           python benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
           python -O benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
           python benchmarks/near_clifford/application_counts/test_contract.py drafts/ci-counts-smoke
@@ -110,6 +110,9 @@ jobs:
           evidence=benchmarks/near_clifford/results/apple-m4-counts-annotations-2026-10-08
           python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
           python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+          evidence=benchmarks/near_clifford/results/apple-m4-packed-rejection-2026-10-08
+          python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
+          python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
   diagnostic-corruption:
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -136,7 +139,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [normal, optimized]
-        publication: [apple-m4-application-counts-2026-10-07, apple-m4-native-counts-2026-10-07, apple-m4-scalar-rejection-one-shot-2026-10-07, apple-m4-counts-annotations-2026-10-08]
+        publication: [apple-m4-application-counts-2026-10-07, apple-m4-native-counts-2026-10-07, apple-m4-scalar-rejection-one-shot-2026-10-07, apple-m4-counts-annotations-2026-10-08, apple-m4-packed-rejection-2026-10-08]
     steps:
       - uses: actions/checkout@v4
         with:
