@@ -5,6 +5,7 @@ import gzip
 import itertools
 import json
 import math
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -76,6 +77,10 @@ def validate(out,git_sources=False,allow_smoke=False):
     require(closure['binary_sha256']==header['binary_sha256'],'binary closure mismatch')
     require(closure['environment_after']==header['environment_before'],'peer environment closure mismatch')
     require(bool(header['sources']) and bool(header['symft_sources']),'missing source inventories')
+    mandatory={'benchmarks/near_clifford/diagnostics/'+name for name in
+               ['.gitignore','Cargo.toml','Cargo.lock','main.rs','corpus.py','run.py',
+                'peer_lifetime.py','verify.py','test_contract.py','README.md']}
+    require(mandatory <= set(header['sources']),'mandatory diagnostic harness sources missing')
     require(incumbent.environment_summary(header['packages'],header['symft_sources'],
             header['symft_source_revision'],header['peer_loaded_files'])==header['environment_before'],
             'peer environment receipt mismatch')
@@ -113,6 +118,7 @@ def validate(out,git_sources=False,allow_smoke=False):
                (p.endswith('.py') and p.count('/')==3 or p==prefix+'compiled_sota/manifest.json'
                 or p.startswith(prefix+'compiled_sota/fixtures/') and p.endswith('.stim'))}
         require(set(header['sources'])==expected_paths,'source inventory incomplete or extra paths')
+        require(mandatory <= expected_paths,'source revision predates diagnostic harness')
         for path,sha in header['sources'].items():
             data=subprocess.check_output(['git','show',header['source_revision']+':'+path],cwd=ROOT)
             require(digest(data)==sha,'source revision mismatch: '+path)
@@ -128,6 +134,8 @@ def validate(out,git_sources=False,allow_smoke=False):
     validations={}
     timings={}
     lifetime_outputs={}
+    lifetime_cells=set()
+    peer_lifetime_cells=set()
     failures=[]
     cells={c['id']:c for c in manifest['cells']}
     identities=header['peer_loaded_files']
@@ -136,6 +144,11 @@ def validate(out,git_sources=False,allow_smoke=False):
         result=event.get('result',{})
         if result.get('status')=='ok' or 'loaded_files' in result or 'warm_ns' in result:
             require('input_sha256' in result,'successful payload missing consumed-input identity')
+        peer_event=(kind in ['peer-validation','lifetime-peer-validation','peer-lifetime'] or
+                    kind=='timing' and event.get('backend')!='rstim')
+        if peer_event and ('measurements' in result or 'warm_ns' in result or result.get('status')=='ok'):
+            require('loaded_files' in result and result.get('isolated') is True,
+                    'successful peer payload missing import identity/isolation')
         if 'input_sha256' in result:
             name=event['id'].split('/')[0]
             if kind.startswith('lifetime') or kind=='peer-lifetime': name='msc5'
@@ -231,6 +244,12 @@ def validate(out,git_sources=False,allow_smoke=False):
                 require(raw['shots']>=8192,'insufficient lifecycle validation samples')
                 lifetime_rust_validation[(name,*requested,policy,budget)]=raw
         elif kind in ('lifetime','peer-lifetime'):
+            require(type(event['pair']) is int and 0<=event['pair']<manifest['pairs'],'lifecycle pair out of range')
+            key=((event['id'],event['pair']) if kind=='lifetime' else
+                 (event['id'],event['pair'],event['backend'],event['arithmetic_context']))
+            seen=lifetime_cells if kind=='lifetime' else peer_lifetime_cells
+            require(key not in seen,'duplicate lifecycle observation')
+            seen.add(key)
             if result.get('status')!='ok':
                 failures.append(event)
                 continue
@@ -244,6 +263,7 @@ def validate(out,git_sources=False,allow_smoke=False):
                 require(result['arithmetic']==policy and result['cache_bytes']==budget and
                         result['config']['history']==manifest['histories'][name] and
                         result['config']['repetitions']==manifest['repetitions'] and
+                        result['config']['arithmetic']==policy and result['config']['cache_bytes']==budget and
                         result['input_sha256']==manifest['fixtures']['msc5']['native_sha256'],
                         'lifetime payload differs from event configuration')
             else:
@@ -251,13 +271,30 @@ def validate(out,git_sources=False,allow_smoke=False):
                 require(name in manifest['histories'] and
                         result['config']['history']==manifest['histories'][name] and
                         result['config']['backend']==event['backend'] and
+                        event['arithmetic_context'] in ['strict','fused'] and
+                        result['config']['arithmetic_context']==event['arithmetic_context'] and
+                        result['config']['repetitions']==manifest['repetitions'] and
                         result['config']['batch']==lifetime_tuning[(name,event['backend'])],
                         'peer lifetime configuration mismatch')
+            units=[['rstim',budget] for budget in [0,1<<20,16<<20,64<<20]]+[
+                   [backend,lifetime_tuning[(name,backend)]] for backend in ['clifft','clifft-scheduled','symft']]
+            offset=event['pair']%len(units)
+            units=units[offset:]+units[:offset]
+            if event['pair']%2: units=units[::-1]
+            require(event['order']==units,'lifecycle process order differs from rotated/reversed protocol')
             for index,row in enumerate(result['histories']):
+                require([c['request'] for c in row['calls']]==manifest['histories'][name],
+                        'measured lifecycle calls differ from configured history')
                 require(row['sampling_ns']==sum(c['ns'] for c in row['calls']),'lifetime API sum mismatch')
                 require(row['phase_sum_ns']==row['compile_ns']+row['prepare_ns']+row['sampling_ns'],'lifetime phase sum mismatch')
                 require(all(c['ns']>0 for c in row['calls']),'nonpositive lifetime call')
                 if kind=='lifetime':
+                    require(isinstance(row['outputs_sha256'],str) and
+                            re.fullmatch('[0-9a-f]{64}',row['outputs_sha256']) is not None,
+                            'invalid lifecycle record digest')
+                    require(len(row['continuation'])==16 and
+                            all(type(v) is int and 0<=v<2**64 for v in row['continuation']),
+                            'invalid lifecycle RNG continuation')
                     history=result['config']['history']
                     require([c['request'] for c in row['calls']]==history,'lifetime history mismatch')
                     policy=result['arithmetic']
@@ -284,12 +321,13 @@ def validate(out,git_sources=False,allow_smoke=False):
                     for pair in range(manifest['pairs']):
                         require((f'msc5/lifetime/{name}/c{budget}/{policy}',pair) in actual,
                                 'missing lifetime cell')
-        peer_events={(e['id'],e['pair'],e['backend']) for e in events if e['kind']=='peer-lifetime'}
+        peer_events=peer_lifetime_cells
         for name,history in manifest['histories'].items():
             for backend in ['clifft','clifft-scheduled','symft']:
                 require((name,backend) in lifetime_tuning,'missing lifetime tuning')
-                for pair in range(manifest['pairs']):
-                    require((name,pair,backend) in peer_events,'missing peer lifetime timing')
+                for policy in ['strict','fused']:
+                    for pair in range(manifest['pairs']):
+                        require((name,pair,backend,policy) in peer_events,'missing peer lifetime timing')
             for kind,shots in sorted({(v['kind'],v['shots']) for v in history}):
                 peers={b:lifetime_peer_validation[(name,kind,shots,b)]
                        for b in ['clifft','clifft-scheduled','symft']}

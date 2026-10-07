@@ -201,6 +201,7 @@ def main():
                 record('timing',id=cell['id'],pair=pair,order=order,backend=backend,result=value)
     if 'lifetime' in args.groups:
         reference = {}
+        history_batches = {}
         for policy in POLICIES:
             for name,history in manifest['histories'].items():
                 fixture=manifest['fixtures']['msc5']
@@ -215,6 +216,7 @@ def main():
                             chosen[backend]=min(valid,key=lambda t:statistics.median(t['result']['warm_ns']))['batch']
                         record('lifetime-tuning',id=name,backend=backend,trials=trials,
                                selected=chosen.get(backend),selection_shots=representative)
+                    history_batches[name]=chosen
                     for request in sorted({ (v['kind'],v['shots']) for v in history }):
                         kind,count=request
                         total=math.ceil(8192/count)*count
@@ -224,7 +226,7 @@ def main():
                                    call_shots=count,selected=batch,
                                    result=compact(witness) if 'measurements' in witness else witness)
                 else:
-                    chosen={}
+                    chosen=history_batches[name]
                 for kind,count in sorted({(v['kind'],v['shots']) for v in history}):
                     total=math.ceil(8192/count)*count
                     for budget in BUDGETS:
@@ -237,22 +239,26 @@ def main():
                                arithmetic=policy,cache_bytes=budget,
                                result=compact(witness) if 'measurements' in witness else witness)
                 for pair in range(args.pairs):
-                    budgets=BUDGETS[pair%4:]+BUDGETS[:pair%4]
-                    if pair%2: budgets=budgets[::-1]
-                    for budget in budgets:
-                        cell = dict(id=f'msc5/lifetime/{name}/c{budget}/{policy}',fixture='msc5',
-                                    shots=1,cache_bytes=budget,arithmetic=policy)
-                        value=rust(cell,'lifetime',history=history)
-                        if value.get('status')=='ok':
-                            outputs=[(r['outputs_sha256'],r['continuation']) for r in value['histories']]
-                            key=(policy,name,pair)
-                            if key in reference and outputs != reference[key]:
-                                raise ValueError('cache budget changed same-plan lifetime raw records/RNG')
-                            reference[key]=outputs
-                        record('lifetime',id=cell['id'],pair=pair,result=value)
-                    for backend,batch in chosen.items():
+                    units=[('rstim',budget) for budget in BUDGETS]+list(chosen.items())
+                    offset=pair%len(units)
+                    units=units[offset:]+units[:offset]
+                    if pair%2: units=units[::-1]
+                    for backend,batch in units:
+                        if backend=='rstim':
+                            budget=batch
+                            cell=dict(id=f'msc5/lifetime/{name}/c{budget}/{policy}',fixture='msc5',
+                                      shots=1,cache_bytes=budget,arithmetic=policy)
+                            value=rust(cell,'lifetime',history=history)
+                            if value.get('status')=='ok':
+                                outputs=[(r['outputs_sha256'],r['continuation']) for r in value['histories']]
+                                key=(policy,name,pair)
+                                if key in reference and outputs!=reference[key]:
+                                    raise ValueError('cache budget changed same-plan lifetime raw records/RNG')
+                                reference[key]=outputs
+                            record('lifetime',id=cell['id'],pair=pair,order=units,result=value)
+                            continue
                         config=dict(backend=backend,batch=batch,history=history,
-                                    repetitions=args.repetitions,circuit=fixture['native_path'])
+                                    arithmetic_context=policy,repetitions=args.repetitions,circuit=fixture['native_path'])
                         path=out/'invocation.json'
                         path.write_text(json.dumps(config))
                         python=args.symft_python if backend=='symft' else args.python
@@ -261,7 +267,8 @@ def main():
                             incumbent.bind_peer(value,backend,packages,identities)
                             if value['input_sha256']!=fixture['native_sha256']:
                                 raise ValueError('lifetime peer input changed')
-                        record('peer-lifetime',id=name,pair=pair,backend=backend,result=value)
+                        record('peer-lifetime',id=name,pair=pair,backend=backend,arithmetic_context=policy,
+                               order=units,result=value)
     packages_after=incumbent.capture_packages(args.python,args.symft_python)
     identities_after={name:value['loaded_files'] for name,value in
                       incumbent.capture_identities(args.python,args.symft_python).items()}
