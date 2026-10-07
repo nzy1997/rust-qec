@@ -84,3 +84,93 @@ impl RowDraw for CompactReplay<'_> {
         // This retires the row. No subsequent event is read from its sidecars.
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn each_optional_sidecar_replays_literal_typed_events_without_reading_stale_cells() {
+        let mut kinds = vec![RandomKind::Active];
+        kinds.extend(std::iter::repeat_n(RandomKind::Independent, 131));
+        for probability in [0., 0.001, 0.01, 0.37, 1.] {
+            for choices in [1, 3, 15] {
+                kinds.push(RandomKind::Noise {
+                    probability,
+                    choices,
+                });
+            }
+            kinds.push(RandomKind::Active);
+        }
+        for seed in [173, 917] {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let expected: Vec<_> = {
+                let mut live = RowRandom::live(&mut rng);
+                kinds.iter().map(|&kind| live.draw(kind)).collect()
+            };
+            let mut untouched = rng.clone();
+            let mut noise = NoisePacket::new(&kinds, 15, PACKET_BYTE_BUDGET).unwrap();
+            let mut independent = IndependentPacket::new(131, PACKET_BYTE_BUDGET).unwrap();
+            let (mut n, mut i) = (0, 0);
+            for (&kind, &value) in kinds.iter().zip(&expected) {
+                match kind {
+                    RandomKind::Noise { .. } => {
+                        for bit in 0..4 {
+                            noise.planes()[n][bit] = ((value >> bit) & 1) << 63;
+                        }
+                        n += 1;
+                    }
+                    RandomKind::Independent => {
+                        i += 1;
+                    }
+                    _ => {}
+                }
+            }
+            assert_eq!(i, 131);
+            let words = independent.row(63);
+            i = 0;
+            for (&kind, &value) in kinds.iter().zip(&expected) {
+                if matches!(kind, RandomKind::Independent) {
+                    words[i / 64] |= value << (i % 64);
+                    i += 1;
+                }
+            }
+            independent.transpose(64);
+            for use_noise in [false, true] {
+                for use_independent in [false, true] {
+                    let tape: Vec<_> = kinds
+                        .iter()
+                        .zip(&expected)
+                        .map(|(&kind, &value)| {
+                            if (use_noise && matches!(kind, RandomKind::Noise { .. }))
+                                || (use_independent && matches!(kind, RandomKind::Independent))
+                            {
+                                u64::MAX
+                            } else {
+                                value
+                            }
+                        })
+                        .collect();
+                    let mut replay = CompactReplay::new(
+                        &tape,
+                        use_noise.then_some(&noise),
+                        use_independent.then_some(&independent),
+                        63,
+                    );
+                    for (&kind, &value) in kinds.iter().zip(&expected) {
+                        assert_eq!(
+                            replay.draw(kind),
+                            value,
+                            "seed={seed} noise={use_noise} independent={use_independent}"
+                        );
+                    }
+                    assert_eq!(replay.cursor(), kinds.len());
+                }
+            }
+            for _ in 0..16 {
+                assert_eq!(rng.next_u64(), untouched.next_u64());
+            }
+        }
+    }
+}
