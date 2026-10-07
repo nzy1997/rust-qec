@@ -83,6 +83,11 @@ def validate(out,git_sources=False,allow_smoke=False):
                ['.gitignore','Cargo.toml','Cargo.lock','main.rs','corpus.py','run.py',
                 'peer_lifetime.py','verify.py','test_contract.py','README.md']}
     require(mandatory <= set(header['sources']),'mandatory diagnostic harness sources missing')
+    producer_path='benchmarks/near_clifford/diagnostics/run.py'
+    helper_path='benchmarks/near_clifford/evidence_io.py'
+    require(producer_path in header['sources'],'missing diagnostic producer source')
+    if header['sources'][producer_path]!='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
+        require(helper_path in header['sources'],'nonlegacy producer omits event helper')
     require(incumbent.environment_summary(header['packages'],header['symft_sources'],
             header['symft_source_revision'],header['peer_loaded_files'])==header['environment_before'],
             'peer environment receipt mismatch')
@@ -124,6 +129,9 @@ def validate(out,git_sources=False,allow_smoke=False):
             ':benchmarks/near_clifford/diagnostics/run.py'],cwd=ROOT)
         if digest(producer)=='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
             expected_paths.discard(prefix+'evidence_io.py')
+        else:
+            require(helper_path in expected_paths and helper_path in header['sources'],
+                    'nonlegacy source revision must contain and inventory event helper')
         require(set(header['sources'])==expected_paths,'source inventory incomplete or extra paths')
         require(mandatory <= expected_paths,'source revision predates diagnostic harness')
         for path,sha in header['sources'].items():

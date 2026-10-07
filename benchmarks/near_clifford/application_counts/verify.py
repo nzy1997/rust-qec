@@ -45,6 +45,11 @@ def validate(out,git_sources=False,allow_smoke=False):
     required={'benchmarks/near_clifford/application_counts/'+name for name in
               ['.gitignore','Cargo.toml','Cargo.lock','main.rs','worker.py','common.py','run.py','verify.py','test_contract.py','README.md','manifest.json']}
     require(required<=set(header['sources']),'missing application harness sources')
+    producer_path='benchmarks/near_clifford/diagnostics/run.py'
+    helper_path='benchmarks/near_clifford/evidence_io.py'
+    require(producer_path in header['sources'],'missing diagnostic producer source')
+    if header['sources'][producer_path]!='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
+        require(helper_path in header['sources'],'nonlegacy producer omits event helper')
     if git_sources:
         names=subprocess.check_output(['git','ls-tree','-r','--name-only',header['source_revision']],cwd=ROOT,text=True).splitlines()
         expected={name for name in names if name.startswith('rstim/src/') and name.endswith('.rs') or
@@ -59,6 +64,9 @@ def validate(out,git_sources=False,allow_smoke=False):
             ':benchmarks/near_clifford/diagnostics/run.py'],cwd=ROOT)
         if digest(producer)=='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
             expected.discard('benchmarks/near_clifford/evidence_io.py')
+        else:
+            require(helper_path in expected and helper_path in header['sources'],
+                    'nonlegacy source revision must contain and inventory event helper')
         require(set(header['sources'])==expected and required<=expected,'incomplete source revision/inventory')
         for name,sha in header['sources'].items():
             source=subprocess.check_output(['git','show',header['source_revision']+':'+name],cwd=ROOT)

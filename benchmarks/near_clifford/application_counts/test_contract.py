@@ -61,8 +61,13 @@ def main():
                missing_capability,wrong_input,zero_time,fabricated_rejection,missing_witness_disguised_as_failure]
     if any(v.get('result',{}).get('sampler_info') for v in events):
         mutations.append(wrong_sampler_contract)
+    def missing_helper_inventory(e,h):
+        del h['sources']['benchmarks/near_clifford/evidence_io.py']
+    if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
+        mutations.append(missing_helper_inventory)
     for mutate in mutations:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
+        if mutate is missing_helper_inventory: c['sources_after']=h['sources']
         for index,event in enumerate(e): event['index']=index
         data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()
         c.update(events=len(e),events_sha256=digest(data))
