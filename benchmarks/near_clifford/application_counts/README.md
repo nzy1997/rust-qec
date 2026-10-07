@@ -89,6 +89,8 @@ The [scalar-rejection one-shot follow-up](../results/apple-m4-scalar-rejection-o
 retains eight complete Strict/Fused comparisons with the same raw-count contract.
 The [compiled annotation-index follow-up](../results/apple-m4-counts-annotations-2026-10-08/README.md)
 retains the complete 24-cell matrix with that same contract.
+The [packed-rejection follow-up](../results/apple-m4-packed-rejection-2026-10-08/README.md)
+retains a new complete 24-cell same-run peer comparison with streaming packet counts.
 
 The default `--rust-route native` benchmarks `sample_postselected_counts` through the
 public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v4` with
