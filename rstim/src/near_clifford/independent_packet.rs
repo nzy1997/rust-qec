@@ -12,6 +12,16 @@ pub(super) struct IndependentPacket {
 }
 
 impl IndependentPacket {
+    #[cfg(test)]
+    pub(super) fn snapshot(&self) -> (Vec<u64>, usize, Vec<u64>, usize, usize) {
+        (
+            self.rows.clone(),
+            self.rows.capacity(),
+            self.masks.clone(),
+            self.masks.capacity(),
+            self.words_per_row,
+        )
+    }
     pub(super) fn new(count: usize, remaining_bytes: usize) -> Option<Self> {
         // Small independent populations retain the existing fill/gather path.
         if count < MIN_INDEPENDENT_COUNT {

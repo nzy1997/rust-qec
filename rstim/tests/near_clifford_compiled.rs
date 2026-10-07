@@ -1116,6 +1116,65 @@ fn compiled_long_random_runs_keep_records_and_rng_across_packets_and_call_splits
 }
 
 #[test]
+fn compiled_compact_noise_keeps_cache_replay_tails_and_split_typed_rng_streams() {
+    let mut text = String::from(
+        "H 0 1\nT 0 1\nDEPOLARIZE2(0) 0 1\nDEPOLARIZE2(1) 0 1\nMPP(0.007) !Y0*X1\nMRX(0.37) !0\nCX rec[-1] 1\n",
+    );
+    text.push_str("REPEAT 33 {\nX_ERROR(0.01) 0 2\nDEPOLARIZE1(0.01) 2\nDEPOLARIZE2(0.01) 0 1\nY_ERROR(0.37) 2\nMR(0.001) 2\nCX rec[-1] 0\nR 3\nH 3\nM 3\n}\nT_DAG 1\nMX 0\nMY 1\n");
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic).unwrap();
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        for budget in [0, initial + 288, 64 * 1024 * 1024] {
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut packed = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+            let mut a = StdRng::seed_from_u64(1604);
+            let mut b = a.clone();
+            for shots in [64, 63, 129, 1, 32, 64] {
+                let expected = scalar.sample(shots, &mut a).unwrap();
+                let actual = packed.sample_measurements_u8(shots, &mut b).unwrap();
+                assert_eq!(
+                    actual.measurements,
+                    expected
+                        .iter()
+                        .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+        }
+        let mut a = StdRng::seed_from_u64(1605);
+        let mut b = a.clone();
+        let expected = plan.sample(129, &mut a).unwrap();
+        let mut packed = plan.prepare_sampler().unwrap();
+        let mut actual = packed
+            .sample_measurements_u8(64, &mut b)
+            .unwrap()
+            .measurements;
+        actual.extend(
+            packed
+                .sample_measurements_u8(65, &mut b)
+                .unwrap()
+                .measurements,
+        );
+        assert_eq!(
+            actual,
+            expected
+                .iter()
+                .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(a.next_u64(), b.next_u64());
+    }
+}
+
+#[test]
 fn compiled_both_rotation_policies_match_independent_full_joint_noisy_density() {
     // Evolve every dense physical branch independently, then compare public
     // structured and flat samples with that complete joint distribution.

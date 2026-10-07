@@ -12,9 +12,15 @@ use random_event_runs::RandomRunPlan;
 #[path = "independent_packet.rs"]
 mod independent_packet;
 use independent_packet::IndependentPacket;
+#[path = "noise_packet.rs"]
+mod noise_packet;
+use noise_packet::NoisePacket;
 #[path = "scalar_basis.rs"]
 mod scalar_basis;
 use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
+#[cfg(test)]
+#[path = "lazy_uniform_reference_tests.rs"]
+mod lazy_uniform_reference_tests;
 
 const PLAN_BYTE_BUDGET: usize = 64 * 1024 * 1024;
 const COEFFICIENT_BYTE_BUDGET: usize = 64 * 1024 * 1024;
@@ -1429,6 +1435,14 @@ impl CompiledNearCliffordExecutor {
             #[cfg(test)]
             last_packet_live: 0,
             #[cfg(test)]
+            last_packet_live_mask: 0,
+            #[cfg(test)]
+            last_packet_error_producer: None,
+            #[cfg(test)]
+            observe_lazy_error_producer: false,
+            #[cfg(test)]
+            materialized_packet_reference: false,
+            #[cfg(test)]
             last_scalar_prepared: false,
             packet_x: Vec::new(),
             packet_z: Vec::new(),
@@ -1462,6 +1476,14 @@ pub struct CompiledNearCliffordSampler<'a> {
     #[cfg(test)]
     last_packet_live: usize,
     #[cfg(test)]
+    last_packet_live_mask: u64,
+    #[cfg(test)]
+    last_packet_error_producer: Option<PacketErrorProducerObservation>,
+    #[cfg(test)]
+    observe_lazy_error_producer: bool,
+    #[cfg(test)]
+    materialized_packet_reference: bool,
+    #[cfg(test)]
     last_scalar_prepared: bool,
     packet_x: Vec<u64>,
     packet_z: Vec<u64>,
@@ -1470,6 +1492,16 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_noise_masks: Vec<u64>,
     packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
+}
+
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+struct PacketErrorProducerObservation {
+    lanes: usize,
+    coherent: bool,
+    noise_admitted: bool,
+    noise_reserved_bytes: usize,
+    rows: Vec<Vec<u64>>,
 }
 
 impl Planner {
@@ -1859,6 +1891,83 @@ fn broadcast_packet_state(states: &mut [Option<usize>; 64], mut mask: u64, id: O
     }
 }
 
+// Some(id) means every live lane has that exact ID; the array may be stale
+// and must not be read. With None, every live lane is materialized in lanes.
+struct PacketCacheStates {
+    lanes: [Option<usize>; 64],
+    uniform: Option<usize>,
+    #[cfg(test)]
+    materialized_reference: bool,
+}
+impl PacketCacheStates {
+    #[cfg(test)]
+    fn enable_materialized_reference(&mut self, start: usize) {
+        self.materialized_reference = true;
+        self.lanes = [Some(start); 64];
+        self.uniform = None;
+    }
+    #[cfg(test)]
+    fn reference_transition(&mut self, mask: u64, id: Option<usize>) {
+        if self.materialized_reference {
+            // Literal S2 writes, including newly dead lanes, before live removal.
+            for lane in 0..64 {
+                if mask & (1u64 << lane) != 0 {
+                    self.lanes[lane] = id;
+                }
+            }
+        }
+    }
+    fn new(start: usize) -> Self {
+        Self {
+            lanes: [None; 64],
+            uniform: Some(start),
+            #[cfg(test)]
+            materialized_reference: false,
+        }
+    }
+    fn uniform(&mut self, live: u64) -> Option<usize> {
+        #[cfg(test)]
+        if self.materialized_reference {
+            // Frozen S2 representation: literal scan, never inspect the hint
+            // or call a production scan helper.
+            let first = (0..64).find(|&lane| live & (1u64 << lane) != 0)?;
+            let id = self.lanes[first]?;
+            for lane in 0..64 {
+                if live & (1u64 << lane) != 0 && self.lanes[lane] != Some(id) {
+                    return None;
+                }
+            }
+            return Some(id);
+        }
+        if live == 0 {
+            return None;
+        }
+        if self.uniform.is_none() {
+            self.uniform = uniform_packet_state(&self.lanes, live);
+        }
+        self.uniform
+    }
+    // masks partition the pre-operation live set. live is the post-admission
+    // subset after callers remove every mask whose next ID is None.
+    fn finish_uniform(&mut self, masks: [u64; 2], next: [Option<usize>; 2], live: u64) {
+        #[cfg(test)]
+        if self.materialized_reference {
+            return; // Each reference transition was already broadcast immediately.
+        }
+        match (masks[0] & live != 0, masks[1] & live != 0) {
+            (false, false) => self.uniform = None,
+            (true, false) => self.uniform = next[0],
+            (false, true) => self.uniform = next[1],
+            (true, true) if next[0] == next[1] => self.uniform = next[0],
+            (true, true) => {
+                self.uniform = None;
+                broadcast_packet_state(&mut self.lanes, masks[0] & live, next[0]);
+                broadcast_packet_state(&mut self.lanes, masks[1] & live, next[1]);
+            }
+        }
+    }
+}
+
 fn fill_original_row_with_noise_masks<R: Rng>(
     random: &mut RowRandom<'_, R>,
     kinds: &[RandomKind],
@@ -1914,8 +2023,10 @@ fn resize_packet(buffer: &mut Vec<u64>, len: usize) -> Result<(), String> {
             .try_reserve_exact(len - buffer.len())
             .map_err(|e| format!("compiled packet allocation failed: {e}"))?;
     }
-    // Every used frame/record cell is cleared by the packet and every tape
-    // event is filled by its row generator. Retained cells need no second fill.
+    // Used frame/record cells are cleared by the packet. Active events fill
+    // their tape slots; compact Independent/Noise slots can remain untouched
+    // until restoration makes the full tape complete for each replayed row.
+    // Retained cells need no second fill here.
     buffer.resize(len, 0);
     Ok(())
 }
@@ -2654,6 +2765,7 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut Vec<u8>,
         coherent: bool,
+        mut noise_packet: Option<&mut NoisePacket>,
     ) -> Result<(), String> {
         let mut x = std::mem::take(&mut self.packet_x);
         let mut z = std::mem::take(&mut self.packet_z);
@@ -2669,11 +2781,24 @@ impl CompiledNearCliffordSampler<'_> {
                     .reset(&plan.initial_coefficients, lanes, plan.peak_active_rank)?;
             }
             noise_masks.fill(0);
+            if let Some(packet) = &mut noise_packet {
+                packet.clear();
+            }
             for lane in 0..lanes {
                 let mut random = RowRandom::live(&mut *rng);
                 let row = &mut tape[lane * random_count..(lane + 1) * random_count];
                 if let Some(runs) = &plan.random_runs {
-                    if let Some(packet) = &mut independent_packet {
+                    if let Some(packet) = &mut noise_packet {
+                        runs.fill_row_with_compact_noise(
+                            &mut random,
+                            &plan.random_kinds,
+                            row,
+                            &mut noise_masks,
+                            1u64 << lane,
+                            packet.planes(),
+                            independent_packet.as_mut().map(|packet| packet.row(lane)),
+                        );
+                    } else if let Some(packet) = &mut independent_packet {
                         runs.fill_row_with_compact_independent(
                             &mut random,
                             &plan.random_kinds,
@@ -2704,11 +2829,41 @@ impl CompiledNearCliffordSampler<'_> {
             if let Some(packet) = &mut independent_packet {
                 packet.transpose(lanes);
             }
+            #[cfg(test)]
+            if self.observe_lazy_error_producer {
+                // Observe completed producer storage before any physics/Err.
+                // Decode into copies only: original tape/sidecars are untouched.
+                let rows = (0..lanes)
+                    .map(|lane| {
+                        let mut row = tape[lane * random_count..(lane + 1) * random_count].to_vec();
+                        if let Some(packet) = &noise_packet {
+                            packet.restore_row(&plan.random_kinds, &mut row, lane);
+                        }
+                        if let Some(packet) = &independent_packet {
+                            packet.restore_row(&plan.random_kinds, &mut row, lane);
+                        }
+                        row
+                    })
+                    .collect();
+                self.last_packet_error_producer = Some(PacketErrorProducerObservation {
+                    lanes,
+                    coherent,
+                    noise_admitted: noise_packet.is_some(),
+                    noise_reserved_bytes: noise_packet
+                        .as_ref()
+                        .map_or(0, |packet| packet.lazy_error_reserved_bytes()),
+                    rows,
+                });
+            }
             x.fill(0);
             z.fill(0);
             records.fill(0);
             let start = self.cache.as_ref().map_or(0, |cache| cache.start);
-            let mut states = [Some(start); 64];
+            let mut states = PacketCacheStates::new(start);
+            #[cfg(test)]
+            if self.materialized_packet_reference {
+                states.enable_materialized_reference(start);
+            }
             let all = if lanes == 64 {
                 u64::MAX
             } else {
@@ -2740,8 +2895,9 @@ impl CompiledNearCliffordSampler<'_> {
                                 anti,
                                 plan.rotation_arithmetic,
                             )?;
-                        } else if let Some(id) = uniform_packet_state(&states, live) {
+                        } else if let Some(id) = states.uniform(live) {
                             let masks = [live & !anti, live & anti];
+                            let mut next_states = [None; 2];
                             for (sign, mask) in masks.into_iter().enumerate() {
                                 if mask == 0 {
                                     continue;
@@ -2755,11 +2911,14 @@ impl CompiledNearCliffordSampler<'_> {
                                     sign != 0,
                                     &mut next,
                                 )?;
-                                broadcast_packet_state(&mut states, mask, next);
+                                next_states[sign] = next;
+                                #[cfg(test)]
+                                states.reference_transition(mask, next);
                                 if next.is_none() {
                                     live &= !mask;
                                 }
                             }
+                            states.finish_uniform(masks, next_states, live);
                         } else {
                             let mut remaining = live;
                             while remaining != 0 {
@@ -2771,9 +2930,9 @@ impl CompiledNearCliffordSampler<'_> {
                                     *expand,
                                     *dagger,
                                     anti >> lane & 1 != 0,
-                                    &mut states[lane],
+                                    &mut states.lanes[lane],
                                 )?;
-                                if states[lane].is_none() {
+                                if states.lanes[lane].is_none() {
                                     live &= !(1 << lane);
                                 }
                             }
@@ -2781,7 +2940,7 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                     PlanOp::Noise { choices, .. } => {
                         // No-hit channels have no effect on any frame or record.
-                        // Typed draws remain in the complete tape for replay.
+                        // Optional compact draws restore the complete tape before replay.
                         let selected = noise_masks[noise_event];
                         noise_event += 1;
                         event += 1;
@@ -2795,13 +2954,17 @@ impl CompiledNearCliffordSampler<'_> {
                                 records[*index] ^= selected;
                             }
                         } else {
-                            let masks = packet_choice_masks(
-                                selected,
-                                choices.len(),
-                                &tape,
-                                event - 1,
-                                random_count,
-                            );
+                            let masks = if let Some(packet) = &noise_packet {
+                                packet.choice_masks(noise_event - 1, selected, choices.len())
+                            } else {
+                                packet_choice_masks(
+                                    selected,
+                                    choices.len(),
+                                    &tape,
+                                    event - 1,
+                                    random_count,
+                                )
+                            };
                             for (choice, mask) in choices.iter().zip(masks) {
                                 if mask != 0 {
                                     choice.pauli.packet_apply(mask, &mut x, &mut z);
@@ -2866,7 +3029,7 @@ impl CompiledNearCliffordSampler<'_> {
                                         y,
                                         if offset { branch ^ all } else { branch },
                                     )?;
-                                } else if let Some(id) = uniform_packet_state(&states, live) {
+                                } else if let Some(id) = states.uniform(live) {
                                     let probability =
                                         self.cached_probability_zero(node, &m.pauli, Some(id))?;
                                     let mut remaining = live;
@@ -2880,6 +3043,7 @@ impl CompiledNearCliffordSampler<'_> {
                                         }
                                     }
                                     let masks = [live & !branch, live & branch];
+                                    let mut next_states = [None; 2];
                                     for (bit, mask) in masks.into_iter().enumerate() {
                                         if mask == 0 {
                                             continue;
@@ -2894,11 +3058,14 @@ impl CompiledNearCliffordSampler<'_> {
                                             bit != 0,
                                             &mut next,
                                         )?;
-                                        broadcast_packet_state(&mut states, mask, next);
+                                        next_states[bit] = next;
+                                        #[cfg(test)]
+                                        states.reference_transition(mask, next);
                                         if next.is_none() {
                                             live &= !mask;
                                         }
                                     }
+                                    states.finish_uniform(masks, next_states, live);
                                 } else {
                                     let mut remaining = live;
                                     while remaining != 0 {
@@ -2908,7 +3075,7 @@ impl CompiledNearCliffordSampler<'_> {
                                             >= self.cached_probability_zero(
                                                 node,
                                                 &m.pauli,
-                                                states[lane],
+                                                states.lanes[lane],
                                             )?;
                                         if bit {
                                             branch |= 1 << lane;
@@ -2920,9 +3087,9 @@ impl CompiledNearCliffordSampler<'_> {
                                             y,
                                             bit ^ offset,
                                             bit,
-                                            &mut states[lane],
+                                            &mut states.lanes[lane],
                                         )?;
-                                        if states[lane].is_none() {
+                                        if states.lanes[lane].is_none() {
                                             live &= !(1 << lane);
                                         }
                                     }
@@ -2966,6 +3133,7 @@ impl CompiledNearCliffordSampler<'_> {
             #[cfg(test)]
             {
                 self.last_packet_live = (live & all).count_ones() as usize;
+                self.last_packet_live_mask = live & all;
             }
             if (live & all).count_ones() as usize <= lanes / 4 {
                 self.pack_enabled = false;
@@ -2976,6 +3144,13 @@ impl CompiledNearCliffordSampler<'_> {
                 } else {
                     // Admission failed. Replay the same row's already drawn events;
                     // no quantum result is resampled and the caller RNG is untouched.
+                    if let Some(packet) = &noise_packet {
+                        packet.restore_row(
+                            &plan.random_kinds,
+                            &mut tape[lane * random_count..(lane + 1) * random_count],
+                            lane,
+                        );
+                    }
                     if let Some(packet) = &independent_packet {
                         packet.restore_row(
                             &plan.random_kinds,
@@ -3093,12 +3268,41 @@ impl CompiledNearCliffordSampler<'_> {
                         IndependentPacket::new(self.plan.independent_event_count, remaining)
                     });
             }
+            // Preserve the existing full-tape admission and Independent priority.
+            // This optional local buffer is never retained by the sampler, and is
+            // dropped before scalar fallback can reconsider scalar tape admission.
+            let mut noise_packet = if shots >= 64 && self.plan.random_runs.is_some() {
+                self.scalar_tape_other_bytes()
+                    .and_then(|n| {
+                        self.packet_tape
+                            .capacity()
+                            .checked_mul(size_of::<u64>())
+                            .and_then(|tape| n.checked_add(tape))
+                    })
+                    .and_then(|occupied| PACKET_BYTE_BUDGET.checked_sub(occupied))
+                    .and_then(|remaining| {
+                        NoisePacket::new(
+                            &self.plan.random_kinds,
+                            self.plan.noise_event_count,
+                            remaining,
+                        )
+                    })
+            } else {
+                None
+            };
             for offset in (0..shots).step_by(64) {
                 let lanes = (shots - offset).min(64);
                 let coherent = coherent_eligible && (!self.pack_enabled || self.cache.is_none());
                 if coherent || (self.pack_enabled && self.cache.is_some()) {
-                    self.packet(lanes, sweep, rng, &mut measurements, coherent)?;
+                    // Tails retain the original fill/consumer without compact clearing.
+                    let compact = if lanes == 64 {
+                        noise_packet.as_mut()
+                    } else {
+                        None
+                    };
+                    self.packet(lanes, sweep, rng, &mut measurements, coherent, compact)?;
                 } else {
+                    drop(noise_packet.take());
                     for _ in 0..lanes {
                         measurements
                             .extend(self.row(sweep, rng)?.measurements.into_iter().map(u8::from));
@@ -3122,6 +3326,151 @@ impl CompiledNearCliffordSampler<'_> {
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    // Literal S2 array bookkeeping. Keep these loops independent of the
+    // production uniform scan/broadcast helpers and lazy-state hint.
+    fn literal_uniform(lanes: &[Option<usize>; 64], live: u64) -> Option<usize> {
+        let first = (0..64).find(|&lane| live & (1u64 << lane) != 0)?;
+        let id = lanes[first]?;
+        for lane in 0..64 {
+            if live & (1u64 << lane) != 0 && lanes[lane] != Some(id) {
+                return None;
+            }
+        }
+        Some(id)
+    }
+
+    fn literal_transition(lanes: &mut [Option<usize>; 64], mask: u64, id: Option<usize>) {
+        for lane in 0..64 {
+            if mask & (1u64 << lane) != 0 {
+                lanes[lane] = id;
+            }
+        }
+    }
+
+    fn check_lazy_against_literal(
+        lazy: &mut PacketCacheStates,
+        literal: &[Option<usize>; 64],
+        live: u64,
+    ) {
+        // Decode before uniform() can install a reconvergence hint.
+        for lane in 0..64 {
+            if live & (1u64 << lane) != 0 {
+                let actual = if let Some(id) = lazy.uniform {
+                    Some(id)
+                } else {
+                    lazy.lanes[lane]
+                };
+                assert_eq!(actual, literal[lane], "lane={lane}; live={live:#x}");
+            }
+        }
+        if lazy.uniform.is_none() {
+            for lane in 0..64 {
+                if live & (1u64 << lane) != 0 {
+                    assert!(lazy.lanes[lane].is_some());
+                }
+            }
+        }
+        assert_eq!(lazy.uniform(live), literal_uniform(literal, live));
+    }
+
+    fn check_lazy_partition(pre_live: u64, first: u64, next: [Option<usize>; 2]) {
+        assert_eq!(first & !pre_live, 0);
+        let masks = [first, pre_live & !first];
+        let mut lazy = PacketCacheStates::new(7);
+        // Poison the lazy array to prove uniform hints hide stale entries.
+        lazy.lanes.fill(Some(usize::MAX));
+        let mut literal = [Some(7); 64];
+        assert_eq!(lazy.uniform(pre_live), literal_uniform(&literal, pre_live));
+        let mut live = pre_live;
+        for bit in 0..2 {
+            literal_transition(&mut literal, masks[bit], next[bit]);
+            if next[bit].is_none() {
+                live &= !masks[bit];
+            }
+        }
+        lazy.finish_uniform(masks, next, live);
+        check_lazy_against_literal(&mut lazy, &literal, live);
+    }
+
+    #[test]
+    fn lazy_cached_states_match_literal_admission_and_tail_partitions() {
+        // Exhaustive sparse live sets and their partitions for widths 0..=6.
+        for width in 0..=6 {
+            for pre_live in 0u64..(1u64 << width) {
+                for first in 0u64..(1u64 << width) {
+                    if first & !pre_live != 0 {
+                        continue;
+                    }
+                    for next in [
+                        [Some(0), Some(0)],
+                        [Some(11), Some(11)],
+                        [Some(11), Some(12)],
+                        [Some(11), None],
+                        [None, Some(12)],
+                        [None, None],
+                    ] {
+                        check_lazy_partition(pre_live, first, next);
+                    }
+                }
+            }
+        }
+        let tail63 = (1u64 << 63) - 1;
+        let sparse = 1 | (1u64 << 31) | (1u64 << 63);
+        for pre_live in [0, 1, 1u64 << 63, tail63, sparse, u64::MAX] {
+            for first in [0, pre_live, pre_live & 0x5555_5555_5555_5555] {
+                for next in [
+                    [Some(0), Some(0)],
+                    [Some(11), Some(11)],
+                    [Some(11), Some(12)],
+                    [Some(11), None],
+                    [None, Some(12)],
+                    [None, None],
+                ] {
+                    check_lazy_partition(pre_live, first, next);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn lazy_cached_states_reconverge_then_split_without_reading_stale_lanes() {
+        let live = 1 | (1u64 << 17) | (1u64 << 63);
+        let masks = [1 | (1u64 << 63), 1u64 << 17];
+        let mut lazy = PacketCacheStates::new(7);
+        let mut literal = [Some(7); 64];
+        lazy.finish_uniform(masks, [Some(11), Some(12)], live);
+        literal_transition(&mut literal, masks[0], Some(11));
+        literal_transition(&mut literal, masks[1], Some(12));
+        check_lazy_against_literal(&mut lazy, &literal, live);
+        assert!(lazy.uniform.is_none());
+        // Emulate unchanged diverse-lane transitions to one actual ID.
+        for lane in [0, 17, 63] {
+            lazy.lanes[lane] = Some(0);
+            literal[lane] = Some(0);
+        }
+        check_lazy_against_literal(&mut lazy, &literal, live);
+        assert_eq!(lazy.uniform, Some(0));
+        lazy.lanes.fill(Some(usize::MAX));
+        lazy.finish_uniform(masks, [Some(21), Some(22)], live);
+        literal_transition(&mut literal, masks[0], Some(21));
+        literal_transition(&mut literal, masks[1], Some(22));
+        check_lazy_against_literal(&mut lazy, &literal, live);
+        assert!(lazy.uniform.is_none());
+        // One failed branch leaves a uniform surviving subset.
+        lazy.finish_uniform(masks, [Some(23), Some(23)], live);
+        literal_transition(&mut literal, live, Some(23));
+        literal_transition(&mut literal, masks[0], None);
+        literal_transition(&mut literal, masks[1], Some(24));
+        lazy.finish_uniform(masks, [None, Some(24)], masks[1]);
+        check_lazy_against_literal(&mut lazy, &literal, masks[1]);
+        assert_eq!(lazy.uniform, Some(24));
+        // Finally all admitted survivors die. No stale entry can revive them.
+        lazy.finish_uniform([0, masks[1]], [None, None], 0);
+        literal_transition(&mut literal, masks[1], None);
+        check_lazy_against_literal(&mut lazy, &literal, 0);
+        assert!(lazy.uniform.is_none());
+    }
 
     fn single(v: &mut [ComplexAmp], q: usize, m: [[ComplexAmp; 2]; 2]) {
         let bit = 1 << q;
@@ -3553,6 +3902,106 @@ mod tests {
             );
             assert!(flat.packet_independent.is_some());
             assert_eq!(flat.coefficient_cache_reserved_bytes(), 0);
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
+    fn compact_noise_restores_mixed_and_all_cache_dead_rows_before_scalar_fallback() {
+        // Noise and Independent events on disjoint dormant qubits do not change
+        // the two active projections used by the existing partial-replay witness.
+        let mut text = String::from("H 0 1\nT 0 1\nCX 0 1\nMY 0\nMX 1\n");
+        text.push_str("REPEAT 33 {\nX_ERROR(0.01) 2\nDEPOLARIZE1(0.01) 2\nDEPOLARIZE2(0.01) 2 3\nY_ERROR(0.37) 2\nMR(0.001) 2\nR 4\nH 4\nM 4\n}\nDEPOLARIZE2(0) 2 3\nDEPOLARIZE2(1) 2 3\nMR(0.37) 2\n");
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            assert!(plan.noise_event_count >= MIN_SCALAR_PREPARED_NOISE_EVENTS);
+            // Scheduled independent events end the deterministic prefix before
+            // the two T expansions. Their 2- and 4-coefficient states cost
+            // 288 + 320 bytes, then one 2-coefficient projection costs 288.
+            assert_eq!(plan.initial_coefficients.len(), 1);
+            assert_eq!(
+                CoefficientCache::state_charge(&[ComplexAmp::new(0., 0.); 2]),
+                Some(288)
+            );
+            assert_eq!(
+                CoefficientCache::state_charge(&[ComplexAmp::new(0., 0.); 4]),
+                Some(320)
+            );
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for extra in [0, 896] {
+                let mut packed = plan
+                    .prepare_sampler_with_cache_budget(initial + extra)
+                    .unwrap();
+                assert!(packed.cache.is_some());
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(1606);
+                let mut b = a.clone();
+                let expected = scalar.sample(64, &mut a).unwrap();
+                let actual = packed.sample_measurements_u8(64, &mut b).unwrap();
+                assert_eq!(
+                    actual.measurements,
+                    expected
+                        .iter()
+                        .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                        .collect::<Vec<_>>()
+                );
+                if extra == 0 {
+                    assert_eq!(packed.last_packet_live, 0);
+                    assert!(!packed.pack_enabled);
+                } else {
+                    assert!(
+                        packed.last_packet_live > 0 && packed.last_packet_live < 64,
+                        "{arithmetic:?} extra={extra} live={} initial={initial} reserved={}",
+                        packed.last_packet_live,
+                        packed.coefficient_cache_reserved_bytes()
+                    );
+                }
+                assert_eq!(packed.coefficient_cache_reserved_bytes(), initial + extra);
+                assert!(packed.packet_independent.is_some());
+                assert_eq!(a.next_u64(), b.next_u64());
+                // Subsequent calls keep the original prepared-scalar admission.
+                for shots in [63, 64] {
+                    let expected = scalar.sample(shots, &mut a).unwrap();
+                    let actual = packed.sample_measurements_u8(shots, &mut b).unwrap();
+                    assert_eq!(
+                        actual.measurements,
+                        expected
+                            .iter()
+                            .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                            .collect::<Vec<_>>()
+                    );
+                    if extra == 0 {
+                        assert!(packed.last_scalar_prepared);
+                    }
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+            // ONE call must drop its local Noise allocation after the first
+            // all-dead packet, before preparing scalar rows for 64 + 1 shots.
+            let mut packed = plan.prepare_sampler_with_cache_budget(initial).unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(1607);
+            let mut b = a.clone();
+            let expected = scalar.sample(129, &mut a).unwrap();
+            let actual = packed.sample_measurements_u8(129, &mut b).unwrap();
+            assert_eq!(
+                actual.measurements,
+                expected
+                    .iter()
+                    .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(packed.last_packet_live, 0);
+            assert!(!packed.pack_enabled);
+            assert!(packed.last_scalar_prepared);
             assert_eq!(a.next_u64(), b.next_u64());
         }
     }
@@ -4271,6 +4720,19 @@ mod scalar_prepared_tape_tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
 
+    pub(super) fn draw_frozen_packet_rows(
+        kinds: &[RandomKind],
+        lanes: usize,
+        rng: &mut impl Rng,
+    ) -> Vec<Vec<u64>> {
+        (0..lanes)
+            .map(|_| {
+                let mut row = FrozenScalarRowRandom::live(&mut *rng);
+                kinds.iter().map(|&kind| row.draw(kind)).collect()
+            })
+            .collect()
+    }
+
     // Exact baseline live typed policy, captured before the new row strategy.
     // It never calls production RowRandom or the prepared run implementation.
     struct FrozenScalarRowRandom<'a, R> {
@@ -4696,6 +5158,82 @@ mod scalar_prepared_tape_tests {
         assert!(plan.independent_event_count >= 129);
         assert!(plan.random_runs.is_some());
         plan
+    }
+
+    #[test]
+    fn noncompact_full_noise_packet_matches_frozen_typed_rows_with_both_independent_modes() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = mixed_plan_with_arithmetic(policy);
+            assert!(plan.noise_event_count > 0);
+            let baseline = without_runs(&plan);
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for cache_budget in [initial, DEFAULT_CACHE_BYTE_BUDGET] {
+                for compact_independent in [false, true] {
+                    let mut packed = plan
+                        .prepare_sampler_with_cache_budget(cache_budget)
+                        .unwrap();
+                    assert!(packed.cache.is_some());
+                    resize_packet(&mut packed.packet_x, plan.num_qubits).unwrap();
+                    resize_packet(&mut packed.packet_z, plan.num_qubits).unwrap();
+                    resize_packet(&mut packed.packet_records, plan.measurement_count).unwrap();
+                    resize_packet(&mut packed.packet_noise_masks, plan.noise_event_count).unwrap();
+                    resize_packet(&mut packed.packet_tape, 64 * plan.random_kinds.len()).unwrap();
+                    packed.packet_tape.fill(u64::MAX);
+                    if compact_independent {
+                        let occupied = packed.scalar_tape_other_bytes().unwrap()
+                            + packed.packet_tape.capacity() * size_of::<u64>();
+                        packed.packet_independent = IndependentPacket::new(
+                            plan.independent_event_count,
+                            PACKET_BYTE_BUDGET.checked_sub(occupied).unwrap(),
+                        );
+                        assert!(packed.packet_independent.is_some());
+                    }
+                    let sweep = [false, true];
+                    let mut a = StdRng::seed_from_u64(1613);
+                    let mut b = a.clone();
+                    let mut scalar = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut expected = Vec::new();
+                    for _ in 0..64 {
+                        let values = {
+                            let mut old = FrozenScalarRowRandom::live(&mut a);
+                            plan.random_kinds
+                                .iter()
+                                .map(|&kind| old.draw(kind))
+                                .collect::<Vec<_>>()
+                        };
+                        let mut replay = RowRandom::recorded(&values, &mut a);
+                        expected.extend(
+                            scalar
+                                .row_with_random(&sweep, &mut replay)
+                                .unwrap()
+                                .measurements
+                                .into_iter()
+                                .map(u8::from),
+                        );
+                        assert_eq!(replay.cursor, plan.random_kinds.len());
+                    }
+                    let mut actual = Vec::new();
+                    // None is also the public mode after optional Noise rejection.
+                    packed
+                        .packet(64, &sweep, &mut b, &mut actual, false, None)
+                        .unwrap();
+                    assert_eq!(
+                        actual, expected,
+                        "{policy:?} cache={cache_budget} independent={compact_independent}"
+                    );
+                    if cache_budget == initial {
+                        assert_eq!(packed.last_packet_live, 0);
+                    }
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
     }
 
     #[test]

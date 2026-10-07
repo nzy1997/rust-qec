@@ -95,3 +95,17 @@ The [complete compiled M4 comparison](results/apple-m4-compiled-sota-2026-10-07/
 retains all 21 configurations with the explicit Fused FP64 policy. Its warm
 geometric mean advantage is 1.4011× against each configuration's fastest valid
 peer, while cultivation and cold-call costs remain optimization targets.
+
+
+The [compiled Noise/lazy M4 comparison](results/apple-m4-compiled-noise-lazy-2026-10-07/analysis.md)
+retains the complete S3 source-bound 21-configuration result: 16 warm wins and a
+1.5079× geometric-mean ratio against each configuration's fastest independently
+tuned current peer. Shot-count geomeans are 2.1973×/1.3976×/1.1165× at 1/64/1024
+shots. All five losses remain, including every cultivation d5 configuration and
+its unfavorable cold costs. The measured compiled policy is explicitly Fused
+FP64; Strict remains the public default. This shared-host Apple M4, full-record,
+non-postselected comparison has independently audited raw/source/import closure,
+without peer compiler-flag attestation or a universal SOTA claim. Subsequent
+bounded prototypes left no clear measured, contract-feasible next small change;
+the retained source and known limitations are published without claiming the
+optimization space is exhausted.
