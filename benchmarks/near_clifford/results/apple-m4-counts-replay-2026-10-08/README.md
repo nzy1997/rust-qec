@@ -35,7 +35,7 @@ Fused surface d7 ratios are 9.540×/3.308×/1.203×; d9 ratios are
 
 The [paired Rust-only ablations](../apple-m4-counts-replay-rust-ablation-2026-10-08/README.md)
 isolate the two changes and retain their confirmation experiment. Recorded-tail
-retirement improves MSC d5 one-shot by 22–25%; compact replay improves its bulk
+retirement increases MSC d5 one-shot throughput by 22–25%; compact replay improves its bulk
 throughput by 16–27% against recorded-tail retirement. Small other-cell
 regressions remain, including about 1.8% lower MSC d3 Fused 1024 throughput and
 about 1% lower surface d7 one-shot throughput in the confirmation. Unrelated
