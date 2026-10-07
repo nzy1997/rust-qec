@@ -61,3 +61,10 @@ Semantic controls enumerate nontrivial three/four-record distributions, includin
 repeated observable indices and repeated detector history offsets. Resealed
 corruption tests must reject missing coverage, altered counts/input/batch/imports
 and malformed timing. Lossless gzip event streams are supported for publication.
+
+New native SymFT events retain its public counts-sampler `info` receipt, including
+the selected active-components flag, raw/reference output policy and dimensions.
+The verifier checks reported policy and shape. Older receipts lacking this
+additive field make no active-components claim; raw-record workers do not expose
+the same receipt. `max_active_qubits` is not treated as a common dense-state
+dimension across backends.

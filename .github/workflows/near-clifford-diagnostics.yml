@@ -12,6 +12,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  producer-smoke:
+    # The producer is deliberately frozen to #780; this one-off campaign job
+    # must not treat a future production optimization as a baseline violation.
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      SYMFT_PY_ENABLE_CUDA: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned smoke backends
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          rustup default 1.93.1
+          python -m venv drafts/ci-clifft
+          drafts/ci-clifft/bin/python -m pip install numpy==2.4.6 clifft==0.11.0
+          python -m venv drafts/ci-symft
+          drafts/ci-symft/bin/python -m pip install numpy==2.4.6 setuptools==80.9.0 wheel==0.45.1
+          git clone https://github.com/haoliri0/SOFT.git drafts/ci-soft
+          git -C drafts/ci-soft checkout c89b98514a919240b8afa53a271e08d926d3c987
+          drafts/ci-symft/bin/python -m pip install --no-build-isolation drafts/ci-soft/python
+      - name: Validate bounded lossless event storage
+        run: |
+          python benchmarks/near_clifford/test_evidence_io.py
+          python -O benchmarks/near_clifford/test_evidence_io.py
+      - name: Exercise native counts metadata and independent raw oracle
+        run: |
+          python benchmarks/near_clifford/application_counts/run.py \
+            --out drafts/ci-counts-smoke \
+            --python "$PWD/drafts/ci-clifft/bin/python" \
+            --symft-python "$PWD/drafts/ci-symft/bin/python" \
+            --symft-source "$PWD/drafts/ci-soft" \
+            --only msc_d3_inject_cultivate_p1e-3 --shots 1 --pairs 1 --repetitions 1
+          python benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
+          python -O benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
+          python benchmarks/near_clifford/application_counts/test_contract.py drafts/ci-counts-smoke
+          python -O benchmarks/near_clifford/application_counts/test_contract.py drafts/ci-counts-smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: near-clifford-counts-producer-smoke-${{ github.sha }}
+          path: drafts/ci-counts-smoke/
+          retention-days: 14
   evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 90

@@ -26,6 +26,7 @@ def main():
     text=data.decode()
     batch=args.batch if args.batch in ['auto','scalar'] else int(args.batch)
     identity=loaded_files(args.backend)
+    sampler_info=None
     start=time.perf_counter_ns()
     if args.backend.startswith('clifft'):
         import clifft
@@ -49,7 +50,8 @@ def main():
         sampler=circuit.compile_counts_sampler(batch=batch!='scalar',observable=0,
             postselect_detectors=True,reference_sample=False,
             batch_size=0 if batch in ['scalar','auto'] else batch,threads=1)
-        rank=int(sampler.info['max_active_qubits'])
+        sampler_info=sampler.info
+        rank=int(sampler_info['max_active_qubits'])
         def sample(seed):
             r=sampler.sample(shots=args.shots,stream_id=seed)
             if r['active_threads']!=1: raise ValueError('peer used more than one thread')
@@ -79,7 +81,7 @@ def main():
     print(json.dumps(dict(backend=args.backend,status='ok',input_sha256=hashlib.sha256(data).hexdigest(),
         loaded_files=identity,isolated=True,batch=batch,shots=args.shots,
         compile_ns=compile_ns,prepare_ns=0,first_ns=first_ns,observations=observations,
-        peak_active_width=rank,peak_rss_bytes=rss,execution=execution,
+        peak_active_width=rank,peak_rss_bytes=rss,execution=execution,sampler_info=sampler_info,
         output_contract='all-zero raw detector postselection; raw observable 0 counts; no reference normalization')))
 
 

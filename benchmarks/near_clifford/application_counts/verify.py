@@ -59,10 +59,19 @@ def validate(out,git_sources=False,allow_smoke=False):
                 baseline=subprocess.check_output(['git','show','3ef5030db205b3e9b2126e31b2602f760d4665cc:'+name],cwd=ROOT)
                 require(source==baseline,'production changed')
     cases_by_id={case['id']:case for case in cases};tuning={};native={};raw={};rust={};checked={};timed={};capabilities={};failures=[];rejected={}
+    widths={name:annotations(texts[name])['width'] for name in NAMES}
     def bind(result,backend,name,projected=False):
         require(result['backend']==backend,'executor label differs')
         require(result['input_sha256']==digest((records_only(texts[name]) if projected else texts[name]).encode()),'consumed input differs')
         if backend!='rstim': inc.bind_peer(result,backend,header['packages'],header['peer_loaded_files'])
+        if not projected and backend=='symft' and result.get('sampler_info') is not None:
+            info=result['sampler_info']
+            require(info['detector_postselection'] is True and info['reference_normalized'] is False,
+                    'native sampler output contract differs')
+            require(type(info['active_components']) is bool and type(info['threads']) is int and info['threads']==1,
+                    'native sampler execution features differ')
+            require(info['num_measurements']==widths[name] and
+                    info['max_active_qubits']==result['peak_active_width'],'native sampler dimensions differ')
     for event in events:
         kind=event['kind'];result=event.get('result',{})
         if kind=='capability':
