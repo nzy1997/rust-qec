@@ -327,12 +327,15 @@ impl CoefficientCache {
         if !self.fits(charge) {
             return None;
         }
+        let internable = (coefficient_intern::MIN_COEFFICIENTS
+            ..=coefficient_intern::MAX_COEFFICIENTS)
+            .contains(&coefficients.len());
         // Defer optional index allocation until enough non-scalar states have
         // accumulated to amortize it. Small and cold caches retain the original
         // admission path; existing unindexed states remain valid cache entries.
         if !self.intern_attempted
             && self.states.len() >= coefficient_intern::MIN_STATES
-            && coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS
+            && internable
         {
             self.intern_attempted = true;
             let remaining = self.budget - self.reserved - charge;
@@ -342,7 +345,7 @@ impl CoefficientCache {
                 .as_ref()
                 .map_or(0, CoefficientIntern::reserved_bytes);
         }
-        let slot = if coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS {
+        let slot = if internable {
             if let Some(intern) = &self.intern {
                 let (existing, slot) = intern.find_or_slot(node, coefficients, &self.states);
                 if let Some(id) = existing {
