@@ -20,7 +20,9 @@ def validate(out,git_sources=False,allow_smoke=False):
     header=json.loads((out/'header.json').read_text());closure=json.loads((out/'closure.json').read_text())
     data=read_event_bytes(out)
     events=[json.loads(line) for line in data.splitlines()]
-    require(header['schema']=='rstim.postselected-counts.v1','wrong schema')
+    require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2'],'wrong schema')
+    native_rust=header['schema']=='rstim.postselected-counts.v2'
+    require(header.get('rust_route')=='native' if native_rust else header.get('rust_route','structured')=='structured','Rust route differs')
     require(closure['events']==len(events) and closure['events_sha256']==digest(data),'event closure mismatch')
     require([e['index'] for e in events]==list(range(len(events))),'event index mismatch')
     require(closure['sources_after']==header['sources'] and closure['binary_sha256']==header['binary_sha256'],
@@ -45,6 +47,10 @@ def validate(out,git_sources=False,allow_smoke=False):
     required={'benchmarks/near_clifford/application_counts/'+name for name in
               ['.gitignore','Cargo.toml','Cargo.lock','main.rs','worker.py','common.py','run.py','verify.py','test_contract.py','README.md','manifest.json']}
     require(required<=set(header['sources']),'missing application harness sources')
+    if native_rust:
+        native_producer_path='benchmarks/near_clifford/application_counts/run.py'
+        producer_bytes=subprocess.check_output(['git','show',header['source_revision']+':'+native_producer_path],cwd=ROOT)
+        require(digest(producer_bytes)==header['sources'][native_producer_path] and b'rstim.postselected-counts.v2' in producer_bytes and b'--rust-route' in producer_bytes, 'native schema requires source-bound native producer')
     producer_path='benchmarks/near_clifford/diagnostics/run.py'
     helper_path='benchmarks/near_clifford/evidence_io.py'
     require(producer_path in header['sources'],'missing diagnostic producer source')
@@ -71,7 +77,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         for name,sha in header['sources'].items():
             source=subprocess.check_output(['git','show',header['source_revision']+':'+name],cwd=ROOT)
             require(digest(source)==sha,'source digest differs: '+name)
-            if name.startswith('rstim/src/') or name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']:
+            if not native_rust and (name.startswith('rstim/src/') or name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']):
                 baseline=subprocess.check_output(['git','show','3ef5030db205b3e9b2126e31b2602f760d4665cc:'+name],cwd=ROOT)
                 require(source==baseline,'production changed')
     cases_by_id={case['id']:case for case in cases};tuning={};native={};raw={};rust={};checked={};timed={};capabilities={};failures=[];rejected={}
@@ -80,6 +86,11 @@ def validate(out,git_sources=False,allow_smoke=False):
         require(result['backend']==backend,'executor label differs')
         require(result['input_sha256']==digest((records_only(texts[name]) if projected else texts[name]).encode()),'consumed input differs')
         if backend!='rstim': inc.bind_peer(result,backend,header['packages'],header['peer_loaded_files'])
+        else:
+            expected_execution='native raw postselected counts; no early rejection' if native_rust else 'full structured records then filter; no early rejection'
+            require(result['execution']==expected_execution,'Rust execution route differs')
+            if native_rust and 'measurements' in result:
+                require(result.get('exact_native_counts_rng') is True,'missing native exact counts/RNG witness')
         if not projected and backend=='symft' and result.get('sampler_info') is not None:
             info=result['sampler_info']
             require(info['detector_postselection'] is True and info['reference_normalized'] is False,

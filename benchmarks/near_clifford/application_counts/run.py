@@ -37,6 +37,7 @@ def main():
     p.add_argument('--repetitions',type=int,default=7)
     p.add_argument('--only',nargs='+',choices=NAMES,default=NAMES)
     p.add_argument('--shots',nargs='+',type=int,choices=SHOTS,default=SHOTS)
+    p.add_argument('--rust-route',choices=['structured','native'],default='structured')
     args=p.parse_args()
     require(1<=args.pairs<=20 and 1<=args.repetitions<=64,'bounded pairs/repetitions required')
     out=args.out.resolve();require(not out.exists(),'out must be fresh');out.mkdir(parents=True)
@@ -58,7 +59,7 @@ def main():
     env=inc.environment_summary(packages,peer_sources,peer_revision,identities)
     cases=[dict(id=f'{name}/{shots}/{policy}',name=name,shots=shots,policy=policy)
            for name in args.only for shots in args.shots for policy in POLICIES]
-    header=dict(schema='rstim.postselected-counts.v1',manifest=manifest,cases=cases,
+    header=dict(schema='rstim.postselected-counts.v2' if args.rust_route=='native' else 'rstim.postselected-counts.v1',manifest=manifest,cases=cases,
         selected_names=args.only,selected_shots=args.shots,pairs=args.pairs,repetitions=args.repetitions,
         source_revision=revision,sources=sources,binary_sha256=binary_hashes,packages=packages,
         peer_loaded_files=identities,symft_source_revision=peer_revision,symft_sources=peer_sources,
@@ -69,6 +70,7 @@ def main():
         compiler_environment={key:os.environ.get(key) for key in
             ['RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CC','CXX','CFLAGS','CXXFLAGS']},
         started_utc=datetime.now(timezone.utc).isoformat())
+    if args.rust_route=='native': header['rust_route']='native'
     (out/'header.json').write_text(json.dumps(header,indent=2)+'\n')
     index=0
     def record(kind,**payload):
@@ -86,7 +88,7 @@ def main():
         return result
     def rust(case,validate=False):
         return diag.invoke([binaries['near-clifford-application-counts'],str(ROOT/manifest['inputs'][case['name']]['path']),
-            str(case['shots']),str(1 if validate else args.repetitions),case['policy'],'validate' if validate else 'bench'])
+            str(case['shots']),str(1 if validate else args.repetitions),case['policy'],'validate' if validate else 'bench',args.rust_route])
     # No gate lowering: inspect all eleven complete original inputs independently.
     for name,value in manifest['inputs'].items():
         for policy in POLICIES:

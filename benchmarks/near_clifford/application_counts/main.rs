@@ -1,16 +1,46 @@
-//! Full structured sampling followed by all-zero detector filtering and counts.
-//! This adapter introduces no early rejection or production sampling API.
-use rand::{SeedableRng, rngs::SmallRng};
-use rstim::near_clifford::{CompiledNearCliffordExecutor, CompiledRotationArithmetic};
+//! Original-circuit raw postselection with structured or native Rust counts.
+//! Both Rust routes retain all random events; neither performs early rejection.
+use rand::{RngCore, SeedableRng, rngs::SmallRng};
+use rstim::near_clifford::{
+    CompiledNearCliffordExecutor, CompiledRotationArithmetic, NearCliffordShot,
+};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{hint::black_box, time::Instant};
 
+fn structured_counts(records: &[NearCliffordShot]) -> Result<(usize, usize), String> {
+    let mut accepted = 0usize;
+    let mut logical_errors = 0usize;
+    for row in records {
+        if row.detectors.iter().all(|d| !d) {
+            accepted += 1;
+            let mut found = false;
+            let mut observable = false;
+            for (index, parity) in &row.observables {
+                if *index == 0 {
+                    found = true;
+                    observable ^= parity;
+                }
+            }
+            if !found {
+                return Err("observable 0 required".into());
+            }
+            logical_errors += usize::from(observable);
+        }
+    }
+    Ok((accepted, logical_errors))
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 6 {
-        return Err("usage: PROBE CIRCUIT SHOTS REPETITIONS strict|fused bench|validate".into());
+    if args.len() != 6 && args.len() != 7 {
+        return Err("usage: PROBE CIRCUIT SHOTS REPETITIONS strict|fused bench|validate [structured|native]".into());
     }
+    let route = args.get(6).map_or("structured", String::as_str);
+    if route != "structured" && route != "native" {
+        return Err("Rust route must be structured or native".into());
+    }
+    let native = route == "native";
     let text = std::fs::read_to_string(&args[1])?;
     let shots: usize = args[2].parse()?;
     let repetitions: usize = args[3].parse()?;
@@ -32,32 +62,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !validation && args[5] != "bench" {
         return Err("action must be bench or validate".into());
     }
+    let mut reference_sampler = if native && validation {
+        Some(plan.prepare_sampler()?)
+    } else {
+        None
+    };
     let mut witness_bits = Vec::new();
     let mut witness_width = 0;
     let mut sample = |seed: u64| -> Result<_, String> {
         let mut rng = SmallRng::seed_from_u64(seed);
+        let mut reference_rng = rng.clone();
         let start = Instant::now();
-        let records = sampler.sample(shots, &mut rng)?;
-        let mut accepted = 0usize;
-        let mut logical_errors = 0usize;
-        for row in &records {
-            if row.detectors.iter().all(|d| !d) {
-                accepted += 1;
-                let mut found = false;
-                let mut observable = false;
-                for (index, parity) in &row.observables {
-                    if *index == 0 {
-                        found = true;
-                        observable ^= parity;
-                    }
+        let (ns, records, accepted, logical_errors) = if native {
+            let counts = sampler.sample_postselected_counts(shots, 0, &mut rng)?;
+            let ns = start.elapsed().as_nanos();
+            let records = if validation {
+                let records = reference_sampler
+                    .as_mut()
+                    .unwrap()
+                    .sample(shots, &mut reference_rng)?;
+                if structured_counts(&records)? != (counts.accepted, counts.logical_errors)
+                    || (0..16).any(|_| rng.next_u64() != reference_rng.next_u64())
+                {
+                    return Err(
+                        "native counts or RNG continuation differs from structured witness".into(),
+                    );
                 }
-                if !found {
-                    return Err("observable 0 required".into());
-                }
-                logical_errors += usize::from(observable);
-            }
-        }
-        let ns = start.elapsed().as_nanos();
+                records
+            } else {
+                Vec::new()
+            };
+            (ns, records, counts.accepted, counts.logical_errors)
+        } else {
+            let records = sampler.sample(shots, &mut rng)?;
+            let (accepted, logical_errors) = structured_counts(&records)?;
+            (
+                start.elapsed().as_nanos(),
+                records,
+                accepted,
+                logical_errors,
+            )
+        };
         if validation {
             witness_width = records.first().map_or(0, |row| row.measurements.len());
             witness_bits.extend(
@@ -109,12 +154,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = json!({"backend":"rstim","status":"ok","arithmetic":args[4],
         "input_sha256":format!("{:x}",Sha256::digest(text.as_bytes())),
         "output_contract":"all-zero raw detector postselection; raw observable 0 counts; no reference normalization",
-        "execution":"full structured records then filter; no early rejection",
+        "execution":if native { "native raw postselected counts; no early rejection" } else { "full structured records then filter; no early rejection" },
         "compile_ns":compile_ns,"prepare_ns":prepare_ns,"first_ns":first.0,
         "shots":shots,"observations":observations,"peak_rss_bytes":rss,
         "peak_active_rank":plan.peak_active_rank(),
         "cache_reserved_bytes":sampler.coefficient_cache_reserved_bytes()});
     if validation {
+        if native {
+            output["exact_native_counts_rng"] = json!(true);
+        }
         output["measurements"] = json!(witness_bits);
         output["width"] = json!(witness_width);
         output["call_shots"] = json!(shots);

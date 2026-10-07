@@ -78,3 +78,18 @@ The published Linux high-water marks are retained as process observations but
 cannot establish simulator-only memory usage or relative engine memory costs.
 Future Linux memory comparisons need a separately attributed measurement.
 See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusage.2.html).
+
+## Native Rust counts follow-up
+
+Use `--rust-route native` to benchmark `sample_postselected_counts` instead of the
+structured-record adapter. This emits schema `rstim.postselected-counts.v2` with
+an explicit native route. V1 publications retain the frozen PR780 production
+check; V2 binds the optimized production bytes to the measured Git revision.
+Both require complete source inventories and unchanged source/binary closure.
+
+The native route applies all-zero **raw** detector postselection and XOR-folded
+raw observable0. It retains all random draws and does not reject shots early.
+Each validation call also runs a separate structured sampler from the same RNG
+seed, requires exact counts and 16-word RNG continuation, and retains its full
+raw records for independent annotation replay. This reference work is excluded
+from reported native timing. Finite peer checks and rare-error limits are unchanged.
