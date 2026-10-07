@@ -115,10 +115,15 @@ def summarize(out,kind,check=False):
         'OS RSS is whole-process high-water, including probe/interpreter allocations. Linux ru_maxrss may retain launcher memory across exec; these Linux receipts cannot establish simulator memory usage or cross-backend memory differences. Mac measurements have no pinned-core claim.',
         f"Collector CPU affinity: `{header['host'].get('affinity')}`; compiler environment: `{json.dumps(header.get('compiler_environment',{}),sort_keys=True)}`.",
         'Empty CSV RSS/cache entries mean unmeasured; raw flat peer workers do not report RSS. Peer preparation is included in compilation.',
-        'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.',
+        # Preserve frozen v1/v2 rendering; v3 counts has no lifecycle phase receipts.
+        ('This counts campaign records no lifecycle phase measurements.'
+         if header['schema']=='rstim.postselected-counts.v3' else
+         'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.'),
         'Activity metrics preserve their API names: rstim peak_active_rank, Clifft peak_active_width, SymFT max_active_qubits. They are not a common cross-engine rank scale.',
         'The active_components column is the reported native SymFT counts-sampler flag where available; empty means unmeasured, including raw-record workers.',
-        'See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS; lifecycle.csv for every history/budget.', '',
+        ('See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS.'
+         if header['schema']=='rstim.postselected-counts.v3' else
+         'See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS; lifecycle.csv for every history/budget.'), '',
         '| Cell | rstim µs | Fastest peer µs | Speedup | Paired range | Peer |',
         '| --- | ---: | ---: | ---: | --- | --- |']
     for value in comparisons:
