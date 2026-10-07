@@ -13,9 +13,9 @@ concurrency:
 
 jobs:
   producer-smoke:
-    # The producer is deliberately frozen to #780; this one-off campaign job
-    # must not treat a future production optimization as a baseline violation.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks'
+    # Run collection only for the evidence campaign and the native counts follow-up.
+    # Historical v1 publications remain frozen; v2 binds optimized source bytes.
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
