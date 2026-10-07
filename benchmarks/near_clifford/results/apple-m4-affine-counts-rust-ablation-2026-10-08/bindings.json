@@ -1,0 +1,33 @@
+{
+  "scope": "Exploratory Rust-only paired measurements; exact source equivalence, not a peer/SOTA campaign. Original recorded dirty/head identities are unchanged. Binary hashes and before/after closures are retained; binary executables are not published.",
+  "routes": {
+    "baseline": {
+      "recorded_head": "1ccb5e92a330ed42efab7323aef4f2daeeaa1802",
+      "source_equivalent_retained_commit": "1ccb5e92a330ed42efab7323aef4f2daeeaa1802",
+      "untracked_input_mapping": {
+        "drafts/counts-path-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/msc_d3_inject_cultivate_p1e-3.masks.json",
+        "drafts/counts-path-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/msc_d5_inject_cultivate_p1e-3.masks.json",
+        "drafts/counts-path-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/pure_surface_d7_r7_p1e-3.masks.json",
+        "drafts/counts-path-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/pure_surface_d9_r9_p1e-3.masks.json",
+        "drafts/counts-path-ablation/main.rs": "probe/main.rs",
+        "drafts/counts-path-ablation/Cargo.toml": "probe/Cargo.toml",
+        "drafts/counts-path-ablation/Cargo.lock": "probe/Cargo.lock"
+      },
+      "binary_sha256_at_measurement": "4f0c7ec7b36753f09b84822a3bfa2d3b9392942876d08c9323e5d2426fd9ed02"
+    },
+    "candidate": {
+      "recorded_head": "9ac12fa989a103eca84d5bfbc0de838ec33660ee",
+      "source_equivalent_retained_commit": "3ef49cf9c3f156a492682d24e392915510f2a3a8",
+      "untracked_input_mapping": {
+        "drafts/counts-path-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/msc_d3_inject_cultivate_p1e-3.masks.json",
+        "drafts/counts-path-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/msc_d5_inject_cultivate_p1e-3.masks.json",
+        "drafts/counts-path-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/pure_surface_d7_r7_p1e-3.masks.json",
+        "drafts/counts-path-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/pure_surface_d9_r9_p1e-3.masks.json",
+        "drafts/counts-path-ablation/main.rs": "probe/main.rs",
+        "drafts/counts-path-ablation/Cargo.toml": "probe/Cargo.toml",
+        "drafts/counts-path-ablation/Cargo.lock": "probe/Cargo.lock"
+      },
+      "binary_sha256_at_measurement": "a8cb37fe85798b0c61e68900d5c3a0ace76625ee0bfa6ab8aebc6b368d486708"
+    }
+  }
+}

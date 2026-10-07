@@ -36,7 +36,7 @@ individual first calls. Warm throughput does not establish a cold single-request
 advantage. All backend cold phases, accepted throughput and whole-process RSS
 remain in [warm.csv](warm.csv).
 
-Separate paired Rust-only ablations against packed rejection show roughly 3×
+Separate [paired Rust-only ablations](../apple-m4-affine-counts-rust-ablation-2026-10-08/README.md) against packed rejection show roughly 3×
 bulk surface improvement and 19–22× warm one-shot improvement. MSC d5 Fused
 1024 regresses about 2.4%, with all five paired ratios below one; Strict 64
 regresses about 4.6%. These exploratory regressions are retained and identify
