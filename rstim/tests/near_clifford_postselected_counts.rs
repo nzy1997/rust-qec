@@ -156,3 +156,46 @@ fn missing_observable_fails_before_consuming_rng_even_for_zero_shots() {
     );
     assert_eq!(a.next_u64(), b.next_u64());
 }
+
+#[test]
+fn rejected_scalar_rows_consume_sparse_noise_and_independent_draws_before_next_call() {
+    for repeats in [2, 70] {
+        let text = format!(
+            "H 0\nM 0\nDETECTOR rec[-1]\nH 1 2 3 4\nT 1 2 3 4\nREPEAT {repeats} {{\nDEPOLARIZE1(0.001) 1 2 3 4\nX_ERROR(0.003) 1\nH 5\nM(0.002) 5\nR 5\n}}\nMPP(0.004) X1*Y2*X3*Y4\nCX rec[-1] 1\nMRX 1\nM 1 2 3 4\nOBSERVABLE_INCLUDE(7) rec[-1]\n"
+        );
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            for budget in [0, 64 * 1024 * 1024] {
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut native = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut a = StdRng::seed_from_u64(719);
+                let mut b = a.clone();
+                for shots in [1, 31, 32, 64, 65, 127, 1, 129] {
+                    let records = scalar.sample(shots, &mut a).unwrap();
+                    assert_eq!(
+                        native.sample_postselected_counts(shots, 7, &mut b).unwrap(),
+                        count_records(&records, 7)
+                    );
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+                let records = scalar.sample(65, &mut a).unwrap();
+                let flat = native.sample_measurements_u8(65, &mut b).unwrap();
+                assert_eq!(
+                    flat.measurements,
+                    records
+                        .iter()
+                        .flat_map(|s| s.measurements.iter().copied().map(u8::from))
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+        }
+    }
+}

@@ -91,11 +91,14 @@ def main():
         obs['elapsed_ns']=float(obs['elapsed_ns']);obs['ns_per_call']=obs['elapsed_ns']/obs['calls']
     mutations.extend([missing_first_call,fabricated_validation_first_call,fractional_observation_counts,
                       negative_discarded_count,noninteger_elapsed_time])
-    if header['schema']=='rstim.postselected-counts.v2':
+    if header['schema'] in ['rstim.postselected-counts.v2','rstim.postselected-counts.v3']:
         def missing_rust_route(e,h): del h['rust_route']
         def wrong_rust_execution(e,h): next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')['result']['execution']='full structured records then filter; no early rejection' if h['rust_route']=='native' else 'native raw postselected counts; no early rejection'
         def missing_native_exact_witness(e,h): del next(v for v in e if v['kind']=='counts-validation' and v['backend']=='rstim')['result']['exact_native_counts_rng']
         mutations.extend([missing_rust_route,wrong_rust_execution])
+        if header['schema']=='rstim.postselected-counts.v3':
+            def fabricated_v2_producer(e,h): h['schema']='rstim.postselected-counts.v2'
+            mutations.append(fabricated_v2_producer)
         if header['rust_route']=='native': mutations.append(missing_native_exact_witness)
     for mutate in mutations:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
