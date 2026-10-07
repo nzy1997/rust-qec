@@ -1,0 +1,99 @@
+name: Near-Clifford x86 diagnostic shards
+
+# Independent VM budgets preserve closed receipts before the global job cap.
+# Remeasure explicitly; evidence publications reuse the closed receipts.
+# Each shard reports its own actual hardware; do not pool absolute timings across VMs.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: cache-lifetime
+            arguments: '--groups cache lifetime'
+          - shard: boundary
+            arguments: '--groups boundary'
+          - shard: rank
+            arguments: '--groups structure --only rank-4 rank-8 rank-12 rank-16'
+          - shard: structure-incumbent
+            arguments: '--groups structure incumbent --only qubits-16 qubits-64 qubits-129 qubits-256 depth-1 depth-8 depth-32 noise-0 noise-0.0001 noise-0.001 noise-0.01 reset_every-1 reset_every-4 reset_every-32 brick16 parity129 rounds129'
+    env:
+      RUSTFLAGS: '-C target-cpu=native'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      SYMFT_PY_ENABLE_CUDA: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned CPU backends and probes
+        id: prepare
+        timeout-minutes: 20
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          rustup default 1.93.1
+          python -m venv drafts/x86-clifft
+          drafts/x86-clifft/bin/python -m pip install numpy==2.4.6 clifft==0.11.0
+          python -m venv drafts/x86-symft
+          drafts/x86-symft/bin/python -m pip install numpy==2.4.6 setuptools==80.9.0 wheel==0.45.1
+          git clone https://github.com/haoliri0/SOFT.git drafts/x86-soft
+          git -C drafts/x86-soft checkout c89b98514a919240b8afa53a271e08d926d3c987
+          drafts/x86-symft/bin/python -m pip install --no-build-isolation drafts/x86-soft/python > drafts/x86-soft-build.log 2>&1
+          cargo build --release --locked --manifest-path benchmarks/near_clifford/diagnostics/Cargo.toml
+          cargo build --release --locked --manifest-path benchmarks/near_clifford/application_counts/Cargo.toml
+      - name: Record virtual host and select one logical CPU
+        id: host
+        run: |
+          python - <<'PY'
+          import json, os, platform, subprocess
+          from pathlib import Path
+          affinity = sorted(os.sched_getaffinity(0))
+          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
+                         available_affinity=affinity, virtual_machine=True,
+                         rustflags=os.environ['RUSTFLAGS'],
+                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
+                         meminfo=Path('/proc/meminfo').read_text(),
+                         cpuinfo=Path('/proc/cpuinfo').read_text())
+          Path('drafts/x86-host.json').write_text(json.dumps(receipt, indent=2)+'\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'BENCH_CPU={affinity[0]}\n')
+          PY
+      - name: Measure diagnostic shard
+        timeout-minutes: 120
+        run: |
+          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/diagnostics/run.py \
+            --out drafts/x86-diagnostics \
+            --python "$PWD/drafts/x86-clifft/bin/python" \
+            --symft-python "$PWD/drafts/x86-symft/bin/python" \
+            --symft-source "$PWD/drafts/x86-soft" \
+            ${{ matrix.arguments }} \
+            > drafts/x86-diagnostics.log 2>&1
+      - name: Verify closed evidence and derive reports
+        timeout-minutes: 50
+        if: ${{ !cancelled() }}
+        run: |
+          python benchmarks/near_clifford/analyze_diagnostics.py drafts/x86-diagnostics
+          python -O benchmarks/near_clifford/diagnostics/verify.py drafts/x86-diagnostics --git-sources
+      - name: Retain results, setup logs and partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-clifford-x86-${{ matrix.shard }}-${{ github.sha }}
+          retention-days: 30
+          path: |
+            drafts/x86-host.json
+            drafts/x86-*.log
+            drafts/x86-diagnostics/
