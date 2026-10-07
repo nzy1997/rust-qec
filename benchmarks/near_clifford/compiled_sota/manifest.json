@@ -1,0 +1,174 @@
+{
+  "schema": "rstim.near-clifford-compiled-sota.v2",
+  "frozen_on": "2026-10-07",
+  "output_contract": "all raw measurement records; no postselection; detector/observable-only annotations omitted identically from timed inputs",
+  "cases": [
+    {
+      "id": "terminal",
+      "family": "terminal",
+      "file": "fixtures/terminal.stim",
+      "sha256": "f5d17ab34e8f67f6a1df550f5756298cab0f6e4a1187671b6c26c2e586f1d58e",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "nzy1997/rust-qec",
+        "commit": "f5b0de1a932693e55fe82849d31fa99b9135b1b6",
+        "path": "benchmarks/near_clifford/scale/fixtures/terminal.stim",
+        "license": "repository license"
+      }
+    },
+    {
+      "id": "brick16",
+      "family": "entangled",
+      "file": "fixtures/brick16.stim",
+      "sha256": "2703477fcdf0fd05cfb2058910e7dcf072f701e4ab707e77f3eb1b01064a30de",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "nzy1997/rust-qec",
+        "commit": "f5b0de1a932693e55fe82849d31fa99b9135b1b6",
+        "path": "benchmarks/near_clifford/results/apple-m4-pauli-profiles-2026-10-03/brick_16_16_3.stim",
+        "license": "repository license"
+      }
+    },
+    {
+      "id": "parity129",
+      "family": "parity",
+      "file": "fixtures/parity129.stim",
+      "sha256": "a468819a6477ddfeb312e916060ae3e321a8118460cd65657d5f2db4f70cdfb7",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "nzy1997/rust-qec",
+        "commit": "f5b0de1a932693e55fe82849d31fa99b9135b1b6",
+        "path": "benchmarks/near_clifford/results/apple-m4-pauli-profiles-2026-10-03/parity_12_129_3.stim",
+        "license": "repository license"
+      }
+    },
+    {
+      "id": "rounds129",
+      "family": "adaptive",
+      "file": "fixtures/rounds129.stim",
+      "sha256": "a1567afb199d2ffecf28f557a1c88bdf21d16f46777483699d8ec2a5b68453a6",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "nzy1997/rust-qec",
+        "commit": "f5b0de1a932693e55fe82849d31fa99b9135b1b6",
+        "path": "benchmarks/near_clifford/results/apple-m4-pauli-profiles-2026-10-03/rounds_8_129_4.stim",
+        "license": "repository license"
+      }
+    },
+    {
+      "id": "qec32",
+      "family": "noisy-syndrome",
+      "file": "fixtures/qec32.stim",
+      "sha256": "9d867fc76b43b9d9a0721d3d75835d3cbdda6ce04f589b376967012363616488",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "nzy1997/rust-qec",
+        "commit": "f5b0de1a932693e55fe82849d31fa99b9135b1b6",
+        "path": "benchmarks/near_clifford/results/apple-m4-probability-profiles-2026-09-30/qec_32.stim",
+        "license": "repository license"
+      }
+    },
+    {
+      "id": "msc3",
+      "family": "cultivation",
+      "file": "fixtures/msc3.stim",
+      "sha256": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "unitaryfoundation/clifft-bench",
+        "commit": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+        "path": "workloads/circuits/msc_d3_inject_cultivate_p1e-3.stim",
+        "license": "Apache-2.0",
+        "paper_source_commit": "db7dc9f13a2c2854690e92390c779048a1ac1400"
+      }
+    },
+    {
+      "id": "msc5",
+      "family": "cultivation",
+      "file": "fixtures/msc5.stim",
+      "sha256": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+      "shots": [
+        1,
+        64,
+        1024
+      ],
+      "source": {
+        "repository": "unitaryfoundation/clifft-bench",
+        "commit": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+        "path": "workloads/circuits/msc_d5_inject_cultivate_p1e-3.stim",
+        "license": "Apache-2.0",
+        "paper_source_commit": "db7dc9f13a2c2854690e92390c779048a1ac1400"
+      }
+    }
+  ],
+  "incompatible_published_workloads": {
+    "distillation": "arbitrary R_X(-0.3040867239846964) unsupported",
+    "coherent-surface": "arbitrary R_Z(0.02) unsupported",
+    "quantum-volume": "U3 unsupported"
+  },
+  "baseline_versions": {
+    "clifft": "0.11.0",
+    "symft": "0.1.1",
+    "numpy": "2.4.6"
+  },
+  "symft_source": {
+    "repository": "https://github.com/haoliri0/SOFT",
+    "commit": "c89b98514a919240b8afa53a271e08d926d3c987"
+  },
+  "cpu_threads": 1,
+  "precision": "complex-fp64",
+  "rstim_rng": "SmallRng/rand-0.8.7",
+  "preserve_incumbent_matrix": true,
+  "rstim_api": "CompiledNearCliffordExecutor",
+  "input_contract": "identical native records_only input for every backend; no spectator or gate lowering",
+  "compiled_support": "MPP products with distinct qubits per product, including signs; native noisy M/MR variants in the supported Clifford+T subset",
+  "protocol": {
+    "pairs_minimum": 3,
+    "repetitions_minimum": 7,
+    "validation_shots_minimum": 8192,
+    "warm_observation_minimum_ns": 50000000,
+    "batch_grid": [
+      1,
+      64,
+      256,
+      1024,
+      "auto"
+    ],
+    "symft_candidates": [
+      "scalar",
+      1,
+      64,
+      256,
+      1024,
+      "auto"
+    ],
+    "symft_default": "scalar",
+    "symft_scalar": "compile_sampler(batch=False, batch_size=0); distinct from batch=True, batch_size=1",
+    "peer_identity": "Python -I for workers and package inspection; actual backend wrapper/native extension paths and hashes bound to distribution inventory; strict before/after package/source/import identity guard"
+  },
+  "rotation_arithmetic": "fused"
+}
