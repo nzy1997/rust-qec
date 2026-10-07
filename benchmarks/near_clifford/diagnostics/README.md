@@ -84,6 +84,11 @@ reseal corrupted inputs, policies, masks, imports and missing timing/cell eviden
 and require rejection.
 
 The runner writes source/environment receipts, fsynced `events.jsonl` checkpoints
-and a completion closure. A publication may losslessly gzip the event stream;
-the verifier checks its original uncompressed digest. Missing closure denotes
+and a completion closure. Publication accepts exactly one encoding: plain
+`events.jsonl`, `events.jsonl.gz`, or contiguous `events.part-00000.jsonl.gz`
+parts. Decoded parts concatenate before JSON parsing, including across UTF-8
+boundaries. Every compressed blob stays below10MiB. The verifier checks the
+complete original decoded digest and event count, rejecting missing trailing
+parts. New producers inventory the shared reader; only the exact Git-bound
+legacy producer implementation is exempt from that added inventory entry. Missing closure denotes
 an interrupted campaign and cannot pass verification.

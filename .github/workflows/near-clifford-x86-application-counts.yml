@@ -1,15 +1,8 @@
 name: Near-Clifford x86 application counts
 
 # Independent VM budget: structural timeouts cannot starve application counts.
-# Data/report-only commits do not restart formal measurement.
+# Remeasure explicitly; evidence/validator publications reuse closed receipts.
 on:
-  push:
-    branches: [codex/near-clifford-diagnostic-benchmarks]
-    paths:
-      - 'benchmarks/near_clifford/application_counts/**'
-      - 'benchmarks/near_clifford/diagnostics/run.py'
-      - 'benchmarks/near_clifford/evidence_io.py'
-      - '.github/workflows/near-clifford-x86-application-counts.yml'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +10,6 @@ permissions:
 
 jobs:
   benchmark:
-    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'codex/near-clifford-diagnostic-benchmarks'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:

@@ -1,7 +1,7 @@
 """Replay source-bound capabilities, count semantics, tuning and timing coverage."""
 import argparse
 import importlib.util
-import gzip
+import sys
 import json
 from pathlib import Path
 import statistics
@@ -12,11 +12,13 @@ driver=importlib.util.module_from_spec(spec);spec.loader.exec_module(driver)
 from evidence import expand
 from projection import records_only
 inc=driver.inc
+sys.path.insert(0,str(HERE.parent))
+from evidence_io import read_event_bytes
 
 
 def validate(out,git_sources=False,allow_smoke=False):
     header=json.loads((out/'header.json').read_text());closure=json.loads((out/'closure.json').read_text())
-    data=(out/'events.jsonl').read_bytes() if (out/'events.jsonl').exists() else gzip.decompress((out/'events.jsonl.gz').read_bytes())
+    data=read_event_bytes(out)
     events=[json.loads(line) for line in data.splitlines()]
     require(header['schema']=='rstim.postselected-counts.v1','wrong schema')
     require(closure['events']==len(events) and closure['events_sha256']==digest(data),'event closure mismatch')
@@ -46,11 +48,17 @@ def validate(out,git_sources=False,allow_smoke=False):
     if git_sources:
         names=subprocess.check_output(['git','ls-tree','-r','--name-only',header['source_revision']],cwd=ROOT,text=True).splitlines()
         expected={name for name in names if name.startswith('rstim/src/') and name.endswith('.rs') or
-                  name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml'] or
+                  name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml','benchmarks/near_clifford/evidence_io.py'] or
                   name.startswith('benchmarks/near_clifford/diagnostics/') or
                   name.startswith('benchmarks/near_clifford/application_counts/') or
                   name.startswith('benchmarks/near_clifford/compiled_sota/') and
                   (name.endswith('.py') or name.endswith('.stim') or name.endswith('/manifest.json'))}
+        # Exact historical producer implementation predates helper inventory.
+        # Derive this exemption from immutable Git bytes, never a receipt flag.
+        producer=subprocess.check_output(['git','show',header['source_revision']+
+            ':benchmarks/near_clifford/diagnostics/run.py'],cwd=ROOT)
+        if digest(producer)=='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
+            expected.discard('benchmarks/near_clifford/evidence_io.py')
         require(set(header['sources'])==expected and required<=expected,'incomplete source revision/inventory')
         for name,sha in header['sources'].items():
             source=subprocess.check_output(['git','show',header['source_revision']+':'+name],cwd=ROOT)

@@ -1,6 +1,5 @@
 """Adversarial resealing tests against an actual retained campaign."""
 import copy
-import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -8,13 +7,14 @@ import shutil
 import sys
 import tempfile
 from verify import validate
+from evidence_io import read_event_bytes
 
 
 def main():
     if len(sys.argv)!=2:
         raise ValueError('usage: test_contract.py CAMPAIGN_DIRECTORY')
     source=Path(sys.argv[1])
-    original=(source/'events.jsonl').read_bytes() if (source/'events.jsonl').exists() else gzip.decompress((source/'events.jsonl.gz').read_bytes())
+    original=read_event_bytes(source)
     events=[json.loads(line) for line in original.splitlines()]
     header=json.loads((source/'header.json').read_text())
     closure=json.loads((source/'closure.json').read_text())

@@ -60,7 +60,11 @@ raw transcript replay, finite comparisons and complete timing order/coverage.
 Semantic controls enumerate nontrivial three/four-record distributions, including
 repeated observable indices and repeated detector history offsets. Resealed
 corruption tests must reject missing coverage, altered counts/input/batch/imports
-and malformed timing. Lossless gzip event streams are supported for publication.
+and malformed timing. Publication accepts exactly one event encoding: `events.jsonl`,
+`events.jsonl.gz`, or contiguous `events.part-00000.jsonl.gz` parts. Parts
+concatenate after decompression, even across JSON/UTF-8 boundaries. The closure
+checks the complete decoded byte digest and event count; missing trailing parts
+therefore cannot pass. Each published compressed blob stays below10MiB.
 
 New native SymFT events retain its public counts-sampler `info` receipt, including
 the selected active-components flag, raw/reference output policy and dimensions.

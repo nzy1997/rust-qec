@@ -1,7 +1,6 @@
 """Replay diagnostic coverage, timing arithmetic and finite parity witnesses."""
 import argparse
 import hashlib
-import gzip
 import itertools
 import json
 import math
@@ -18,6 +17,8 @@ from evidence import expand,parity_counts
 from projection import records_only
 import run as incumbent
 from corpus import build,BASELINE
+sys.path.insert(0,str(HERE.parent))
+from evidence_io import read_event_bytes
 
 
 def require(condition,message):
@@ -69,7 +70,7 @@ def selected_trial(event,header):
 def validate(out,git_sources=False,allow_smoke=False):
     header=json.loads((out/'header.json').read_text())
     closure=json.loads((out/'closure.json').read_text())
-    events_bytes=(out/'events.jsonl').read_bytes() if (out/'events.jsonl').exists() else gzip.decompress((out/'events.jsonl.gz').read_bytes())
+    events_bytes=read_event_bytes(out)
     events=[json.loads(line) for line in events_bytes.splitlines()]
     require(closure['events']==len(events),'event count mismatch')
     require(closure['events_sha256']==digest(events_bytes),'event digest mismatch')
@@ -113,11 +114,16 @@ def validate(out,git_sources=False,allow_smoke=False):
         tracked=subprocess.check_output(['git','ls-tree','-r','--name-only',header['source_revision']],cwd=ROOT,text=True).splitlines()
         prefix='benchmarks/near_clifford/'
         expected_paths={p for p in tracked if p.startswith('rstim/src/') and p.endswith('.rs')
-            or p in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']
+            or p in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml',prefix+'evidence_io.py']
             or p.startswith(prefix+'diagnostics/') and not any(part in ['target','__pycache__'] for part in p.split('/'))
             or p.startswith(prefix+'compiled_sota/') and
                (p.endswith('.py') and p.count('/')==3 or p==prefix+'compiled_sota/manifest.json'
                 or p.startswith(prefix+'compiled_sota/fixtures/') and p.endswith('.stim'))}
+        # Exempt only the exact historical implementation before helper inventory.
+        producer=subprocess.check_output(['git','show',header['source_revision']+
+            ':benchmarks/near_clifford/diagnostics/run.py'],cwd=ROOT)
+        if digest(producer)=='cf4ca29cf945c5d8cf5997ba3c7dcf8b0f269497e8cc21801c4eaf177e01f16d':
+            expected_paths.discard(prefix+'evidence_io.py')
         require(set(header['sources'])==expected_paths,'source inventory incomplete or extra paths')
         require(mandatory <= expected_paths,'source revision predates diagnostic harness')
         for path,sha in header['sources'].items():
