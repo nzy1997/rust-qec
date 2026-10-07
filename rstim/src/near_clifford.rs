@@ -1457,6 +1457,18 @@ pub struct NearCliffordMeasurementBatch {
     pub measurements: Vec<u8>,
 }
 
+/// Counts after requiring every raw detector parity to be zero.
+///
+/// Logical errors are accepted shots whose chosen raw observable parity is one.
+/// Repeated `OBSERVABLE_INCLUDE` events for that index are XOR-folded. No
+/// reference-sample normalization is applied.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct NearCliffordPostselectedCounts {
+    pub attempted: usize,
+    pub accepted: usize,
+    pub logical_errors: usize,
+}
+
 const MAX_NEAR_CLIFFORD_QUBITS: usize = 4096;
 
 impl NearCliffordExecutor {
