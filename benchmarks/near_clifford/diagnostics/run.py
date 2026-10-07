@@ -33,6 +33,7 @@ def inventory():
               and not any(part in ('target','__pycache__') for part in p.relative_to(HERE).parts)]
     paths += list((HERE.parent/'compiled_sota').glob('*.py'))
     paths += [HERE.parent/'compiled_sota/manifest.json']
+    paths += [HERE.parent/'evidence_io.py']
     paths += list((HERE.parent/'compiled_sota/fixtures').glob('*.stim'))
     return {str(p.relative_to(ROOT)):sha(p) for p in sorted(paths)}
 

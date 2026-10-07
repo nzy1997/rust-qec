@@ -1,12 +1,12 @@
 """Original-annotation semantic controls and resealed campaign mutations."""
 import copy
-import gzip
 import json
 from pathlib import Path
 import sys
 import tempfile
 from common import annotations,raw_counts,require,digest
 from verify import validate
+from evidence_io import read_event_bytes
 
 
 def semantic_controls():
@@ -30,7 +30,7 @@ def main():
     if len(sys.argv)==1: return
     require(len(sys.argv)==2,'usage: test_contract.py [CAMPAIGN_DIRECTORY]')
     source=Path(sys.argv[1]);validate(source,allow_smoke=True)
-    data=(source/'events.jsonl').read_bytes() if (source/'events.jsonl').exists() else gzip.decompress((source/'events.jsonl.gz').read_bytes())
+    data=read_event_bytes(source)
     events=[json.loads(line) for line in data.splitlines()]
     header=json.loads((source/'header.json').read_text());closure=json.loads((source/'closure.json').read_text())
     def missing_timing(e,h): e.remove(next(v for v in e if v['kind']=='timing'))
