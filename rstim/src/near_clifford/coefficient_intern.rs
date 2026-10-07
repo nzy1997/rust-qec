@@ -86,6 +86,93 @@ mod tests {
     }
 
     #[test]
+    fn original_cultivation_counts_delay_index_then_reuse_states_with_exact_rng() {
+        use rand::{RngCore, SeedableRng, rngs::StdRng};
+        use std::collections::HashSet;
+        let text = include_str!(
+            "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+        );
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let mut cached = plan.prepare_sampler().unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(1739);
+            let mut b = a.clone();
+            for shots in [1, 64, 1024, 64] {
+                let rows = scalar.sample(shots, &mut b).unwrap();
+                let accepted: Vec<_> = rows
+                    .iter()
+                    .filter(|r| r.detectors.iter().all(|&v| !v))
+                    .collect();
+                let expected = NearCliffordPostselectedCounts {
+                    attempted: shots,
+                    accepted: accepted.len(),
+                    logical_errors: accepted
+                        .iter()
+                        .filter(|r| {
+                            r.observables
+                                .iter()
+                                .filter(|(i, _)| *i == 0)
+                                .fold(false, |v, (_, bit)| v ^ bit)
+                        })
+                        .count(),
+                };
+                assert_eq!(
+                    cached.sample_postselected_counts(shots, 0, &mut a).unwrap(),
+                    expected
+                );
+                if shots == 1 {
+                    assert!(cached.cache.as_ref().unwrap().intern.is_none());
+                }
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+            assert_eq!(
+                cached.sample_measurements_u8(17, &mut a).unwrap(),
+                scalar.sample_measurements_u8(17, &mut b).unwrap()
+            );
+            for _ in 0..16 {
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+            let cache = cached.cache.as_ref().unwrap();
+            assert!(
+                cache.intern.is_some(),
+                "bulk calls must actually activate the optional index"
+            );
+            // Two independent cached edges to the same non-scalar child at one
+            // producing node witness actual interning, rather than cache growth.
+            let mut children = HashSet::new();
+            let mut reused = false;
+            let edges = cache.nodes.iter().copied().enumerate().chain(
+                cache
+                    .states
+                    .iter()
+                    .skip(1)
+                    .filter_map(|s| s.next_node.map(|n| (n, s.transition))),
+            );
+            for (node, op) in edges {
+                let next = match op {
+                    CachedOp::Rotate(next) => next,
+                    CachedOp::Measure(m) => m.next,
+                    CachedOp::None => [None; 2],
+                };
+                for child in next.into_iter().flatten().filter(|&id| id != 0) {
+                    reused |= !children.insert((node, child));
+                }
+            }
+            assert!(
+                reused,
+                "the original circuit must witness an exactly reused coherent state"
+            );
+        }
+    }
+
+    #[test]
     fn index_capacity_is_charged_and_small_budget_declines() {
         assert!(CoefficientIntern::new(0).is_none());
         assert!(CoefficientIntern::new(SLOTS * size_of::<Entry>() - 1).is_none());
