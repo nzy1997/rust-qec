@@ -73,7 +73,7 @@ mod tests {
     }
 
     #[test]
-    fn lazy_interning_reuses_exact_states_even_after_cache_budget_is_full() {
+    fn lazy_interning_reuses_exact_states_until_admission_closes() {
         let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMY 0\n").unwrap();
         let mut cache = CoefficientCache::new(&plan, DEFAULT_CACHE_BYTE_BUDGET).unwrap();
         let initial = cache.reserved;
@@ -84,10 +84,11 @@ mod tests {
         assert!(cache.reserved > initial);
         let reserved = cache.reserved;
         let states = cache.states.len();
-        cache.budget = reserved;
         assert_eq!(cache.store(23, &values), Some(first));
         assert_eq!(cache.reserved, reserved);
         assert_eq!(cache.states.len(), states);
+        cache.budget = reserved;
+        assert_eq!(cache.store(23, &values), None);
         assert_eq!(cache.store(24, &values), None);
         assert_eq!(cache.reserved, reserved);
         assert_eq!(cache.states.len(), states);

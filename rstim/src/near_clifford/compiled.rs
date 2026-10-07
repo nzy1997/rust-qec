@@ -320,11 +320,18 @@ impl CoefficientCache {
         if coefficients.len() == 1 {
             return Some(0);
         }
+        let charge = Self::state_charge(coefficients)?;
+        // Once admission closes, avoid hashing a coefficient vector on every
+        // scalar replay. Interning is optional construction work, not a lookup
+        // route after the bounded cache has filled.
+        if !self.fits(charge) {
+            return None;
+        }
         // Defer optional index allocation until an actual non-scalar state is
         // stored, preserving cold preparation and error-only cache footprints.
         if !self.intern_attempted && coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS {
             self.intern_attempted = true;
-            let remaining = self.budget - self.reserved;
+            let remaining = self.budget - self.reserved - charge;
             self.intern = CoefficientIntern::new(remaining);
             self.reserved += self
                 .intern
@@ -344,10 +351,6 @@ impl CoefficientCache {
         } else {
             None
         };
-        let charge = Self::state_charge(coefficients)?;
-        if !self.fits(charge) {
-            return None;
-        }
         let mut state = Vec::new();
         state.try_reserve_exact(coefficients.len()).ok()?;
         state.extend_from_slice(coefficients);
