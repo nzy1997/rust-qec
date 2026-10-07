@@ -213,7 +213,7 @@ class ReferenceTests(unittest.TestCase):
 
     def test_bundle_rejects_resealed_native_time_and_missing_checksums(self):
         source = ROOT/'site/static/data/atom-loss'
-        self.assertEqual(verify(source), 'PASS')
+        self.assertEqual(verify(source, historical=True), 'PASS')
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)/'bundle'
             def reset():
@@ -233,7 +233,7 @@ class ReferenceTests(unittest.TestCase):
                 (root/'tradeoff.json').write_text(json.dumps(data))
                 reseal('tradeoff.json')
                 with self.subTest(defect=defect), self.assertRaisesRegex(ValueError, 'native|Native'):
-                    verify(root)
+                    verify(root, historical=True)
             for name in ['accuracy-time.svg', 'source-snapshot-timing.json', 'shot-data-v1.zip', 'timing-sweep.svg', 'sampling-reference-cost.svg', 'provenance-correctness.json']:
                 reset()
                 manifest = json.loads((root/'bundle.json').read_text())
@@ -241,7 +241,7 @@ class ReferenceTests(unittest.TestCase):
                 (root/name).write_text('replaced but unlisted')
                 (root/'bundle.json').write_text(json.dumps(manifest))
                 with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'Missing required'):
-                    verify(root)
+                    verify(root, historical=True)
             reset()
             manifest = json.loads((root/'bundle.json').read_text())
             for name in ['provenance-timing.json', 'source-snapshot-timing.json']:
@@ -249,14 +249,14 @@ class ReferenceTests(unittest.TestCase):
                 (root/name).unlink()
             (root/'bundle.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, 'Missing required'):
-                verify(root)
+                verify(root, historical=True)
             reset()
             snapshot = json.loads((root/'source-snapshot-timing.json').read_text())
             snapshot['files'][next(iter(snapshot['files']))] += '# changed'
             (root/'source-snapshot-timing.json').write_text(json.dumps(snapshot))
             reseal('source-snapshot-timing.json')
             with self.assertRaisesRegex(ValueError, 'Source snapshot mismatch'):
-                verify(root)
+                verify(root, historical=True)
 
     def test_timing_table_corruption_is_rejected_after_resealing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -272,7 +272,7 @@ class ReferenceTests(unittest.TestCase):
             manifest['sha256'][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
             (root/'bundle.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, 'Timing sweep CSV'):
-                verify(root)
+                verify(root, historical=True)
 
     def test_summary_fields_and_completeness_reject_resealed_corruption(self):
         source = ROOT/'site/static/data/atom-loss'
@@ -301,7 +301,7 @@ class ReferenceTests(unittest.TestCase):
                 manifest['sha256']['summary.csv'] = hashlib.sha256(path.read_bytes()).hexdigest()
                 (root/'bundle.json').write_text(json.dumps(manifest))
                 with self.subTest(defect=defect), self.assertRaisesRegex(ValueError,'Summary CSV'):
-                    verify(root)
+                    verify(root, historical=True)
 
     def test_low_probability_cutoff_fails_overall_sampling_report(self):
         original = correctness.rust_rows
@@ -416,7 +416,7 @@ class ReferenceTests(unittest.TestCase):
                 manifest['sha256']['correctness.json']=hashlib.sha256((root/'correctness.json').read_bytes()).hexdigest()
                 (root/'bundle.json').write_text(json.dumps(manifest))
                 with self.subTest(path=path),self.assertRaises((KeyError,ValueError)):
-                    verify(root)
+                    verify(root, historical=True)
 
     def test_sampling_count_cannot_change_throughput_after_resealing(self):
         source=ROOT/'site/static/data/atom-loss'
@@ -427,7 +427,7 @@ class ReferenceTests(unittest.TestCase):
             manifest=json.loads((root/'bundle.json').read_text())
             manifest['sha256']['sampling.json']=hashlib.sha256((root/'sampling.json').read_bytes()).hexdigest()
             (root/'bundle.json').write_text(json.dumps(manifest))
-            with self.assertRaisesRegex(ValueError,'Sampling workload'):verify(root)
+            with self.assertRaisesRegex(ValueError,'Sampling workload'):verify(root, historical=True)
 
     def test_stdlib_statistics_match_independent_reference(self):
         from scipy.stats import binom, fisher_exact

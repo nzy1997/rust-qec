@@ -116,13 +116,12 @@ def clean_source(repo=ROOT):
             'inputs': entries, 'input_digest': input_digest(entries), 'build_commands': BUILD_COMMANDS, 'build_policy': BUILD_POLICY}
 
 
-def verify_source(record, repo=ROOT):
+def verify_source(record, repo=ROOT, *, historical=False):
     commit = record['source_commit']
     if record.get('schema') != 1 or record.get('working_tree_dirty') is not False:
         raise ValueError('Missing clean source provenance')
     if len(commit) != 40 or any(c not in '0123456789abcdef' for c in commit):
         raise ValueError('Invalid source commit')
-    current = inventory(repo, 'HEAD')
     if record['input_digest'] != input_digest(record['inputs']):
         raise ValueError('Incomplete or altered source inventory')
     # Squash merging preserves source files but not the measured commit's
@@ -132,12 +131,18 @@ def verify_source(record, repo=ROOT):
         ['git', '-C', str(repo), 'cat-file', '-e', commit+'^{commit}'],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     ).returncode == 0
+    if historical and not source_available:
+        raise ValueError('Historical verification requires the measured source commit; fetch its retained ref')
     if source_available and inventory(repo, commit) != record['inputs']:
         raise ValueError('Incomplete or altered source inventory')
     if record.get('build_policy') != BUILD_POLICY:
         raise ValueError('Unexpected clean-build environment policy')
     if record['build_commands'] != BUILD_COMMANDS:
         raise ValueError('Unexpected evidence build commands')
+    if historical:
+        # This verifies immutable historical evidence, never the current build.
+        return commit
+    current = inventory(repo, 'HEAD')
     if current != record['inputs']:
         raise ValueError('Current source/build inputs differ from measured source commit; regenerate evidence')
     # Catch newly staged/untracked build inputs before a local verification too.
@@ -181,9 +186,12 @@ def capture(out, stage, extra=None):
     save(out/('provenance-'+stage+'.json'), record)
 
 
-def verify_bundle_source(out, repo=ROOT):
+def verify_bundle_source(out, repo=ROOT, *, historical=False):
     binding = json.loads((out/'source-manifest.json').read_text())
-    commit = verify_source(binding, repo)
+    commit = verify_source(binding, repo, historical=historical)
+    def source_text(name):
+        return (git(repo, 'show', commit+':'+name).decode() if historical
+                else (repo/name).read_text())
     env = binding.get('build_environment', {})
     fixed = {'LANG': 'C', 'LC_ALL': 'C', **THREAD_ENVIRONMENT}
     if (not {'PATH', 'HOME', 'CARGO_HOME'}.issubset(env)
@@ -196,7 +204,7 @@ def verify_bundle_source(out, repo=ROOT):
     if not isinstance(binding.get('rustc'), str) or not binding['rustc'].strip():
         raise ValueError('Missing recorded build compiler')
     dependencies = {}
-    for line in (repo/'benchmarks/atom_loss/requirements.txt').read_text().splitlines():
+    for line in source_text('benchmarks/atom_loss/requirements.txt').splitlines():
         package, separator, version = line.strip().partition('==')
         if package in CAPTURE_DEPENDENCIES:
             if not separator or not version.strip() or package in dependencies:
@@ -225,10 +233,10 @@ def verify_bundle_source(out, repo=ROOT):
         runtime = host
         suffix = '' if path.stem == 'provenance-all' else path.stem.removeprefix('provenance')
         snapshot = json.loads((out/('source-snapshot'+suffix+'.json')).read_text())
-        expected = {name: (repo/name).read_text() for name in binding['inputs']
+        expected = {name: source_text(name) for name in binding['inputs']
                     if name.startswith('benchmarks/atom_loss/') and (repo/name).suffix in {'.py', '.stim', '.txt', '.md'}}
         if record['sources'] != {name: hashlib.sha256(text.encode()).hexdigest() for name, text in expected.items()}:
-            raise ValueError('Stage source inventory differs from current source: '+path.name)
+            raise ValueError('Stage source inventory differs from bound source: '+path.name)
         if snapshot != {'base_commit': commit, 'files': expected}:
-            raise ValueError('Snapshot differs from measured/current source: '+path.name)
+            raise ValueError('Snapshot differs from bound source: '+path.name)
     return commit
