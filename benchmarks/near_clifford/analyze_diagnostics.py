@@ -28,7 +28,7 @@ def table(path,rows,check):
     if not rows: return
     keys=list(rows[0])
     f=io.StringIO(newline='')
-    writer=csv.DictWriter(f,fieldnames=keys);writer.writeheader();writer.writerows(rows)
+    writer=csv.DictWriter(f,fieldnames=keys,lineterminator="\n");writer.writeheader();writer.writerows(rows)
     emit(path,f.getvalue().encode(),check)
 
 
@@ -112,7 +112,7 @@ def summarize(out,kind,check=False):
         'Five independent rotated/reversed process rounds; seven observations of at least50ms per warm process.',
         'Ranges below are paired process-median ranges, not confidence intervals. Strict/Fused are separate.',
         'Clifft0.11.0 and SymFT0.1.1 sourcec89b985 are distribution/import hash bound; native peer build flags are not fully attested.',
-        'OS RSS is whole-process high-water, including probe/interpreter allocations. Mac measurements have no pinned-core claim.',
+        'OS RSS is whole-process high-water, including probe/interpreter allocations. Linux ru_maxrss may retain launcher memory across exec; these Linux receipts cannot establish simulator memory usage or cross-backend memory differences. Mac measurements have no pinned-core claim.',
         f"Collector CPU affinity: `{header['host'].get('affinity')}`; compiler environment: `{json.dumps(header.get('compiler_environment',{}),sort_keys=True)}`.",
         'Empty CSV RSS/cache entries mean unmeasured; raw flat peer workers do not report RSS. Peer preparation is included in compilation.',
         'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.',
@@ -122,7 +122,7 @@ def summarize(out,kind,check=False):
         '| Cell | rstim µs | Fastest peer µs | Speedup | Paired range | Peer |',
         '| --- | ---: | ---: | ---: | --- | --- |']
     for value in comparisons:
-        lines.append(f"| {value['id']} | {value['rstim_ns']/1000:.3f} | {value['peer_ns']/1000:.3f} | {value['speedup']:.3f}× | {value['paired_min']:.3f}–{value['paired_max']:.3f} | {value['fastest_peer']} |")
+        lines.append(f"| {value['id']} | {value['rstim_ns']/1000:.3f} | {value['peer_ns']/1000:.3f} | {value['speedup']:.4g}× | {value['paired_min']:.4g}–{value['paired_max']:.4g} | {value['fastest_peer']} |")
     if summary['omitted_cells']:
         lines+=['','Cells without a complete successful timing comparison (original failures remain in events):',
                 ', '.join('`'+cell+'`' for cell in summary['omitted_cells'])]

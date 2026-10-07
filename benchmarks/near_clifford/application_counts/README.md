@@ -72,3 +72,9 @@ The verifier checks reported policy and shape. Older receipts lacking this
 additive field make no active-components claim; raw-record workers do not expose
 the same receipt. `max_active_qubits` is not treated as a common dense-state
 dimension across backends.
+
+Linux `ru_maxrss` receipts may include launcher memory inherited across exec.
+The published Linux high-water marks are retained as process observations but
+cannot establish simulator-only memory usage or relative engine memory costs.
+Future Linux memory comparisons need a separately attributed measurement.
+See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusage.2.html).

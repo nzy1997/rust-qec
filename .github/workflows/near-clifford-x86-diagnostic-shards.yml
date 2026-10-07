@@ -1,12 +1,9 @@
 name: Near-Clifford x86 diagnostic shards
 
 # Independent VM budgets preserve closed receipts before the global job cap.
-# Bootstrap once on this branch; after dispatch use explicit remeasurement only.
+# Remeasure explicitly; evidence publications reuse the closed receipts.
 # Each shard reports its own actual hardware; do not pool absolute timings across VMs.
 on:
-  push:
-    branches: [codex/near-clifford-diagnostic-benchmarks]
-    paths: [.github/workflows/near-clifford-x86-diagnostic-shards.yml]
   workflow_dispatch:
 
 permissions:

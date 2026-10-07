@@ -92,3 +92,9 @@ complete original decoded digest and event count, rejecting missing trailing
 parts. New producers inventory the shared reader; only the exact Git-bound
 legacy producer implementation is exempt from that added inventory entry. Missing closure denotes
 an interrupted campaign and cannot pass verification.
+
+Linux `ru_maxrss` receipts may include launcher memory inherited across exec.
+The published Linux high-water marks are retained as process observations but
+cannot establish simulator-only memory usage or relative engine memory costs.
+Future Linux memory comparisons need a separately attributed measurement.
+See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusage.2.html).

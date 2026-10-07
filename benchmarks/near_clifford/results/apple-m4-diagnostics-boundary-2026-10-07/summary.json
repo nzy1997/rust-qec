@@ -20,6 +20,14 @@
     "valid_cells": 72
   },
   "statistical_unit": "median of observations within each independent process; process medians summarized across rounds",
+  "activity_metrics": {
+    "rstim": "peak_active_rank",
+    "clifft": "peak_active_width",
+    "clifft-scheduled": "peak_active_width",
+    "symft": "max_active_qubits"
+  },
+  "complete_timing_cells": 72,
+  "omitted_cells": [],
   "warm_comparisons": [
     {
       "id": "msc5/s1/c67108864/strict",
