@@ -29,7 +29,7 @@ MSC d3 leads by 1.557×/1.518× at 1/64; 1024 is near parity (1.013×, paired
 range crosses one). MSC d5 remains 1.421×/1.091×/1.101× slower. See
 [comparisons.csv](comparisons.csv) for every Strict/Fused point and paired range.
 
-Affine preparation belongs to `first_ns`: surface d7 Fused first calls cost
+Affine preparation belongs to `first_ns`: surface d7 Fused cell-median first calls cost
 1.43–1.57 ms, d9 2.80–3.39 ms, in addition to circuit compilation. Warm throughput
 does not establish a cold single-request advantage. All backend cold phases,
 accepted throughput and whole-process RSS remain in [warm.csv](warm.csv).
