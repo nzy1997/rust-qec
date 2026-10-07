@@ -3,6 +3,9 @@ use super::*;
 #[path = "compile_frame.rs"]
 mod compile_frame;
 use compile_frame::CompileFrame;
+#[path = "coefficient_intern.rs"]
+mod coefficient_intern;
+use coefficient_intern::CoefficientIntern;
 #[path = "coherent_packet.rs"]
 mod coherent_packet;
 use coherent_packet::CoherentPacket;
@@ -216,9 +219,12 @@ struct CachedState {
     transition: CachedOp,
 }
 struct CoefficientCache {
-    // Scalar state 0 is shared across positions; other IDs are never deduplicated.
+    // Scalar state 0 is shared across positions. Optional interning only shares
+    // exact coefficient bits produced at the same coherent node.
     nodes: Vec<CachedOp>,
     states: Vec<CachedState>,
+    intern: Option<CoefficientIntern>,
+    intern_attempted: bool,
     start: usize,
     reserved: usize,
     budget: usize,
@@ -261,6 +267,8 @@ impl CoefficientCache {
         Some(Self {
             nodes,
             states,
+            intern: None,
+            intern_attempted: false,
             start,
             reserved: bytes,
             budget,
@@ -308,10 +316,34 @@ impl CoefficientCache {
             .checked_add(bytes)
             .is_some_and(|sum| sum <= self.budget)
     }
-    fn store(&mut self, coefficients: &[ComplexAmp]) -> Option<usize> {
+    fn store(&mut self, node: usize, coefficients: &[ComplexAmp]) -> Option<usize> {
         if coefficients.len() == 1 {
             return Some(0);
         }
+        // Defer optional index allocation until an actual non-scalar state is
+        // stored, preserving cold preparation and error-only cache footprints.
+        if !self.intern_attempted && coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS {
+            self.intern_attempted = true;
+            let remaining = self.budget - self.reserved;
+            self.intern = CoefficientIntern::new(remaining);
+            self.reserved += self
+                .intern
+                .as_ref()
+                .map_or(0, CoefficientIntern::reserved_bytes);
+        }
+        let slot = if coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS {
+            if let Some(intern) = &self.intern {
+                let (existing, slot) = intern.find_or_slot(node, coefficients, &self.states);
+                if let Some(id) = existing {
+                    return Some(id);
+                }
+                slot
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         let charge = Self::state_charge(coefficients)?;
         if !self.fits(charge) {
             return None;
@@ -327,6 +359,9 @@ impl CoefficientCache {
             transition: CachedOp::None,
         });
         self.reserved += charge;
+        if let (Some(intern), Some((slot, fingerprint))) = (&mut self.intern, slot) {
+            intern.insert(slot, fingerprint, node, id);
+        }
         Some(id)
     }
 }
@@ -2231,7 +2266,7 @@ impl CompiledNearCliffordSampler<'_> {
                     CachedOp::None => [None; 2],
                     _ => return Ok(()),
                 };
-                if let Some(next) = cache.store(&self.coefficients) {
+                if let Some(next) = cache.store(node, &self.coefficients) {
                     children[usize::from(sign)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Rotate(children)) {
                         *state = Some(next);
@@ -2294,7 +2329,7 @@ impl CompiledNearCliffordSampler<'_> {
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(CachedOp::Measure(mut entry)) = cache.entry(id, node) {
-                if let Some(next) = cache.store(&self.coefficients) {
+                if let Some(next) = cache.store(node, &self.coefficients) {
                     entry.next[usize::from(branch)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Measure(entry)) {
                         *state = Some(next);
