@@ -115,14 +115,14 @@ def summarize(out,kind,check=False):
         'OS RSS is whole-process high-water, including probe/interpreter allocations. Linux ru_maxrss may retain launcher memory across exec; these Linux receipts cannot establish simulator memory usage or cross-backend memory differences. Mac measurements have no pinned-core claim.',
         f"Collector CPU affinity: `{header['host'].get('affinity')}`; compiler environment: `{json.dumps(header.get('compiler_environment',{}),sort_keys=True)}`.",
         'Empty CSV RSS/cache entries mean unmeasured; raw flat peer workers do not report RSS. Peer preparation is included in compilation.',
-        # Preserve frozen v1/v2 rendering; v3 counts has no lifecycle phase receipts.
+        # Preserve frozen rendering; modern counts has no lifecycle phase receipts.
         ('This counts campaign records no lifecycle phase measurements.'
-         if header['schema']=='rstim.postselected-counts.v3' else
+         if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4'] else
          'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.'),
         'Activity metrics preserve their API names: rstim peak_active_rank, Clifft peak_active_width, SymFT max_active_qubits. They are not a common cross-engine rank scale.',
         'The active_components column is the reported native SymFT counts-sampler flag where available; empty means unmeasured, including raw-record workers.',
         ('See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS.'
-         if header['schema']=='rstim.postselected-counts.v3' else
+         if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4'] else
          'See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS; lifecycle.csv for every history/budget.'), '',
         '| Cell | rstim µs | Fastest peer µs | Speedup | Paired range | Peer |',
         '| --- | ---: | ---: | ---: | --- | --- |']
@@ -133,7 +133,7 @@ def summarize(out,kind,check=False):
                 ', '.join('`'+cell+'`' for cell in summary['omitted_cells'])]
     if kind=='application_counts':
         lines+=['','Counts contract: all-zero raw detector postselection and XOR-folded raw observable0, no reference normalization.',
-            ('Rust uses native counts with scalar/admission-fallback early rejection; live packed lanes complete simulation.' if header['schema']=='rstim.postselected-counts.v3' else 'Rust uses native counts without early rejection; peers use native counts/early rejection.') if header.get('rust_route')=='native' else 'Rust builds full structured records then filters/counts; peers use native counts/early rejection.',
+            ('Rust uses native counts with scalar/admission-fallback rejection and packed detector retirement; packed annotations reduce counts during execution.' if header['schema']=='rstim.postselected-counts.v4' else 'Rust uses native counts with scalar/admission-fallback early rejection; live packed lanes complete simulation.' if header['schema']=='rstim.postselected-counts.v3' else 'Rust uses native counts without early rejection; peers use native counts/early rejection.') if header.get('rust_route')=='native' else 'Rust builds full structured records then filters/counts; peers use native counts/early rejection.',
             'This is separate from raw-record throughput. Accepted rates are in warm.csv; sparse logical errors do not certify conditional accuracy.',
             'Accepted throughput pools accepted shots/time within each process, then takes the median across processes; zero survivors are retained.',
             'Original-circuit capability failures are retained in capability.csv and events, without gate lowering.']
