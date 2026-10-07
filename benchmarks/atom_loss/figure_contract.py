@@ -96,9 +96,10 @@ def compare_figures(root, redrawn):
                 raise ValueError('Figure differs from validated JSON: '+png)
 
 
-def verify_presentation(root):
-    methodology = Path(__file__).with_name('README.md')
-    if (root/'methodology.md').read_bytes() != methodology.read_bytes():
+def verify_presentation(root, *, methodology=None):
+    if methodology is None:
+        methodology = Path(__file__).with_name('README.md').read_bytes()
+    if (root/'methodology.md').read_bytes() != methodology:
         raise ValueError('Published methodology differs from source README')
     from .plot import render
     with tempfile.TemporaryDirectory(prefix='atom-loss-figure-check-') as temp:
