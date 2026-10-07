@@ -83,6 +83,9 @@ See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusa
 
 ## Native Rust counts follow-up
 
+The [formal M4 native-counts publication](../results/apple-m4-native-counts-2026-10-07/README.md)
+contains complete 24-cell comparisons and identifies the remaining peer gaps.
+
 The default `--rust-route native` benchmarks `sample_postselected_counts` through the
 public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v2` with
 an explicit native or structured route. V1 publications retain the frozen PR780 production

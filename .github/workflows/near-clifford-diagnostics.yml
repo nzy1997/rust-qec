@@ -96,11 +96,17 @@ jobs:
             python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
             python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
           done
+          evidence=benchmarks/near_clifford/results/apple-m4-native-counts-2026-10-07
+          python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
+          python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
       - name: Reject resealed evidence corruption
         run: |
           evidence=benchmarks/near_clifford/results/apple-m4-diagnostics-cache-lifetime-2026-10-07
           python3 benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
           python3 -O benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
           evidence=benchmarks/near_clifford/results/apple-m4-application-counts-2026-10-07
+          python3 benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
+          python3 -O benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
+          evidence=benchmarks/near_clifford/results/apple-m4-native-counts-2026-10-07
           python3 benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
           python3 -O benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
