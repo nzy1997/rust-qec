@@ -20,10 +20,11 @@ def validate(out,git_sources=False,allow_smoke=False):
     header=json.loads((out/'header.json').read_text());closure=json.loads((out/'closure.json').read_text())
     data=read_event_bytes(out)
     events=[json.loads(line) for line in data.splitlines()]
-    require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2','rstim.postselected-counts.v3','rstim.postselected-counts.v4'],'wrong schema')
+    require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2','rstim.postselected-counts.v3','rstim.postselected-counts.v4','rstim.postselected-counts.v5'],'wrong schema')
     modern=header['schema']!='rstim.postselected-counts.v1'
     scalar_rejection=header['schema']=='rstim.postselected-counts.v3'
     packed_rejection=header['schema']=='rstim.postselected-counts.v4'
+    affine_counts=header['schema']=='rstim.postselected-counts.v5'
     route=header.get('rust_route') if modern else header.get('rust_route','structured')
     require(route in ['structured','native'] if modern else route=='structured','Rust route differs')
     native_rust=route=='native'
@@ -91,7 +92,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         require(result['input_sha256']==digest((records_only(texts[name]) if projected else texts[name]).encode()),'consumed input differs')
         if backend!='rstim': inc.bind_peer(result,backend,header['packages'],header['peer_loaded_files'])
         else:
-            expected_execution=('native raw postselected counts; scalar and packed early rejection' if packed_rejection else 'native raw postselected counts; scalar early rejection' if scalar_rejection else 'native raw postselected counts; no early rejection') if native_rust else 'full structured records then filter; no early rejection'
+            expected_execution=('native raw postselected counts; optional affine model and scalar/packed early rejection' if affine_counts else 'native raw postselected counts; scalar and packed early rejection' if packed_rejection else 'native raw postselected counts; scalar early rejection' if scalar_rejection else 'native raw postselected counts; no early rejection') if native_rust else 'full structured records then filter; no early rejection'
             require(result['execution']==expected_execution,'Rust execution route differs')
             if native_rust and 'measurements' in result:
                 require(result.get('exact_native_counts_rng') is True,'missing native exact counts/RNG witness')

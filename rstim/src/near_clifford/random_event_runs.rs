@@ -134,6 +134,9 @@ impl RandomRunPlan {
         })
     }
 
+    pub(super) fn reserved_bytes(&self) -> usize {
+        self.runs.capacity() * size_of::<RandomRun>()
+    }
     pub(super) fn fill_row<R: Rng>(
         &self,
         random: &mut RowRandom<'_, R>,
@@ -365,17 +368,10 @@ impl<R: Rng> RowRandom<'_, R> {
             PreparedRandom::Independent => {
                 let mut offset = 0;
                 while offset < output.len() {
-                    if self.bits_left == 0 {
-                        self.bit_word = self.rng.r#gen::<u64>();
-                        self.bits_left = 64;
-                    }
-                    let take = (output.len() - offset).min(self.bits_left as usize);
-                    let word = self.bit_word;
+                    let (word, take) = self.take_independent(output.len() - offset);
                     for (bit, value) in output[offset..offset + take].iter_mut().enumerate() {
                         *value = (word >> bit) & 1;
                     }
-                    self.bit_word = if take == 64 { 0 } else { word >> take };
-                    self.bits_left -= take as u8;
                     offset += take;
                     // Do not load another word when offset reaches output.len().
                 }
@@ -450,21 +446,17 @@ impl<R: Rng> RowRandom<'_, R> {
                 self.noise_log_failure = log_failure;
                 let mut offset = 0;
                 while offset < output.len() {
-                    let skip = self.noise_skip.get_or_insert_with(|| {
-                        let u = self.rng.r#gen::<f64>();
-                        ((-u).ln_1p() / log_failure).floor() as usize
-                    });
-                    if *skip != 0 {
-                        let failures = (*skip).min(output.len() - offset);
+                    let remaining = output.len() - offset;
+                    let Some(failures) = self.sparse_hit(remaining) else {
                         if !COMPACT {
-                            clear_events(&mut output[offset..offset + failures]);
+                            clear_events(&mut output[offset..]);
                         }
-                        *skip -= failures;
-                        offset += failures;
-                        // Some(0) must survive an exact run boundary: the next
-                        // same-p sparse event succeeds without renewing a uniform.
-                        continue;
+                        break;
+                    };
+                    if !COMPACT {
+                        clear_events(&mut output[offset..offset + failures]);
                     }
+                    offset += failures;
                     // All skipped events are same-p sparse Noise; their choice
                     // count cannot affect Bernoulli failures or pending carry.
                     // Read the original event ONLY at a success, before drawing
@@ -474,11 +466,7 @@ impl<R: Rng> RowRandom<'_, R> {
                     else {
                         unreachable!("sparse runs contain only noise events")
                     };
-                    let value = if choices == 1 {
-                        1
-                    } else {
-                        (self.rng.gen_range(0..choices) + 1) as u64
-                    };
+                    let value = self.noise_choice(choices);
                     write_noise_event::<COMPACT>(output, offset, value, &mut planes, lane_bit);
                     self.noise_skip = None;
                     if let Some((masks, lane)) = &mut noise_masks {
@@ -610,9 +598,19 @@ mod random_event_runs_tests {
         let plan = RandomRunPlan::build(kinds, PLAN_BYTE_BUDGET).unwrap();
         let mut a = StdRng::seed_from_u64(seed);
         let mut b = a.clone();
+        let mut c = a.clone();
+        let mut d = a.clone();
+        let mut active = vec![0u64; kinds.len().div_ceil(64)];
+        for event in 0..kinds.len() {
+            if (event * 7 + event / 31) % 11 < 5 {
+                active[event / 64] |= 1u64 << (event % 64);
+            }
+        }
         for _ in 0..8 {
             let mut scalar = RowRandom::live(&mut a);
             let mut runs = RowRandom::live(&mut b);
+            let mut visitor = RowRandom::live(&mut c);
+            let mut selected = RowRandom::live(&mut d);
             let expected = kinds
                 .iter()
                 .map(|&kind| scalar.draw(kind))
@@ -620,12 +618,50 @@ mod random_event_runs_tests {
             let mut actual = vec![0; kinds.len()];
             plan.fill_row(&mut runs, kinds, &mut actual);
             assert_eq!(expected, actual);
+            let mut scattered = vec![0; kinds.len()];
+            plan.visit_nonzero(&mut visitor, kinds, |event, value| scattered[event] = value);
+            assert_eq!(expected, scattered);
+            assert_eq!(scalar.bit_word, visitor.bit_word);
+            assert_eq!(scalar.bits_left, visitor.bits_left);
+            assert_eq!(scalar.noise_probability, visitor.noise_probability);
+            assert_eq!(scalar.noise_skip, visitor.noise_skip);
+            scattered.fill(0);
+            plan.visit_selected(&mut selected, kinds, &active, |event, value| {
+                scattered[event] = value
+            });
+            for (event, (&expected, &actual)) in expected.iter().zip(&scattered).enumerate() {
+                assert_eq!(
+                    actual,
+                    if active[event / 64] >> (event % 64) & 1 != 0 {
+                        expected
+                    } else {
+                        0
+                    }
+                );
+            }
+            assert_eq!(scalar.bit_word, selected.bit_word);
+            assert_eq!(scalar.bits_left, selected.bits_left);
+            assert_eq!(scalar.noise_probability, selected.noise_probability);
+            assert_eq!(scalar.noise_skip, selected.noise_skip);
+            let mut replay_rng = StdRng::seed_from_u64(99);
+            let before = replay_rng.clone().next_u64();
+            let mut replay = RowRandom::recorded(&expected, &mut replay_rng);
+            scattered.fill(0);
+            plan.visit_nonzero(&mut replay, kinds, |event, value| scattered[event] = value);
+            assert_eq!(expected, scattered);
+            assert_eq!(replay.cursor, kinds.len());
+            assert_eq!(before, replay_rng.next_u64());
             assert_eq!(scalar.bit_word, runs.bit_word);
             assert_eq!(scalar.bits_left, runs.bits_left);
             assert_eq!(scalar.noise_probability, runs.noise_probability);
             assert_eq!(scalar.noise_skip, runs.noise_skip);
         }
-        assert_eq!(a.next_u64(), b.next_u64());
+        for _ in 0..16 {
+            let expected = a.next_u64();
+            assert_eq!(expected, b.next_u64());
+            assert_eq!(expected, c.next_u64());
+            assert_eq!(expected, d.next_u64());
+        }
     }
 
     #[test]
@@ -906,5 +942,111 @@ mod random_event_runs_tests {
         drop(scalar);
         drop(runs);
         assert_eq!(a.next_u64(), b.next_u64());
+    }
+}
+
+impl RandomRunPlan {
+    #[cfg(test)]
+    pub(super) fn visit_nonzero<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        emit: impl FnMut(usize, u64),
+    ) {
+        self.visit_impl(random, kinds, None, emit);
+    }
+    pub(super) fn visit_selected<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        active: &[u64],
+        emit: impl FnMut(usize, u64),
+    ) {
+        debug_assert_eq!(active.len(), kinds.len().div_ceil(64));
+        self.visit_impl(random, kinds, Some(active), emit);
+    }
+    fn visit_impl<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        active: Option<&[u64]>,
+        mut emit: impl FnMut(usize, u64),
+    ) {
+        let needed =
+            |event: usize| active.is_none_or(|words| words[event / 64] >> (event % 64) & 1 != 0);
+        debug_assert_eq!(kinds.len(), self.event_count);
+        if let Some(tape) = random.tape {
+            for (event, &value) in tape[random.cursor..random.cursor + self.event_count]
+                .iter()
+                .enumerate()
+            {
+                if value != 0 && needed(event) {
+                    emit(event, value);
+                }
+            }
+            random.cursor += self.event_count;
+            return;
+        }
+        let mut event = 0;
+        for run in &self.runs {
+            match run.kind {
+                PreparedRandom::Independent => {
+                    let mut offset = 0;
+                    while offset < run.count {
+                        let (mut bits, take) = random.take_independent(run.count - offset);
+                        if let Some(words) = active {
+                            let start = event + offset;
+                            let shift = start % 64;
+                            let mut mask = words[start / 64] >> shift;
+                            if shift != 0 && take > 64 - shift {
+                                mask |= words[start / 64 + 1] << (64 - shift);
+                            }
+                            bits &= mask;
+                        }
+                        while bits != 0 {
+                            let bit = bits.trailing_zeros() as usize;
+                            bits &= bits - 1;
+                            emit(event + offset + bit, 1);
+                        }
+                        offset += take;
+                    }
+                }
+                PreparedRandom::Sparse {
+                    probability_bits,
+                    log_failure,
+                } => {
+                    if random.noise_probability != probability_bits {
+                        random.noise_skip = None;
+                        random.noise_probability = probability_bits;
+                    }
+                    random.noise_log_failure = log_failure;
+                    let mut offset = 0;
+                    while offset < run.count {
+                        let Some(failures) = random.sparse_hit(run.count - offset) else {
+                            break;
+                        };
+                        offset += failures;
+                        let RandomKind::Noise { choices, .. } = kinds[event + offset] else {
+                            unreachable!("sparse run kinds")
+                        };
+                        let value = random.noise_choice(choices);
+                        if needed(event + offset) {
+                            emit(event + offset, value);
+                        }
+                        offset += 1;
+                    }
+                }
+                _ => {
+                    for offset in 0..run.count {
+                        let value = random.draw(kinds[event + offset]);
+                        if value != 0 && needed(event + offset) {
+                            emit(event + offset, value);
+                        }
+                    }
+                }
+            }
+            event += run.count;
+        }
+        debug_assert_eq!(event, kinds.len());
     }
 }

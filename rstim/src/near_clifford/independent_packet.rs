@@ -116,20 +116,9 @@ impl<R: Rng> RowRandom<'_, R> {
         debug_assert!(self.tape.is_none());
         let mut remaining = count;
         while remaining != 0 {
-            if self.bits_left == 0 {
-                self.bit_word = self.rng.r#gen::<u64>();
-                self.bits_left = 64;
-            }
             let bit = *independent % 64;
-            let take = remaining.min(self.bits_left as usize).min(64 - bit);
-            let value = if take == 64 {
-                self.bit_word
-            } else {
-                self.bit_word & ((1u64 << take) - 1)
-            };
+            let (value, take) = self.take_independent(remaining.min(64 - bit));
             words[*independent / 64] |= value << bit;
-            self.bit_word = if take == 64 { 0 } else { self.bit_word >> take };
-            self.bits_left -= take as u8;
             *independent += take;
             remaining -= take;
             // Exact boundaries do not prefetch. Other typed runs keep this pool.
