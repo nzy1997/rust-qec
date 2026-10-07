@@ -80,3 +80,18 @@ the exact timed calling paths. This additive comparison preserves the older
 matrices and makes no counts-only or GPU claim.
 The [complete post-#777 M4 baseline](results/apple-m4-current-sota-2026-10-07/analysis.md)
 retains all 21 configurations and the remaining architecture gap.
+
+The opt-in `CompiledNearCliffordExecutor` evaluates the physical Clifford frame
+at compile time and samples raw records with a virtual Pauli frame and compact
+amplitudes. The [experimental compiled CPU protocol](compiled_sota/README.md)
+uses identical native MPP/readout inputs for every backend, full observable
+parities, and independently bound consumed-input hashes. Its RNG policy differs
+from the legacy executor; successful scalar, flat, cached and split calls using
+the same fixed compiled plan and arithmetic policy preserve its own stream.
+Changing the compiler revision or measurement schedule can change seeded results.
+The earlier matrices and baseline remain separate.
+
+The [complete compiled M4 comparison](results/apple-m4-compiled-sota-2026-10-07/analysis.md)
+retains all 21 configurations with the explicit Fused FP64 policy. Its warm
+geometric mean advantage is 1.4011× against each configuration's fastest valid
+peer, while cultivation and cold-call costs remain optimization targets.
