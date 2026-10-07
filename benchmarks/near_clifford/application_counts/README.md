@@ -87,6 +87,8 @@ The [formal M4 native-counts publication](../results/apple-m4-native-counts-2026
 contains complete 24-cell comparisons and identifies the remaining peer gaps.
 The [scalar-rejection one-shot follow-up](../results/apple-m4-scalar-rejection-one-shot-2026-10-07/README.md)
 retains eight complete Strict/Fused comparisons with the same raw-count contract.
+The [compiled annotation-index follow-up](../results/apple-m4-counts-annotations-2026-10-08/README.md)
+retains the complete 24-cell matrix with that same contract.
 
 The default `--rust-route native` benchmarks `sample_postselected_counts` through the
 public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v3` with

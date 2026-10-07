@@ -501,7 +501,7 @@ impl BatchOutput<'_> {
             }
         }
     }
-    fn packet_counts(&mut self, operations: &[PlanOp], records: &[u64], live: u64) {
+    fn packet_counts(&mut self, plan: &CompiledNearCliffordExecutor, records: &[u64], live: u64) {
         let Self::Counts {
             observable_index,
             counts,
@@ -511,11 +511,11 @@ impl BatchOutput<'_> {
         };
         let mut accepted = live;
         let mut logical = 0;
-        for operation in operations {
+        for &position in &plan.annotation_positions {
             if let PlanOp::Annotation {
                 offsets,
                 observable,
-            } = operation
+            } = &plan.operations[position]
             {
                 let parity = offsets.iter().fold(0, |bits, &index| bits ^ records[index]);
                 match observable {
@@ -973,6 +973,7 @@ pub enum CompiledRotationArithmetic {
 #[derive(Clone, Debug)]
 pub struct CompiledNearCliffordExecutor {
     operations: Vec<PlanOp>,
+    annotation_positions: Vec<usize>,
     num_qubits: usize,
     measurement_count: usize,
     peak_active_rank: usize,
@@ -1297,6 +1298,7 @@ impl CompiledNearCliffordExecutor {
         }
         let mut plan = Self {
             operations: planner.operations,
+            annotation_positions: Vec::new(),
             num_qubits: incumbent.num_qubits,
             measurement_count: incumbent.measurement_count,
             peak_active_rank: planner.peak,
@@ -1309,6 +1311,31 @@ impl CompiledNearCliffordExecutor {
             independent_event_count: 0,
             scalar_basis: None,
         };
+        let annotation_count = plan
+            .operations
+            .iter()
+            .filter(|op| matches!(op, PlanOp::Annotation { .. }))
+            .count();
+        planner.reserved_bytes = planner
+            .reserved_bytes
+            .checked_add(
+                annotation_count
+                    .checked_mul(std::mem::size_of::<usize>())
+                    .ok_or("compiled annotation index size overflow")?,
+            )
+            .ok_or("compiled annotation index budget overflow")?;
+        if planner.reserved_bytes > PLAN_BYTE_BUDGET {
+            return Err("compiled annotation index exceeds plan byte budget".into());
+        }
+        plan.annotation_positions
+            .try_reserve_exact(annotation_count)
+            .map_err(|e| format!("compiled annotation index allocation failed: {e}"))?;
+        plan.annotation_positions.extend(
+            plan.operations
+                .iter()
+                .enumerate()
+                .filter_map(|(index, op)| matches!(op, PlanOp::Annotation { .. }).then_some(index)),
+        );
         let mut filled = Vec::new();
         filled
             .try_reserve_exact(plan.measurement_count)
@@ -3255,7 +3282,7 @@ impl CompiledNearCliffordSampler<'_> {
             if (live & all).count_ones() as usize <= lanes / 4 {
                 self.pack_enabled = false;
             }
-            output.packet_counts(&plan.operations, &records, live & all);
+            output.packet_counts(plan, &records, live & all);
             for lane in 0..lanes {
                 if live >> lane & 1 != 0 {
                     output.packet_row(&records, lane);
@@ -3377,8 +3404,8 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         rng: &mut impl Rng,
     ) -> Result<NearCliffordPostselectedCounts, String> {
-        if !self.plan.operations.iter().any(|operation| {
-            matches!(operation,
+        if !self.plan.annotation_positions.iter().any(|&position| {
+            matches!(&self.plan.operations[position],
             PlanOp::Annotation { observable: Some(index), .. } if *index == observable_index)
         }) {
             return Err(format!(
@@ -3843,6 +3870,7 @@ mod tests {
                                 }
                                 let plan = CompiledNearCliffordExecutor {
                                     operations: Vec::new(),
+                                    annotation_positions: Vec::new(),
                                     num_qubits: 3,
                                     measurement_count: 1,
                                     peak_active_rank: axes.len(),
@@ -4543,6 +4571,7 @@ mod tests {
     fn compiled_positive_tiny_projection_is_normalized_without_a_cutoff() {
         let plan = CompiledNearCliffordExecutor {
             operations: Vec::new(),
+            annotation_positions: Vec::new(),
             num_qubits: 1,
             measurement_count: 0,
             peak_active_rank: 1,
