@@ -1,14 +1,14 @@
 {
-  "source_revision": "3ef49cf9c3f156a492682d24e392915510f2a3a8",
+  "source_revision": "469fb50c156d91d89e63118c749927e99a8e382e",
   "host": {
     "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
     "machine": "arm64",
     "cpus": 10,
     "affinity": null,
     "load": [
-      1.701171875,
-      1.84619140625,
-      1.962890625
+      6.04150390625,
+      4.24267578125,
+      3.7255859375
     ]
   },
   "verification": {
@@ -33,11 +33,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 1743.1161234094475,
-      "peer_ns": 2809.9042427648214,
-      "speedup": 1.612000603418658,
-      "paired_min": 1.5546968836321473,
-      "paired_max": 1.640821473385973
+      "rstim_ns": 1811.8250172120158,
+      "peer_ns": 2886.122424242424,
+      "speedup": 1.592936622921515,
+      "paired_min": 1.564841680345677,
+      "paired_max": 1.604211071807242
     },
     {
       "id": "msc_d3_inject_cultivate_p1e-3/1/fused",
@@ -45,11 +45,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 1774.8942174576691,
-      "peer_ns": 2763.2075158883667,
-      "speedup": 1.5568294091612638,
-      "paired_min": 1.5458906976484994,
-      "paired_max": 1.6056705231919515
+      "rstim_ns": 1784.092663954899,
+      "peer_ns": 2883.8139454409134,
+      "speedup": 1.6164036788583616,
+      "paired_min": 1.5847092957442446,
+      "paired_max": 1.633850367907066
     },
     {
       "id": "msc_d3_inject_cultivate_p1e-3/64/strict",
@@ -57,23 +57,23 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft",
-      "rstim_ns": 12441.194575765116,
-      "peer_ns": 18959.717968157696,
-      "speedup": 1.5239467442371144,
-      "paired_min": 1.4996367670274997,
-      "paired_max": 1.5453403775562806
+      "rstim_ns": 12555.726085864926,
+      "peer_ns": 18952.37400530504,
+      "speedup": 1.5094606138820896,
+      "paired_min": 1.5004972335392566,
+      "paired_max": 1.5148173677278516
     },
     {
       "id": "msc_d3_inject_cultivate_p1e-3/64/fused",
       "shots": 64,
       "arithmetic": "fused",
       "cache_bytes": null,
-      "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 12714.457411645055,
-      "peer_ns": 19303.571208027788,
-      "speedup": 1.5182379069002052,
-      "paired_min": 1.4977277661818693,
-      "paired_max": 1.5362510831206029
+      "fastest_peer": "clifft",
+      "rstim_ns": 12520.847771657487,
+      "peer_ns": 18988.006833712985,
+      "speedup": 1.5165112762328063,
+      "paired_min": 1.4952251010345627,
+      "paired_max": 1.5338688796333355
     },
     {
       "id": "msc_d3_inject_cultivate_p1e-3/1024/strict",
@@ -81,11 +81,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft",
-      "rstim_ns": 199329.32270916336,
-      "peer_ns": 200800.488,
-      "speedup": 1.0073805763790369,
-      "paired_min": 0.9833486232054787,
-      "paired_max": 1.0181437756083902
+      "rstim_ns": 198434.97222222222,
+      "peer_ns": 197524.58661417323,
+      "speedup": 0.9954121715650531,
+      "paired_min": 0.9889081032893571,
+      "paired_max": 1.0034479766276012
     },
     {
       "id": "msc_d3_inject_cultivate_p1e-3/1024/fused",
@@ -93,11 +93,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 195285.35019455253,
-      "peer_ns": 197792.77075098813,
-      "speedup": 1.01283977806803,
-      "paired_min": 0.9992328472909039,
-      "paired_max": 1.0778726343986647
+      "rstim_ns": 197428.76377952757,
+      "peer_ns": 197448.68897637795,
+      "speedup": 1.0001009234747205,
+      "paired_min": 0.9971059970184656,
+      "paired_max": 1.0053556493800784
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/1/strict",
@@ -105,11 +105,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 13810.955837703561,
-      "peer_ns": 8515.251021798365,
-      "speedup": 0.6165576895519386,
-      "paired_min": 0.6128933714268806,
-      "paired_max": 0.63502877116736
+      "rstim_ns": 13722.416735253772,
+      "peer_ns": 8543.257303946693,
+      "speedup": 0.6225767274651057,
+      "paired_min": 0.612639544124411,
+      "paired_max": 0.6270640135609981
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/1/fused",
@@ -117,11 +117,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 12016.413503123498,
-      "peer_ns": 8453.553846153845,
-      "speedup": 0.7035005781014828,
-      "paired_min": 0.6956228616404198,
-      "paired_max": 0.7238234821434917
+      "rstim_ns": 12019.923113887555,
+      "peer_ns": 8551.704805883359,
+      "speedup": 0.7114608575160442,
+      "paired_min": 0.7024763946759587,
+      "paired_max": 0.7216700369597948
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/64/strict",
@@ -129,11 +129,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 528488.1368421053,
-      "peer_ns": 373399.2611940298,
-      "speedup": 0.7065423708944845,
-      "paired_min": 0.6763355393020541,
-      "paired_max": 0.7125544947910929
+      "rstim_ns": 529944.7684210526,
+      "peer_ns": 366394.4379562044,
+      "speedup": 0.6913823096090951,
+      "paired_min": 0.6664129641294817,
+      "paired_max": 0.717350595251237
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/64/fused",
@@ -141,11 +141,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 404331.3306451613,
-      "peer_ns": 370789.4888888889,
-      "speedup": 0.9170436738039762,
-      "paired_min": 0.9074450063777392,
-      "paired_max": 0.9605672261861138
+      "rstim_ns": 406322.56451612903,
+      "peer_ns": 372534.2074074074,
+      "speedup": 0.9168435128653053,
+      "paired_min": 0.8874312900433382,
+      "paired_max": 0.9279082248518405
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/1024/strict",
@@ -153,11 +153,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 8657034.833333334,
-      "peer_ns": 5877990.666666667,
-      "speedup": 0.6789842919464592,
-      "paired_min": 0.6676394115862165,
-      "paired_max": 0.6991925609663259
+      "rstim_ns": 8450291.833333334,
+      "peer_ns": 5924606.666666667,
+      "speedup": 0.7011126696590814,
+      "paired_min": 0.6756345185107275,
+      "paired_max": 0.721559948606951
     },
     {
       "id": "msc_d5_inject_cultivate_p1e-3/1024/fused",
@@ -165,11 +165,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 6520578.25,
-      "peer_ns": 5919851.888888889,
-      "speedup": 0.9078722257322637,
-      "paired_min": 0.8882449618663317,
-      "paired_max": 0.9159510340633032
+      "rstim_ns": 6572479.125,
+      "peer_ns": 5894518.555555556,
+      "speedup": 0.8968485777511779,
+      "paired_min": 0.8887331067302346,
+      "paired_max": 0.9338072128464033
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/1/strict",
@@ -177,23 +177,23 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft",
-      "rstim_ns": 407.6733171352162,
-      "peer_ns": 3885.2941724941725,
-      "speedup": 9.53041077055702,
-      "paired_min": 9.22720668489714,
-      "paired_max": 9.731113103398416
+      "rstim_ns": 428.0579759774671,
+      "peer_ns": 4091.707716226168,
+      "speedup": 9.558769946717579,
+      "paired_min": 9.476577648767192,
+      "paired_max": 9.8148569820723
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/1/fused",
       "shots": 1,
       "arithmetic": "fused",
       "cache_bytes": null,
-      "fastest_peer": "clifft-scheduled",
-      "rstim_ns": 410.43772881745497,
-      "peer_ns": 3901.768084276239,
-      "speedup": 9.50635823738216,
-      "paired_min": 9.374515463387173,
-      "paired_max": 9.830888692157117
+      "fastest_peer": "clifft",
+      "rstim_ns": 427.91396367868816,
+      "peer_ns": 4033.5911107526013,
+      "speedup": 9.426173140218772,
+      "paired_min": 9.321056151664342,
+      "paired_max": 9.743951050032116
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/64/strict",
@@ -201,11 +201,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 8499.885602583716,
-      "peer_ns": 29732.979785969084,
-      "speedup": 3.4980447003817474,
-      "paired_min": 3.3980756772499676,
-      "paired_max": 3.902390065600826
+      "rstim_ns": 8923.687544610992,
+      "peer_ns": 32820.05249343832,
+      "speedup": 3.6778576490229455,
+      "paired_min": 3.6524565582090167,
+      "paired_max": 3.823177320975906
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/64/fused",
@@ -213,11 +213,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 8696.108347826086,
-      "peer_ns": 29082.84534883721,
-      "speedup": 3.3443517704224033,
-      "paired_min": 3.2646135070526974,
-      "paired_max": 3.938463816221105
+      "rstim_ns": 8609.576962809917,
+      "peer_ns": 33089.24669312169,
+      "speedup": 3.843306916943143,
+      "paired_min": 3.6620389347701545,
+      "paired_max": 4.188756558541222
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/1024/strict",
@@ -225,11 +225,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 132786.00530503978,
-      "peer_ns": 158945.47619047618,
-      "speedup": 1.1970047282116976,
-      "paired_min": 1.1663078445575468,
-      "paired_max": 1.2207846774292201
+      "rstim_ns": 134471.87634408602,
+      "peer_ns": 159730.99681528663,
+      "speedup": 1.187839429016129,
+      "paired_min": 1.18618171871866,
+      "paired_max": 1.2075500676508775
     },
     {
       "id": "pure_surface_d7_r7_p1e-3/1024/fused",
@@ -237,11 +237,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 133883.56684491978,
-      "peer_ns": 157914.28706624606,
-      "speedup": 1.1794896923321558,
-      "paired_min": 1.176870870148165,
-      "paired_max": 1.205519111138568
+      "rstim_ns": 134318.28686327077,
+      "peer_ns": 159268.45222929935,
+      "speedup": 1.1857540469632895,
+      "paired_min": 1.1823702064063901,
+      "paired_max": 1.2085016793987515
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/1/strict",
@@ -249,23 +249,23 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "clifft",
-      "rstim_ns": 909.4333030192797,
-      "peer_ns": 4573.640995152291,
-      "speedup": 5.029110963902464,
-      "paired_min": 4.885934965874994,
-      "paired_max": 5.188011574701005
+      "rstim_ns": 912.4026021422967,
+      "peer_ns": 4541.8828231447,
+      "speedup": 4.97793716554565,
+      "paired_min": 4.862249072544912,
+      "paired_max": 5.119547725220562
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/1/fused",
       "shots": 1,
       "arithmetic": "fused",
       "cache_bytes": null,
-      "fastest_peer": "clifft",
-      "rstim_ns": 908.961079096148,
-      "peer_ns": 4520.162267221117,
-      "speedup": 4.972888687066638,
-      "paired_min": 4.881889627932159,
-      "paired_max": 5.203440531715416
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 880.8059612098579,
+      "peer_ns": 4489.006014902595,
+      "speedup": 5.096475515148176,
+      "paired_min": 4.909114533960605,
+      "paired_max": 5.154924754626786
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/64/strict",
@@ -273,11 +273,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 17548.144561403507,
-      "peer_ns": 53996.502159827214,
-      "speedup": 3.0770490846417187,
-      "paired_min": 3.033219718729099,
-      "paired_max": 3.49429419003198
+      "rstim_ns": 17833.69293865906,
+      "peer_ns": 59208.24023668639,
+      "speedup": 3.320021290056951,
+      "paired_min": 3.2736821083537713,
+      "paired_max": 3.464633456295198
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/64/fused",
@@ -285,11 +285,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 17164.592516306213,
-      "peer_ns": 53556.06316916488,
-      "speedup": 3.1201476596829836,
-      "paired_min": 3.0361418437083105,
-      "paired_max": 3.7071769540084625
+      "rstim_ns": 18087.3869801085,
+      "peer_ns": 60754.63061968408,
+      "speedup": 3.358950117366242,
+      "paired_min": 3.274114485297327,
+      "paired_max": 4.088852611223439
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/1024/strict",
@@ -297,11 +297,11 @@
       "arithmetic": "strict",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 275474.6758241758,
-      "peer_ns": 339209.1621621622,
-      "speedup": 1.2313624152467122,
-      "paired_min": 1.1976969650374762,
-      "paired_max": 1.2697777294594805
+      "rstim_ns": 275361.7087912088,
+      "peer_ns": 340272.39455782314,
+      "speedup": 1.2357288021328792,
+      "paired_min": 1.2284037900948759,
+      "paired_max": 1.2516849285453728
     },
     {
       "id": "pure_surface_d9_r9_p1e-3/1024/fused",
@@ -309,11 +309,11 @@
       "arithmetic": "fused",
       "cache_bytes": null,
       "fastest_peer": "symft",
-      "rstim_ns": 272656.29891304346,
-      "peer_ns": 335483.8333333333,
-      "speedup": 1.2304275920664758,
-      "paired_min": 1.2057921708188952,
-      "paired_max": 1.2596577257181727
+      "rstim_ns": 275823.95604395604,
+      "peer_ns": 338939.3918918919,
+      "speedup": 1.228825069269464,
+      "paired_min": 1.2252568904814245,
+      "paired_max": 1.2587058583617605
     }
   ],
   "lifecycle": [],
