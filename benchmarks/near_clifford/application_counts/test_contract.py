@@ -45,8 +45,18 @@ def main():
         id=next(v for v in e if v['kind']=='validation-check' and v['passed'])['id']
         e[:]=[v for v in e if v.get('id')!=id or v['kind'] not in ['validation-check','timing']]
         e.append(dict(kind='rejected',id=id,reason='counts finite witness disagreement'))
+    def missing_witness_disguised_as_failure(e,h):
+        witness=next(v for v in e if v['kind']=='raw-validation')
+        prefix=witness['id'].rsplit('/',1)[0];backend=witness['backend'];e.remove(witness)
+        ids={v['id'] for v in e if v.get('id','').rsplit('/',1)[0]==prefix and v['kind']=='validation-check'}
+        for v in e:
+            if v['kind']=='validation-check' and v['id'] in ids:
+                v['checks']=[dict(backend=backend,passed=False,reason='missing witness') if c['backend']==backend else c for c in v['checks']]
+                v['passed']=False
+        e[:]=[v for v in e if v.get('id') not in ids or v['kind']!='timing']
+        e.extend(dict(kind='rejected',id=id,reason='counts finite witness disagreement') for id in ids)
     for mutate in [missing_timing,wrong_executor,wrong_counts,wrong_batch,optional_identity,
-                   missing_capability,wrong_input,zero_time,fabricated_rejection]:
+                   missing_capability,wrong_input,zero_time,fabricated_rejection,missing_witness_disguised_as_failure]:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
         for index,event in enumerate(e): event['index']=index
         data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()
