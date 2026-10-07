@@ -136,6 +136,22 @@ impl<'a, R: Rng> RowRandom<'a, R> {
             Some(hit)
         }
     }
+    // Recorded rows have already consumed every caller RNG event. Retiring a
+    // rejected row only advances its tape cursor; live rows keep the literal draws.
+    fn discard_remaining(&mut self, kinds: &[RandomKind]) {
+        if let Some(tape) = self.tape {
+            let end = self
+                .cursor
+                .checked_add(kinds.len())
+                .expect("random tape cursor overflow");
+            assert!(end <= tape.len(), "recorded random tape is incomplete");
+            self.cursor = end;
+        } else {
+            for &kind in kinds {
+                self.draw(kind);
+            }
+        }
+    }
     #[inline]
     fn draw(&mut self, kind: RandomKind) -> u64 {
         if let Some(tape) = self.tape {
@@ -2848,9 +2864,7 @@ impl CompiledNearCliffordSampler<'_> {
                                 // Consume the remaining fixed typed draws, including sparse
                                 // run renewal and unused-bit boundaries, in their original
                                 // row order. Recorded fallback tapes require no new draws.
-                                for &kind in &plan.random_kinds[event..] {
-                                    random.draw(kind);
-                                }
+                                random.discard_remaining(&plan.random_kinds[event..]);
                                 return Ok(shot);
                             }
                         }
@@ -5803,6 +5817,80 @@ mod postselected_packet_tests {
             let actual = native.sample_measurements_u8(65, &mut b).unwrap();
             assert_eq!(actual, expected);
             assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+}
+
+#[cfg(test)]
+mod recorded_rejection_tail_scout {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+    #[test]
+    fn retiring_rejected_rows_matches_literal_live_and_recorded_draws() {
+        let mut kinds = vec![RandomKind::Independent; 131];
+        for p in [0., 0.001, 0.01, 0.37, 1.] {
+            for choices in [1, 3, 15] {
+                kinds.extend(
+                    [RandomKind::Noise {
+                        probability: p,
+                        choices,
+                    }; 129],
+                );
+                kinds.push(RandomKind::Active);
+                kinds.extend([RandomKind::Independent; 65]);
+            }
+        }
+        for seed in [1, 739, 1739, 1002739] {
+            for first in [0, 1, 63, 64, 65, 131, 260, kinds.len() - 1, kinds.len()] {
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                let mut literal = RowRandom::live(&mut a);
+                let mut selected = RowRandom::live(&mut b);
+                let mut tape = Vec::new();
+                for (i, &kind) in kinds.iter().enumerate() {
+                    let value = literal.draw(kind);
+                    tape.push(value);
+                    if i < first {
+                        assert_eq!(selected.draw(kind), value);
+                    }
+                }
+                selected.discard_remaining(&kinds[first..]);
+                assert_eq!(
+                    (
+                        literal.bit_word,
+                        literal.bits_left,
+                        literal.noise_probability,
+                        literal.noise_log_failure,
+                        literal.noise_skip
+                    ),
+                    (
+                        selected.bit_word,
+                        selected.bits_left,
+                        selected.noise_probability,
+                        selected.noise_log_failure,
+                        selected.noise_skip
+                    )
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                let mut a = StdRng::seed_from_u64(seed + 2);
+                let mut b = a.clone();
+                let mut literal = RowRandom::recorded(&tape, &mut a);
+                let mut selected = RowRandom::recorded(&tape, &mut b);
+                for &kind in &kinds[..first] {
+                    assert_eq!(literal.draw(kind), selected.draw(kind));
+                }
+                for &kind in &kinds[first..] {
+                    literal.draw(kind);
+                }
+                selected.discard_remaining(&kinds[first..]);
+                assert_eq!(literal.cursor, selected.cursor);
+                assert_eq!(selected.cursor, tape.len());
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
         }
     }
 }
