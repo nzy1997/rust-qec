@@ -55,8 +55,13 @@ def main():
                 v['passed']=False
         e[:]=[v for v in e if v.get('id') not in ids or v['kind']!='timing']
         e.extend(dict(kind='rejected',id=id,reason='counts finite witness disagreement') for id in ids)
-    for mutate in [missing_timing,wrong_executor,wrong_counts,wrong_batch,optional_identity,
-                   missing_capability,wrong_input,zero_time,fabricated_rejection,missing_witness_disguised_as_failure]:
+    def wrong_sampler_contract(e,h):
+        next(v for v in e if v.get('result',{}).get('sampler_info'))['result']['sampler_info']['reference_normalized']=True
+    mutations=[missing_timing,wrong_executor,wrong_counts,wrong_batch,optional_identity,
+               missing_capability,wrong_input,zero_time,fabricated_rejection,missing_witness_disguised_as_failure]
+    if any(v.get('result',{}).get('sampler_info') for v in events):
+        mutations.append(wrong_sampler_contract)
+    for mutate in mutations:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
         for index,event in enumerate(e): event['index']=index
         data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()
