@@ -568,3 +568,20 @@ python -O -m benchmarks.atom_loss.verify
 
 Historical timings remain available in Git history. Current figures show the
 fresh output-inclusive workflow measurements and the native offline comparator.
+
+### Verifying retained evidence after simulator changes
+
+The default source check requires the current source/build inputs to match the
+measurement. To audit historical evidence after those inputs advance, use
+`python -m benchmarks.atom_loss.verify --historical-source` and
+`python -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources/manifest.json --historical-source`.
+This explicit mode requires the measured Git commit to be available and checks
+its complete independently derived source inventory, recorded dependencies and
+stage snapshots. Fetch `benchmark-source/atom-loss-reference-d2692515` for the published timing
+bundle or `benchmark-source/envelope-resources-1f015586` for the resource campaign
+if the measured commit is missing.
+It verifies the recorded run; it does not certify current-build timing.
+`python -m benchmarks.atom_loss.decoder_replay --historical-source` additionally
+replays those validated archives with the current decoder binaries. CI continues
+to generate correctness and smoke resource evidence with the current build; the
+release gate still requires a complete resource campaign bound to the candidate.
