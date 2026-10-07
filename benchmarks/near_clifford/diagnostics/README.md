@@ -59,7 +59,9 @@ phases. It deliberately excludes diagnostic record conversion and destruction,
 and must not be relabeled as an end-to-end wall-clock measurement. Rust histories
 check exact record digests and 16-word RNG continuation across cache budgets
 within a fixed plan/policy/history. Peer RNG streams need not match Rust's.
-Peer lifetime tuning uses the largest call in the history, then freezes its
+Lifecycle process units (all four Rust budgets and all three peers) rotate and
+reverse together in each arithmetic context; peers are remeasured for both
+Strict and Fused comparisons. Peer lifetime tuning uses the largest call in the history, then freezes its
 batch for that history; it is not exhaustive history-total tuning. Every distinct
 call size/kind is separately validated with full records at that frozen batch,
 including lifetime-only campaigns. Rust validates both public flat and structured

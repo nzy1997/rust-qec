@@ -61,18 +61,37 @@ def main():
     def missing_peer_lifetime(e,h):
         index=next(i for i,v in enumerate(e) if v['kind']=='peer-lifetime')
         del e[index]
+    def empty_peer_calls(e,h):
+        v=next(v for v in e if v['kind']=='peer-lifetime')
+        row=v['result']['histories'][0]
+        row.update(calls=[],sampling_ns=0,phase_sum_ns=row['compile_ns']+row['prepare_ns'])
+    def optional_identity(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='symft')
+        del v['result']['loaded_files']
+        del v['result']['isolated']
+    def empty_lifetime_digest(e,h):
+        for v in e:
+            if v['kind']=='lifetime':
+                for row in v['result']['histories']:
+                    row.update(outputs_sha256='',continuation=[])
+    def duplicate_lifetime(e,h):
+        v=next(v for v in e if v['kind']=='peer-lifetime')
+        e.append(copy.deepcopy(v))
+    def pre_harness_source(e,h):
+        h['source_revision']=h['manifest']['baseline']
+        h['sources']={key:value for key,value in h['sources'].items() if '/diagnostics/' not in key}
     mutations=[missing_timing,changed_timing,missing_mask,wrong_policy,changed_input,
                dropped_cell,forged_import,truncated_warm,wrong_batch,missing_tuning,
-               empty_sources,forged_environment]
+               empty_sources,forged_environment,optional_identity,pre_harness_source]
     if any(v['kind']=='lifetime' for v in events):
-        mutations += [wrong_lifetime,missing_peer_lifetime]
+        mutations += [wrong_lifetime,missing_peer_lifetime,empty_peer_calls,empty_lifetime_digest,duplicate_lifetime]
     for mutate in mutations:
         with tempfile.TemporaryDirectory() as temporary:
             out=Path(temporary)
             shutil.copytree(source/'circuits',out/'circuits')
             e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure)
             mutate(e,h)
-            if mutate==empty_sources: c['sources_after']={}
+            if mutate in [empty_sources,pre_harness_source]: c['sources_after']=h['sources']
             for index,v in enumerate(e): v['index']=index
             data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()
             c.update(events=len(e),events_sha256=hashlib.sha256(data).hexdigest())
