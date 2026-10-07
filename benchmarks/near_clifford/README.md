@@ -90,3 +90,8 @@ from the legacy executor; successful scalar, flat, cached and split calls using
 the same fixed compiled plan and arithmetic policy preserve its own stream.
 Changing the compiler revision or measurement schedule can change seeded results.
 The earlier matrices and baseline remain separate.
+
+The [complete compiled M4 comparison](results/apple-m4-compiled-sota-2026-10-07/analysis.md)
+retains all 21 configurations with the explicit Fused FP64 policy. Its warm
+geometric mean advantage is 1.4011× against each configuration's fastest valid
+peer, while cultivation and cold-call costs remain optimization targets.
