@@ -199,3 +199,32 @@ fn rejected_scalar_rows_consume_sparse_noise_and_independent_draws_before_next_c
         }
     }
 }
+
+#[test]
+fn sparse_maximum_observable_index_preserves_counts_and_rng() {
+    let text = "R 0 1 2\nH 0 1\nT 0\nMX 0 1\nCX rec[-1] 2\nM 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(4294967295) rec[-3]\nOBSERVABLE_INCLUDE(2) rec[-1]\nOBSERVABLE_INCLUDE(4294967295) rec[-2]\nOBSERVABLE_INCLUDE(7)\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        for shots in [0, 1, 63, 64, 65, 1024] {
+            let mut counts_sampler = plan.prepare_sampler().unwrap();
+            let mut reference = plan.prepare_sampler().unwrap();
+            let mut counts_rng = StdRng::seed_from_u64(20261008);
+            let mut reference_rng = counts_rng.clone();
+            for observable in [u32::MAX, 2, 7, u32::MAX] {
+                let raw = reference.sample(shots, &mut reference_rng).unwrap();
+                let counts = counts_sampler
+                    .sample_postselected_counts(shots, observable, &mut counts_rng)
+                    .unwrap();
+                assert_eq!(counts, count_records(&raw, observable));
+                assert_eq!(
+                    counts_rng.clone().next_u64(),
+                    reference_rng.clone().next_u64()
+                );
+            }
+        }
+    }
+}
