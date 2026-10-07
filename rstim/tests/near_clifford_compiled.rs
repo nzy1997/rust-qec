@@ -4,7 +4,7 @@ mod oracle;
 use oracle::DenseOracle;
 use rand::{RngCore, SeedableRng, rngs::StdRng};
 use rstim::ir::{PauliBasis, StimInstr, StimTarget};
-use rstim::near_clifford::CompiledNearCliffordExecutor;
+use rstim::near_clifford::{CompiledNearCliffordExecutor, CompiledRotationArithmetic};
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
@@ -294,6 +294,13 @@ fn key(bits: &[bool]) -> u64 {
         .fold(0, |word, (i, &bit)| word | (u64::from(bit) << i))
 }
 fn check_distribution(text: &str, qubits: usize) {
+    check_distribution_with_arithmetic(text, qubits, CompiledRotationArithmetic::Strict);
+}
+fn check_distribution_with_arithmetic(
+    text: &str,
+    qubits: usize,
+    arithmetic: CompiledRotationArithmetic,
+) {
     let branches = evolve(
         &rstim::parser::parse_lines(text).unwrap(),
         vec![Branch {
@@ -307,7 +314,9 @@ fn check_distribution(text: &str, qubits: usize) {
         *expected.entry(key(&branch.records)).or_default() += branch.weight;
     }
     assert!((expected.values().sum::<f64>() - 1.).abs() < 2e-12);
-    let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
+    let plan =
+        CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+    assert_eq!(plan.rotation_arithmetic(), arithmetic);
     let shots = 16384;
     let mut observed = BTreeMap::<u64, usize>::new();
     let mut rng = StdRng::seed_from_u64(20261007);
@@ -893,7 +902,7 @@ fn compiled_shared_coherent_states_preserve_mixed_pauli_signs_and_noisy_feedback
 
 #[test]
 fn compiled_batched_coherence_keeps_full_joint_records_after_projection_noise_and_feedback() {
-    let text = "H 0 1 2 3\nT 0 1 2 3\nDEPOLARIZE2(0.23) 0 1\nMPP(0.37) !X0*Y1*Y2*X3\nMRX(0.41) !0\nCX rec[-1] 3\nT_DAG 3\nMRY 1\nMY 2\nMX 3\nM 0 1 2 3\n";
+    let text = "H 0 1 2 3\nT 0 1 2 3\nDEPOLARIZE2(0.23) 0 1\nMPP(0.37) !X0*Y1*X2*Y3\nMRX(0.41) !0\nCX rec[-1] 3\nT_DAG 3\nMRY 1\nMY 2\nMX 3\nM 0 1 2 3\n";
     let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
     assert!(plan.peak_active_rank() >= 4);
     check_distribution(text, 4);
@@ -1104,4 +1113,253 @@ fn compiled_long_random_runs_keep_records_and_rng_across_packets_and_call_splits
     let continuation = expected_rng.next_u64();
     assert_eq!(continuation, flat_rng.next_u64());
     assert_eq!(continuation, split_rng.next_u64());
+}
+
+#[test]
+fn compiled_both_rotation_policies_match_independent_full_joint_noisy_density() {
+    // Evolve every dense physical branch independently, then compare public
+    // structured and flat samples with that complete joint distribution.
+    // Rank four also exercises the coherent packet path in the flat API.
+    let text = "H 0 1 2 3\nT 0 1 2 3\nDEPOLARIZE2(0.23) 0 1\nMPP(0.37) !X0*Y1*X2*Y3\nMRX(0.41) !0\nCX rec[-1] 3\nT_DAG 3\nMRY 1\nMY 2\nMX 3\nM 0 1 2 3\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        assert!(plan.peak_active_rank() >= 4);
+        assert_eq!(plan.rotation_arithmetic(), arithmetic);
+        check_distribution_with_arithmetic(text, 4, arithmetic);
+    }
+}
+
+#[test]
+fn compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails() {
+    let text = "H 0 1 2 3 4 5 6 7\nT 0 1 2 3 4 5 6 7\nDEPOLARIZE2(0.23) 0 1\nMPP(0.37) !X0*Y1*X2*Y3*X4*Y5*Y6*X7\nMRX(0.41) !0\nCX rec[-1] 7\nT_DAG 7\nMRY 1\nMY 2\nMX 3\nM 0 1 2 3 4 5 6 7\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        assert!(plan.peak_active_rank() >= 8);
+        for budget in [0, 16384, 64 * 1024 * 1024] {
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut flat = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+            let mut a = StdRng::seed_from_u64(464);
+            let mut b = a.clone();
+            for shots in [0, 1, 31, 32, 63, 64, 65, 129, 64, 1024] {
+                let expected = scalar.sample(shots, &mut a).unwrap();
+                let actual = flat.sample_measurements_u8(shots, &mut b).unwrap();
+                assert_eq!(
+                    actual.measurements,
+                    expected
+                        .iter()
+                        .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+        }
+    }
+}
+
+// The late product commutes with feedback on the separate reset ancilla,
+// while it requires all four non-Clifford axes at once. This keeps rank four
+// available to exercise the public coherent packet strategy on the new plan.
+const COMMUTING_CLASSICAL_PACKET_CIRCUIT: &str = "H 0 1 2 3 5\nT 0 1 2 3\nX_ERROR(0.23) 4\nMR(0.37) !4\nCX rec[-1] 4\nDETECTOR rec[-1] rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\nMPP(0.19) !X0*X1*X2*X3\nM 4 5\nDETECTOR rec[-4] rec[-2]\nDETECTOR\nOBSERVABLE_INCLUDE(7) rec[-3]\n";
+
+fn commuting_classical_expected_annotations(
+    records: &[bool],
+    packet_circuit: bool,
+) -> (Vec<bool>, Vec<(u32, bool)>) {
+    if packet_circuit {
+        assert_eq!(records.len(), 4);
+        (
+            vec![false, records[0] ^ records[2], false],
+            vec![(2, records[0]), (7, records[1])],
+        )
+    } else {
+        assert_eq!(records.len(), 5);
+        (
+            vec![
+                false,
+                records[0] ^ records[3],
+                records[1] ^ records[2],
+                false,
+            ],
+            vec![(2, records[0]), (7, records[1] ^ records[2])],
+        )
+    }
+}
+
+#[test]
+fn compiled_commuting_classical_readers_release_separate_nonclifford_axes() {
+    // The blanket reader barriers kept both T axes live simultaneously. The
+    // late MX0 can now cross the independent reader and T1, closing axis0
+    // before axis1 opens. This small generic witness does not embed a fixture.
+    let text = "H 0 1\nT 0 1\nMR 2\nCX rec[-1] 2\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(3) rec[-1]\nMX 0 1\nM 2\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        assert_eq!(plan.rotation_arithmetic(), arithmetic);
+        assert_eq!(plan.peak_active_rank(), 1);
+        check_distribution_with_arithmetic(text, 3, arithmetic);
+    }
+}
+
+#[test]
+fn compiled_commuting_classical_readers_match_dense_joint_noise_reset_and_native_products() {
+    let mut circuits = Vec::new();
+    for (noise, earlier_readout, later_readout) in [(0., 0., 0.), (0.23, 0.37, 0.41), (1., 1., 1.)]
+    {
+        // The early MR moves before its X error, making the error an identity
+        // Pauli plus a deferred record XOR. The late inverted/noisy MRX may
+        // cross the feedback and annotations, but both still consume the
+        // final earlier report. The final Z2 result copies that control.
+        circuits.push((
+            format!(
+                "H 0 1\nT 0 1\nX_ERROR({noise}) 2\nMR({earlier_readout}) !2\nCX rec[-1] 2\nDETECTOR rec[-1] rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\nMRX({later_readout}) !0\nMX 1\nM 2\nMPP(0.19) !X0*X1\nDETECTOR rec[-5] rec[-2]\nDETECTOR rec[-4] rec[-3]\nDETECTOR\nOBSERVABLE_INCLUDE(7) rec[-4] rec[-3]\n"
+            ),
+            3,
+            false,
+        ));
+    }
+    circuits.push((COMMUTING_CLASSICAL_PACKET_CIRCUIT.to_owned(), 6, true));
+    for (text, qubits, packet_circuit) in circuits {
+        // Enumerate full physical branches with the independent matrix oracle.
+        // Each complete raw word has an independently enumerated annotation
+        // tuple; duplicate/empty detector inputs give exact constant false.
+        let expected_annotations = evolve(
+            &rstim::parser::parse_lines(&text).unwrap(),
+            vec![Branch {
+                state: DenseOracle::new(qubits),
+                records: Vec::new(),
+                weight: 1.,
+            }],
+        )
+        .into_iter()
+        .map(|branch| {
+            (
+                key(&branch.records),
+                commuting_classical_expected_annotations(&branch.records, packet_circuit),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            check_distribution_with_arithmetic(&text, qubits, arithmetic);
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            assert_eq!(plan.peak_active_rank(), if packet_circuit { 4 } else { 1 });
+            for shot in plan.sample(129, &mut StdRng::seed_from_u64(91017)).unwrap() {
+                let expected = &expected_annotations[&key(&shot.measurements)];
+                assert_eq!(shot.detectors, expected.0);
+                assert_eq!(shot.observables, expected.1);
+                // A reset prepares Z=0; only the final earlier reported bit
+                // controls X on the ancilla. This is a physical correlation,
+                // not merely a comparison with compiler metadata.
+                assert_eq!(
+                    shot.measurements[0],
+                    shot.measurements[if packet_circuit { 2 } else { 3 }]
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn compiled_new_commuting_plan_keeps_scalar_cache_coherent_and_split_raw_rng_streams() {
+    for text in [
+        COMMUTING_CLASSICAL_PACKET_CIRCUIT.to_owned(),
+        COMMUTING_CLASSICAL_PACKET_CIRCUIT
+            .replace("0.23", "0.003")
+            .replace("0.37", "0.007")
+            .replace("0.19", "0.019"),
+    ] {
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            assert_eq!(plan.peak_active_rank(), 4);
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for budget in [0, initial + 288, 64 * 1024 * 1024] {
+                // Structured sampling is scalar. Budget-zero flat sampling
+                // selects coherent packets at >=32 shots; nonzero budgets
+                // exercise cache packets and bounded cache fallback/replay.
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut flat = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut cached_structured = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut a = StdRng::seed_from_u64(91018);
+                let mut b = a.clone();
+                let mut c = a.clone();
+                for shots in [0, 1, 31, 32, 33, 63, 64, 65, 129, 64] {
+                    let expected = scalar.sample(shots, &mut a).unwrap();
+                    let actual = flat.sample_measurements_u8(shots, &mut b).unwrap();
+                    let structured = cached_structured.sample(shots, &mut c).unwrap();
+                    assert_eq!(structured, expected);
+                    assert_eq!(
+                        actual.measurements,
+                        expected
+                            .iter()
+                            .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                            .collect::<Vec<_>>()
+                    );
+                    assert_eq!(a.clone().next_u64(), b.clone().next_u64());
+                    assert_eq!(a.clone().next_u64(), c.clone().next_u64());
+                    for shot in expected {
+                        let annotations =
+                            commuting_classical_expected_annotations(&shot.measurements, true);
+                        assert_eq!(shot.detectors, annotations.0);
+                        assert_eq!(shot.observables, annotations.1);
+                    }
+                }
+                for parts in [[0, 31, 98, 0], [64, 0, 65, 0], [1, 31, 32, 65]] {
+                    let mut a = StdRng::seed_from_u64(91019);
+                    let mut b = a.clone();
+                    let mut c = a.clone();
+                    let expected = plan
+                        .prepare_sampler_with_cache_budget(0)
+                        .unwrap()
+                        .sample(129, &mut a)
+                        .unwrap();
+                    let mut flat = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                    let mut structured = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                    let mut flat_records = Vec::new();
+                    let mut structured_shots = Vec::new();
+                    for shots in parts {
+                        flat_records.extend(
+                            flat.sample_measurements_u8(shots, &mut b)
+                                .unwrap()
+                                .measurements,
+                        );
+                        structured_shots.extend(structured.sample(shots, &mut c).unwrap());
+                    }
+                    assert_eq!(structured_shots, expected);
+                    assert_eq!(
+                        flat_records,
+                        expected
+                            .iter()
+                            .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                            .collect::<Vec<_>>()
+                    );
+                    let continuation = a.next_u64();
+                    assert_eq!(continuation, b.next_u64());
+                    assert_eq!(continuation, c.next_u64());
+                }
+            }
+        }
+    }
 }

@@ -14,7 +14,9 @@ use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::sync::{Arc, OnceLock};
 
 mod compiled;
-pub use compiled::{CompiledNearCliffordExecutor, CompiledNearCliffordSampler};
+pub use compiled::{
+    CompiledNearCliffordExecutor, CompiledNearCliffordSampler, CompiledRotationArithmetic,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ComplexAmp {
