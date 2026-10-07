@@ -48,6 +48,11 @@ They do not prove arbitrary joint distributions. REPEAT expansion is bounded and
 used only for annotation analysis; execution retains original source text.
 Failures are retained and rejected cells are excluded from timing. `--pairs 1
 --repetitions 1` is smoke-only and requires verifier `--allow-smoke`.
+Raw-record reference collection has a600second process bound, separate from the
+180second timing/native-counts worker bound. The initial retained smoke used180
+seconds and timed out the SymFT surface-d9 scalar8192×one-shot raw reference;
+it did not certify or time those two arithmetic-context cells. The formal bound
+is enlarged only for this correctness work, with the same frozen batch/call size.
 
 Offline verification needs no peer imports and runs under Python `-O`. It checks
 the closure, deterministic matrix, actual input/executor/import identity, tuning,
