@@ -109,3 +109,8 @@ without peer compiler-flag attestation or a universal SOTA claim. Subsequent
 bounded prototypes left no clear measured, contract-feasible next small change;
 the retained source and known limitations are published without claiming the
 optimization space is exhausted.
+
+The [bounded counts replay campaign](results/apple-m4-counts-replay-2026-10-08/README.md)
+retains 24 original postselection cells and [three paired Rust ablations](results/apple-m4-counts-replay-rust-ablation-2026-10-08/README.md).
+Fused cultivation d5 bulk counts lead on the measured M4 host, while Strict,
+one-shot and cold costs remain targets. Small ablation regressions are retained.
