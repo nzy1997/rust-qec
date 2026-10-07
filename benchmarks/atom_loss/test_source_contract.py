@@ -196,6 +196,79 @@ class SourceContractTests(unittest.TestCase):
             for suffix in ['all','seeds']:
                 (out/f'provenance-{suffix}.json').write_text(json.dumps(stage))
 
+    def test_historical_bundle_checks_measured_tree_and_snapshots_in_both_modes(self):
+        from .source_contract import input_digest
+        out, binding, _ = self.runtime_bundle()
+        # Both the simulator and harness/dependency pins advance after measurement.
+        self.write('decoder/src/lib.rs', '// new decoder\n')
+        self.write('benchmarks/atom_loss/run.py', '# new harness\n')
+        self.write('benchmarks/atom_loss/requirements.txt', 'stim==999.0.0\n')
+        self.commit()
+        program = ('from pathlib import Path; import sys; '
+                   'from benchmarks.atom_loss.source_contract import verify_bundle_source; '
+                   'print(verify_bundle_source(Path(sys.argv[1]), Path(sys.argv[2]), historical=sys.argv[3]=="historical"))')
+        def run(flags, mode):
+            return subprocess.run([sys.executable,*flags,'-c',program,str(out),str(self.repo),mode],
+                                  capture_output=True,text=True,cwd=ROOT)
+        snapshot = out/'source-snapshot-seeds.json'
+        original_snapshot = snapshot.read_text()
+        for flags in [[], ['-O']]:
+            current = run(flags, 'current')
+            self.assertNotEqual(current.returncode, 0)
+            self.assertIn('Current source/build inputs differ', current.stderr)
+            historical = run(flags, 'historical')
+            self.assertEqual(historical.returncode, 0, historical.stderr)
+            self.assertEqual(historical.stdout.strip(), binding['source_commit'])
+            for defect, error in [('missing-commit', 'requires the measured source commit'),
+                                  ('omitted-input', 'source inventory'),
+                                  ('changed-input', 'source inventory')]:
+                altered = copy.deepcopy(binding)
+                if defect == 'missing-commit':
+                    altered['source_commit'] = '0'*40
+                elif defect == 'omitted-input':
+                    del altered['inputs']['decoder/build.rs']
+                else:
+                    altered['inputs']['decoder/build.rs']['git_blob'] = 'a'*40
+                altered['input_digest'] = input_digest(altered['inputs'])
+                (out/'source-manifest.json').write_text(json.dumps(altered))
+                result = run(flags, 'historical')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, result.stderr)
+            (out/'source-manifest.json').write_text(json.dumps(binding))
+            altered = json.loads(original_snapshot)
+            altered['files']['benchmarks/atom_loss/run.py'] = '# resealed false source\n'
+            snapshot.write_text(json.dumps(altered))
+            result = run(flags, 'historical')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Snapshot differs', result.stderr)
+            snapshot.write_text(original_snapshot)
+
+    def test_historical_resources_require_complete_measured_tree(self):
+        from unittest.mock import patch
+        import shutil
+        from . import readiness_resources, retained_source
+        resources = self.repo/'resources'
+        shutil.copytree(ROOT/'benchmarks/atom_loss/readiness/resources', resources)
+        manifest = json.loads((ROOT/'benchmarks/atom_loss/readiness/resources/manifest.json').read_text())
+        manifest['checkout_revision'] = self.record['source_commit']
+        manifest['source_inputs'] = retained_source.inventory(self.repo, self.record['source_commit'])
+        path = resources/'manifest.json'
+        path.write_text(json.dumps(manifest))
+        self.write('benchmarks/atom_loss/run.py', '# advanced harness\n')
+        self.commit()
+        with patch.object(readiness_resources, 'ROOT', self.repo):
+            self.assertIn('retained measurement source inputs differ from current checkout',
+                          readiness_resources.verify_manifest(path))
+            self.assertEqual(readiness_resources.verify_manifest(path, historical=True), [])
+            manifest['source_inputs'].pop('benchmarks/atom_loss/run.py')
+            path.write_text(json.dumps(manifest))
+            self.assertIn('retained measurement source inputs differ from measured revision',
+                          readiness_resources.verify_manifest(path, historical=True))
+            manifest['checkout_revision'] = '0'*40
+            path.write_text(json.dumps(manifest))
+            self.assertIn('historical verification requires the measured source commit; fetch its retained ref',
+                          readiness_resources.verify_manifest(path, historical=True))
+
     def test_runtime_provenance_requires_a_recorded_build_compiler(self):
         from .source_contract import verify_bundle_source
         out, binding, _ = self.runtime_bundle()
