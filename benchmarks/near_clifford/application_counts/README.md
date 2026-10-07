@@ -87,13 +87,18 @@ The [formal M4 native-counts publication](../results/apple-m4-native-counts-2026
 contains complete 24-cell comparisons and identifies the remaining peer gaps.
 
 The default `--rust-route native` benchmarks `sample_postselected_counts` through the
-public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v2` with
+public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v3` with
 an explicit native or structured route. V1 publications retain the frozen PR780 production
-check; V2 binds the optimized production bytes to the measured Git revision.
+check; V2/V3 bind the optimized production bytes to the measured Git revision.
+V2 native publications retain full simulation; V3 native execution permits scalar
+and admission-fallback rejection while preserving the complete random stream.
 Both require complete source inventories and unchanged source/binary closure.
 
 The native route applies all-zero **raw** detector postselection and XOR-folded
-raw observable0. It retains all random draws and does not reject shots early.
+raw observable0. It retains all random draws. Scalar and admission-fallback rows
+skip remaining physics after a nonzero detector; live packed rows finish their
+simulation. Remaining typed draws are consumed in original order even for rejected
+rows, preserving sparse-noise runs, independent-bit pools and subsequent calls.
 Each validation call also runs a separate structured sampler from the same RNG
 seed, requires exact counts and 16-word RNG continuation, and retains its full
 raw records for independent annotation replay. This reference work is excluded

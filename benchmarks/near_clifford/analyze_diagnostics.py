@@ -128,7 +128,7 @@ def summarize(out,kind,check=False):
                 ', '.join('`'+cell+'`' for cell in summary['omitted_cells'])]
     if kind=='application_counts':
         lines+=['','Counts contract: all-zero raw detector postselection and XOR-folded raw observable0, no reference normalization.',
-            'Rust uses native counts without early rejection; peers use native counts/early rejection.' if header.get('rust_route')=='native' else 'Rust builds full structured records then filters/counts; peers use native counts/early rejection.',
+            ('Rust uses native counts with scalar/admission-fallback early rejection; live packed lanes complete simulation.' if header['schema']=='rstim.postselected-counts.v3' else 'Rust uses native counts without early rejection; peers use native counts/early rejection.') if header.get('rust_route')=='native' else 'Rust builds full structured records then filters/counts; peers use native counts/early rejection.',
             'This is separate from raw-record throughput. Accepted rates are in warm.csv; sparse logical errors do not certify conditional accuracy.',
             'Accepted throughput pools accepted shots/time within each process, then takes the median across processes; zero survivors are retained.',
             'Original-circuit capability failures are retained in capability.csv and events, without gate lowering.']
