@@ -233,6 +233,56 @@ impl RandomRunPlan {
         debug_assert_eq!(noise, noise_masks.len());
         debug_assert_eq!(independent.div_ceil(64), independent_words.len());
     }
+
+    pub(super) fn fill_row_with_compact_noise<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        output: &mut [u64],
+        noise_masks: &mut [u64],
+        lane_bit: u64,
+        planes: &mut [[u64; 4]],
+        mut independent_words: Option<&mut [u64]>,
+    ) {
+        assert_eq!(output.len(), self.event_count);
+        assert_eq!(kinds.len(), self.event_count);
+        assert_eq!(planes.len(), noise_masks.len());
+        debug_assert!(lane_bit.is_power_of_two());
+        let mut event = 0;
+        let mut noise = 0;
+        let mut independent = 0;
+        for run in &self.runs {
+            let end = event + run.count;
+            match run.kind {
+                PreparedRandom::Independent if independent_words.is_some() => {
+                    random.fill_independent_words(
+                        run.count,
+                        independent_words.as_deref_mut().unwrap(),
+                        &mut independent,
+                    );
+                }
+                PreparedRandom::Noise { .. } | PreparedRandom::Sparse { .. } => {
+                    let noise_end = noise + run.count;
+                    random.fill_prepared_storage::<true>(
+                        run.kind,
+                        &mut output[event..end],
+                        Some((&mut noise_masks[noise..noise_end], lane_bit)),
+                        matches!(run.kind, PreparedRandom::Sparse { .. })
+                            .then_some(&kinds[event..end]),
+                        Some(&mut planes[noise..noise_end]),
+                    );
+                    noise = noise_end;
+                }
+                _ => random.fill_prepared_impl(run.kind, &mut output[event..end], None, None),
+            }
+            event = end;
+        }
+        debug_assert_eq!(event, output.len());
+        debug_assert_eq!(noise, noise_masks.len());
+        if let Some(words) = independent_words {
+            debug_assert_eq!(independent.div_ceil(64), words.len());
+        }
+    }
 }
 
 // Short homogeneous runs are common between unlike events. Fixed-size stores
@@ -271,18 +321,38 @@ impl<R: Rng> RowRandom<'_, R> {
         &mut self,
         kind: PreparedRandom,
         output: &mut [u64],
+        noise_masks: Option<(&mut [u64], u64)>,
+        sparse_kinds: Option<&[RandomKind]>,
+    ) {
+        self.fill_prepared_storage::<false>(kind, output, noise_masks, sparse_kinds, None);
+    }
+
+    // Both destinations use one typed draw/carry implementation. The const flag
+    // removes Noise tape stores/clears from the compact specialization only.
+    fn fill_prepared_storage<const COMPACT: bool>(
+        &mut self,
+        kind: PreparedRandom,
+        output: &mut [u64],
         mut noise_masks: Option<(&mut [u64], u64)>,
         sparse_kinds: Option<&[RandomKind]>,
+        mut planes: Option<&mut [[u64; 4]]>,
     ) {
         if output.is_empty() {
             return; // Empty runs cannot alter pending probability or prefetch RNG.
         }
         if let Some(tape) = self.tape {
             let end = self.cursor + output.len();
-            output.copy_from_slice(&tape[self.cursor..end]);
+            if COMPACT {
+                let lane = noise_masks.as_ref().unwrap().1;
+                for (index, &value) in tape[self.cursor..end].iter().enumerate() {
+                    write_noise_event::<true>(output, index, value, &mut planes, lane);
+                }
+            } else {
+                output.copy_from_slice(&tape[self.cursor..end]);
+            }
             self.cursor = end;
             if let Some((masks, lane)) = noise_masks {
-                for (&value, mask) in output.iter().zip(masks) {
+                for (&value, mask) in tape[end - output.len()..end].iter().zip(masks) {
                     if value != 0 {
                         *mask |= lane;
                     }
@@ -290,6 +360,7 @@ impl<R: Rng> RowRandom<'_, R> {
             }
             return; // Same replay values, no RNG or bit/geometric state updates.
         }
+        let lane_bit = noise_masks.as_ref().map_or(0, |(_, lane)| *lane);
         match kind {
             PreparedRandom::Independent => {
                 let mut offset = 0;
@@ -319,17 +390,26 @@ impl<R: Rng> RowRandom<'_, R> {
                 choices,
             } => {
                 if probability == 0. {
-                    clear_events(output);
+                    if !COMPACT {
+                        clear_events(output);
+                    }
                 } else if probability == 1. && choices == 1 {
-                    output.fill(1);
+                    if COMPACT {
+                        for index in 0..output.len() {
+                            write_noise_event::<true>(output, index, 1, &mut planes, lane_bit);
+                        }
+                    } else {
+                        output.fill(1);
+                    }
                     if let Some((masks, lane)) = noise_masks {
                         for mask in masks {
                             *mask |= lane;
                         }
                     }
                 } else if probability == 1. {
-                    for value in output {
-                        *value = (self.rng.gen_range(0..choices) + 1) as u64;
+                    for index in 0..output.len() {
+                        let value = (self.rng.gen_range(0..choices) + 1) as u64;
+                        write_noise_event::<COMPACT>(output, index, value, &mut planes, lane_bit);
                     }
                     if let Some((masks, lane)) = noise_masks {
                         for mask in masks {
@@ -340,15 +420,16 @@ impl<R: Rng> RowRandom<'_, R> {
                     // This preserves the original direct-noise draw expression.
                     // In particular, direct noise does NOT change the pending
                     // sparse probability/skip, even when its probability differs.
-                    for (index, value) in output.iter_mut().enumerate() {
-                        *value = if !near_noise_occurs(probability, self.rng) {
+                    for index in 0..output.len() {
+                        let value = if !near_noise_occurs(probability, self.rng) {
                             0
                         } else if choices == 1 {
                             1
                         } else {
                             (self.rng.gen_range(0..choices) + 1) as u64
                         };
-                        if *value != 0 {
+                        write_noise_event::<COMPACT>(output, index, value, &mut planes, lane_bit);
+                        if value != 0 {
                             if let Some((masks, lane)) = &mut noise_masks {
                                 masks[index] |= *lane;
                             }
@@ -375,7 +456,9 @@ impl<R: Rng> RowRandom<'_, R> {
                     });
                     if *skip != 0 {
                         let failures = (*skip).min(output.len() - offset);
-                        clear_events(&mut output[offset..offset + failures]);
+                        if !COMPACT {
+                            clear_events(&mut output[offset..offset + failures]);
+                        }
                         *skip -= failures;
                         offset += failures;
                         // Some(0) must survive an exact run boundary: the next
@@ -391,11 +474,12 @@ impl<R: Rng> RowRandom<'_, R> {
                     else {
                         unreachable!("sparse runs contain only noise events")
                     };
-                    output[offset] = if choices == 1 {
+                    let value = if choices == 1 {
                         1
                     } else {
                         (self.rng.gen_range(0..choices) + 1) as u64
                     };
+                    write_noise_event::<COMPACT>(output, offset, value, &mut planes, lane_bit);
                     self.noise_skip = None;
                     if let Some((masks, lane)) = &mut noise_masks {
                         masks[offset] |= *lane;
@@ -405,6 +489,29 @@ impl<R: Rng> RowRandom<'_, R> {
                 }
             }
         }
+    }
+}
+
+#[inline]
+fn write_noise_event<const COMPACT: bool>(
+    output: &mut [u64],
+    index: usize,
+    value: u64,
+    planes: &mut Option<&mut [[u64; 4]]>,
+    lane_bit: u64,
+) {
+    if COMPACT {
+        if value != 0 {
+            debug_assert!(value <= 15);
+            let plane = &mut planes.as_deref_mut().unwrap()[index];
+            for (bit, word) in plane.iter_mut().enumerate() {
+                if value >> bit & 1 != 0 {
+                    *word |= lane_bit;
+                }
+            }
+        }
+    } else {
+        output[index] = value;
     }
 }
 
