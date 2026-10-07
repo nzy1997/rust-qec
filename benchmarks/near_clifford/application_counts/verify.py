@@ -21,8 +21,10 @@ def validate(out,git_sources=False,allow_smoke=False):
     data=read_event_bytes(out)
     events=[json.loads(line) for line in data.splitlines()]
     require(header['schema'] in ['rstim.postselected-counts.v1','rstim.postselected-counts.v2'],'wrong schema')
-    native_rust=header['schema']=='rstim.postselected-counts.v2'
-    require(header.get('rust_route')=='native' if native_rust else header.get('rust_route','structured')=='structured','Rust route differs')
+    modern=header['schema']=='rstim.postselected-counts.v2'
+    route=header.get('rust_route') if modern else header.get('rust_route','structured')
+    require(route in ['structured','native'] if modern else route=='structured','Rust route differs')
+    native_rust=route=='native'
     require(closure['events']==len(events) and closure['events_sha256']==digest(data),'event closure mismatch')
     require([e['index'] for e in events]==list(range(len(events))),'event index mismatch')
     require(closure['sources_after']==header['sources'] and closure['binary_sha256']==header['binary_sha256'],
@@ -47,7 +49,7 @@ def validate(out,git_sources=False,allow_smoke=False):
     required={'benchmarks/near_clifford/application_counts/'+name for name in
               ['.gitignore','Cargo.toml','Cargo.lock','main.rs','worker.py','common.py','run.py','verify.py','test_contract.py','README.md','manifest.json']}
     require(required<=set(header['sources']),'missing application harness sources')
-    if native_rust:
+    if modern:
         native_producer_path='benchmarks/near_clifford/application_counts/run.py'
         producer_bytes=subprocess.check_output(['git','show',header['source_revision']+':'+native_producer_path],cwd=ROOT)
         require(digest(producer_bytes)==header['sources'][native_producer_path] and b'rstim.postselected-counts.v2' in producer_bytes and b'--rust-route' in producer_bytes, 'native schema requires source-bound native producer')
@@ -77,7 +79,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         for name,sha in header['sources'].items():
             source=subprocess.check_output(['git','show',header['source_revision']+':'+name],cwd=ROOT)
             require(digest(source)==sha,'source digest differs: '+name)
-            if not native_rust and (name.startswith('rstim/src/') or name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']):
+            if not modern and (name.startswith('rstim/src/') or name in ['Cargo.toml','Cargo.lock','rstim/Cargo.toml']):
                 baseline=subprocess.check_output(['git','show','3ef5030db205b3e9b2126e31b2602f760d4665cc:'+name],cwd=ROOT)
                 require(source==baseline,'production changed')
     cases_by_id={case['id']:case for case in cases};tuning={};native={};raw={};rust={};checked={};timed={};capabilities={};failures=[];rejected={}

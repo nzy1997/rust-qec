@@ -101,12 +101,29 @@ def check_result(result,backend,shots,repetitions,validate=False,policy=None,bat
     require(len(result['observations'])==repetitions,'observation count differs')
     if backend=='rstim': require(result['arithmetic']==policy,'Rust policy mismatch')
     else: require(str(result['batch'])==str(batch) and result['isolated'] is True,'peer batch/isolation mismatch')
+    require(type(result['shots']) is int and result['shots']>0,'invalid shot count type')
     for obs in result['observations']:
-        require(type(obs['calls']) is int and obs['calls']>0,'non-positive call count')
+        require(all(type(obs[key]) is int for key in
+                    ['calls','attempted','accepted','discarded','logical_errors','elapsed_ns']),
+                'observation counts/time must be integers')
+        require(obs['calls']>0,'non-positive call count')
         require(obs['attempted']==shots*obs['calls'],'attempt count mismatch')
         require(obs['accepted']+obs['discarded']==obs['attempted'] and
-                0<=obs['logical_errors']<=obs['accepted'],'invalid postselection counts')
-        require(obs['elapsed_ns']>0 and obs['ns_per_call']==obs['elapsed_ns']/obs['calls'],'timing arithmetic differs')
+                0<=obs['logical_errors']<=obs['accepted']<=obs['attempted'] and obs['discarded']>=0,
+                'invalid postselection counts')
+        require(obs['elapsed_ns']>0 and type(obs['ns_per_call']) in [int,float] and
+                math.isfinite(obs['ns_per_call']) and obs['ns_per_call']>0 and
+                obs['ns_per_call']==obs['elapsed_ns']/obs['calls'],'timing arithmetic differs')
         require(obs['attempted']>=8192 if validate else obs['elapsed_ns']>=50_000_000,'incomplete observation')
-    require(result['compile_ns']>0 and result['prepare_ns']>=0 and result['peak_rss_bytes']>0,
+    require(type(result['compile_ns']) is int and result['compile_ns']>0 and
+            type(result['prepare_ns']) is int and result['prepare_ns']>=0 and
+            type(result['peak_rss_bytes']) is int and result['peak_rss_bytes']>0,
             'missing measured phases or process RSS')
+    require(type(result['first_ns']) is int and
+            (result['first_ns']==0 if validate and backend=='rstim' else result['first_ns']>0),
+            'invalid measured first-call time')
+    metric='peak_active_rank' if backend=='rstim' else 'peak_active_width'
+    require(type(result[metric]) is int and result[metric]>=0,'invalid activity metric')
+    if backend=='rstim':
+        require(type(result['cache_reserved_bytes']) is int and
+                0<=result['cache_reserved_bytes']<=64*1024*1024,'invalid coefficient cache ledger')

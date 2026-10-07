@@ -10,7 +10,9 @@ Four supported candidates (MSCd3/MSCd5/surface d7/d9) are selected for counts at
 1/64/1024 attempted shots per call. The contract is all-zero **raw** detector
 postselection and XOR-folded observable 0 counts, with reference normalization
 disabled. Repeated observable include events contribute XOR, not separate errors.
-rstim uses public structured records then filters/counts. Clifft uses native
+The current runner defaults to native Rust counts; `--rust-route structured`
+selects full structured records then filtering. Frozen v1 publications used the
+structured adapter. Clifft uses native
 early rejection and SymFT compiled counts. This application comparison measures
 the same output contract with different execution work; it must remain separate
 from full raw-record throughput. Report attempted and accepted shots/s and
@@ -81,9 +83,9 @@ See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusa
 
 ## Native Rust counts follow-up
 
-Use `--rust-route native` to benchmark `sample_postselected_counts` instead of the
-structured-record adapter. This emits schema `rstim.postselected-counts.v2` with
-an explicit native route. V1 publications retain the frozen PR780 production
+The default `--rust-route native` benchmarks `sample_postselected_counts` through the
+public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v2` with
+an explicit native or structured route. V1 publications retain the frozen PR780 production
 check; V2 binds the optimized production bytes to the measured Git revision.
 Both require complete source inventories and unchanged source/binary closure.
 
