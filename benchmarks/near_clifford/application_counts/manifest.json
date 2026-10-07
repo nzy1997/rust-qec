@@ -1,0 +1,94 @@
+{
+  "schema": "rstim.application-corpus.v1",
+  "inputs": {
+    "coherent_d3_r1": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/coherent_d3_r1.stim",
+      "sha256": "9b439238478b15977829c1015ee47dfe401976b3882092d9560ba321fb0f510a",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/coherent_d3_r1.stim",
+      "license": "Apache-2.0"
+    },
+    "coherent_d3_r3": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/coherent_d3_r3.stim",
+      "sha256": "87d1308c83894e87c60aeb2dc31b74be89b3460a951929951f2c3ac92606827d",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/coherent_d3_r3.stim",
+      "license": "Apache-2.0"
+    },
+    "coherent_d5_r1": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/coherent_d5_r1.stim",
+      "sha256": "2707188abe8912f693fe4f910db8c4b6bd795c71a8fba38cc153da90ee5910b8",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/coherent_d5_r1.stim",
+      "license": "Apache-2.0"
+    },
+    "coherent_d5_r5": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/coherent_d5_r5.stim",
+      "sha256": "54088bbd5f06b441596e414f9fa99d8eeaff8a4a1a862b911e0ad40092c5e549",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/coherent_d5_r5.stim",
+      "license": "Apache-2.0"
+    },
+    "distillation": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/distillation.stim",
+      "sha256": "188bd53c48dbc21f840fb297df6f41c61f5bad6a856bba621f00ff42078921c1",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/distillation.stim",
+      "license": "Apache-2.0"
+    },
+    "msc_d3_inject_cultivate_p1e-3": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim",
+      "sha256": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/msc_d3_inject_cultivate_p1e-3.stim",
+      "license": "Apache-2.0"
+    },
+    "msc_d5_inject_cultivate_p1e-3": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim",
+      "sha256": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/msc_d5_inject_cultivate_p1e-3.stim",
+      "license": "Apache-2.0"
+    },
+    "pure_surface_d7_r7_p1e-3": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d7_r7_p1e-3.stim",
+      "sha256": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/pure_surface_d7_r7_p1e-3.stim",
+      "license": "Apache-2.0"
+    },
+    "quantum_volume_q10_seed42": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/quantum_volume_q10_seed42.stim",
+      "sha256": "faf7fbf3bf4048c1c7a0f9954cc14160e74d48ebc8972b41cf3c6bc07c697f6a",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/quantum_volume_q10_seed42.stim",
+      "license": "Apache-2.0"
+    },
+    "quantum_volume_q20_seed42": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/quantum_volume_q20_seed42.stim",
+      "sha256": "b9bbbe939ce4c1754b6bac936c04b2c4ce572657831fef6a7bc5c3054f81ce53",
+      "source_repository": "https://github.com/unitaryfoundation/clifft-bench",
+      "source_revision": "566924f2638a04d87cffa5930a91f3b4b3a48ee7",
+      "source_path": "workloads/circuits/quantum_volume_q20_seed42.stim",
+      "license": "Apache-2.0"
+    },
+    "pure_surface_d9_r9_p1e-3": {
+      "path": "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim",
+      "sha256": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
+      "source_repository": "https://github.com/haoliri0/SOFT",
+      "source_revision": "c89b98514a919240b8afa53a271e08d926d3c987",
+      "source_path": "benchmark/circuit/pure_surface_d9_r9_p1e-3.stim",
+      "license": "Apache-2.0",
+      "physical_correctness": "upstream generated surface-code fixture; no new physics certification"
+    }
+  }
+}
