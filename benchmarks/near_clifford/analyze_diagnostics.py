@@ -2,6 +2,7 @@
 import argparse
 import csv
 import gzip
+import io
 import json
 from pathlib import Path
 import statistics
@@ -15,14 +16,21 @@ BACKENDS=['rstim','clifft','clifft-scheduled','symft']
 def median(values): return statistics.median(values)
 
 
-def table(path,rows):
+def emit(path,data,check):
+    if check:
+        if not path.exists() or path.read_bytes()!=data: raise ValueError('derived artifact differs: '+str(path))
+    else: path.write_bytes(data)
+
+
+def table(path,rows,check):
     if not rows: return
     keys=list(rows[0])
-    with path.open('w',newline='') as f:
-        writer=csv.DictWriter(f,fieldnames=keys);writer.writeheader();writer.writerows(rows)
+    f=io.StringIO(newline='')
+    writer=csv.DictWriter(f,fieldnames=keys);writer.writeheader();writer.writerows(rows)
+    emit(path,f.getvalue().encode(),check)
 
 
-def summarize(out,kind):
+def summarize(out,kind,check=False):
     verification=json.loads(subprocess.check_output([sys.executable,str(HERE/kind/'verify.py'),str(out),'--git-sources'],text=True))
     header=json.loads((out/'header.json').read_text())
     data=(out/'events.jsonl').read_bytes() if (out/'events.jsonl').exists() else gzip.decompress((out/'events.jsonl.gz').read_bytes())
@@ -86,8 +94,9 @@ def summarize(out,kind):
     summary=dict(source_revision=header['source_revision'],host=header['host'],verification=verification,
         statistical_unit='median of observations within each independent process; process medians summarized across rounds',
         warm_comparisons=comparisons,lifecycle=lifecycle,capabilities=capabilities)
-    (out/'summary.json').write_text(json.dumps(summary,indent=2)+'\n')
-    table(out/'warm.csv',rows);table(out/'comparisons.csv',comparisons);table(out/'lifecycle.csv',lifecycle);table(out/'capability.csv',capabilities)
+    emit(out/'summary.json',(json.dumps(summary,indent=2)+'\n').encode(),check)
+    table(out/'warm.csv',rows,check);table(out/'comparisons.csv',comparisons,check)
+    table(out/'lifecycle.csv',lifecycle,check);table(out/'capability.csv',capabilities,check)
     lines=['# Verified near-Clifford diagnostic measurements','',
         f"Measured source: `{header['source_revision']}`. Host: `{header['host']['platform']}`.",
         f"Verification: `{json.dumps(verification,sort_keys=True)}`.",
@@ -107,11 +116,12 @@ def summarize(out,kind):
             'Rust builds full structured records then filters/counts; peers use native counts/early rejection.',
             'This is separate from raw-record throughput. Accepted rates are in warm.csv; sparse logical errors do not certify conditional accuracy.',
             'Original-circuit capability failures are retained in capability.csv and events, without gate lowering.']
-    (out/'analysis.md').write_text('\n'.join(lines)+'\n')
+    emit(out/'analysis.md',('\n'.join(lines)+'\n').encode(),check)
     return verification
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('out',type=Path)
     p.add_argument('--kind',choices=['diagnostics','application_counts'],default='diagnostics')
-    args=p.parse_args();print(json.dumps(summarize(args.out,args.kind),sort_keys=True))
+    p.add_argument('--check',action='store_true',help='verify existing derived artifacts without writing')
+    args=p.parse_args();print(json.dumps(summarize(args.out,args.kind,args.check),sort_keys=True))
