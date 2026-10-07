@@ -26,6 +26,20 @@ def require(condition,message):
         raise ValueError(message)
 
 
+def positive_integer(value):
+    return type(value) is int and value>0
+
+
+def phases(record):
+    require(positive_integer(record['compile_ns']) and
+            type(record['prepare_ns']) is int and record['prepare_ns']>=0,
+            'invalid compile/prepare phase receipt')
+
+
+def reservation(value,budget):
+    require(type(value) is int and 0<=value<=budget,'invalid cache reservation receipt')
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -151,6 +165,7 @@ def validate(out,git_sources=False,allow_smoke=False):
     lifetime_outputs={}
     lifetime_cells=set()
     peer_lifetime_cells=set()
+    lifetime_emission=[]
     failures=[]
     cells={c['id']:c for c in manifest['cells']}
     identities=header['peer_loaded_files']
@@ -221,6 +236,14 @@ def validate(out,git_sources=False,allow_smoke=False):
             require(recomputed==event['comparisons'],'finite witness comparison mismatch')
             validations[event['id']]=len(witnesses)==4 and all(c['passed'] for c in recomputed)
         elif kind=='timing':
+            require(event['id'] in manifest['selected_cells'] and validations.get(event['id']) is True,
+                    'timing for unselected or unvalidated cell')
+            require(type(event['pair']) is int and 0<=event['pair']<manifest['pairs'],
+                    'timing pair out of range')
+            require(event['backend'] in incumbent.BACKENDS,'unknown timing backend')
+            order=incumbent.BACKENDS[event['pair']%4:]+incumbent.BACKENDS[:event['pair']%4]
+            if event['pair']%2: order=order[::-1]
+            require(event['order']==order,'flat process order differs from rotated/reversed protocol')
             cell=cells[event['id']]
             key=(event['id'],event['pair'],event['backend'])
             require(key not in timings,'duplicate timing')
@@ -228,6 +251,10 @@ def validate(out,git_sources=False,allow_smoke=False):
             if 'warm_ns' in result:
                 require(result['shots']==cell['shots'],'peer timing shots mismatch')
                 peer_warm(result,manifest['repetitions'])
+                require(positive_integer(result['compile_ns']) and
+                        len(result['first_ns'])==manifest['repetitions'] and
+                        all(positive_integer(v) for v in result['first_ns']),
+                        'invalid peer compile/first phase receipts')
                 selected=tuning[(cell['fixture'],cell['shots'],event['backend'])]
                 require(result['batch']==selected,'timing batch differs from validated frozen selection')
                 require(result['threads']==1 and result['width']==raw_peers[(cell['fixture'],cell['shots'],event['backend'])]['width'],
@@ -235,13 +262,21 @@ def validate(out,git_sources=False,allow_smoke=False):
             elif result.get('status')=='ok':
                 require(result['arithmetic']==cell['arithmetic'] and result['cache_bytes']==cell['cache_bytes'],'timing policy/budget mismatch')
                 require(result['shots']==cell['shots'],'timing shots mismatch')
+                phases(result)
+                reservation(result['cache_reserved_bytes'],cell['cache_bytes'])
+                require(len(result['cold'])==manifest['repetitions'],'missing probe cold observations')
+                for cold in result['cold']:
+                    phases(cold)
+                    require(positive_integer(cold['first_ns']),'invalid first-call phase receipt')
+                    reservation(cold['cache_reserved_bytes'],cell['cache_bytes'])
                 require(len(result['warm'])==manifest['repetitions'],'missing probe observations')
                 for obs in result['warm']:
-                    require(obs['elapsed_ns']>=50_000_000 and obs['calls']>0
+                    require(type(obs['elapsed_ns']) is int and obs['elapsed_ns']>=50_000_000
+                            and positive_integer(obs['calls'])
                             and obs['ns_per_call']==obs['elapsed_ns']/obs['calls'],'invalid probe timing arithmetic')
             else: failures.append(event)
             if result.get('status')=='ok':
-                require(result['peak_rss_bytes']>0,'missing measured RSS')
+                require(positive_integer(result['peak_rss_bytes']),'invalid measured RSS')
         elif kind in ('lifetime-peer-validation','lifetime-validation'):
             name=event['id']
             requested=(event['kind_requested'],event['call_shots'])
@@ -270,16 +305,34 @@ def validate(out,git_sources=False,allow_smoke=False):
             seen=lifetime_cells if kind=='lifetime' else peer_lifetime_cells
             require(key not in seen,'duplicate lifecycle observation')
             seen.add(key)
-            if result.get('status')!='ok':
-                failures.append(event)
-                continue
-            require(len(result['histories'])==manifest['repetitions'],'missing lifetime repetitions')
+            require('lifetime' in manifest['selected_groups'],'unselected lifecycle observation')
             if kind=='lifetime':
                 parts=event['id'].split('/')
-                require(len(parts)==5 and parts[:2]==['msc5','lifetime'],'invalid lifecycle event ID')
+                require(len(parts)==5 and parts[:2]==['msc5','lifetime'] and parts[3].startswith('c'),
+                        'invalid lifecycle event ID')
                 name,budget,policy=parts[2],int(parts[3][1:]),parts[4]
                 require(name in manifest['histories'] and budget in [0,1<<20,16<<20,64<<20]
                         and policy in ['strict','fused'],'unknown lifecycle cell')
+                unit=['rstim',budget]
+            else:
+                name,policy=event['id'],event['arithmetic_context']
+                require(name in manifest['histories'] and policy in ['strict','fused'] and
+                        event['backend'] in incumbent.BACKENDS[1:],'unknown peer lifecycle cell')
+                unit=[event['backend'],lifetime_tuning[(name,event['backend'])]]
+            units=[['rstim',b] for b in [0,1<<20,16<<20,64<<20]]+[
+                   [backend,lifetime_tuning[(name,backend)]] for backend in incumbent.BACKENDS[1:]]
+            offset=event['pair']%len(units)
+            units=units[offset:]+units[:offset]
+            if event['pair']%2: units=units[::-1]
+            require(event['order']==units,'lifecycle process order differs from rotated/reversed protocol')
+            lifetime_emission.append((policy,name,event['pair'],*unit))
+            if result.get('status')!='ok':
+                failures.append(event)
+                continue
+            require(positive_integer(result['peak_rss_bytes']),'invalid lifecycle RSS')
+            require(len(result['histories'])==manifest['repetitions'],'missing lifetime repetitions')
+            if kind=='lifetime':
+                reservation(result['cache_reserved_bytes'],budget)
                 require(result['arithmetic']==policy and result['cache_bytes']==budget and
                         result['config']['history']==manifest['histories'][name] and
                         result['config']['repetitions']==manifest['repetitions'] and
@@ -296,19 +349,19 @@ def validate(out,git_sources=False,allow_smoke=False):
                         result['config']['repetitions']==manifest['repetitions'] and
                         result['config']['batch']==lifetime_tuning[(name,event['backend'])],
                         'peer lifetime configuration mismatch')
-            units=[['rstim',budget] for budget in [0,1<<20,16<<20,64<<20]]+[
-                   [backend,lifetime_tuning[(name,backend)]] for backend in ['clifft','clifft-scheduled','symft']]
-            offset=event['pair']%len(units)
-            units=units[offset:]+units[:offset]
-            if event['pair']%2: units=units[::-1]
-            require(event['order']==units,'lifecycle process order differs from rotated/reversed protocol')
             for index,row in enumerate(result['histories']):
+                phases(row)
+                require(positive_integer(row['sampling_ns']) and positive_integer(row['phase_sum_ns']),
+                        'invalid lifecycle phase domains')
                 require([c['request'] for c in row['calls']]==manifest['histories'][name],
                         'measured lifecycle calls differ from configured history')
                 require(row['sampling_ns']==sum(c['ns'] for c in row['calls']),'lifetime API sum mismatch')
                 require(row['phase_sum_ns']==row['compile_ns']+row['prepare_ns']+row['sampling_ns'],'lifetime phase sum mismatch')
-                require(all(c['ns']>0 for c in row['calls']),'nonpositive lifetime call')
+                require(all(positive_integer(c['ns']) for c in row['calls']),'invalid lifetime call interval')
                 if kind=='lifetime':
+                    for call in row['calls']:
+                        reservation(call['reserved_before'],budget)
+                        reservation(call['reserved_after'],budget)
                     require(isinstance(row['outputs_sha256'],str) and
                             re.fullmatch('[0-9a-f]{64}',row['outputs_sha256']) is not None,
                             'invalid lifecycle record digest')
@@ -333,7 +386,27 @@ def validate(out,git_sources=False,allow_smoke=False):
                 for pair in range(manifest['pairs']):
                     for backend in ['rstim','clifft','clifft-scheduled','symft']:
                         require((id,pair,backend) in timings,'missing timing: '+id)
+    expected_timing=[]
+    for id in manifest['selected_cells']:
+        if validations.get(id):
+            for pair in range(manifest['pairs']):
+                order=incumbent.BACKENDS[pair%4:]+incumbent.BACKENDS[:pair%4]
+                if pair%2: order=order[::-1]
+                expected_timing.extend((id,pair,backend) for backend in order)
+    observed_timing=[(e['id'],e['pair'],e['backend']) for e in events if e['kind']=='timing']
+    require(observed_timing==expected_timing,'flat timing coverage/emission order differs')
     if 'lifetime' in manifest['selected_groups']:
+        expected_lifetime=[]
+        for policy in ['strict','fused']:
+            for name in expected['histories']:
+                for pair in range(manifest['pairs']):
+                    units=[['rstim',b] for b in [0,1<<20,16<<20,64<<20]]+[
+                           [backend,lifetime_tuning[(name,backend)]] for backend in incumbent.BACKENDS[1:]]
+                    offset=pair%len(units)
+                    units=units[offset:]+units[:offset]
+                    if pair%2: units=units[::-1]
+                    expected_lifetime.extend((policy,name,pair,*unit) for unit in units)
+        require(lifetime_emission==expected_lifetime,'lifecycle timing coverage/emission order differs')
         actual={(e['id'],e['pair']) for e in events if e['kind']=='lifetime'}
         for policy in ['strict','fused']:
             for name in manifest['histories']:
