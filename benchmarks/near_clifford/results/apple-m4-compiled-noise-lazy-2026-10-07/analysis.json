@@ -1,0 +1,295 @@
+{
+  "source_revision": "1f015586d7e6133c6f3d5067ad4b67051841a939",
+  "started": "2026-10-07T04:28:34.260142+00:00",
+  "finished": "2026-10-07T04:32:17.177227+00:00",
+  "case_count": 21,
+  "median_wins": 16,
+  "all_pairs_wins": 16,
+  "geomeans": {
+    "all": 1.507907707722844,
+    "shots1": 2.197283130889183,
+    "shots64": 1.3976274748337545,
+    "shots1024": 1.1164694201497551,
+    "adaptive": 1.6201437495278197,
+    "cultivation": 1.0058697579631586,
+    "entangled": 2.154937833023792,
+    "noisy-syndrome": 1.925740469215723,
+    "parity": 1.3672346753412576,
+    "terminal": 1.905946513395085
+  },
+  "cases": [
+    {
+      "id": "terminal",
+      "family": "terminal",
+      "shots": 1,
+      "rstim_warm_us": 0.24572244227990683,
+      "peer_warm_us": 1.5326846090181774,
+      "peer": "symft",
+      "speedup": 6.237462865814547,
+      "paired_speedup_range": [
+        6.199957970892238,
+        6.259063551419653
+      ]
+    },
+    {
+      "id": "terminal",
+      "family": "terminal",
+      "shots": 64,
+      "rstim_warm_us": 3.743473759077637,
+      "peer_warm_us": 4.91678977384464,
+      "peer": "clifft-scheduled",
+      "speedup": 1.3134297420736027,
+      "paired_speedup_range": [
+        1.3025925857014997,
+        1.3164343512606032
+      ]
+    },
+    {
+      "id": "terminal",
+      "family": "terminal",
+      "shots": 1024,
+      "rstim_warm_us": 59.038680047225505,
+      "peer_warm_us": 49.894646061814555,
+      "peer": "clifft",
+      "speedup": 0.8451179128988561,
+      "paired_speedup_range": [
+        0.84022580990583,
+        0.8498957145273864
+      ]
+    },
+    {
+      "id": "brick16",
+      "family": "entangled",
+      "shots": 1,
+      "rstim_warm_us": 0.3221349869535805,
+      "peer_warm_us": 1.8878092954768555,
+      "peer": "clifft-scheduled",
+      "speedup": 5.860305064438369,
+      "paired_speedup_range": [
+        5.715360832529313,
+        5.941849454081187
+      ]
+    },
+    {
+      "id": "brick16",
+      "family": "entangled",
+      "shots": 64,
+      "rstim_warm_us": 5.965805058458602,
+      "peer_warm_us": 8.835243286219082,
+      "peer": "clifft-scheduled",
+      "speedup": 1.4809808901972172,
+      "paired_speedup_range": [
+        1.4678764834443248,
+        1.4974729044338346
+      ]
+    },
+    {
+      "id": "brick16",
+      "family": "entangled",
+      "shots": 1024,
+      "rstim_warm_us": 95.12394866920152,
+      "peer_warm_us": 109.67923903508772,
+      "peer": "clifft-scheduled",
+      "speedup": 1.153013942014781,
+      "paired_speedup_range": [
+        1.1503212763210942,
+        1.1679648301999057
+      ]
+    },
+    {
+      "id": "parity129",
+      "family": "parity",
+      "shots": 1,
+      "rstim_warm_us": 1.8439672149284556,
+      "peer_warm_us": 2.8464210975748605,
+      "peer": "clifft-scheduled",
+      "speedup": 1.5436397537497972,
+      "paired_speedup_range": [
+        1.5207137507817423,
+        1.5949776851364261
+      ]
+    },
+    {
+      "id": "parity129",
+      "family": "parity",
+      "shots": 64,
+      "rstim_warm_us": 12.965388903292714,
+      "peer_warm_us": 17.970304707150557,
+      "peer": "clifft-scheduled",
+      "speedup": 1.38602126331797,
+      "paired_speedup_range": [
+        1.3605161295195638,
+        1.3895184686452917
+      ]
+    },
+    {
+      "id": "parity129",
+      "family": "parity",
+      "shots": 1024,
+      "rstim_warm_us": 212.214156779661,
+      "peer_warm_us": 253.5056818181818,
+      "peer": "clifft-scheduled",
+      "speedup": 1.1945747902266164,
+      "paired_speedup_range": [
+        1.1839906758692456,
+        1.2185098315511378
+      ]
+    },
+    {
+      "id": "rounds129",
+      "family": "adaptive",
+      "shots": 1,
+      "rstim_warm_us": 1.9461776817686438,
+      "peer_warm_us": 3.0183683448026075,
+      "peer": "clifft-scheduled",
+      "speedup": 1.550921261238378,
+      "paired_speedup_range": [
+        1.4997211768773355,
+        1.5917091936071899
+      ]
+    },
+    {
+      "id": "rounds129",
+      "family": "adaptive",
+      "shots": 64,
+      "rstim_warm_us": 9.818860985666602,
+      "peer_warm_us": 17.631666431593793,
+      "peer": "clifft-scheduled",
+      "speedup": 1.7956936611417746,
+      "paired_speedup_range": [
+        1.787284547857364,
+        1.8143723994247407
+      ]
+    },
+    {
+      "id": "rounds129",
+      "family": "adaptive",
+      "shots": 1024,
+      "rstim_warm_us": 157.54782704402515,
+      "peer_warm_us": 240.5753173076923,
+      "peer": "clifft-scheduled",
+      "speedup": 1.526998637946723,
+      "paired_speedup_range": [
+        1.5116312371334604,
+        1.5365447444409261
+      ]
+    },
+    {
+      "id": "qec32",
+      "family": "noisy-syndrome",
+      "shots": 1,
+      "rstim_warm_us": 0.7475210501136228,
+      "peer_warm_us": 1.9247780429594272,
+      "peer": "clifft",
+      "speedup": 2.574881393195365,
+      "paired_speedup_range": [
+        2.512147323143721,
+        2.670235264097391
+      ]
+    },
+    {
+      "id": "qec32",
+      "family": "noisy-syndrome",
+      "shots": 64,
+      "rstim_warm_us": 5.738323158136333,
+      "peer_warm_us": 10.865501521077793,
+      "peer": "clifft",
+      "speedup": 1.8934976685082063,
+      "paired_speedup_range": [
+        1.8806872417162985,
+        1.9097131766191147
+      ]
+    },
+    {
+      "id": "qec32",
+      "family": "noisy-syndrome",
+      "shots": 1024,
+      "rstim_warm_us": 89.41809464285714,
+      "peer_warm_us": 130.9774947643979,
+      "peer": "clifft-scheduled",
+      "speedup": 1.4647761763156804,
+      "paired_speedup_range": [
+        1.4617466253413582,
+        1.470933141576236
+      ]
+    },
+    {
+      "id": "msc3",
+      "family": "cultivation",
+      "shots": 1,
+      "rstim_warm_us": 1.6982607159839687,
+      "peer_warm_us": 2.3336533183982078,
+      "peer": "clifft",
+      "speedup": 1.3741431432959303,
+      "paired_speedup_range": [
+        1.3522739710528269,
+        1.3926708010528792
+      ]
+    },
+    {
+      "id": "msc3",
+      "family": "cultivation",
+      "shots": 64,
+      "rstim_warm_us": 14.332597019203211,
+      "peer_warm_us": 17.920365102113937,
+      "peer": "symft",
+      "speedup": 1.2503222603763808,
+      "paired_speedup_range": [
+        1.2407985798505414,
+        1.2503222603763808
+      ]
+    },
+    {
+      "id": "msc3",
+      "family": "cultivation",
+      "shots": 1024,
+      "rstim_warm_us": 228.57095890410957,
+      "peer_warm_us": 222.04608849557522,
+      "peer": "clifft",
+      "speedup": 0.9714536333057443,
+      "paired_speedup_range": [
+        0.9667698076928726,
+        1.0011004845672058
+      ]
+    },
+    {
+      "id": "msc5",
+      "family": "cultivation",
+      "shots": 1,
+      "rstim_warm_us": 32.68547450980392,
+      "peer_warm_us": 26.10380636743215,
+      "peer": "clifft-scheduled",
+      "speedup": 0.7986362982003636,
+      "paired_speedup_range": [
+        0.7975382920702696,
+        0.7997503930186062
+      ]
+    },
+    {
+      "id": "msc5",
+      "family": "cultivation",
+      "shots": 64,
+      "rstim_warm_us": 1323.4944736842106,
+      "peer_warm_us": 1202.8651904761905,
+      "peer": "clifft-scheduled",
+      "speedup": 0.9088554689070787,
+      "paired_speedup_range": [
+        0.9067872479528063,
+        0.9112479736514129
+      ]
+    },
+    {
+      "id": "msc5",
+      "family": "cultivation",
+      "shots": 1024,
+      "rstim_warm_us": 21205.875333333333,
+      "peer_warm_us": 18129.541666666668,
+      "peer": "clifft-scheduled",
+      "speedup": 0.8549301258113594,
+      "paired_speedup_range": [
+        0.8477630501320307,
+        0.8622815670090103
+      ]
+    }
+  ]
+}
