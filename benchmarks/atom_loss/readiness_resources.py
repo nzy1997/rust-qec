@@ -604,7 +604,7 @@ def render_report(manifest):
     return '\n'.join(lines)
 
 
-def verify_manifest(manifest_path):
+def verify_manifest(manifest_path, *, historical=False):
     """Fast structural + hash + coverage + budget verification of the retained report."""
     manifest_path = Path(manifest_path)
     manifest = json.loads(manifest_path.read_text())
@@ -624,13 +624,15 @@ def verify_manifest(manifest_path):
             or set(revision) == {'0'}):
         problems.append('invalid retained measurement source revision')
     try:
-        if manifest['source_inputs'] != retained_source.inventory(ROOT, 'HEAD'):
+        if not historical and manifest['source_inputs'] != retained_source.inventory(ROOT, 'HEAD'):
             problems.append('retained measurement source inputs differ from current checkout')
-        if not problems and subprocess.run(
-                ['git', '-C', str(ROOT), 'cat-file', '-e', revision+'^{commit}'],
-                capture_output=True, check=False).returncode == 0:
-            if manifest['source_inputs'] != retained_source.inventory(ROOT, revision):
-                problems.append('retained measurement source inputs differ from measured revision')
+        available = subprocess.run(
+            ['git', '-C', str(ROOT), 'cat-file', '-e', revision+'^{commit}'],
+            capture_output=True, check=False).returncode == 0
+        if historical and not available:
+            problems.append('historical verification requires the measured source commit; fetch its retained ref')
+        if available and manifest['source_inputs'] != retained_source.inventory(ROOT, revision):
+            problems.append('retained measurement source inputs differ from measured revision')
     except (subprocess.CalledProcessError, ValueError):
         problems.append('cannot verify retained measurement source inputs')
     if not manifest['stress_budget'].get('declared_before_run'):
@@ -842,17 +844,21 @@ def main():
     parser.add_argument('--profile', default='smoke', choices=('smoke', 'full'))
     parser.add_argument('--out', type=Path)
     parser.add_argument('--verify', type=Path)
+    parser.add_argument('--historical-source', action='store_true',
+                        help='Verify retained resources against their available measured Git commit, not the current build')
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     if args.verify is not None:
-        problems = verify_manifest(args.verify)
+        problems = verify_manifest(args.verify, historical=args.historical_source)
         if not problems:
-            print(f'{PASS_LINE} verify')
+            scope = ' historical evidence (measured Git source; current-build resources unverified)' if args.historical_source else ''
+            print(f'{PASS_LINE} verify{scope}')
             raise SystemExit(0)
         print('FAIL envelope operating envelope verify', file=sys.stderr)
         for problem in problems:
             print('  - ' + problem, file=sys.stderr)
         raise SystemExit(1)
+    require(not args.historical_source, '--historical-source requires --verify')
     binary = args.binary.resolve()
     require(binary.is_file(), f'missing binary: {binary}')
     if args.self_test:

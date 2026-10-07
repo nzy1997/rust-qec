@@ -9,7 +9,7 @@ from pathlib import Path
 from .artifacts import require_complete_sweep, required_files, TIMING_FILES, CORRECTNESS_FILES, native_total, timing_rows, summary_rows, SUMMARY_FIELDS, wilson
 
 
-def verify(root):
+def verify(root, *, historical=False):
     manifest=json.loads((root/'bundle.json').read_text())
     listed = set(manifest['sha256'])
     required = required_files(root)
@@ -141,12 +141,22 @@ def verify(root):
     from .shot_data import rescore_seeds
     rescore_seeds(root/'accuracy-seeds.zip',root)
     from .source_contract import verify_bundle_source
-    verify_bundle_source(root)
+    commit = verify_bundle_source(root, historical=historical)
     from .figure_contract import verify_presentation
-    verify_presentation(root)
+    if historical:
+        from .source_contract import ROOT, git
+        methodology = git(ROOT, 'show', commit+':benchmarks/atom_loss/README.md')
+        verify_presentation(root, methodology=methodology)
+    else:
+        verify_presentation(root)
     return 'PASS'
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('root',type=Path,nargs='?',default=Path('site/static/data/atom-loss'))
-    print(verify(p.parse_args().root))
+    p.add_argument('--historical-source', action='store_true',
+                   help='Verify retained evidence against its available measured Git commit; makes no claim about the current build')
+    a = p.parse_args()
+    result = verify(a.root, historical=a.historical_source)
+    print(result + (' historical evidence (measured Git source; current-build timing unverified)'
+                    if a.historical_source else ''))

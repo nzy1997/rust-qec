@@ -121,8 +121,10 @@ if __name__ == '__main__':
     p.add_argument('--root', type=Path, default=ROOT/'site/static/data/atom-loss')
     p.add_argument('--binary', type=Path, default=ROOT/'target/release/rstim')
     p.add_argument('--exporter', type=Path, default=ROOT/'target/release/examples/export_matching_benchmark')
+    p.add_argument('--historical-source', action='store_true',
+                   help='Validate archived evidence at its measured Git commit before replaying with the current binary')
     a = p.parse_args()
     from .verify import verify
-    verify(a.root)
+    verify(a.root, historical=a.historical_source)
     for name in ['shot-data-v1.zip', 'accuracy-seeds.zip']:
         print('PASS', name, replay(a.root/name, a.binary, a.exporter), flush=True)
