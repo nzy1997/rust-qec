@@ -20,6 +20,8 @@ subsequent RNG continuation are checked independently outside timing.
 - Clifft 0.11.0 default/scheduled and SymFT 0.1.1 source c89b985 are pinned by
   package, loaded-file and source digests; each tunes its native batch independently.
 
+The same source also has a closed [Linux VM x86 counts campaign](../linux-vm-x86-affine-counts-2026-10-08/README.md), with separate host-specific comparisons.
+
 ## Results and remaining directions
 
 All following ratios compare to the fastest peer within this campaign. In Fused,
@@ -38,8 +40,8 @@ remain in [warm.csv](warm.csv).
 
 Separate [paired Rust-only ablations](../apple-m4-affine-counts-rust-ablation-2026-10-08/README.md) against packed rejection show roughly 3×
 bulk surface improvement and 19–22× warm one-shot improvement. MSC d5 Fused
-1024 regresses about 2.4%, with all five paired ratios below one; Strict 64
-regresses about 4.6%. These exploratory regressions are retained and identify
+1024 warm throughput decreases about 2.4%, with all five paired ratios below one;
+Strict 64 warm throughput decreases about 4.6%. These exploratory regressions are retained and identify
 follow-up work; cross-campaign peer timing is not used to estimate them.
 
 The host is shared and unpinned. Finite witnesses do not certify rare conditional
