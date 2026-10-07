@@ -234,48 +234,54 @@ fn packed_rejection_preserves_accepted_fallback_rows_and_following_raw_calls() {
     // The noncommuting MPP keeps MY before the detector. A small cache can admit
     // a rejected MY branch while accepted lanes need recorded scalar fallback.
     let text = "H 0 1\nT 0 1\nCX 0 1\nMY !0\nDETECTOR rec[-1]\nMPP(0.003) X0*X1\nREPEAT 70 {\nDEPOLARIZE1(0.001) 0 1\nH 2\nM(0.004) 2\nR 2\n}\nCX sweep[1] 0\nM 0 1\nOBSERVABLE_INCLUDE(7) rec[-1]\nOBSERVABLE_INCLUDE(7) rec[-2]\n";
-    for arithmetic in [
-        CompiledRotationArithmetic::Strict,
-        CompiledRotationArithmetic::Fused,
-    ] {
-        let plan =
-            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
-        let initial = plan
-            .prepare_sampler()
-            .unwrap()
-            .coefficient_cache_reserved_bytes();
-        for budget in [0, initial + 288, 64 * 1024 * 1024] {
-            let mut native = plan.prepare_sampler_with_cache_budget(budget).unwrap();
-            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            let mut a = StdRng::seed_from_u64(583);
-            let mut b = a.clone();
-            for shots in [32, 63, 64, 65, 127, 129, 1024, 64] {
-                let rows = reference
-                    .sample_with_sweep(shots, &[false, true], &mut a)
-                    .unwrap();
-                let expected = count_records(&rows, 7);
-                assert!(expected.accepted > 0 && expected.accepted < shots);
-                let actual = native
-                    .sample_postselected_counts_with_sweep(shots, 7, &[false, true], &mut b)
-                    .unwrap();
-                assert_eq!(actual, expected);
-                for _ in 0..16 {
-                    assert_eq!(a.next_u64(), b.next_u64());
+    let wide = text.replace("REPEAT 70", "REPEAT 130").replace(
+        "H 2\n",
+        "DEPOLARIZE2(0.001) 0 1\nDEPOLARIZE2(0.37) 0 1\nX_ERROR(0) 0\nY_ERROR(1) 1\nH 2\n",
+    );
+    for text in [text, wide.as_str()] {
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for budget in [0, initial + 288, 64 * 1024 * 1024] {
+                let mut native = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(583);
+                let mut b = a.clone();
+                for shots in [32, 63, 64, 65, 127, 129, 1024, 64] {
+                    let rows = reference
+                        .sample_with_sweep(shots, &[false, true], &mut a)
+                        .unwrap();
+                    let expected = count_records(&rows, 7);
+                    assert!(expected.accepted > 0 && expected.accepted < shots);
+                    let actual = native
+                        .sample_postselected_counts_with_sweep(shots, 7, &[false, true], &mut b)
+                        .unwrap();
+                    assert_eq!(actual, expected);
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
                 }
+                let rows = reference
+                    .sample_with_sweep(65, &[false, true], &mut a)
+                    .unwrap();
+                let flat = native
+                    .sample_measurements_u8_with_sweep(65, &[false, true], &mut b)
+                    .unwrap();
+                assert_eq!(
+                    flat.measurements,
+                    rows.iter()
+                        .flat_map(|row| row.measurements.iter().map(|bit| u8::from(*bit)))
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(a.next_u64(), b.next_u64());
             }
-            let rows = reference
-                .sample_with_sweep(65, &[false, true], &mut a)
-                .unwrap();
-            let flat = native
-                .sample_measurements_u8_with_sweep(65, &[false, true], &mut b)
-                .unwrap();
-            assert_eq!(
-                flat.measurements,
-                rows.iter()
-                    .flat_map(|row| row.measurements.iter().map(|bit| u8::from(*bit)))
-                    .collect::<Vec<_>>()
-            );
-            assert_eq!(a.next_u64(), b.next_u64());
         }
     }
 }

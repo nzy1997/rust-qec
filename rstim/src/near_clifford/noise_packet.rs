@@ -59,7 +59,7 @@ impl NoisePacket {
     }
 
     #[inline]
-    fn value(&self, noise: usize, lane: usize) -> u64 {
+    pub(super) fn value(&self, noise: usize, lane: usize) -> u64 {
         let [a, b, c, d] = self.planes[noise];
         ((a >> lane) & 1)
             | (((b >> lane) & 1) << 1)
@@ -224,6 +224,23 @@ mod tests {
                 }
                 for (lane, expected) in expected_rows.iter().enumerate() {
                     let row = &mut rows[lane * kinds.len()..(lane + 1) * kinds.len()];
+                    // Compare directly with literal live draws before restoring any
+                    // sentinel-valued compact tape cells, including every category.
+                    let mut replay =
+                        CompactReplay::new(row, Some(&packet), independent.as_ref(), lane);
+                    for (&kind, &value) in kinds.iter().zip(expected) {
+                        assert_eq!(replay.draw(kind), value);
+                    }
+                    assert_eq!(replay.cursor(), kinds.len());
+                    for split in [0, 1, 63, 64, 65, kinds.len() - 1, kinds.len()] {
+                        let mut replay =
+                            CompactReplay::new(row, Some(&packet), independent.as_ref(), lane);
+                        for (&kind, &value) in kinds[..split].iter().zip(&expected[..split]) {
+                            assert_eq!(replay.draw(kind), value);
+                        }
+                        replay.discard_remaining(&kinds[split..]);
+                        assert_eq!(replay.cursor(), kinds.len());
+                    }
                     packet.restore_row(&kinds, row, lane);
                     if let Some(independent) = &independent {
                         independent.restore_row(&kinds, row, lane);
