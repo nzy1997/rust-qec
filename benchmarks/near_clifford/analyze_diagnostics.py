@@ -93,6 +93,7 @@ def summarize(out,kind):
         f"Verification: `{json.dumps(verification,sort_keys=True)}`.",
         'Five independent rotated/reversed process rounds; seven observations of at least50ms per warm process.',
         'Ranges below are paired process-median ranges, not confidence intervals. Strict/Fused are separate.',
+        'Clifft0.11.0 and SymFT0.1.1 sourcec89b985 are distribution/import hash bound; native peer build flags are not fully attested.',
         'OS RSS is whole-process high-water, including probe/interpreter allocations. Mac measurements have no pinned-core claim.',
         'Empty CSV RSS/cache entries mean unmeasured; raw flat peer workers do not report RSS. Peer preparation is included in compilation.',
         'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.',
