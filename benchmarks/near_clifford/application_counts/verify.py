@@ -125,6 +125,10 @@ def validate(out,git_sources=False,allow_smoke=False):
     for case in cases:
         require(case['id'] in rust,'missing Rust counts witness')
         require(all((case['name'],case['shots'],backend) in tuning for backend in inc.BACKENDS[1:]),'missing peer tuning')
+        for backend in inc.BACKENDS[1:]:
+            key=(case['name'],case['shots'],backend)
+            if tuning[key] is not None:
+                require(key in native and key in raw,'selected peer validation event missing')
         require(checked.get(case['id']) is True or case['id'] in rejected,'cell disappeared without retained rejection')
         if case['id'] in rejected:
             executors_incomplete=(rust[case['id']].get('status')!='ok' or
