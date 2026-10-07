@@ -99,14 +99,43 @@ jobs:
           evidence=benchmarks/near_clifford/results/apple-m4-native-counts-2026-10-07
           python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
           python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
-      - name: Reject resealed evidence corruption
+  diagnostic-corruption:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, optimized]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject resealed diagnostic corruption
+        env:
+          PYTHON_MODE: ${{ matrix.mode }}
         run: |
+          python_flags=()
+          if [[ "$PYTHON_MODE" == optimized ]]; then python_flags=(-O); fi
           evidence=benchmarks/near_clifford/results/apple-m4-diagnostics-cache-lifetime-2026-10-07
-          python3 benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
-          python3 -O benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
-          evidence=benchmarks/near_clifford/results/apple-m4-application-counts-2026-10-07
-          python3 benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
-          python3 -O benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
-          evidence=benchmarks/near_clifford/results/apple-m4-native-counts-2026-10-07
-          python3 benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
-          python3 -O benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
+          python3 "${python_flags[@]}" benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
+  counts-corruption:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [normal, optimized]
+        publication: [apple-m4-application-counts-2026-10-07, apple-m4-native-counts-2026-10-07]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject resealed application counts corruption
+        env:
+          PYTHON_MODE: ${{ matrix.mode }}
+          PUBLICATION: ${{ matrix.publication }}
+        run: |
+          python_flags=()
+          if [[ "$PYTHON_MODE" == optimized ]]; then python_flags=(-O); fi
+          evidence="benchmarks/near_clifford/results/$PUBLICATION"
+          python3 "${python_flags[@]}" benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
