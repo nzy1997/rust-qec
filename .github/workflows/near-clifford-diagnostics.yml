@@ -15,7 +15,7 @@ jobs:
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection'
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -53,7 +53,7 @@ jobs:
             --python "$PWD/drafts/ci-clifft/bin/python" \
             --symft-python "$PWD/drafts/ci-symft/bin/python" \
             --symft-source "$PWD/drafts/ci-soft" \
-            --only msc_d3_inject_cultivate_p1e-3 --shots 1 64 --pairs 1 --repetitions 1
+            --only msc_d3_inject_cultivate_p1e-3 pure_surface_d7_r7_p1e-3 --shots 1 64 --pairs 1 --repetitions 1
           python benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
           python -O benchmarks/near_clifford/application_counts/verify.py drafts/ci-counts-smoke --git-sources --allow-smoke
           python benchmarks/near_clifford/application_counts/test_contract.py drafts/ci-counts-smoke
