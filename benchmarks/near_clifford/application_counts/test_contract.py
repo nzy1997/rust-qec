@@ -65,6 +65,11 @@ def main():
         del h['sources']['benchmarks/near_clifford/evidence_io.py']
     if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
         mutations.append(missing_helper_inventory)
+    if header['schema']=='rstim.postselected-counts.v2':
+        def missing_native_route(e,h): del h['rust_route']
+        def wrong_rust_execution(e,h): next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')['result']['execution']='full structured records then filter; no early rejection'
+        def missing_native_exact_witness(e,h): del next(v for v in e if v['kind']=='counts-validation' and v['backend']=='rstim')['result']['exact_native_counts_rng']
+        mutations.extend([missing_native_route,wrong_rust_execution,missing_native_exact_witness])
     for mutate in mutations:
         e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure);mutate(e,h)
         if mutate is missing_helper_inventory: c['sources_after']=h['sources']

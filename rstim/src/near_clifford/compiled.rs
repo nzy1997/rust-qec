@@ -470,6 +470,71 @@ enum PlanOp {
     },
 }
 
+// Shared dispatcher sinks keep packet admission, fallback and RNG order identical.
+enum BatchOutput<'a> {
+    Measurements(&'a mut Vec<u8>),
+    Counts {
+        observable_index: u32,
+        counts: &'a mut NearCliffordPostselectedCounts,
+    },
+}
+impl BatchOutput<'_> {
+    fn row(&mut self, shot: NearCliffordShot) {
+        match self {
+            Self::Measurements(output) => {
+                output.extend(shot.measurements.into_iter().map(u8::from))
+            }
+            Self::Counts {
+                observable_index,
+                counts,
+            } => {
+                if shot.detectors.iter().any(|&bit| bit) {
+                    return;
+                }
+                counts.accepted += 1;
+                let parity = shot
+                    .observables
+                    .iter()
+                    .filter(|(index, _)| index == observable_index)
+                    .fold(false, |parity, (_, bit)| parity ^ bit);
+                counts.logical_errors += usize::from(parity);
+            }
+        }
+    }
+    fn packet_counts(&mut self, operations: &[PlanOp], records: &[u64], live: u64) {
+        let Self::Counts {
+            observable_index,
+            counts,
+        } = self
+        else {
+            return;
+        };
+        let mut accepted = live;
+        let mut logical = 0;
+        for operation in operations {
+            if let PlanOp::Annotation {
+                offsets,
+                observable,
+            } = operation
+            {
+                let parity = offsets.iter().fold(0, |bits, &index| bits ^ records[index]);
+                match observable {
+                    None => accepted &= !parity,
+                    Some(index) if index == observable_index => logical ^= parity,
+                    _ => {}
+                }
+            }
+        }
+        counts.accepted += accepted.count_ones() as usize;
+        counts.logical_errors += (accepted & logical).count_ones() as usize;
+    }
+    fn packet_row(&mut self, records: &[u64], lane: usize) {
+        if let Self::Measurements(output) = self {
+            output.extend(records.iter().map(|bits| ((bits >> lane) & 1) as u8));
+        }
+    }
+}
+
 struct Product {
     terms: Vec<(usize, MeasurementBasis)>,
     inverted: bool,
@@ -2763,7 +2828,7 @@ impl CompiledNearCliffordSampler<'_> {
         lanes: usize,
         sweep: &[bool],
         rng: &mut impl Rng,
-        output: &mut Vec<u8>,
+        output: &mut BatchOutput<'_>,
         coherent: bool,
         mut noise_packet: Option<&mut NoisePacket>,
     ) -> Result<(), String> {
@@ -3138,9 +3203,10 @@ impl CompiledNearCliffordSampler<'_> {
             if (live & all).count_ones() as usize <= lanes / 4 {
                 self.pack_enabled = false;
             }
+            output.packet_counts(&plan.operations, &records, live & all);
             for lane in 0..lanes {
                 if live >> lane & 1 != 0 {
-                    output.extend(records.iter().map(|bits| ((bits >> lane) & 1) as u8));
+                    output.packet_row(&records, lane);
                 } else {
                     // Admission failed. Replay the same row's already drawn events;
                     // no quantum result is resampled and the caller RNG is untouched.
@@ -3162,12 +3228,7 @@ impl CompiledNearCliffordSampler<'_> {
                         &tape[lane * random_count..(lane + 1) * random_count],
                         &mut *rng,
                     );
-                    output.extend(
-                        self.row_with_random(sweep, &mut random)?
-                            .measurements
-                            .into_iter()
-                            .map(u8::from),
-                    );
+                    output.row(self.row_with_random(sweep, &mut random)?);
                     debug_assert_eq!(random.cursor, random_count);
                 }
             }
@@ -3221,6 +3282,72 @@ impl CompiledNearCliffordSampler<'_> {
         measurements
             .try_reserve_exact(len)
             .map_err(|e| e.to_string())?;
+        self.sample_batch(
+            shots,
+            sweep,
+            rng,
+            &mut BatchOutput::Measurements(&mut measurements),
+        )?;
+        Ok(NearCliffordMeasurementBatch {
+            shots,
+            measurements_per_shot: self.plan.measurement_count,
+            measurements,
+        })
+    }
+
+    /// Counts all-zero raw detector shots and their XOR-folded raw observable parity.
+    ///
+    /// The observable index must occur in the compiled circuit, even for zero shots.
+    /// No reference normalization or early rejection is performed. Sampling consumes
+    /// the same random events as [`Self::sample`], without materializing batch records.
+    pub fn sample_postselected_counts(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        self.sample_postselected_counts_with_sweep(shots, observable_index, &[], rng)
+    }
+
+    /// The counts contract of [`Self::sample_postselected_counts`] with sweep controls.
+    pub fn sample_postselected_counts_with_sweep(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        if !self.plan.operations.iter().any(|operation| {
+            matches!(operation,
+            PlanOp::Annotation { observable: Some(index), .. } if *index == observable_index)
+        }) {
+            return Err(format!(
+                "observable {observable_index} is absent from the compiled circuit"
+            ));
+        }
+        let mut counts = NearCliffordPostselectedCounts {
+            attempted: shots,
+            ..Default::default()
+        };
+        self.sample_batch(
+            shots,
+            sweep,
+            rng,
+            &mut BatchOutput::Counts {
+                observable_index,
+                counts: &mut counts,
+            },
+        )?;
+        Ok(counts)
+    }
+
+    fn sample_batch(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+    ) -> Result<(), String> {
         let packet_bytes = self
             .plan
             .random_kinds
@@ -3300,25 +3427,20 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, &mut measurements, coherent, compact)?;
+                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
-                        measurements
-                            .extend(self.row(sweep, rng)?.measurements.into_iter().map(u8::from));
+                        output.row(self.row(sweep, rng)?);
                     }
                 }
             }
         } else {
             for _ in 0..shots {
-                measurements.extend(self.row(sweep, rng)?.measurements.into_iter().map(u8::from));
+                output.row(self.row(sweep, rng)?);
             }
         }
-        Ok(NearCliffordMeasurementBatch {
-            shots,
-            measurements_per_shot: self.plan.measurement_count,
-            measurements,
-        })
+        Ok(())
     }
 }
 
@@ -5221,7 +5343,14 @@ mod scalar_prepared_tape_tests {
                     let mut actual = Vec::new();
                     // None is also the public mode after optional Noise rejection.
                     packed
-                        .packet(64, &sweep, &mut b, &mut actual, false, None)
+                        .packet(
+                            64,
+                            &sweep,
+                            &mut b,
+                            &mut BatchOutput::Measurements(&mut actual),
+                            false,
+                            None,
+                        )
                         .unwrap();
                     assert_eq!(
                         actual, expected,
