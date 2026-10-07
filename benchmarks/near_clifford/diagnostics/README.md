@@ -98,3 +98,8 @@ The published Linux high-water marks are retained as process observations but
 cannot establish simulator-only memory usage or relative engine memory costs.
 Future Linux memory comparisons need a separately attributed measurement.
 See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusage.2.html).
+
+Finite union-bound budgets apply per runner invocation. Separate hosts or
+shards do not share one0.001 family guarantee. Each x86 diagnostic shard
+retains its own VM hardware and source receipt; absolute timings must not be
+pooled into one hardware comparison even when CPU model names match.
