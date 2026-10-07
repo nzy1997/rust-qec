@@ -93,16 +93,28 @@ The [packed-rejection follow-up](../results/apple-m4-packed-rejection-2026-10-08
 retains a new complete 24-cell same-run peer comparison with streaming packet counts.
 
 The default `--rust-route native` benchmarks `sample_postselected_counts` through the
-public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v4` with
+public compiled sampler; `--rust-route structured` selects the adapter. This emits schema `rstim.postselected-counts.v5` with
 an explicit native or structured route. V1 publications retain the frozen PR780 production
-check; V2/V3/V4 bind the optimized production bytes to the measured Git revision.
+check; V2/V3/V4/V5 bind the optimized production bytes to the measured Git revision.
 V2 native publications retain full simulation; V3 native execution permits scalar
 and admission-fallback rejection while preserving the complete random stream.
 V4 also retires live packed lanes at nonzero detectors and folds selected observable
-parities during packet execution. All modern schemas require complete source inventories and unchanged source/binary closure.
+parities during packet execution. V5 may lazily prepare an affine detector/observable
+model for compiled plans without rotations or active projections. Its reverse GF2
+construction and all heap scratch fit within the remaining 64 MiB plan reservation,
+after optional scalar-basis and random-run metadata. Bounded construction work and
+failed admission retain the original scalar/packed path. The first nonempty counts
+call pays this model cost, recorded in `first_ns`; compilation/preparation do not
+hide it. Subsequent counts calls reuse the immutable model, also shared by cloned
+plans, with a separately bounded 16 MiB output workspace. Raw structured/flat calls
+continue using the physical executor. All modern schemas require complete source
+inventories and unchanged source/binary closure.
 
 The native route applies all-zero **raw** detector postselection and XOR-folded
-raw observable0. It retains all random draws. Scalar and admission-fallback rows
+raw observable0. It retains all random draws. An admitted affine model accumulates
+random-event effects directly into detector/observable bit planes without a random
+tape or physical replay. Sweep inputs, deterministic raw constants, readout noise,
+record feedback and repeated includes retain their original semantics. Scalar and admission-fallback rows
 skip remaining physics after a nonzero detector. Packed rows retire at a nonzero
 detector; an empty live packet skips remaining physics while preserving accepted
 admission-fallback replay. The packet random tape is drawn completely before execution. Remaining typed draws are consumed in original order even for rejected

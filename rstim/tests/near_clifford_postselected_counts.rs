@@ -279,3 +279,55 @@ fn packed_rejection_preserves_accepted_fallback_rows_and_following_raw_calls() {
         }
     }
 }
+
+#[test]
+fn affine_counts_preserve_raw_parities_sparse_indices_sweeps_and_mixed_call_rng() {
+    let texts = [
+        "H 0 64\nS 0\nCX 0 64\nCZ 0 64\nDEPOLARIZE2(0.003) 0 64\nMPP(0.003) !X0*Y64\nCX rec[-1] 0\nMRY(0.37) !64\nCX sweep[1] 64\nMRX(1) !0\nMX(0) 0\nM 0 64\nDETECTOR rec[-1] rec[-3]\nDETECTOR rec[-2] rec[-2]\nOBSERVABLE_INCLUDE(4294967295) rec[-1]\nOBSERVABLE_INCLUDE(4294967295) rec[-2]\nOBSERVABLE_INCLUDE(7)\n",
+        "REPEAT 70 {\nH 0\nM(0.003) 0\nDEPOLARIZE1(0.003) 0\nX_ERROR(0) 0\nY_ERROR(1) 0\nR 0\n}\nH 1\nM 0 1\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(4294967295) rec[-1]\nOBSERVABLE_INCLUDE(7) rec[-1] rec[-1]\n",
+        "X 0\nM !0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(4294967295) rec[-1]\nOBSERVABLE_INCLUDE(7)\n",
+    ];
+    for text in texts {
+        let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
+        for budget in [0, 64 * 1024 * 1024] {
+            for seed in [719, 1739, 2739] {
+                let mut counts = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                for (position, shots) in [0, 1, 31, 32, 63, 64, 65, 127, 129, 1024, 64]
+                    .into_iter()
+                    .enumerate()
+                {
+                    let sweep = [false, position % 2 == 0];
+                    for observable in [u32::MAX, 7] {
+                        let rows = reference.sample_with_sweep(shots, &sweep, &mut a).unwrap();
+                        let actual = counts
+                            .sample_postselected_counts_with_sweep(
+                                shots, observable, &sweep, &mut b,
+                            )
+                            .unwrap();
+                        assert_eq!(actual, count_records(&rows, observable));
+                        for _ in 0..16 {
+                            assert_eq!(a.next_u64(), b.next_u64());
+                        }
+                    }
+                    // A raw call before/after counts uses the same sampler and RNG history.
+                    let rows = reference.sample_with_sweep(65, &sweep, &mut a).unwrap();
+                    let flat = counts
+                        .sample_measurements_u8_with_sweep(65, &sweep, &mut b)
+                        .unwrap();
+                    assert_eq!(
+                        flat.measurements,
+                        rows.iter()
+                            .flat_map(|r| r.measurements.iter().copied().map(u8::from))
+                            .collect::<Vec<_>>()
+                    );
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+            }
+        }
+    }
+}
