@@ -116,6 +116,9 @@ jobs:
           evidence=benchmarks/near_clifford/results/apple-m4-affine-counts-2026-10-08
           python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
           python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+          evidence=benchmarks/near_clifford/results/linux-vm-x86-affine-counts-2026-10-08
+          python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
+          python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
   diagnostic-corruption:
     runs-on: ubuntu-latest
     timeout-minutes: 90
