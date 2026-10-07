@@ -19,6 +19,9 @@ use independent_packet::IndependentPacket;
 #[path = "noise_packet.rs"]
 mod noise_packet;
 use noise_packet::NoisePacket;
+#[path = "compact_replay.rs"]
+mod compact_replay;
+use compact_replay::{CompactReplay, RowDraw};
 #[path = "scalar_basis.rs"]
 mod scalar_basis;
 use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
@@ -2792,7 +2795,7 @@ impl CompiledNearCliffordSampler<'_> {
     fn row_with_random_mode<const POSTSELECT: bool>(
         &mut self,
         sweep: &[bool],
-        random: &mut RowRandom<'_, impl Rng>,
+        random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
         self.x.fill(0);
         self.z.fill(0);
@@ -3372,31 +3375,39 @@ impl CompiledNearCliffordSampler<'_> {
                 } else {
                     // Admission failed. Replay the same row's already drawn events;
                     // no quantum result is resampled and the caller RNG is untouched.
-                    if let Some(packet) = &noise_packet {
-                        packet.restore_row(
-                            &plan.random_kinds,
-                            &mut tape[lane * random_count..(lane + 1) * random_count],
+                    if matches!(output, BatchOutput::Counts { .. }) {
+                        let mut random = CompactReplay::new(
+                            &tape[lane * random_count..(lane + 1) * random_count],
+                            noise_packet.as_deref(),
+                            independent_packet.as_ref(),
                             lane,
                         );
-                    }
-                    if let Some(packet) = &independent_packet {
-                        packet.restore_row(
-                            &plan.random_kinds,
-                            &mut tape[lane * random_count..(lane + 1) * random_count],
-                            lane,
-                        );
-                    }
-                    let mut random = RowRandom::recorded(
-                        &tape[lane * random_count..(lane + 1) * random_count],
-                        &mut *rng,
-                    );
-                    let shot = if matches!(output, BatchOutput::Counts { .. }) {
-                        self.row_with_random_mode::<true>(sweep, &mut random)?
+                        let shot = self.row_with_random_mode::<true>(sweep, &mut random)?;
+                        output.row(shot);
+                        debug_assert_eq!(random.cursor(), random_count);
                     } else {
-                        self.row_with_random(sweep, &mut random)?
-                    };
-                    output.row(shot);
-                    debug_assert_eq!(random.cursor, random_count);
+                        if let Some(packet) = &noise_packet {
+                            packet.restore_row(
+                                &plan.random_kinds,
+                                &mut tape[lane * random_count..(lane + 1) * random_count],
+                                lane,
+                            );
+                        }
+                        if let Some(packet) = &independent_packet {
+                            packet.restore_row(
+                                &plan.random_kinds,
+                                &mut tape[lane * random_count..(lane + 1) * random_count],
+                                lane,
+                            );
+                        }
+                        let mut random = RowRandom::recorded(
+                            &tape[lane * random_count..(lane + 1) * random_count],
+                            &mut *rng,
+                        );
+                        let shot = self.row_with_random(sweep, &mut random)?;
+                        output.row(shot);
+                        debug_assert_eq!(random.cursor, random_count);
+                    }
                 }
             }
             Ok(())
