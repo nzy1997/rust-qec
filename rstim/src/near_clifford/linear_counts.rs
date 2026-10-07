@@ -51,6 +51,16 @@ impl Budget {
         Some(v)
     }
 }
+// for_support visits every packed word and every set-bit callback on both axes.
+fn pauli_visit_work(pauli: &PackedPauli) -> Option<usize> {
+    pauli.x.len().checked_add(pauli.z.len())?.checked_add(
+        pauli
+            .x
+            .iter()
+            .chain(&pauli.z)
+            .try_fold(0usize, |n, word| n.checked_add(word.count_ones() as usize))?,
+    )
+}
 fn variable_count(choices: usize, binary: bool) -> usize {
     if binary {
         usize::BITS as usize - choices.leading_zeros() as usize
@@ -170,16 +180,8 @@ impl LinearCountsPlan {
                         } else {
                             column
                         }];
-                        let words = c.pauli.x.len().checked_add(c.pauli.z.len())?;
-                        let support = c
-                            .pauli
-                            .x
-                            .iter()
-                            .chain(&c.pauli.z)
-                            .try_fold(0usize, |n, v| n.checked_add(v.count_ones() as usize))?;
                         work = work
-                            .checked_add(words)?
-                            .checked_add(support)?
+                            .checked_add(pauli_visit_work(&c.pauli)?)?
                             .checked_add(c.record_flips.len())?;
                     }
                     if work > BUILD_WORK_LIMIT {
@@ -197,14 +199,15 @@ impl LinearCountsPlan {
                         .checked_add(usize::from(m.readout > 0.))?;
                     work = work
                         .checked_add(m.basis.len())?
-                        .checked_add(plan.num_qubits.checked_mul(4)?)?;
+                        .checked_add(pauli_visit_work(&m.pauli.physical)?)?
+                        .checked_add(m.reset.as_ref().map_or(Some(0), pauli_visit_work)?)?;
                 }
-                PlanOp::Feedback { condition, .. } => {
+                PlanOp::Feedback { condition, pauli } => {
                     if matches!(condition, Condition::Sweep(_)) {
                         sweep_count = sweep_count.checked_add(1)?;
                         variables = variables.checked_add(1)?;
                     }
-                    work = work.checked_add(plan.num_qubits)?;
+                    work = work.checked_add(pauli_visit_work(pauli)?)?;
                 }
                 PlanOp::Annotation {
                     offsets,
@@ -226,6 +229,15 @@ impl LinearCountsPlan {
         observables.dedup();
         let outputs = detectors.checked_add(observables.len())?;
         let blocks = outputs.div_ceil(64);
+        // Observable readers perform a binary search in the deduplicated index list.
+        // Include its comparisons, including the final equality check.
+        let lookup_visits = usize::BITS as usize - observables.len().leading_zeros() as usize + 2;
+        work = work.checked_add(observable_count.checked_mul(lookup_visits)?)?;
+        // Each adjoint block clears its variable, frame and record scratch first.
+        work = work
+            .checked_add(variables)?
+            .checked_add(plan.num_qubits.checked_mul(2)?)?
+            .checked_add(plan.measurement_count)?;
         if work.checked_mul(blocks.max(1))? > BUILD_WORK_LIMIT {
             return None;
         }
@@ -727,6 +739,41 @@ fn original_surface_models_are_admitted_and_match_complete_record_rng() {
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn dense_feedback_declines_model_before_adjoint_work_exceeds_limit() {
+    let text = "H 0\nM 0\nREPEAT 51000 {\nCY rec[-1] 0\n}\nM 0\nREPEAT 5000 {\nDETECTOR rec[-2]\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+    let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
+    assert!(LinearCountsPlan::build(&plan, plan.counts_plan_budget).is_none());
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+    for seed in [739, 1739] {
+        let mut physical = plan.prepare_sampler().unwrap();
+        let mut native = plan.prepare_sampler().unwrap();
+        let mut a = StdRng::seed_from_u64(seed);
+        let mut b = a.clone();
+        let rows = physical.sample(1, &mut a).unwrap();
+        let expected = NearCliffordPostselectedCounts {
+            attempted: 1,
+            accepted: usize::from(rows[0].detectors.iter().all(|v| !*v)),
+            logical_errors: usize::from(
+                rows[0].detectors.iter().all(|v| !*v)
+                    && rows[0]
+                        .observables
+                        .iter()
+                        .filter(|(i, _)| *i == 0)
+                        .fold(false, |v, (_, bit)| v ^ *bit),
+            ),
+        };
+        assert_eq!(
+            native.sample_postselected_counts(1, 0, &mut b).unwrap(),
+            expected
+        );
+        for _ in 0..16 {
+            assert_eq!(a.next_u64(), b.next_u64());
         }
     }
 }
