@@ -59,7 +59,7 @@ def main():
     env=inc.environment_summary(packages,peer_sources,peer_revision,identities)
     cases=[dict(id=f'{name}/{shots}/{policy}',name=name,shots=shots,policy=policy)
            for name in args.only for shots in args.shots for policy in POLICIES]
-    header=dict(schema='rstim.postselected-counts.v3',manifest=manifest,cases=cases,
+    header=dict(schema='rstim.postselected-counts.v4',manifest=manifest,cases=cases,
         selected_names=args.only,selected_shots=args.shots,pairs=args.pairs,repetitions=args.repetitions,
         source_revision=revision,sources=sources,binary_sha256=binary_hashes,packages=packages,
         peer_loaded_files=identities,symft_source_revision=peer_revision,symft_sources=peer_sources,
