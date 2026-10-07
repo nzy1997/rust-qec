@@ -3,6 +3,9 @@ use super::*;
 
 const SLOTS: usize = 8192;
 const PROBES: usize = 8;
+// Amortize index construction only after the sampler has retained enough states.
+// Small caches keep ordinary admission without allocating the optional table.
+pub(super) const MIN_STATES: usize = 128;
 // Hashing is optional for small amplitudes; wide state vectors retain the old path.
 pub(super) const MAX_COEFFICIENTS: usize = 4096;
 
@@ -98,7 +101,26 @@ mod tests {
         let initial = cache.reserved;
         assert!(cache.intern.is_none());
         let values = [ComplexAmp::new(0.5, 0.0), ComplexAmp::new(0.25, 0.5)];
+        let first_cold = cache.store(23, &values).unwrap();
+        assert!(cache.intern.is_none());
+        assert!(!cache.intern_attempted);
+        assert_eq!(
+            cache.reserved,
+            initial + CoefficientCache::state_charge(&values).unwrap()
+        );
+        // Cold states remain usable and unindexed. Ordinary bounded admission
+        // continues until there is enough construction work to amortize a table.
+        for node in 100.. {
+            if cache.states.len() >= MIN_STATES {
+                break;
+            }
+            cache.store(node, &values).unwrap();
+            assert!(cache.intern.is_none());
+            assert!(!cache.intern_attempted);
+        }
+        assert_eq!(&*cache.states[first_cold].coefficients, &values);
         let first = cache.store(23, &values).unwrap();
+        assert_ne!(first, first_cold);
         assert!(cache.intern.is_some());
         assert!(cache.reserved > initial);
         let reserved = cache.reserved;

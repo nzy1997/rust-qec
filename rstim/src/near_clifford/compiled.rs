@@ -327,9 +327,13 @@ impl CoefficientCache {
         if !self.fits(charge) {
             return None;
         }
-        // Defer optional index allocation until an actual non-scalar state is
-        // stored, preserving cold preparation and error-only cache footprints.
-        if !self.intern_attempted && coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS {
+        // Defer optional index allocation until enough non-scalar states have
+        // accumulated to amortize it. Small and cold caches retain the original
+        // admission path; existing unindexed states remain valid cache entries.
+        if !self.intern_attempted
+            && self.states.len() >= coefficient_intern::MIN_STATES
+            && coefficients.len() <= coefficient_intern::MAX_COEFFICIENTS
+        {
             self.intern_attempted = true;
             let remaining = self.budget - self.reserved - charge;
             self.intern = CoefficientIntern::new(remaining);
