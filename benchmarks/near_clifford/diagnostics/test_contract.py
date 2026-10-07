@@ -80,6 +80,9 @@ def main():
     def wrong_peer_executor(e,h):
         v=next(v for v in e if v['kind']=='timing' and v['backend']=='clifft')
         v['result']['backend']='clifft-scheduled'
+    def wrong_tuning_executor(e,h):
+        v=next(v for v in e if v['kind']=='peer-tuning' and v['backend']=='clifft')
+        v['trials'][0]['result']['backend']='clifft-scheduled'
     def duplicate_lifecycle_witness(e,h):
         v=next(v for v in e if v['kind']=='lifetime-peer-validation')
         e.insert(e.index(v)+1,copy.deepcopy(v))
@@ -88,7 +91,8 @@ def main():
         h['sources']={key:value for key,value in h['sources'].items() if '/diagnostics/' not in key}
     mutations=[missing_timing,changed_timing,missing_mask,wrong_policy,changed_input,
                dropped_cell,forged_import,truncated_warm,wrong_batch,missing_tuning,
-               empty_sources,forged_environment,optional_identity,pre_harness_source,wrong_peer_executor]
+               empty_sources,forged_environment,optional_identity,pre_harness_source,
+               wrong_peer_executor,wrong_tuning_executor]
     if any(v['kind']=='lifetime' for v in events):
         mutations += [wrong_lifetime,missing_peer_lifetime,empty_peer_calls,empty_lifetime_digest,
                       duplicate_lifetime,duplicate_lifecycle_witness]

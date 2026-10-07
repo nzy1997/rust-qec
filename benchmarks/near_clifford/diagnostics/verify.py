@@ -52,6 +52,7 @@ def selected_trial(event,header):
     for trial in event['trials']:
         result=trial['result']
         if 'warm_ns' in result:
+            require(result.get('backend')==backend,'tuning executor differs from event backend')
             incumbent.bind_peer(result,backend,header['packages'],header['peer_loaded_files'])
             require(result['input_sha256']==manifest['fixtures'][fixture]['native_sha256']
                     and result['shots']==shots and result['threads']==1,'tuning input/shot/thread mismatch')
