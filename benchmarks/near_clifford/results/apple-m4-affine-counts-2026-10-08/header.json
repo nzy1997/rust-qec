@@ -265,7 +265,7 @@
   ],
   "pairs": 5,
   "repetitions": 7,
-  "source_revision": "3ef49cf9c3f156a492682d24e392915510f2a3a8",
+  "source_revision": "469fb50c156d91d89e63118c749927e99a8e382e",
   "sources": {
     "Cargo.lock": "9fb0df67ee4eb933f34a4f26e57771d51c5f9f938e767576a0148ef0f50fcac8",
     "Cargo.toml": "d4e6a06ab3606822d09e21790c8b60783f6f7c2875498e4cad251de086e31298",
@@ -334,7 +334,7 @@
     "rstim/src/near_clifford/independent_packet.rs": "186bbfd2cd615dbd4afbd1f43c01742a928ae095f701042c4ef7f81efff247aa",
     "rstim/src/near_clifford/lazy_uniform_noise_error_tests.rs": "2dfed66619d64a1dfb8a8842e86012ed760e5687684b8f1e26d60f8bc09e5417",
     "rstim/src/near_clifford/lazy_uniform_reference_tests.rs": "4b16c07ee7374ad40d4543d6bd615119ae9dea2ba5daf2e2b6a168420d2f1e7d",
-    "rstim/src/near_clifford/linear_counts.rs": "1629c7b35a0bd79aa20a07720832cb7cb894b396b1e3e452950b26623b694aa9",
+    "rstim/src/near_clifford/linear_counts.rs": "73f791bff194f5341e02cf2553b548164451cb43431f6b14439709654f15a425",
     "rstim/src/near_clifford/noise_packet.rs": "f415cedad5b25879e68ba13c7731872d7d95913e4cd9dbb3079da9694b93316a",
     "rstim/src/near_clifford/random_event_runs.rs": "7a0c9822daa2a683f91e90512c16cbbe99e4f719845497247caa820dafe4c514",
     "rstim/src/near_clifford/scalar_basis.rs": "aa4854f9f2b09c3096610ea6d7f1bedfc9eb2b410efa827dc9444c86faec17b4",
@@ -417,8 +417,8 @@
     "benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
   },
   "binary_sha256": {
-    "near-clifford-application-counts": "ef8b7191e526cdb5d24f272311a3a8bcaef5507a5dd61630d80a53e293f880dc",
-    "near-clifford-diagnostics": "af76cd25700be1136b8ddb5364eab84a060719cf7952af793c27c275012bae76"
+    "near-clifford-application-counts": "80615baf34257396b05969576db8b07a114639e788b9513238626f377db61ce4",
+    "near-clifford-diagnostics": "4be00e6bb3b4bacec29ba6a93902bb90c37b0a5d63683e42c20ba700668102ad"
   },
   "packages": {
     "symft": {
@@ -1560,9 +1560,9 @@
     "cpus": 10,
     "affinity": null,
     "load": [
-      1.701171875,
-      1.84619140625,
-      1.962890625
+      6.04150390625,
+      4.24267578125,
+      3.7255859375
     ]
   },
   "compiler": "rustc 1.93.1 (01f6ddf75 2026-02-11) (Homebrew)\nbinary: rustc\ncommit-hash: 01f6ddf7588f42ae2d7eb0a2f21d44e8e96674cf\ncommit-date: 2026-02-11\nhost: aarch64-apple-darwin\nrelease: 1.93.1\nLLVM version: 21.1.8\n",
@@ -1574,6 +1574,6 @@
     "CFLAGS": null,
     "CXXFLAGS": null
   },
-  "started_utc": "2026-10-07T20:27:05.003217+00:00",
+  "started_utc": "2026-10-07T20:54:18.637686+00:00",
   "rust_route": "native"
 }

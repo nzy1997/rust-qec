@@ -1,6 +1,6 @@
 # Verified near-Clifford diagnostic measurements
 
-Measured source: `3ef49cf9c3f156a492682d24e392915510f2a3a8`. Host: `macOS-27.0.1-arm64-arm-64bit-Mach-O`.
+Measured source: `469fb50c156d91d89e63118c749927e99a8e382e`. Host: `macOS-27.0.1-arm64-arm-64bit-Mach-O`.
 Verification: `{"events": 658, "retained_failure_events": 14, "selected_cells": 24, "valid_cells": 24}`.
 Complete timing comparisons: `24/24` selected cells; verifier valid_cells counts finite-witness acceptance.
 Five independent rotated/reversed process rounds; seven observations of at least50ms per warm process.
@@ -16,30 +16,30 @@ See warm.csv for all backends, cold phases, named activity metrics, throughput a
 
 | Cell | rstim µs | Fastest peer µs | Speedup | Paired range | Peer |
 | --- | ---: | ---: | ---: | --- | --- |
-| msc_d3_inject_cultivate_p1e-3/1/strict | 1.743 | 2.810 | 1.612× | 1.555–1.641 | clifft-scheduled |
-| msc_d3_inject_cultivate_p1e-3/1/fused | 1.775 | 2.763 | 1.557× | 1.546–1.606 | clifft-scheduled |
-| msc_d3_inject_cultivate_p1e-3/64/strict | 12.441 | 18.960 | 1.524× | 1.5–1.545 | clifft |
-| msc_d3_inject_cultivate_p1e-3/64/fused | 12.714 | 19.304 | 1.518× | 1.498–1.536 | clifft-scheduled |
-| msc_d3_inject_cultivate_p1e-3/1024/strict | 199.329 | 200.800 | 1.007× | 0.9833–1.018 | clifft |
-| msc_d3_inject_cultivate_p1e-3/1024/fused | 195.285 | 197.793 | 1.013× | 0.9992–1.078 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/1/strict | 13.811 | 8.515 | 0.6166× | 0.6129–0.635 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/1/fused | 12.016 | 8.454 | 0.7035× | 0.6956–0.7238 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/64/strict | 528.488 | 373.399 | 0.7065× | 0.6763–0.7126 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/64/fused | 404.331 | 370.789 | 0.917× | 0.9074–0.9606 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/1024/strict | 8657.035 | 5877.991 | 0.679× | 0.6676–0.6992 | clifft-scheduled |
-| msc_d5_inject_cultivate_p1e-3/1024/fused | 6520.578 | 5919.852 | 0.9079× | 0.8882–0.916 | clifft-scheduled |
-| pure_surface_d7_r7_p1e-3/1/strict | 0.408 | 3.885 | 9.53× | 9.227–9.731 | clifft |
-| pure_surface_d7_r7_p1e-3/1/fused | 0.410 | 3.902 | 9.506× | 9.375–9.831 | clifft-scheduled |
-| pure_surface_d7_r7_p1e-3/64/strict | 8.500 | 29.733 | 3.498× | 3.398–3.902 | symft |
-| pure_surface_d7_r7_p1e-3/64/fused | 8.696 | 29.083 | 3.344× | 3.265–3.938 | symft |
-| pure_surface_d7_r7_p1e-3/1024/strict | 132.786 | 158.945 | 1.197× | 1.166–1.221 | symft |
-| pure_surface_d7_r7_p1e-3/1024/fused | 133.884 | 157.914 | 1.179× | 1.177–1.206 | symft |
-| pure_surface_d9_r9_p1e-3/1/strict | 0.909 | 4.574 | 5.029× | 4.886–5.188 | clifft |
-| pure_surface_d9_r9_p1e-3/1/fused | 0.909 | 4.520 | 4.973× | 4.882–5.203 | clifft |
-| pure_surface_d9_r9_p1e-3/64/strict | 17.548 | 53.997 | 3.077× | 3.033–3.494 | symft |
-| pure_surface_d9_r9_p1e-3/64/fused | 17.165 | 53.556 | 3.12× | 3.036–3.707 | symft |
-| pure_surface_d9_r9_p1e-3/1024/strict | 275.475 | 339.209 | 1.231× | 1.198–1.27 | symft |
-| pure_surface_d9_r9_p1e-3/1024/fused | 272.656 | 335.484 | 1.23× | 1.206–1.26 | symft |
+| msc_d3_inject_cultivate_p1e-3/1/strict | 1.812 | 2.886 | 1.593× | 1.565–1.604 | clifft-scheduled |
+| msc_d3_inject_cultivate_p1e-3/1/fused | 1.784 | 2.884 | 1.616× | 1.585–1.634 | clifft-scheduled |
+| msc_d3_inject_cultivate_p1e-3/64/strict | 12.556 | 18.952 | 1.509× | 1.5–1.515 | clifft |
+| msc_d3_inject_cultivate_p1e-3/64/fused | 12.521 | 18.988 | 1.517× | 1.495–1.534 | clifft |
+| msc_d3_inject_cultivate_p1e-3/1024/strict | 198.435 | 197.525 | 0.9954× | 0.9889–1.003 | clifft |
+| msc_d3_inject_cultivate_p1e-3/1024/fused | 197.429 | 197.449 | 1× | 0.9971–1.005 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/1/strict | 13.722 | 8.543 | 0.6226× | 0.6126–0.6271 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/1/fused | 12.020 | 8.552 | 0.7115× | 0.7025–0.7217 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/64/strict | 529.945 | 366.394 | 0.6914× | 0.6664–0.7174 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/64/fused | 406.323 | 372.534 | 0.9168× | 0.8874–0.9279 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/1024/strict | 8450.292 | 5924.607 | 0.7011× | 0.6756–0.7216 | clifft-scheduled |
+| msc_d5_inject_cultivate_p1e-3/1024/fused | 6572.479 | 5894.519 | 0.8968× | 0.8887–0.9338 | clifft-scheduled |
+| pure_surface_d7_r7_p1e-3/1/strict | 0.428 | 4.092 | 9.559× | 9.477–9.815 | clifft |
+| pure_surface_d7_r7_p1e-3/1/fused | 0.428 | 4.034 | 9.426× | 9.321–9.744 | clifft |
+| pure_surface_d7_r7_p1e-3/64/strict | 8.924 | 32.820 | 3.678× | 3.652–3.823 | symft |
+| pure_surface_d7_r7_p1e-3/64/fused | 8.610 | 33.089 | 3.843× | 3.662–4.189 | symft |
+| pure_surface_d7_r7_p1e-3/1024/strict | 134.472 | 159.731 | 1.188× | 1.186–1.208 | symft |
+| pure_surface_d7_r7_p1e-3/1024/fused | 134.318 | 159.268 | 1.186× | 1.182–1.209 | symft |
+| pure_surface_d9_r9_p1e-3/1/strict | 0.912 | 4.542 | 4.978× | 4.862–5.12 | clifft |
+| pure_surface_d9_r9_p1e-3/1/fused | 0.881 | 4.489 | 5.096× | 4.909–5.155 | clifft-scheduled |
+| pure_surface_d9_r9_p1e-3/64/strict | 17.834 | 59.208 | 3.32× | 3.274–3.465 | symft |
+| pure_surface_d9_r9_p1e-3/64/fused | 18.087 | 60.755 | 3.359× | 3.274–4.089 | symft |
+| pure_surface_d9_r9_p1e-3/1024/strict | 275.362 | 340.272 | 1.236× | 1.228–1.252 | symft |
+| pure_surface_d9_r9_p1e-3/1024/fused | 275.824 | 338.939 | 1.229× | 1.225–1.259 | symft |
 
 Counts contract: all-zero raw detector postselection and XOR-folded raw observable0, no reference normalization.
 Rust may lazily prepare an affine detector/observable model on rotation-free plans; construction is included in first_ns. Other plans retain scalar/packed early rejection.

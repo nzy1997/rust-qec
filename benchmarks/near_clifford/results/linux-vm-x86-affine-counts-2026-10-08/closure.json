@@ -1,6 +1,6 @@
 {
   "events": 658,
-  "events_sha256": "8cd4296ec1d0f6000eb2a19f564a7cc908e0abfc189dad66cb96ff3b5af2fcb9",
+  "events_sha256": "4b04cd12c28cb907f77e4f337516154563fa2b01b31284dba96ce4bbc26dabc3",
   "sources_after": {
     "Cargo.lock": "9fb0df67ee4eb933f34a4f26e57771d51c5f9f938e767576a0148ef0f50fcac8",
     "Cargo.toml": "d4e6a06ab3606822d09e21790c8b60783f6f7c2875498e4cad251de086e31298",
@@ -126,40 +126,40 @@
     "rstim/src/unified_cli/mod.rs": "c125b1ae61062ae9b0b5e7fe8e8a21a28ea8e5665ac12fce7bbacfac7b58855e",
     "rstim/src/unified_cli/pipeline.rs": "d8a667b04959c0c1328a02ed5000a675616d239b17f3fb8f968d1bd8dc254262",
     "rstim/src/validation.rs": "5e03cedf550dcbd1b2a511e90fab6560308261b1b697d92fe9071567f20065d1",
+    "benchmarks/near_clifford/application_counts/manifest.json": "5bcbdbd9ff6b9ec79570fa7301ef460f7f4aba54754845af02f130b6691f2a3d",
+    "benchmarks/near_clifford/application_counts/common.py": "ca5abe55a4afa33ed67db57579c5e9c2cb2900a48b32e5540eccb92169275193",
+    "benchmarks/near_clifford/application_counts/main.rs": "1e39af46adbc03486590ea52d36465cf152bf016df9fdcbcd1612e44ce014898",
+    "benchmarks/near_clifford/application_counts/.gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
     "benchmarks/near_clifford/application_counts/worker.py": "bedf4b555b9711e447565ae850e518e78136cdfa432594300d9f4cae868f5f98",
-    "benchmarks/near_clifford/application_counts/Cargo.toml": "3c9898819656df7d99dee296cd073ff3645b4091e1af8e8eac089a3773e1cb1f",
     "benchmarks/near_clifford/application_counts/run.py": "f4d31cd7468ffa142c6c499825172eb55318d862850b1de3114d4dd2aa8f315f",
+    "benchmarks/near_clifford/application_counts/verify.py": "fd5f4e3ed5c2cc1e3525ebd237bdd53b931a6d220e2c7e93f895e5a91080e2de",
+    "benchmarks/near_clifford/application_counts/test_contract.py": "df569b96ae9eaff90a10f83580ac6e367fdfbcadd60429cb1a03f094a4aafde9",
+    "benchmarks/near_clifford/application_counts/Cargo.toml": "3c9898819656df7d99dee296cd073ff3645b4091e1af8e8eac089a3773e1cb1f",
     "benchmarks/near_clifford/application_counts/Cargo.lock": "2cea45defc0dd77661d9053d75cb133fb30a4f9bb8abb27ebd27d47e4fc06325",
     "benchmarks/near_clifford/application_counts/README.md": "bb411735280d9592178eaeb5324031fa4731c37494ec51bb3810d99ba7ffa0ae",
-    "benchmarks/near_clifford/application_counts/test_contract.py": "df569b96ae9eaff90a10f83580ac6e367fdfbcadd60429cb1a03f094a4aafde9",
-    "benchmarks/near_clifford/application_counts/common.py": "ca5abe55a4afa33ed67db57579c5e9c2cb2900a48b32e5540eccb92169275193",
-    "benchmarks/near_clifford/application_counts/.gitignore": "337613937fda3acd2ba7834aa3e1b1eacfe04c9cafb336dfd6dfb7b6827d8f3e",
-    "benchmarks/near_clifford/application_counts/manifest.json": "5bcbdbd9ff6b9ec79570fa7301ef460f7f4aba54754845af02f130b6691f2a3d",
-    "benchmarks/near_clifford/application_counts/main.rs": "1e39af46adbc03486590ea52d36465cf152bf016df9fdcbcd1612e44ce014898",
-    "benchmarks/near_clifford/application_counts/verify.py": "fd5f4e3ed5c2cc1e3525ebd237bdd53b931a6d220e2c7e93f895e5a91080e2de",
-    "benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
-    "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d7_r7_p1e-3.stim": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
-    "benchmarks/near_clifford/application_counts/fixtures/quantum_volume_q20_seed42.stim": "b9bbbe939ce4c1754b6bac936c04b2c4ce572657831fef6a7bc5c3054f81ce53",
     "benchmarks/near_clifford/application_counts/fixtures/distillation.stim": "188bd53c48dbc21f840fb297df6f41c61f5bad6a856bba621f00ff42078921c1",
     "benchmarks/near_clifford/application_counts/fixtures/coherent_d5_r5.stim": "54088bbd5f06b441596e414f9fa99d8eeaff8a4a1a862b911e0ad40092c5e549",
-    "benchmarks/near_clifford/application_counts/fixtures/coherent_d3_r1.stim": "9b439238478b15977829c1015ee47dfe401976b3882092d9560ba321fb0f510a",
-    "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
-    "benchmarks/near_clifford/application_counts/fixtures/LICENSE-Clifft-paper": "732c3e3adada5f0e13611858f277526076101e5b18318932c120fdda339565ea",
     "benchmarks/near_clifford/application_counts/fixtures/LICENSE-SOFT": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "benchmarks/near_clifford/application_counts/fixtures/quantum_volume_q20_seed42.stim": "b9bbbe939ce4c1754b6bac936c04b2c4ce572657831fef6a7bc5c3054f81ce53",
     "benchmarks/near_clifford/application_counts/fixtures/coherent_d3_r3.stim": "87d1308c83894e87c60aeb2dc31b74be89b3460a951929951f2c3ac92606827d",
-    "benchmarks/near_clifford/application_counts/fixtures/coherent_d5_r1.stim": "2707188abe8912f693fe4f910db8c4b6bd795c71a8fba38cc153da90ee5910b8",
+    "benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+    "benchmarks/near_clifford/application_counts/fixtures/LICENSE-Clifft-paper": "732c3e3adada5f0e13611858f277526076101e5b18318932c120fdda339565ea",
+    "benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
     "benchmarks/near_clifford/application_counts/fixtures/quantum_volume_q10_seed42.stim": "faf7fbf3bf4048c1c7a0f9954cc14160e74d48ebc8972b41cf3c6bc07c697f6a",
-    "benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
+    "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d7_r7_p1e-3.stim": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
+    "benchmarks/near_clifford/application_counts/fixtures/coherent_d5_r1.stim": "2707188abe8912f693fe4f910db8c4b6bd795c71a8fba38cc153da90ee5910b8",
+    "benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
+    "benchmarks/near_clifford/application_counts/fixtures/coherent_d3_r1.stim": "9b439238478b15977829c1015ee47dfe401976b3882092d9560ba321fb0f510a"
   },
   "binary_sha256": {
-    "near-clifford-application-counts": "80615baf34257396b05969576db8b07a114639e788b9513238626f377db61ce4",
-    "near-clifford-diagnostics": "4be00e6bb3b4bacec29ba6a93902bb90c37b0a5d63683e42c20ba700668102ad"
+    "near-clifford-application-counts": "6f0c817a79db598b21b643433e0d310b1b4199b57f8b72dc36f3c5044f5ee303",
+    "near-clifford-diagnostics": "e8db4a80cb944b9020f7273c0d055376053c71ca7f8b0a20a2bb3d74a46a45f6"
   },
   "environment_after": {
-    "packages_sha256": "3729dbdd0b123075ad5243f4fed11b06d598a623fc65e6aea5e9c69dc2750bf3",
+    "packages_sha256": "07e9cd59f9b73e08c50a7b5dda8bce141c1ee77cfa4d22fca0226a35c71e53c4",
     "symft_source_sha256": "c7e85d5510a95646750b1fc6407f84e1818d221a01a3ce67c06011d22e2f9b00",
     "symft_source_revision": "c89b98514a919240b8afa53a271e08d926d3c987",
-    "loaded_files_sha256": "8a7c4ff2f5565623a2c24179d72a6f57b3b9d647cebcf92992f2c38793e4214e"
+    "loaded_files_sha256": "9e99e1c89c8480e7a2b231e48dca1298217a7dac3536f6c08d59ef77fe0f2db7"
   },
-  "finished_utc": "2026-10-07T21:06:46.005041+00:00"
+  "finished_utc": "2026-10-07T21:20:11.889071+00:00"
 }
