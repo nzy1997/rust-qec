@@ -3,6 +3,8 @@
 The [verified comparison](analysis.md) measures the public compiled Rust native
 counts API against native Clifft and SymFT counts on the same shared, unpinned
 Apple M4. Measured source is `bb11a636b0c855ed7deb547d5dbdd2baff96b987`.
+The retained Git tag `benchmark-source/native-counts-2026-10-07` preserves that
+producer after squash merging; full-history CI checkout also fetches its tag.
 All 24 selected cells have finite correctness witnesses and complete timing;
 14 capability failures retain seven unsupported original circuits under both
 arithmetic policies. Original source text and licenses are retained unchanged.
