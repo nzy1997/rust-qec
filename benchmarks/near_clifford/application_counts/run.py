@@ -64,7 +64,10 @@ def main():
         peer_loaded_files=identities,symft_source_revision=peer_revision,symft_sources=peer_sources,
         environment_before=env,host=dict(platform=platform.platform(),machine=platform.machine(),cpus=os.cpu_count(),
             affinity=sorted(os.sched_getaffinity(0)) if hasattr(os,'sched_getaffinity') else None,load=os.getloadavg()),
-        compiler=subprocess.check_output(['rustc','-vV'],text=True),started_utc=datetime.now(timezone.utc).isoformat())
+        compiler=subprocess.check_output(['rustc','-vV'],text=True),
+        compiler_environment={key:os.environ.get(key) for key in
+            ['RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CC','CXX','CFLAGS','CXXFLAGS']},
+        started_utc=datetime.now(timezone.utc).isoformat())
     (out/'header.json').write_text(json.dumps(header,indent=2)+'\n')
     index=0
     def record(kind,**payload):

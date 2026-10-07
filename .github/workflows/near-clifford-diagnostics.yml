@@ -1,0 +1,52 @@
+name: Near-Clifford diagnostic evidence
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: near-clifford-diagnostics-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            benchmarks/near_clifford/diagnostics -> target
+            benchmarks/near_clifford/application_counts -> target
+      - name: Check isolated public-API probes
+        run: |
+          cargo fmt --manifest-path benchmarks/near_clifford/diagnostics/Cargo.toml --check
+          cargo fmt --manifest-path benchmarks/near_clifford/application_counts/Cargo.toml --check
+          cargo check --locked --manifest-path benchmarks/near_clifford/diagnostics/Cargo.toml
+          cargo check --locked --manifest-path benchmarks/near_clifford/application_counts/Cargo.toml
+      - name: Replay formal diagnostic evidence and source identities
+        run: |
+          for campaign in cache-lifetime boundary structure; do
+            evidence="benchmarks/near_clifford/results/apple-m4-diagnostics-${campaign}-2026-10-07"
+            python3 benchmarks/near_clifford/diagnostics/verify.py "$evidence" --git-sources
+            python3 -O benchmarks/near_clifford/diagnostics/verify.py "$evidence" --git-sources
+          done
+          evidence=benchmarks/near_clifford/results/apple-m4-application-counts-2026-10-07
+          python3 benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+          python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+      - name: Reject resealed evidence corruption
+        run: |
+          evidence=benchmarks/near_clifford/results/apple-m4-diagnostics-cache-lifetime-2026-10-07
+          python3 benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
+          python3 -O benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
+          evidence=benchmarks/near_clifford/results/apple-m4-application-counts-2026-10-07
+          python3 benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
+          python3 -O benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
