@@ -89,13 +89,85 @@ def main():
     def pre_harness_source(e,h):
         h['source_revision']=h['manifest']['baseline']
         h['sources']={key:value for key,value in h['sources'].items() if '/diagnostics/' not in key}
+    def wrong_declared_order(e,h):
+        v=next(v for v in e if v['kind']=='timing')
+        v['order']=v['order'][::-1]
+    def wrong_emission_order(e,h):
+        indices=[i for i,v in enumerate(e) if v['kind']=='timing'][:2]
+        a,b=indices;e[a],e[b]=e[b],e[a]
+    def pair_out_of_range(e,h):
+        v=copy.deepcopy(next(v for v in e if v['kind']=='timing'))
+        v['pair']=h['manifest']['pairs'];e.append(v)
+    def boolean_pair(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['pair']==0)
+        v['pair']=False
+    def unknown_timing_backend(e,h):
+        v=copy.deepcopy(next(v for v in e if v['kind']=='timing'))
+        v.update(backend='unknown',result={'status':'error'});e.append(v)
+    def unselected_timing(e,h):
+        v=copy.deepcopy(next(v for v in e if v['kind']=='timing'))
+        v.update(id=next(c['id'] for c in h['manifest']['cells'] if c['id'] not in h['manifest']['selected_cells']),
+                 result={'status':'error'});e.append(v)
+    def missing_cold(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')
+        del v['result']['cold']
+    def negative_cold_first(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')
+        v['result']['cold'][0]['first_ns']=-1
+    def negative_cold_prepare(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')
+        v['result']['cold'][0]['prepare_ns']=-1
+    def excessive_cold_reservation(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='rstim')
+        v['result']['cold'][0]['cache_reserved_bytes']=v['result']['cache_bytes']+1
+    def negative_peer_compile(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='symft')
+        v['result']['compile_ns']=-1
+    def truncated_peer_first(e,h):
+        v=next(v for v in e if v['kind']=='timing' and v['backend']=='symft')
+        v['result']['first_ns'].pop()
+    def wrong_lifetime_emission(e,h):
+        indices=[i for i,v in enumerate(e) if v['kind'] in ['lifetime','peer-lifetime']][:2]
+        a,b=indices;e[a],e[b]=e[b],e[a]
+    def failed_lifetime_envelope(e,h):
+        v=copy.deepcopy(next(v for v in e if v['kind']=='lifetime'))
+        v.update(id='msc5/lifetime/unknown/c0/strict',result={'status':'error'});e.append(v)
+    def negative_lifetime_compile(e,h):
+        v=next(v for v in e if v['kind']=='lifetime')
+        row=v['result']['histories'][0]
+        row['compile_ns']=-1
+        row['phase_sum_ns']=row['compile_ns']+row['prepare_ns']+row['sampling_ns']
+    def negative_lifetime_prepare(e,h):
+        v=next(v for v in e if v['kind']=='lifetime')
+        row=v['result']['histories'][0]
+        row['prepare_ns']=-1
+        row['phase_sum_ns']=row['compile_ns']+row['prepare_ns']+row['sampling_ns']
+    def excessive_lifetime_reservation(e,h):
+        v=next(v for v in e if v['kind']=='lifetime')
+        v['result']['histories'][0]['calls'][0]['reserved_before']=v['result']['cache_bytes']+1
+    def excessive_lifetime_top_reservation(e,h):
+        v=next(v for v in e if v['kind']=='lifetime')
+        v['result']['cache_reserved_bytes']=v['result']['cache_bytes']+1
+    def negative_peer_lifetime_compile(e,h):
+        v=next(v for v in e if v['kind']=='peer-lifetime')
+        row=v['result']['histories'][0]
+        row['compile_ns']=-1
+        row['phase_sum_ns']=row['compile_ns']+row['prepare_ns']+row['sampling_ns']
     mutations=[missing_timing,changed_timing,missing_mask,wrong_policy,changed_input,
                dropped_cell,forged_import,truncated_warm,wrong_batch,missing_tuning,
                empty_sources,forged_environment,optional_identity,pre_harness_source,
-               wrong_peer_executor,wrong_tuning_executor]
+               wrong_peer_executor,wrong_tuning_executor,wrong_declared_order,wrong_emission_order,
+               pair_out_of_range,boolean_pair,unknown_timing_backend,
+               missing_cold,negative_cold_first,negative_cold_prepare,excessive_cold_reservation,
+               negative_peer_compile,truncated_peer_first]
+    if any(c['id'] not in header['manifest']['selected_cells'] for c in header['manifest']['cells']):
+        mutations.append(unselected_timing)
     if any(v['kind']=='lifetime' for v in events):
         mutations += [wrong_lifetime,missing_peer_lifetime,empty_peer_calls,empty_lifetime_digest,
-                      duplicate_lifetime,duplicate_lifecycle_witness]
+                      duplicate_lifetime,duplicate_lifecycle_witness,wrong_lifetime_emission,
+                      failed_lifetime_envelope,negative_lifetime_compile,negative_lifetime_prepare,
+                      excessive_lifetime_reservation,excessive_lifetime_top_reservation,
+                      negative_peer_lifetime_compile]
     def missing_helper_inventory(e,h):
         del h['sources']['benchmarks/near_clifford/evidence_io.py']
     if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
