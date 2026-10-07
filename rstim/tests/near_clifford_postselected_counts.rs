@@ -25,6 +25,40 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
+    let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        for seed in [1739, 583] {
+            let mut cached = plan.prepare_sampler().unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let initial = cached.coefficient_cache_reserved_bytes();
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            for shots in [1, 63, 64, 65, 129, 1024, 64] {
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                assert_eq!(
+                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                    count_records(&expected, 7)
+                );
+                let expected = scalar.sample_measurements_u8(17, &mut b).unwrap();
+                assert_eq!(cached.sample_measurements_u8(17, &mut a).unwrap(), expected);
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+            assert!(cached.coefficient_cache_reserved_bytes() > initial);
+        }
+    }
+}
+
+#[test]
 fn raw_postselection_folds_annotations_without_reference_normalization() {
     // The deterministic raw one must be rejected despite its zero normalized value.
     let plan = CompiledNearCliffordExecutor::compile_text(
