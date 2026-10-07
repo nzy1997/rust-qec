@@ -96,13 +96,17 @@ def main():
     if any(v['kind']=='lifetime' for v in events):
         mutations += [wrong_lifetime,missing_peer_lifetime,empty_peer_calls,empty_lifetime_digest,
                       duplicate_lifetime,duplicate_lifecycle_witness]
+    def missing_helper_inventory(e,h):
+        del h['sources']['benchmarks/near_clifford/evidence_io.py']
+    if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
+        mutations.append(missing_helper_inventory)
     for mutate in mutations:
         with tempfile.TemporaryDirectory() as temporary:
             out=Path(temporary)
             shutil.copytree(source/'circuits',out/'circuits')
             e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure)
             mutate(e,h)
-            if mutate in [empty_sources,pre_harness_source]: c['sources_after']=h['sources']
+            if mutate in [empty_sources,pre_harness_source,missing_helper_inventory]: c['sources_after']=h['sources']
             for index,v in enumerate(e): v['index']=index
             data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()
             c.update(events=len(e),events_sha256=hashlib.sha256(data).hexdigest())
