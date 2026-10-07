@@ -149,6 +149,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         if peer_event and ('measurements' in result or 'warm_ns' in result or result.get('status')=='ok'):
             require('loaded_files' in result and result.get('isolated') is True,
                     'successful peer payload missing import identity/isolation')
+            require(result.get('backend')==event['backend'],'peer executor differs from event backend')
         if 'input_sha256' in result:
             name=event['id'].split('/')[0]
             if kind.startswith('lifetime') or kind=='peer-lifetime': name='msc5'
@@ -166,6 +167,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         elif kind=='lifetime-tuning':
             name=event['id']
             require(name in manifest['histories'],'unknown lifetime tuning history')
+            require((name,event['backend']) not in lifetime_tuning,'duplicate lifecycle tuning')
             require(event['selection_shots']==max(v['shots'] for v in manifest['histories'][name]),
                     'wrong lifetime tuning shot size')
             lifetime_tuning[(name,event['backend'])]=selected_trial(event,header)
@@ -232,6 +234,7 @@ def validate(out,git_sources=False,allow_smoke=False):
                     'unknown lifecycle validation call')
             if kind=='lifetime-peer-validation':
                 key=(name,*requested,event['backend'])
+                require(key not in lifetime_peer_validation,'duplicate lifecycle peer witness')
                 require(result.get('batch')==lifetime_tuning[(name,event['backend'])],
                         'lifetime witness batch differs from frozen tuning')
                 lifetime_peer_validation[key]=expand(result)
@@ -242,6 +245,8 @@ def validate(out,git_sources=False,allow_smoke=False):
                         'lifetime witness configuration mismatch')
                 raw=expand(result)
                 require(raw['shots']>=8192,'insufficient lifecycle validation samples')
+                require((name,*requested,policy,budget) not in lifetime_rust_validation,
+                        'duplicate lifecycle Rust witness')
                 lifetime_rust_validation[(name,*requested,policy,budget)]=raw
         elif kind in ('lifetime','peer-lifetime'):
             require(type(event['pair']) is int and 0<=event['pair']<manifest['pairs'],'lifecycle pair out of range')
