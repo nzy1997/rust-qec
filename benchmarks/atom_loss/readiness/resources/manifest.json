@@ -1,8 +1,8 @@
 {
   "schema_version": "rustqec.envelope-resources-manifest.v1",
   "generated_by": "python3 -m benchmarks.atom_loss.readiness_resources --profile full",
-  "generated_at": "2026-10-05T08:59:47Z",
-  "checkout_revision": "941faa798553458c333aaba6537ad8aa1c660f7d",
+  "generated_at": "2026-10-07T00:33:18Z",
+  "checkout_revision": "e514459851a3873eb6f4d93293ffef875cb4f19c",
   "source_inputs": {
     "Cargo.lock": {
       "mode": "100644",
@@ -494,7 +494,31 @@
     },
     "rstim/src/near_clifford.rs": {
       "mode": "100644",
-      "git_blob": "e357125dcae25677dadcbf9a7a5bb3855a49df0a"
+      "git_blob": "83e349b0a38b9e1539f70d1ed704e401348edb14"
+    },
+    "rstim/src/near_clifford/coherent_packet.rs": {
+      "mode": "100644",
+      "git_blob": "d93b56a091f9e671db5c4f769ec47965441314b6"
+    },
+    "rstim/src/near_clifford/compile_frame.rs": {
+      "mode": "100644",
+      "git_blob": "cf5ac0fde9b3a002828666d2bf3022547713d286"
+    },
+    "rstim/src/near_clifford/compiled.rs": {
+      "mode": "100644",
+      "git_blob": "0cc5ae22da78df2d058fb769ce85b06b63699811"
+    },
+    "rstim/src/near_clifford/independent_packet.rs": {
+      "mode": "100644",
+      "git_blob": "eb253a61ef93b71365509e53e74a8d796f7006c2"
+    },
+    "rstim/src/near_clifford/random_event_runs.rs": {
+      "mode": "100644",
+      "git_blob": "9dd18128b237a1f8654e5e12cabe15b58e1c4aeb"
+    },
+    "rstim/src/near_clifford/scalar_basis.rs": {
+      "mode": "100644",
+      "git_blob": "3db00204dfe66fd4871d1fb3a93c5de017f4ec43"
     },
     "rstim/src/operations.rs": {
       "mode": "100644",
@@ -754,15 +778,15 @@
     }
   },
   "machine": {
-    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "platform": "macOS-27.0.1-arm64-arm-64bit",
     "machine": "arm64",
-    "python": "3.14.7",
+    "python": "3.12.13",
     "cpu_count": 10,
     "memory_bytes": 34359738368
   },
   "build": {
-    "path": "/private/tmp/rstim-refinements-resource-20261004/target/release/rstim",
-    "sha256": "d17402ba180c849cc1d6d566cbe3168008abbeb7cd9c56248c5a4068c5c611da",
+    "path": "/Users/nzy/.codex/worktrees/near-clifford-sota/rstim/target/release/rstim",
+    "sha256": "6236b2829a94d547bdd06370019b61c18f3bfabd0eca6461d86b44f0a8c87489",
     "version": "rstim 0.3.0",
     "advertised_decoders": [
       "envelope-matching",
@@ -782,7 +806,7 @@
       "peak_rss_bytes": 4294967296
     }
   },
-  "total_wall_seconds": 91.94474149995949,
+  "total_wall_seconds": 58.23865066701546,
   "cases": [
     {
       "id": "matching-d3r2-p002-b1024",
@@ -793,11 +817,11 @@
       "seed": 715247,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.018974500009790063,
-      "compile_seconds": 0.002245792,
-      "decode_seconds": 0.004515625,
+      "wall_seconds": 0.008589584031142294,
+      "compile_seconds": 0.00117025,
+      "decode_seconds": 0.001925834,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 8552448,
+      "peak_rss_watermark_bytes": 8503296,
       "observed_pattern_count": 49,
       "cache": {
         "builds": 49,
@@ -806,7 +830,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p002-b1024.json",
-      "raw_sha256": "cffa872693ac232f36e540470da0db7cc224772d27284dd7e6e1873be8e286da",
+      "raw_sha256": "3c3a2a6928e34258f3d1413753da50fa724b9aa58d00582711ef9b0323caa8f7",
       "output_rule_problems": []
     },
     {
@@ -818,11 +842,11 @@
       "seed": 715652,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.03719179204199463,
-      "compile_seconds": 0.0011135,
-      "decode_seconds": 0.025413625,
+      "wall_seconds": 0.0277964579872787,
+      "compile_seconds": 0.001060083,
+      "decode_seconds": 0.019919958,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 14057472,
+      "peak_rss_watermark_bytes": 14483456,
       "observed_pattern_count": 245,
       "cache": {
         "builds": 245,
@@ -831,7 +855,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p002-b16384.json",
-      "raw_sha256": "a92037d04e1f1819de1b92345d0d4106551bc6ee425ef6c4a2c54c7cb22da347",
+      "raw_sha256": "322ca5d950466428ee4d321554f37f1e48d43596e539719778507b086a4e879f",
       "output_rule_problems": []
     },
     {
@@ -843,11 +867,11 @@
       "seed": 715951,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.10655770800076425,
-      "compile_seconds": 0.001952125,
-      "decode_seconds": 0.092800417,
+      "wall_seconds": 0.07309862494003028,
+      "compile_seconds": 0.001027958,
+      "decode_seconds": 0.064989125,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 18759680,
+      "peak_rss_watermark_bytes": 18677760,
       "observed_pattern_count": 433,
       "cache": {
         "builds": 433,
@@ -856,7 +880,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p002-b65536.json",
-      "raw_sha256": "78a6d6f968fe0b95daad495cf02ad6519a525e7f920d30a1ad9483a42a4262a4",
+      "raw_sha256": "d0b554c5af0740fbb8a56b0f320a9b25985c579d29a363054ee60889df0a7eeb",
       "output_rule_problems": []
     },
     {
@@ -868,11 +892,11 @@
       "seed": 715427,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.0316092919674702,
-      "compile_seconds": 0.001936375,
-      "decode_seconds": 0.019966334,
+      "wall_seconds": 0.0211309160804376,
+      "compile_seconds": 0.001034292,
+      "decode_seconds": 0.013743417,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 24166400,
+      "peak_rss_watermark_bytes": 24002560,
       "observed_pattern_count": 598,
       "cache": {
         "builds": 598,
@@ -881,7 +905,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p020-b1024.json",
-      "raw_sha256": "1770a28d008ac5b45176f53e73e534a1dfcd854db7f47c9a174eef2edc8330ae",
+      "raw_sha256": "22893382563dedb1c693b23b3de37b2154d86a27f9e118beff9a07522f2baab1",
       "output_rule_problems": []
     },
     {
@@ -893,11 +917,11 @@
       "seed": 715832,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.3164933750522323,
-      "compile_seconds": 0.001952875,
-      "decode_seconds": 0.301556209,
+      "wall_seconds": 0.21019670902751386,
+      "compile_seconds": 0.001074792,
+      "decode_seconds": 0.200183834,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44089344,
+      "peak_rss_watermark_bytes": 44843008,
       "observed_pattern_count": 4684,
       "cache": {
         "builds": 7219,
@@ -906,7 +930,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p020-b16384.json",
-      "raw_sha256": "3528bd860a6a4a80cdc4053712d0c0c04cbaf42bd785c8918be988b9f9ae9f90",
+      "raw_sha256": "16040ad422625c8829e90e68cf5e034914c141906e560fbd5f708aa8a72be20e",
       "output_rule_problems": []
     },
     {
@@ -918,11 +942,11 @@
       "seed": 716131,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 1.159888249996584,
-      "compile_seconds": 0.002000709,
-      "decode_seconds": 1.1390425,
+      "wall_seconds": 0.691567707923241,
+      "compile_seconds": 0.001067875,
+      "decode_seconds": 0.681356625,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44187648,
+      "peak_rss_watermark_bytes": 44859392,
       "observed_pattern_count": 11669,
       "cache": {
         "builds": 28107,
@@ -931,7 +955,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p020-b65536.json",
-      "raw_sha256": "f0a4c8f2176036c20ba0af6548e9ada50961f979466556c2a790fd28571aa752",
+      "raw_sha256": "9bbe84b96c84f752b06a1efc93fa634f635fe3536f82510c5b8b50c211a73e16",
       "output_rule_problems": []
     },
     {
@@ -943,11 +967,11 @@
       "seed": 716227,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.05285583401564509,
-      "compile_seconds": 0.00106425,
-      "decode_seconds": 0.037359792,
+      "wall_seconds": 0.03828420804347843,
+      "compile_seconds": 0.001020625,
+      "decode_seconds": 0.029138167,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 44187648,
+      "peak_rss_watermark_bytes": 44859392,
       "observed_pattern_count": 1024,
       "cache": {
         "builds": 1024,
@@ -956,7 +980,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/matching-d3r2-p100-b1024.json",
-      "raw_sha256": "ad44263e38e57fd9ff0fb7da6c7235dbdc6b856f618bc94b6093f53b00e9883d",
+      "raw_sha256": "476f4b788272ea2b5093bef055c3bf0ed554b339c78df67dc2102054d649e789",
       "output_rule_problems": []
     },
     {
@@ -968,11 +992,11 @@
       "seed": 716632,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.6593343339627609,
-      "compile_seconds": 0.002372917,
-      "decode_seconds": 0.643862709,
+      "wall_seconds": 0.46889458398800343,
+      "compile_seconds": 0.001062625,
+      "decode_seconds": 0.45917375,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 45678592,
+      "peak_rss_watermark_bytes": 46694400,
       "observed_pattern_count": 16244,
       "cache": {
         "builds": 16381,
@@ -981,7 +1005,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r2-p100-b16384.json",
-      "raw_sha256": "ea520dea68ce795473ec749575157d2de6dd50e1cd0fb98211a9c18b617c4db4",
+      "raw_sha256": "f8d92bba6eca925f905d9261855c2ec485bf2f26211a1cd463f5097587108561",
       "output_rule_problems": []
     },
     {
@@ -993,11 +1017,11 @@
       "seed": 716931,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 2.9165242909803055,
-      "compile_seconds": 0.002012292,
-      "decode_seconds": 2.893059083,
+      "wall_seconds": 1.8499472079565749,
+      "compile_seconds": 0.001029,
+      "decode_seconds": 1.839561125,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 46235648,
+      "peak_rss_watermark_bytes": 46743552,
       "observed_pattern_count": 65536,
       "cache": {
         "builds": 65519,
@@ -1006,7 +1030,7 @@
       },
       "completed_shots": 65536,
       "raw": "raw/matching-d3r2-p100-b65536.json",
-      "raw_sha256": "0c1334722c91ee08709576aa2b9e7cfcf49fd0c815f4719d074ee37ace7fa11f",
+      "raw_sha256": "8f0864adf6d50c78062fe5db38902e150e39452cbadc4d6f02c4d8f99b220455",
       "output_rule_problems": []
     },
     {
@@ -1018,11 +1042,11 @@
       "seed": 715301,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.8965280419797637,
-      "compile_seconds": 0.003007625,
-      "decode_seconds": 0.873783,
+      "wall_seconds": 0.5612422080012038,
+      "compile_seconds": 0.001572458,
+      "decode_seconds": 0.548017792,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 101482496,
+      "peak_rss_watermark_bytes": 72269824,
       "observed_pattern_count": 9059,
       "cache": {
         "builds": 12326,
@@ -1031,7 +1055,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d3r3-p020-b16384.json",
-      "raw_sha256": "dd70049444ab828f46840e25576462287776657d16d3b597b329a90988935c24",
+      "raw_sha256": "b79e6a1326fe15522df56636054884d02f8eaf1f80132cfd84bbbad30c9d1feb",
       "output_rule_problems": []
     },
     {
@@ -1043,11 +1067,11 @@
       "seed": 715302,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 3.712744583026506,
-      "compile_seconds": 0.0071955,
-      "decode_seconds": 3.673081459,
+      "wall_seconds": 2.4385239999974146,
+      "compile_seconds": 0.0044605,
+      "decode_seconds": 2.411254334,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": 16314,
       "cache": {
         "builds": 16384,
@@ -1056,7 +1080,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/matching-d5r3-p020-b16384.json",
-      "raw_sha256": "c493e52fbb2399f4a9cbd9dda6c25e181bdaaf6f9f857a2fe9fd384785b0b2d1",
+      "raw_sha256": "9b18936cb2f6e11f0c378595131a23d4abe62376d909c5c62ce2ff82a17cdeb1",
       "output_rule_problems": []
     },
     {
@@ -1068,11 +1092,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 0.0365070829866454,
-      "compile_seconds": 0.000496583,
-      "decode_seconds": 0.023027209,
+      "wall_seconds": 0.016728084068745375,
+      "compile_seconds": 0.000250125,
+      "decode_seconds": 0.009656417,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -1081,7 +1105,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/matching-eviction-wires24.json",
-      "raw_sha256": "5376a99886fd56e165169c61d3982645358e1fa46ec9772c3c2b96f2c57be404",
+      "raw_sha256": "8d2a94191da41b8d9aab66221e8f9dece511bcfcb6635b1786c50c32e538129a",
       "output_rule_problems": []
     },
     {
@@ -1093,11 +1117,11 @@
       "seed": 715401,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 3.6632363329990767,
-      "compile_seconds": 0.00630775,
-      "decode_seconds": 3.6440910840000003,
+      "wall_seconds": 2.2339811669662595,
+      "compile_seconds": 0.00252525,
+      "decode_seconds": 2.2250636249999998,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": 45,
       "cache": {
         "builds": 45,
@@ -1106,7 +1130,7 @@
       },
       "completed_shots": 1024,
       "raw": "raw/mle-d3r2-p002-b1024.json",
-      "raw_sha256": "0748cd18211520e46160fb852bf784756e3965e6dc91f2d5eb66e7d11e09224b",
+      "raw_sha256": "bafefe9a08351a3e906d9537ba21900e81d56c04d9a249823ab366178ebdf7f8",
       "output_rule_problems": []
     },
     {
@@ -1118,11 +1142,11 @@
       "seed": 715402,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 58.607166666013654,
-      "compile_seconds": 0.0049985,
-      "decode_seconds": 58.589030917,
+      "wall_seconds": 36.15952829190064,
+      "compile_seconds": 0.00249075,
+      "decode_seconds": 36.148345542,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": 267,
       "cache": {
         "builds": 267,
@@ -1131,7 +1155,7 @@
       },
       "completed_shots": 16384,
       "raw": "raw/mle-d3r2-p002-b16384.json",
-      "raw_sha256": "e897f9698d6ecc1746fbf1147ce526f32fba17dc36e40ebf0c9cda2ac3e5a79a",
+      "raw_sha256": "8e3b0f066df2510f0be069a10afcb012b059862715e8b7b564cfbaecf3b6d61d",
       "output_rule_problems": []
     },
     {
@@ -1143,11 +1167,11 @@
       "seed": null,
       "exit_code": 0,
       "error_code": null,
-      "wall_seconds": 1.4583431669743732,
-      "compile_seconds": 0.000687292,
-      "decode_seconds": 1.43205075,
+      "wall_seconds": 0.9331844159169123,
+      "compile_seconds": 0.000277583,
+      "decode_seconds": 0.917419959,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": 1401,
       "cache": {
         "builds": 1402,
@@ -1156,7 +1180,7 @@
       },
       "completed_shots": 1601,
       "raw": "raw/mle-eviction-wires24.json",
-      "raw_sha256": "1a0d288c137874266904ce9ca95545a2939355bd47a128e7910ef0078ad947ea",
+      "raw_sha256": "c7d12ca323b125ee30c9eda1b2b29c1717fb8b5f208a62910a455da9a12dbb85",
       "output_rule_problems": []
     },
     {
@@ -1168,16 +1192,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "unsupported_circuit",
-      "wall_seconds": 0.24384933395776898,
+      "wall_seconds": 0.1673597500193864,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-candidate-limit.json",
-      "raw_sha256": "79860dd9007e4543e4e3c79591fb4ae8545fa2d2be8fbb5f95ef9f5c80d742e1",
+      "raw_sha256": "654e62bbbdbb03b465f1ca176e57740d35918dcda4a536574ee3b4543545bfeb",
       "output_rule_problems": []
     },
     {
@@ -1189,16 +1213,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_timeout",
-      "wall_seconds": 0.008091584022622555,
-      "compile_seconds": 0.000128458,
+      "wall_seconds": 0.00540216697845608,
+      "compile_seconds": 0.000112625,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-solve-timeout.json",
-      "raw_sha256": "8dbb9784beaa1833f0d351e76ac49bbb4f9d363ebd27cdb86dc57607f33aadd1",
+      "raw_sha256": "0777a9b055b9a2be54ee0f9f059a010fce604809b6596a414cfb4c60cccc22b2",
       "output_rule_problems": []
     },
     {
@@ -1210,16 +1234,16 @@
       "seed": null,
       "exit_code": 3,
       "error_code": "decode_infeasible",
-      "wall_seconds": 0.014236499962862581,
-      "compile_seconds": 0.000119292,
+      "wall_seconds": 0.005048749968409538,
+      "compile_seconds": 0.000102791,
       "decode_seconds": null,
       "stats_written": true,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-mle-infeasible.json",
-      "raw_sha256": "3e152db4d658fffb5eb9ae722a149b132610318612f32c2ce09e52e635f0722d",
+      "raw_sha256": "8fe9131e947afb0de53214871122dcaa3f806bd917166ed42b8e161e48c34b38",
       "output_rule_problems": []
     },
     {
@@ -1231,16 +1255,16 @@
       "seed": null,
       "exit_code": 2,
       "error_code": "output_error",
-      "wall_seconds": 0.005991749989334494,
+      "wall_seconds": 0.0038868330884724855,
       "compile_seconds": null,
       "decode_seconds": null,
       "stats_written": false,
-      "peak_rss_watermark_bytes": 259391488,
+      "peak_rss_watermark_bytes": 212205568,
       "observed_pattern_count": null,
       "cache": null,
       "completed_shots": 0,
       "raw": "raw/fail-stale-output-overwrite.json",
-      "raw_sha256": "136dbdd6c8b93dc356678435282834b76697979b9fc9205e1e1946f53c9a79f7",
+      "raw_sha256": "001aad4ac1199446d40cb236c1ce9c1b2a3ba3e4ddda01242aeb17313670f112",
       "output_rule_problems": []
     }
   ],
