@@ -1,0 +1,92 @@
+{
+  "source_revision": "e514459851a3873eb6f4d93293ffef875cb4f19c",
+  "scope": "Apple M4 fp64 CPU, full raw records, identical native input",
+  "host_conditions": "Shared host; unrelated jobs remain running. No idle, exclusive-host, pinned-core, GPU or x86 claim.",
+  "before": {
+    "utc": "2026-10-07T00:17:23.584942+00:00",
+    "cpu": "Apple M4",
+    "logical_cpus": 10,
+    "memory_bytes": 34359738368,
+    "load_average": [
+      8.4013671875,
+      17.1083984375,
+      20.6953125
+    ],
+    "busy_processes": [
+      {
+        "executable": "lean",
+        "cpu_percent": 100.0
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 100.0
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 100.0
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 100.0
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 98.5
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 100.0
+      }
+    ],
+    "thermal_status": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded",
+    "compiler_overrides": {
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_DIR": null
+    }
+  },
+  "after": {
+    "utc": "2026-10-07T00:21:40.496392+00:00",
+    "cpu": "Apple M4",
+    "logical_cpus": 10,
+    "memory_bytes": 34359738368,
+    "load_average": [
+      6.87841796875,
+      11.30810546875,
+      17.17236328125
+    ],
+    "busy_processes": [
+      {
+        "executable": "Ce",
+        "cpu_percent": 98.7
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 99.2
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 98.7
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 98.7
+      },
+      {
+        "executable": "proje",
+        "cpu_percent": 99.8
+      }
+    ],
+    "thermal_status": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded",
+    "compiler_overrides": {
+      "RUSTFLAGS": null,
+      "CARGO_ENCODED_RUSTFLAGS": null,
+      "RUSTC_WRAPPER": null,
+      "RUSTC_WORKSPACE_WRAPPER": null,
+      "CARGO_TARGET_DIR": null
+    }
+  },
+  "exit_code": 0
+}
