@@ -1,5 +1,5 @@
 //! Original-circuit raw postselection with structured or native Rust counts.
-//! Both Rust routes retain all random events; neither performs early rejection.
+//! Both routes retain all draws; native scalar/fallback rows skip rejected physics.
 use rand::{RngCore, SeedableRng, rngs::SmallRng};
 use rstim::near_clifford::{
     CompiledNearCliffordExecutor, CompiledRotationArithmetic, NearCliffordShot,
