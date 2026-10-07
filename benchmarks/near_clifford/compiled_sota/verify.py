@@ -10,7 +10,7 @@ import statistics
 import subprocess
 from evidence import expand, parity_counts
 from projection import records_only, physical_width
-from run import BACKENDS, BATCHES, HERE, ROOT, RSTIM_API, batches, bind_peer, default_batch, environment_summary, harness_inventory, masks, report, sha
+from run import BACKENDS, BATCHES, HERE, ROOT, RSTIM_API, RSTIM_ROTATION_ARITHMETIC, batches, bind_arithmetic, bind_peer, default_batch, environment_summary, harness_inventory, masks, report, sha
 
 
 def require(condition, message):
@@ -32,6 +32,7 @@ def close(a, b):
 
 def compiled_configuration(raw):
     require(raw['backend'] == 'rstim' and raw['api'] == RSTIM_API, 'compiled API identity')
+    bind_arithmetic(raw)
     require(raw['rng'] == 'SmallRng/rand-0.8.7', 'compiled RNG identity')
     require(integer(raw['peak_active_rank']) and raw['peak_active_rank'] <= 16, 'compiled rank')
     require(integer(raw['cache_reserved_bytes']) and raw['cache_reserved_bytes'] <= 64*1024*1024,
@@ -89,9 +90,11 @@ def transcript(encoded, backend, shots, width, call_shots, expected_hash, input_
 
 def validate(result, allow_subset=False, git_sources=False, artifacts=None):
     manifest = json.loads((HERE/'manifest.json').read_text())
-    require(manifest['schema'] == 'rstim.near-clifford-compiled-sota.v1' and
+    require(manifest['schema'] == 'rstim.near-clifford-compiled-sota.v2' and
         manifest['rstim_api'] == RSTIM_API, 'compiled manifest')
-    require(result['schema'] == 'rstim.near-clifford-compiled-sota-results.v1', 'schema')
+    require(manifest['rotation_arithmetic'] == RSTIM_ROTATION_ARITHMETIC, 'compiled manifest arithmetic')
+    require(result['schema'] == 'rstim.near-clifford-compiled-sota-results.v2', 'schema')
+    require(result['rotation_arithmetic'] == RSTIM_ROTATION_ARITHMETIC, 'compiled result arithmetic')
     require(result['rstim_api'] == RSTIM_API and result['input_contract'] ==
         'identical native records_only circuit for every backend', 'compiled result contract')
     require(type(result['subset']) is bool and (allow_subset or not result['subset']), 'subset is not publication evidence')

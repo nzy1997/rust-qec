@@ -9,11 +9,19 @@ use coherent_packet::CoherentPacket;
 #[path = "random_event_runs.rs"]
 mod random_event_runs;
 use random_event_runs::RandomRunPlan;
+#[path = "independent_packet.rs"]
+mod independent_packet;
+use independent_packet::IndependentPacket;
+#[path = "scalar_basis.rs"]
+mod scalar_basis;
+use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
 
 const PLAN_BYTE_BUDGET: usize = 64 * 1024 * 1024;
 const COEFFICIENT_BYTE_BUDGET: usize = 64 * 1024 * 1024;
 const DEFAULT_CACHE_BYTE_BUDGET: usize = 64 * 1024 * 1024;
 const PACKET_BYTE_BUDGET: usize = 16 * 1024 * 1024;
+// Conservative admission floor: noisy application scouts cover 128 or more events.
+const MIN_SCALAR_PREPARED_NOISE_EVENTS: usize = 128;
 
 #[derive(Clone, Copy, Debug)]
 enum RandomKind {
@@ -48,6 +56,8 @@ struct RowRandom<'a, R> {
     bit_word: u64,
     bits_left: u8,
     noise_probability: u64,
+    // Zero is an uninitialized sentinel: every valid sparse log(1-p) is finite and negative.
+    noise_log_failure: f64,
     noise_skip: Option<usize>,
 }
 impl<'a, R: Rng> RowRandom<'a, R> {
@@ -59,6 +69,7 @@ impl<'a, R: Rng> RowRandom<'a, R> {
             bit_word: 0,
             bits_left: 0,
             noise_probability: 0,
+            noise_log_failure: 0.,
             noise_skip: None,
         }
     }
@@ -97,10 +108,16 @@ impl<'a, R: Rng> RowRandom<'a, R> {
                     if self.noise_probability != probability.to_bits() {
                         self.noise_skip = None;
                         self.noise_probability = probability.to_bits();
+                        self.noise_log_failure = 0.;
                     }
                     let skip = self.noise_skip.get_or_insert_with(|| {
                         let u = self.rng.r#gen::<f64>();
-                        ((-u).ln_1p() / (-probability).ln_1p()).floor() as usize
+                        // Cache only the deterministic denominator. Draw expression,
+                        // typed uniform and exact no-prefetch boundaries are unchanged.
+                        if self.noise_log_failure == 0. {
+                            self.noise_log_failure = (-probability).ln_1p();
+                        }
+                        ((-u).ln_1p() / self.noise_log_failure).floor() as usize
                     });
                     if *skip != 0 {
                         *skip -= 1;
@@ -341,34 +358,33 @@ impl BasisGate {
             }
         }
     }
+    #[inline(always)]
     fn conjugate(self, x: &mut [u64], z: &mut [u64]) {
         match self {
             Self::H(q) => {
-                if get(x, q) != get(z, q) {
-                    flip(x, q);
-                    flip(z, q);
-                }
+                let word = q / 64;
+                let mask = 1u64 << (q % 64);
+                let changed = (x[word] ^ z[word]) & mask;
+                x[word] ^= changed;
+                z[word] ^= changed;
             }
             Self::S(q) => {
-                if get(x, q) {
-                    flip(z, q);
-                }
+                let word = q / 64;
+                z[word] ^= x[word] & (1u64 << (q % 64));
             }
             Self::CX(a, b) => {
-                if get(x, a) {
-                    flip(x, b);
-                }
-                if get(z, b) {
-                    flip(z, a);
-                }
+                let (aw, ab) = (a / 64, a % 64);
+                let (bw, bb) = (b / 64, b % 64);
+                let target_x = ((x[aw] >> ab) & 1) << bb;
+                let control_z = ((z[bw] >> bb) & 1) << ab;
+                x[bw] ^= target_x;
+                z[aw] ^= control_z;
             }
             Self::CZ(a, b) => {
-                if get(x, a) {
-                    flip(z, b);
-                }
-                if get(x, b) {
-                    flip(z, a);
-                }
+                let (aw, ab) = (a / 64, a % 64);
+                let (bw, bb) = (b / 64, b % 64);
+                z[aw] ^= ((x[bw] >> bb) & 1) << ab;
+                z[bw] ^= ((x[aw] >> ab) & 1) << bb;
             }
         }
     }
@@ -719,8 +735,10 @@ fn schedule_measurements(tape: &mut [TapeOp], reserved_bytes: &mut usize) -> Res
     // Q^a Pi_a E = phase (E Q^c) Q^b Pi_b, c=[E,P], b=a xor c.
     // The moved instrument uses its early ideal b, and the deferred noise XORs
     // c into the reported record (after independent inversion/readout noise).
-    // Full P/Q commutation permits measurement exchange; feedback/annotations
-    // remain hard barriers while deferred noise restores original record labels.
+    // Full P/Q commutation also permits crossing feedback that reads only
+    // earlier records. Annotations read earlier records and have no quantum action.
+    // Only measurements move left: record producers cannot move past their readers,
+    // and deferred noise stays before every original reader of its corrected record.
     let reorder_measurements = true;
     let mut remaining = 4_000_000usize;
     for start in 0..tape.len() {
@@ -742,6 +760,8 @@ fn schedule_measurements(tape: &mut [TapeOp], reserved_bytes: &mut usize) -> Res
             let other_count = match &tape[position - 1] {
                 TapeOp::Noise { choices, .. } => choices.len().max(1),
                 TapeOp::Measure { reset: Some(_), .. } => 2,
+                TapeOp::Feedback { .. } => 2,
+                TapeOp::Annotation { offsets, .. } => offsets.len().max(1),
                 _ => 1,
             };
             let cost = pauli
@@ -825,7 +845,19 @@ fn schedule_measurements(tape: &mut [TapeOp], reserved_bytes: &mut usize) -> Res
                                 .all(|other| commute(p, other))
                         })
                 }
-                _ => false,
+                TapeOp::Feedback {
+                    condition,
+                    pauli: other,
+                } => {
+                    let reads_earlier_record = match condition {
+                        Condition::Record(index) => record.is_none_or(|output| *index < output),
+                        Condition::Sweep(_) => true,
+                    };
+                    reads_earlier_record && operators.clone().all(|p| commute(p, other))
+                }
+                TapeOp::Annotation { offsets, .. } => {
+                    record.is_none_or(|output| offsets.iter().all(|index| *index < output))
+                }
             };
             if !movable {
                 break;
@@ -835,6 +867,19 @@ fn schedule_measurements(tape: &mut [TapeOp], reserved_bytes: &mut usize) -> Res
         }
     }
     Ok(())
+}
+
+/// Arithmetic used by every compiled rotation, including the deterministic prefix.
+/// The policy is immutable for a plan and its coefficient caches. It does not change
+/// probability reduction order, projection arithmetic, or the typed RNG policy.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CompiledRotationArithmetic {
+    /// Preserve the original separately rounded multiply and add operations.
+    #[default]
+    Strict,
+    /// Round the partner product and addition together with explicit FP64 FMA.
+    /// Coefficient/CDF bits and sampled records may differ from Strict.
+    Fused,
 }
 
 /// Opt-in offline plan. Its own reproducible RNG policy is distinct from the
@@ -861,10 +906,13 @@ pub struct CompiledNearCliffordExecutor {
     measurement_count: usize,
     peak_active_rank: usize,
     prefix_len: usize,
+    rotation_arithmetic: CompiledRotationArithmetic,
     initial_coefficients: Arc<Vec<ComplexAmp>>,
     random_kinds: Vec<RandomKind>,
     random_runs: Option<RandomRunPlan>,
     noise_event_count: usize,
+    independent_event_count: usize,
+    scalar_basis: Option<Vec<Option<ScalarBasisProgram>>>,
 }
 struct Planner {
     state: CompileFrame,
@@ -1127,9 +1175,28 @@ impl Planner {
 
 impl CompiledNearCliffordExecutor {
     pub fn compile_text(text: &str) -> Result<Self, String> {
-        Self::compile_with_limit(crate::parser::parse_lines(text)?, 16)
+        Self::compile_text_with_arithmetic(text, CompiledRotationArithmetic::Strict)
+    }
+    /// Compile with one rotation policy for the prefix, scalar, and packet paths.
+    pub fn compile_text_with_arithmetic(
+        text: &str,
+        arithmetic: CompiledRotationArithmetic,
+    ) -> Result<Self, String> {
+        Self::compile_with_limit_and_arithmetic(crate::parser::parse_lines(text)?, 16, arithmetic)
     }
     pub fn compile_with_limit(instructions: Vec<StimInstr>, limit: usize) -> Result<Self, String> {
+        Self::compile_with_limit_and_arithmetic(
+            instructions,
+            limit,
+            CompiledRotationArithmetic::Strict,
+        )
+    }
+    /// Fused uses explicit mul_add only in rotations; other arithmetic stays strict.
+    pub fn compile_with_limit_and_arithmetic(
+        instructions: Vec<StimInstr>,
+        limit: usize,
+        arithmetic: CompiledRotationArithmetic,
+    ) -> Result<Self, String> {
         if limit >= usize::BITS as usize - 1 {
             return Err("compiled near-Clifford rank exceeds platform capacity".into());
         }
@@ -1163,10 +1230,13 @@ impl CompiledNearCliffordExecutor {
             measurement_count: incumbent.measurement_count,
             peak_active_rank: planner.peak,
             prefix_len: 0,
+            rotation_arithmetic: arithmetic,
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
             random_kinds: Vec::new(),
             random_runs: None,
             noise_event_count: 0,
+            independent_event_count: 0,
+            scalar_basis: None,
         };
         let mut filled = Vec::new();
         filled
@@ -1282,16 +1352,51 @@ impl CompiledNearCliffordExecutor {
                 }
             }
         }
+        plan.independent_event_count = plan
+            .random_kinds
+            .iter()
+            .filter(|kind| matches!(kind, RandomKind::Independent))
+            .count();
         plan.noise_event_count = plan
             .random_kinds
             .iter()
             .filter(|kind| matches!(kind, RandomKind::Noise { .. }))
             .count();
+        if let Some((programs, bytes)) = build_scalar_basis(
+            &plan.operations,
+            plan.num_qubits,
+            PLAN_BYTE_BUDGET.saturating_sub(planner.reserved_bytes),
+        ) {
+            planner.reserved_bytes += bytes;
+            plan.scalar_basis = Some(programs);
+        }
         plan.random_runs = RandomRunPlan::build(
             &plan.random_kinds,
             PLAN_BYTE_BUDGET.saturating_sub(planner.reserved_bytes),
         );
         Ok(plan)
+    }
+    // The packet and dense paths keep the original gates. Direct test-only
+    // Planner plans have no optional table and retain sequential execution.
+    #[inline(always)]
+    fn conjugate_scalar_basis(
+        &self,
+        node: usize,
+        gates: &[BasisGate],
+        x: &mut [u64],
+        z: &mut [u64],
+    ) {
+        if let Some(Some(program)) = self.scalar_basis.as_ref().and_then(|p| p.get(node)) {
+            program.apply(gates, x, z);
+        } else {
+            for &gate in gates {
+                gate.conjugate(x, z);
+            }
+        }
+    }
+    /// The fixed rotation policy of this plan and every sampler prepared from it.
+    pub fn rotation_arithmetic(&self) -> CompiledRotationArithmetic {
+        self.rotation_arithmetic
     }
     pub fn peak_active_rank(&self) -> usize {
         self.peak_active_rank
@@ -1323,11 +1428,14 @@ impl CompiledNearCliffordExecutor {
             pack_enabled: true,
             #[cfg(test)]
             last_packet_live: 0,
+            #[cfg(test)]
+            last_scalar_prepared: false,
             packet_x: Vec::new(),
             packet_z: Vec::new(),
             packet_tape: Vec::new(),
             packet_records: Vec::new(),
             packet_noise_masks: Vec::new(),
+            packet_independent: None,
             coherent: CoherentPacket::default(),
         })
     }
@@ -1340,7 +1448,9 @@ impl CompiledNearCliffordExecutor {
     }
 }
 
-/// Retains allocations, with identical streams for structured and flat APIs.
+/// Retains allocations, with identical streams for successful structured and flat calls.
+/// On an execution error, RNG events may already have been drawn for the current
+/// row or packet; no exact failed-call RNG prefix is promised across strategies.
 pub struct CompiledNearCliffordSampler<'a> {
     plan: &'a CompiledNearCliffordExecutor,
     x: Vec<u64>,
@@ -1351,11 +1461,14 @@ pub struct CompiledNearCliffordSampler<'a> {
     pack_enabled: bool,
     #[cfg(test)]
     last_packet_live: usize,
+    #[cfg(test)]
+    last_scalar_prepared: bool,
     packet_x: Vec<u64>,
     packet_z: Vec<u64>,
     packet_tape: Vec<u64>,
     packet_records: Vec<u64>,
     packet_noise_masks: Vec<u64>,
+    packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
 }
 
@@ -1975,6 +2088,9 @@ impl CompiledNearCliffordSampler<'_> {
                 .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
             self.coefficients.resize(len, ComplexAmp::default());
         }
+        if self.plan.rotation_arithmetic == CompiledRotationArithmetic::Fused {
+            return self.rotate_signed_fused(p, dagger, flip);
+        }
         let c = (std::f64::consts::PI / 8.).cos();
         let s = (std::f64::consts::PI / 8.).sin();
         let imaginary = p.physical.phase % 2 == 0;
@@ -1986,12 +2102,8 @@ impl CompiledNearCliffordSampler<'_> {
         if dagger ^ flip {
             factor = -factor;
         }
-        let term = |index: usize, amp: ComplexAmp| {
-            let factor = if (index & p.z).count_ones() % 2 != 0 {
-                -factor
-            } else {
-                factor
-            };
+        let term = |parity: bool, amp: ComplexAmp| {
+            let factor = if parity { -factor } else { factor };
             if imaginary {
                 ComplexAmp::new(-amp.im * factor, amp.re * factor)
             } else {
@@ -2000,10 +2112,12 @@ impl CompiledNearCliffordSampler<'_> {
         };
         if p.x == 0 {
             for (i, amp) in self.coefficients.iter_mut().enumerate() {
-                *amp = *amp * c + term(i, *amp);
+                *amp = *amp * c + term((i & p.z).count_ones() % 2 != 0, *amp);
             }
         } else {
             let pivot = 1 << p.x.trailing_zeros();
+            let parity_swap = (p.x & p.z).count_ones() % 2 != 0;
+            let uniform = p.z & (pivot - 1) == 0;
             for block in (0..self.coefficients.len()).step_by(pivot * 2) {
                 let other = block ^ p.x;
                 // The chosen pivot bit is zero in block and one in other, so
@@ -2016,17 +2130,231 @@ impl CompiledNearCliffordSampler<'_> {
                     let (left, right) = self.coefficients.split_at_mut(block);
                     (&mut right[..pivot], &mut left[other..other + pivot])
                 };
-                for (offset, (a, b)) in a.iter_mut().zip(b).enumerate() {
-                    let old_a = *a;
-                    let old_b = *b;
-                    *a = old_a * c + term(other + offset, old_b);
-                    *b = old_b * c + term(block + offset, old_a);
+                if uniform {
+                    // No Z coordinate below the chosen X pivot: every offset
+                    // in this block has the same two signed rotation factors.
+                    let parity_a = (block & p.z).count_ones() % 2 != 0;
+                    let parity_b = parity_a ^ parity_swap;
+                    for (a, b) in a.iter_mut().zip(b) {
+                        let old_a = *a;
+                        let old_b = *b;
+                        *a = old_a * c + term(parity_b, old_b);
+                        *b = old_b * c + term(parity_a, old_a);
+                    }
+                } else {
+                    for (offset, (a, b)) in a.iter_mut().zip(b).enumerate() {
+                        let old_a = *a;
+                        let old_b = *b;
+                        let parity_a = ((block + offset) & p.z).count_ones() % 2 != 0;
+                        *a = old_a * c + term(parity_a ^ parity_swap, old_b);
+                        *b = old_b * c + term(parity_a, old_a);
+                    }
                 }
             }
         }
         Ok(())
     }
+    fn rotate_signed_fused(
+        &mut self,
+        p: &CompactPauli,
+        dagger: bool,
+        flip: bool,
+    ) -> Result<(), String> {
+        let c = (std::f64::consts::PI / 8.).cos();
+        let s = (std::f64::consts::PI / 8.).sin();
+        let imaginary = p.physical.phase % 2 == 0;
+        let mut factor = if matches!(p.physical.phase, 0 | 3) {
+            -s
+        } else {
+            s
+        };
+        if dagger ^ flip {
+            factor = -factor;
+        }
+        let update = |own: ComplexAmp, parity: bool, partner: ComplexAmp| {
+            let factor = if parity { -factor } else { factor };
+            if imaginary {
+                ComplexAmp::new(
+                    (-partner.im).mul_add(factor, own.re * c),
+                    partner.re.mul_add(factor, own.im * c),
+                )
+            } else {
+                ComplexAmp::new(
+                    partner.re.mul_add(factor, own.re * c),
+                    partner.im.mul_add(factor, own.im * c),
+                )
+            }
+        };
+        // With no compact Z signs, use the highest X bit to borrow two full
+        // halves once. Any lower X mask permutes adjacent two-coefficient
+        // groups, so even a lowest pivot of one can expose two FP64 lanes.
+        // Larger lowest-pivot blocks already vectorize in the retained kernel.
+        if p.z == 0 && p.x >= 2 && p.x & 7 != 0 {
+            match (imaginary, p.x & 1 != 0) {
+                (true, true) => Self::rotate_fused_highest_z0::<true, true>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (true, false) => Self::rotate_fused_highest_z0::<true, false>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (false, true) => Self::rotate_fused_highest_z0::<false, true>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (false, false) => Self::rotate_fused_highest_z0::<false, false>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+            }
+            return Ok(());
+        }
+        if p.x == 0 {
+            for (i, amp) in self.coefficients.iter_mut().enumerate() {
+                *amp = update(*amp, (i & p.z).count_ones() % 2 != 0, *amp);
+            }
+        } else {
+            let pivot = 1 << p.x.trailing_zeros();
+            let parity_swap = (p.x & p.z).count_ones() % 2 != 0;
+            let uniform = p.z & (pivot - 1) == 0;
+            for block in (0..self.coefficients.len()).step_by(pivot * 2) {
+                let other = block ^ p.x;
+                // The chosen pivot bit is zero in block and one in other, so
+                // these equally sized ranges are disjoint. Borrow both once;
+                // the iterator removes repeated bounds checks inside the kernel.
+                let (a, b) = if block < other {
+                    let (left, right) = self.coefficients.split_at_mut(other);
+                    (&mut left[block..block + pivot], &mut right[..pivot])
+                } else {
+                    let (left, right) = self.coefficients.split_at_mut(block);
+                    (&mut right[..pivot], &mut left[other..other + pivot])
+                };
+                if uniform {
+                    // No Z coordinate below the chosen X pivot: every offset
+                    // in this block has the same two signed rotation factors.
+                    let parity_a = (block & p.z).count_ones() % 2 != 0;
+                    let parity_b = parity_a ^ parity_swap;
+                    for (a, b) in a.iter_mut().zip(b) {
+                        let old_a = *a;
+                        let old_b = *b;
+                        *a = update(old_a, parity_b, old_b);
+                        *b = update(old_b, parity_a, old_a);
+                    }
+                } else {
+                    for (offset, (a, b)) in a.iter_mut().zip(b).enumerate() {
+                        let old_a = *a;
+                        let old_b = *b;
+                        let parity_a = ((block + offset) & p.z).count_ones() % 2 != 0;
+                        *a = update(old_a, parity_a ^ parity_swap, old_b);
+                        *b = update(old_b, parity_a, old_a);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    fn rotate_fused_highest_z0<const IMAGINARY: bool, const SWAP: bool>(
+        coefficients: &mut [ComplexAmp],
+        x: usize,
+        c: f64,
+        factor: f64,
+    ) {
+        let pivot = 1usize << (usize::BITS - 1 - x.leading_zeros());
+        let group_xor = (x ^ pivot) >> 1;
+        debug_assert!(pivot >= 2);
+        debug_assert_eq!(coefficients.len() % (pivot * 2), 0);
+        for block in coefficients.chunks_exact_mut(pivot * 2) {
+            let (left, right) = block.split_at_mut(pivot);
+            for (group, a) in left.chunks_exact_mut(2).enumerate() {
+                // XOR is a permutation of the pivot/2 adjacent groups.
+                // The separate halves and distinct groups never overlap.
+                let other = (group ^ group_xor) * 2;
+                let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
+                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                Self::rotate_fused_adjacent_pair::<IMAGINARY, SWAP>(a, b, c, factor);
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn rotate_fused_adjacent_pair<const IMAGINARY: bool, const SWAP: bool>(
+        a: &mut [ComplexAmp; 2],
+        b: &mut [ComplexAmp; 2],
+        c: f64,
+        factor: f64,
+    ) {
+        // Snapshot all four inputs before either group is written. Local
+        // two-lane arrays expose SLP without changing the persistent AoS layout.
+        let old_a = *a;
+        let old_b = if SWAP { [b[1], b[0]] } else { *b };
+        let ar = [old_a[0].re, old_a[1].re];
+        let ai = [old_a[0].im, old_a[1].im];
+        let br = [old_b[0].re, old_b[1].re];
+        let bi = [old_b[0].im, old_b[1].im];
+        let (out_ar, out_ai, out_br, out_bi) = if IMAGINARY {
+            (
+                [
+                    (-bi[0]).mul_add(factor, ar[0] * c),
+                    (-bi[1]).mul_add(factor, ar[1] * c),
+                ],
+                [
+                    br[0].mul_add(factor, ai[0] * c),
+                    br[1].mul_add(factor, ai[1] * c),
+                ],
+                [
+                    (-ai[0]).mul_add(factor, br[0] * c),
+                    (-ai[1]).mul_add(factor, br[1] * c),
+                ],
+                [
+                    ar[0].mul_add(factor, bi[0] * c),
+                    ar[1].mul_add(factor, bi[1] * c),
+                ],
+            )
+        } else {
+            (
+                [
+                    br[0].mul_add(factor, ar[0] * c),
+                    br[1].mul_add(factor, ar[1] * c),
+                ],
+                [
+                    bi[0].mul_add(factor, ai[0] * c),
+                    bi[1].mul_add(factor, ai[1] * c),
+                ],
+                [
+                    ar[0].mul_add(factor, br[0] * c),
+                    ar[1].mul_add(factor, br[1] * c),
+                ],
+                [
+                    ai[0].mul_add(factor, bi[0] * c),
+                    ai[1].mul_add(factor, bi[1] * c),
+                ],
+            )
+        };
+        a[0] = ComplexAmp::new(out_ar[0], out_ai[0]);
+        a[1] = ComplexAmp::new(out_ar[1], out_ai[1]);
+        b[usize::from(SWAP)] = ComplexAmp::new(out_br[0], out_bi[0]);
+        b[usize::from(!SWAP)] = ComplexAmp::new(out_br[1], out_bi[1]);
+    }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
+        // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
+        match p.physical.phase & 3 {
+            0 => self.probability_zero_phase::<0>(p),
+            1 => self.probability_zero_phase::<1>(p),
+            2 => self.probability_zero_phase::<2>(p),
+            _ => self.probability_zero_phase::<3>(p),
+        }
+    }
+    #[inline]
+    fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
         let mut expectation = 0.;
         let mut norm = 0.;
         for (i, &amp) in self.coefficients.iter().enumerate() {
@@ -2035,8 +2363,7 @@ impl CompiledNearCliffordSampler<'_> {
             } else {
                 1.
             };
-            expectation +=
-                (self.coefficients[i ^ p.x].conj() * i_pow(p.physical.phase) * (amp * sign)).re;
+            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
             norm += amp.norm_sqr();
         }
         ((1. + expectation / norm) * 0.5).clamp(0., 1.)
@@ -2092,8 +2419,102 @@ impl CompiledNearCliffordSampler<'_> {
         }
         Ok(())
     }
+    // Packet frame/mask buffers and the optional Independent sidecar share the
+    // existing cap with scalar tape. Count actual retained capacities, not len.
+    fn scalar_tape_other_bytes(&self) -> Option<usize> {
+        let vectors = self
+            .packet_x
+            .capacity()
+            .checked_add(self.packet_z.capacity())?
+            .checked_add(self.packet_records.capacity())?
+            .checked_add(self.packet_noise_masks.capacity())?
+            .checked_mul(size_of::<u64>())?;
+        let independent = self
+            .packet_independent
+            .as_ref()
+            .map_or(Some(0), IndependentPacket::reserved_bytes)?;
+        vectors.checked_add(independent)
+    }
+
+    fn try_prepare_scalar_tape(&mut self, byte_budget: usize) -> bool {
+        let Some(remaining) = self
+            .scalar_tape_other_bytes()
+            .and_then(|occupied| byte_budget.checked_sub(occupied))
+        else {
+            return false;
+        };
+        let max_words = remaining / size_of::<u64>();
+        let count = self.plan.random_kinds.len();
+        if count > max_words || self.packet_tape.capacity() > max_words {
+            return false; // Optional rejection precedes any RNG draw or growth.
+        }
+        if self.packet_tape.capacity() < count {
+            if self
+                .packet_tape
+                .try_reserve_exact(count - self.packet_tape.len())
+                .is_err()
+            {
+                return false;
+            }
+            if self.packet_tape.capacity() > max_words {
+                // Allocators may round exact requests upward. Drop the optional
+                // enlarged scratch before live fallback, rather than retain an
+                // over-budget buffer. No quantum/RNG state has changed yet.
+                self.packet_tape = Vec::new();
+                return false;
+            }
+        }
+        if self.packet_tape.len() < count {
+            self.packet_tape.resize(count, 0);
+        }
+        true // A retained 64R packet tape keeps its original len/capacity.
+    }
+
     fn row(&mut self, sweep: &[bool], rng: &mut impl Rng) -> Result<NearCliffordShot, String> {
-        self.row_with_random(sweep, &mut RowRandom::live(rng))
+        self.row_with_scalar_tape_budget(sweep, rng, PACKET_BYTE_BUDGET)
+    }
+
+    fn row_with_scalar_tape_budget(
+        &mut self,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        byte_budget: usize,
+    ) -> Result<NearCliffordShot, String> {
+        #[cfg(test)]
+        {
+            self.last_scalar_prepared = false;
+        }
+        let plan = self.plan;
+        if plan.noise_event_count < MIN_SCALAR_PREPARED_NOISE_EVENTS || plan.random_kinds.is_empty()
+        {
+            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+        }
+        let Some(runs) = &plan.random_runs else {
+            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+        };
+        if !self.try_prepare_scalar_tape(byte_budget) {
+            return self.row_with_random(sweep, &mut RowRandom::live(rng));
+        }
+        #[cfg(test)]
+        {
+            self.last_scalar_prepared = true;
+        }
+        let count = plan.random_kinds.len();
+        let mut tape = std::mem::take(&mut self.packet_tape);
+        let result = {
+            runs.fill_row(
+                &mut RowRandom::live(&mut *rng),
+                &plan.random_kinds,
+                &mut tape[..count],
+            );
+            let mut replay = RowRandom::recorded(&tape[..count], &mut *rng);
+            let result = self.row_with_random(sweep, &mut replay);
+            debug_assert!(result.is_err() || replay.cursor == count);
+            result
+        };
+        // Restore even on execution Err; never retry after the row was drawn.
+        self.packet_tape = tape;
+        result
     }
     fn row_with_random(
         &mut self,
@@ -2120,9 +2541,7 @@ impl CompiledNearCliffordSampler<'_> {
         for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
             match op {
                 PlanOp::Basis(gates) => {
-                    for gate in gates {
-                        gate.conjugate(&mut self.x, &mut self.z);
-                    }
+                    plan.conjugate_scalar_basis(node, gates, &mut self.x, &mut self.z);
                 }
                 PlanOp::Rotate {
                     pauli,
@@ -2192,8 +2611,8 @@ impl CompiledNearCliffordSampler<'_> {
                             &mut state,
                         )?;
                     }
-                    for gate in &m.basis {
-                        gate.conjugate(&mut self.x, &mut self.z);
+                    if !m.basis.is_empty() {
+                        plan.conjugate_scalar_basis(node, &m.basis, &mut self.x, &mut self.z);
                     }
                     match m.projection {
                         Projection::Constant(_) => {}
@@ -2241,6 +2660,7 @@ impl CompiledNearCliffordSampler<'_> {
         let mut tape = std::mem::take(&mut self.packet_tape);
         let mut records = std::mem::take(&mut self.packet_records);
         let mut noise_masks = std::mem::take(&mut self.packet_noise_masks);
+        let mut independent_packet = self.packet_independent.take();
         let result = (|| {
             let plan = self.plan;
             let random_count = plan.random_kinds.len();
@@ -2253,13 +2673,24 @@ impl CompiledNearCliffordSampler<'_> {
                 let mut random = RowRandom::live(&mut *rng);
                 let row = &mut tape[lane * random_count..(lane + 1) * random_count];
                 if let Some(runs) = &plan.random_runs {
-                    runs.fill_row_with_noise_masks(
-                        &mut random,
-                        &plan.random_kinds,
-                        row,
-                        &mut noise_masks,
-                        1u64 << lane,
-                    );
+                    if let Some(packet) = &mut independent_packet {
+                        runs.fill_row_with_compact_independent(
+                            &mut random,
+                            &plan.random_kinds,
+                            row,
+                            &mut noise_masks,
+                            1u64 << lane,
+                            packet.row(lane),
+                        );
+                    } else {
+                        runs.fill_row_with_noise_masks(
+                            &mut random,
+                            &plan.random_kinds,
+                            row,
+                            &mut noise_masks,
+                            1u64 << lane,
+                        );
+                    }
                 } else {
                     fill_original_row_with_noise_masks(
                         &mut random,
@@ -2269,6 +2700,9 @@ impl CompiledNearCliffordSampler<'_> {
                         1u64 << lane,
                     );
                 }
+            }
+            if let Some(packet) = &mut independent_packet {
+                packet.transpose(lanes);
             }
             x.fill(0);
             z.fill(0);
@@ -2283,6 +2717,7 @@ impl CompiledNearCliffordSampler<'_> {
             let mut live = all;
             let mut event = 0;
             let mut noise_event = 0;
+            let mut independent_event = 0;
             let mut record = 0;
             for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
                 match op {
@@ -2298,7 +2733,13 @@ impl CompiledNearCliffordSampler<'_> {
                     } => {
                         let anti = pauli.physical.packet_anti(&x, &z);
                         if coherent {
-                            self.coherent.rotate(pauli, *expand, *dagger, anti)?;
+                            self.coherent.rotate_with_arithmetic(
+                                pauli,
+                                *expand,
+                                *dagger,
+                                anti,
+                                plan.rotation_arithmetic,
+                            )?;
                         } else if let Some(id) = uniform_packet_state(&states, live) {
                             let masks = [live & !anti, live & anti];
                             for (sign, mask) in masks.into_iter().enumerate() {
@@ -2395,11 +2836,16 @@ impl CompiledNearCliffordSampler<'_> {
                                 }
                             }
                             Projection::Independent { .. } => {
-                                for lane in 0..lanes {
-                                    if tape[lane * random_count + event] != 0 {
-                                        branch |= 1 << lane;
+                                if let Some(packet) = &independent_packet {
+                                    branch = packet.mask(independent_event);
+                                } else {
+                                    for lane in 0..lanes {
+                                        if tape[lane * random_count + event] != 0 {
+                                            branch |= 1 << lane;
+                                        }
                                     }
                                 }
+                                independent_event += 1;
                                 event += 1;
                             }
                             Projection::Active {
@@ -2513,6 +2959,7 @@ impl CompiledNearCliffordSampler<'_> {
             }
             debug_assert_eq!(event, random_count);
             debug_assert_eq!(noise_event, plan.noise_event_count);
+            debug_assert_eq!(independent_event, plan.independent_event_count);
             debug_assert_eq!(record, plan.measurement_count);
             // When almost every row replays, scalar arithmetic avoids duplicated work.
             // This affects only execution strategy, never random-event or record order.
@@ -2529,6 +2976,13 @@ impl CompiledNearCliffordSampler<'_> {
                 } else {
                     // Admission failed. Replay the same row's already drawn events;
                     // no quantum result is resampled and the caller RNG is untouched.
+                    if let Some(packet) = &independent_packet {
+                        packet.restore_row(
+                            &plan.random_kinds,
+                            &mut tape[lane * random_count..(lane + 1) * random_count],
+                            lane,
+                        );
+                    }
                     let mut random = RowRandom::recorded(
                         &tape[lane * random_count..(lane + 1) * random_count],
                         &mut *rng,
@@ -2549,6 +3003,7 @@ impl CompiledNearCliffordSampler<'_> {
         self.packet_tape = tape;
         self.packet_records = records;
         self.packet_noise_masks = noise_masks;
+        self.packet_independent = independent_packet;
         result
     }
     pub fn sample(
@@ -2620,6 +3075,24 @@ impl CompiledNearCliffordSampler<'_> {
             resize_packet(&mut self.packet_records, self.plan.measurement_count)?;
             resize_packet(&mut self.packet_noise_masks, self.plan.noise_event_count)?;
             resize_packet(&mut self.packet_tape, 64 * self.plan.random_kinds.len())?;
+            if self.packet_independent.is_none() && self.plan.random_runs.is_some() {
+                // Optional compact workspace counts actual retained capacities.
+                // Overflow, admission or allocation failure leaves the original
+                // run producer and complete-tape consumer available.
+                let occupied = self
+                    .packet_x
+                    .capacity()
+                    .checked_add(self.packet_z.capacity())
+                    .and_then(|n| n.checked_add(self.packet_records.capacity()))
+                    .and_then(|n| n.checked_add(self.packet_noise_masks.capacity()))
+                    .and_then(|n| n.checked_add(self.packet_tape.capacity()))
+                    .and_then(|n| n.checked_mul(size_of::<u64>()));
+                self.packet_independent = occupied
+                    .and_then(|n| PACKET_BYTE_BUDGET.checked_sub(n))
+                    .and_then(|remaining| {
+                        IndependentPacket::new(self.plan.independent_event_count, remaining)
+                    });
+            }
             for offset in (0..shots).step_by(64) {
                 let lanes = (shots - offset).min(64);
                 let coherent = coherent_eligible && (!self.pack_enabled || self.cache.is_none());
@@ -2751,225 +3224,280 @@ mod tests {
     }
 
     #[test]
-    fn compiled_forced_projectors_preserve_full_conditional_complex_density() {
-        let mut rng = StdRng::seed_from_u64(20261007);
-        let mut flags = [false; 4];
-        for _ in 0..64 {
-            let gates = (0..12)
-                .map(|_| {
-                    let a = rng.gen_range(0..3);
-                    let b = (a + rng.gen_range(1..3)) % 3;
-                    match rng.gen_range(0..9) {
-                        0 => CliffordGate::H(a),
-                        1 => CliffordGate::S(a),
-                        2 => CliffordGate::SDag(a),
-                        3 => CliffordGate::X(a),
-                        4 => CliffordGate::Y(a),
-                        5 => CliffordGate::Z(a),
-                        6 => CliffordGate::CX(a, b),
-                        7 => CliffordGate::CZ(a, b),
-                        _ => CliffordGate::Swap(a, b),
-                    }
-                })
-                .collect::<Vec<_>>();
-            for axes in [vec![0, 1, 2], vec![0, 2]] {
-                let mut coeff = (0..1 << axes.len())
-                    .map(|_| ComplexAmp::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)))
+    fn both_arithmetic_policies_preserve_dense_conditional_complex_density() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let mut rng = StdRng::seed_from_u64(20261007);
+            let mut flags = [false; 4];
+            for _ in 0..64 {
+                let gates = (0..12)
+                    .map(|_| {
+                        let a = rng.gen_range(0..3);
+                        let b = (a + rng.gen_range(1..3)) % 3;
+                        match rng.gen_range(0..9) {
+                            0 => CliffordGate::H(a),
+                            1 => CliffordGate::S(a),
+                            2 => CliffordGate::SDag(a),
+                            3 => CliffordGate::X(a),
+                            4 => CliffordGate::Y(a),
+                            5 => CliffordGate::Z(a),
+                            6 => CliffordGate::CX(a, b),
+                            7 => CliffordGate::CZ(a, b),
+                            _ => CliffordGate::Swap(a, b),
+                        }
+                    })
                     .collect::<Vec<_>>();
-                normalize(&mut coeff);
-                for q in 0..3 {
-                    for basis in [
-                        MeasurementBasis::X,
-                        MeasurementBasis::Y,
-                        MeasurementBasis::Z,
-                    ] {
-                        let mut planner = Planner {
-                            state: CompileFrame::identity(3).unwrap(),
-                            axes: axes.clone(),
-                            limit: 3,
-                            peak: axes.len(),
-                            operations: Vec::new(),
-                            expanded: 0,
-                            reserved_bytes: 0,
-                            tape: None,
-                            record_count: 0,
-                        };
-                        for gate in &gates {
-                            planner.state.apply_clifford(*gate).unwrap();
-                        }
-                        planner.measure(q, basis, true, false, false).unwrap();
-                        let PlanOp::Measure(m) = &planner.operations[0] else {
-                            panic!("measurement plan");
-                        };
-                        flags[0] |= matches!(m.projection, Projection::Independent { .. });
-                        flags[1] |= matches!(m.projection, Projection::Active { y: true, .. });
-                        flags[2] |= m.pauli.x.count_ones() > 1;
-                        flags[3] |= matches!(m.projection, Projection::Active { offset: true, .. });
-                        let frame_x = rng.gen_range(0u64..8);
-                        let frame_z = rng.gen_range(0u64..8);
-                        let mut before = embed(&coeff, &axes, None);
-                        dense_frame(&mut before, frame_x, frame_z);
-                        for gate in &gates {
-                            dense_gate(&mut before, *gate);
-                        }
-                        for branch in [false, true] {
-                            let mut image = before.clone();
-                            dense_gate(
-                                &mut image,
-                                match basis {
-                                    MeasurementBasis::X => CliffordGate::X(q),
-                                    MeasurementBasis::Y => CliffordGate::Y(q),
-                                    MeasurementBasis::Z => CliffordGate::Z(q),
-                                },
-                            );
-                            let mut expected = before
-                                .iter()
-                                .zip(&image)
-                                .map(|(&a, &b)| (a + b * if branch { -1. } else { 1. }) * 0.5)
-                                .collect::<Vec<_>>();
-                            if normalize(&mut expected) < 1e-24 {
-                                continue;
-                            }
-                            let plan = CompiledNearCliffordExecutor {
+                for axes in [vec![0, 1, 2], vec![0, 2]] {
+                    let mut coeff = (0..1 << axes.len())
+                        .map(|_| {
+                            ComplexAmp::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0))
+                        })
+                        .collect::<Vec<_>>();
+                    normalize(&mut coeff);
+                    for q in 0..3 {
+                        for basis in [
+                            MeasurementBasis::X,
+                            MeasurementBasis::Y,
+                            MeasurementBasis::Z,
+                        ] {
+                            let mut planner = Planner {
+                                state: CompileFrame::identity(3).unwrap(),
+                                axes: axes.clone(),
+                                limit: 3,
+                                peak: axes.len(),
                                 operations: Vec::new(),
-                                num_qubits: 3,
-                                measurement_count: 1,
-                                peak_active_rank: axes.len(),
-                                prefix_len: 0,
-                                initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
-                                random_kinds: Vec::new(),
-                                random_runs: None,
-                                noise_event_count: 0,
+                                expanded: 0,
+                                reserved_bytes: 0,
+                                tape: None,
+                                record_count: 0,
                             };
-                            let mut sampler = plan.prepare_sampler().unwrap();
-                            sampler.coefficients = coeff.clone();
-                            sampler.x[0] = frame_x;
-                            sampler.z[0] = frame_z;
-                            let base_branch =
-                                branch ^ m.pauli.physical.anticommutes(&sampler.x, &sampler.z);
-                            let fixed = match m.projection {
-                                Projection::Constant(bit) => {
-                                    assert_eq!(bit, base_branch);
-                                    None
-                                }
-                                Projection::Independent { pivot } => Some((pivot, base_branch)),
-                                Projection::Active {
-                                    pivot,
-                                    index,
-                                    y,
-                                    offset,
-                                } => {
-                                    sampler
-                                        .project(&m.pauli, index, y, base_branch ^ offset)
-                                        .unwrap();
-                                    Some((pivot, base_branch ^ offset))
-                                }
-                            };
-                            for gate in &m.basis {
-                                gate.conjugate(&mut sampler.x, &mut sampler.z);
-                            }
-                            if let Some((pivot, true)) = fixed {
-                                flip(&mut sampler.x, pivot);
-                            }
-                            let mut actual = embed(&sampler.coefficients, &planner.axes, None);
-                            dense_frame(&mut actual, sampler.x[0], sampler.z[0]);
-                            // U'=UC: C's right-composition list acts in reverse order.
-                            for gate in m.basis.iter().rev() {
-                                dense_basis(&mut actual, *gate);
-                            }
                             for gate in &gates {
-                                dense_gate(&mut actual, *gate);
+                                planner.state.apply_clifford(*gate).unwrap();
                             }
-                            for i in 0..8 {
-                                for j in 0..8 {
-                                    let a = actual[i] * actual[j].conj();
-                                    let e = expected[i] * expected[j].conj();
-                                    assert!(
-                                        (a.re - e.re).abs() < 3e-12 && (a.im - e.im).abs() < 3e-12,
-                                        "q={q}, basis={basis:?}, branch={branch}, projection={:?}",
-                                        m.projection
-                                    );
+                            planner.measure(q, basis, true, false, false).unwrap();
+                            let PlanOp::Measure(m) = &planner.operations[0] else {
+                                panic!("measurement plan");
+                            };
+                            flags[0] |= matches!(m.projection, Projection::Independent { .. });
+                            flags[1] |= matches!(m.projection, Projection::Active { y: true, .. });
+                            flags[2] |= m.pauli.x.count_ones() > 1;
+                            flags[3] |=
+                                matches!(m.projection, Projection::Active { offset: true, .. });
+                            let frame_x = rng.gen_range(0u64..8);
+                            let frame_z = rng.gen_range(0u64..8);
+                            let mut before = embed(&coeff, &axes, None);
+                            dense_frame(&mut before, frame_x, frame_z);
+                            for gate in &gates {
+                                dense_gate(&mut before, *gate);
+                            }
+                            for branch in [false, true] {
+                                let mut image = before.clone();
+                                dense_gate(
+                                    &mut image,
+                                    match basis {
+                                        MeasurementBasis::X => CliffordGate::X(q),
+                                        MeasurementBasis::Y => CliffordGate::Y(q),
+                                        MeasurementBasis::Z => CliffordGate::Z(q),
+                                    },
+                                );
+                                let mut expected = before
+                                    .iter()
+                                    .zip(&image)
+                                    .map(|(&a, &b)| (a + b * if branch { -1. } else { 1. }) * 0.5)
+                                    .collect::<Vec<_>>();
+                                if normalize(&mut expected) < 1e-24 {
+                                    continue;
+                                }
+                                let plan = CompiledNearCliffordExecutor {
+                                    operations: Vec::new(),
+                                    num_qubits: 3,
+                                    measurement_count: 1,
+                                    peak_active_rank: axes.len(),
+                                    prefix_len: 0,
+                                    initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+                                    random_kinds: Vec::new(),
+                                    random_runs: None,
+                                    noise_event_count: 0,
+                                    independent_event_count: 0,
+                                    scalar_basis: None,
+                                    rotation_arithmetic: policy,
+                                };
+                                let mut sampler = plan.prepare_sampler().unwrap();
+                                sampler.coefficients = coeff.clone();
+                                sampler.x[0] = frame_x;
+                                sampler.z[0] = frame_z;
+                                let base_branch =
+                                    branch ^ m.pauli.physical.anticommutes(&sampler.x, &sampler.z);
+                                let fixed = match m.projection {
+                                    Projection::Constant(bit) => {
+                                        assert_eq!(bit, base_branch);
+                                        None
+                                    }
+                                    Projection::Independent { pivot } => Some((pivot, base_branch)),
+                                    Projection::Active {
+                                        pivot,
+                                        index,
+                                        y,
+                                        offset,
+                                    } => {
+                                        sampler
+                                            .project(&m.pauli, index, y, base_branch ^ offset)
+                                            .unwrap();
+                                        Some((pivot, base_branch ^ offset))
+                                    }
+                                };
+                                for gate in &m.basis {
+                                    gate.conjugate(&mut sampler.x, &mut sampler.z);
+                                }
+                                if let Some((pivot, true)) = fixed {
+                                    flip(&mut sampler.x, pivot);
+                                }
+                                let mut actual = embed(&sampler.coefficients, &planner.axes, None);
+                                dense_frame(&mut actual, sampler.x[0], sampler.z[0]);
+                                // U'=UC: C's right-composition list acts in reverse order.
+                                for gate in m.basis.iter().rev() {
+                                    dense_basis(&mut actual, *gate);
+                                }
+                                for gate in &gates {
+                                    dense_gate(&mut actual, *gate);
+                                }
+                                for i in 0..8 {
+                                    for j in 0..8 {
+                                        let a = actual[i] * actual[j].conj();
+                                        let e = expected[i] * expected[j].conj();
+                                        assert!(
+                                            (a.re - e.re).abs() < 3e-12
+                                                && (a.im - e.im).abs() < 3e-12,
+                                            "q={q}, basis={basis:?}, branch={branch}, projection={:?}",
+                                            m.projection
+                                        );
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            assert_eq!(
+                flags, [true; 4],
+                "must exercise independent, Y, multi-X and negative-offset cases"
+            );
         }
-        assert_eq!(
-            flags, [true; 4],
-            "must exercise independent, Y, multi-X and negative-offset cases"
-        );
     }
 
     #[test]
-    fn compiled_pauli_rotation_kernel_matches_dense_complex_density_and_expansion() {
-        let plan = CompiledNearCliffordExecutor::compile_text("I 2\n").unwrap();
-        let mut rng = StdRng::seed_from_u64(748);
-        for expand in [false, true] {
-            for _ in 0..128 {
-                let x = if expand {
-                    rng.gen_range(0usize..4) | 4
-                } else {
-                    rng.gen_range(0usize..8)
-                };
-                let z = rng.gen_range(0usize..8);
-                let negative = rng.r#gen::<bool>();
-                let dagger = rng.r#gen::<bool>();
-                let frame_x = rng.gen_range(0u64..8);
-                let frame_z = rng.gen_range(0u64..8);
-                let mut pauli = Pauli::identity(3);
-                for q in 0..3 {
-                    pauli.x[q] = x >> q & 1 != 0;
-                    pauli.z[q] = z >> q & 1 != 0;
-                }
-                pauli.phase = ((x & z).count_ones() as u8 + 2 * u8::from(negative)) % 4;
-                let p = CompactPauli {
-                    physical: PackedPauli::new(&pauli),
-                    x,
-                    z,
-                };
-                let mut coefficients = (0..if expand { 4 } else { 8 })
-                    .map(|_| ComplexAmp::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0)))
-                    .collect::<Vec<_>>();
-                normalize(&mut coefficients);
-                let mut before = coefficients.clone();
-                before.resize(8, ComplexAmp::default());
-                dense_frame(&mut before, frame_x, frame_z);
-                let mut image = before.clone();
-                for q in 0..3 {
-                    match (pauli.x[q], pauli.z[q]) {
-                        (true, true) => dense_gate(&mut image, CliffordGate::Y(q)),
-                        (true, false) => dense_gate(&mut image, CliffordGate::X(q)),
-                        (false, true) => dense_gate(&mut image, CliffordGate::Z(q)),
-                        _ => {}
+    fn both_arithmetic_policies_match_dense_pauli_rotation_and_expansion() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 2\n", policy)
+                .unwrap();
+            let mut rng = StdRng::seed_from_u64(748);
+            for expand in [false, true] {
+                for _ in 0..128 {
+                    let x = if expand {
+                        rng.gen_range(0usize..4) | 4
+                    } else {
+                        rng.gen_range(0usize..8)
+                    };
+                    let z = rng.gen_range(0usize..8);
+                    let negative = rng.r#gen::<bool>();
+                    let dagger = rng.r#gen::<bool>();
+                    let frame_x = rng.gen_range(0u64..8);
+                    let frame_z = rng.gen_range(0u64..8);
+                    let mut pauli = Pauli::identity(3);
+                    for q in 0..3 {
+                        pauli.x[q] = x >> q & 1 != 0;
+                        pauli.z[q] = z >> q & 1 != 0;
                     }
-                }
-                if negative {
-                    for amp in &mut image {
-                        *amp = *amp * -1.;
+                    pauli.phase = ((x & z).count_ones() as u8 + 2 * u8::from(negative)) % 4;
+                    let p = CompactPauli {
+                        physical: PackedPauli::new(&pauli),
+                        x,
+                        z,
+                    };
+                    let mut coefficients = (0..if expand { 4 } else { 8 })
+                        .map(|_| {
+                            ComplexAmp::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0))
+                        })
+                        .collect::<Vec<_>>();
+                    normalize(&mut coefficients);
+                    let mut before = coefficients.clone();
+                    before.resize(8, ComplexAmp::default());
+                    dense_frame(&mut before, frame_x, frame_z);
+                    let mut image = before.clone();
+                    for q in 0..3 {
+                        match (pauli.x[q], pauli.z[q]) {
+                            (true, true) => dense_gate(&mut image, CliffordGate::Y(q)),
+                            (true, false) => dense_gate(&mut image, CliffordGate::X(q)),
+                            (false, true) => dense_gate(&mut image, CliffordGate::Z(q)),
+                            _ => {}
+                        }
                     }
-                }
-                let c = (std::f64::consts::PI / 8.).cos();
-                let s = (std::f64::consts::PI / 8.).sin();
-                let rotation = ComplexAmp::new(0., if dagger { s } else { -s });
-                let expected = before
-                    .iter()
-                    .zip(&image)
-                    .map(|(&a, &b)| a * c + b * rotation)
-                    .collect::<Vec<_>>();
-                let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
-                sampler.coefficients = coefficients;
-                sampler.x[0] = frame_x;
-                sampler.z[0] = frame_z;
-                sampler.rotate(&p, expand, dagger).unwrap();
-                let mut actual = sampler.coefficients.clone();
-                dense_frame(&mut actual, frame_x, frame_z);
-                for i in 0..8 {
-                    for j in 0..8 {
-                        let a = actual[i] * actual[j].conj();
-                        let e = expected[i] * expected[j].conj();
-                        assert!((a.re - e.re).abs() < 3e-12 && (a.im - e.im).abs() < 3e-12);
+                    if negative {
+                        for amp in &mut image {
+                            *amp = *amp * -1.;
+                        }
+                    }
+                    let c = (std::f64::consts::PI / 8.).cos();
+                    let s = (std::f64::consts::PI / 8.).sin();
+                    let rotation = ComplexAmp::new(0., if dagger { s } else { -s });
+                    let expected = before
+                        .iter()
+                        .zip(&image)
+                        .map(|(&a, &b)| a * c + b * rotation)
+                        .collect::<Vec<_>>();
+                    let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                    sampler.coefficients = coefficients.clone();
+                    sampler.x[0] = frame_x;
+                    sampler.z[0] = frame_z;
+                    sampler.rotate(&p, expand, dagger).unwrap();
+                    let anti = if p.physical.anticommutes(&sampler.x, &sampler.z) {
+                        u64::MAX
+                    } else {
+                        0
+                    };
+                    // Packet lanes are compared directly to the physical dense oracle,
+                    // rather than taking the scalar candidate as physics evidence.
+                    let mut packet = CoherentPacket::default();
+                    for lanes in [1, 7, 32, 64] {
+                        packet.reset(&coefficients, lanes, 3).unwrap();
+                        packet
+                            .rotate_with_arithmetic(&p, expand, dagger, anti, policy)
+                            .unwrap();
+                        for lane in 0..lanes {
+                            let mut lane_state = (0..packet.len)
+                                .map(|i| {
+                                    ComplexAmp::new(
+                                        packet.re[i * lanes + lane],
+                                        packet.im[i * lanes + lane],
+                                    )
+                                })
+                                .collect::<Vec<_>>();
+                            dense_frame(&mut lane_state, frame_x, frame_z);
+                            for i in 0..8 {
+                                for j in 0..8 {
+                                    let a = lane_state[i] * lane_state[j].conj();
+                                    let e = expected[i] * expected[j].conj();
+                                    assert!(
+                                        (a.re - e.re).abs() < 3e-12 && (a.im - e.im).abs() < 3e-12,
+                                        "policy={policy:?}; lanes={lanes}; lane={lane}; expand={expand}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    let mut actual = sampler.coefficients.clone();
+                    dense_frame(&mut actual, frame_x, frame_z);
+                    for i in 0..8 {
+                        for j in 0..8 {
+                            let a = actual[i] * actual[j].conj();
+                            let e = expected[i] * expected[j].conj();
+                            assert!((a.re - e.re).abs() < 3e-12 && (a.im - e.im).abs() < 3e-12);
+                        }
                     }
                 }
             }
@@ -2998,6 +3526,87 @@ mod tests {
             assert_eq!(packed.coefficient_cache_reserved_bytes(), initial + 288);
         }
         assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn coherent_compact_packets_keep_raw_rows_and_rng_across_tails() {
+        let mut text = String::from(
+            "H 0 1 2 3\nT 0 1 2 3\nDEPOLARIZE2(0.23) 0 1\nMPP(0.37) !X0*Y1*X2*Y3\nMRX(0.41) !0\nCX rec[-1] 3\nT_DAG 3\nMRY 1\nMY 2\nMX 3\nM 0 1 2 3\n",
+        );
+        text.push_str("REPEAT 129 {\nR 4\nH 4\nM 4\n}\n");
+        let plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
+        assert!(plan.peak_active_rank >= 4);
+        assert!(plan.independent_event_count >= 129);
+        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut flat = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut a = StdRng::seed_from_u64(461);
+        let mut b = a.clone();
+        for shots in [64, 1, 31, 32, 63, 65, 129, 64] {
+            let expected = scalar.sample(shots, &mut a).unwrap();
+            let actual = flat.sample_measurements_u8(shots, &mut b).unwrap();
+            assert_eq!(
+                actual.measurements,
+                expected
+                    .iter()
+                    .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+                    .collect::<Vec<_>>()
+            );
+            assert!(flat.packet_independent.is_some());
+            assert_eq!(flat.coefficient_cache_reserved_bytes(), 0);
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
+    fn compact_packet_restores_cache_dead_rows_after_many_independent_events() {
+        let mut text = String::from("H 0 1\nT 0 1\nCX 0 1\nMY 0\nMX 1\n");
+        text.push_str("REPEAT 129 {\nR 2\nH 2\nM 2\n}\n");
+        let plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
+        assert!(plan.independent_event_count >= 129);
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        for shots in [64, 65, 127, 129] {
+            let mut packed = plan
+                .prepare_sampler_with_cache_budget(initial + 896)
+                .unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(583);
+            let mut b = a.clone();
+            // Fresh first packet gives an actual mixed-live replay witness;
+            // later tails may switch to scalar and must not reuse stale counts.
+            let mut expected = scalar
+                .sample_measurements_u8(64, &mut a)
+                .unwrap()
+                .measurements;
+            let mut actual = packed
+                .sample_measurements_u8(64, &mut b)
+                .unwrap()
+                .measurements;
+            assert!(packed.packet_independent.is_some());
+            assert!(
+                packed.last_packet_live > 0 && packed.last_packet_live < 64,
+                "live {} initial {}",
+                packed.last_packet_live,
+                initial
+            );
+            assert_eq!(packed.coefficient_cache_reserved_bytes(), initial + 896);
+            expected.extend(
+                scalar
+                    .sample_measurements_u8(shots - 64, &mut a)
+                    .unwrap()
+                    .measurements,
+            );
+            actual.extend(
+                packed
+                    .sample_measurements_u8(shots - 64, &mut b)
+                    .unwrap()
+                    .measurements,
+            );
+            assert_eq!(expected, actual);
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
     }
 
     #[test]
@@ -3041,6 +3650,264 @@ mod tests {
         }
     }
 
+    fn classical_schedule_pauli(width: usize, x: &[usize], z: &[usize]) -> PackedPauli {
+        let mut p = Pauli::identity(width);
+        for &q in x {
+            p.x[q] = true;
+        }
+        for &q in z {
+            p.z[q] = true;
+        }
+        p.phase = (x.iter().filter(|q| z.contains(q)).count() % 4) as u8;
+        PackedPauli::new(&p)
+    }
+
+    fn classical_schedule_measure(
+        pauli: PackedPauli,
+        record: Option<usize>,
+        reset: Option<PackedPauli>,
+    ) -> TapeOp {
+        TapeOp::Measure {
+            pauli,
+            record,
+            inverted: record.is_some(),
+            readout: if record.is_some() { 0.37 } else { 0. },
+            reset,
+        }
+    }
+
+    fn classical_schedule_record_position(tape: &[TapeOp], record: Option<usize>) -> usize {
+        tape.iter()
+            .position(|op| matches!(op, TapeOp::Measure { record: found, .. } if *found == record))
+            .unwrap()
+    }
+
+    #[test]
+    fn scheduled_commuting_record_and_sweep_feedback_keep_earlier_producer_and_metadata() {
+        for condition in [Condition::Record(0), Condition::Sweep(3)] {
+            let mut tape = vec![
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[1]), Some(0), None),
+                TapeOp::Feedback {
+                    condition,
+                    pauli: classical_schedule_pauli(2, &[], &[1]),
+                },
+                classical_schedule_measure(
+                    classical_schedule_pauli(2, &[], &[0]),
+                    Some(1),
+                    Some(classical_schedule_pauli(2, &[0], &[])),
+                ),
+            ];
+            let mut reserved = 19;
+            schedule_measurements(&mut tape, &mut reserved).unwrap();
+            let reader = tape
+                .iter()
+                .position(|op| matches!(op, TapeOp::Feedback { .. }))
+                .unwrap();
+            assert!(classical_schedule_record_position(&tape, Some(0)) < reader);
+            let later = classical_schedule_record_position(&tape, Some(1));
+            assert!(later < reader);
+            let TapeOp::Measure {
+                inverted,
+                readout,
+                reset,
+                ..
+            } = &tape[later]
+            else {
+                unreachable!()
+            };
+            assert!(*inverted);
+            assert_eq!(*readout, 0.37);
+            assert_eq!(reset.as_ref().unwrap().x, [1]);
+            assert_eq!(reserved, 19);
+        }
+    }
+
+    #[test]
+    fn scheduled_recordless_reset_can_cross_commuting_record_feedback() {
+        let mut tape = vec![
+            classical_schedule_measure(classical_schedule_pauli(2, &[], &[1]), Some(0), None),
+            TapeOp::Feedback {
+                condition: Condition::Record(0),
+                pauli: classical_schedule_pauli(2, &[], &[1]),
+            },
+            classical_schedule_measure(
+                classical_schedule_pauli(2, &[], &[0]),
+                None,
+                Some(classical_schedule_pauli(2, &[0], &[])),
+            ),
+        ];
+        schedule_measurements(&mut tape, &mut 0).unwrap();
+        let reader = tape
+            .iter()
+            .position(|op| matches!(op, TapeOp::Feedback { .. }))
+            .unwrap();
+        assert!(classical_schedule_record_position(&tape, Some(0)) < reader);
+        assert!(classical_schedule_record_position(&tape, None) < reader);
+    }
+
+    #[test]
+    fn scheduled_feedback_rejects_anticommuting_measurement_or_reset() {
+        for (feedback, reset) in [
+            (classical_schedule_pauli(2, &[0], &[]), None),
+            (
+                classical_schedule_pauli(2, &[], &[0]),
+                Some(classical_schedule_pauli(2, &[0], &[])),
+            ),
+        ] {
+            let mut tape = vec![
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[1]), Some(0), None),
+                TapeOp::Feedback {
+                    condition: Condition::Record(0),
+                    pauli: feedback,
+                },
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[0]), Some(1), reset),
+            ];
+            schedule_measurements(&mut tape, &mut 0).unwrap();
+            assert!(matches!(&tape[1], TapeOp::Feedback { .. }));
+            assert_eq!(classical_schedule_record_position(&tape, Some(1)), 2);
+        }
+    }
+
+    #[test]
+    fn scheduled_feedback_retains_equal_and_later_record_index_barriers() {
+        // Hand-built invalid-source tapes exercise the defensive admission guard,
+        // rather than relying only on the parser's earlier-record restriction.
+        for input in [1, 2] {
+            let mut tape = vec![
+                TapeOp::Feedback {
+                    condition: Condition::Record(input),
+                    pauli: classical_schedule_pauli(2, &[], &[1]),
+                },
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[0]), Some(1), None),
+            ];
+            schedule_measurements(&mut tape, &mut 0).unwrap();
+            assert!(matches!(&tape[0], TapeOp::Feedback { .. }));
+            assert_eq!(classical_schedule_record_position(&tape, Some(1)), 1);
+        }
+    }
+
+    #[test]
+    fn scheduled_annotations_allow_empty_duplicate_and_recordless_crossings() {
+        for (offsets, record) in [
+            (Vec::new(), Some(1)),
+            (vec![0, 0], Some(1)),
+            (vec![0, 0], None),
+        ] {
+            let expected_offsets = offsets.clone();
+            let mut tape = vec![
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[1]), Some(0), None),
+                TapeOp::Annotation {
+                    offsets,
+                    observable: Some(7),
+                },
+                classical_schedule_measure(
+                    classical_schedule_pauli(2, &[], &[0]),
+                    record,
+                    Some(classical_schedule_pauli(2, &[0], &[])),
+                ),
+            ];
+            schedule_measurements(&mut tape, &mut 0).unwrap();
+            let reader = tape
+                .iter()
+                .position(|op| matches!(op, TapeOp::Annotation { .. }))
+                .unwrap();
+            assert!(classical_schedule_record_position(&tape, Some(0)) < reader);
+            assert!(classical_schedule_record_position(&tape, record) < reader);
+            let TapeOp::Annotation {
+                offsets,
+                observable,
+            } = &tape[reader]
+            else {
+                unreachable!()
+            };
+            assert_eq!(offsets, &expected_offsets);
+            assert_eq!(*observable, Some(7));
+        }
+    }
+
+    #[test]
+    fn scheduled_annotations_retain_equal_and_later_record_index_barriers() {
+        for offsets in [vec![1], vec![2], vec![0, 2]] {
+            let mut tape = vec![
+                TapeOp::Annotation {
+                    offsets,
+                    observable: None,
+                },
+                classical_schedule_measure(classical_schedule_pauli(2, &[], &[0]), Some(1), None),
+            ];
+            schedule_measurements(&mut tape, &mut 0).unwrap();
+            assert!(matches!(&tape[0], TapeOp::Annotation { .. }));
+            assert_eq!(classical_schedule_record_position(&tape, Some(1)), 1);
+        }
+    }
+
+    #[test]
+    fn scheduled_annotation_scan_budget_accepts_exact_boundary_and_stops_next_attempt() {
+        // 64 words * 62_500 offsets = exactly 4_000_000 units. The next
+        // commuting producer comparison must stop; one extra offset stops
+        // before the annotation swap. Each offsets Vec is only about 0.5 MiB.
+        for (count, expected_position) in [(62_500, 1), (62_501, 2)] {
+            let mut tape = vec![
+                classical_schedule_measure(
+                    classical_schedule_pauli(4096, &[], &[1]),
+                    Some(0),
+                    None,
+                ),
+                TapeOp::Annotation {
+                    offsets: vec![0; count],
+                    observable: None,
+                },
+                classical_schedule_measure(
+                    classical_schedule_pauli(4096, &[], &[0]),
+                    Some(1),
+                    None,
+                ),
+            ];
+            let mut reserved = 23;
+            schedule_measurements(&mut tape, &mut reserved).unwrap();
+            assert_eq!(classical_schedule_record_position(&tape, Some(0)), 0);
+            assert_eq!(
+                classical_schedule_record_position(&tape, Some(1)),
+                expected_position
+            );
+            assert_eq!(reserved, 23);
+        }
+    }
+
+    #[test]
+    fn scheduled_feedback_index_cost_stops_safely_when_only_one_word_scan_remains() {
+        // After the annotation swap, 64 or 128 units remain. Feedback costs
+        // 2 * 64, including its index guard: only the second case may swap.
+        for (count, expected_position) in [(62_499, 2), (62_498, 1)] {
+            let mut tape = vec![
+                classical_schedule_measure(
+                    classical_schedule_pauli(4096, &[], &[1]),
+                    Some(0),
+                    None,
+                ),
+                TapeOp::Feedback {
+                    condition: Condition::Record(0),
+                    pauli: classical_schedule_pauli(4096, &[], &[1]),
+                },
+                TapeOp::Annotation {
+                    offsets: vec![0; count],
+                    observable: Some(2),
+                },
+                classical_schedule_measure(
+                    classical_schedule_pauli(4096, &[], &[0]),
+                    Some(1),
+                    None,
+                ),
+            ];
+            schedule_measurements(&mut tape, &mut 0).unwrap();
+            assert_eq!(classical_schedule_record_position(&tape, Some(0)), 0);
+            assert_eq!(
+                classical_schedule_record_position(&tape, Some(1)),
+                expected_position
+            );
+        }
+    }
+
     #[test]
     fn compiled_positive_tiny_projection_is_normalized_without_a_cutoff() {
         let plan = CompiledNearCliffordExecutor {
@@ -3049,10 +3916,13 @@ mod tests {
             measurement_count: 0,
             peak_active_rank: 1,
             prefix_len: 0,
+            rotation_arithmetic: CompiledRotationArithmetic::Strict,
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
             random_kinds: Vec::new(),
             random_runs: None,
             noise_event_count: 0,
+            independent_event_count: 0,
+            scalar_basis: None,
         };
         let mut sampler = plan.prepare_sampler().unwrap();
         sampler.coefficients = vec![ComplexAmp::new(1., 0.), ComplexAmp::new(1e-16, 0.)];
@@ -3067,5 +3937,872 @@ mod tests {
         };
         sampler.project(&p, 0, false, true).unwrap();
         assert_eq!(sampler.coefficients, vec![ComplexAmp::new(1., 0.)]);
+    }
+}
+
+#[cfg(test)]
+mod row_random_log_cache_tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    // Frozen old scalar policy. It deliberately recomputes log(1-p) at every
+    // renewal and contains no cache or calls to the new RowRandom implementation.
+    struct LegacyRowRandom<'a, R> {
+        tape: Option<&'a [u64]>,
+        cursor: usize,
+        rng: &'a mut R,
+        bit_word: u64,
+        bits_left: u8,
+        noise_probability: u64,
+        noise_skip: Option<usize>,
+    }
+    impl<'a, R: Rng> LegacyRowRandom<'a, R> {
+        fn live(rng: &'a mut R) -> Self {
+            Self {
+                tape: None,
+                cursor: 0,
+                rng,
+                bit_word: 0,
+                bits_left: 0,
+                noise_probability: 0,
+                noise_skip: None,
+            }
+        }
+        fn recorded(tape: &'a [u64], rng: &'a mut R) -> Self {
+            Self {
+                tape: Some(tape),
+                ..Self::live(rng)
+            }
+        }
+        #[inline]
+        fn draw(&mut self, kind: RandomKind) -> u64 {
+            if let Some(tape) = self.tape {
+                let value = tape[self.cursor];
+                self.cursor += 1;
+                value
+            } else {
+                match kind {
+                    RandomKind::Independent => {
+                        if self.bits_left == 0 {
+                            self.bit_word = self.rng.r#gen::<u64>();
+                            self.bits_left = 64;
+                        }
+                        let bit = self.bit_word & 1;
+                        self.bit_word >>= 1;
+                        self.bits_left -= 1;
+                        bit
+                    }
+                    RandomKind::Noise {
+                        probability,
+                        choices,
+                    } if (1e-12..=0.01).contains(&probability) => {
+                        // IID Bernoulli failures before the next success follow a geometric
+                        // law. Renewing this run avoids a uniform draw at each sparse site.
+                        // The run and unused bit pool end at each row, making call splits
+                        // independent of execution strategy. All channels remain Pauli.
+                        if self.noise_probability != probability.to_bits() {
+                            self.noise_skip = None;
+                            self.noise_probability = probability.to_bits();
+                        }
+                        let skip = self.noise_skip.get_or_insert_with(|| {
+                            let u = self.rng.r#gen::<f64>();
+                            ((-u).ln_1p() / (-probability).ln_1p()).floor() as usize
+                        });
+                        if *skip != 0 {
+                            *skip -= 1;
+                            0
+                        } else {
+                            self.noise_skip = None;
+                            if choices == 1 {
+                                1
+                            } else {
+                                (self.rng.gen_range(0..choices) + 1) as u64
+                            }
+                        }
+                    }
+                    RandomKind::Active => self.rng.r#gen::<f64>().to_bits(),
+                    RandomKind::Noise {
+                        probability,
+                        choices,
+                    } => {
+                        if !near_noise_occurs(probability, self.rng) {
+                            0
+                        } else if choices == 1 {
+                            1
+                        } else {
+                            (self.rng.gen_range(0..choices) + 1) as u64
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn noise(probability: f64, choices: usize) -> RandomKind {
+        RandomKind::Noise {
+            probability,
+            choices,
+        }
+    }
+
+    fn assert_same_state(legacy: &LegacyRowRandom<'_, StdRng>, cached: &RowRandom<'_, StdRng>) {
+        assert_eq!(legacy.cursor, cached.cursor);
+        assert_eq!(legacy.bit_word, cached.bit_word);
+        assert_eq!(legacy.bits_left, cached.bits_left);
+        assert_eq!(legacy.noise_probability, cached.noise_probability);
+        assert_eq!(legacy.noise_skip, cached.noise_skip);
+        assert_eq!(
+            (*legacy.rng).clone().next_u64(),
+            (*cached.rng).clone().next_u64()
+        );
+        if cached.noise_log_failure != 0. {
+            let probability = f64::from_bits(cached.noise_probability);
+            assert_eq!(
+                cached.noise_log_failure.to_bits(),
+                (-probability).ln_1p().to_bits()
+            );
+        }
+    }
+
+    fn event_schedule() -> Vec<RandomKind> {
+        let mut kinds = Vec::new();
+        for (kind, count) in [
+            (RandomKind::Independent, 63),
+            (RandomKind::Active, 2),
+            (RandomKind::Independent, 2),
+            (noise(0.01, 1), 4097),
+            (noise(0.01, 3), 129),
+            (noise(0.37, 15), 3),
+            (RandomKind::Active, 3),
+            (noise(0., 1), 5),
+            (noise(-0., 15), 2),
+            (noise(1., 1), 3),
+            (noise(1., 15), 9),
+            (noise(0.01, 15), 129),
+            (RandomKind::Independent, 65),
+            (noise(1e-12, 3), 130),
+            (noise(f64::from_bits(1e-12f64.to_bits() - 1), 15), 5),
+            (noise(1e-12, 1), 65),
+            (noise(0.001, 15), 2049),
+            (noise(0.001, 1), 129),
+            (noise(f64::from_bits(0.01f64.to_bits() + 1), 3), 7),
+            (noise(0.01, 15), 1025),
+            (RandomKind::Independent, 129),
+        ] {
+            kinds.extend(std::iter::repeat_n(kind, count));
+        }
+        kinds
+    }
+
+    #[test]
+    fn scalar_cache_matches_frozen_old_policy_after_every_typed_call() {
+        let kinds = event_schedule();
+        for seed in [0, 1, 63, 64, 65, 2415] {
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            for _row in 0..3 {
+                let mut legacy = LegacyRowRandom::live(&mut a);
+                let mut cached = RowRandom::live(&mut b);
+                for &kind in &kinds {
+                    assert_eq!(legacy.draw(kind), cached.draw(kind));
+                    assert_same_state(&legacy, &cached);
+                }
+            }
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
+    fn prepared_scalar_switches_match_frozen_old_typed_calls() {
+        let kinds = event_schedule();
+        let chunks = [1, 63, 2, 64, 65, 129, 7, 3];
+        for seed in [0, 1, 65, 2415] {
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            let mut legacy = LegacyRowRandom::live(&mut a);
+            let mut cached = RowRandom::live(&mut b);
+            let mut offset = 0;
+            let mut chunk = 0;
+            while offset < kinds.len() {
+                let end = (offset + chunks[chunk % chunks.len()]).min(kinds.len());
+                let events = &kinds[offset..end];
+                let expected = events
+                    .iter()
+                    .map(|&kind| legacy.draw(kind))
+                    .collect::<Vec<_>>();
+                let actual = if chunk % 2 == 0 {
+                    let mut actual = vec![u64::MAX; events.len()];
+                    RandomRunPlan::build(events, PLAN_BYTE_BUDGET)
+                        .unwrap()
+                        .fill_row(&mut cached, events, &mut actual);
+                    actual
+                } else {
+                    events
+                        .iter()
+                        .map(|&kind| cached.draw(kind))
+                        .collect::<Vec<_>>()
+                };
+                assert_eq!(expected, actual);
+                assert_same_state(&legacy, &cached);
+                offset = end;
+                chunk += 1;
+            }
+            drop(legacy);
+            drop(cached);
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
+    fn zero_skip_and_same_probability_survive_direct_noise_and_choice_changes() {
+        let p: f64 = 0.01;
+        let mut a = StdRng::seed_from_u64(81);
+        let mut b = a.clone();
+        let mut legacy = LegacyRowRandom::live(&mut a);
+        let mut cached = RowRandom::live(&mut b);
+        // Hand-seeded legacy state remains a supported test fixture: a scalar
+        // renewal can initialize the cache lazily without altering the carry.
+        legacy.noise_probability = p.to_bits();
+        cached.noise_probability = p.to_bits();
+        legacy.noise_skip = Some(3);
+        cached.noise_skip = Some(3);
+        let skipped = [noise(p, 1), noise(p, 3), noise(p, 15)];
+        let expected = skipped.map(|kind| legacy.draw(kind));
+        let mut actual = [u64::MAX; 3];
+        RandomRunPlan::build(&skipped, PLAN_BYTE_BUDGET)
+            .unwrap()
+            .fill_row(&mut cached, &skipped, &mut actual);
+        assert_eq!(expected, actual);
+        assert_eq!(cached.noise_skip, Some(0));
+        let log = cached.noise_log_failure.to_bits();
+        for kind in [
+            noise(0.37, 15),
+            noise(0., 1),
+            noise(1., 15),
+            RandomKind::Active,
+            RandomKind::Independent,
+        ] {
+            assert_eq!(legacy.draw(kind), cached.draw(kind));
+            assert_same_state(&legacy, &cached);
+            assert_eq!(cached.noise_skip, Some(0));
+            assert_eq!(cached.noise_log_failure.to_bits(), log);
+        }
+        assert_eq!(legacy.draw(noise(p, 15)), cached.draw(noise(p, 15)));
+        assert_eq!(cached.noise_skip, None); // Success renews only on the next event.
+        assert_eq!(legacy.draw(noise(p, 3)), cached.draw(noise(p, 3)));
+        assert_same_state(&legacy, &cached);
+        assert_eq!(cached.noise_log_failure.to_bits(), log);
+        assert_eq!(legacy.draw(noise(0.001, 15)), cached.draw(noise(0.001, 15)));
+        assert_same_state(&legacy, &cached);
+        assert_eq!(
+            cached.noise_log_failure.to_bits(),
+            (-0.001f64).ln_1p().to_bits()
+        );
+    }
+
+    #[test]
+    fn empty_prepared_and_recorded_replay_do_not_modify_cached_state_or_rng() {
+        let kinds = [
+            noise(0.01, 15),
+            RandomKind::Active,
+            RandomKind::Independent,
+            noise(0.001, 3),
+            noise(0.37, 15),
+        ];
+        let mut a = StdRng::seed_from_u64(2415);
+        let mut b = a.clone();
+        let row = {
+            let mut legacy = LegacyRowRandom::live(&mut a);
+            kinds.map(|kind| legacy.draw(kind))
+        };
+        {
+            let mut legacy = LegacyRowRandom::live(&mut b);
+            for &kind in &kinds {
+                legacy.draw(kind);
+            }
+        }
+        assert_eq!(a.clone().next_u64(), b.clone().next_u64());
+        let mut legacy = LegacyRowRandom::recorded(&row, &mut a);
+        let mut cached = RowRandom::recorded(&row, &mut b);
+        cached.noise_probability = 0.01f64.to_bits();
+        cached.noise_log_failure = (-0.01f64).ln_1p();
+        cached.noise_skip = Some(0);
+        legacy.noise_probability = cached.noise_probability;
+        legacy.noise_skip = cached.noise_skip;
+        let before = cached.noise_log_failure.to_bits();
+        RandomRunPlan::build(&[], PLAN_BYTE_BUDGET)
+            .unwrap()
+            .fill_row(&mut cached, &[], &mut []);
+        assert_eq!(cached.noise_log_failure.to_bits(), before);
+        for kind in kinds {
+            assert_eq!(legacy.draw(kind), cached.draw(kind));
+            assert_same_state(&legacy, &cached);
+            assert_eq!(cached.noise_log_failure.to_bits(), before);
+            assert_eq!(cached.noise_skip, Some(0));
+        }
+        assert_eq!(cached.cursor, kinds.len());
+        legacy.cursor = 0;
+        cached.cursor = 0;
+        let expected = kinds.map(|kind| legacy.draw(kind));
+        let mut actual = [u64::MAX; 5];
+        RandomRunPlan::build(&kinds, PLAN_BYTE_BUDGET)
+            .unwrap()
+            .fill_row(&mut cached, &kinds, &mut actual);
+        assert_eq!(expected, actual);
+        assert_same_state(&legacy, &cached);
+        assert_eq!(cached.noise_log_failure.to_bits(), before);
+        assert_eq!(cached.noise_skip, Some(0));
+        drop(legacy);
+        drop(cached);
+        assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage() {
+        assert!(
+            size_of::<RowRandom<'static, StdRng>>()
+                <= size_of::<LegacyRowRandom<'static, StdRng>>() + size_of::<f64>()
+        );
+    }
+}
+
+#[cfg(test)]
+mod scalar_prepared_tape_tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    // Exact baseline live typed policy, captured before the new row strategy.
+    // It never calls production RowRandom or the prepared run implementation.
+    struct FrozenScalarRowRandom<'a, R> {
+        tape: Option<&'a [u64]>,
+        cursor: usize,
+        rng: &'a mut R,
+        bit_word: u64,
+        bits_left: u8,
+        noise_probability: u64,
+        // Zero is an uninitialized sentinel: every valid sparse log(1-p) is finite and negative.
+        noise_log_failure: f64,
+        noise_skip: Option<usize>,
+    }
+    impl<'a, R: Rng> FrozenScalarRowRandom<'a, R> {
+        fn live(rng: &'a mut R) -> Self {
+            Self {
+                tape: None,
+                cursor: 0,
+                rng,
+                bit_word: 0,
+                bits_left: 0,
+                noise_probability: 0,
+                noise_log_failure: 0.,
+                noise_skip: None,
+            }
+        }
+        fn recorded(tape: &'a [u64], rng: &'a mut R) -> Self {
+            Self {
+                tape: Some(tape),
+                ..Self::live(rng)
+            }
+        }
+        #[inline]
+        fn draw(&mut self, kind: RandomKind) -> u64 {
+            if let Some(tape) = self.tape {
+                let value = tape[self.cursor];
+                self.cursor += 1;
+                value
+            } else {
+                match kind {
+                    RandomKind::Independent => {
+                        if self.bits_left == 0 {
+                            self.bit_word = self.rng.r#gen::<u64>();
+                            self.bits_left = 64;
+                        }
+                        let bit = self.bit_word & 1;
+                        self.bit_word >>= 1;
+                        self.bits_left -= 1;
+                        bit
+                    }
+                    RandomKind::Noise {
+                        probability,
+                        choices,
+                    } if (1e-12..=0.01).contains(&probability) => {
+                        // IID Bernoulli failures before the next success follow a geometric
+                        // law. Renewing this run avoids a uniform draw at each sparse site.
+                        // The run and unused bit pool end at each row, making call splits
+                        // independent of execution strategy. All channels remain Pauli.
+                        if self.noise_probability != probability.to_bits() {
+                            self.noise_skip = None;
+                            self.noise_probability = probability.to_bits();
+                            self.noise_log_failure = 0.;
+                        }
+                        let skip = self.noise_skip.get_or_insert_with(|| {
+                            let u = self.rng.r#gen::<f64>();
+                            // Cache only the deterministic denominator. Draw expression,
+                            // typed uniform and exact no-prefetch boundaries are unchanged.
+                            if self.noise_log_failure == 0. {
+                                self.noise_log_failure = (-probability).ln_1p();
+                            }
+                            ((-u).ln_1p() / self.noise_log_failure).floor() as usize
+                        });
+                        if *skip != 0 {
+                            *skip -= 1;
+                            0
+                        } else {
+                            self.noise_skip = None;
+                            if choices == 1 {
+                                1
+                            } else {
+                                (self.rng.gen_range(0..choices) + 1) as u64
+                            }
+                        }
+                    }
+                    RandomKind::Active => self.rng.r#gen::<f64>().to_bits(),
+                    RandomKind::Noise {
+                        probability,
+                        choices,
+                    } => {
+                        if !near_noise_occurs(probability, self.rng) {
+                            0
+                        } else if choices == 1 {
+                            1
+                        } else {
+                            (self.rng.gen_range(0..choices) + 1) as u64
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn mixed_plan() -> CompiledNearCliffordExecutor {
+        let text = "H 0 1 2 3\nT 0 1 2 3\nREPEAT 129 {\nX_ERROR(0.001) 0 4 0 4\nDEPOLARIZE1(0.001) 4\nDEPOLARIZE2(0.001) 0 1\nR 4\nH 4\nMR(0.001) !4\nCX rec[-1] 0\n}\nDEPOLARIZE1(0) 1\nX_ERROR(1) 4\nDEPOLARIZE2(1) 0 1\nY_ERROR(0.37) 2\nMPP(0.007) !Y0*X1 X0*!Y1\nMRX(0.37) !0\nCX rec[-1] 3\nCX sweep[1] 2\nT_DAG 1\nMY 2\nMX 3\nM(1) 0 1 4\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(2) rec[-3]\n";
+        let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
+        assert!(plan.noise_event_count >= 128);
+        assert!(plan.independent_event_count >= 129);
+        assert!(plan.random_runs.is_some());
+        plan
+    }
+
+    fn without_runs(plan: &CompiledNearCliffordExecutor) -> CompiledNearCliffordExecutor {
+        let mut baseline = plan.clone();
+        baseline.random_runs = None; // Same quantum plan, explicit original live scalar policy.
+        baseline
+    }
+
+    fn flatten(shots: &[NearCliffordShot]) -> Vec<u8> {
+        shots
+            .iter()
+            .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
+            .collect()
+    }
+
+    #[test]
+    fn single_row_prepared_values_and_replay_match_frozen_old_typed_policy() {
+        let plan = mixed_plan();
+        for seed in [0, 1, 63, 65, 2415] {
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            for _row in 0..3 {
+                let expected = {
+                    let mut old = FrozenScalarRowRandom::live(&mut a);
+                    plan.random_kinds
+                        .iter()
+                        .map(|&kind| old.draw(kind))
+                        .collect::<Vec<_>>()
+                };
+                let mut actual = vec![u64::MAX; plan.random_kinds.len()];
+                plan.random_runs.as_ref().unwrap().fill_row(
+                    &mut RowRandom::live(&mut b),
+                    &plan.random_kinds,
+                    &mut actual,
+                );
+                assert_eq!(actual, expected);
+                assert_eq!(a.clone().next_u64(), b.clone().next_u64());
+                let mut old = FrozenScalarRowRandom::recorded(&expected, &mut a);
+                let mut replay = RowRandom::recorded(&actual, &mut b);
+                for &kind in &plan.random_kinds {
+                    assert_eq!(old.draw(kind), replay.draw(kind));
+                }
+                assert_eq!(old.cursor, replay.cursor);
+            }
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
+    fn structured_prepared_rows_match_same_plan_old_scalar_across_cache_and_call_sizes() {
+        let plan = mixed_plan();
+        let baseline = without_runs(&plan);
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        let sweep = [false, true];
+        for cache in [0, 1, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
+            for shots in [0, 1, 31, 32, 64, 65, 129] {
+                let mut a = StdRng::seed_from_u64(3715);
+                let mut b = a.clone();
+                let mut old = baseline.prepare_sampler_with_cache_budget(cache).unwrap();
+                let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                let expected = old.sample_with_sweep(shots, &sweep, &mut a).unwrap();
+                let actual = prepared.sample_with_sweep(shots, &sweep, &mut b).unwrap();
+                assert_eq!(actual, expected); // Includes annotation fields, not only bits.
+                assert!(!old.last_scalar_prepared);
+                assert_eq!(prepared.last_scalar_prepared, shots != 0);
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+        }
+    }
+
+    #[test]
+    fn flat_and_split_calls_match_old_scalar_not_a_new_packet_oracle() {
+        let plan = mixed_plan();
+        let baseline = without_runs(&plan);
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
+            for sweep in [vec![], vec![false, true]] {
+                for shots in [0, 1, 31, 32, 64, 65, 129] {
+                    let mut a = StdRng::seed_from_u64(3716);
+                    let mut b = a.clone();
+                    let expected = baseline
+                        .prepare_sampler_with_cache_budget(cache)
+                        .unwrap()
+                        .sample_with_sweep(shots, &sweep, &mut a)
+                        .unwrap();
+                    let actual = plan
+                        .prepare_sampler_with_cache_budget(cache)
+                        .unwrap()
+                        .sample_measurements_u8_with_sweep(shots, &sweep, &mut b)
+                        .unwrap();
+                    assert_eq!(actual.measurements, flatten(&expected));
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                for parts in [
+                    vec![1, 128],
+                    vec![31, 98],
+                    vec![32, 97],
+                    vec![64, 65],
+                    vec![65, 64],
+                    vec![129, 0],
+                    vec![1, 31, 32, 64, 1],
+                ] {
+                    let mut a = StdRng::seed_from_u64(3717);
+                    let mut b = a.clone();
+                    let expected = baseline
+                        .prepare_sampler_with_cache_budget(cache)
+                        .unwrap()
+                        .sample_with_sweep(129, &sweep, &mut a)
+                        .unwrap();
+                    let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut c = StdRng::seed_from_u64(3717);
+                    let mut actual = Vec::new();
+                    let mut structured_actual = Vec::new();
+                    for shots in parts {
+                        actual.extend(
+                            prepared
+                                .sample_measurements_u8_with_sweep(shots, &sweep, &mut b)
+                                .unwrap()
+                                .measurements,
+                        );
+                        structured_actual
+                            .extend(structured.sample_with_sweep(shots, &sweep, &mut c).unwrap());
+                    }
+                    assert_eq!(actual, flatten(&expected));
+                    assert_eq!(structured_actual, expected);
+                    let continuation = a.next_u64();
+                    assert_eq!(continuation, b.next_u64());
+                    assert_eq!(continuation, c.next_u64());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scalar_reuses_full_packet_tape_without_shrinking_and_preserves_later_packets() {
+        let plan = mixed_plan();
+        let baseline = without_runs(&plan);
+        let mut a = StdRng::seed_from_u64(3718);
+        let mut b = a.clone();
+        let mut old = baseline.prepare_sampler().unwrap();
+        let mut mixed = plan.prepare_sampler().unwrap();
+        let sweep = [false, true];
+        assert_eq!(
+            mixed
+                .sample_measurements_u8_with_sweep(64, &sweep, &mut b)
+                .unwrap()
+                .measurements,
+            flatten(&old.sample_with_sweep(64, &sweep, &mut a).unwrap())
+        );
+        let capacity = mixed.packet_tape.capacity();
+        let len = mixed.packet_tape.len();
+        assert!(len >= 64 * plan.random_kinds.len());
+        assert_eq!(
+            mixed.sample_with_sweep(1, &sweep, &mut b).unwrap(),
+            old.sample_with_sweep(1, &sweep, &mut a).unwrap()
+        );
+        assert!(mixed.last_scalar_prepared);
+        assert_eq!(mixed.packet_tape.capacity(), capacity);
+        assert_eq!(mixed.packet_tape.len(), len);
+        assert_eq!(
+            mixed
+                .sample_measurements_u8_with_sweep(65, &sweep, &mut b)
+                .unwrap()
+                .measurements,
+            flatten(&old.sample_with_sweep(65, &sweep, &mut a).unwrap())
+        );
+        assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn actual_shared_capacity_budget_rejection_falls_back_to_original_live_scalar() {
+        let plan = mixed_plan();
+        let baseline = without_runs(&plan);
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        resize_packet(&mut prepared.packet_x, plan.num_qubits).unwrap();
+        resize_packet(&mut prepared.packet_z, plan.num_qubits).unwrap();
+        resize_packet(&mut prepared.packet_records, plan.measurement_count).unwrap();
+        resize_packet(&mut prepared.packet_noise_masks, plan.noise_event_count).unwrap();
+        prepared.packet_independent =
+            IndependentPacket::new(plan.independent_event_count, PACKET_BYTE_BUDGET);
+        assert!(prepared.packet_independent.is_some());
+        assert!(prepared.try_prepare_scalar_tape(PACKET_BYTE_BUDGET));
+        let occupied = prepared.scalar_tape_other_bytes().unwrap()
+            + prepared.packet_tape.capacity() * size_of::<u64>();
+        assert!(occupied <= PACKET_BYTE_BUDGET);
+        let capacity = prepared.packet_tape.capacity();
+        for (budget, expected_prepared) in [(0, false), (occupied - 1, false), (occupied, true)] {
+            let mut a = StdRng::seed_from_u64(3719);
+            let mut b = a.clone();
+            let expected = baseline
+                .prepare_sampler_with_cache_budget(0)
+                .unwrap()
+                .row(&[], &mut a)
+                .unwrap();
+            let actual = prepared
+                .row_with_scalar_tape_budget(&[], &mut b, budget)
+                .unwrap();
+            assert_eq!(expected, actual);
+            assert_eq!(prepared.last_scalar_prepared, expected_prepared);
+            assert_eq!(prepared.packet_tape.capacity(), capacity);
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+        let mut fresh = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        assert!(!fresh.try_prepare_scalar_tape(0));
+        assert_eq!(fresh.packet_tape.capacity(), 0); // Rejects before allocation/growth.
+    }
+
+    #[test]
+    fn below_uniform_noise_threshold_retains_live_scalar_without_tape() {
+        let count = MIN_SCALAR_PREPARED_NOISE_EVENTS - 1;
+        let text = format!("H 0\nT 0\nREPEAT {count} {{\nX_ERROR(0.001) 0\n}}\nMX 0\n");
+        let plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
+        let baseline = without_runs(&plan);
+        assert_eq!(plan.noise_event_count, count);
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut a = StdRng::seed_from_u64(3723);
+        let mut b = a.clone();
+        assert_eq!(
+            prepared.sample(1, &mut a).unwrap(),
+            baseline
+                .prepare_sampler_with_cache_budget(0)
+                .unwrap()
+                .sample(1, &mut b)
+                .unwrap()
+        );
+        assert!(!prepared.last_scalar_prepared);
+        assert_eq!(prepared.packet_tape.capacity(), 0);
+        assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn zero_calls_and_output_errors_do_not_draw_or_allocate_scalar_tape() {
+        let plan = mixed_plan();
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut a = StdRng::seed_from_u64(3720);
+        let mut b = a.clone();
+        assert!(prepared.sample(0, &mut a).unwrap().is_empty());
+        assert!(
+            prepared
+                .sample_measurements_u8(0, &mut a)
+                .unwrap()
+                .measurements
+                .is_empty()
+        );
+        assert_eq!(prepared.packet_tape.capacity(), 0);
+        assert!(!prepared.last_scalar_prepared);
+        assert!(prepared.sample_measurements_u8(usize::MAX, &mut a).is_err());
+        assert!(prepared.sample(usize::MAX, &mut a).is_err());
+        assert_eq!(prepared.packet_tape.capacity(), 0);
+        assert_eq!(a.next_u64(), b.next_u64());
+        let empty = CompiledNearCliffordExecutor::compile_text("I 0\n").unwrap();
+        let mut sampler = empty.prepare_sampler().unwrap();
+        let mut a = StdRng::seed_from_u64(3721);
+        let mut b = a.clone();
+        assert!(
+            sampler
+                .sample(129, &mut a)
+                .unwrap()
+                .iter()
+                .all(|shot| shot.measurements.is_empty())
+        );
+        assert_eq!(sampler.packet_tape.capacity(), 0);
+        assert!(!sampler.last_scalar_prepared);
+        assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn execution_error_restores_tape_and_does_not_retry_or_redraw() {
+        let mut text = String::from("H 0\nT 0\nMX 0\n");
+        text.push_str("REPEAT 129 {\nX_ERROR(0.001) 1\n}\nM 1\n");
+        let mut plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
+        assert!(plan.noise_event_count >= 128);
+        // Deliberately invalid quantum state exercises the existing logical Err.
+        // Failed-call prefix equality is not a cross-strategy API contract.
+        plan.initial_coefficients =
+            Arc::new(vec![ComplexAmp::default(); plan.initial_coefficients.len()]);
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut a = StdRng::seed_from_u64(3722);
+        let mut expected_rng = a.clone();
+        {
+            let mut frozen = FrozenScalarRowRandom::live(&mut expected_rng);
+            for &kind in &plan.random_kinds {
+                frozen.draw(kind);
+            }
+        }
+        let baseline = without_runs(&plan);
+        let mut old_rng = StdRng::seed_from_u64(3722);
+        let old_error = baseline
+            .prepare_sampler_with_cache_budget(0)
+            .unwrap()
+            .row(&[], &mut old_rng)
+            .unwrap_err();
+        let prepared_error = prepared.row(&[], &mut a).unwrap_err();
+        assert_eq!(prepared_error, old_error);
+        assert!(prepared.last_scalar_prepared);
+        assert!(prepared.packet_tape.len() >= plan.random_kinds.len());
+        assert_eq!(a.next_u64(), expected_rng.next_u64()); // Exactly one full-row draw.
+    }
+
+    fn mixed_plan_with_arithmetic(
+        policy: CompiledRotationArithmetic,
+    ) -> CompiledNearCliffordExecutor {
+        let text = "H 0 1 2 3\nT 0 1 2 3\nREPEAT 129 {\nX_ERROR(0.001) 0 4 0 4\nDEPOLARIZE1(0.001) 4\nDEPOLARIZE2(0.001) 0 1\nR 4\nH 4\nMR(0.001) !4\nCX rec[-1] 0\n}\nDEPOLARIZE1(0) 1\nX_ERROR(1) 4\nDEPOLARIZE2(1) 0 1\nY_ERROR(0.37) 2\nMPP(0.007) !Y0*X1 X0*!Y1\nMRX(0.37) !0\nCX rec[-1] 3\nCX sweep[1] 2\nT_DAG 1\nMY 2\nMX 3\nM(1) 0 1 4\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(2) rec[-3]\n";
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, policy).unwrap();
+        assert!(plan.noise_event_count >= 128);
+        assert!(plan.independent_event_count >= 129);
+        assert!(plan.random_runs.is_some());
+        plan
+    }
+
+    #[test]
+    fn both_arithmetic_policies_preserve_full_raw_rows_rng_and_cache_across_cold_warm_tails() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = mixed_plan_with_arithmetic(policy);
+            let baseline = without_runs(&plan);
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
+                for seed in [0, 63, 3716] {
+                    let mut a = StdRng::seed_from_u64(seed);
+                    let mut b = a.clone();
+                    let mut c = a.clone();
+                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    old.pack_enabled = false;
+                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    structured.pack_enabled = false;
+                    // First call is cold; repeated 64/65 calls retain warmed
+                    // transition state. Measurements include physical resets,
+                    // readout inversions, MPP, feedback and 129 independent events.
+                    for shots in [0, 1, 7, 31, 32, 63, 64, 65, 129, 64, 1, 65] {
+                        let expected = old
+                            .sample_with_sweep(shots, &[false, true], &mut a)
+                            .unwrap();
+                        let raw = flat
+                            .sample_measurements_u8_with_sweep(shots, &[false, true], &mut b)
+                            .unwrap();
+                        let actual = structured
+                            .sample_with_sweep(shots, &[false, true], &mut c)
+                            .unwrap();
+                        assert_eq!(
+                            raw.measurements,
+                            flatten(&expected),
+                            "policy={policy:?}; cache={cache}; seed={seed}; shots={shots}"
+                        );
+                        assert_eq!(
+                            actual, expected,
+                            "policy={policy:?}; all structured annotation fields"
+                        );
+                        // Cloned continuation leaves the live streams undisturbed.
+                        assert_eq!(a.clone().next_u64(), b.clone().next_u64());
+                        assert_eq!(a.clone().next_u64(), c.clone().next_u64());
+                        assert!(!old.last_scalar_prepared);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn both_arithmetic_policies_preserve_split_raw_streams_rng_and_annotation_fields() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = mixed_plan_with_arithmetic(policy);
+            let baseline = without_runs(&plan);
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
+                for parts in [
+                    vec![1, 128],
+                    vec![31, 98],
+                    vec![32, 97],
+                    vec![64, 65],
+                    vec![65, 64],
+                    vec![129, 0],
+                    vec![0, 1, 7, 24, 32, 64, 1],
+                ] {
+                    let mut a = StdRng::seed_from_u64(3717);
+                    let mut b = a.clone();
+                    let mut c = a.clone();
+                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    old.pack_enabled = false;
+                    let expected = old.sample_with_sweep(129, &[false, true], &mut a).unwrap();
+                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    structured.pack_enabled = false;
+                    let mut raw = Vec::new();
+                    let mut actual = Vec::new();
+                    for shots in parts {
+                        raw.extend(
+                            flat.sample_measurements_u8_with_sweep(shots, &[false, true], &mut b)
+                                .unwrap()
+                                .measurements,
+                        );
+                        actual.extend(
+                            structured
+                                .sample_with_sweep(shots, &[false, true], &mut c)
+                                .unwrap(),
+                        );
+                    }
+                    assert_eq!(raw, flatten(&expected), "policy={policy:?}; cache={cache}");
+                    assert_eq!(actual, expected);
+                    assert_eq!(a.clone().next_u64(), b.clone().next_u64());
+                    assert_eq!(a.clone().next_u64(), c.clone().next_u64());
+                }
+            }
+        }
     }
 }

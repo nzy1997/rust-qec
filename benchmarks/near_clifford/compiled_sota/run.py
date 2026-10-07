@@ -19,6 +19,7 @@ ROOT = HERE.parents[2]
 BACKENDS = ['rstim', 'clifft', 'clifft-scheduled', 'symft']
 BATCHES = [1, 64, 256, 1024, 'auto']
 RSTIM_API = 'CompiledNearCliffordExecutor'
+RSTIM_ROTATION_ARITHMETIC = 'fused'
 
 
 def batches(backend):
@@ -110,6 +111,13 @@ def bind_input(payload, expected):
     return payload
 
 
+def bind_arithmetic(payload):
+    """Require the immutable policy reported by the actual compiled plan getter."""
+    if payload.get('rotation_arithmetic') != RSTIM_ROTATION_ARITHMETIC:
+        raise ValueError('compiled rotation arithmetic differs from frozen fused policy')
+    return payload
+
+
 def masks(text, width):
     # Rich fixed set: every marginal, adjacent correlation, four contiguous
     # blocks, full parity, and each original detector/observable parity.
@@ -157,6 +165,7 @@ def report(result):
     lines = ['# Experimental compiled near-Clifford raw-record comparison', '',
         f"Host: {result['host']}. Single CPU thread; full raw records, without postselection.",
         f'rstim API: {RSTIM_API}. Every backend receives the identical native records-only circuit.',
+        f"Rotation arithmetic: {result['rotation_arithmetic']} (rstim immutable plan policy; peer build flags are not attested).",
         'Warm timings exclude output destruction; each raw observation accumulates at least 50 ms of public calls.',
         'Tuning and correctness are outside all measured windows. Ranges describe process medians, not confidence intervals.', '',
         '| Fixture | Shots | rstim ms | Fastest peer ms | rstim speedup | Paired speedup range | Fastest peer |',
@@ -206,6 +215,8 @@ def main():
     if args.out.exists():
         p.error('out must be a fresh nonexistent directory')
     manifest = json.loads((HERE/'manifest.json').read_text())
+    if manifest.get('schema') != 'rstim.near-clifford-compiled-sota.v2' or manifest.get('rstim_api') != RSTIM_API or manifest.get('rotation_arithmetic') != RSTIM_ROTATION_ARITHMETIC:
+        p.error('manifest must freeze compiled-sota v2 with fused rotation arithmetic')
     selected = manifest['cases']
     if args.only:
         if set(args.only)-{c['id'] for c in selected}:
@@ -237,7 +248,7 @@ def main():
     for name, identity in identities.items():
         bind_peer(identity, name, packages, peer_loaded_files)
     symft_revision, symft_source_files = capture_symft_source(args.symft_source)
-    result = {'schema': 'rstim.near-clifford-compiled-sota-results.v1', 'rstim_api': RSTIM_API,
+    result = {'schema': 'rstim.near-clifford-compiled-sota-results.v2', 'rstim_api': RSTIM_API, 'rotation_arithmetic': RSTIM_ROTATION_ARITHMETIC,
         'input_contract': 'identical native records_only circuit for every backend',
         'started': datetime.now(timezone.utc).isoformat(),
         'host': platform.platform(), 'affinity': 'unavailable on macOS; no pinned-core claim',
@@ -261,7 +272,7 @@ def main():
             command=[str(binary), str(path), str(shots), str(repetitions or args.repetitions), '3',
                 'dump' if mode == 'dump' else 'bench']
             if dump_total is not None: command.append(str(dump_total))
-            return bind_input(invoke(command), expected_inputs[path])
+            return bind_arithmetic(bind_input(invoke(command), expected_inputs[path]))
         python = args.symft_python if backend == 'symft' else args.python
         command=[str(python), '-I', str(HERE/'worker.py'), backend, str(path), str(shots),
             '--mode', mode, '--batch', str(batch), '--repetitions', str(repetitions or args.repetitions)]

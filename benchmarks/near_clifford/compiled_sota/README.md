@@ -1,6 +1,7 @@
 # Experimental compiled CPU near-Clifford comparison
 
-This standalone harness measures the opt-in `CompiledNearCliffordExecutor` API.
+This standalone harness measures the opt-in `CompiledNearCliffordExecutor` API
+with explicitly selected `CompiledRotationArithmetic::Fused`.
 It does not establish a SOTA win. The earlier `../sota/` baseline and its results
 are separate, immutable evidence. The frozen manifest preserves its seven
 fixtures and three shot sizes (1, 64, 1024), including published magic-state
@@ -24,7 +25,44 @@ executor's stream. The probe still supplies `SmallRng` from locked rand 0.8.7.
 Distribution comparisons do not require matching random bits between simulators.
 Both timed observations and default/selected validation transcripts must identify
 `api: CompiledNearCliffordExecutor`; the verifier rejects legacy API evidence.
-The manifest and result schemas use the separate compiled-sota v1 namespace.
+The manifest and result schemas use the separate compiled-sota v2 namespace.
+The earlier formal `compiled-full-v1` campaign remains immutable v1/Strict evidence;
+it must be verified with its original frozen v1 harness. This v2 verifier rejects
+v1 data rather than relabeling or resealing it as Fused evidence.
+
+`compile_text` and the other existing public constructors retain Strict by default.
+The v2 probe explicitly calls `compile_text_with_arithmetic(text, Fused)` for both
+its primary plan and every freshly compiled first-call plan. The plan's immutable
+policy governs deterministic-prefix compilation, scalar and packet rotation
+execution, and cached transitions. Fused uses explicit fp64 `mul_add` in the
+rotation update expressions; it does not enable global fast-math, reassociation,
+or reduced precision. Strict and Fused describe distinct floating-point expression
+policies. Roundoff can change a marginal branch decision; cross-policy raw bits or
+caller RNG continuation are not promised identical. Fused publication requires
+separate mathematical and independent physical-executor instrument checks; seeded
+tests require exact raw records and RNG continuation across successful scalar,
+flat, cached and split calls using the same fixed compiled plan and arithmetic
+policy. A different compiler revision or measurement schedule can change typed
+random-event order and its seeded stream. Distribution checks against peers retain
+the existing finite witness and error budget.
+
+The concise `rotation_arithmetic: fused` field occurs in the manifest and result,
+and in every rstim default/selected raw dump and timing observation. Raw metadata
+comes from the actual `rotation_arithmetic()` getter; every fresh first-call plan
+is also checked against the frozen choice before sampling. The launcher rejects
+a wrong or missing raw policy before accepting its output. The offline verifier
+requires the manifest, top-level result and every rstim dump/timing policy to be
+Fused, even after transcript hashes and frozen tuning are recomputed. This field
+identifies rstim's plan only; it is not a claim about a peer wheel's build flags.
+
+Clifft v0.11.0 source at commit `8c5f8143665c24d4a870411e6110a287769f7516`
+uses explicit FMA in its [NEON kernels](https://github.com/unitaryfoundation/clifft/blob/8c5f8143665c24d4a870411e6110a287769f7516/src/clifft/sampling/kernels_neon.cc).
+Its [CMake configuration](https://github.com/unitaryfoundation/clifft/blob/8c5f8143665c24d4a870411e6110a287769f7516/CMakeLists.txt)
+enables `-ffast-math` for GNU/Clang Release and RelWithDebInfo host builds;
+Python builds default to Release. The installed wheel's exact build flags
+are not attested by this protocol. Its version, loaded extension and file hashes
+remain bound to the frozen peer inventory; no identical compiler/arithmetic
+policy across peers is asserted.
 
 Clifft 0.11.0 is tested with both its default compiler and the opt-in active-width
 schedule pass. Clifft independently tunes batch sizes 1/64/256/1024/auto.

@@ -134,7 +134,6 @@ impl RandomRunPlan {
         })
     }
 
-    #[cfg(test)]
     pub(super) fn fill_row<R: Rng>(
         &self,
         random: &mut RowRandom<'_, R>,
@@ -192,6 +191,47 @@ impl RandomRunPlan {
         }
         debug_assert_eq!(event, output.len());
         debug_assert_eq!(noise, noise_masks.len());
+    }
+
+    pub(super) fn fill_row_with_compact_independent<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        output: &mut [u64],
+        noise_masks: &mut [u64],
+        lane_bit: u64,
+        independent_words: &mut [u64],
+    ) {
+        assert_eq!(output.len(), self.event_count);
+        assert_eq!(kinds.len(), self.event_count);
+        debug_assert!(lane_bit.is_power_of_two());
+        let mut event = 0;
+        let mut noise = 0;
+        let mut independent = 0;
+        for run in &self.runs {
+            let end = event + run.count;
+            match run.kind {
+                PreparedRandom::Independent => {
+                    random.fill_independent_words(run.count, independent_words, &mut independent);
+                }
+                PreparedRandom::Noise { .. } | PreparedRandom::Sparse { .. } => {
+                    let noise_end = noise + run.count;
+                    random.fill_prepared_impl(
+                        run.kind,
+                        &mut output[event..end],
+                        Some((&mut noise_masks[noise..noise_end], lane_bit)),
+                        matches!(run.kind, PreparedRandom::Sparse { .. })
+                            .then_some(&kinds[event..end]),
+                    );
+                    noise = noise_end;
+                }
+                _ => random.fill_prepared_impl(run.kind, &mut output[event..end], None, None),
+            }
+            event = end;
+        }
+        debug_assert_eq!(event, output.len());
+        debug_assert_eq!(noise, noise_masks.len());
+        debug_assert_eq!(independent.div_ceil(64), independent_words.len());
     }
 }
 
@@ -324,6 +364,9 @@ impl<R: Rng> RowRandom<'_, R> {
                     self.noise_skip = None;
                     self.noise_probability = probability_bits;
                 }
+                // Live, nonempty prepared runs already own this exact denominator.
+                // Populate it even at the same p, so prepared -> scalar reuses it.
+                self.noise_log_failure = log_failure;
                 let mut offset = 0;
                 while offset < output.len() {
                     let skip = self.noise_skip.get_or_insert_with(|| {
@@ -719,6 +762,7 @@ mod random_event_runs_tests {
         );
         assert_eq!(expected, actual);
         assert_eq!(runs.noise_skip, Some(0));
+        let before_empty_log = runs.noise_log_failure.to_bits();
         runs.fill_prepared(
             PreparedRandom::from_kind(RandomKind::Noise {
                 probability: 0.001,
@@ -728,6 +772,7 @@ mod random_event_runs_tests {
             &[],
         );
         assert_eq!(runs.noise_probability, p.to_bits());
+        assert_eq!(runs.noise_log_failure.to_bits(), before_empty_log);
         assert_eq!(scalar.draw(RandomKind::Active), {
             let mut active = [0];
             runs.fill_prepared(PreparedRandom::Active, &mut active, &[RandomKind::Active]);

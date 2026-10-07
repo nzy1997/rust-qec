@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 from evidence import compact, expand
 from projection import records_only, physical_width
-from run import BACKENDS, BATCHES, HERE, RSTIM_API, batches, bind_input, bind_peer, capture_identities, capture_packages, default_batch, environment_summary, harness_inventory, masks, sha
+from run import BACKENDS, BATCHES, HERE, RSTIM_API, RSTIM_ROTATION_ARITHMETIC, batches, bind_arithmetic, bind_input, bind_peer, capture_identities, capture_packages, default_batch, environment_summary, harness_inventory, masks, sha
 from verify import validate
 from worker import prepare
 
@@ -36,7 +36,7 @@ def fixture():
     packages={name:{'version':version,'files':{f['path']:f['sha256'] for f in identities[name].values()}
         if name in identities else {'/synthetic/site-packages/numpy/__init__.py':'0'*64}}
         for name,version in manifest['baseline_versions'].items()}
-    result={'schema':'rstim.near-clifford-compiled-sota-results.v1','rstim_api':RSTIM_API,
+    result={'schema':'rstim.near-clifford-compiled-sota-results.v2','rstim_api':RSTIM_API, 'rotation_arithmetic':RSTIM_ROTATION_ARITHMETIC,
         'input_contract':'identical native records_only circuit for every backend','subset':True,
         'started':'2026-10-07T00:00:00+00:00','finished':'2026-10-07T00:01:00+00:00',
         'host':'synthetic unit-test data','pairs':1,'repetitions':1,'validation_shots':n,
@@ -56,6 +56,8 @@ def fixture():
             'batch_enabled':batch!='scalar','isolated':True,
             'loaded_files':copy.deepcopy(identities.get('symft' if backend=='symft' else 'clifft')),
             'first_ns':[100],'warm_ns':[500000.0],'warm_totals_ns':[50_000_000],'warm_calls':[100]}
+        if backend == 'rstim':
+            raw['rotation_arithmetic'] = RSTIM_ROTATION_ARITHMETIC
         if dump:
             raw.update(measurements=[0]*(shots*width),call_shots=call_shots)
         return raw
@@ -100,6 +102,7 @@ class ContractTest(unittest.TestCase):
         report=validate(self.result,allow_subset=True)
         self.assertIn('terminal',report)
         self.assertIn(RSTIM_API,report)
+        self.assertIn('Rotation arithmetic: fused',report)
         self.assertIn('identical native',report)
         self.assertIn('Compile ms | Prepare ms | First ms',report)
         self.assertIn('Cache reserved bytes',report)
@@ -218,6 +221,52 @@ class ContractTest(unittest.TestCase):
         self.rejected(lambda r:r.update(input_contract='lowered circuit'))
         self.rejected(lambda r:r['cases'][0]['runs'][0]['rstim'].update(api='NearCliffordExecutor'))
         self.rejected(lambda r:r['cases'][0]['runs'][0]['rstim'].pop('api'))
+
+    def test_rotation_arithmetic_is_frozen_in_launcher_result_and_manifest(self):
+        good={'rotation_arithmetic':'fused'}
+        self.assertEqual(bind_arithmetic(good),good)
+        for wrong in [None,'strict','fast',True,1]:
+            with self.assertRaises(ValueError):bind_arithmetic({'rotation_arithmetic':wrong})
+            self.rejected(lambda r,w=wrong:r.update(rotation_arithmetic=w))
+        with self.assertRaises(ValueError):bind_arithmetic({})
+        self.rejected(lambda r:r.pop('rotation_arithmetic'))
+        self.rejected(lambda r:r.update(schema='rstim.near-clifford-compiled-sota-results.v1'))
+        manifest=json.loads((HERE/'manifest.json').read_text())
+        for wrong in [None,'strict','fast',True,1]:
+            candidate=copy.deepcopy(manifest);candidate['rotation_arithmetic']=wrong
+            with patch('verify.json.loads',return_value=candidate):
+                with self.assertRaisesRegex(ValueError,'compiled manifest arithmetic'):
+                    validate(self.result,allow_subset=True)
+        candidate=copy.deepcopy(manifest);candidate.pop('rotation_arithmetic')
+        with patch('verify.json.loads',return_value=candidate):
+            with self.assertRaises(KeyError):validate(self.result,allow_subset=True)
+
+    def test_rejects_wrong_or_missing_rotation_arithmetic_in_timed_observations(self):
+        for wrong in [None,'strict','fast',True,1]:
+            self.rejected(lambda r,w=wrong:r['cases'][0]['runs'][0]['rstim'].update(rotation_arithmetic=w))
+        self.rejected(lambda r:r['cases'][0]['runs'][0]['rstim'].pop('rotation_arithmetic'))
+
+    def test_rejects_arithmetic_dump_forgery_even_after_resealing_all_hashes(self):
+        def altered(r,selected,mutate):
+            owner=r['tuning'][0] if selected else r['validation'][0]
+            payload=expand(owner['transcripts']['rstim']);mutate(payload)
+            owner['transcripts']['rstim']=compact(payload)
+            hashes=owner['selected_payload_sha256' if selected else 'payload_sha256']
+            name='terminal-64-rstim-selected.json' if selected else 'terminal-rstim-validation.json'
+            hashes[name]=hashed((json.dumps(payload)+'\n').encode())
+        for selected in [False,True]:
+            for mutate in [lambda p:p.pop('rotation_arithmetic'),
+                    lambda p:p.update(rotation_arithmetic='strict'),
+                    lambda p:p.update(rotation_arithmetic=True)]:
+                self.rejected(lambda r,s=selected,m=mutate:altered(r,s,m))
+        # Re-label every rstim observation and rehash both transcripts/tuning.
+        # A self-consistent Strict campaign still cannot enter this Fused freeze.
+        def all_strict(r):
+            r['rotation_arithmetic']='strict'
+            for selected in [False,True]:
+                altered(r,selected,lambda p:p.update(rotation_arithmetic='strict'))
+            r['cases'][0]['runs'][0]['rstim']['rotation_arithmetic']='strict'
+        self.rejected(all_strict)
 
     def test_rejects_invalid_compiled_resource_metadata(self):
         for field, values in [('peak_active_rank',[-1,17,True,1.0]),

@@ -86,5 +86,7 @@ at compile time and samples raw records with a virtual Pauli frame and compact
 amplitudes. The [experimental compiled CPU protocol](compiled_sota/README.md)
 uses identical native MPP/readout inputs for every backend, full observable
 parities, and independently bound consumed-input hashes. Its RNG policy differs
-from the legacy executor; scalar, flat, cached and split calls preserve the
-compiled API's own stream. The earlier matrices and baseline remain separate.
+from the legacy executor; successful scalar, flat, cached and split calls using
+the same fixed compiled plan and arithmetic policy preserve its own stream.
+Changing the compiler revision or measurement schedule can change seeded results.
+The earlier matrices and baseline remain separate.

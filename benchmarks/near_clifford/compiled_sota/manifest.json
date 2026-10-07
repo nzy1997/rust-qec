@@ -1,5 +1,5 @@
 {
-  "schema": "rstim.near-clifford-compiled-sota.v1",
+  "schema": "rstim.near-clifford-compiled-sota.v2",
   "frozen_on": "2026-10-07",
   "output_contract": "all raw measurement records; no postselection; detector/observable-only annotations omitted identically from timed inputs",
   "cases": [
@@ -169,5 +169,6 @@
     "symft_default": "scalar",
     "symft_scalar": "compile_sampler(batch=False, batch_size=0); distinct from batch=True, batch_size=1",
     "peer_identity": "Python -I for workers and package inspection; actual backend wrapper/native extension paths and hashes bound to distribution inventory; strict before/after package/source/import identity guard"
-  }
+  },
+  "rotation_arithmetic": "fused"
 }
