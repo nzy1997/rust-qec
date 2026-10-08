@@ -2715,7 +2715,7 @@ impl CompiledNearCliffordSampler<'_> {
     ) {
         use std::arch::x86_64::*;
         let old_a = *a;
-        let old_b = if SWAP { [b[1], b[0]] } else { *b };
+        let old_b = *b;
         let av = [old_a[0].re, old_a[0].im, old_a[1].re, old_a[1].im];
         let bv = [old_b[0].re, old_b[0].im, old_b[1].re, old_b[1].im];
         // SAFETY: Each local f64 array contains exactly four initialized
@@ -2725,8 +2725,19 @@ impl CompiledNearCliffordSampler<'_> {
         let vc = _mm256_set1_pd(c);
         let vf = _mm256_set1_pd(factor);
         let sign = _mm256_set_pd(0., -0., 0., -0.);
-        let pa = _mm256_xor_pd(_mm256_permute_pd::<5>(vb), sign);
-        let pb = _mm256_xor_pd(_mm256_permute_pd::<5>(va), sign);
+        // Keep own terms and outputs in their original coefficient order.
+        // SWAP maps partner lanes [re0,im0,re1,im1] to
+        // [im1,re1,im0,re0], combining the pair and component permutations.
+        let (pa, pb) = if SWAP {
+            (
+                _mm256_permute4x64_pd::<0x1b>(vb),
+                _mm256_permute4x64_pd::<0x1b>(va),
+            )
+        } else {
+            (_mm256_permute_pd::<5>(vb), _mm256_permute_pd::<5>(va))
+        };
+        let pa = _mm256_xor_pd(pa, sign);
+        let pb = _mm256_xor_pd(pb, sign);
         // Match partner.mul_add(factor, own*c), including unary negation
         // before FMA. No reassociation or fused own*c multiply is permitted.
         let oa = _mm256_fmadd_pd(pa, vf, _mm256_mul_pd(va, vc));
@@ -2739,8 +2750,8 @@ impl CompiledNearCliffordSampler<'_> {
         }
         a[0] = ComplexAmp::new(out_a[0], out_a[1]);
         a[1] = ComplexAmp::new(out_a[2], out_a[3]);
-        b[usize::from(SWAP)] = ComplexAmp::new(out_b[0], out_b[1]);
-        b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
+        b[0] = ComplexAmp::new(out_b[0], out_b[1]);
+        b[1] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
