@@ -1495,6 +1495,60 @@ fn compiled_conditional_noise_schedule_reduces_structural_rank_and_keeps_public_
 }
 
 #[test]
+fn compiled_conditional_packets_preserve_streams_for_zero_sparse_and_certain_channels() {
+    let base = conditional_structural::circuit(8, 3, true);
+    for channel in ["X_ERROR", "DEPOLARIZE1", "DEPOLARIZE2"] {
+        for probability in ["0", "0.001", "1"] {
+            let text = base.replace("DEPOLARIZE1(0.001)", &format!("{channel}({probability})"));
+            for arithmetic in [
+                CompiledRotationArithmetic::Strict,
+                CompiledRotationArithmetic::Fused,
+            ] {
+                let plan =
+                    CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                        .unwrap();
+                let mut expected_rng = StdRng::seed_from_u64(391729);
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut expected = Vec::new();
+                for _ in 0..129 {
+                    expected.extend(
+                        reference.sample(1, &mut expected_rng).unwrap()[0]
+                            .measurements
+                            .iter()
+                            .copied()
+                            .map(u8::from),
+                    );
+                }
+                for cache in [0, 2048, 8192, 64 * 1024 * 1024] {
+                    let mut rng = StdRng::seed_from_u64(391729);
+                    let mut sampler = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    if cache >= 8192 {
+                        assert!(sampler.coefficient_cache_reserved_bytes() > 0);
+                    }
+                    let mut actual = Vec::new();
+                    for shots in [64, 0, 1, 63, 1] {
+                        actual.extend(
+                            sampler
+                                .sample_measurements_u8(shots, &mut rng)
+                                .unwrap()
+                                .measurements,
+                        );
+                    }
+                    assert_eq!(
+                        actual, expected,
+                        "{channel}({probability}) {arithmetic:?} cache={cache}"
+                    );
+                    let mut continuation = expected_rng.clone();
+                    for _ in 0..16 {
+                        assert_eq!(rng.next_u64(), continuation.next_u64());
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn compiled_conditional_schedule_matches_independent_signed_noisy_density() {
     let base = conditional_structural::circuit(4, 2, true);
     let mut noisy = String::new();
