@@ -5950,3 +5950,95 @@ mod recorded_rejection_tail_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod noise_span_diagnostic_tests {
+    use super::*;
+    use rand::{SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn original_plan_noise_span_prevalence() {
+        let fixtures = [
+            (
+                "msc3",
+                include_str!(
+                    "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim"
+                ),
+            ),
+            (
+                "msc5",
+                include_str!(
+                    "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+                ),
+            ),
+            (
+                "surface7",
+                include_str!(
+                    "../../../benchmarks/near_clifford/application_counts/fixtures/pure_surface_d7_r7_p1e-3.stim"
+                ),
+            ),
+            (
+                "surface9",
+                include_str!(
+                    "../../../benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim"
+                ),
+            ),
+        ];
+        for (name, text) in fixtures {
+            for arithmetic in [
+                CompiledRotationArithmetic::Strict,
+                CompiledRotationArithmetic::Fused,
+            ] {
+                let plan =
+                    CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                        .unwrap();
+                let mut spans = Vec::new();
+                let (mut node, mut event) = (plan.prefix_len, 0);
+                while node < plan.operations.len() {
+                    if matches!(plan.operations[node], PlanOp::Noise { .. }) {
+                        let (start, offset) = (node, event);
+                        while node < plan.operations.len()
+                            && matches!(plan.operations[node], PlanOp::Noise { .. })
+                        {
+                            node += 1;
+                            event += 1;
+                        }
+                        spans.push((start, offset, node - start));
+                        continue;
+                    }
+                    if let PlanOp::Measure(m) = &plan.operations[node] {
+                        event += usize::from(!matches!(m.projection, Projection::Constant(_)));
+                        event += usize::from(m.record.is_some() && m.readout > 0.);
+                    }
+                    node += 1;
+                }
+                assert_eq!(event, plan.random_kinds.len());
+                let mut zero_spans = 0usize;
+                let mut skipped_nodes = 0usize;
+                for seed in 739..747 {
+                    let mut rng = StdRng::seed_from_u64(seed);
+                    let mut random = RowRandom::live(&mut rng);
+                    let values: Vec<_> = plan
+                        .random_kinds
+                        .iter()
+                        .map(|&kind| random.draw(kind))
+                        .collect();
+                    for &(_, offset, length) in &spans {
+                        if length >= 4
+                            && values[offset..offset + length]
+                                .iter()
+                                .all(|&value| value == 0)
+                        {
+                            zero_spans += 1;
+                            skipped_nodes += length;
+                        }
+                    }
+                }
+                println!(
+                    "{}",
+                    serde_json::json!({"name": name, "policy": format!("{arithmetic:?}"), "operations": plan.operations.len() - plan.prefix_len, "noise_events": plan.noise_event_count, "random_events": plan.random_kinds.len(), "spans": spans.len(), "max_span": spans.iter().map(|s| s.2).max(), "eligible_nodes": spans.iter().filter(|s| s.2 >= 4).map(|s| s.2).sum::<usize>(), "seeds": 8, "zero_spans": zero_spans, "potential_skipped_nodes": skipped_nodes})
+                );
+            }
+        }
+    }
+}
