@@ -1422,3 +1422,105 @@ fn compiled_new_commuting_plan_keeps_scalar_cache_coherent_and_split_raw_rng_str
         }
     }
 }
+
+#[path = "support/near_clifford_structural.rs"]
+mod conditional_structural;
+
+#[test]
+fn compiled_conditional_noise_schedule_reduces_structural_rank_and_keeps_public_streams() {
+    let text = conditional_structural::circuit(16, 8, false);
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic).unwrap();
+        assert_eq!(plan.peak_active_rank(), 9);
+        let mut rng = StdRng::seed_from_u64(1081739);
+        let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut expected = Vec::new();
+        for _ in 0..129 {
+            expected.extend(reference.sample(1, &mut rng).unwrap());
+        }
+        let raw: Vec<_> = expected
+            .iter()
+            .flat_map(|s| s.measurements.iter().copied().map(u8::from))
+            .collect();
+        let final_rng = rng.clone();
+        for cache in [0, 2048, 64 * 1024 * 1024] {
+            let mut other_rng = StdRng::seed_from_u64(1081739);
+            let mut sampler = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+            let mut actual = Vec::new();
+            for shots in [1, 0, 31, 32, 64, 1] {
+                actual.extend(
+                    sampler
+                        .sample_measurements_u8(shots, &mut other_rng)
+                        .unwrap()
+                        .measurements,
+                );
+            }
+            assert_eq!(actual, raw, "policy={arithmetic:?} cache={cache}");
+            let mut continuation = final_rng.clone();
+            for _ in 0..16 {
+                assert_eq!(continuation.next_u64(), other_rng.next_u64());
+            }
+        }
+        let accepted = expected
+            .iter()
+            .filter(|s| s.detectors.iter().all(|b| !*b))
+            .count();
+        let errors = expected
+            .iter()
+            .filter(|s| {
+                s.detectors.iter().all(|b| !*b)
+                    && s.observables
+                        .iter()
+                        .filter(|(id, _)| *id == 0)
+                        .fold(false, |p, (_, v)| p ^ v)
+            })
+            .count();
+        let mut counts_rng = StdRng::seed_from_u64(1081739);
+        let counts = plan
+            .prepare_sampler()
+            .unwrap()
+            .sample_postselected_counts(129, 0, &mut counts_rng)
+            .unwrap();
+        assert_eq!(counts.attempted, 129);
+        assert_eq!(counts.accepted, accepted);
+        assert_eq!(counts.logical_errors, errors);
+        for _ in 0..16 {
+            assert_eq!(rng.next_u64(), counts_rng.next_u64());
+        }
+    }
+}
+
+#[test]
+fn compiled_conditional_schedule_matches_independent_signed_noisy_density() {
+    let base = conditional_structural::circuit(4, 2, true);
+    let mut noisy = String::new();
+    let mut channel = false;
+    for line in base.lines() {
+        if line.starts_with("DEPOLARIZE1") {
+            if !channel {
+                noisy.push_str("DEPOLARIZE2(0.23) 0 1\n");
+                channel = true;
+            }
+        } else {
+            noisy.push_str(line);
+            noisy.push('\n');
+        }
+    }
+    noisy = noisy.replacen("M 0\n", "M(0.23) 0\n", 1);
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(&noisy, arithmetic).unwrap();
+        assert!(
+            plan.peak_active_rank() < 4,
+            "must validate the new schedule, not fallback"
+        );
+        check_distribution_with_arithmetic(&noisy, 8, arithmetic);
+    }
+}

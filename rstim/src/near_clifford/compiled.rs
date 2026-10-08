@@ -28,6 +28,12 @@ use compact_replay::{CompactReplay, RowDraw};
 #[path = "noise_spans.rs"]
 mod noise_spans;
 use noise_spans::NoiseSpans;
+#[path = "noise_schedule.rs"]
+mod noise_schedule;
+use noise_schedule::NoiseSigns;
+#[cfg(test)]
+#[path = "../../tests/support/near_clifford_structural.rs"]
+mod conditional_fixture;
 #[path = "scalar_basis.rs"]
 mod scalar_basis;
 use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
@@ -1036,6 +1042,10 @@ pub enum CompiledRotationArithmetic {
 /// projection and reset always use the ideal physical branch.
 /// Compilation reserves at most 64 MiB each for the validation view, transient Pauli tape, emitted
 /// plan, and live/reduced coefficients. Tape and plan can coexist during compilation.
+/// Optional noise-transparent scheduling borrows the compilation frame, has a
+/// sixteen-million-work bound, and shares the 64 MiB tape/plan reservations. Its
+/// one-time typed scalar row shares the 16 MiB packet buffer cap. Rejection
+/// before scheduling retains the existing compiler.
 /// The packed compilation frame reserves at most 9 MiB. Optional transitions
 /// reserve at most 64 MiB and packet event/frame work buffers 16 MiB.
 /// Optional homogeneous random-event runs use at most 8 MiB within the plan budget; rejection
@@ -1061,6 +1071,7 @@ pub struct CompiledNearCliffordExecutor {
     random_kinds: Vec<RandomKind>,
     random_runs: Option<RandomRunPlan>,
     noise_spans: Option<NoiseSpans>,
+    noise_signs: Option<NoiseSigns>,
     noise_event_count: usize,
     independent_event_count: usize,
     scalar_basis: Option<Vec<Option<ScalarBasisProgram>>>,
@@ -1370,12 +1381,57 @@ impl CompiledNearCliffordExecutor {
         planner.block(&instructions)?;
         let mut tape = planner.tape.take().unwrap();
         remove_unobservable_rotations(&mut tape)?;
-        schedule_measurements(&mut tape, &mut planner.reserved_bytes)?;
+        let capture_bytes = planner.reserved_bytes;
+        let mut schedule = noise_schedule::build(
+            &tape,
+            &mut planner.state,
+            limit,
+            PLAN_BYTE_BUDGET.saturating_sub(capture_bytes),
+        );
+        // Bound both retained metadata representations and final construction
+        // scratch before accepting an optional schedule. Rejection keeps the
+        // existing compiler and its seeded stream.
+        if schedule.as_ref().is_some_and(|s| {
+            s.reserved_bytes()
+                .and_then(|m| m.checked_mul(3))
+                .and_then(|m| capture_bytes.checked_mul(2).and_then(|c| m.checked_add(c)))
+                .is_none_or(|n| n > PLAN_BYTE_BUDGET)
+        }) {
+            schedule = None;
+        }
+        if let Some(selected) = &schedule {
+            if selected.apply(&mut tape).is_none() {
+                schedule = None;
+            }
+        }
+        if schedule.is_none() {
+            schedule_measurements(&mut tape, &mut planner.reserved_bytes)?;
+        }
         planner.state.reset_identity();
         planner.expanded = 0;
-        planner.reserved_bytes = 0;
-        for op in tape {
+        planner.reserved_bytes = schedule
+            .as_ref()
+            .and_then(|s| s.reserved_bytes())
+            .unwrap_or(0);
+        let mut logical_ids = Vec::new();
+        if schedule.is_some() {
+            logical_ids
+                .try_reserve_exact(
+                    tape.len()
+                        .checked_mul(2)
+                        .ok_or("scheduled node size overflow")?,
+                )
+                .map_err(|e| format!("scheduled node allocation failed: {e}"))?;
+        }
+        for (position, op) in tape.into_iter().enumerate() {
+            let begin = planner.operations.len();
             planner.finish_op(op)?;
+            if let Some(selected) = &schedule {
+                logical_ids.extend(std::iter::repeat_n(
+                    selected.order[position],
+                    planner.operations.len() - begin,
+                ));
+            }
         }
         let mut plan = Self {
             operations: planner.operations,
@@ -1389,6 +1445,7 @@ impl CompiledNearCliffordExecutor {
             random_kinds: Vec::new(),
             random_runs: None,
             noise_spans: None,
+            noise_signs: None,
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
@@ -1474,7 +1531,13 @@ impl CompiledNearCliffordExecutor {
         let prefix = plan
             .operations
             .iter()
-            .take_while(|op| matches!(op, PlanOp::Basis(_) | PlanOp::Rotate { .. }))
+            .enumerate()
+            .take_while(|(node, op)| {
+                matches!(op, PlanOp::Basis(_) | PlanOp::Rotate { .. })
+                    && schedule
+                        .as_ref()
+                        .is_none_or(|s| !s.has_refs(logical_ids[*node]))
+            })
             .count();
         let mut sampler = plan.prepare_sampler_with_cache_budget(0)?;
         for op in &plan.operations[..prefix] {
@@ -1534,6 +1597,30 @@ impl CompiledNearCliffordExecutor {
                 }
             }
         }
+        if let Some(selected) = &schedule {
+            let signs = selected
+                .bind(
+                    &plan.operations,
+                    &logical_ids,
+                    plan.prefix_len,
+                    PLAN_BYTE_BUDGET.saturating_sub(planner.reserved_bytes),
+                )
+                .ok_or("scheduled noise metadata exceeds plan budget")?;
+            planner.reserved_bytes = planner
+                .reserved_bytes
+                .checked_add(
+                    signs
+                        .reserved_bytes()
+                        .ok_or("scheduled noise metadata size overflow")?,
+                )
+                .ok_or("scheduled plan size overflow")?;
+            if planner.reserved_bytes > PLAN_BYTE_BUDGET {
+                return Err("scheduled plan exceeds 64 MiB".into());
+            }
+            plan.noise_signs = Some(signs);
+        }
+        drop(schedule);
+        drop(logical_ids);
         plan.independent_event_count = plan
             .random_kinds
             .iter()
@@ -1615,7 +1702,29 @@ impl CompiledNearCliffordExecutor {
             .try_reserve_exact(self.initial_coefficients.len())
             .map_err(|e| format!("compiled sampler allocation failed: {e}"))?;
         coefficients.extend_from_slice(&self.initial_coefficients);
+        let mut conditional_tape = Vec::new();
+        if self.noise_signs.is_some() {
+            let count = self.random_kinds.len();
+            if count
+                .checked_mul(size_of::<u64>())
+                .is_none_or(|n| n > PACKET_BYTE_BUDGET)
+            {
+                return Err("scheduled row exceeds 16 MiB".into());
+            }
+            conditional_tape
+                .try_reserve_exact(count)
+                .map_err(|e| format!("scheduled row allocation failed: {e}"))?;
+            if conditional_tape
+                .capacity()
+                .checked_mul(size_of::<u64>())
+                .is_none_or(|n| n > PACKET_BYTE_BUDGET)
+            {
+                return Err("scheduled row capacity exceeds 16 MiB".into());
+            }
+            conditional_tape.resize(count, 0);
+        }
         Ok(CompiledNearCliffordSampler {
+            conditional_tape,
             plan: self,
             x: vec![0; self.num_qubits.div_ceil(64)],
             z: vec![0; self.num_qubits.div_ceil(64)],
@@ -1680,6 +1789,7 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_x: Vec<u64>,
     packet_z: Vec<u64>,
     packet_tape: Vec<u64>,
+    conditional_tape: Vec<u64>,
     packet_records: Vec<u64>,
     packet_noise_masks: Vec<u64>,
     packet_independent: Option<IndependentPacket>,
@@ -2831,7 +2941,11 @@ impl CompiledNearCliffordSampler<'_> {
             .packet_independent
             .as_ref()
             .map_or(Some(0), IndependentPacket::reserved_bytes)?;
-        vectors.checked_add(independent)
+        vectors.checked_add(independent)?.checked_add(
+            self.conditional_tape
+                .capacity()
+                .checked_mul(size_of::<u64>())?,
+        )
     }
 
     fn try_prepare_scalar_tape(&mut self, byte_budget: usize) -> bool {
@@ -2905,6 +3019,24 @@ impl CompiledNearCliffordSampler<'_> {
             self.last_scalar_prepared = false;
         }
         let plan = self.plan;
+        if plan.noise_signs.is_some() {
+            let mut tape = std::mem::take(&mut self.conditional_tape);
+            let count = plan.random_kinds.len();
+            assert_eq!(tape.len(), count, "scheduled row buffer is incomplete");
+            let mut live = RowRandom::live(&mut *rng);
+            if let Some(runs) = &plan.random_runs {
+                runs.fill_row(&mut live, &plan.random_kinds, &mut tape);
+            } else {
+                for (&kind, value) in plan.random_kinds.iter().zip(&mut tape) {
+                    *value = live.draw(kind);
+                }
+            }
+            let mut replay = RowRandom::recorded(&tape, &mut *rng);
+            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
+            debug_assert!(result.is_err() || replay.cursor == count);
+            self.conditional_tape = tape;
+            return result;
+        }
         if plan.noise_event_count < MIN_SCALAR_PREPARED_NOISE_EVENTS || plan.random_kinds.is_empty()
         {
             return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
@@ -3012,7 +3144,15 @@ impl CompiledNearCliffordSampler<'_> {
                     pauli,
                     expand,
                     dagger,
-                } => self.cached_rotate(node, pauli, *expand, *dagger, &mut state)?,
+                } => {
+                    if let Some(signs) = &plan.noise_signs {
+                        let sign = pauli.physical.anticommutes(&self.x, &self.z)
+                            ^ signs.scalar(node, random);
+                        self.cached_rotate_signed(node, pauli, *expand, *dagger, sign, &mut state)?;
+                    } else {
+                        self.cached_rotate(node, pauli, *expand, *dagger, &mut state)?;
+                    }
+                }
                 PlanOp::Noise {
                     probability,
                     choices,
@@ -3062,7 +3202,11 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                 }
                 PlanOp::Measure(m) => {
-                    let anti = m.pauli.physical.anticommutes(&self.x, &self.z);
+                    let anti = m.pauli.physical.anticommutes(&self.x, &self.z)
+                        ^ plan
+                            .noise_signs
+                            .as_ref()
+                            .is_some_and(|s| s.scalar(node, random));
                     let branch = match m.projection {
                         Projection::Constant(bit) => bit,
                         Projection::Independent { .. } => {
@@ -3271,7 +3415,16 @@ impl CompiledNearCliffordSampler<'_> {
                         expand,
                         dagger,
                     } => {
-                        let anti = pauli.physical.packet_anti(&x, &z);
+                        let anti = pauli.physical.packet_anti(&x, &z)
+                            ^ plan.noise_signs.as_ref().map_or(0, |s| {
+                                s.packet(
+                                    node,
+                                    &tape,
+                                    random_count,
+                                    &noise_masks,
+                                    noise_packet.as_deref(),
+                                )
+                            });
                         if coherent {
                             self.coherent.rotate_with_arithmetic(
                                 pauli,
@@ -3404,7 +3557,16 @@ impl CompiledNearCliffordSampler<'_> {
                         }
                     }
                     PlanOp::Measure(m) => {
-                        let anti = m.pauli.physical.packet_anti(&x, &z);
+                        let anti = m.pauli.physical.packet_anti(&x, &z)
+                            ^ plan.noise_signs.as_ref().map_or(0, |s| {
+                                s.packet(
+                                    node,
+                                    &tape,
+                                    random_count,
+                                    &noise_masks,
+                                    noise_packet.as_deref(),
+                                )
+                            });
                         let mut branch = 0;
                         match m.projection {
                             Projection::Constant(bit) => {
@@ -3779,7 +3941,14 @@ impl CompiledNearCliffordSampler<'_> {
                 .checked_mul(64 * 4 * size_of::<f64>())
                 .is_some_and(|n| n <= COEFFICIENT_BYTE_BUDGET);
         let packed = shots >= 32
-            && packet_bytes.is_some_and(|n| n <= PACKET_BYTE_BUDGET)
+            && packet_bytes
+                .and_then(|n| {
+                    self.conditional_tape
+                        .capacity()
+                        .checked_mul(size_of::<u64>())
+                        .and_then(|c| n.checked_add(c))
+                })
+                .is_some_and(|n| n <= PACKET_BYTE_BUDGET)
             && (coherent_eligible || (self.pack_enabled && self.cache.is_some()));
         if packed {
             resize_packet(&mut self.packet_x, self.plan.num_qubits)?;
@@ -3787,6 +3956,26 @@ impl CompiledNearCliffordSampler<'_> {
             resize_packet(&mut self.packet_records, self.plan.measurement_count)?;
             resize_packet(&mut self.packet_noise_masks, self.plan.noise_event_count)?;
             resize_packet(&mut self.packet_tape, 64 * self.plan.random_kinds.len())?;
+            let retained = self.scalar_tape_other_bytes().and_then(|n| {
+                self.packet_tape
+                    .capacity()
+                    .checked_mul(size_of::<u64>())
+                    .and_then(|t| n.checked_add(t))
+            });
+            if retained.is_none_or(|n| n > PACKET_BYTE_BUDGET) {
+                // Exact requests may round up. Drop optional buffers before
+                // scalar fallback; the admitted conditional row stays available.
+                self.packet_x = Vec::new();
+                self.packet_z = Vec::new();
+                self.packet_records = Vec::new();
+                self.packet_noise_masks = Vec::new();
+                self.packet_tape = Vec::new();
+                self.packet_independent = None;
+                for _ in 0..shots {
+                    output.row(self.row_for_output(sweep, rng, output)?);
+                }
+                return Ok(());
+            }
             if self.packet_independent.is_none() && self.plan.random_runs.is_some() {
                 // Optional compact workspace counts actual retained capacities.
                 // Overflow, admission or allocation failure leaves the original
@@ -3798,7 +3987,13 @@ impl CompiledNearCliffordSampler<'_> {
                     .and_then(|n| n.checked_add(self.packet_records.capacity()))
                     .and_then(|n| n.checked_add(self.packet_noise_masks.capacity()))
                     .and_then(|n| n.checked_add(self.packet_tape.capacity()))
-                    .and_then(|n| n.checked_mul(size_of::<u64>()));
+                    .and_then(|n| n.checked_mul(size_of::<u64>()))
+                    .and_then(|n| {
+                        self.conditional_tape
+                            .capacity()
+                            .checked_mul(size_of::<u64>())
+                            .and_then(|c| n.checked_add(c))
+                    });
                 self.packet_independent = occupied
                     .and_then(|n| PACKET_BYTE_BUDGET.checked_sub(n))
                     .and_then(|remaining| {
@@ -4202,6 +4397,7 @@ mod tests {
                                     random_kinds: Vec::new(),
                                     random_runs: None,
                                     noise_spans: None,
+                                    noise_signs: None,
                                     noise_event_count: 0,
                                     independent_event_count: 0,
                                     scalar_basis: None,
@@ -4907,6 +5103,7 @@ mod tests {
             random_kinds: Vec::new(),
             random_runs: None,
             noise_spans: None,
+            noise_signs: None,
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
