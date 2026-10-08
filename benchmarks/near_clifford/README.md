@@ -1,5 +1,12 @@
 # Near-Clifford P0/P1 benchmark
 
+Compact counts replay borrows the packet producer's existing nonzero Noise lane
+masks for zero-prefix scans, while decoding nonzero choices from the original
+four bit-planes. This uses the same event cursor and adds no buffer or RNG draw.
+The x86 preflight retains `x86-scout-noise-hit-masks.log`: its producer differential
+test compares masks and skipped prefixes with literal rows across reused complete
+and short packets, both Independent producers, and probability/category changes.
+
 Run from the repository root:
 
 ```sh

@@ -3567,7 +3567,9 @@ impl CompiledNearCliffordSampler<'_> {
                     if matches!(output, BatchOutput::Counts { .. }) {
                         let mut random = CompactReplay::new(
                             &tape[lane * random_count..(lane + 1) * random_count],
-                            noise_packet.as_deref(),
+                            noise_packet
+                                .as_deref()
+                                .map(|packet| (packet, noise_masks.as_slice())),
                             independent_packet.as_ref(),
                             lane,
                         );
