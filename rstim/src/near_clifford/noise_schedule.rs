@@ -803,15 +803,23 @@ impl NoiseSigns {
     ) -> u64 {
         let mut parity = 0;
         for r in &self.refs[self.offsets[node]..self.offsets[node + 1]] {
-            let masks = if let Some(p) = packet {
-                p.choice_masks(r.ordinal, hits[r.ordinal], r.choices as usize)
-            } else {
-                packet_choice_masks(hits[r.ordinal], r.choices as usize, tape, r.event, count)
-            };
-            for (i, &mask) in masks.iter().enumerate() {
-                if r.mask >> i & 1 != 0 {
-                    parity ^= mask;
-                }
+            let mut selected = hits[r.ordinal];
+            // Only the sign is consumed here, not the individual choice masks.
+            // A single-outcome channel contributes its populated lanes directly.
+            if r.choices == 1 {
+                parity ^= selected & 0u64.wrapping_sub(u64::from(r.mask & 1));
+                continue;
+            }
+            while selected != 0 {
+                let lane = selected.trailing_zeros() as usize;
+                selected &= selected - 1;
+                let value = if let Some(p) = packet {
+                    p.value(r.ordinal, lane)
+                } else {
+                    tape[lane * count + r.event]
+                };
+                debug_assert!((1..=u64::from(r.choices)).contains(&value));
+                parity ^= u64::from((r.mask >> (value - 1)) & 1) << lane;
             }
         }
         parity
@@ -822,6 +830,64 @@ impl NoiseSigns {
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+    #[test]
+    fn conditional_packet_sign_matches_every_choice_subset_and_storage_route() {
+        // Exercise every subset of the 15 nonzero outcomes. Four repeated
+        // groups cover all outcomes and lane 63; zero lanes stay unselected.
+        for choices in [1, 3, 15] {
+            let kinds = [RandomKind::Noise {
+                probability: 1.,
+                choices,
+            }];
+            let mut compact = NoisePacket::new(&kinds, 1, PACKET_BYTE_BUDGET).unwrap();
+            let mut tape = vec![99; 64 * 3];
+            let mut populated = 0;
+            for lane in 0..64 {
+                let value = (lane % (choices + 1)) as u64;
+                tape[lane * 3 + 1] = value;
+                if value != 0 {
+                    populated |= 1u64 << lane;
+                }
+                for bit in 0..4 {
+                    compact.planes()[0][bit] |= ((value >> bit) & 1) << lane;
+                }
+            }
+            for mask in 0..1u16 << choices {
+                let allowed: Vec<u64> = (1..=choices)
+                    .filter(|choice| mask >> (choice - 1) & 1 != 0)
+                    .map(|choice| choice as u64)
+                    .collect();
+                let signs = NoiseSigns {
+                    offsets: vec![0, 1],
+                    refs: vec![NoiseRef {
+                        event: 1,
+                        ordinal: 0,
+                        mask,
+                        choices: choices as u8,
+                    }],
+                };
+                for selected in [0, populated, populated & 0x5555_5555_5555_5555] {
+                    let expected = (0..64).fold(0, |bits, lane| {
+                        let value = tape[lane * 3 + 1];
+                        if selected >> lane & 1 != 0 && allowed.contains(&value) {
+                            bits | 1u64 << lane
+                        } else {
+                            bits
+                        }
+                    });
+                    for packet in [None, Some(&compact)] {
+                        assert_eq!(signs.packet(0, &tape, 3, &[selected], packet), expected);
+                        // Duplicate references cancel instead of combining with OR.
+                        let twice = NoiseSigns {
+                            offsets: vec![0, 2],
+                            refs: vec![signs.refs[0]; 2],
+                        };
+                        assert_eq!(twice.packet(0, &tape, 3, &[selected], packet), 0);
+                    }
+                }
+            }
+        }
+    }
     fn captured(text: &str) -> (Planner, Vec<TapeOp>) {
         let instr = crate::parser::parse_lines(text).unwrap();
         let incumbent = NearCliffordExecutor::compile_with_limit(
