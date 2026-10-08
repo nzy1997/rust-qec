@@ -13,6 +13,22 @@ measurement, not a publishable performance result.
 `--no-build` reuses an existing binary and marks its source revision unverified;
 every run records the binary's SHA-256 hash.
 
+For bottleneck diagnosis, the existing manual x86 application-counts workflow
+also accepts `profile_only=true` with an exact `baseline_ref` commit. This runs
+native coefficient/CDF/RNG gates, builds both unchanged production probes, then
+records four whole-process `cpu-clock:u` profiles for d5 Strict/Fused 1024-shot
+counts. Raw samples, stack exports, ELF binaries/build IDs, probe inputs, command
+outputs and source closures remain in the workflow artifact. Ordinary peer and
+paired timing modes retain their defaults.
+
+These profiles include startup, warmup and teardown. Every instrumented result
+is marked `performance_valid=false`; use profiles to locate work, never to claim
+speedups or SOTA. `native_cpu_profile.py --verify DIR` requires the original
+Linux tool/environment, checks Git input bytes, and replays raw samples with the
+recorded trusted `perf` executable. Checksum-only fixture tests explicitly skip
+Git/tool execution and do not certify actual profiles. The sampling options are
+documented in the [Linux perf source](https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf-record.txt).
+
 The [Apple M4 measurement and analysis](results/apple-m4-2026-09-29.md) and its
 [raw JSON](results/apple-m4-2026-09-29.json) are retained for this matrix.
 The subsequent [boundary validation and CPU profile](results/apple-m4-boundary-validation-2026-09-29.md)

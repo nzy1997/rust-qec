@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       baseline_ref:
-        description: 'Optional exact baseline commit for a paired Rust-only warm scout; empty runs the original peer benchmark'
+        description: 'Exact baseline commit for paired scouts or CPU profiles; empty runs the peer benchmark unless profile_only is set'
         required: false
         default: ''
         type: string
@@ -16,12 +16,18 @@ on:
         default: false
         type: boolean
 
+      profile_only:
+        description: Collect diagnostic CPU samples instead of application timings
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
 
 jobs:
   benchmark:
-    if: ${{ inputs.baseline_ref == '' }}
+    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -96,7 +102,7 @@ jobs:
             drafts/x86-*.log
             drafts/x86-application-counts/
   paired-scout:
-    if: ${{ inputs.baseline_ref != '' }}
+    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -116,26 +122,7 @@ jobs:
       - name: Prepare pinned Rust and verify coefficients and public RNG
         timeout-minutes: 20
         run: |
-          rustup toolchain install 1.93.1 --profile minimal
-          rustup default 1.93.1
-          mkdir -p drafts
-          python benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-normal.log 2>&1
-          python -O benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-optimized.log 2>&1
-          grep -m1 '^flags' /proc/cpuinfo > drafts/x86-scout-features.txt
-          grep -qw avx2 drafts/x86-scout-features.txt
-          grep -qw fma drafts/x86-scout-features.txt
-          cargo test --release --locked -p rstim --lib fused_avx2_pairs_match_independent_full_vector_gather_bits -- --nocapture > drafts/x86-scout-direct-bits.log 2>&1
-          cargo test --release --locked -p rstim --lib both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries -- --nocapture > drafts/x86-scout-highest-gather.log 2>&1
-          cargo test --release --locked -p rstim --lib scalar_high_multi_x_matches_gather_coefficient_and_cdf_bits_for_both_policies -- --nocapture > drafts/x86-scout-gather-cdf.log 2>&1
-          cargo test --release --locked -p rstim --lib scalar_rotation_preserves_frozen_coefficient_bits_for_all_phase_and_pair_cases -- --nocapture > drafts/x86-scout-frozen-bits.log 2>&1
-          cargo test --release --locked -p rstim --lib both_rotation_policies_match_independent_coefficient_and_cdf_bits -- --nocapture > drafts/x86-scout-both-policy-bits.log 2>&1
-          cargo test --release --locked -p rstim --test near_clifford_postselected_counts -- --nocapture > drafts/x86-scout-public-counts.log 2>&1
-          grep -q 'test result: ok. 1 passed' drafts/x86-scout-direct-bits.log
-          grep -q 'test result: ok. 1 passed' drafts/x86-scout-highest-gather.log
-          grep -q 'test result: ok. 1 passed' drafts/x86-scout-gather-cdf.log
-          grep -q 'test result: ok. 1 passed' drafts/x86-scout-frozen-bits.log
-          grep -q 'test result: ok. 1 passed' drafts/x86-scout-both-policy-bits.log
-          grep -q 'test result: ok. 10 passed' drafts/x86-scout-public-counts.log
+          bash benchmarks/near_clifford/verify_x86_rotations.sh
       - name: Record virtual host and pin paired campaigns to one CPU
         run: |
           python - <<'PY'
@@ -177,3 +164,48 @@ jobs:
             drafts/x86-pair-followup/
             drafts/rust-pair-scout-probe/build.log
             drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log
+  cpu-profile:
+    if: ${{ inputs.profile_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      RUSTFLAGS: '-C target-cpu=native'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+      LC_ALL: C
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare profiling tool and verify native arithmetic and public RNG
+        timeout-minutes: 20
+        run: |
+          mkdir -p drafts
+          sudo apt-get update > drafts/x86-profile-tool-setup.log 2>&1
+          sudo apt-get install -y linux-tools-generic binutils >> drafts/x86-profile-tool-setup.log 2>&1
+          bash benchmarks/near_clifford/verify_x86_rotations.sh
+          python benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-normal.log 2>&1
+          python -O benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-optimized.log 2>&1
+      - name: Sample fixed native production binaries
+        timeout-minutes: 15
+        env:
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+        run: |
+          python benchmarks/near_clifford/native_cpu_profile.py --baseline-ref "$BASELINE_REF" --out drafts/x86-native-profile > drafts/x86-profile-run.log 2>&1
+          python -O benchmarks/near_clifford/native_cpu_profile.py --verify drafts/x86-native-profile > drafts/x86-profile-verify.log 2>&1
+      - name: Retain original samples, binaries, sources and partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-clifford-x86-native-profile-${{ github.sha }}
+          retention-days: 30
+          path: |
+            drafts/x86-profile-*
+            drafts/x86-scout-*
+            drafts/x86-native-profile/
