@@ -1052,7 +1052,9 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
             shutil.copytree(evidence_dir, clone)
             retained = transform(clone, Path(temporary))
             report = evaluate(clone, matrix_path, policy_path, candidate,
-                              DEFAULT_TARGETS, None, retained, mle_scope_path)
+                              DEFAULT_TARGETS, None,
+                              retained if retained is not None else retained_report_path,
+                              mle_scope_path)
             rejected = report["status"] == "fail" and any(
                 needle in gap for gap in report["blocking_gaps"]
             )
@@ -1150,7 +1152,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         shutil.copytree(evidence_dir, clone)
         fail_correctness(clone, Path(temporary))
         demoted_report = evaluate(clone, matrix_path, policy_path, candidate,
-                                  DEFAULT_TARGETS, None, None)
+                                  DEFAULT_TARGETS, None, retained_report_path, mle_scope_path)
     demoted = demoted_report["decoders"]["envelope-matching"]
     ninth = (demoted_report["status"] == "fail"
              and demoted["decision"] == "beta"
@@ -1457,7 +1459,7 @@ def self_test(evidence_dir: Path, matrix_path: Path, policy_path: Path, candidat
         shutil.copytree(evidence_dir, clone)
         remove_mle_real_circuit_case(clone, Path(temporary))
         decision_report = evaluate(clone, matrix_path, policy_path, candidate,
-                                   DEFAULT_TARGETS, None, None, mle_scope_path)
+                                   DEFAULT_TARGETS, None, retained_report_path, mle_scope_path)
     matching_decision = decision_report["decoders"]["envelope-matching"]
     mle_decision = decision_report["decoders"]["envelope-mle"]
     twenty_second = (matching_decision["decision"] == "supported"
