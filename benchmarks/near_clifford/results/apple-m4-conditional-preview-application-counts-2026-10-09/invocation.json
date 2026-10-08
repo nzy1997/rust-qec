@@ -1,0 +1,1 @@
+{"action": "inspect", "circuit": "/Users/nzy/.codex/worktrees/near-clifford-current-source-diagnostics/rstim/benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim", "shots": 1, "repetitions": 1, "arithmetic": "fused", "cache_bytes": 67108864}

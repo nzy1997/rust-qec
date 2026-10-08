@@ -1,0 +1,1 @@
+{"id": "rank-16/s1024/c67108864/fused", "fixture": "rank-16", "shots": 1024, "cache_bytes": 67108864, "arithmetic": "fused", "groups": ["structure"], "action": "bench", "repetitions": 7, "circuit": "/home/runner/work/rust-qec/rust-qec/drafts/x86-diagnostics/circuits/rank-16.records.stim"}

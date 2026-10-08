@@ -1,0 +1,1 @@
+{"action": "inspect", "circuit": "/home/runner/work/rust-qec/rust-qec/benchmarks/near_clifford/application_counts/fixtures/pure_surface_d9_r9_p1e-3.stim", "shots": 1, "repetitions": 1, "arithmetic": "fused", "cache_bytes": 67108864}

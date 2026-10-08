@@ -14,11 +14,12 @@ python3 -m benchmarks.atom_loss.readiness_resources --verify benchmarks/near_cli
 python3 -O -m benchmarks.atom_loss.readiness_resources --verify benchmarks/near_clifford/results/apple-m4-compact-zero-spans-envelope-resources-2026-10-08/manifest.json --historical-source
 ```
 
-The default [CLI resource archive](../../../atom_loss/readiness/resources/manifest.json)
-contains the same unchanged 19-case measurements and retains the original producer
-revision. Its 200 measured source inputs match the current runtime, so the default
-CI verifier checks current source identity without `--historical-source`. The prior
-canonical measurements remain available in Git history.
+PR #792 replaced the default [CLI resource archive](../../../atom_loss/readiness/resources/manifest.json)
+with a fresh 19-case campaign measured at
+`bacdcfa3a0c86619087a0f30944f08e2c4527974`, binding 201 source inputs. The default
+CI verifier checks current source identity without `--historical-source`.
+This archive preserves the unchanged historical `d989531d837fe874a77ac05745f5d77ea5639d52`
+campaign and its 200 source inputs; use the historical-source commands above for it.
 
 ```sh
 python3 -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources/manifest.json

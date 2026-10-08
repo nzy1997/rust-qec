@@ -1,0 +1,63 @@
+{
+  "measured_revision": "bacdcfa3a0c86619087a0f30944f08e2c4527974",
+  "kind": "application_counts",
+  "original_bundle": "combined-preview-m4-application-formal",
+  "original_files": {
+    "analysis.md": {
+      "bytes": 4998,
+      "sha256": "b2851c9f9e0ffb1ecbbf20225a0a0163f023891a56ef6aa8d3cc8e18d25080a7"
+    },
+    "capability.csv": {
+      "bytes": 2772,
+      "sha256": "cb0773fb52312f5c64cb799a72274bedc6137bcdf727b6ffc7438e3231cf6c4e"
+    },
+    "closure.json": {
+      "bytes": 18534,
+      "sha256": "3ddf16051fbd4896a3b409702f14ddb6c80f2b1866fe1defedb1a50e17576e5b"
+    },
+    "comparisons.csv": {
+      "bytes": 3713,
+      "sha256": "9bb858ca92ab4d7d23e8666718103c75f77f8a46f88790f7d5212a46884cdc9d"
+    },
+    "events.jsonl": {
+      "bytes": 12158117,
+      "sha256": "c97c03f264d47661da46f810fc19fcdb0c70835dce198a5615790bfea765ca1a"
+    },
+    "header.json": {
+      "bytes": 265260,
+      "sha256": "2330d44666acd6c876309319dcb42e2bc2709e4357fd0ded01d88b7ea056ba66"
+    },
+    "invocation.json": {
+      "bytes": 271,
+      "sha256": "c1cfd2f10452f565f8a486bfdf5248afdb9725c76a63b57d0b2c4d7f12ee7569"
+    },
+    "msc_d3_inject_cultivate_p1e-3.records.stim": {
+      "bytes": 4084,
+      "sha256": "3e751c01c4fdd6f491c8e3988102386d323406c1181a7a20a67ec2cb565ff1de"
+    },
+    "msc_d5_inject_cultivate_p1e-3.records.stim": {
+      "bytes": 20147,
+      "sha256": "19905b7ab679ccadfc4ecda19fd5daeb174dda35fd72282c576b9a4339ea7088"
+    },
+    "pure_surface_d7_r7_p1e-3.records.stim": {
+      "bytes": 9480,
+      "sha256": "fdae9940ea3ee07ff29888bb09120813199ec0a315759adec71b9591c7770c31"
+    },
+    "pure_surface_d9_r9_p1e-3.records.stim": {
+      "bytes": 17175,
+      "sha256": "37738a99cd26780a6bdba1b9236b0be2985c19252b6fee06517f7eea91cf1f2d"
+    },
+    "summary.json": {
+      "bytes": 14848,
+      "sha256": "1dbccb4fab0fabe5558154ef897575ef92e03b60c6a9a1af7bb5b8c948a69106"
+    },
+    "warm.csv": {
+      "bytes": 21341,
+      "sha256": "2966c673fa0829b92e7412344a95ca4bf36a13a81ff97dcb76017d21fea8c1aa"
+    }
+  },
+  "decoded_events_sha256": "c97c03f264d47661da46f810fc19fcdb0c70835dce198a5615790bfea765ca1a",
+  "publication_analyzer_sha256": "5691c0d29dc72f19c4f69943a16f8f9da211dba2f5e02f846b41c63899dd55fd",
+  "encoding": "lossless canonical evidence_io gzip; closure covers decoded original bytes",
+  "scope": "original-analysis.md preserves measured generator output; analysis.md corrects only v2-without-lifecycle scope prose. Actual native binaries remain retained in ignored originals, not vendored here. A diagnostic binary hash is an attestation where no executable was retained."
+}

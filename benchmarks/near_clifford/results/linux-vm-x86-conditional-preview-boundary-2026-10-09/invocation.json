@@ -1,0 +1,1 @@
+{"id": "qec32/s4096/c67108864/fused", "fixture": "qec32", "shots": 4096, "cache_bytes": 67108864, "arithmetic": "fused", "groups": ["boundary"], "action": "bench", "repetitions": 7, "circuit": "/home/runner/work/rust-qec/rust-qec/drafts/x86-diagnostics/circuits/qec32.records.stim"}
