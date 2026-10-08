@@ -3,6 +3,9 @@ use super::*;
 
 pub(super) trait RowDraw {
     fn draw(&mut self, kind: RandomKind) -> u64;
+    fn noise_value(&self, _event: usize, _ordinal: usize) -> u64 {
+        panic!("scheduled noise requires a complete recorded row")
+    }
     fn discard_remaining(&mut self, kinds: &[RandomKind]);
     fn skip_zero_noise(&mut self, _maximum: usize) -> usize {
         0 // Live consumers retain their original draw path.
@@ -10,6 +13,9 @@ pub(super) trait RowDraw {
 }
 
 impl<R: Rng> RowDraw for RowRandom<'_, R> {
+    fn noise_value(&self, event: usize, _ordinal: usize) -> u64 {
+        self.tape.expect("scheduled noise requires a recorded row")[event]
+    }
     #[inline]
     fn draw(&mut self, kind: RandomKind) -> u64 {
         RowRandom::draw(self, kind)
@@ -73,6 +79,10 @@ impl<'a> CompactReplay<'a> {
     }
 }
 impl RowDraw for CompactReplay<'_> {
+    fn noise_value(&self, event: usize, ordinal: usize) -> u64 {
+        self.noise
+            .map_or_else(|| self.tape[event], |p| p.value(ordinal, self.lane))
+    }
     fn skip_zero_noise(&mut self, maximum: usize) -> usize {
         // The prepared span contains only Noise nodes, each with one event.
         // Compact cells in the full tape may be stale: consult the sidecar

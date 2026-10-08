@@ -105,6 +105,30 @@ parities, and independently bound consumed-input hashes. Its RNG policy differs
 from the legacy executor; successful scalar, flat, cached and split calls using
 the same fixed compiled plan and arithmetic policy preserve its own stream.
 Changing the compiler revision or measurement schedule can change seeded results.
+The compiler can also reorder commuting rotations and measurements across
+Pauli channels when a bounded search predicts a strictly lower peak active rank.
+Channel order, record dependencies, feedback and annotations remain constrained.
+Each crossed channel contributes a sign conditioned on its sampled Pauli choice:
+anticommuting choices reverse the rotation angle or flip the logical measurement
+branch. Identity outcomes contribute no sign. Reset crossings require full
+commutation. Physical projector probabilities and readout noise retain their
+existing semantics.
+
+This optional search accepts at most 2048 tape operations and uses a work budget
+of 16 million, borrowing the existing compilation frame. Search scratch and
+conditional metadata share the existing 64 MiB tape/plan reservations. An
+initial greedy schedule is completed and validated before a width-one lookahead
+previews ready rotations followed by their nonexpanding closure. The preview
+reuses one trial frame, accounts for its retained storage, and accepts only a
+complete schedule with strictly lower peak rank. Work or memory exhaustion
+retains the complete greedy schedule. Neither search establishes optimal rank.
+An unselected or rejected search keeps the existing measurement scheduler. An
+accepted plan draws its complete typed random row once before scalar replay, so
+signs can depend on channels later in the selected order. The row and optional
+packet buffers share the 16 MiB cap; packet admission uses retained capacities
+and can discard optional buffers before scalar fallback. These are reservation
+bounds, not whole-process RSS guarantees. Lower predicted rank alone does not
+establish a throughput advantage over another backend.
 The earlier matrices and baseline remain separate.
 
 The [complete compiled M4 comparison](results/apple-m4-compiled-sota-2026-10-07/analysis.md)

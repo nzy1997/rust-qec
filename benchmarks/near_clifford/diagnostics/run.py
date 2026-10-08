@@ -20,6 +20,7 @@ import run as incumbent
 from evidence import compact, parity_counts
 from projection import records_only
 from corpus import build, BUDGETS, POLICIES
+from source_contract import SCHEMA, CONTRACT, production_inventory
 
 
 def sha(path):
@@ -71,6 +72,7 @@ def main():
         p.error('out must be a new directory')
     out.mkdir(parents=True)
     manifest = build(out/'circuits')
+    manifest['schema'] = SCHEMA
     manifest['pairs'], manifest['repetitions'] = args.pairs, args.repetitions
     cells = [c for c in manifest['cells'] if set(c['groups']) & set(args.groups)
              and (not args.only or c['fixture'] in args.only)]
@@ -84,6 +86,12 @@ def main():
         fixture.update(native_path=str(native), native_sha256=sha(native))
     files = inventory()
     source = subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    production = dict(kind=CONTRACT, revision=source,
+                      sources=production_inventory(source, current=True))
+    for path, expected in files.items():
+        data = subprocess.check_output(['git','show',source+':'+path],cwd=ROOT)
+        if hashlib.sha256(data).hexdigest() != expected:
+            raise ValueError('dirty diagnostic source: '+path)
     source_clean = not subprocess.check_output(['git','diff','--name-only','HEAD','--','rstim/src'],cwd=ROOT,text=True)
     build_result = subprocess.run(['cargo','build','--release','--locked','--manifest-path',str(HERE/'Cargo.toml')],cwd=ROOT)
     if build_result.returncode or inventory() != files or not source_clean:
@@ -95,6 +103,7 @@ def main():
     peer_revision, peer_sources = incumbent.capture_symft_source(args.symft_source)
     guard = incumbent.environment_summary(packages,peer_sources,peer_revision,identities)
     header = dict(schema=manifest['schema'], source_revision=source, sources=files,
+                  production_contract=production,
                   manifest=manifest, packages=packages, peer_loaded_files=identities,
                   symft_source_revision=peer_revision, symft_sources=peer_sources,
                   environment_before=guard, binary_sha256=sha(binary),
@@ -275,10 +284,13 @@ def main():
                       incumbent.capture_identities(args.python,args.symft_python).items()}
     revision_after,sources_after=incumbent.capture_symft_source(args.symft_source)
     after=incumbent.environment_summary(packages_after,sources_after,revision_after,identities_after)
-    if after!=guard or inventory()!=files or sha(binary)!=header['binary_sha256']:
+    production_after = dict(kind=CONTRACT, revision=source,
+                            sources=production_inventory(source, current=True))
+    if after!=guard or inventory()!=files or sha(binary)!=header['binary_sha256'] or production_after!=production:
         raise ValueError('end source/environment/binary guard failed')
     (out/'closure.json').write_text(json.dumps(dict(completed_utc=datetime.now(timezone.utc).isoformat(),
         events=index,events_sha256=sha(out/'events.jsonl'),environment_after=after,
+        production_contract_after=production_after,
         sources_after=files,binary_sha256=sha(binary)),indent=2)+'\n')
 
 
