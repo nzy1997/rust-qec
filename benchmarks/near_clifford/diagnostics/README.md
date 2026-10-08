@@ -58,8 +58,12 @@ The v2 producer rejects dirty tracked production or harness inputs before
 building. Verification reconstructs the complete production inventory from the
 measured Git commit and checks its closure and source-bound producer/helper.
 Changing only a v1 receipt's schema cannot turn it into v2 evidence. The v1
-frozen-production check remains intact: runs of changed production collected by
-the historical producer cannot pass that check and must be retained as such.
+frozen-production check remains intact when verification uses `--git-sources`:
+runs of changed production collected by the historical producer cannot pass
+that check and must be retained as such. Historical v1 verification without
+`--git-sources` checks the transcript; it does not establish production source
+identity. V2 always validates its production contract against Git, including
+when `--git-sources` is omitted.
 Collect a fresh v2 campaign for a formal current-production comparison.
 
 Formal timings use five rotated/reversed independent process rounds and seven
