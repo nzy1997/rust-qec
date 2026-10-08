@@ -4027,7 +4027,12 @@ impl CompiledNearCliffordSampler<'_> {
             };
             for offset in (0..shots).step_by(64) {
                 let lanes = (shots - offset).min(64);
-                let coherent = coherent_eligible && (!self.pack_enabled || self.cache.is_none());
+                // Complete rank-two packets avoid coefficient-cache lookup
+                // overhead; partial packets retain the cache-first route.
+                let coherent = coherent_eligible
+                    && (!self.pack_enabled
+                        || self.cache.is_none()
+                        || (lanes == 64 && self.plan.peak_active_rank == 2));
                 if coherent || (self.pack_enabled && self.cache.is_some()) {
                     // Tails retain the original fill/consumer without compact clearing.
                     let compact = if lanes == 64 {
