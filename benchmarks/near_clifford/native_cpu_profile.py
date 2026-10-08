@@ -8,6 +8,8 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import signal
+import sys
 import subprocess
 import time
 
@@ -18,7 +20,7 @@ NAME = "msc_d5_inject_cultivate_p1e-3"
 CASES = [("baseline", "strict"), ("candidate", "strict"), ("candidate", "fused"), ("baseline", "fused")]
 ENV = {"RUSTFLAGS": "-C target-cpu=native", **{k: "1" for k in scout.ENV_KEYS[1:]}}
 PREFLIGHT = ["direct-bits", "highest-gather", "gather-cdf", "frozen-bits", "both-policy-bits", "public-counts"]
-EXPORTS = {"perf-script.txt": ["script", "--header"],
+EXPORTS = {"perf-script.txt": ["script", "--header", "-F", "comm,pid,tid,cpu,time,event,ip,sym,dso"],
            "perf-report.txt": ["report", "--stdio", "--no-children", "--percent-limit", "0"],
            "perf-buildids.txt": ["buildid-list"], "perf-header.txt": ["report", "--header-only"]}
 
@@ -42,16 +44,37 @@ def choose_perf():
     raise ValueError("no working perf executable; retain setup logs, do not claim a profile")
 
 
-def command(args, directory, stem):
-    """Every subprocess is bounded and reaped; failures keep their original output."""
+def command(args, directory, stem, *, timeout=180):
+    """Kill the created session's process group on timeout and retain failure receipts."""
     stdout, stderr = directory / stem, directory / (stem + ".stderr")
+    timed_out = False
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        result = subprocess.run(args, stdout=out, stderr=err, check=False, timeout=180)
-    item = dict(command=args, exit_code=result.returncode, outputs={
+        process = subprocess.Popen(args, stdout=out, stderr=err, start_new_session=True)
+        try:
+            process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            # Privileged recording has its own shorter root-owned GNU timeout
+            # watchdog. Ordinary commands and their descendants share this group.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=10)
+    item = dict(command=args, exit_code=process.returncode, timed_out=timed_out, outputs={
         p.name: dict(path=p.name, sha256=scout.digest(p)) for p in [stdout, stderr]})
     (directory / (stem + ".command.json")).write_text(json.dumps(item, indent=2) + "\n")
-    require(result.returncode == 0, "profile command failed: " + stem)
+    require(not timed_out and process.returncode == 0, "profile command failed: " + stem)
     return item
+
+
+def exec_probe(pid_path, args):
+    """Retain the exact task identity, then exec the unchanged native binary."""
+    path = Path(pid_path)
+    require(path.is_file() and not path.is_symlink() and path.stat().st_size == 0, "fresh task receipt required")
+    path.write_text(json.dumps(dict(pid=os.getpid(), executable=args[0], binary_sha256=scout.digest(Path(args[0])),
+                                   affinity=sorted(os.sched_getaffinity(0)))) + "\n")
+    os.execv(args[0], args)
 
 
 def probe_args(root, policy, action, repetitions):
@@ -61,14 +84,44 @@ def probe_args(root, policy, action, repetitions):
             str(scout.probe(root) / (NAME + ".masks.json")), "1024", policy, "native", action, str(repetitions)]
 
 
-def record_args(perf, cpu, root, policy, data):
-    return ["sudo", "-n", "env", *[k + "=" + v for k, v in ENV.items()], str(perf), "record",
+def record_args(perf, cpu, root, policy, data, driver=None):
+    driver = driver or ROOT / "benchmarks/near_clifford/native_cpu_profile.py"
+    # Root-owned watchdog bounds the privileged process group even when sudo
+    # isolates the child in a different session/PTY. Outer bound is 180 seconds.
+    return ["sudo", "-n", "env", *[k + "=" + v for k, v in ENV.items()],
+            "timeout", "--signal=TERM", "--kill-after=5s", "150s", str(perf), "record",
             "-e", "cpu-clock:u", "-F", "499", "--call-graph", "dwarf,8192", "-o", str(data),
-            "--", "taskset", "-c", str(cpu), *probe_args(root, policy, "bench", 101)]
+            "--", "taskset", "-c", str(cpu), "python3", str(driver), "--exec-probe", str(Path(data).with_name("task.json")),
+            "--", *probe_args(root, policy, "bench", 101)]
+
+
+def ownership_args(uid, gid, data):
+    return ["sudo", "-n", "chown", "--", str(uid) + ":" + str(gid), str(data)]
+
+
+def verify_samples(text, cpu, pid, executable):
+    # Parse blocks explicitly so call-chain frames remain associated with their
+    # sample. libc samples are valid; native blocks must map into this executable.
+    headers = list(re.finditer(r"(?m)^\s*(\S+)\s+(\d+)/\s*(\d+)\s+\[(\d+)\]\s+\d+\.\d+:\s+cpu-clock:u:", text))
+    require(headers, "actual software sample headers required")
+    native = 0
+    mapped = 0
+    for index, match in enumerate(headers):
+        comm, sample_pid, tid, sample_cpu = match.groups()
+        require(int(sample_cpu) == cpu and int(sample_pid) == pid and int(tid) == pid, "sample CPU/process/thread binding")
+        block = text[match.start():headers[index + 1].start() if index + 1 < len(headers) else len(text)]
+        if comm == Path(executable).name[:15]:
+            native += 1
+            dsos = re.findall(r"\(([^()\n]+)\)", block)
+            if any(d == executable or d == Path(executable).name for d in dsos):
+                mapped += 1
+        else:
+            require(comm in ["taskset", "python3"], "known pre-exec sampling scope")
+    require(native >= 100 and mapped >= 100, "at least 100 native task samples mapped to measured executable required")
 
 
 def verify_command(item, directory, stem, args):
-    require(item["command"] == args and item["exit_code"] == 0, "fixed successful command: " + stem)
+    require(item["command"] == args and item["exit_code"] == 0 and item["timed_out"] is False, "fixed successful command: " + stem)
     require(item == read(directory / (stem + ".command.json")), "original command receipt: " + stem)
     require(set(item["outputs"]) == {stem, stem + ".stderr"}, "exact command outputs: " + stem)
     for name, entry in item["outputs"].items():
@@ -108,7 +161,7 @@ def profile(baseline_ref, out):
                   profile_driver_sha256=scout.digest(Path(__file__)), available_affinity=available, affinity=[cpu],
                   native_preflight_sha256=scout.digest(out / "original-native-preflight.sh"), features_sha256=scout.digest(out / "features.txt"),
                   host=platform.platform(), lscpu=json.loads(scout.run(["lscpu", "--json"])), rustc=scout.run(["rustc", "-Vv"]),
-                  perf=dict(path=str(perf), sha256=scout.digest(perf), version=version), cases=CASES,
+                  owner=dict(uid=os.getuid(), gid=os.getgid()), perf=dict(path=str(perf), sha256=scout.digest(perf), version=version), cases=CASES,
                   roots={role: str(root) for role, root in roots.items()}, original_out=str(out), binaries={},
                   event="cpu-clock:u", frequency=499, call_graph="dwarf,8192", observations=101)
     (out / "header.json").write_text(json.dumps(header, indent=2) + "\n")
@@ -132,13 +185,20 @@ def profile(baseline_ref, out):
                 and checked.get("native_counts_rng") is True and checked.get("seeds") == 4, "profile input records/RNG validation failed")
         # sudo is limited to this isolated runner's perf child. No sysctl or source
         # change occurs. Explicit environment matches the validated native child.
+        (directory / "task.json").touch(mode=0o600)
         args = record_args(perf, cpu, root, policy, directory / "perf.data")
-        record = command(args, directory, "instrumented-result.json")
+        try:
+            record = command(args, directory, "instrumented-result.json")
+        finally:
+            # Preserve readable partial raw data even after a failed recording.
+            if (directory / "perf.data").exists():
+                ownership = command(ownership_args(os.getuid(), os.getgid(), directory / "perf.data"), directory, "ownership.log")
+        require((directory / "perf.data").stat().st_uid == os.getuid(), "readable raw perf ownership")
         exports = {}
         for stem, subcommand in EXPORTS.items():
             exports[stem] = command([str(perf), *subcommand, "-i", str(directory / "perf.data")], directory, stem)
         item = dict(index=index, role=role, policy=policy, directory=directory.name, validate=validate, record=record,
-                    exports=exports, data_sha256=scout.digest(directory / "perf.data"), performance_valid=False)
+                    exports=exports, ownership=ownership, task_sha256=scout.digest(directory / "task.json"), data_sha256=scout.digest(directory / "perf.data"), performance_valid=False)
         events.append(item)
         with (out / "events.jsonl").open("a") as stream:
             stream.write(json.dumps(item, separators=(",", ":")) + "\n")
@@ -170,7 +230,9 @@ def verify(out, *, git_sources=True, replay=True):
     require(all(re.fullmatch(r"[0-9a-f]{40}", i["head"]) for i in h["identities"].values()), "exact source commits")
     require(set(h["roots"]) == {"baseline", "candidate"} and Path(h["roots"]["candidate"]).is_absolute()
             and Path(h["roots"]["baseline"]) == Path(h["roots"]["candidate"]) / "drafts/rust-pair-scout-baseline", "bounded source roots")
+    require(all(Path(p).is_absolute() and ".." not in Path(p).parts for p in [*h["roots"].values(), h["original_out"]]), "canonical original paths")
     require(Path(h["original_out"]).is_relative_to(Path(h["roots"]["candidate"]) / "drafts"), "bounded original profile output")
+    require(set(h["owner"]) == {"uid", "gid"} and all(type(v) is int and v >= 0 for v in h["owner"].values()), "recorded raw data owner")
     require(all(type(t) in [int, float] and math.isfinite(t) for t in [h["started"], c["finished"]]) and c["finished"] >= h["started"], "closed profile time")
     scout.verify_retained_inputs(out, h["identities"], h["retained"])
     require(scout.digest(out / "original-profile-driver.py") == h["profile_driver_sha256"], "profile driver bytes")
@@ -218,7 +280,8 @@ def verify(out, *, git_sources=True, replay=True):
         require(set(e["exports"]) == {"perf-script.txt", "perf-report.txt", "perf-buildids.txt", "perf-header.txt"}, "full perf exports")
         original_data = Path(h["original_out"]) / e["directory"] / "perf.data"
         verify_command(e["validate"], directory, "validation.json", probe_args(h["roots"][role], policy, "validate", 7))
-        verify_command(e["record"], directory, "instrumented-result.json", record_args(h["perf"]["path"], h["affinity"][0], h["roots"][role], policy, original_data))
+        verify_command(e["record"], directory, "instrumented-result.json", record_args(h["perf"]["path"], h["affinity"][0], h["roots"][role], policy, original_data, Path(h["roots"]["candidate"]) / "benchmarks/near_clifford/native_cpu_profile.py"))
+        verify_command(e["ownership"], directory, "ownership.log", ownership_args(h["owner"]["uid"], h["owner"]["gid"], original_data))
         for stem, subcommand in EXPORTS.items():
             verify_command(e["exports"][stem], directory, stem, [h["perf"]["path"], *subcommand, "-i", str(original_data)])
         checked = read(directory / "validation.json")
@@ -231,8 +294,12 @@ def verify(out, *, git_sources=True, replay=True):
                     and math.isfinite(o["ns_per_call"]) and o["ns_per_call"] == o["elapsed_ns"] / o["calls"], "instrumented observation arithmetic")
         data = directory / "perf.data"
         require(data.read_bytes()[:8] == b"PERFILE2" and scout.digest(data) == e["data_sha256"], "original perf data bytes")
-        samples = re.findall(r"(?m)^[^#\n]+\s\d+\.\d+:\s+(?:\d+\s+)?cpu-clock:u:", (directory / "perf-script.txt").read_text())
-        require(len(samples) >= 100, "at least 100 actual software samples required")
+        task = read(directory / "task.json")
+        executable = probe_args(h["roots"][role], policy, "bench", 101)[0]
+        require(scout.digest(directory / "task.json") == e["task_sha256"] and type(task["pid"]) is int and task["pid"] > 0
+                and task["executable"] == executable and task["binary_sha256"] == h["identities"][role]["binary"]
+                and task["affinity"] == h["affinity"], "exact exec task identity")
+        verify_samples((directory / "perf-script.txt").read_text(), h["affinity"][0], task["pid"], executable)
         ids = (directory / "perf-buildids.txt").read_text().splitlines()
         executable = probe_args(h["roots"][role], policy, "bench", 101)[0]
         require(any(line.split(maxsplit=1) == [buildids[role], executable] for line in ids), "samples bound to exact measured executable build-id/path")
@@ -252,6 +319,9 @@ def verify(out, *, git_sources=True, replay=True):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 4 and sys.argv[1] == "--exec-probe":
+        require(sys.argv[3] == "--", "fixed exec separator")
+        exec_probe(sys.argv[2], sys.argv[4:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-ref")
     parser.add_argument("--out", type=Path)

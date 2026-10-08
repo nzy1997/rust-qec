@@ -136,3 +136,9 @@ retains complete M4/x86 peer comparisons and [paired warm/cold Rust scouts](resu
 Single-shot MSC improvements reproduce; bulk and cold compilation remain targets,
 with all regressions retained. The new x86 host reports EPYC 9V45, distinct from
 the earlier 7763 campaigns, so cross-campaign differences are not source effects.
+
+The CPU profile collector retains the native exec PID, executable digest and CPU
+affinity and checks sample process/thread/CPU plus native executable stack frames.
+The privileged recording has a shorter process-group watchdog; command timeouts
+retain failed receipts and partial logs. After recording closes, only that raw
+file is chowned to the runner so unprivileged exports and artifact retention work.
