@@ -3936,7 +3936,10 @@ impl CompiledNearCliffordSampler<'_> {
                     (2 * self.plan.num_qubits + self.plan.measurement_count) * size_of::<u64>(),
                 )
             });
-        let coherent_eligible = self.plan.peak_active_rank >= 4
+        // Conditional scheduling can reduce the peak below four while its
+        // sign-dependent coefficient transitions still exhaust the cache.
+        let coherent_eligible = (self.plan.peak_active_rank >= 4
+            || (self.plan.peak_active_rank != 0 && self.plan.noise_signs.is_some()))
             && (1usize << self.plan.peak_active_rank)
                 .checked_mul(64 * 4 * size_of::<f64>())
                 .is_some_and(|n| n <= COEFFICIENT_BYTE_BUDGET);
