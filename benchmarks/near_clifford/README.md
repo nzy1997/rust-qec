@@ -31,9 +31,13 @@ AVX2 dispatch. A skipped gate is explicit
 in its log and is not evidence that the wider kernel ran. A source-effect claim
 for this kernel requires the admitted native gate and the complete paired A/B,
 confirmation and identical-binary A/A campaigns on the recorded host.
-Dispatch paired experiments for this kernel with `require_avx512=true`; this
-fails preflight before timings if the CPU feature or actual admitted-gate marker
-is absent. The default is false for experiments targeting existing fallback CPUs.
+Dispatch paired experiments, current-peer runs, and profiles for this kernel with
+`require_avx512=true`. The preflight rejects missing AVX512F before installing
+the Rust toolchain or building probes and retains the hardware rejection in
+`x86-scout-avx512-hardware-admission.log`. Hardware presence still requires the
+actual admitted numerical-gate marker before any timing or profile. The default
+is false for experiments targeting existing fallback CPUs; a skipped native gate
+remains fallback evidence only.
 
 These profiles include startup, warmup and teardown. Every instrumented result
 is marked `performance_valid=false`; use profiles to locate work, never to claim
