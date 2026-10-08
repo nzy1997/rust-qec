@@ -1,0 +1,89 @@
+{
+  "scope": "Original same-host Rust-only paired warm, confirmation and cold experiments; all cells/regressions retained. Original headers, closures, events, probes and drivers unchanged; binaries not vendored.",
+  "campaigns": {
+    "first-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "191c10bbe1b3a8ea86ed5f7d8e6d6d814cc30909",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/strict-pair-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/strict-pair-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "b555f785af3e432cf850de67acad46d01a33e9c1",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/strict-pair-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/strict-pair-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "confirmation-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "191c10bbe1b3a8ea86ed5f7d8e6d6d814cc30909",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/strict-pair-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/strict-pair-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "b555f785af3e432cf850de67acad46d01a33e9c1",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/strict-pair-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/strict-pair-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "first-cold": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "191c10bbe1b3a8ea86ed5f7d8e6d6d814cc30909",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/main.rs": "probe/cold-baseline/main.rs",
+            "drafts/strict-pair-cold-ablation/Cargo.toml": "probe/cold-baseline/Cargo.toml",
+            "drafts/strict-pair-cold-ablation/Cargo.lock": "probe/cold-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "b555f785af3e432cf850de67acad46d01a33e9c1",
+          "untracked_input_mapping": {
+            "drafts/strict-pair-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/strict-pair-cold-ablation/main.rs": "probe/cold-candidate/main.rs",
+            "drafts/strict-pair-cold-ablation/Cargo.toml": "probe/cold-candidate/Cargo.toml",
+            "drafts/strict-pair-cold-ablation/Cargo.lock": "probe/cold-candidate/Cargo.lock"
+          }
+        }
+      }
+    }
+  }
+}
