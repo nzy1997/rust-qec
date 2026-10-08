@@ -25,6 +25,9 @@ use noise_packet::NoisePacket;
 #[path = "compact_replay.rs"]
 mod compact_replay;
 use compact_replay::{CompactReplay, RowDraw};
+#[path = "noise_spans.rs"]
+mod noise_spans;
+use noise_spans::NoiseSpans;
 #[path = "scalar_basis.rs"]
 mod scalar_basis;
 use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
@@ -1057,6 +1060,7 @@ pub struct CompiledNearCliffordExecutor {
     initial_coefficients: Arc<Vec<ComplexAmp>>,
     random_kinds: Vec<RandomKind>,
     random_runs: Option<RandomRunPlan>,
+    noise_spans: Option<NoiseSpans>,
     noise_event_count: usize,
     independent_event_count: usize,
     scalar_basis: Option<Vec<Option<ScalarBasisProgram>>>,
@@ -1384,6 +1388,7 @@ impl CompiledNearCliffordExecutor {
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
             random_kinds: Vec::new(),
             random_runs: None,
+            noise_spans: None,
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
@@ -1555,9 +1560,17 @@ impl CompiledNearCliffordExecutor {
             .random_runs
             .as_ref()
             .map_or(0, RandomRunPlan::reserved_bytes);
-        plan.counts_plan_budget = PLAN_BYTE_BUDGET
+        let remaining = PLAN_BYTE_BUDGET
             .saturating_sub(planner.reserved_bytes)
             .saturating_sub(run_bytes);
+        if plan.noise_event_count >= MIN_SCALAR_PREPARED_NOISE_EVENTS {
+            plan.noise_spans = NoiseSpans::build(&plan.operations, plan.prefix_len, remaining);
+        }
+        plan.counts_plan_budget = remaining.saturating_sub(
+            plan.noise_spans
+                .as_ref()
+                .map_or(0, NoiseSpans::reserved_bytes),
+        );
         Ok(plan)
     }
     // The packet and dense paths keep the original gates. Direct test-only
@@ -2821,7 +2834,7 @@ impl CompiledNearCliffordSampler<'_> {
                 &mut tape[..count],
             );
             let mut replay = RowRandom::recorded(&tape[..count], &mut *rng);
-            let result = self.row_with_random_mode::<POSTSELECT>(sweep, &mut replay);
+            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
             debug_assert!(result.is_err() || replay.cursor == count);
             result
         };
@@ -2838,6 +2851,14 @@ impl CompiledNearCliffordSampler<'_> {
     }
 
     fn row_with_random_mode<const POSTSELECT: bool>(
+        &mut self,
+        sweep: &[bool],
+        random: &mut impl RowDraw,
+    ) -> Result<NearCliffordShot, String> {
+        self.row_with_random_kernel::<POSTSELECT, false>(sweep, random)
+    }
+
+    fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
@@ -2860,7 +2881,35 @@ impl CompiledNearCliffordSampler<'_> {
         };
         let plan = self.plan;
         let mut event = 0;
-        for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
+        let mut spans = plan
+            .noise_spans
+            .as_ref()
+            .map_or(&[][..], NoiseSpans::spans)
+            .iter()
+            .peekable();
+        let mut node = plan.prefix_len;
+        while node < plan.operations.len() {
+            if POSTSELECT && SKIP_NOISE {
+                if let Some(span) = spans.peek() {
+                    if node >= span.end {
+                        spans.next();
+                        continue;
+                    }
+                    if node >= span.start {
+                        // The complete typed producer has already drawn this row.
+                        // Only literal zero Noise values retire operations; no
+                        // basis, measurement, feedback or annotation is crossed.
+                        let skipped = random.skip_zero_noise(span.end - node);
+                        node += skipped;
+                        event += skipped;
+                        if node == span.end {
+                            spans.next();
+                            continue;
+                        }
+                    }
+                }
+            }
+            let op = &plan.operations[node];
             match op {
                 PlanOp::Basis(gates) => {
                     plan.conjugate_scalar_basis(node, gates, &mut self.x, &mut self.z);
@@ -2982,6 +3031,7 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                 }
             }
+            node += 1;
         }
         debug_assert_eq!(event, plan.random_kinds.len());
         Ok(shot)
@@ -4057,6 +4107,7 @@ mod tests {
                                     initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
                                     random_kinds: Vec::new(),
                                     random_runs: None,
+                                    noise_spans: None,
                                     noise_event_count: 0,
                                     independent_event_count: 0,
                                     scalar_basis: None,
@@ -4761,6 +4812,7 @@ mod tests {
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
             random_kinds: Vec::new(),
             random_runs: None,
+            noise_spans: None,
             noise_event_count: 0,
             independent_event_count: 0,
             scalar_basis: None,
