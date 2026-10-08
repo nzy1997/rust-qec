@@ -110,7 +110,18 @@ def validate(out,git_sources=False,allow_smoke=False):
     require(header['packages']['symft']['version']=='0.1.1' and
             header['packages']['clifft_environment']['clifft']['version']=='0.11.0','wrong peer versions')
     manifest=header['manifest']
-    require(manifest['schema']=='rstim.near-clifford-diagnostics.v1','wrong schema')
+    current = manifest['schema'] == 'rstim.near-clifford-diagnostics.v2'
+    require(manifest['schema'] in ['rstim.near-clifford-diagnostics.v1',
+                                 'rstim.near-clifford-diagnostics.v2'], 'wrong schema')
+    require(header['schema'] == manifest['schema'], 'header schema differs from manifest')
+    if 'benchmarks/near_clifford/diagnostics/source_contract.py' in header['sources']:
+        require(current, 'current-production harness cannot claim the frozen v1 schema')
+    if current:
+        from source_contract import validate_contract
+        validate_contract(header, closure)
+    else:
+        require('production_contract' not in header and 'production_contract_after' not in closure,
+                'frozen v1 schema cannot carry a current-production contract')
     require(manifest['baseline']==BASELINE,'wrong frozen production baseline')
     with tempfile.TemporaryDirectory() as temporary:
         expected=build(Path(temporary))
@@ -151,7 +162,7 @@ def validate(out,git_sources=False,allow_smoke=False):
         for path,sha in header['sources'].items():
             data=subprocess.check_output(['git','show',header['source_revision']+':'+path],cwd=ROOT)
             require(digest(data)==sha,'source revision mismatch: '+path)
-            if path.startswith('rstim/src/') or path.startswith(prefix+'compiled_sota/fixtures/') or path==prefix+'compiled_sota/manifest.json':
+            if (not current and path.startswith('rstim/src/')) or path.startswith(prefix+'compiled_sota/fixtures/') or path==prefix+'compiled_sota/manifest.json':
                 baseline=subprocess.check_output(['git','show',manifest['baseline']+':'+path],cwd=ROOT)
                 require(data==baseline,'production differs from frozen baseline: '+path)
     raw_peers={}
