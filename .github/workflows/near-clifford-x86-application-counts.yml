@@ -22,7 +22,7 @@ on:
         default: false
         type: boolean
       require_avx512:
-        description: Require the admitted four-amplitude AVX512 native gate before paired timings
+        description: Require AVX512 hardware before compiler/backend setup and the numerical gate before timings or profiling
         required: false
         default: false
         type: boolean
@@ -53,6 +53,8 @@ jobs:
       - name: Prepare pinned CPU backends and probes
         id: prepare
         timeout-minutes: 20
+        env:
+          REQUIRE_AVX512: ${{ inputs.require_avx512 }}
         run: |
           bash benchmarks/near_clifford/verify_x86_rotations.sh
           python -m venv drafts/x86-clifft
@@ -228,12 +230,14 @@ jobs:
         with:
           python-version: '3.12'
       - name: Prepare profiling tool and verify native arithmetic and public RNG
+        env:
+          REQUIRE_AVX512: ${{ inputs.require_avx512 }}
         timeout-minutes: 20
         run: |
           mkdir -p drafts
+          bash benchmarks/near_clifford/verify_x86_rotations.sh
           sudo apt-get update > drafts/x86-profile-tool-setup.log 2>&1
           sudo apt-get install -y linux-tools-generic binutils >> drafts/x86-profile-tool-setup.log 2>&1
-          bash benchmarks/near_clifford/verify_x86_rotations.sh
           python benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-normal.log 2>&1
           python -O benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-optimized.log 2>&1
       - name: Sample fixed native production binaries

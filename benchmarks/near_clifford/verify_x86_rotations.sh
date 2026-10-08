@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-rustup toolchain install 1.93.1 --profile minimal
-rustup default 1.93.1
 mkdir -p drafts
-python benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-normal.log 2>&1
-python -O benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-optimized.log 2>&1
 grep -m1 '^flags' /proc/cpuinfo > drafts/x86-scout-features.txt
 grep -qw avx2 drafts/x86-scout-features.txt
 grep -qw fma drafts/x86-scout-features.txt
+if [[ "${REQUIRE_AVX512:-false}" == "true" ]]; then
+    if ! grep -qw avx512f drafts/x86-scout-features.txt; then
+        printf '%s\n' 'AVX512 hardware admission rejected before setup: AVX512F absent' > drafts/x86-scout-avx512-hardware-admission.log
+        exit 1
+    fi
+    printf '%s\n' 'AVX512 hardware present; native numerical admission still required' > drafts/x86-scout-avx512-hardware-admission.log
+fi
+
+rustup toolchain install 1.93.1 --profile minimal
+rustup default 1.93.1
+python benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-normal.log 2>&1
+python -O benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-optimized.log 2>&1
 # Retain the wider-kernel gate separately. CPUs without AVX512F still exercise
 # the existing fallback; their log explicitly records that this gate skipped.
 cargo test --release --locked -p rstim --lib strict_avx512_blocks_match_independent_full_vector_gather_bits -- --nocapture > drafts/x86-scout-avx512-direct-bits.log 2>&1
@@ -18,6 +26,9 @@ else
     grep -q 'AVX512 four-amplitude native gate skipped' drafts/x86-scout-avx512-direct-bits.log
 fi
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-avx512-direct-bits.log
+if [[ "${REQUIRE_AVX512:-false}" == "true" ]]; then
+    grep -q 'AVX512 four-amplitude native gate admitted and complete' drafts/x86-scout-avx512-direct-bits.log
+fi
 cargo test --release --locked -p rstim --lib fused_avx2_pairs_match_independent_full_vector_gather_bits -- --nocapture > drafts/x86-scout-direct-bits.log 2>&1
 cargo test --release --locked -p rstim --lib both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries -- --nocapture > drafts/x86-scout-highest-gather.log 2>&1
 cargo test --release --locked -p rstim --lib scalar_high_multi_x_matches_gather_coefficient_and_cdf_bits_for_both_policies -- --nocapture > drafts/x86-scout-gather-cdf.log 2>&1
