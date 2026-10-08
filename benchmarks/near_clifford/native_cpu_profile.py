@@ -90,7 +90,7 @@ def record_args(perf, cpu, root, policy, data, driver=None):
     # isolates the child in a different session/PTY. Outer bound is 180 seconds.
     return ["sudo", "-n", "env", *[k + "=" + v for k, v in ENV.items()],
             "timeout", "--signal=KILL", "150s", str(perf), "record",
-            "-e", "cpu-clock:u", "-F", "499", "--call-graph", "dwarf,8192", "-o", str(data),
+            "-e", "cpu-clock:u", "--sample-cpu", "-F", "499", "--call-graph", "dwarf,8192", "-o", str(data),
             "--", "taskset", "-c", str(cpu), "python3", str(driver), "--exec-probe", str(Path(data).with_name("task.json")),
             "--", *probe_args(root, policy, "bench", 101)]
 

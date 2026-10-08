@@ -117,7 +117,7 @@ class ProfileContract(unittest.TestCase):
             profile.verify(out, git_sources=False, replay=False)
 
     def test_resealed_semantic_corruptions_are_rejected(self):
-        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout"]:
+        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout", "cpu_attribute"]:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
                 out = Path(temporary)
                 h, c, events = fixture(out)
@@ -158,6 +158,7 @@ class ProfileContract(unittest.TestCase):
                 else:
                     item = e["record"]
                     if kind == "cpu_command": item["command"][item["command"].index("-c") + 1] = "1"
+                    elif kind == "cpu_attribute": item["command"].remove("--sample-cpu")
                     elif kind == "exit": item["exit_code"] = 1
                     elif kind == "timeout": item["timed_out"] = True
                     elif kind == "output_inventory": item["outputs"].pop("instrumented-result.json.stderr")
