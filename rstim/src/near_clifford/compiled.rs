@@ -2602,6 +2602,28 @@ impl CompiledNearCliffordSampler<'_> {
         factor: f64,
     ) {
         #[cfg(target_arch = "x86_64")]
+        if !FUSED
+            && IMAGINARY
+            && coefficients.len() >= 16
+            && x >= 4
+            && Self::avx512_complex_layout_supported()
+            && std::arch::is_x86_feature_detected!("avx512f")
+            && std::arch::is_x86_feature_detected!("fma")
+        {
+            // SAFETY: Runtime detection includes the required OS vector state.
+            // The layout guard and highest-X split establish the helper's
+            // initialized, padding-free, disjoint four-amplitude groups.
+            unsafe {
+                match x & 3 {
+                    0 => Self::rotate_highest_z0_avx512::<0>(coefficients, x, c, factor),
+                    1 => Self::rotate_highest_z0_avx512::<1>(coefficients, x, c, factor),
+                    2 => Self::rotate_highest_z0_avx512::<2>(coefficients, x, c, factor),
+                    _ => Self::rotate_highest_z0_avx512::<3>(coefficients, x, c, factor),
+                }
+            }
+            return;
+        }
+        #[cfg(target_arch = "x86_64")]
         if FUSED
             && IMAGINARY
             && std::arch::is_x86_feature_detected!("avx2")
@@ -2676,6 +2698,96 @@ impl CompiledNearCliffordSampler<'_> {
         b[usize::from(SWAP)] = ComplexAmp::new(out_br[0], out_bi[0]);
         b[usize::from(!SWAP)] = ComplexAmp::new(out_br[1], out_bi[1]);
     }
+    #[cfg(target_arch = "x86_64")]
+    const fn avx512_complex_layout_supported() -> bool {
+        // ComplexAmp has no public representation guarantee. Select this
+        // private direct-load kernel only when both fields exactly cover its
+        // bytes; all other layouts retain the existing AVX2/portable paths.
+        size_of::<ComplexAmp>() == 2 * size_of::<f64>()
+            && std::mem::offset_of!(ComplexAmp, re) == 0
+            && std::mem::offset_of!(ComplexAmp, im) == size_of::<f64>()
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn rotate_highest_z0_avx512<const LOW_X: usize>(
+        coefficients: &mut [ComplexAmp],
+        x: usize,
+        c: f64,
+        factor: f64,
+    ) {
+        // Caller requires AVX512F/FMA, the verified ComplexAmp layout,
+        // 4 <= x < coefficients.len(), and a power-of-two coefficient count.
+        // Explicit assembly keeps Rust 1.88 support without unstable AVX512
+        // intrinsics or changing the workspace's minimum Rust version.
+        let pivot = 1usize << (usize::BITS - 1 - x.leading_zeros());
+        let group_xor = (x ^ pivot) >> 2;
+        debug_assert!(LOW_X < 4 && LOW_X == x & 3);
+        debug_assert!(x >= 4 && x < coefficients.len());
+        debug_assert!(pivot >= 4 && Self::avx512_complex_layout_supported());
+        debug_assert_eq!(coefficients.len() % (pivot * 2), 0);
+        let byte_len = pivot * size_of::<ComplexAmp>();
+        let permutation: [u64; 8] = std::array::from_fn(|lane| ((lane ^ (LOW_X * 2)) ^ 1) as u64);
+        let signs = [-0., 0., -0., 0., -0., 0., -0., 0.];
+        for block in coefficients.chunks_exact_mut(pivot * 2) {
+            let (left, right) = block.split_at_mut(pivot);
+            // SAFETY: Both whole-slice pointers cover pivot initialized
+            // ComplexAmps with no padding, and halves never overlap. Each
+            // 64-byte group contains four values. group_xor < pivot/4 makes
+            // the right-side group mapping a permutation, so every group is
+            // read/written once. Both original groups are loaded before stores.
+            // The permutation swaps real/imaginary and the two low X bits;
+            // sign XOR applies unary negation before partner*factor. Strict
+            // computes own*c + partner*factor with separate multiplies and
+            // an original-order addition; no operation is fused/reassociated.
+            // Explicit XMM outputs clobber the aliased YMM/ZMM registers; early
+            // GPR outputs cannot overlap inputs still needed by the loop.
+            unsafe {
+                std::arch::asm!(
+                    "vmovupd zmm2, [{signs}]",
+                    "vbroadcastsd zmm3, [{factor}]",
+                    "vbroadcastsd zmm4, [{c}]",
+                    "vmovupd zmm5, [{permutation}]",
+                    "xor {position}, {position}",
+                    "2:",
+                    "mov {other}, {position}",
+                    "shr {other}, 6",
+                    "xor {other}, {group_xor}",
+                    "shl {other}, 6",
+                    "vmovupd zmm0, [{left} + {position}]",
+                    "vmovupd zmm1, [{right} + {other}]",
+                    "vpermpd zmm6, zmm5, zmm1",
+                    "vpermpd zmm7, zmm5, zmm0",
+                    "vpxord zmm6, zmm6, zmm2",
+                    "vpxord zmm7, zmm7, zmm2",
+                    "vmulpd zmm0, zmm0, zmm4",
+                    "vmulpd zmm1, zmm1, zmm4",
+                    "vmulpd zmm6, zmm6, zmm3",
+                    "vmulpd zmm7, zmm7, zmm3",
+                    "vaddpd zmm0, zmm0, zmm6",
+                    "vaddpd zmm1, zmm1, zmm7",
+                    "vmovupd [{left} + {position}], zmm0",
+                    "vmovupd [{right} + {other}], zmm1",
+                    "add {position}, 64",
+                    "cmp {position}, {byte_len}",
+                    "jb 2b",
+                    left = in(reg) left.as_mut_ptr(),
+                    right = in(reg) right.as_mut_ptr(),
+                    group_xor = in(reg) group_xor,
+                    byte_len = in(reg) byte_len,
+                    c = in(reg) &c,
+                    factor = in(reg) &factor,
+                    signs = in(reg) signs.as_ptr(),
+                    permutation = in(reg) permutation.as_ptr(),
+                    position = out(reg) _,
+                    other = out(reg) _,
+                    out("xmm0") _, out("xmm1") _, out("xmm2") _, out("xmm3") _,
+                    out("xmm4") _, out("xmm5") _, out("xmm6") _, out("xmm7") _,
+                    options(nostack),
+                );
+            }
+        }
+    }
+
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2,fma")]
     unsafe fn rotate_highest_z0_avx2<const SWAP: bool>(
@@ -6278,5 +6390,105 @@ mod avx2_rotation_bits_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64"))]
+mod avx512_rotation_bits_tests {
+    use super::*;
+
+    #[test]
+    fn strict_avx512_blocks_match_independent_full_vector_gather_bits() {
+        if !std::arch::is_x86_feature_detected!("avx512f")
+            || !std::arch::is_x86_feature_detected!("fma")
+            || !CompiledNearCliffordSampler::avx512_complex_layout_supported()
+        {
+            println!("AVX512 four-amplitude native gate skipped: CPU or layout unsupported");
+            return;
+        }
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+            f64::MAX * 0.125,
+            -f64::MAX * 0.125,
+        ];
+        for len in [8, 16, 64, 256, 1024, 2048] {
+            for kind in 0..4 {
+                let before: Vec<_> = (0..len)
+                    .map(|i| {
+                        ComplexAmp::new(
+                            values[(i * 3 + kind) % values.len()],
+                            values[(i * 7 + 2 * kind) % values.len()],
+                        )
+                    })
+                    .collect();
+                // All masks exercise every low-X permutation and both tiny
+                // and multi-group halves, including high XOR block offsets.
+                for x in 4..len {
+                    for factor in [0.3826834323650898, -0.3826834323650898] {
+                        let c = 0.9238795325112867;
+                        // Independent full-vector snapshot gather, with no
+                        // production block/group/permutation/assembly reuse.
+                        let expected: Vec<_> = (0..len)
+                            .map(|i| {
+                                let own = before[i];
+                                let partner = before[i ^ x];
+                                ComplexAmp::new(
+                                    own.re * c + (-partner.im) * factor,
+                                    own.im * c + partner.re * factor,
+                                )
+                            })
+                            .collect();
+                        let mut actual = before.clone();
+                        // SAFETY: Features/layout checked above; x and length
+                        // satisfy the helper's power-of-two mask preconditions.
+                        unsafe {
+                            match x & 3 {
+                                0 => CompiledNearCliffordSampler::rotate_highest_z0_avx512::<0>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                ),
+                                1 => CompiledNearCliffordSampler::rotate_highest_z0_avx512::<1>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                ),
+                                2 => CompiledNearCliffordSampler::rotate_highest_z0_avx512::<2>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                ),
+                                _ => CompiledNearCliffordSampler::rotate_highest_z0_avx512::<3>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                ),
+                            }
+                        }
+                        for (i, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+                            assert_eq!(
+                                (actual.re.to_bits(), actual.im.to_bits()),
+                                (expected.re.to_bits(), expected.im.to_bits()),
+                                "len={len};kind={kind};x={x};i={i};factor={factor}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        println!("AVX512 four-amplitude native gate admitted and complete");
     }
 }

@@ -21,6 +21,20 @@ counts. Raw samples, stack exports, ELF binaries/build IDs, probe inputs, comman
 outputs and source closures remain in the workflow artifact. Ordinary peer and
 paired timing modes retain their defaults.
 
+The native correctness preflight also records a separate four-amplitude AVX-512
+rotation gate in `x86-scout-avx512-direct-bits.log`. Eligible Strict imaginary
+rotations use four-amplitude groups only for vectors of at least 16 amplitudes,
+with AVX512F/FMA and the verified private field layout. Each product is separately
+rounded before the original-order addition; this kernel contains no FMA. Smaller
+vectors and other CPUs/layouts retain the existing paths; Fused keeps its existing
+AVX2 dispatch. A skipped gate is explicit
+in its log and is not evidence that the wider kernel ran. A source-effect claim
+for this kernel requires the admitted native gate and the complete paired A/B,
+confirmation and identical-binary A/A campaigns on the recorded host.
+Dispatch paired experiments for this kernel with `require_avx512=true`; this
+fails preflight before timings if the CPU feature or actual admitted-gate marker
+is absent. The default is false for experiments targeting existing fallback CPUs.
+
 These profiles include startup, warmup and teardown. Every instrumented result
 is marked `performance_valid=false`; use profiles to locate work, never to claim
 speedups or SOTA. `native_cpu_profile.py --verify DIR` requires the original

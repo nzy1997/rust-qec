@@ -21,6 +21,11 @@ on:
         required: false
         default: false
         type: boolean
+      require_avx512:
+        description: Require the admitted four-amplitude AVX512 native gate before paired timings
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -154,8 +159,14 @@ jobs:
           python-version: '3.12'
       - name: Prepare pinned Rust and verify coefficients and public RNG
         timeout-minutes: 20
+        env:
+          REQUIRE_AVX512: ${{ inputs.require_avx512 }}
         run: |
           bash benchmarks/near_clifford/verify_x86_rotations.sh
+          if [[ "$REQUIRE_AVX512" == "true" ]]; then
+            grep -qw avx512f drafts/x86-scout-features.txt
+            grep -q 'AVX512 four-amplitude native gate admitted and complete' drafts/x86-scout-avx512-direct-bits.log
+          fi
       - name: Record virtual host and pin paired campaigns to one CPU
         run: |
           python - <<'PY'
