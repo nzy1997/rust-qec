@@ -117,7 +117,12 @@ existing semantics.
 This optional search accepts at most 2048 tape operations and uses a work budget
 of 16 million, borrowing the existing compilation frame. Search scratch and
 conditional metadata share the existing 64 MiB tape/plan reservations. An
-unselected or rejected search keeps the existing measurement scheduler. An
+initial greedy schedule is completed and validated before a width-one lookahead
+previews ready rotations followed by their nonexpanding closure. The preview
+reuses one trial frame, accounts for its retained storage, and accepts only a
+complete schedule with strictly lower peak rank. Work or memory exhaustion
+retains the complete greedy schedule. Neither search establishes optimal rank.
+An unselected or rejected search keeps the existing measurement scheduler. An
 accepted plan draws its complete typed random row once before scalar replay, so
 signs can depend on channels later in the selected order. The row and optional
 packet buffers share the 16 MiB cap; packet admission uses retained capacities

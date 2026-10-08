@@ -77,6 +77,44 @@ impl CompileFrame {
         }
     }
 
+    pub(super) fn reserved_bytes(&self) -> Option<usize> {
+        let rows = self
+            .inverse
+            .capacity()
+            .checked_mul(size_of::<PackedPauli>())?;
+        self.inverse
+            .iter()
+            .try_fold(rows.checked_add(size_of::<Self>())?, |n, row| {
+                n.checked_add(
+                    row.x
+                        .capacity()
+                        .checked_add(row.z.capacity())?
+                        .checked_mul(size_of::<u64>())?,
+                )
+            })
+    }
+
+    // Search reuses one preallocated trial frame. No infallible Vec clone or
+    // new frame allocation occurs for individual lookahead candidates.
+    pub(super) fn copy_from(&mut self, other: &Self) -> Option<()> {
+        if self.num_qubits != other.num_qubits
+            || self.inverse.len() != other.inverse.len()
+            || self
+                .inverse
+                .iter()
+                .zip(&other.inverse)
+                .any(|(a, b)| a.x.len() != b.x.len() || a.z.len() != b.z.len())
+        {
+            return None;
+        }
+        for (row, source) in self.inverse.iter_mut().zip(&other.inverse) {
+            row.x.copy_from_slice(&source.x);
+            row.z.copy_from_slice(&source.z);
+            row.phase = source.phase;
+        }
+        Some(())
+    }
+
     // Exact canonical Pauli multiplication: Z_left crosses X_right.
     fn multiply(left: &mut PackedPauli, right: &PackedPauli) {
         debug_assert_eq!(left.x.len(), right.x.len());
@@ -299,6 +337,13 @@ mod packed_compile_frame_tests {
         let mut rng = StdRng::seed_from_u64(2026100701);
         for n in [1, 3, 5, 63, 64, 65, 129] {
             let mut frame = CompileFrame::identity(n).unwrap();
+            let mut copied = CompileFrame::identity(n).unwrap();
+            let copied_bytes = copied.reserved_bytes().unwrap();
+            let copied_planes: Vec<_> = copied
+                .inverse
+                .iter()
+                .map(|row| (row.x.as_ptr(), row.z.as_ptr()))
+                .collect();
             let mut reference = ActiveState::new(n, 16);
             for _ in 0..24 {
                 let a = rng.gen_range(0..n);
@@ -349,6 +394,13 @@ mod packed_compile_frame_tests {
                     + 2 * u8::from(rng.r#gen::<bool>()))
                     & 3;
                 compare(&frame, &reference, &PackedPauli::new(&input));
+                copied.copy_from(&frame).unwrap();
+                compare(&copied, &reference, &PackedPauli::new(&input));
+                assert_eq!(copied.reserved_bytes().unwrap(), copied_bytes);
+                for (row, &(x, z)) in copied.inverse.iter().zip(&copied_planes) {
+                    assert_eq!(row.x.as_ptr(), x);
+                    assert_eq!(row.z.as_ptr(), z);
+                }
                 for basis in [
                     MeasurementBasis::X,
                     MeasurementBasis::Y,
@@ -381,6 +433,8 @@ mod packed_compile_frame_tests {
         assert!(frame.pauli(1, MeasurementBasis::Z).is_err());
         assert!(CompileFrame::identity(4097).is_err());
         let wide = CompileFrame::identity(65).unwrap();
+        assert!(frame.copy_from(&wide).is_none());
+        assert_eq!(frame.pauli(0, MeasurementBasis::X).unwrap().phase, 2);
         assert!(
             wide.reexpress(&PackedPauli {
                 x: vec![0, 2],
