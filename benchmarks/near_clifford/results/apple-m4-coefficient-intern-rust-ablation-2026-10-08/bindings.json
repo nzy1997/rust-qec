@@ -1,0 +1,313 @@
+{
+  "scope": "Exploratory same-host Rust-only paired warm and cold experiments, including rejected variants; original headers/closures and drivers unchanged; measured binaries not vendored.",
+  "campaigns": {
+    "full-hash-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "b5d36e85345ade4b2e9e0478df39b8e7e7c52348",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "admission-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "6b333e8a9fbc3484d8751c6ef67930318910f115",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "admission-confirmation": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "6b333e8a9fbc3484d8751c6ef67930318910f115",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "admission-cold": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "6b333e8a9fbc3484d8751c6ef67930318910f115",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        }
+      }
+    },
+    "sparse-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "e0ac486ba3e8ac3d1572822447497c1d708f89ef",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "sparse-cold": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "2940cb66a1e861916edb6f05a23c07c1bb8825c3",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "e0ac486ba3e8ac3d1572822447497c1d708f89ef",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        }
+      }
+    },
+    "deferred-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "f6c20661fd8952ebc9d4876c777d9e05000400dc",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "eeca660a1f5cfb9c73f2698dab964e41e59c4034",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "deferred-cold": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "f6c20661fd8952ebc9d4876c777d9e05000400dc",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "c1b2da42218a93fd8bd9ff523f54a107c3c57e66",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        }
+      }
+    },
+    "large-warm": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "f6c20661fd8952ebc9d4876c777d9e05000400dc",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "0177cf3d4c2b988b35c692cc9a5098a3bf4f322f",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "large-confirmation": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "f6c20661fd8952ebc9d4876c777d9e05000400dc",
+          "untracked_input_mapping": {
+            "drafts/compact-replay-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-baseline/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-baseline/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/compact-replay-ablation/main.rs": "probe/warm-baseline/main.rs",
+            "drafts/compact-replay-ablation/Cargo.toml": "probe/warm-baseline/Cargo.toml",
+            "drafts/compact-replay-ablation/Cargo.lock": "probe/warm-baseline/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "0177cf3d4c2b988b35c692cc9a5098a3bf4f322f",
+          "untracked_input_mapping": {
+            "drafts/intern-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/warm-candidate/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/warm-candidate/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-ablation/main.rs": "probe/warm-candidate/main.rs",
+            "drafts/intern-ablation/Cargo.toml": "probe/warm-candidate/Cargo.toml",
+            "drafts/intern-ablation/Cargo.lock": "probe/warm-candidate/Cargo.lock"
+          }
+        }
+      }
+    },
+    "large-cold": {
+      "routes": {
+        "baseline": {
+          "source_equivalent_commit": "f6c20661fd8952ebc9d4876c777d9e05000400dc",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        },
+        "candidate": {
+          "source_equivalent_commit": "0177cf3d4c2b988b35c692cc9a5098a3bf4f322f",
+          "untracked_input_mapping": {
+            "drafts/intern-cold-ablation/msc_d3_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d3_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/msc_d5_inject_cultivate_p1e-3.masks.json": "probe/cold/msc_d5_inject_cultivate_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d7_r7_p1e-3.masks.json": "probe/cold/pure_surface_d7_r7_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/pure_surface_d9_r9_p1e-3.masks.json": "probe/cold/pure_surface_d9_r9_p1e-3.masks.json",
+            "drafts/intern-cold-ablation/main.rs": "probe/cold/main.rs",
+            "drafts/intern-cold-ablation/Cargo.toml": "probe/cold/Cargo.toml",
+            "drafts/intern-cold-ablation/Cargo.lock": "probe/cold/Cargo.lock"
+          }
+        }
+      }
+    }
+  }
+}
