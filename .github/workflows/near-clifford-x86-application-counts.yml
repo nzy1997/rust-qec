@@ -10,6 +10,11 @@ on:
         required: false
         default: ''
         type: string
+      diagnostic_followup:
+        description: 'After paired scouts close, retain actual binaries/assembly and run two identical-binary A/A controls'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -152,6 +157,11 @@ jobs:
         run: |
           taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-warm > drafts/x86-scout-warm.log 2>&1
           taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-confirmation > drafts/x86-scout-confirmation.log 2>&1
+      - name: Retain actual binaries and measure identical-binary null controls
+        if: ${{ inputs.diagnostic_followup }}
+        timeout-minutes: 15
+        run: |
+          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/x86_pair_followup.py --closed-campaign drafts/x86-pair-confirmation --out drafts/x86-pair-followup > drafts/x86-scout-followup.log 2>&1
       - name: Retain full paired evidence and partial failures
         if: always()
         uses: actions/upload-artifact@v4
@@ -162,5 +172,6 @@ jobs:
             drafts/x86-scout-*
             drafts/x86-pair-warm/
             drafts/x86-pair-confirmation/
+            drafts/x86-pair-followup/
             drafts/rust-pair-scout-probe/build.log
             drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log

@@ -6,6 +6,7 @@ before collection; original events, source identities and partial failures remai
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -109,12 +110,68 @@ def verify_retained_inputs(out, identities, retained):
             raise ValueError("retained driver bytes do not match measured driver")
 
 
-def collect(roots, out):
+def verify_closed_campaign(out):
+    """Replay the complete fixed protocol before accepting a closed scout."""
+    header = json.loads((out / "header.json").read_text())
+    closure = json.loads((out / "closure.json").read_text())
+    raw = (out / "events.jsonl").read_bytes()
+    events = [json.loads(line) for line in raw.splitlines()]
+    cases = [(n, s, p) for n in NAMES for s in [1, 64, 1024] for p in ["strict", "fused"]]
+    roles = ["baseline", "candidate"]
+    if header["schema"] not in ["exploratory.avx2-pair-ablation.v1", "exploratory.same-binary-warm-control.v1"] or header["cases"] != [list(c) for c in cases] or (header["pairs"], header["observations_per_process"], header["minimum_warm_observation_ns"]) != (5, 7, 50_000_000):
+        raise ValueError("closed campaign protocol mismatch")
+    if set(header["identities"]) != set(roles) or header["identities"] != closure["identities_after"] or any(i["dirty"] for i in header["identities"].values()):
+        raise ValueError("closed campaign source/role identity mismatch")
+    if header["schema"] == "exploratory.same-binary-warm-control.v1" and header["identities"]["baseline"] != header["identities"]["candidate"]:
+        raise ValueError("null control source/binary identities differ")
+    if not all(type(t) in [int, float] and math.isfinite(t) for t in [header["started"], closure["finished"]]) or closure["finished"] < header["started"] or closure["events"] != 288 or len(events) != 288 or digest(out / "events.jsonl") != closure["events_sha256"]:
+        raise ValueError("closed campaign time/events/digest mismatch")
+    verify_retained_inputs(out, header["identities"], header["retained"])
+    schedule = [(r, c, "validate") for c in cases for r in roles]
+    for round_index in range(5):
+        ordered = cases[round_index:] + cases[:round_index]
+        if round_index % 2:
+            ordered.reverse()
+        for index, case in enumerate(ordered):
+            order_roles = roles[::-1] if (index + round_index) % 2 else roles
+            schedule.extend((r, case, "bench") for r in order_roles)
+    values = {c: {r: [] for r in roles} for c in cases}
+    for index, (event, (role, case, action)) in enumerate(zip(events, schedule)):
+        if (event["index"], event["route"], tuple(event["case"]), event["action"]) != (index, role, case, action):
+            raise ValueError("closed campaign alternating schedule mismatch")
+        result = event["result"]
+        if result["shots"] != case[1] or result["policy"] != case[2]:
+            raise ValueError("closed campaign result context mismatch")
+        if action == "validate":
+            if result.get("status") != "ok" or result.get("exact_records_counts_rng") is not True or result.get("native_counts_rng") is not True or result.get("seeds") != 4:
+                raise ValueError("closed campaign records/counts/RNG failed")
+        else:
+            observations = result["observations"]
+            if result["route"] != "native" or len(observations) != 7:
+                raise ValueError("closed campaign native observation inventory mismatch")
+            for o in observations:
+                if type(o["calls"]) is not int or o["calls"] <= 0 or type(o["elapsed_ns"]) is not int or o["elapsed_ns"] < 50_000_000 or not math.isfinite(o["ns_per_call"]) or o["ns_per_call"] != o["elapsed_ns"] / o["calls"]:
+                    raise ValueError("closed campaign invalid observation")
+            values[case][role].append(statistics.median(o["ns_per_call"] for o in observations))
+    expected = []
+    for case in cases:
+        v = values[case]
+        a, b = statistics.median(v["baseline"]), statistics.median(v["candidate"])
+        paired = [x / y for x, y in zip(v["baseline"], v["candidate"])]
+        expected.append(dict(case=list(case), baseline_ns=a, candidate_ns=b, speedup=a/b, paired_range=[min(paired), max(paired)]))
+    if json.loads((out / "summary.json").read_text()) != expected:
+        raise ValueError("closed campaign derived statistics mismatch")
+    return header, closure
+
+
+def collect(roots, out, *, same_binary_control=False):
     out.mkdir(parents=True, exist_ok=False)
     retained = retain_probe_inputs(roots, out)
     before = {key: identity(root) for key, root in roots.items()}
     if any(info["dirty"] for info in before.values()):
         raise ValueError("measured checkout changed during preparation")
+    if same_binary_control and (len(before) != 2 or len({str(root.resolve()) for root in roots.values()}) != 1 or len({info["binary"] for info in before.values()}) != 1):
+        raise ValueError("same-binary control requires exactly two labels for one checkout and binary")
     verify_retained_inputs(out, before, retained)
     cases = [(n, shots, policy) for n in NAMES for shots in [1, 64, 1024] for policy in ["strict", "fused"]]
     header = dict(schema="exploratory.avx2-pair-ablation.v1", started=time.time(), identities=before,
@@ -123,6 +180,9 @@ def collect(roots, out):
                   cases=cases, rustc=run(["rustc", "-Vv"]), host=platform.platform(),
                   affinity=sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
                   scope="Paired same-host warm Rust source effect only; all 24 cells retained, no peers or SOTA claim")
+    if same_binary_control:
+        header["schema"] = "exploratory.same-binary-warm-control.v1"
+        header["scope"] = "A/A null control: both labels execute the identical binary from the identical checkout; no source effect or peer claim"
     (out / "header.json").write_text(json.dumps(header, indent=2) + "\n")
     events = []
 
