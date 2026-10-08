@@ -472,7 +472,7 @@ jobs:
             --profile smoke \
             --out envelope-evidence/resources.json
           python3 -m benchmarks.atom_loss.readiness_resources \
-            --verify benchmarks/atom_loss/readiness/resources/manifest.json
+            --verify benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09/manifest.json
           python3 -m benchmarks.atom_loss.mle_candidate_resources \
             --binary target/release/rstim \
             --plan docs/envelope-mle-scope.json \
@@ -523,6 +523,7 @@ jobs:
             --policy tooling/docs/envelope-compatibility-policy.md \
             --mle-scope "$PWD/source/docs/envelope-mle-scope.json" \
             --candidate-revision "$SOURCE_SHA" \
+            --retained-report tooling/benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09/manifest.json \
             --out gate-out/release-gate.json
       - name: Prove the gate rejects defective bundles
         run: |
@@ -532,7 +533,8 @@ jobs:
             --matrix tooling/docs/envelope-support.json \
             --policy tooling/docs/envelope-compatibility-policy.md \
             --mle-scope "$PWD/source/docs/envelope-mle-scope.json" \
-            --candidate-revision "$SOURCE_SHA"
+            --candidate-revision "$SOURCE_SHA" \
+            --retained-report tooling/benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09/manifest.json
       - name: Upload the envelope release decision
         uses: actions/upload-artifact@v4
         with:
@@ -590,7 +592,7 @@ jobs:
             --matrix tooling/docs/envelope-support.json \
             --policy tooling/docs/envelope-compatibility-policy.md \
             --mle-scope source/docs/envelope-mle-scope.json \
-            --retained-resources tooling/benchmarks/atom_loss/readiness/resources \
+            --retained-resources tooling/benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09 \
             --out-dir publication
       - name: Round-trip verify the bundle against the staged release
         run: |
