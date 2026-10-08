@@ -2625,15 +2625,7 @@ impl CompiledNearCliffordSampler<'_> {
                 // The separate halves and distinct groups never overlap.
                 let other = (group ^ group_xor) * 2;
                 let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                // SAFETY: pivot is a power of two and x ^ pivot < pivot,
-                // so group_xor < pivot/2. The left half has pivot/2 pairs,
-                // hence group < pivot/2 and group ^ group_xor < pivot/2.
-                // Thus other + 2 <= pivot == right.len(), without overflow.
-                // split_at_mut separates a from right; the temporary borrow
-                // of b ends before the next, distinct XOR-permuted pair.
-                let b: &mut [ComplexAmp; 2] = unsafe { right.get_unchecked_mut(other..other + 2) }
-                    .try_into()
-                    .unwrap();
+                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
                 Self::rotate_adjacent_pair::<FUSED, IMAGINARY, SWAP>(a, b, c, factor);
             }
         }
@@ -2703,15 +2695,7 @@ impl CompiledNearCliffordSampler<'_> {
                 // The separate halves and distinct groups never overlap.
                 let other = (group ^ group_xor) * 2;
                 let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                // SAFETY: pivot is a power of two and x ^ pivot < pivot,
-                // so group_xor < pivot/2. The left half has pivot/2 pairs,
-                // hence group < pivot/2 and group ^ group_xor < pivot/2.
-                // Thus other + 2 <= pivot == right.len(), without overflow.
-                // split_at_mut separates a from right; the temporary borrow
-                // of b ends before the next, distinct XOR-permuted pair.
-                let b: &mut [ComplexAmp; 2] = unsafe { right.get_unchecked_mut(other..other + 2) }
-                    .try_into()
-                    .unwrap();
+                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
                 // SAFETY: This function has the same CPU feature precondition.
                 unsafe {
                     Self::rotate_adjacent_pair_avx2::<SWAP>(a, b, c, factor);
@@ -3587,7 +3571,7 @@ impl CompiledNearCliffordSampler<'_> {
                             independent_packet.as_ref(),
                             lane,
                         );
-                        let shot = self.row_with_random_mode::<true>(sweep, &mut random)?;
+                        let shot = self.row_with_random_kernel::<true, true>(sweep, &mut random)?;
                         output.row(shot);
                         debug_assert_eq!(random.cursor(), random_count);
                     } else {
