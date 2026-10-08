@@ -1520,27 +1520,29 @@ fn compiled_conditional_packets_preserve_streams_for_zero_sparse_and_certain_cha
                     );
                 }
                 for cache in [0, 2048, 8192, 64 * 1024 * 1024] {
-                    let mut rng = StdRng::seed_from_u64(391729);
-                    let mut sampler = plan.prepare_sampler_with_cache_budget(cache).unwrap();
-                    if cache >= 8192 {
-                        assert!(sampler.coefficient_cache_reserved_bytes() > 0);
-                    }
-                    let mut actual = Vec::new();
-                    for shots in [64, 0, 1, 63, 1] {
-                        actual.extend(
-                            sampler
-                                .sample_measurements_u8(shots, &mut rng)
-                                .unwrap()
-                                .measurements,
+                    for chunks in [[64, 0, 1, 63, 1], [31, 32, 0, 64, 2]] {
+                        let mut rng = StdRng::seed_from_u64(391729);
+                        let mut sampler = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                        if cache >= 8192 {
+                            assert!(sampler.coefficient_cache_reserved_bytes() > 0);
+                        }
+                        let mut actual = Vec::new();
+                        for shots in chunks {
+                            actual.extend(
+                                sampler
+                                    .sample_measurements_u8(shots, &mut rng)
+                                    .unwrap()
+                                    .measurements,
+                            );
+                        }
+                        assert_eq!(
+                            actual, expected,
+                            "{channel}({probability}) {arithmetic:?} cache={cache} chunks={chunks:?}"
                         );
-                    }
-                    assert_eq!(
-                        actual, expected,
-                        "{channel}({probability}) {arithmetic:?} cache={cache}"
-                    );
-                    let mut continuation = expected_rng.clone();
-                    for _ in 0..16 {
-                        assert_eq!(rng.next_u64(), continuation.next_u64());
+                        let mut continuation = expected_rng.clone();
+                        for _ in 0..16 {
+                            assert_eq!(rng.next_u64(), continuation.next_u64());
+                        }
                     }
                 }
             }
