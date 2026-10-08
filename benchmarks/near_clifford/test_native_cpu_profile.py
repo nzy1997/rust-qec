@@ -2,6 +2,11 @@
 import copy
 import hashlib
 import json
+import os
+import signal
+import subprocess
+import sys
+import time
 from pathlib import Path
 import tempfile
 import unittest
@@ -16,7 +21,7 @@ def write_json(path, value):
 def output_command(directory, stem, args, text):
     (directory / stem).write_text(text)
     (directory / (stem + ".stderr")).write_text("")
-    item = dict(command=args, exit_code=0, outputs={
+    item = dict(command=args, exit_code=0, timed_out=False, outputs={
         name: dict(path=name, sha256=profile.scout.digest(directory / name)) for name in [stem, stem + ".stderr"]})
     write_json(directory / (stem + ".command.json"), item)
     return item
@@ -58,7 +63,7 @@ def fixture(out):
              host="Linux-fixture", rustc="host: x86_64-unknown-linux-gnu\nrelease: 1.93.1\n",
              available_affinity=[0, 1, 2, 3], affinity=[0], cases=[list(t) for t in profile.CASES],
              roots=roots, original_out=str(original_out), binaries={},
-             perf=dict(path="/usr/lib/linux-tools/fixture/perf", sha256="f" * 64, version="fixture"),
+             owner=dict(uid=1000, gid=1000), perf=dict(path="/usr/lib/linux-tools/fixture/perf", sha256="f" * 64, version="fixture"),
              event="cpu-clock:u", frequency=499, call_graph="dwarf,8192", observations=101)
     binaries = out / "binaries"
     binaries.mkdir()
@@ -77,12 +82,15 @@ def fixture(out):
         validation = dict(shots=1024, policy=policy, status="ok", seeds=4, exact_records_counts_rng=True, native_counts_rng=True)
         result = dict(shots=1024, policy=policy, route="native", observations=[dict(calls=10, elapsed_ns=50_000_000, ns_per_call=5_000_000)] * 101)
         e["validate"] = output_command(directory, "validation.json", profile.probe_args(roots[role], policy, "validate", 7), json.dumps(validation))
-        e["record"] = output_command(directory, "instrumented-result.json", profile.record_args(h["perf"]["path"], 0, roots[role], policy, data), json.dumps(result))
+        e["record"] = output_command(directory, "instrumented-result.json", profile.record_args(h["perf"]["path"], 0, roots[role], policy, data, "/fixture/benchmarks/near_clifford/native_cpu_profile.py"), json.dumps(result))
+        e["ownership"] = output_command(directory, "ownership.log", profile.ownership_args(1000, 1000, data), "")
+        write_json(directory / "task.json", dict(pid=123, executable=profile.probe_args(roots[role], policy, "bench", 101)[0], binary_sha256=identities[role]["binary"], affinity=[0]))
+        e["task_sha256"] = profile.scout.digest(directory / "task.json")
         # This raw placeholder is intentionally not a real perf file. Tests skip
         # Git/tool replay explicitly; production/default verification requires both.
         (directory / "perf.data").write_bytes(b"PERFILE2fixture-not-real-perf-data")
         e["data_sha256"] = profile.scout.digest(directory / "perf.data")
-        texts = {"perf-script.txt": "".join(f"counts-path-abl 123 [000] 1.{i:06d}: cpu-clock:u: 123 fake (/fixture)\n" for i in range(100)),
+        texts = {"perf-script.txt": "".join(f"counts-path-abl 123/123 [000] 1.{i:06d}: cpu-clock:u: 123 fake (counts-path-ablation)\n" for i in range(100)),
                  "perf-report.txt": "fixture report\n", "perf-header.txt": "fixture header\n",
                  "perf-buildids.txt": role.encode().hex() + " " + profile.probe_args(roots[role], policy, "bench", 101)[0] + "\n"}
         e["exports"] = {stem: output_command(directory, stem, [h["perf"]["path"], *cmd, "-i", str(data)], texts[stem]) for stem, cmd in profile.EXPORTS.items()}
@@ -109,7 +117,7 @@ class ProfileContract(unittest.TestCase):
             profile.verify(out, git_sources=False, replay=False)
 
     def test_resealed_semantic_corruptions_are_rejected(self):
-        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order"]:
+        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout"]:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
                 out = Path(temporary)
                 h, c, events = fixture(out)
@@ -118,6 +126,22 @@ class ProfileContract(unittest.TestCase):
                 if kind == "scope": h["performance_valid"] = True
                 elif kind == "source_closure": c["identities_after"]["candidate"]["binary"] = "0" * 64
                 elif kind == "source_root": h["roots"]["baseline"] = "/unexpected"
+                elif kind == "escaped_out": h["original_out"] = "/fixture/drafts/../../escaped-profile"
+                elif kind.startswith("task_"):
+                    body = profile.read(directory / "task.json")
+                    if kind == "task_pid": body["pid"] = 999
+                    elif kind == "task_binary": body["binary_sha256"] = "0" * 64
+                    else: body["affinity"] = [999]
+                    write_json(directory / "task.json", body)
+                    e["task_sha256"] = profile.scout.digest(directory / "task.json")
+                elif kind.startswith("sample_"):
+                    stem = "perf-script.txt"
+                    body = (directory / stem).read_text()
+                    changes = {"sample_cpu": ("[000]", "[999]"), "sample_pid": ("123/123", "999/123"),
+                               "sample_tid": ("123/123", "123/999"), "sample_executable": ("(counts-path-ablation)", "(/usr/bin/unrelated)"),
+                               "sample_comm": ("counts-path-abl", "unrelated-app")}
+                    body = body.replace(*changes[kind])
+                    e["exports"][stem] = output_command(directory, stem, e["exports"][stem]["command"], body)
                 elif kind == "binary": (out / "binaries/baseline.bin").write_bytes(b"corrupt")
                 elif kind == "event_order": events[0], events[1] = events[1], events[0]
                 elif kind in ["validation", "duration", "observations"]:
@@ -135,12 +159,55 @@ class ProfileContract(unittest.TestCase):
                     item = e["record"]
                     if kind == "cpu_command": item["command"][item["command"].index("-c") + 1] = "1"
                     elif kind == "exit": item["exit_code"] = 1
+                    elif kind == "timeout": item["timed_out"] = True
                     elif kind == "output_inventory": item["outputs"].pop("instrumented-result.json.stderr")
                     else: item["outputs"]["instrumented-result.json"]["path"] = "../escape"
                     write_json(directory / "instrumented-result.json.command.json", item)
                 seal(out, h, c, events)
                 with self.assertRaises(ValueError):
                     profile.verify(out, git_sources=False, replay=False)
+
+    def test_timeout_stops_descendant_and_preserves_failed_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            pidfile = out / "descendant.pid"
+            script = "import subprocess,time,pathlib,sys; p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)']); pathlib.Path(sys.argv[1]).write_text(str(p.pid)); print('partial output',flush=True); time.sleep(30)"
+            try:
+                with self.assertRaises(ValueError):
+                    profile.command([sys.executable, "-c", script, str(pidfile)], out, "timeout.log", timeout=0.5)
+                receipt = profile.read(out / "timeout.log.command.json")
+                self.assertTrue(receipt["timed_out"])
+                self.assertNotEqual(receipt["exit_code"], 0)
+                self.assertEqual((out / "timeout.log").read_text(), "partial output\n")
+                child = int(pidfile.read_text())
+                # A reparented zombie is already stopped, and its parent init owns
+                # reaping. Never mistake kill(pid, 0) for a running descendant.
+                for _ in range(50):
+                    state = subprocess.run(["ps", "-p", str(child), "-o", "stat="], capture_output=True, text=True, timeout=2).stdout.strip()
+                    if not state or state.startswith("Z"):
+                        break
+                    time.sleep(0.02)
+                self.assertTrue(not state or state.startswith("Z"), state)
+            finally:
+                if pidfile.exists():
+                    try:
+                        os.kill(int(pidfile.read_text()), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+    @unittest.skipUnless(hasattr(os, "sched_getaffinity"), "native Linux exec contract")
+    def test_task_receipt_survives_exec_with_same_pid_and_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            receipt = out / "task.json"
+            receipt.touch(mode=0o600)
+            result = subprocess.run([sys.executable, str(Path(profile.__file__)), "--exec-probe", str(receipt), "--",
+                                     sys.executable, "-c", "import os; print(os.getpid())"], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            task = profile.read(receipt)
+            self.assertEqual(task["pid"], int(result.stdout))
+            self.assertEqual(task["binary_sha256"], profile.scout.digest(Path(sys.executable)))
+            self.assertEqual(task["affinity"], sorted(os.sched_getaffinity(0)))
 
 
 if __name__ == "__main__":
