@@ -36,6 +36,7 @@ jobs:
       OPENBLAS_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
       SYMFT_PY_ENABLE_CUDA: '0'
+      RAYON_NUM_THREADS: '1'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,8 +49,7 @@ jobs:
         id: prepare
         timeout-minutes: 20
         run: |
-          rustup toolchain install 1.93.1 --profile minimal
-          rustup default 1.93.1
+          bash benchmarks/near_clifford/verify_x86_rotations.sh
           python -m venv drafts/x86-clifft
           drafts/x86-clifft/bin/python -m pip install numpy==2.4.6 clifft==0.11.0
           python -m venv drafts/x86-symft
@@ -91,6 +91,38 @@ jobs:
         run: |
           python benchmarks/near_clifford/analyze_diagnostics.py drafts/x86-application-counts --kind application_counts
           python -O benchmarks/near_clifford/application_counts/verify.py drafts/x86-application-counts --git-sources
+      - name: Retain closed measured production probes
+        run: |
+          python - <<'PYBIN'
+          import hashlib, json
+          from pathlib import Path
+          evidence = Path('drafts/x86-application-counts')
+          header_bytes = (evidence / 'header.json').read_bytes()
+          closure_bytes = (evidence / 'closure.json').read_bytes()
+          header, closure = json.loads(header_bytes), json.loads(closure_bytes)
+          hashes = header['binary_sha256']
+          if hashes != closure['binary_sha256']:
+              raise ValueError('measured binaries changed before closure')
+          paths = {name: Path('benchmarks/near_clifford') / package / 'target/release' / name
+                   for name, package in [('near-clifford-application-counts', 'application_counts'),
+                                         ('near-clifford-diagnostics', 'diagnostics')]}
+          if set(hashes) != set(paths):
+              raise ValueError('unexpected measured binary inventory')
+          binaries = {name: path.read_bytes() for name, path in paths.items()}
+          for name, data in binaries.items():
+              if hashlib.sha256(data).hexdigest() != hashes[name]:
+                  raise ValueError('actual production binary differs: ' + name)
+          out = evidence / 'production-binaries'
+          out.mkdir()
+          receipt = dict(source_revision=header['source_revision'],
+                         measured_header_sha256=hashlib.sha256(header_bytes).hexdigest(),
+                         measured_closure_sha256=hashlib.sha256(closure_bytes).hexdigest(), binaries={})
+          for name, data in binaries.items():
+              filename = name + '.bin'
+              (out / filename).write_bytes(data)
+              receipt['binaries'][name] = dict(path=filename, sha256=hashes[name], bytes=len(data))
+          (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PYBIN
       - name: Retain results, setup logs and partial failures
         if: always()
         uses: actions/upload-artifact@v4
@@ -100,6 +132,7 @@ jobs:
           path: |
             drafts/x86-host.json
             drafts/x86-*.log
+            drafts/x86-scout-*
             drafts/x86-application-counts/
   paired-scout:
     if: ${{ inputs.baseline_ref != '' && !inputs.profile_only }}
