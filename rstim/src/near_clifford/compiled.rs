@@ -2625,7 +2625,15 @@ impl CompiledNearCliffordSampler<'_> {
                 // The separate halves and distinct groups never overlap.
                 let other = (group ^ group_xor) * 2;
                 let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                // SAFETY: pivot is a power of two and x ^ pivot < pivot,
+                // so group_xor < pivot/2. The left half has pivot/2 pairs,
+                // hence group < pivot/2 and group ^ group_xor < pivot/2.
+                // Thus other + 2 <= pivot == right.len(), without overflow.
+                // split_at_mut separates a from right; the temporary borrow
+                // of b ends before the next, distinct XOR-permuted pair.
+                let b: &mut [ComplexAmp; 2] = unsafe { right.get_unchecked_mut(other..other + 2) }
+                    .try_into()
+                    .unwrap();
                 Self::rotate_adjacent_pair::<FUSED, IMAGINARY, SWAP>(a, b, c, factor);
             }
         }
@@ -2695,7 +2703,15 @@ impl CompiledNearCliffordSampler<'_> {
                 // The separate halves and distinct groups never overlap.
                 let other = (group ^ group_xor) * 2;
                 let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                // SAFETY: pivot is a power of two and x ^ pivot < pivot,
+                // so group_xor < pivot/2. The left half has pivot/2 pairs,
+                // hence group < pivot/2 and group ^ group_xor < pivot/2.
+                // Thus other + 2 <= pivot == right.len(), without overflow.
+                // split_at_mut separates a from right; the temporary borrow
+                // of b ends before the next, distinct XOR-permuted pair.
+                let b: &mut [ComplexAmp; 2] = unsafe { right.get_unchecked_mut(other..other + 2) }
+                    .try_into()
+                    .unwrap();
                 // SAFETY: This function has the same CPU feature precondition.
                 unsafe {
                     Self::rotate_adjacent_pair_avx2::<SWAP>(a, b, c, factor);
@@ -2715,7 +2731,7 @@ impl CompiledNearCliffordSampler<'_> {
     ) {
         use std::arch::x86_64::*;
         let old_a = *a;
-        let old_b = *b;
+        let old_b = if SWAP { [b[1], b[0]] } else { *b };
         let av = [old_a[0].re, old_a[0].im, old_a[1].re, old_a[1].im];
         let bv = [old_b[0].re, old_b[0].im, old_b[1].re, old_b[1].im];
         // SAFETY: Each local f64 array contains exactly four initialized
@@ -2725,19 +2741,8 @@ impl CompiledNearCliffordSampler<'_> {
         let vc = _mm256_set1_pd(c);
         let vf = _mm256_set1_pd(factor);
         let sign = _mm256_set_pd(0., -0., 0., -0.);
-        // Keep own terms and outputs in their original coefficient order.
-        // SWAP maps partner lanes [re0,im0,re1,im1] to
-        // [im1,re1,im0,re0], combining the pair and component permutations.
-        let (pa, pb) = if SWAP {
-            (
-                _mm256_permute4x64_pd::<0x1b>(vb),
-                _mm256_permute4x64_pd::<0x1b>(va),
-            )
-        } else {
-            (_mm256_permute_pd::<5>(vb), _mm256_permute_pd::<5>(va))
-        };
-        let pa = _mm256_xor_pd(pa, sign);
-        let pb = _mm256_xor_pd(pb, sign);
+        let pa = _mm256_xor_pd(_mm256_permute_pd::<5>(vb), sign);
+        let pb = _mm256_xor_pd(_mm256_permute_pd::<5>(va), sign);
         // Match partner.mul_add(factor, own*c), including unary negation
         // before FMA. No reassociation or fused own*c multiply is permitted.
         let oa = _mm256_fmadd_pd(pa, vf, _mm256_mul_pd(va, vc));
@@ -2750,8 +2755,8 @@ impl CompiledNearCliffordSampler<'_> {
         }
         a[0] = ComplexAmp::new(out_a[0], out_a[1]);
         a[1] = ComplexAmp::new(out_a[2], out_a[3]);
-        b[0] = ComplexAmp::new(out_b[0], out_b[1]);
-        b[1] = ComplexAmp::new(out_b[2], out_b[3]);
+        b[usize::from(SWAP)] = ComplexAmp::new(out_b[0], out_b[1]);
+        b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
@@ -6105,6 +6110,98 @@ mod recorded_rejection_tail_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod highest_rotation_gather_tests {
+    use super::*;
+
+    fn check<const FUSED: bool, const IMAGINARY: bool>() {
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+        ];
+        for len in [4, 8, 16, 64, 256, 1024] {
+            let before: Vec<_> = (0..len)
+                .map(|i| {
+                    ComplexAmp::new(
+                        values[(i * 3) % values.len()],
+                        values[(i * 7 + 1) % values.len()],
+                    )
+                })
+                .collect();
+            let masks: Vec<_> = if len == 1024 {
+                vec![2, 3, 255, 256, 257, 511, 512, 513, 1022, 1023]
+            } else {
+                (2..len).collect()
+            };
+            for x in masks {
+                for factor in [0.3826834323650898, -0.3826834323650898] {
+                    let c = 0.9238795325112867;
+                    // Snapshot gather visits every coefficient independently,
+                    // without production's block, pair or XOR-group traversal.
+                    let expected: Vec<_> = (0..len)
+                        .map(|i| {
+                            let own = before[i];
+                            let partner = before[i ^ x];
+                            let (pr, pi) = if IMAGINARY {
+                                (-partner.im, partner.re)
+                            } else {
+                                (partner.re, partner.im)
+                            };
+                            if FUSED {
+                                ComplexAmp::new(
+                                    pr.mul_add(factor, own.re * c),
+                                    pi.mul_add(factor, own.im * c),
+                                )
+                            } else {
+                                ComplexAmp::new(own.re * c + pr * factor, own.im * c + pi * factor)
+                            }
+                        })
+                        .collect();
+                    let mut actual = before.clone();
+                    if x & 1 != 0 {
+                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, true>(
+                            &mut actual,
+                            x,
+                            c,
+                            factor,
+                        );
+                    } else {
+                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, false>(
+                            &mut actual,
+                            x,
+                            c,
+                            factor,
+                        );
+                    }
+                    for (i, (a, b)) in actual.iter().zip(expected).enumerate() {
+                        assert_eq!(
+                            (a.re.to_bits(), a.im.to_bits()),
+                            (b.re.to_bits(), b.im.to_bits()),
+                            "fused={FUSED}; imaginary={IMAGINARY}; len={len}; x={x}; i={i}; factor={factor}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries() {
+        check::<false, false>();
+        check::<false, true>();
+        check::<true, false>();
+        check::<true, true>();
     }
 }
 
