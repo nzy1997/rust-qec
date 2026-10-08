@@ -425,3 +425,37 @@ fn long_noise_spans_preserve_hits_readout_feedback_and_mixed_call_rng() {
         }
     }
 }
+
+#[test]
+fn wide_coherent_rows_preserve_counts_records_and_following_rng() {
+    let text = "REPEAT 3 {\nR 0 1 2 3 4 5\nH 0 1 2 3 4 5\nT 0 1 2 3 4 5\nDEPOLARIZE2(0.02) 0 1 2 3 4 5\nCX 0 1 1 2 2 3 3 4 4 5\nT_DAG 0 2 4\nCX 0 5 1 4 2 3\nT 1 3 5\nMY 0 1 2\nCX rec[-1] 5\nT_DAG 5\nMX 3 4 5\nDETECTOR rec[-1] rec[-3]\nOBSERVABLE_INCLUDE(7) rec[-2] rec[-4]\n}\n";
+    for policy in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, policy).unwrap();
+        for seed in [739, 1739] {
+            let mut cached = plan.prepare_sampler().unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            for shots in [1, 63, 64, 65, 129, 1024, 1] {
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                assert_eq!(
+                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                    count_records(&expected, 7)
+                );
+                assert_eq!(
+                    cached.sample_measurements_u8(17, &mut a).unwrap(),
+                    scalar.sample_measurements_u8(17, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
