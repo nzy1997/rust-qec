@@ -34,7 +34,8 @@ def number(value, positive=False):
     return type(value) is int and value >= (1 if positive else 0)
 
 
-def verify_campaign(archive, label, binding):
+def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-intern"):
+    require(schema_prefix in ("coefficient-intern", "zero-noise-spans"), "supported scout family")
     path = archive / label
     header, closure, summary = [load(path / name) for name in
                                 ['header.json', 'closure.json', 'summary.json']]
@@ -42,8 +43,8 @@ def verify_campaign(archive, label, binding):
     require(len(data) < 10 * 1024 * 1024, 'unbounded scout event file')
     events = [json.loads(line) for line in data.splitlines()]
     cold = label.endswith('-cold')
-    require(header['schema'] == ('exploratory.coefficient-intern-cold.v1' if cold
-                                else 'exploratory.coefficient-intern-ablation.v1'), 'schema')
+    require(header['schema'] == ('exploratory.' + schema_prefix + '-cold.v1' if cold
+                                else 'exploratory.' + schema_prefix + '-ablation.v1'), 'schema')
     require(header['cases'] == CASES and header['pairs'] == 5, 'case/round coverage')
     require(header['observations_per_process'] == (32 if cold else 7), 'observation coverage')
     require(header['identities'] == closure['identities_after'], 'identity closure')
