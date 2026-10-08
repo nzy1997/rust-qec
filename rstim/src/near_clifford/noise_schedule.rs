@@ -803,10 +803,14 @@ impl NoiseSigns {
     ) -> u64 {
         let mut parity = 0;
         for r in &self.refs[self.offsets[node]..self.offsets[node + 1]] {
+            let selected = hits[r.ordinal];
+            if selected == 0 {
+                continue;
+            }
             let masks = if let Some(p) = packet {
-                p.choice_masks(r.ordinal, hits[r.ordinal], r.choices as usize)
+                p.choice_masks(r.ordinal, selected, r.choices as usize)
             } else {
-                packet_choice_masks(hits[r.ordinal], r.choices as usize, tape, r.event, count)
+                packet_choice_masks(selected, r.choices as usize, tape, r.event, count)
             };
             for (i, &mask) in masks.iter().enumerate() {
                 if r.mask >> i & 1 != 0 {
