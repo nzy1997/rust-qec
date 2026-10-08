@@ -846,6 +846,39 @@ mod tests {
                 CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, policy).unwrap();
             assert_eq!(plan.peak_active_rank(), 2);
             assert!(plan.noise_signs.is_some());
+            for shots in [1, 31, 32, 64] {
+                let mut scalar_rng = StdRng::seed_from_u64(718293);
+                let expected = plan
+                    .prepare_sampler_with_cache_budget(0)
+                    .unwrap()
+                    .sample(shots, &mut scalar_rng)
+                    .unwrap();
+                let mut actual_rng = StdRng::seed_from_u64(718293);
+                let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                sampler.observe_lazy_error_producer = true;
+                let actual = sampler
+                    .sample_measurements_u8(shots, &mut actual_rng)
+                    .unwrap();
+                let expected: Vec<u8> = expected
+                    .iter()
+                    .flat_map(|row| row.measurements.iter().map(|&value| u8::from(value)))
+                    .collect();
+                assert_eq!(
+                    actual.measurements, expected,
+                    "packet boundary records, shots={shots}"
+                );
+                assert_eq!(
+                    sampler
+                        .last_packet_error_producer
+                        .as_ref()
+                        .map(|producer| producer.coherent),
+                    (shots >= 32).then_some(true),
+                    "packet boundary route, shots={shots}"
+                );
+                for _ in 0..16 {
+                    assert_eq!(actual_rng.next_u64(), scalar_rng.next_u64());
+                }
+            }
             let mut expected_rng = StdRng::seed_from_u64(718293);
             let rows = plan
                 .prepare_sampler_with_cache_budget(0)
