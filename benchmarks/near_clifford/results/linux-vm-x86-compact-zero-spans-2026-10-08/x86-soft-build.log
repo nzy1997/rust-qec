@@ -1,0 +1,15 @@
+Processing ./drafts/x86-soft/python
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: numpy>=1.20 in ./drafts/x86-symft/lib/python3.12/site-packages (from symft==0.1.1) (2.4.6)
+Building wheels for collected packages: symft
+  Building wheel for symft (pyproject.toml): started
+  Building wheel for symft (pyproject.toml): finished with status 'done'
+  Created wheel for symft: filename=symft-0.1.1-cp312-cp312-linux_x86_64.whl size=7180468 sha256=0f07d70885485446353326125317629bf28d848b452f320f65947d6e507a5448
+  Stored in directory: /tmp/pip-ephem-wheel-cache-b538a66d/wheels/44/e0/1e/be9cb9d8062d6025f6d208c5b7c0ae272ae55ccd0ac6c363f8
+Successfully built symft
+Installing collected packages: symft
+Successfully installed symft-0.1.1
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python -m pip install --upgrade pip

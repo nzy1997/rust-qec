@@ -1,0 +1,15 @@
+{
+  "source_revision": "d989531d837fe874a77ac05745f5d77ea5639d52",
+  "binaries": {
+    "near-clifford-application-counts": {
+      "path": "near-clifford-application-counts.bin",
+      "sha256": "7bb5ea9131f4f3c881f831cd64c31b789dbf7ea0dba56e582c6e1bdd1aa7f8af",
+      "bytes": 907104
+    },
+    "near-clifford-diagnostics": {
+      "path": "near-clifford-diagnostics.bin",
+      "sha256": "5ca9a0793e298752e8b80372a7f12e7a4f04e24712859281e6c96460357952a4",
+      "bytes": 927120
+    }
+  }
+}

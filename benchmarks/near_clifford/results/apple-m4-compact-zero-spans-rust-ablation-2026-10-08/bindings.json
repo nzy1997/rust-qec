@@ -1,0 +1,13 @@
+{
+  "host": "apple-m4",
+  "baseline": "e1453a7b634275d3055ef64b2f4a7b33d3995870",
+  "candidate": "d989531d837fe874a77ac05745f5d77ea5639d52",
+  "campaigns": [
+    "warm",
+    "confirmation",
+    "same-binary-warm",
+    "same-binary-confirmation",
+    "first-cold"
+  ],
+  "cold_driver_sha256": "123d2520b3d4b6a1c408e500dad958630999810fb07d11e4ba227ae4fdae1142"
+}

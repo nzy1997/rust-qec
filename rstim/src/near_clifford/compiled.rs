@@ -2601,6 +2601,19 @@ impl CompiledNearCliffordSampler<'_> {
         c: f64,
         factor: f64,
     ) {
+        #[cfg(target_arch = "x86_64")]
+        if FUSED
+            && IMAGINARY
+            && std::arch::is_x86_feature_detected!("avx2")
+            && std::arch::is_x86_feature_detected!("fma")
+        {
+            // SAFETY: Both CPU features are checked once before the loop.
+            // The helper snapshots disjoint groups using local f64 arrays.
+            unsafe {
+                Self::rotate_highest_z0_avx2::<SWAP>(coefficients, x, c, factor);
+            }
+            return;
+        }
         let pivot = 1usize << (usize::BITS - 1 - x.leading_zeros());
         let group_xor = (x ^ pivot) >> 1;
         debug_assert!(pivot >= 2);
@@ -2662,6 +2675,72 @@ impl CompiledNearCliffordSampler<'_> {
         a[1] = ComplexAmp::new(out_ar[1], out_ai[1]);
         b[usize::from(SWAP)] = ComplexAmp::new(out_br[0], out_bi[0]);
         b[usize::from(!SWAP)] = ComplexAmp::new(out_br[1], out_bi[1]);
+    }
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn rotate_highest_z0_avx2<const SWAP: bool>(
+        coefficients: &mut [ComplexAmp],
+        x: usize,
+        c: f64,
+        factor: f64,
+    ) {
+        let pivot = 1usize << (usize::BITS - 1 - x.leading_zeros());
+        let group_xor = (x ^ pivot) >> 1;
+        debug_assert!(pivot >= 2);
+        debug_assert_eq!(coefficients.len() % (pivot * 2), 0);
+        for block in coefficients.chunks_exact_mut(pivot * 2) {
+            let (left, right) = block.split_at_mut(pivot);
+            for (group, a) in left.chunks_exact_mut(2).enumerate() {
+                // XOR is a permutation of the pivot/2 adjacent groups.
+                // The separate halves and distinct groups never overlap.
+                let other = (group ^ group_xor) * 2;
+                let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
+                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                // SAFETY: This function has the same CPU feature precondition.
+                unsafe {
+                    Self::rotate_adjacent_pair_avx2::<SWAP>(a, b, c, factor);
+                }
+            }
+        }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn rotate_adjacent_pair_avx2<const SWAP: bool>(
+        a: &mut [ComplexAmp; 2],
+        b: &mut [ComplexAmp; 2],
+        c: f64,
+        factor: f64,
+    ) {
+        use std::arch::x86_64::*;
+        let old_a = *a;
+        let old_b = if SWAP { [b[1], b[0]] } else { *b };
+        let av = [old_a[0].re, old_a[0].im, old_a[1].re, old_a[1].im];
+        let bv = [old_b[0].re, old_b[0].im, old_b[1].re, old_b[1].im];
+        // SAFETY: Each local f64 array contains exactly four initialized
+        // elements. Unaligned loads require no stronger alignment; no
+        // ComplexAmp representation or field-layout assumption is made.
+        let (va, vb) = unsafe { (_mm256_loadu_pd(av.as_ptr()), _mm256_loadu_pd(bv.as_ptr())) };
+        let vc = _mm256_set1_pd(c);
+        let vf = _mm256_set1_pd(factor);
+        let sign = _mm256_set_pd(0., -0., 0., -0.);
+        let pa = _mm256_xor_pd(_mm256_permute_pd::<5>(vb), sign);
+        let pb = _mm256_xor_pd(_mm256_permute_pd::<5>(va), sign);
+        // Match partner.mul_add(factor, own*c), including unary negation
+        // before FMA. No reassociation or fused own*c multiply is permitted.
+        let oa = _mm256_fmadd_pd(pa, vf, _mm256_mul_pd(va, vc));
+        let ob = _mm256_fmadd_pd(pb, vf, _mm256_mul_pd(vb, vc));
+        let (mut out_a, mut out_b) = ([0.; 4], [0.; 4]);
+        // SAFETY: Both output arrays have four writable f64 elements.
+        unsafe {
+            _mm256_storeu_pd(out_a.as_mut_ptr(), oa);
+            _mm256_storeu_pd(out_b.as_mut_ptr(), ob);
+        }
+        a[0] = ComplexAmp::new(out_a[0], out_a[1]);
+        a[1] = ComplexAmp::new(out_a[2], out_a[3]);
+        b[usize::from(SWAP)] = ComplexAmp::new(out_b[0], out_b[1]);
+        b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
@@ -3492,7 +3571,7 @@ impl CompiledNearCliffordSampler<'_> {
                             independent_packet.as_ref(),
                             lane,
                         );
-                        let shot = self.row_with_random_mode::<true>(sweep, &mut random)?;
+                        let shot = self.row_with_random_kernel::<true, true>(sweep, &mut random)?;
                         output.row(shot);
                         debug_assert_eq!(random.cursor(), random_count);
                     } else {
@@ -6012,6 +6091,190 @@ mod recorded_rejection_tail_tests {
                 assert_eq!(selected.cursor, tape.len());
                 for _ in 0..16 {
                     assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod highest_rotation_gather_tests {
+    use super::*;
+
+    fn check<const FUSED: bool, const IMAGINARY: bool>() {
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+        ];
+        for len in [4, 8, 16, 64, 256, 1024] {
+            let before: Vec<_> = (0..len)
+                .map(|i| {
+                    ComplexAmp::new(
+                        values[(i * 3) % values.len()],
+                        values[(i * 7 + 1) % values.len()],
+                    )
+                })
+                .collect();
+            let masks: Vec<_> = if len == 1024 {
+                vec![2, 3, 255, 256, 257, 511, 512, 513, 1022, 1023]
+            } else {
+                (2..len).collect()
+            };
+            for x in masks {
+                for factor in [0.3826834323650898, -0.3826834323650898] {
+                    let c = 0.9238795325112867;
+                    // Snapshot gather visits every coefficient independently,
+                    // without production's block, pair or XOR-group traversal.
+                    let expected: Vec<_> = (0..len)
+                        .map(|i| {
+                            let own = before[i];
+                            let partner = before[i ^ x];
+                            let (pr, pi) = if IMAGINARY {
+                                (-partner.im, partner.re)
+                            } else {
+                                (partner.re, partner.im)
+                            };
+                            if FUSED {
+                                ComplexAmp::new(
+                                    pr.mul_add(factor, own.re * c),
+                                    pi.mul_add(factor, own.im * c),
+                                )
+                            } else {
+                                ComplexAmp::new(own.re * c + pr * factor, own.im * c + pi * factor)
+                            }
+                        })
+                        .collect();
+                    let mut actual = before.clone();
+                    if x & 1 != 0 {
+                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, true>(
+                            &mut actual,
+                            x,
+                            c,
+                            factor,
+                        );
+                    } else {
+                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, false>(
+                            &mut actual,
+                            x,
+                            c,
+                            factor,
+                        );
+                    }
+                    for (i, (a, b)) in actual.iter().zip(expected).enumerate() {
+                        assert_eq!(
+                            (a.re.to_bits(), a.im.to_bits()),
+                            (b.re.to_bits(), b.im.to_bits()),
+                            "fused={FUSED}; imaginary={IMAGINARY}; len={len}; x={x}; i={i}; factor={factor}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries() {
+        check::<false, false>();
+        check::<false, true>();
+        check::<true, false>();
+        check::<true, true>();
+    }
+}
+
+#[cfg(all(test, target_arch = "x86_64"))]
+mod avx2_rotation_bits_tests {
+    use super::*;
+
+    #[test]
+    fn fused_avx2_pairs_match_independent_full_vector_gather_bits() {
+        if !std::arch::is_x86_feature_detected!("avx2")
+            || !std::arch::is_x86_feature_detected!("fma")
+        {
+            return;
+        }
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+        ];
+        for len in [4, 8, 64, 1024] {
+            for kind in 0..4 {
+                let before: Vec<_> = (0..len)
+                    .map(|i| {
+                        let scale = if kind == 3 {
+                            (i + 1) as f64 / len as f64
+                        } else {
+                            1.
+                        };
+                        ComplexAmp::new(
+                            values[(i * 3 + kind) % values.len()] * scale,
+                            values[(i * 7 + 2 * kind) % values.len()] * scale,
+                        )
+                    })
+                    .collect();
+                for x in 2..len {
+                    for factor in [0.3826834323650898, -0.3826834323650898] {
+                        let c = 0.9238795325112867;
+                        // Independent full-vector gather: no split, grouping,
+                        // permutation helper or SIMD intrinsic from production.
+                        let expected: Vec<_> = (0..len)
+                            .map(|i| {
+                                let own = before[i];
+                                let partner = before[i ^ x];
+                                ComplexAmp::new(
+                                    (-partner.im).mul_add(factor, own.re * c),
+                                    partner.re.mul_add(factor, own.im * c),
+                                )
+                            })
+                            .collect();
+                        let mut actual = before.clone();
+                        // SAFETY: The feature checks above establish the
+                        // helper's CPU precondition; x is inside this vector.
+                        unsafe {
+                            if x & 1 != 0 {
+                                CompiledNearCliffordSampler::rotate_highest_z0_avx2::<true>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                );
+                            } else {
+                                CompiledNearCliffordSampler::rotate_highest_z0_avx2::<false>(
+                                    &mut actual,
+                                    x,
+                                    c,
+                                    factor,
+                                );
+                            }
+                        }
+                        for (i, (actual, expected)) in actual.iter().zip(expected).enumerate() {
+                            assert_eq!(
+                                actual.re.to_bits(),
+                                expected.re.to_bits(),
+                                "re len={len};kind={kind};x={x};i={i};factor={factor}"
+                            );
+                            assert_eq!(
+                                actual.im.to_bits(),
+                                expected.im.to_bits(),
+                                "im len={len};kind={kind};x={x};i={i};factor={factor}"
+                            );
+                        }
+                    }
                 }
             }
         }

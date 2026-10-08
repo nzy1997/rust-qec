@@ -115,8 +115,8 @@ def summarize(out,kind,check=False):
         'OS RSS is whole-process high-water, including probe/interpreter allocations. Linux ru_maxrss may retain launcher memory across exec; these Linux receipts cannot establish simulator memory usage or cross-backend memory differences. Mac measurements have no pinned-core claim.',
         f"Collector CPU affinity: `{header['host'].get('affinity')}`; compiler environment: `{json.dumps(header.get('compiler_environment',{}),sort_keys=True)}`.",
         'Empty CSV RSS/cache entries mean unmeasured; raw flat peer workers do not report RSS. Peer preparation is included in compilation.',
-        # Preserve frozen rendering; modern counts has no lifecycle phase receipts.
-        ('This counts campaign records no lifecycle phase measurements.'
+        # Counts retain raw phase metadata without a derived lifecycle comparison.
+        ('Raw compile/prepare/first-call metadata is retained; this counts campaign has no derived lifecycle comparison. Use a dedicated fresh-seed cold campaign for phase comparisons.'
          if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4','rstim.postselected-counts.v5'] else
          'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.'),
         'Activity metrics preserve their API names: rstim peak_active_rank, Clifft peak_active_width, SymFT max_active_qubits. They are not a common cross-engine rank scale.',

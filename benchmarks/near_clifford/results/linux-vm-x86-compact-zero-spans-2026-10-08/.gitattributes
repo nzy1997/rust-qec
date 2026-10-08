@@ -1,0 +1,2 @@
+# Retain original native test-output bytes, including their final blank line.
+x86-scout-*.log whitespace=-blank-at-eof

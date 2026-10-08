@@ -13,6 +13,22 @@ measurement, not a publishable performance result.
 `--no-build` reuses an existing binary and marks its source revision unverified;
 every run records the binary's SHA-256 hash.
 
+For bottleneck diagnosis, the existing manual x86 application-counts workflow
+also accepts `profile_only=true` with an exact `baseline_ref` commit. This runs
+native coefficient/CDF/RNG gates, builds both unchanged production probes, then
+records four whole-process `cpu-clock:u` profiles for d5 Strict/Fused 1024-shot
+counts. Raw samples, stack exports, ELF binaries/build IDs, probe inputs, command
+outputs and source closures remain in the workflow artifact. Ordinary peer and
+paired timing modes retain their defaults.
+
+These profiles include startup, warmup and teardown. Every instrumented result
+is marked `performance_valid=false`; use profiles to locate work, never to claim
+speedups or SOTA. `native_cpu_profile.py --verify DIR` requires the original
+Linux tool/environment, checks Git input bytes, and replays raw samples with the
+recorded trusted `perf` executable. Checksum-only fixture tests explicitly skip
+Git/tool execution and do not certify actual profiles. The sampling options are
+documented in the [Linux perf source](https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf-record.txt).
+
 The [Apple M4 measurement and analysis](results/apple-m4-2026-09-29.md) and its
 [raw JSON](results/apple-m4-2026-09-29.json) are retained for this matrix.
 The subsequent [boundary validation and CPU profile](results/apple-m4-boundary-validation-2026-09-29.md)
@@ -120,3 +136,21 @@ retains complete M4/x86 peer comparisons and [paired warm/cold Rust scouts](resu
 Single-shot MSC improvements reproduce; bulk and cold compilation remain targets,
 with all regressions retained. The new x86 host reports EPYC 9V45, distinct from
 the earlier 7763 campaigns, so cross-campaign differences are not source effects.
+
+The CPU profile collector retains the native exec PID, executable digest and CPU
+affinity and checks sample process/thread/CPU plus native executable stack frames.
+The privileged recording has a shorter process-group watchdog; command timeouts
+retain failed receipts and partial logs. After recording closes, only that raw
+file is chowned to the runner so unprivileged exports and artifact retention work.
+
+
+The [compact scalar zero-noise replay campaign](results/apple-m4-compact-zero-spans-2026-10-08/README.md)
+retains complete M4 and [x86 peer matrices](results/linux-vm-x86-compact-zero-spans-2026-10-08/README.md),
+master A/B experiments, same-binary A/A controls and fresh-seed cold phases.
+D5 warm bulk source effects reproduce on both architectures; the M4 peer lead
+is not reproduced on x86, where d5 bulk remains 0.67–0.76× the fastest Clifft
+path. D3 bulk is near parity and cold phase-sum benefits are small.
+Every regression and outlier is retained, with source-bound offline replay and
+actual native coefficient/CDF/counts/RNG gate receipts. Current diagnostic profiles
+point to rotation/probability/projection kernels, with no elapsed-fraction claim.
+These results leave concrete optimization directions; the campaign is continuing.

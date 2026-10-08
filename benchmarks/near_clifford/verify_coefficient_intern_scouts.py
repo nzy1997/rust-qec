@@ -34,7 +34,7 @@ def number(value, positive=False):
     return type(value) is int and value >= (1 if positive else 0)
 
 
-def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-intern"):
+def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-intern", cold_validation_prefix=False):
     require(schema_prefix in ("coefficient-intern", "zero-noise-spans", "strict-coefficient-pairs"), "supported scout family")
     path = archive / label
     header, closure, summary = [load(path / name) for name in
@@ -43,6 +43,7 @@ def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-inter
     require(len(data) < 10 * 1024 * 1024, 'unbounded scout event file')
     events = [json.loads(line) for line in data.splitlines()]
     cold = label.endswith('-cold')
+    require(type(cold_validation_prefix) is bool and (not cold_validation_prefix or cold), "cold validation prefix only applies to cold campaigns")
     # The Strict warm collectors froze this historical spelling; retain their bytes.
     warm_schema = ('exploratory.zero-strict-pair-ablation.v1' if schema_prefix == 'strict-coefficient-pairs'
                    else 'exploratory.' + schema_prefix + '-ablation.v1')
@@ -51,7 +52,7 @@ def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-inter
     require(header['cases'] == CASES and header['pairs'] == 5, 'case/round coverage')
     require(header['observations_per_process'] == (32 if cold else 7), 'observation coverage')
     require(header['identities'] == closure['identities_after'], 'identity closure')
-    require(closure['events'] == len(events) == (240 if cold else 288), 'event coverage')
+    require(closure['events'] == len(events) == (240 if cold and not cold_validation_prefix else 288), 'event coverage')
     require(closure['events_sha256'] == digest(data), 'event digest')
     for role in ['baseline', 'candidate']:
         identity, route = header['identities'][role], binding['routes'][role]
@@ -73,7 +74,7 @@ def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-inter
                 contents = subprocess.check_output(['git', '-C', str(ROOT), 'show', identity['head'] + ':' + name])
             require(digest(contents) == sha, f'source identity: {label}/{role}/{name}')
     expected_order = []
-    if not cold:
+    if not cold or cold_validation_prefix:
         expected_order.extend((case, role, 'validate') for case in CASES for role in ['baseline', 'candidate'])
     for round_index in range(5):
         rotated = CASES[round_index:] + CASES[:round_index]

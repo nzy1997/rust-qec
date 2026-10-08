@@ -67,6 +67,19 @@ impl NoisePacket {
             | (((d >> lane) & 1) << 3)
     }
 
+    pub(super) fn zero_prefix(&self, start: usize, maximum: usize, lane: usize) -> usize {
+        let end = start.checked_add(maximum).expect("noise cursor overflow");
+        let values = self
+            .planes
+            .get(start..end)
+            .expect("compact noise is incomplete");
+        let mask = 1u64 << lane;
+        values
+            .iter()
+            .position(|&[a, b, c, d]| (a | b | c | d) & mask != 0)
+            .unwrap_or(maximum)
+    }
+
     pub(super) fn choice_masks(&self, noise: usize, selected: u64, choices: usize) -> [u64; 15] {
         let mut result = [0; 15];
         let mut hits = selected;

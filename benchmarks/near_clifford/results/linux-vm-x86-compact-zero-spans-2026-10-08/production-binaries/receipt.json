@@ -1,0 +1,17 @@
+{
+  "source_revision": "2a54d756b04b814fa1db129e27168615fb407b58",
+  "measured_header_sha256": "0e2eacf75f12b0fe37b1279a2909f4e7ddd85cfc0101fa29e0114c68dec6a539",
+  "measured_closure_sha256": "83e3ea24b75763f25f643d7fba8003285ccd9cddada04d7fc3a66e5e00d960f2",
+  "binaries": {
+    "near-clifford-application-counts": {
+      "path": "near-clifford-application-counts.bin",
+      "sha256": "20a61824351c452e9cf02a58029a3599320e3d2047eb2a163765d28b591d24bf",
+      "bytes": 1129128
+    },
+    "near-clifford-diagnostics": {
+      "path": "near-clifford-diagnostics.bin",
+      "sha256": "056b2d5c707fe032d9ea0f62fe6fbb2fa4aba119d03d579b43a07dda3a340b2a",
+      "bytes": 1150272
+    }
+  }
+}
