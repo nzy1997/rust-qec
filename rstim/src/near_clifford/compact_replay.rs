@@ -4,6 +4,9 @@ use super::*;
 pub(super) trait RowDraw {
     fn draw(&mut self, kind: RandomKind) -> u64;
     fn discard_remaining(&mut self, kinds: &[RandomKind]);
+    fn skip_zero_noise(&mut self, _maximum: usize) -> usize {
+        0 // Live and compact-sidecar consumers retain their original path.
+    }
 }
 
 impl<R: Rng> RowDraw for RowRandom<'_, R> {
@@ -13,6 +16,25 @@ impl<R: Rng> RowDraw for RowRandom<'_, R> {
     }
     fn discard_remaining(&mut self, kinds: &[RandomKind]) {
         RowRandom::discard_remaining(self, kinds);
+    }
+    #[inline]
+    fn skip_zero_noise(&mut self, maximum: usize) -> usize {
+        let Some(tape) = self.tape else {
+            return 0;
+        };
+        let end = self
+            .cursor
+            .checked_add(maximum)
+            .expect("random tape cursor overflow");
+        let values = tape
+            .get(self.cursor..end)
+            .expect("recorded random tape is incomplete");
+        let skipped = values
+            .iter()
+            .position(|&value| value != 0)
+            .unwrap_or(maximum);
+        self.cursor += skipped;
+        skipped
     }
 }
 
