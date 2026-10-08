@@ -12,6 +12,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  current-evidence:
+    name: Current evidence (${{ matrix.publication }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - publication: apple-m4-conditional-preview-rank-2026-10-09
+            kind: diagnostics
+          - publication: linux-vm-x86-conditional-preview-rank-2026-10-09
+            kind: diagnostics
+          - publication: linux-vm-x86-conditional-preview-boundary-2026-10-09
+            kind: diagnostics
+          - publication: linux-vm-x86-conditional-preview-cache-lifetime-2026-10-09
+            kind: diagnostics
+          - publication: linux-vm-x86-conditional-preview-structure-incumbent-2026-10-09
+            kind: diagnostics
+          - publication: linux-vm-x86-conditional-preview-application-counts-2026-10-09
+            kind: application_counts
+          - publication: apple-m4-conditional-preview-application-counts-2026-10-09
+            kind: application_counts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Replay complete current-source evidence
+        env:
+          PUBLICATION: ${{ matrix.publication }}
+          KIND: ${{ matrix.kind }}
+        run: |
+          evidence="benchmarks/near_clifford/results/$PUBLICATION"
+          python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind "$KIND" --check
+          python3 -O "benchmarks/near_clifford/$KIND/verify.py" "$evidence" --git-sources
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.

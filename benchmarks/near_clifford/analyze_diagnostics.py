@@ -118,11 +118,14 @@ def summarize(out,kind,check=False):
         # Counts retain raw phase metadata without a derived lifecycle comparison.
         ('Raw compile/prepare/first-call metadata is retained; this counts campaign has no derived lifecycle comparison. Use a dedicated fresh-seed cold campaign for phase comparisons.'
          if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4','rstim.postselected-counts.v5'] else
+         'Raw compile/prepare/first-call metadata is retained; this selected diagnostic campaign has no derived lifecycle comparison. Use a dedicated fresh-seed cold campaign for phase comparisons.'
+         if header['schema']=='rstim.near-clifford-diagnostics.v2' and not lifecycle else
          'Lifecycle phase sums exclude diagnostic conversion and destruction; they are not end-to-end wall-clock time.'),
         'Activity metrics preserve their API names: rstim peak_active_rank, Clifft peak_active_width, SymFT max_active_qubits. They are not a common cross-engine rank scale.',
         'The active_components column is the reported native SymFT counts-sampler flag where available; empty means unmeasured, including raw-record workers.',
         ('See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS.'
-         if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4','rstim.postselected-counts.v5'] else
+         if header['schema'] in ['rstim.postselected-counts.v3','rstim.postselected-counts.v4','rstim.postselected-counts.v5']
+         or (header['schema']=='rstim.near-clifford-diagnostics.v2' and not lifecycle) else
          'See warm.csv for all backends, cold phases, named activity metrics, throughput and RSS; lifecycle.csv for every history/budget.'), '',
         '| Cell | rstim µs | Fastest peer µs | Speedup | Paired range | Peer |',
         '| --- | ---: | ---: | ---: | --- | --- |']
