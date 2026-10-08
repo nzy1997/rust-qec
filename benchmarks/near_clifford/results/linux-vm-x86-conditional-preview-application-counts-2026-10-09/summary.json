@@ -1,0 +1,478 @@
+{
+  "source_revision": "bacdcfa3a0c86619087a0f30944f08e2c4527974",
+  "host": {
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpus": 4,
+    "affinity": [
+      0
+    ],
+    "load": [
+      3.5517578125,
+      2.951171875,
+      1.5087890625
+    ]
+  },
+  "verification": {
+    "events": 658,
+    "retained_failure_events": 14,
+    "selected_cells": 24,
+    "valid_cells": 24
+  },
+  "statistical_unit": "median of observations within each independent process; process medians summarized across rounds",
+  "activity_metrics": {
+    "rstim": "peak_active_rank",
+    "clifft": "peak_active_width",
+    "clifft-scheduled": "peak_active_width",
+    "symft": "max_active_qubits"
+  },
+  "complete_timing_cells": 24,
+  "omitted_cells": [],
+  "warm_comparisons": [
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/1/strict",
+      "shots": 1,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 1844.8189868280265,
+      "peer_ns": 7243.215237543453,
+      "speedup": 3.9262471219452295,
+      "paired_min": 3.8935082610114278,
+      "paired_max": 3.940962811248852
+    },
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/1/fused",
+      "shots": 1,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 1843.0835637141067,
+      "peer_ns": 7210.696899783706,
+      "speedup": 3.912300582428831,
+      "paired_min": 3.8436488820653336,
+      "paired_max": 3.930349656215395
+    },
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/64/strict",
+      "shots": 64,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 29250.18947368421,
+      "peer_ns": 39399.91968503937,
+      "speedup": 1.346997075710797,
+      "paired_min": 1.3400550437986343,
+      "paired_max": 1.3573937343514058
+    },
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/64/fused",
+      "shots": 64,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 29249.616374269004,
+      "peer_ns": 39412.99842395587,
+      "speedup": 1.3474706102001266,
+      "paired_min": 1.342135117317365,
+      "paired_max": 1.356424250811868
+    },
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/1024/strict",
+      "shots": 1024,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 461044.871559633,
+      "peer_ns": 444664.4867256637,
+      "speedup": 0.9644711700651666,
+      "paired_min": 0.9598091430383149,
+      "paired_max": 0.9759380571649858
+    },
+    {
+      "id": "msc_d3_inject_cultivate_p1e-3/1024/fused",
+      "shots": 1024,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 460863.3027522936,
+      "peer_ns": 445457.1327433628,
+      "speedup": 0.9665710636604725,
+      "paired_min": 0.9627099567612051,
+      "paired_max": 0.9685686626564906
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/1/strict",
+      "shots": 1,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 9698.659038013964,
+      "peer_ns": 14807.937518507551,
+      "speedup": 1.526802567289739,
+      "paired_min": 1.5089162469887047,
+      "paired_max": 1.543159888625703
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/1/fused",
+      "shots": 1,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 9875.878333004148,
+      "peer_ns": 14789.442637492608,
+      "speedup": 1.4975318790702234,
+      "paired_min": 1.4733095627984372,
+      "paired_max": 1.5187249334014374
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/64/strict",
+      "shots": 64,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 437861.7913043478,
+      "peer_ns": 494671.23529411765,
+      "speedup": 1.1297428666258822,
+      "paired_min": 1.1216124213367438,
+      "paired_max": 1.153453669754644
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/64/fused",
+      "shots": 64,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 447665.5089285714,
+      "peer_ns": 492749.637254902,
+      "speedup": 1.1007094078662292,
+      "paired_min": 1.0408766692008518,
+      "paired_max": 1.10886381286312
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/1024/strict",
+      "shots": 1024,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 7481563.285714285,
+      "peer_ns": 7391508.714285715,
+      "speedup": 0.9879631344427005,
+      "paired_min": 0.9788123560344927,
+      "paired_max": 0.9952973812151912
+    },
+    {
+      "id": "msc_d5_inject_cultivate_p1e-3/1024/fused",
+      "shots": 1024,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "symft",
+      "rstim_ns": 7749963.857142857,
+      "peer_ns": 7427383.571428572,
+      "speedup": 0.9583765432122661,
+      "paired_min": 0.9515711087526868,
+      "paired_max": 0.972661021141372
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/1/strict",
+      "shots": 1,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft",
+      "rstim_ns": 906.6417523436509,
+      "peer_ns": 9136.917778183812,
+      "speedup": 10.077759770675751,
+      "paired_min": 9.999367449451942,
+      "paired_max": 10.253360746708237
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/1/fused",
+      "shots": 1,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft",
+      "rstim_ns": 907.9442346104958,
+      "peer_ns": 9154.635847674845,
+      "speedup": 10.082817312675756,
+      "paired_min": 9.998350328401603,
+      "paired_max": 10.123004116938185
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/64/strict",
+      "shots": 64,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 17609.699295774648,
+      "peer_ns": 52866.006335797254,
+      "speedup": 3.002095915884388,
+      "paired_min": 2.9711734159205605,
+      "paired_max": 3.027305505208005
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/64/fused",
+      "shots": 64,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft",
+      "rstim_ns": 17551.974025974025,
+      "peer_ns": 52775.45780590717,
+      "speedup": 3.0068103865586973,
+      "paired_min": 2.990218375245236,
+      "paired_max": 3.06355388111052
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/1024/strict",
+      "shots": 1024,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft",
+      "rstim_ns": 270593.8864864865,
+      "peer_ns": 327779.82352941175,
+      "speedup": 1.2113349188536866,
+      "paired_min": 1.1977011562423725,
+      "paired_max": 1.2262895166080359
+    },
+    {
+      "id": "pure_surface_d7_r7_p1e-3/1024/fused",
+      "shots": 1024,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 269195.6935483871,
+      "peer_ns": 327441.7843137255,
+      "speedup": 1.21637081187136,
+      "paired_min": 1.2116424947777193,
+      "paired_max": 1.2224462390916522
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/1/strict",
+      "shots": 1,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 1966.3517775680352,
+      "peer_ns": 10765.617007534984,
+      "speedup": 5.474919152487453,
+      "paired_min": 5.446039985834491,
+      "paired_max": 5.520121073281038
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/1/fused",
+      "shots": 1,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 1968.8880138604504,
+      "peer_ns": 10907.34242093784,
+      "speedup": 5.539849064117937,
+      "paired_min": 5.440746656803778,
+      "paired_max": 5.680417203430127
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/64/strict",
+      "shots": 64,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 38078.340182648404,
+      "peer_ns": 105264.30947368422,
+      "speedup": 2.764414335519047,
+      "paired_min": 2.747239682476833,
+      "paired_max": 2.779598592059823
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/64/fused",
+      "shots": 64,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 37962.482549317145,
+      "peer_ns": 104916.31865828093,
+      "speedup": 2.76368434340362,
+      "paired_min": 2.7506145139312377,
+      "paired_max": 2.7969690358170487
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/1024/strict",
+      "shots": 1024,
+      "arithmetic": "strict",
+      "cache_bytes": null,
+      "fastest_peer": "clifft",
+      "rstim_ns": 574056.1931818182,
+      "peer_ns": 739074.2205882353,
+      "speedup": 1.287459711028937,
+      "paired_min": 1.2840379027512108,
+      "paired_max": 1.3195501341409765
+    },
+    {
+      "id": "pure_surface_d9_r9_p1e-3/1024/fused",
+      "shots": 1024,
+      "arithmetic": "fused",
+      "cache_bytes": null,
+      "fastest_peer": "clifft-scheduled",
+      "rstim_ns": 570226.3295454546,
+      "peer_ns": 740480.9852941176,
+      "speedup": 1.298573823983853,
+      "paired_min": 1.281714401603701,
+      "paired_max": 1.301015572809322
+    }
+  ],
+  "lifecycle": [],
+  "capabilities": [
+    {
+      "input": "coherent_d3_r1",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "9b439238478b15977829c1015ee47dfe401976b3882092d9560ba321fb0f510a"
+    },
+    {
+      "input": "coherent_d3_r1",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "9b439238478b15977829c1015ee47dfe401976b3882092d9560ba321fb0f510a"
+    },
+    {
+      "input": "coherent_d3_r3",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "87d1308c83894e87c60aeb2dc31b74be89b3460a951929951f2c3ac92606827d"
+    },
+    {
+      "input": "coherent_d3_r3",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "87d1308c83894e87c60aeb2dc31b74be89b3460a951929951f2c3ac92606827d"
+    },
+    {
+      "input": "coherent_d5_r1",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "2707188abe8912f693fe4f910db8c4b6bd795c71a8fba38cc153da90ee5910b8"
+    },
+    {
+      "input": "coherent_d5_r1",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "2707188abe8912f693fe4f910db8c4b6bd795c71a8fba38cc153da90ee5910b8"
+    },
+    {
+      "input": "coherent_d5_r5",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "54088bbd5f06b441596e414f9fa99d8eeaff8a4a1a862b911e0ad40092c5e549"
+    },
+    {
+      "input": "coherent_d5_r5",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_Z",
+      "input_sha256": "54088bbd5f06b441596e414f9fa99d8eeaff8a4a1a862b911e0ad40092c5e549"
+    },
+    {
+      "input": "distillation",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_X",
+      "input_sha256": "188bd53c48dbc21f840fb297df6f41c61f5bad6a856bba621f00ff42078921c1"
+    },
+    {
+      "input": "distillation",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate R_X",
+      "input_sha256": "188bd53c48dbc21f840fb297df6f41c61f5bad6a856bba621f00ff42078921c1"
+    },
+    {
+      "input": "msc_d3_inject_cultivate_p1e-3",
+      "arithmetic": "strict",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f"
+    },
+    {
+      "input": "msc_d3_inject_cultivate_p1e-3",
+      "arithmetic": "fused",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f"
+    },
+    {
+      "input": "msc_d5_inject_cultivate_p1e-3",
+      "arithmetic": "strict",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
+    },
+    {
+      "input": "msc_d5_inject_cultivate_p1e-3",
+      "arithmetic": "fused",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
+    },
+    {
+      "input": "pure_surface_d7_r7_p1e-3",
+      "arithmetic": "strict",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583"
+    },
+    {
+      "input": "pure_surface_d7_r7_p1e-3",
+      "arithmetic": "fused",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583"
+    },
+    {
+      "input": "quantum_volume_q10_seed42",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate U3",
+      "input_sha256": "faf7fbf3bf4048c1c7a0f9954cc14160e74d48ebc8972b41cf3c6bc07c697f6a"
+    },
+    {
+      "input": "quantum_volume_q10_seed42",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate U3",
+      "input_sha256": "faf7fbf3bf4048c1c7a0f9954cc14160e74d48ebc8972b41cf3c6bc07c697f6a"
+    },
+    {
+      "input": "quantum_volume_q20_seed42",
+      "arithmetic": "strict",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate U3",
+      "input_sha256": "b9bbbe939ce4c1754b6bac936c04b2c4ce572657831fef6a7bc5c3054f81ce53"
+    },
+    {
+      "input": "quantum_volume_q20_seed42",
+      "arithmetic": "fused",
+      "status": "unsupported",
+      "error": "near-Clifford unsupported gate U3",
+      "input_sha256": "b9bbbe939ce4c1754b6bac936c04b2c4ce572657831fef6a7bc5c3054f81ce53"
+    },
+    {
+      "input": "pure_surface_d9_r9_p1e-3",
+      "arithmetic": "strict",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c"
+    },
+    {
+      "input": "pure_surface_d9_r9_p1e-3",
+      "arithmetic": "fused",
+      "status": "ok",
+      "error": "",
+      "input_sha256": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c"
+    }
+  ]
+}
