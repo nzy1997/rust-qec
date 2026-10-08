@@ -142,3 +142,15 @@ affinity and checks sample process/thread/CPU plus native executable stack frame
 The privileged recording has a shorter process-group watchdog; command timeouts
 retain failed receipts and partial logs. After recording closes, only that raw
 file is chowned to the runner so unprivileged exports and artifact retention work.
+
+
+The [compact scalar zero-noise replay campaign](results/apple-m4-compact-zero-spans-2026-10-08/README.md)
+retains complete M4 and [x86 peer matrices](results/linux-vm-x86-compact-zero-spans-2026-10-08/README.md),
+master A/B experiments, same-binary A/A controls and fresh-seed cold phases.
+D5 warm bulk source effects reproduce on both architectures; the M4 peer lead
+is not reproduced on x86, where d5 bulk remains 0.67–0.76× the fastest Clifft
+path. D3 bulk is near parity and cold phase-sum benefits are small.
+Every regression and outlier is retained, with source-bound offline replay and
+actual native coefficient/CDF/counts/RNG gate receipts. Current diagnostic profiles
+point to rotation/probability/projection kernels, with no elapsed-fraction claim.
+These results leave concrete optimization directions; the campaign is continuing.

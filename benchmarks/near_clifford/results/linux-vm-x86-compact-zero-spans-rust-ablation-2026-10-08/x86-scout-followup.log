@@ -1,0 +1,688 @@
+All 48 four-seed validations passed
+Closed pair 1
+Closed pair 2
+Closed pair 3
+Closed pair 4
+Closed pair 5
+[
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 1940.1171038336179,
+    "candidate_ns": 1959.830086622506,
+    "speedup": 0.9899414837421642,
+    "paired_range": [
+      0.966951579852453,
+      1.04349295175562
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 1938.9043741275011,
+    "candidate_ns": 1935.9957021721455,
+    "speedup": 1.0015024165353736,
+    "paired_range": [
+      0.9825356509870569,
+      1.0504729795556436
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 30610.153610771114,
+    "candidate_ns": 30667.24034334764,
+    "speedup": 0.9981385109342286,
+    "paired_range": [
+      0.9943616577009564,
+      1.006168003844844
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 30719.138820638822,
+    "candidate_ns": 30555.698839340257,
+    "speedup": 1.005348919759876,
+    "paired_range": [
+      0.9945931591221198,
+      1.0071410908167426
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 481346.78846153844,
+    "candidate_ns": 481100.45192307694,
+    "speedup": 1.0005120272439505,
+    "paired_range": [
+      0.9806275494370059,
+      1.0185921624551388
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 483747.60576923075,
+    "candidate_ns": 480607.3619047619,
+    "speedup": 1.0065339071212378,
+    "paired_range": [
+      0.9980872478821005,
+      1.0187684556996686
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 10763.226431338786,
+    "candidate_ns": 10691.302758178319,
+    "speedup": 1.0067273067452374,
+    "paired_range": [
+      0.9723775410558412,
+      1.0138198122406106
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 10905.131297709924,
+    "candidate_ns": 10839.166702796445,
+    "speedup": 1.0060857625611073,
+    "paired_range": [
+      0.9878823516862979,
+      1.0126010571217348
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 500605.25,
+    "candidate_ns": 502074.04,
+    "speedup": 0.9970745549799787,
+    "paired_range": [
+      0.9795609437085422,
+      1.0317485844452248
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 511685.58585858584,
+    "candidate_ns": 508272.6060606061,
+    "speedup": 1.0067148607996645,
+    "paired_range": [
+      0.9779138511071103,
+      1.0207048247298691
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 7974003.142857143,
+    "candidate_ns": 7939195.571428572,
+    "speedup": 1.0043842693022749,
+    "paired_range": [
+      0.9774485465050731,
+      1.011765912985956
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 8117912.857142857,
+    "candidate_ns": 8175686.0,
+    "speedup": 0.9929335418633809,
+    "paired_range": [
+      0.9664181367265644,
+      1.0391977506029688
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 920.0619928236268,
+    "candidate_ns": 920.4512168182321,
+    "speedup": 0.9995771378346908,
+    "paired_range": [
+      0.9865963166070449,
+      1.0107720810215706
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 918.9863622996618,
+    "candidate_ns": 924.1919522383646,
+    "speedup": 0.994367414771255,
+    "paired_range": [
+      0.9844857578753914,
+      1.0116284712945702
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 18595.95277054667,
+    "candidate_ns": 18578.430534918276,
+    "speedup": 1.0009431494008851,
+    "paired_range": [
+      1.0000811161100258,
+      1.0049118709560074
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 18607.55505952381,
+    "candidate_ns": 18677.41560866318,
+    "speedup": 0.996259624425396,
+    "paired_range": [
+      0.9905085394476515,
+      1.0031625945592462
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 287449.6724137931,
+    "candidate_ns": 288939.9597701149,
+    "speedup": 0.9948422248085467,
+    "paired_range": [
+      0.9909678498368688,
+      1.003316735490155
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 287901.9712643678,
+    "candidate_ns": 287797.7873563218,
+    "speedup": 1.00036200385348,
+    "paired_range": [
+      0.9961073585245616,
+      1.0041665279404874
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 1913.5436662839647,
+    "candidate_ns": 1913.4386361027132,
+    "speedup": 1.0000548908019677,
+    "paired_range": [
+      0.9968767934945438,
+      1.0025177778380678
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 1913.0473275433294,
+    "candidate_ns": 1912.077705544933,
+    "speedup": 1.000507103866953,
+    "paired_range": [
+      0.9993459696525075,
+      1.014150489580174
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 36798.11994113318,
+    "candidate_ns": 36895.98525073746,
+    "speedup": 0.9973475349976643,
+    "paired_range": [
+      0.9949210542517626,
+      1.0040017716268508
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 36844.82179675994,
+    "candidate_ns": 36804.71228844739,
+    "speedup": 1.0010897927417068,
+    "paired_range": [
+      0.9989241341449322,
+      1.0192172007451274
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 564586.9438202247,
+    "candidate_ns": 562282.1011235955,
+    "speedup": 1.004099086013984,
+    "paired_range": [
+      0.9713247336094017,
+      1.0132904512012006
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 564157.404494382,
+    "candidate_ns": 563741.0561797753,
+    "speedup": 1.0007385453126798,
+    "paired_range": [
+      0.9846027899550067,
+      1.0040513467791272
+    ]
+  }
+]
+All 48 four-seed validations passed
+Closed pair 1
+Closed pair 2
+Closed pair 3
+Closed pair 4
+Closed pair 5
+[
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 1942.294953968069,
+    "candidate_ns": 1936.2813770669559,
+    "speedup": 1.0031057350302166,
+    "paired_range": [
+      0.9848725306743064,
+      1.0284764659866497
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 1941.5549256397312,
+    "candidate_ns": 1967.5165859992917,
+    "speedup": 0.986804858193165,
+    "paired_range": [
+      0.9282751046188148,
+      1.0060572183512095
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 30693.293865030675,
+    "candidate_ns": 30617.220930232557,
+    "speedup": 1.002484645323345,
+    "paired_range": [
+      0.9884283934944419,
+      1.0079383767750445
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 30661.90496627836,
+    "candidate_ns": 30682.98527607362,
+    "speedup": 0.9993129641850168,
+    "paired_range": [
+      0.9899991149989782,
+      1.0003150639196459
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 484435.5673076923,
+    "candidate_ns": 480825.67307692306,
+    "speedup": 1.0075076985961848,
+    "paired_range": [
+      0.9999258048267232,
+      1.009168607519578
+    ]
+  },
+  {
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 482023.875,
+    "candidate_ns": 482702.35576923075,
+    "speedup": 0.9985944117298754,
+    "paired_range": [
+      0.9944059445066585,
+      1.0020503686682132
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 10841.7539028621,
+    "candidate_ns": 10795.61139896373,
+    "speedup": 1.0042741908904573,
+    "paired_range": [
+      0.9824673905106046,
+      1.0095701062898061
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 10864.970664928293,
+    "candidate_ns": 10908.572830353249,
+    "speedup": 0.9960029450137022,
+    "paired_range": [
+      0.9839419839938659,
+      1.0013250949890014
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 506400.77777777775,
+    "candidate_ns": 492885.0294117647,
+    "speedup": 1.0274217059952977,
+    "paired_range": [
+      0.9921237263433161,
+      1.0455345654956385
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 518945.1443298969,
+    "candidate_ns": 507933.202020202,
+    "speedup": 1.02167990252635,
+    "paired_range": [
+      0.9803129877532221,
+      1.0443828757644122
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 7953245.857142857,
+    "candidate_ns": 7969290.142857143,
+    "speedup": 0.9979867359041174,
+    "paired_range": [
+      0.990799969260571,
+      1.0321794308858931
+    ]
+  },
+  {
+    "case": [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 8118652.0,
+    "candidate_ns": 8234090.0,
+    "speedup": 0.9859804787171381,
+    "paired_range": [
+      0.9813873612193766,
+      1.0072897444559303
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 919.5699782984515,
+    "candidate_ns": 914.2644041763426,
+    "speedup": 1.0058031069544795,
+    "paired_range": [
+      0.9985413310350022,
+      1.023707490631917
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 921.8748294553634,
+    "candidate_ns": 920.9181324247169,
+    "speedup": 1.0010388513342956,
+    "paired_range": [
+      0.9947580538921851,
+      1.0071187762829767
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 18621.274385703648,
+    "candidate_ns": 18575.667904903417,
+    "speedup": 1.002455173134754,
+    "paired_range": [
+      0.9996610711828129,
+      1.0045479437458689
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 18604.167410714286,
+    "candidate_ns": 18599.360357010042,
+    "speedup": 1.0002584526355731,
+    "paired_range": [
+      0.9755861716006303,
+      1.005792568887368
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 288405.5517241379,
+    "candidate_ns": 287958.4252873563,
+    "speedup": 1.0015527464992053,
+    "paired_range": [
+      0.9984828157585307,
+      1.0067707541849376
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 287862.8908045977,
+    "candidate_ns": 287292.03428571427,
+    "speedup": 1.0019870252243601,
+    "paired_range": [
+      0.9918217843961792,
+      1.0173512545489911
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "strict"
+    ],
+    "baseline_ns": 1915.0815810640008,
+    "candidate_ns": 1921.9498001230013,
+    "speedup": 0.9964264316068188,
+    "paired_range": [
+      0.9732045228301257,
+      0.9989803588012208
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "fused"
+    ],
+    "baseline_ns": 1912.6467370514881,
+    "candidate_ns": 1916.2022687207786,
+    "speedup": 0.9981444904187154,
+    "paired_range": [
+      0.988978324436725,
+      1.0035553758546907
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "strict"
+    ],
+    "baseline_ns": 37011.054774241304,
+    "candidate_ns": 36684.768158473955,
+    "speedup": 1.0088943349555277,
+    "paired_range": [
+      0.99137885008894,
+      1.015543533371933
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "fused"
+    ],
+    "baseline_ns": 36687.082171680115,
+    "candidate_ns": 36665.34897360704,
+    "speedup": 1.0005927448853336,
+    "paired_range": [
+      0.998793174427083,
+      1.0097446427947514
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "strict"
+    ],
+    "baseline_ns": 566489.4943820224,
+    "candidate_ns": 563378.5730337079,
+    "speedup": 1.005521902140443,
+    "paired_range": [
+      1.0000967217965677,
+      1.0220620499193218
+    ]
+  },
+  {
+    "case": [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "fused"
+    ],
+    "baseline_ns": 567294.5393258428,
+    "candidate_ns": 565912.2808988764,
+    "speedup": 1.0024425312431298,
+    "paired_range": [
+      0.9990137001772388,
+      1.0152853677916909
+    ]
+  }
+]

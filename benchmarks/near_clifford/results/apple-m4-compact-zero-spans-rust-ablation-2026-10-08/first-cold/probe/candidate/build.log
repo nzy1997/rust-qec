@@ -1,0 +1,56 @@
+   Compiling libc v0.2.190
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling serde_core v1.0.229
+   Compiling version_check v0.9.5
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling pkg-config v0.3.34
+   Compiling serde v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling typenum v1.20.1
+   Compiling zerocopy v0.8.60
+   Compiling hashbrown v0.17.1
+   Compiling generic-array v0.14.7
+   Compiling zstd-safe v7.3.0
+   Compiling zmij v1.0.23
+   Compiling equivalent v1.0.2
+   Compiling indexmap v2.14.2
+   Compiling serde_json v1.0.151
+   Compiling winnow v0.7.15
+   Compiling toml_write v0.1.2
+   Compiling itoa v1.0.18
+   Compiling syn v3.0.6
+   Compiling memchr v2.8.3
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling jobserver v0.1.35
+   Compiling getrandom v0.2.17
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling rand_core v0.6.4
+   Compiling cc v1.6.0
+   Compiling serde_derive v1.0.229
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling ppv-lite86 v0.2.21
+   Compiling rand_chacha v0.3.1
+   Compiling rand v0.8.7
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling toml_edit v0.22.27
+   Compiling toml v0.8.23
+   Compiling zstd v0.13.3
+   Compiling rstim v0.3.0 (/Users/nzy/.codex/worktrees/near-clifford-four-coefficients/rstim/rstim)
+warning: unused variable: `attempt_count`
+    --> /Users/nzy/.codex/worktrees/near-clifford-four-coefficients/rstim/rstim/src/sim/frame.rs:1407:17
+     |
+1407 |             let attempt_count = pairs.len().saturating_mul(self.batch_size);
+     |                 ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_attempt_count`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rstim` (lib) generated 1 warning (run `cargo fix --lib -p rstim` to apply 1 suggestion)
+   Compiling counts-path-ablation v0.1.0 (/Users/nzy/.codex/worktrees/near-clifford-four-coefficients/rstim/drafts/compact-zero-spans-cold-probe)
+    Finished `release` profile [optimized] target(s) in 19.10s

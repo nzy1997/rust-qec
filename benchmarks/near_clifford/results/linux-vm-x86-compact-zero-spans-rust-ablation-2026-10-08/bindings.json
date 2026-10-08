@@ -1,0 +1,11 @@
+{
+  "host": "linux-vm-x86",
+  "baseline": "e1453a7b634275d3055ef64b2f4a7b33d3995870",
+  "candidate": "d989531d837fe874a77ac05745f5d77ea5639d52",
+  "campaigns": [
+    "warm",
+    "confirmation",
+    "same-binary-warm",
+    "same-binary-confirmation"
+  ]
+}

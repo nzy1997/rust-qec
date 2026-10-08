@@ -1,0 +1,18 @@
+warning: unused variable: `attempt_count`
+    --> rstim/src/sim/frame.rs:1407:17
+     |
+1407 |             let attempt_count = pairs.len().saturating_mul(self.batch_size);
+     |                 ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_attempt_count`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rstim` (lib) generated 1 warning (run `cargo fix --lib -p rstim` to apply 1 suggestion)
+warning: `rstim` (lib test) generated 1 warning (1 duplicate)
+    Finished `release` profile [optimized] target(s) in 0.09s
+     Running unittests src/lib.rs (target/release/deps/rstim-2d1d93be0dc21044)
+
+running 1 test
+test near_clifford::compiled::coherent_packet::rotation_arithmetic_policy_bits_tests::both_rotation_policies_match_independent_coefficient_and_cdf_bits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 339 filtered out; finished in 1.41s
+
