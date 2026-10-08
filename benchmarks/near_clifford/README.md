@@ -28,6 +28,9 @@ CPUs/layouts retain the existing AVX2 or portable paths. A skipped gate is expli
 in its log and is not evidence that the wider kernel ran. A source-effect claim
 for this kernel requires the admitted native gate and the complete paired A/B,
 confirmation and identical-binary A/A campaigns on the recorded host.
+Dispatch paired experiments for this kernel with `require_avx512=true`; this
+fails preflight before timings if the CPU feature or actual admitted-gate marker
+is absent. The default is false for experiments targeting existing fallback CPUs.
 
 These profiles include startup, warmup and teardown. Every instrumented result
 is marked `performance_valid=false`; use profiles to locate work, never to claim
