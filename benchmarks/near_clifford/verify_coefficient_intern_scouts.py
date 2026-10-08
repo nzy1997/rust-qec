@@ -35,7 +35,7 @@ def number(value, positive=False):
 
 
 def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-intern"):
-    require(schema_prefix in ("coefficient-intern", "zero-noise-spans"), "supported scout family")
+    require(schema_prefix in ("coefficient-intern", "zero-noise-spans", "strict-coefficient-pairs"), "supported scout family")
     path = archive / label
     header, closure, summary = [load(path / name) for name in
                                 ['header.json', 'closure.json', 'summary.json']]
@@ -43,8 +43,11 @@ def verify_campaign(archive, label, binding, *, schema_prefix="coefficient-inter
     require(len(data) < 10 * 1024 * 1024, 'unbounded scout event file')
     events = [json.loads(line) for line in data.splitlines()]
     cold = label.endswith('-cold')
+    # The Strict warm collectors froze this historical spelling; retain their bytes.
+    warm_schema = ('exploratory.zero-strict-pair-ablation.v1' if schema_prefix == 'strict-coefficient-pairs'
+                   else 'exploratory.' + schema_prefix + '-ablation.v1')
     require(header['schema'] == ('exploratory.' + schema_prefix + '-cold.v1' if cold
-                                else 'exploratory.' + schema_prefix + '-ablation.v1'), 'schema')
+                                else warm_schema), 'schema')
     require(header['cases'] == CASES and header['pairs'] == 5, 'case/round coverage')
     require(header['observations_per_process'] == (32 if cold else 7), 'observation coverage')
     require(header['identities'] == closure['identities_after'], 'identity closure')
