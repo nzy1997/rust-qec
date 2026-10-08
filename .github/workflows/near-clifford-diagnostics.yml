@@ -15,7 +15,7 @@ jobs:
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay' || github.head_ref == 'codex/near-clifford-cache-reconvergence-scout' || github.head_ref == 'codex/near-clifford-zero-noise-spans'
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay' || github.head_ref == 'codex/near-clifford-cache-reconvergence-scout' || github.head_ref == 'codex/near-clifford-zero-noise-spans' || github.head_ref == 'codex/near-clifford-signed-pairs'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -149,6 +149,18 @@ jobs:
             python3 benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
             python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
           done
+      - name: Replay Strict coefficient-pair scouts and full publications
+        run: |
+          python3 benchmarks/near_clifford/verify_strict_coefficient_pairs_scouts.py
+          python3 -O benchmarks/near_clifford/verify_strict_coefficient_pairs_scouts.py
+          python3 benchmarks/near_clifford/test_strict_coefficient_pairs_scouts.py
+          python3 -O benchmarks/near_clifford/test_strict_coefficient_pairs_scouts.py
+          for host in apple-m4 linux-vm-x86; do
+            evidence="benchmarks/near_clifford/results/${host}-strict-coefficient-pairs-2026-10-08"
+            python3 benchmarks/near_clifford/analyze_diagnostics.py "$evidence" --kind application_counts --check
+            python3 benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+            python3 -O benchmarks/near_clifford/application_counts/verify.py "$evidence" --git-sources
+          done
   diagnostic-corruption:
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -175,7 +187,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [normal, optimized]
-        publication: [apple-m4-application-counts-2026-10-07, apple-m4-native-counts-2026-10-07, apple-m4-scalar-rejection-one-shot-2026-10-07, apple-m4-counts-annotations-2026-10-08, apple-m4-packed-rejection-2026-10-08, apple-m4-affine-counts-2026-10-08, apple-m4-counts-replay-2026-10-08, apple-m4-coefficient-intern-2026-10-08, linux-vm-x86-coefficient-intern-2026-10-08, apple-m4-zero-noise-spans-2026-10-08, linux-vm-x86-zero-noise-spans-2026-10-08]
+        publication: [apple-m4-application-counts-2026-10-07, apple-m4-native-counts-2026-10-07, apple-m4-scalar-rejection-one-shot-2026-10-07, apple-m4-counts-annotations-2026-10-08, apple-m4-packed-rejection-2026-10-08, apple-m4-affine-counts-2026-10-08, apple-m4-counts-replay-2026-10-08, apple-m4-coefficient-intern-2026-10-08, linux-vm-x86-coefficient-intern-2026-10-08, apple-m4-zero-noise-spans-2026-10-08, linux-vm-x86-zero-noise-spans-2026-10-08, apple-m4-strict-coefficient-pairs-2026-10-08, linux-vm-x86-strict-coefficient-pairs-2026-10-08]
     steps:
       - uses: actions/checkout@v4
         with:

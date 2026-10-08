@@ -2414,6 +2414,35 @@ impl CompiledNearCliffordSampler<'_> {
                 amp * factor
             }
         };
+        if p.z == 0 && p.x >= 2 && p.x & 7 != 0 {
+            match (imaginary, p.x & 1 != 0) {
+                (true, true) => Self::rotate_highest_z0::<false, true, true>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (true, false) => Self::rotate_highest_z0::<false, true, false>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (false, true) => Self::rotate_highest_z0::<false, false, true>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+                (false, false) => Self::rotate_highest_z0::<false, false, false>(
+                    &mut self.coefficients,
+                    p.x,
+                    c,
+                    factor,
+                ),
+            }
+            return Ok(());
+        }
         if p.x == 0 {
             for (i, amp) in self.coefficients.iter_mut().enumerate() {
                 *amp = *amp * c + term((i & p.z).count_ones() % 2 != 0, *amp);
@@ -2495,25 +2524,25 @@ impl CompiledNearCliffordSampler<'_> {
         // Larger lowest-pivot blocks already vectorize in the retained kernel.
         if p.z == 0 && p.x >= 2 && p.x & 7 != 0 {
             match (imaginary, p.x & 1 != 0) {
-                (true, true) => Self::rotate_fused_highest_z0::<true, true>(
+                (true, true) => Self::rotate_highest_z0::<true, true, true>(
                     &mut self.coefficients,
                     p.x,
                     c,
                     factor,
                 ),
-                (true, false) => Self::rotate_fused_highest_z0::<true, false>(
+                (true, false) => Self::rotate_highest_z0::<true, true, false>(
                     &mut self.coefficients,
                     p.x,
                     c,
                     factor,
                 ),
-                (false, true) => Self::rotate_fused_highest_z0::<false, true>(
+                (false, true) => Self::rotate_highest_z0::<true, false, true>(
                     &mut self.coefficients,
                     p.x,
                     c,
                     factor,
                 ),
-                (false, false) => Self::rotate_fused_highest_z0::<false, false>(
+                (false, false) => Self::rotate_highest_z0::<true, false, false>(
                     &mut self.coefficients,
                     p.x,
                     c,
@@ -2566,7 +2595,7 @@ impl CompiledNearCliffordSampler<'_> {
         }
         Ok(())
     }
-    fn rotate_fused_highest_z0<const IMAGINARY: bool, const SWAP: bool>(
+    fn rotate_highest_z0<const FUSED: bool, const IMAGINARY: bool, const SWAP: bool>(
         coefficients: &mut [ComplexAmp],
         x: usize,
         c: f64,
@@ -2584,13 +2613,13 @@ impl CompiledNearCliffordSampler<'_> {
                 let other = (group ^ group_xor) * 2;
                 let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
                 let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
-                Self::rotate_fused_adjacent_pair::<IMAGINARY, SWAP>(a, b, c, factor);
+                Self::rotate_adjacent_pair::<FUSED, IMAGINARY, SWAP>(a, b, c, factor);
             }
         }
     }
 
     #[inline(always)]
-    fn rotate_fused_adjacent_pair<const IMAGINARY: bool, const SWAP: bool>(
+    fn rotate_adjacent_pair<const FUSED: bool, const IMAGINARY: bool, const SWAP: bool>(
         a: &mut [ComplexAmp; 2],
         b: &mut [ComplexAmp; 2],
         c: f64,
@@ -2604,43 +2633,29 @@ impl CompiledNearCliffordSampler<'_> {
         let ai = [old_a[0].im, old_a[1].im];
         let br = [old_b[0].re, old_b[1].re];
         let bi = [old_b[0].im, old_b[1].im];
+        // Strict keeps own*c + partner*factor in the original order; Fused
+        // retains the original single-rounding mul_add. Const selection makes
+        // the policy branch disappear from the arithmetic kernel.
+        let accumulate = |partner: f64, own_scaled: f64| {
+            if FUSED {
+                partner.mul_add(factor, own_scaled)
+            } else {
+                own_scaled + partner * factor
+            }
+        };
         let (out_ar, out_ai, out_br, out_bi) = if IMAGINARY {
             (
-                [
-                    (-bi[0]).mul_add(factor, ar[0] * c),
-                    (-bi[1]).mul_add(factor, ar[1] * c),
-                ],
-                [
-                    br[0].mul_add(factor, ai[0] * c),
-                    br[1].mul_add(factor, ai[1] * c),
-                ],
-                [
-                    (-ai[0]).mul_add(factor, br[0] * c),
-                    (-ai[1]).mul_add(factor, br[1] * c),
-                ],
-                [
-                    ar[0].mul_add(factor, bi[0] * c),
-                    ar[1].mul_add(factor, bi[1] * c),
-                ],
+                [accumulate(-bi[0], ar[0] * c), accumulate(-bi[1], ar[1] * c)],
+                [accumulate(br[0], ai[0] * c), accumulate(br[1], ai[1] * c)],
+                [accumulate(-ai[0], br[0] * c), accumulate(-ai[1], br[1] * c)],
+                [accumulate(ar[0], bi[0] * c), accumulate(ar[1], bi[1] * c)],
             )
         } else {
             (
-                [
-                    br[0].mul_add(factor, ar[0] * c),
-                    br[1].mul_add(factor, ar[1] * c),
-                ],
-                [
-                    bi[0].mul_add(factor, ai[0] * c),
-                    bi[1].mul_add(factor, ai[1] * c),
-                ],
-                [
-                    ar[0].mul_add(factor, br[0] * c),
-                    ar[1].mul_add(factor, br[1] * c),
-                ],
-                [
-                    ai[0].mul_add(factor, bi[0] * c),
-                    ai[1].mul_add(factor, bi[1] * c),
-                ],
+                [accumulate(br[0], ar[0] * c), accumulate(br[1], ar[1] * c)],
+                [accumulate(bi[0], ai[0] * c), accumulate(bi[1], ai[1] * c)],
+                [accumulate(ar[0], br[0] * c), accumulate(ar[1], br[1] * c)],
+                [accumulate(ai[0], bi[0] * c), accumulate(ai[1], bi[1] * c)],
             )
         };
         a[0] = ComplexAmp::new(out_ar[0], out_ai[0]);

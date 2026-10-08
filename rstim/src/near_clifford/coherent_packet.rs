@@ -1541,53 +1541,64 @@ mod rotation_arithmetic_policy_bits_tests {
     }
 
     #[test]
-    fn fused_scalar_high_multi_x_matches_gather_coefficient_and_cdf_bits() {
-        let policy = CompiledRotationArithmetic::Fused;
-        let plan =
-            CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 9\n", policy).unwrap();
-        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-        // Actual d5 masks: odd/even row permutation and lowest pivots 1/2/4.
-        // Keep this scalar-only; do not multiply rank10 by all packet lanes.
-        for x in [515, 998, 556] {
-            for phase in 0..4 {
-                let p = compact(x, 0, phase);
-                for expand in [false, true] {
-                    for kind in 0..4 {
-                        let mut before = prefix(1 << (10 - usize::from(expand)), kind);
-                        if kind == 1 {
-                            // Distinguish high rows instead of repeating the prefix pattern.
-                            for (index, amp) in before.iter_mut().enumerate() {
-                                let scale = (index + 1) as f64 / 1024.;
-                                amp.re *= scale;
-                                amp.im *= scale;
+    fn scalar_high_multi_x_matches_gather_coefficient_and_cdf_bits_for_both_policies() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 9\n", policy)
+                .unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            // Actual d5 masks: odd/even row permutation and lowest pivots 1/2/4.
+            // Keep this scalar-only; do not multiply rank10 by all packet lanes.
+            for x in [515, 998, 556] {
+                for phase in 0..4 {
+                    let p = compact(x, 0, phase);
+                    for expand in [false, true] {
+                        for kind in 0..4 {
+                            let mut before = prefix(1 << (10 - usize::from(expand)), kind);
+                            if kind == 1 {
+                                // Distinguish high rows instead of repeating the prefix pattern.
+                                for (index, amp) in before.iter_mut().enumerate() {
+                                    let scale = (index + 1) as f64 / 1024.;
+                                    amp.re *= scale;
+                                    amp.im *= scale;
+                                }
                             }
-                        }
-                        if matches!(kind, 0 | 2) {
-                            // Preserve other signed-zero/subnormal values, but
-                            // give the independent CDF a finite nonzero norm.
-                            *before.last_mut().unwrap() = ComplexAmp::new(0.75, -0.25);
-                        }
-                        for dagger in [false, true] {
-                            for flip in [false, true] {
-                                let context = format!(
-                                    "rank10 Fused x={x}; phase={phase}; expand={expand}; kind={kind}; dagger={dagger}; flip={flip}"
-                                );
-                                let mut expected = before.clone();
-                                reference_rotate(&mut expected, &p, expand, dagger, flip, policy);
-                                scalar.coefficients = before.clone();
-                                scalar.rotate_signed(&p, expand, dagger, flip).unwrap();
-                                assert_scalar_bits(&scalar.coefficients, &expected, &context);
-                                for (cdf_x, cdf_z) in [(0, 1023), (x, 0), (1023, 1023)] {
-                                    for cdf_phase in 0..4 {
-                                        let query = compact(cdf_x, cdf_z, cdf_phase);
-                                        let expected_bits =
-                                            frozen_scalar_probability_zero(&expected, &query)
-                                                .to_bits();
-                                        assert_eq!(
-                                            scalar.probability_zero(&query).to_bits(),
-                                            expected_bits,
-                                            "{context}; CDF x={cdf_x}; z={cdf_z}; phase={cdf_phase}"
-                                        );
+                            if matches!(kind, 0 | 2) {
+                                // Preserve other signed-zero/subnormal values, but
+                                // give the independent CDF a finite nonzero norm.
+                                *before.last_mut().unwrap() = ComplexAmp::new(0.75, -0.25);
+                            }
+                            for dagger in [false, true] {
+                                for flip in [false, true] {
+                                    let context = format!(
+                                        "rank10 {policy:?} x={x}; phase={phase}; expand={expand}; kind={kind}; dagger={dagger}; flip={flip}"
+                                    );
+                                    let mut expected = before.clone();
+                                    reference_rotate(
+                                        &mut expected,
+                                        &p,
+                                        expand,
+                                        dagger,
+                                        flip,
+                                        policy,
+                                    );
+                                    scalar.coefficients = before.clone();
+                                    scalar.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                    assert_scalar_bits(&scalar.coefficients, &expected, &context);
+                                    for (cdf_x, cdf_z) in [(0, 1023), (x, 0), (1023, 1023)] {
+                                        for cdf_phase in 0..4 {
+                                            let query = compact(cdf_x, cdf_z, cdf_phase);
+                                            let expected_bits =
+                                                frozen_scalar_probability_zero(&expected, &query)
+                                                    .to_bits();
+                                            assert_eq!(
+                                                scalar.probability_zero(&query).to_bits(),
+                                                expected_bits,
+                                                "{context}; CDF x={cdf_x}; z={cdf_z}; phase={cdf_phase}"
+                                            );
+                                        }
                                     }
                                 }
                             }
