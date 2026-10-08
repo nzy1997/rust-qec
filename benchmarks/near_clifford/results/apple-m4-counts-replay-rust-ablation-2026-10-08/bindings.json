@@ -1,0 +1,65 @@
+{
+  "scope": "Exact measured source preservation. Originally dirty headers are unchanged. Executables are not vendored; original before/after binary digests are retained. recorded-tail candidate5302111 was reconstructed after measurement with exact whole-source hashes, before the test-module name-only cleanup.",
+  "campaigns": {
+    "recorded-tail": {
+      "baseline": {
+        "source_equivalent_commit": "30c232627a1aabfc540b78abf8fb155dda22c8c0",
+        "original_recorded_head": "30c232627a1aabfc540b78abf8fb155dda22c8c0",
+        "original_recorded_dirty": "",
+        "tracked_inputs_verified": 102,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "a94019675fc9d065c653e703bae31787ebed958233384fe69048b32995ec4af1",
+        "driver_sha256": "112b11f06d4c044a08c00fc5719d8606922d76dcc6415c2019a444a95f03c60a"
+      },
+      "candidate": {
+        "source_equivalent_commit": "5302111ef2d46eb51d5d9f28da46ac1048d4b7fb",
+        "original_recorded_head": "469fb50c156d91d89e63118c749927e99a8e382e",
+        "original_recorded_dirty": " M rstim/src/near_clifford/compiled.rs\n",
+        "tracked_inputs_verified": 102,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "375c77df520f3496ced9bdfc4a9b7507d122e5d6917e2f255dbe94e3cb063c95",
+        "driver_sha256": "112b11f06d4c044a08c00fc5719d8606922d76dcc6415c2019a444a95f03c60a"
+      }
+    },
+    "compact-first": {
+      "baseline": {
+        "source_equivalent_commit": "1273f85afa13dcbd05892d06a5aff85eadd452d6",
+        "original_recorded_head": "1273f85afa13dcbd05892d06a5aff85eadd452d6",
+        "original_recorded_dirty": "",
+        "tracked_inputs_verified": 102,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "375c77df520f3496ced9bdfc4a9b7507d122e5d6917e2f255dbe94e3cb063c95",
+        "driver_sha256": "88f3b8fefdd56bf5433ead8c7378a33cfa549862ea8715f36c7c6919fff9c35e"
+      },
+      "candidate": {
+        "source_equivalent_commit": "a756b857e0966907018c8ee2fc984f7165ab290d",
+        "original_recorded_head": "1273f85afa13dcbd05892d06a5aff85eadd452d6",
+        "original_recorded_dirty": " M rstim/src/near_clifford/compiled.rs\n M rstim/src/near_clifford/noise_packet.rs\n?? rstim/src/near_clifford/compact_replay.rs\n",
+        "tracked_inputs_verified": 103,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "f27cc0f5dd32390d90816aa34e91dc1b0bb25cc99ca4a4cd1b15aa866b92239e",
+        "driver_sha256": "88f3b8fefdd56bf5433ead8c7378a33cfa549862ea8715f36c7c6919fff9c35e"
+      }
+    },
+    "compact-confirmation": {
+      "baseline": {
+        "source_equivalent_commit": "1273f85afa13dcbd05892d06a5aff85eadd452d6",
+        "original_recorded_head": "1273f85afa13dcbd05892d06a5aff85eadd452d6",
+        "original_recorded_dirty": "",
+        "tracked_inputs_verified": 102,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "375c77df520f3496ced9bdfc4a9b7507d122e5d6917e2f255dbe94e3cb063c95",
+        "driver_sha256": "29811877a3343fe3b5cffc788a62c3cfafd0cdf9af3f5dbb552e3129438b6028"
+      },
+      "candidate": {
+        "source_equivalent_commit": "53cfe45e7375292a76dcdc0db2c4e3e455939154",
+        "original_recorded_head": "53cfe45e7375292a76dcdc0db2c4e3e455939154",
+        "original_recorded_dirty": "",
+        "tracked_inputs_verified": 103,
+        "probe_inputs_verified": 7,
+        "binary_sha256": "f27cc0f5dd32390d90816aa34e91dc1b0bb25cc99ca4a4cd1b15aa866b92239e",
+        "driver_sha256": "29811877a3343fe3b5cffc788a62c3cfafd0cdf9af3f5dbb552e3129438b6028"
+      }
+    }
+  }
+}
