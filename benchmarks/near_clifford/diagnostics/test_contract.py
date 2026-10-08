@@ -172,12 +172,36 @@ def main():
         del h['sources']['benchmarks/near_clifford/evidence_io.py']
     if 'benchmarks/near_clifford/evidence_io.py' in header['sources']:
         mutations.append(missing_helper_inventory)
+    def missing_production_source(e,h):
+        del h['production_contract']['sources']['Cargo.lock']
+    def extra_production_source(e,h):
+        h['production_contract']['sources']['invented.rs']='0'*64
+    def changed_production_source(e,h):
+        h['production_contract']['sources']['Cargo.lock']='0'*64
+    def changed_production_revision(e,h):
+        h['production_contract']['revision']=h['manifest']['baseline']
+    def changed_production_kind(e,h):
+        h['production_contract']['kind']='unbound'
+    def missing_production_helper(e,h):
+        del h['sources']['benchmarks/near_clifford/diagnostics/source_contract.py']
+    def downgraded_current_schema(e,h):
+        h['schema']=h['manifest']['schema']='rstim.near-clifford-diagnostics.v1'
+    def mismatched_header_schema(e,h):
+        h['schema']='rstim.near-clifford-diagnostics.v1'
+    production_mutations=[missing_production_source,extra_production_source,changed_production_source,
+                          changed_production_revision,changed_production_kind,missing_production_helper,
+                          downgraded_current_schema,mismatched_header_schema]
+    if header['schema']=='rstim.near-clifford-diagnostics.v2':
+        mutations+=production_mutations
     for mutate in mutations:
         with tempfile.TemporaryDirectory() as temporary:
             out=Path(temporary)
             shutil.copytree(source/'circuits',out/'circuits')
             e,h,c=copy.deepcopy(events),copy.deepcopy(header),copy.deepcopy(closure)
             mutate(e,h)
+            if mutate in production_mutations:
+                c['production_contract_after']=copy.deepcopy(h['production_contract'])
+                c['sources_after']=copy.deepcopy(h['sources'])
             if mutate in [empty_sources,pre_harness_source,missing_helper_inventory]: c['sources_after']=h['sources']
             for index,v in enumerate(e): v['index']=index
             data=('\n'.join(json.dumps(v,separators=(',',':')) for v in e)+'\n').encode()

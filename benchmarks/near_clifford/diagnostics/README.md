@@ -1,9 +1,13 @@
 # Near-Clifford diagnostic benchmarks
 
 This campaign investigates costs left unresolved by the compiled CPU comparison.
-It uses unchanged production bytes from squash commit
-`3ef5030db205b3e9b2126e31b2602f760d4665cc` (PR 780). Existing published evidence
-and the seven-fixture comparison remain immutable. Strict and explicit Fused
+Historical v1 evidence requires unchanged production bytes from squash commit
+`3ef5030db205b3e9b2126e31b2602f760d4665cc` (PR 780). New runs use v2 and bind the
+actual measured Git commit, including every tracked Rust source and Cargo
+manifest/lockfile, before building and again at closure. The frozen corpus
+baseline remains PR 780; v2 does not claim its production bytes are unchanged.
+Existing published evidence and the seven-fixture comparison remain immutable.
+Strict and explicit Fused
 FP64 are separate configurations; Strict remains the public default.
 
 The deterministic corpus in `corpus.py` contains:
@@ -38,6 +42,8 @@ python3 benchmarks/near_clifford/diagnostics/run.py \
 python3 benchmarks/near_clifford/diagnostics/verify.py drafts/diagnostics-p0 --git-sources
 python3 -O benchmarks/near_clifford/diagnostics/verify.py drafts/diagnostics-p0 --git-sources
 python3 benchmarks/near_clifford/diagnostics/test_contract.py drafts/diagnostics-p0
+python3 benchmarks/near_clifford/diagnostics/test_source_contract.py
+python3 -O benchmarks/near_clifford/diagnostics/test_source_contract.py
 ```
 
 Commit the harness before collecting Git-source-verifiable evidence. The runner
@@ -47,6 +53,14 @@ and requires `--allow-smoke` when verified. Each output directory must be fresh.
 For Linux measurements, start the runner under `taskset -c CPU`; its children
 inherit affinity. The host receipt records the actual visible affinity. macOS
 has no pinned-core claim. Unrelated host workloads are not stopped.
+
+The v2 producer rejects dirty tracked production or harness inputs before
+building. Verification reconstructs the complete production inventory from the
+measured Git commit and checks its closure and source-bound producer/helper.
+Changing only a v1 receipt's schema cannot turn it into v2 evidence. The v1
+frozen-production check remains intact: runs of changed production collected by
+the historical producer cannot pass that check and must be retained as such.
+Collect a fresh v2 campaign for a formal current-production comparison.
 
 Formal timings use five rotated/reversed independent process rounds and seven
 observations per process, each accumulating at least 50 ms of public API calls.
