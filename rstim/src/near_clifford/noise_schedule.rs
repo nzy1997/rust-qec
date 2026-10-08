@@ -360,13 +360,244 @@ impl Schedule {
         Some(NoiseSigns { offsets, refs })
     }
 }
-// No tape is mutated until all search/admission/order checks have succeeded.
-// The caller's existing frame is borrowed by value and restored on every return.
+struct PreviewFrontier {
+    done: Vec<bool>,
+    preds: Vec<usize>,
+    order: Vec<usize>,
+    // Noise/feedback/annotations do not change the rank-only frame. Reuse
+    // readiness effects until a quantum step or a copied parent changes it.
+    effects: Vec<i32>,
+    dense_work: u128,
+}
+impl PreviewFrontier {
+    fn new(n: usize, graph: &[u64], words: usize, budget: &mut Budget) -> Option<Self> {
+        budget.tick(graph.len())?;
+        let edges = graph
+            .iter()
+            .try_fold(0usize, |n, bits| n.checked_add(bits.count_ones() as usize))?;
+        budget.tick(
+            graph
+                .len()
+                .checked_add(edges)?
+                .checked_add(n.checked_mul(4)?)?,
+        )?;
+        let done = budget.zeros::<bool>(n)?;
+        let mut preds = budget.zeros::<usize>(n)?;
+        let mut order = budget.zeros::<usize>(n)?;
+        order.clear();
+        let mut effects = budget.zeros::<i32>(n)?;
+        effects.fill(i32::MAX);
+        for id in 0..n {
+            for (w, &value) in graph[id * words..(id + 1) * words].iter().enumerate() {
+                let mut value = value;
+                while value != 0 {
+                    let bit = value.trailing_zeros() as usize;
+                    value &= value - 1;
+                    preds[w * 64 + bit] += 1;
+                }
+            }
+        }
+        Some(Self {
+            done,
+            preds,
+            order,
+            effects,
+            dense_work: 0,
+        })
+    }
+    fn step(
+        &mut self,
+        p: &mut Planner,
+        id: usize,
+        tape: &[TapeOp],
+        graph: &[u64],
+        words: usize,
+        budget: &mut Budget,
+    ) -> Option<()> {
+        if self.done[id] || self.preds[id] != 0 {
+            return None;
+        }
+        // Charge the two bitset scans and the actual successor updates, rather
+        // than charging every tape node for a sparse outgoing edge set.
+        budget.tick(words)?;
+        let row = &graph[id * words..(id + 1) * words];
+        let edges = row
+            .iter()
+            .try_fold(0usize, |n, bits| n.checked_add(bits.count_ones() as usize))?;
+        budget.tick(words.checked_add(edges)?.checked_add(6)?)?;
+        let before = p.axes.len();
+        let quantum = matches!(tape[id], TapeOp::Rotate { .. } | TapeOp::Measure { .. });
+        if quantum {
+            budget.tick(self.effects.len())?;
+        }
+        advance(p, &tape[id], budget)?;
+        if quantum {
+            self.effects.fill(i32::MAX);
+            self.dense_work = self
+                .dense_work
+                .checked_add(1u128.checked_shl(before.max(p.axes.len()).try_into().ok()?)?)?;
+        }
+        self.done[id] = true;
+        // Each id occurs once; storage for the full tape was reserved up front.
+        self.order.push(id);
+        for (w, &value) in graph[id * words..(id + 1) * words].iter().enumerate() {
+            let mut value = value;
+            while value != 0 {
+                let bit = value.trailing_zeros() as usize;
+                value &= value - 1;
+                self.preds[w * 64 + bit] -= 1;
+            }
+        }
+        Some(())
+    }
+    fn close(
+        &mut self,
+        p: &mut Planner,
+        tape: &[TapeOp],
+        graph: &[u64],
+        words: usize,
+        budget: &mut Budget,
+    ) -> Option<()> {
+        loop {
+            let mut best = None;
+            for id in 0..tape.len() {
+                budget.tick(1)?;
+                if !self.done[id] && self.preds[id] == 0 {
+                    if self.effects[id] == i32::MAX {
+                        self.effects[id] = effect(p, &tape[id], budget)?;
+                    }
+                    let score = (self.effects[id], id);
+                    if score.0 <= 0 && best.is_none_or(|b| score < b) {
+                        best = Some(score);
+                    }
+                }
+            }
+            let Some((_, id)) = best else {
+                return Some(());
+            };
+            self.step(p, id, tape, graph, words, budget)?;
+        }
+    }
+    fn copy_from(&mut self, parent: &Self, budget: &mut Budget) -> Option<()> {
+        budget.tick(parent.done.len().checked_mul(3)?)?;
+        self.done.copy_from_slice(&parent.done);
+        self.preds.copy_from_slice(&parent.preds);
+        self.order.clear();
+        self.effects.fill(i32::MAX);
+        self.dense_work = parent.dense_work;
+        Some(())
+    }
+}
+
+// A width-one lookahead previews every ready expanding op followed by the
+// nonexpanding closure. Keep one frame and one winning prefix, not a beam of
+// cloned tapes/frames. Any incomplete search returns the already complete
+// greedy schedule; its legality and references were validated beforehand.
+fn preview_order(
+    tape: &[TapeOp],
+    p: &mut Planner,
+    graph: &[u64],
+    words: usize,
+    budget: &mut Budget,
+) -> Option<Vec<usize>> {
+    let n = tape.len();
+    let q = p.state.num_qubits;
+    let frame_bytes = p.state.reserved_bytes()?;
+    if budget.bytes.checked_add(frame_bytes)? > budget.limit {
+        return None;
+    }
+    let copy_work = q
+        .checked_mul(2)?
+        .checked_mul(q.div_ceil(64).checked_mul(2)?.checked_add(2)?)?;
+    budget.tick(copy_work)?;
+    let trial_frame = CompileFrame::identity(q).ok()?;
+    budget.bytes = budget.bytes.checked_add(trial_frame.reserved_bytes()?)?;
+    if budget.bytes > budget.limit {
+        return None;
+    }
+    let mut axes = budget.zeros::<usize>(q)?;
+    axes.clear();
+    let mut trial_p = Planner {
+        state: trial_frame,
+        axes,
+        limit: p.limit,
+        peak: 0,
+        operations: Vec::new(),
+        expanded: 0,
+        reserved_bytes: 0,
+        tape: None,
+        record_count: 0,
+    };
+    let mut parent = PreviewFrontier::new(n, graph, words, budget)?;
+    let mut trial = PreviewFrontier::new(n, graph, words, budget)?;
+    let mut prefix = budget.zeros::<usize>(n)?;
+    prefix.clear();
+    p.state.reset_identity();
+    p.axes.clear();
+    p.peak = 0;
+    p.expanded = 0;
+    p.reserved_bytes = 0;
+    p.record_count = 0;
+    parent.close(p, tape, graph, words, budget)?;
+    while parent.order.len() != n {
+        let mut best = None;
+        for id in 0..n {
+            budget.tick(1)?;
+            if parent.done[id] || parent.preds[id] != 0 {
+                continue;
+            }
+            budget.tick(copy_work.checked_add(p.axes.len())?)?;
+            trial_p.state.copy_from(&p.state)?;
+            trial_p.axes.clear();
+            trial_p.axes.extend_from_slice(&p.axes);
+            trial_p.peak = p.peak;
+            trial_p.expanded = 0;
+            trial_p.reserved_bytes = 0;
+            trial_p.record_count = 0;
+            trial.copy_from(&parent, budget)?;
+            trial.step(&mut trial_p, id, tape, graph, words, budget)?;
+            trial.close(&mut trial_p, tape, graph, words, budget)?;
+            // Siblings share the parent order and start with distinct ids, so
+            // id is their exact lexicographic tie-break without copying paths.
+            let score = (
+                trial_p.peak,
+                trial_p.axes.len(),
+                std::cmp::Reverse(parent.order.len() + trial.order.len()),
+                trial.dense_work,
+                id,
+            );
+            if best.is_none_or(|b| score < b) {
+                budget.tick(trial.order.len())?;
+                prefix.clear();
+                prefix.extend_from_slice(&trial.order);
+                best = Some(score);
+            }
+        }
+        best?;
+        for &id in &prefix {
+            parent.step(p, id, tape, graph, words, budget)?;
+        }
+    }
+    Some(parent.order)
+}
+
 pub(super) fn build(
     tape: &[TapeOp],
     state: &mut CompileFrame,
     limit: usize,
     remaining: usize,
+) -> Option<Schedule> {
+    build_bounded(tape, state, limit, remaining, WORK_LIMIT)
+}
+
+// No tape is mutated until all search/admission/order checks have succeeded.
+// The caller's existing frame is borrowed by value and restored on every return.
+fn build_bounded(
+    tape: &[TapeOp],
+    state: &mut CompileFrame,
+    limit: usize,
+    remaining: usize,
+    work_limit: usize,
 ) -> Option<Schedule> {
     let n = tape.len();
     if n == 0 || n > MAX_OPS {
@@ -379,7 +610,7 @@ pub(super) fn build(
     let mut budget = Budget {
         bytes: RANK_SCRATCH_BYTES,
         limit: remaining,
-        work: WORK_LIMIT,
+        work: work_limit,
     };
     let words = n.div_ceil(64);
     let mut successors = budget.zeros::<u64>(n.checked_mul(words)?)?;
@@ -445,7 +676,20 @@ pub(super) fn build(
         if p.peak >= old_peak {
             return None;
         }
-        refs_for_order(tape, order, &successors, words, &mut budget)
+        let greedy_peak = p.peak;
+        let fallback = refs_for_order(tape, order, &successors, words, &mut budget)?;
+        if greedy_peak >= 4 {
+            if let Some(order) = preview_order(tape, &mut p, &successors, words, &mut budget) {
+                if p.peak < greedy_peak {
+                    if let Some(selected) =
+                        refs_for_order(tape, order, &successors, words, &mut budget)
+                    {
+                        return Some(selected);
+                    }
+                }
+            }
+        }
+        Some(fallback)
     })();
     *state = p.state;
     result
@@ -600,6 +844,69 @@ mod tests {
         let mut tape = p.tape.take().unwrap();
         remove_unobservable_rotations(&mut tape).unwrap();
         (p, tape)
+    }
+    #[test]
+    fn preview_canonical_structural_rank_is_five() {
+        let (mut p, mut tape) = captured(&conditional_fixture::circuit(16, 8, false));
+        let selected = build(&tape, &mut p.state, 16, PLAN_BYTE_BUDGET).unwrap();
+        selected.apply(&mut tape).unwrap();
+        p.state.reset_identity();
+        for op in tape {
+            p.finish_op(op).unwrap();
+        }
+        assert_eq!(p.peak, 5);
+    }
+    #[test]
+    fn preview_resource_rejection_retains_complete_greedy_schedule() {
+        let text = conditional_fixture::circuit(16, 8, false);
+        for (work, bytes) in [
+            (8_000_000, PLAN_BYTE_BUDGET),
+            (WORK_LIMIT, RANK_SCRATCH_BYTES + 72 * 1024),
+        ] {
+            let (mut p, mut tape) = captured(&text);
+            let before = tape_signature(&tape);
+            let frame_bytes = p.state.reserved_bytes().unwrap();
+            let selected = build_bounded(&tape, &mut p.state, 16, bytes, work)
+                .unwrap_or_else(|| panic!("no complete schedule work={work} bytes={bytes}"));
+            assert_eq!(tape_signature(&tape), before);
+            assert_eq!(p.state.num_qubits, 32);
+            assert_eq!(p.state.reserved_bytes().unwrap(), frame_bytes);
+            assert_eq!(selected.order.len(), tape.len());
+            selected.apply(&mut tape).unwrap();
+            p.state.reset_identity();
+            for op in tape {
+                p.finish_op(op).unwrap();
+            }
+            assert_eq!(p.peak, 9, "work={work} bytes={bytes}");
+        }
+    }
+    fn tape_signature(tape: &[TapeOp]) -> Vec<String> {
+        tape.iter()
+            .map(|op| match op {
+                TapeOp::Rotate { pauli, dagger } => format!("rotate {:?}", (pauli, dagger)),
+                TapeOp::Measure {
+                    pauli,
+                    record,
+                    inverted,
+                    readout,
+                    reset,
+                } => format!(
+                    "measure {:?}",
+                    (pauli, record, inverted, readout.to_bits(), reset)
+                ),
+                TapeOp::Noise {
+                    probability,
+                    choices,
+                } => format!("noise {:?}", (probability.to_bits(), choices)),
+                TapeOp::Feedback { condition, pauli } => {
+                    format!("feedback {:?}", (condition, pauli))
+                }
+                TapeOp::Annotation {
+                    offsets,
+                    observable,
+                } => format!("annotation {:?}", (offsets, observable)),
+            })
+            .collect()
     }
     fn same_quantum(a: &TapeOp, b: &TapeOp) -> bool {
         match (a, b) {
