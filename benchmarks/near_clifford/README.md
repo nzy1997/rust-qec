@@ -114,3 +114,9 @@ The [bounded counts replay campaign](results/apple-m4-counts-replay-2026-10-08/R
 retains 24 original postselection cells and [three paired Rust ablations](results/apple-m4-counts-replay-rust-ablation-2026-10-08/README.md).
 Fused cultivation d5 bulk counts lead on the measured M4 host, while Strict,
 one-shot and cold costs remain targets. Small ablation regressions are retained.
+
+The [prepared zero-noise-span campaign](results/apple-m4-zero-noise-spans-2026-10-08/README.md)
+retains complete M4/x86 peer comparisons and [paired warm/cold Rust scouts](results/apple-m4-zero-noise-spans-rust-ablation-2026-10-08/README.md).
+Single-shot MSC improvements reproduce; bulk and cold compilation remain targets,
+with all regressions retained. The new x86 host reports EPYC 9V45, distinct from
+the earlier 7763 campaigns, so cross-campaign differences are not source effects.

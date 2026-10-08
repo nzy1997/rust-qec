@@ -371,3 +371,57 @@ fn affine_counts_preserve_raw_parities_sparse_indices_sweeps_and_mixed_call_rng(
         }
     }
 }
+
+#[test]
+fn long_noise_spans_preserve_hits_readout_feedback_and_mixed_call_rng() {
+    for probability in [0., 0.001, 0.37, 1.] {
+        let text = format!(
+            "H 0 1 2\nT 0 1 2\nREPEAT 40 {{\nX_ERROR({probability}) 0 1 2\nDEPOLARIZE2({probability}) 0 1\n}}\nMY(0.03) !0\nCX rec[-1] 2\nCX sweep[1] 1\nT_DAG 2\nREPEAT 35 {{\nZ_ERROR(0.003) 0 1 2\nDEPOLARIZE1(0.01) 2\n}}\nMPP(0.004) X1*Y2\nDETECTOR rec[-1]\nMRX 1\nM 0 1 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\nOBSERVABLE_INCLUDE(7) rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-2]\n"
+        );
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            for seed in [739, 1739] {
+                for budget in [0, 64 * 1024 * 1024] {
+                    let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut native = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                    let mut a = StdRng::seed_from_u64(seed);
+                    let mut b = a.clone();
+                    for shots in [0, 1, 31, 32, 63, 64, 65, 129, 1] {
+                        let rows = scalar
+                            .sample_with_sweep(shots, &[false, true], &mut a)
+                            .unwrap();
+                        assert_eq!(
+                            native
+                                .sample_postselected_counts_with_sweep(
+                                    shots,
+                                    7,
+                                    &[false, true],
+                                    &mut b
+                                )
+                                .unwrap(),
+                            count_records(&rows, 7),
+                            "p={probability} shots={shots} seed={seed} {arithmetic:?} budget={budget}"
+                        );
+                        let rows = scalar
+                            .sample_with_sweep(17, &[false, true], &mut a)
+                            .unwrap();
+                        assert_eq!(
+                            native
+                                .sample_with_sweep(17, &[false, true], &mut b)
+                                .unwrap(),
+                            rows
+                        );
+                        for _ in 0..16 {
+                            assert_eq!(a.next_u64(), b.next_u64());
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
