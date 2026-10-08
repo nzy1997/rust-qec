@@ -4,12 +4,19 @@ name: Near-Clifford x86 application counts
 # Remeasure explicitly; evidence/validator publications reuse closed receipts.
 on:
   workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: 'Optional exact baseline commit for a paired Rust-only warm scout; empty runs the original peer benchmark'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   benchmark:
+    if: ${{ inputs.baseline_ref == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -83,3 +90,75 @@ jobs:
             drafts/x86-host.json
             drafts/x86-*.log
             drafts/x86-application-counts/
+  paired-scout:
+    if: ${{ inputs.baseline_ref != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RUSTFLAGS: '-C target-cpu=native'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned Rust and verify coefficients and public RNG
+        timeout-minutes: 20
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal
+          rustup default 1.93.1
+          mkdir -p drafts
+          grep -m1 '^flags' /proc/cpuinfo > drafts/x86-scout-features.txt
+          grep -qw avx2 drafts/x86-scout-features.txt
+          grep -qw fma drafts/x86-scout-features.txt
+          cargo test --release --locked -p rstim --lib fused_avx2_pairs_match_independent_full_vector_gather_bits -- --nocapture > drafts/x86-scout-direct-bits.log 2>&1
+          cargo test --release --locked -p rstim --lib scalar_high_multi_x_matches_gather_coefficient_and_cdf_bits_for_both_policies -- --nocapture > drafts/x86-scout-gather-cdf.log 2>&1
+          cargo test --release --locked -p rstim --lib scalar_rotation_preserves_frozen_coefficient_bits_for_all_phase_and_pair_cases -- --nocapture > drafts/x86-scout-frozen-bits.log 2>&1
+          cargo test --release --locked -p rstim --lib both_rotation_policies_match_independent_coefficient_and_cdf_bits -- --nocapture > drafts/x86-scout-both-policy-bits.log 2>&1
+          cargo test --release --locked -p rstim --test near_clifford_postselected_counts -- --nocapture > drafts/x86-scout-public-counts.log 2>&1
+          grep -q 'test result: ok. 1 passed' drafts/x86-scout-direct-bits.log
+          grep -q 'test result: ok. 1 passed' drafts/x86-scout-gather-cdf.log
+          grep -q 'test result: ok. 1 passed' drafts/x86-scout-frozen-bits.log
+          grep -q 'test result: ok. 1 passed' drafts/x86-scout-both-policy-bits.log
+          grep -q 'test result: ok. 10 passed' drafts/x86-scout-public-counts.log
+      - name: Record virtual host and pin paired campaigns to one CPU
+        run: |
+          python - <<'PY'
+          import json, os, platform, subprocess
+          from pathlib import Path
+          affinity = sorted(os.sched_getaffinity(0))
+          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
+                         available_affinity=affinity, virtual_machine=True,
+                         rustflags=os.environ['RUSTFLAGS'],
+                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
+                         meminfo=Path('/proc/meminfo').read_text(),
+                         cpuinfo=Path('/proc/cpuinfo').read_text())
+          Path('drafts/x86-scout-host.json').write_text(json.dumps(receipt, indent=2)+'\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'BENCH_CPU={affinity[0]}\n')
+          PY
+      - name: Collect all paired warm cells and independent confirmation
+        timeout-minutes: 20
+        env:
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+        run: |
+          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-warm > drafts/x86-scout-warm.log 2>&1
+          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-confirmation > drafts/x86-scout-confirmation.log 2>&1
+      - name: Retain full paired evidence and partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-clifford-x86-pair-scout-${{ github.sha }}
+          retention-days: 30
+          path: |
+            drafts/x86-scout-*
+            drafts/x86-pair-warm/
+            drafts/x86-pair-confirmation/
+            drafts/rust-pair-scout-probe/build.log
+            drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log
