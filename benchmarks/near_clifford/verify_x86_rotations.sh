@@ -15,6 +15,7 @@ cargo test --release --locked -p rstim --lib scalar_high_multi_x_matches_gather_
 cargo test --release --locked -p rstim --lib scalar_rotation_preserves_frozen_coefficient_bits_for_all_phase_and_pair_cases -- --nocapture > drafts/x86-scout-frozen-bits.log 2>&1
 cargo test --release --locked -p rstim --lib both_rotation_policies_match_independent_coefficient_and_cdf_bits -- --nocapture > drafts/x86-scout-both-policy-bits.log 2>&1
 cargo test --release --locked -p rstim --lib near_clifford::compiled::compact_replay::tests -- --nocapture > drafts/x86-scout-compact-zero-spans.log 2>&1
+cargo test --release --locked -p rstim --lib compact_noise_restores_original_typed_rows_and_carry_with_both_independent_producers -- --nocapture > drafts/x86-scout-noise-hit-masks.log 2>&1
 cargo test --release --locked -p rstim --test near_clifford_postselected_counts -- --nocapture > drafts/x86-scout-public-counts.log 2>&1
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-direct-bits.log
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-highest-gather.log
@@ -23,3 +24,4 @@ grep -q 'test result: ok. 1 passed' drafts/x86-scout-frozen-bits.log
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-both-policy-bits.log
 grep -q 'test result: ok. 10 passed' drafts/x86-scout-public-counts.log
 grep -q 'test result: ok. 3 passed' drafts/x86-scout-compact-zero-spans.log
+grep -q 'test result: ok. 1 passed' drafts/x86-scout-noise-hit-masks.log

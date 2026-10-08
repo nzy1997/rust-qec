@@ -67,6 +67,7 @@ impl NoisePacket {
             | (((d >> lane) & 1) << 3)
     }
 
+    #[cfg(test)]
     pub(super) fn zero_prefix(&self, start: usize, maximum: usize, lane: usize) -> usize {
         let end = start.checked_add(maximum).expect("noise cursor overflow");
         let values = self
@@ -167,10 +168,11 @@ mod tests {
                 .then(|| IndependentPacket::new(65, PACKET_BYTE_BUDGET).unwrap());
             let mut a = StdRng::seed_from_u64(1603);
             let mut b = a.clone();
-            // Clear/reuse includes a short packet between complete packets.
+            // Reuse dirty mask storage and planes across a short packet.
+            let mut masks = vec![u64::MAX; count];
             for lanes in [64, 7, 64] {
                 packet.clear();
-                let mut masks = vec![0; count];
+                masks.fill(0);
                 let mut expected_rows = Vec::new();
                 let mut rows = vec![99; lanes * kinds.len()];
                 for lane in 0..lanes {
@@ -229,6 +231,8 @@ mod tests {
                         }
                     }
                     assert_eq!(masks[noise], selected);
+                    let [a, b, c, d] = packet.planes[noise];
+                    assert_eq!(masks[noise], a | b | c | d);
                     assert_eq!(
                         packet.choice_masks(noise, selected, choices),
                         expected_masks
@@ -239,15 +243,59 @@ mod tests {
                     let row = &mut rows[lane * kinds.len()..(lane + 1) * kinds.len()];
                     // Compare directly with literal live draws before restoring any
                     // sentinel-valued compact tape cells, including every category.
-                    let mut replay =
-                        CompactReplay::new(row, Some(&packet), independent.as_ref(), lane);
+                    let mut replay = CompactReplay::new(
+                        row,
+                        Some((&packet, masks.as_slice())),
+                        independent.as_ref(),
+                        lane,
+                    );
                     for (&kind, &value) in kinds.iter().zip(expected) {
                         assert_eq!(replay.draw(kind), value);
                     }
                     assert_eq!(replay.cursor(), kinds.len());
+                    // Independent literal rows define every maximal Noise span.
+                    // Check prefixes before decoding its first nonzero choice.
+                    let mut replay = CompactReplay::new(
+                        row,
+                        Some((&packet, masks.as_slice())),
+                        independent.as_ref(),
+                        lane,
+                    );
+                    let mut event = 0;
+                    let mut noise_event = 0;
+                    while event < kinds.len() {
+                        if matches!(kinds[event], RandomKind::Noise { .. }) {
+                            let maximum = kinds[event..]
+                                .iter()
+                                .take_while(|kind| matches!(kind, RandomKind::Noise { .. }))
+                                .count();
+                            let zeros = expected[event..event + maximum]
+                                .iter()
+                                .position(|&value| value != 0)
+                                .unwrap_or(maximum);
+                            assert_eq!(replay.skip_zero_noise(0), 0);
+                            assert_eq!(replay.skip_zero_noise(maximum), zeros);
+                            assert_eq!(packet.zero_prefix(noise_event, maximum, lane), zeros);
+                            event += zeros;
+                            noise_event += zeros;
+                            if zeros == maximum {
+                                continue;
+                            }
+                        }
+                        assert_eq!(replay.draw(kinds[event]), expected[event]);
+                        noise_event +=
+                            usize::from(matches!(kinds[event], RandomKind::Noise { .. }));
+                        event += 1;
+                    }
+                    assert_eq!(replay.cursor(), kinds.len());
+                    assert_eq!(noise_event, count);
                     for split in [0, 1, 63, 64, 65, kinds.len() - 1, kinds.len()] {
-                        let mut replay =
-                            CompactReplay::new(row, Some(&packet), independent.as_ref(), lane);
+                        let mut replay = CompactReplay::new(
+                            row,
+                            Some((&packet, masks.as_slice())),
+                            independent.as_ref(),
+                            lane,
+                        );
                         for (&kind, &value) in kinds[..split].iter().zip(&expected[..split]) {
                             assert_eq!(replay.draw(kind), value);
                         }

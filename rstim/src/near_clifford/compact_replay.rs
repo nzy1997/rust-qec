@@ -43,7 +43,9 @@ impl<R: Rng> RowDraw for RowRandom<'_, R> {
 // contain retained values from an unrelated prior packet and must not be read.
 pub(super) struct CompactReplay<'a> {
     tape: &'a [u64],
-    noise: Option<&'a NoisePacket>,
+    // The producer already records nonzero lanes for every Noise event.
+    // Borrow those masks with the decoder, without recomputing four-plane ORs.
+    noise: Option<(&'a NoisePacket, &'a [u64])>,
     independent: Option<&'a IndependentPacket>,
     lane: usize,
     cursor: usize,
@@ -53,7 +55,7 @@ pub(super) struct CompactReplay<'a> {
 impl<'a> CompactReplay<'a> {
     pub(super) fn new(
         tape: &'a [u64],
-        noise: Option<&'a NoisePacket>,
+        noise: Option<(&'a NoisePacket, &'a [u64])>,
         independent: Option<&'a IndependentPacket>,
         lane: usize,
     ) -> Self {
@@ -85,8 +87,19 @@ impl RowDraw for CompactReplay<'_> {
             .tape
             .get(self.cursor..end)
             .expect("recorded random tape is incomplete");
-        let skipped = if let Some(noise) = self.noise {
-            noise.zero_prefix(self.noise_event, maximum, self.lane)
+        let skipped = if let Some((_, hits)) = self.noise {
+            let end = self
+                .noise_event
+                .checked_add(maximum)
+                .expect("noise cursor overflow");
+            let masks = hits
+                .get(self.noise_event..end)
+                .expect("compact noise is incomplete");
+            let lane = 1u64 << self.lane;
+            masks
+                .iter()
+                .position(|&mask| mask & lane != 0)
+                .unwrap_or(maximum)
         } else {
             values
                 .iter()
@@ -108,7 +121,7 @@ impl RowDraw for CompactReplay<'_> {
         );
         let value = match kind {
             RandomKind::Noise { .. } if self.noise.is_some() => {
-                let value = self.noise.unwrap().value(self.noise_event, self.lane);
+                let value = self.noise.unwrap().0.value(self.noise_event, self.lane);
                 self.noise_event += 1;
                 value
             }
@@ -155,11 +168,16 @@ mod tests {
         for lane in [0, 1, 31, 32, 63] {
             let mut noise = NoisePacket::new(&kinds, 14, usize::MAX).unwrap();
             let mask = 1u64 << lane;
+            // Other lanes hit every event; only this lane follows literal values.
+            let mut noise_hits = vec![!mask; 14];
             let mut n = 0;
             for (&kind, &value) in kinds.iter().zip(&expected) {
                 if matches!(kind, RandomKind::Noise { .. }) {
                     for bit in 0..4 {
                         noise.planes()[n][bit] = !mask | (((value >> bit) & 1) << lane);
+                    }
+                    if value != 0 {
+                        noise_hits[n] |= mask;
                     }
                     n += 1;
                 }
@@ -191,7 +209,7 @@ mod tests {
                         .collect();
                     let mut replay = CompactReplay::new(
                         &tape,
-                        use_noise.then_some(&noise),
+                        use_noise.then_some((&noise, noise_hits.as_slice())),
                         use_independent.then_some(&independent),
                         lane,
                     );
@@ -261,12 +279,14 @@ mod tests {
                 let mut noise =
                     NoisePacket::new(&plan.random_kinds, plan.noise_event_count, usize::MAX)
                         .unwrap();
+                let mut noise_hits = vec![0; plan.noise_event_count];
                 let mut n = 0;
                 for (&kind, &value) in plan.random_kinds.iter().zip(&tape) {
                     if matches!(kind, RandomKind::Noise { .. }) {
                         for bit in 0..4 {
                             noise.planes()[n][bit] = ((value >> bit) & 1) << 63;
                         }
+                        noise_hits[n] = u64::from(value != 0) << 63;
                         n += 1;
                     }
                 }
@@ -284,7 +304,12 @@ mod tests {
                         })
                         .collect();
                     let mut replay = Observed {
-                        row: CompactReplay::new(&stale, sidecar, None, 63),
+                        row: CompactReplay::new(
+                            &stale,
+                            sidecar.map(|packet| (packet, noise_hits.as_slice())),
+                            None,
+                            63,
+                        ),
                         skipped: 0,
                     };
                     let selected = plan
@@ -390,6 +415,7 @@ mod tests {
             };
             let mut untouched = rng.clone();
             let mut noise = NoisePacket::new(&kinds, 15, PACKET_BYTE_BUDGET).unwrap();
+            let mut noise_hits = vec![0; 15];
             let mut independent = IndependentPacket::new(131, PACKET_BYTE_BUDGET).unwrap();
             let (mut n, mut i) = (0, 0);
             for (&kind, &value) in kinds.iter().zip(&expected) {
@@ -398,6 +424,7 @@ mod tests {
                         for bit in 0..4 {
                             noise.planes()[n][bit] = ((value >> bit) & 1) << 63;
                         }
+                        noise_hits[n] = u64::from(value != 0) << 63;
                         n += 1;
                     }
                     RandomKind::Independent => {
@@ -433,7 +460,7 @@ mod tests {
                         .collect();
                     let mut replay = CompactReplay::new(
                         &tape,
-                        use_noise.then_some(&noise),
+                        use_noise.then_some((&noise, noise_hits.as_slice())),
                         use_independent.then_some(&independent),
                         63,
                     );
