@@ -1435,7 +1435,7 @@ fn compiled_conditional_noise_schedule_reduces_structural_rank_and_keeps_public_
     ] {
         let plan =
             CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic).unwrap();
-        assert_eq!(plan.peak_active_rank(), 9);
+        assert_eq!(plan.peak_active_rank(), 5);
         let mut rng = StdRng::seed_from_u64(1081739);
         let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
         let mut expected = Vec::new();
