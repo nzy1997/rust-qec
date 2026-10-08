@@ -19,6 +19,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE = ROOT / "benchmarks/near_clifford/results/apple-m4-strict-coefficient-pairs-rust-ablation-2026-10-08/probe/warm-candidate"
 NAMES = ["msc_d3_inject_cultivate_p1e-3", "msc_d5_inject_cultivate_p1e-3", "pure_surface_d7_r7_p1e-3", "pure_surface_d9_r9_p1e-3"]
+PROBE_INPUTS = ["Cargo.toml", "Cargo.lock", "main.rs"] + [name + ".masks.json" for name in NAMES]
 ENV_KEYS = ["RUSTFLAGS", "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "RAYON_NUM_THREADS"]
 
 
@@ -38,7 +39,7 @@ def identity(root):
     files = list((root / "rstim/src").rglob("*.rs"))
     files += [root / p for p in ["Cargo.toml", "Cargo.lock", "rstim/Cargo.toml"]]
     files += [root / "benchmarks/near_clifford/application_counts/fixtures" / (n + ".stim") for n in NAMES]
-    files += [p for p in probe(root).iterdir() if p.is_file()]
+    files += [probe(root) / name for name in PROBE_INPUTS]
     return dict(head=run(["git", "rev-parse", "HEAD"], root).strip(),
                 dirty=run(["git", "status", "--porcelain"], root),
                 sources={str(p.relative_to(root)): digest(p) for p in sorted(files)},
@@ -62,22 +63,63 @@ def prepare(baseline_ref):
     for root in roots.values():
         directory = probe(root)
         directory.mkdir(parents=True, exist_ok=True)
-        for source in sorted(ARCHIVE.iterdir()):
-            if source.is_file():
-                shutil.copyfile(source, directory / source.name)
+        for name in PROBE_INPUTS:
+            shutil.copyfile(ARCHIVE / name, directory / name)
         with (directory / "build.log").open("w") as log:
             subprocess.run(["cargo", "build", "--release", "--locked", "--manifest-path", str(directory / "Cargo.toml")], cwd=root, stdout=log, stderr=subprocess.STDOUT, check=True, timeout=900)
     return roots
 
 
+def retain_probe_inputs(roots, out):
+    retained = {}
+    for role, root in roots.items():
+        directory = out / "probe" / role
+        directory.mkdir(parents=True)
+        inputs = {}
+        for name in PROBE_INPUTS:
+            source = probe(root) / name
+            snapshot = directory / name
+            shutil.copyfile(source, snapshot)
+            if digest(source) != digest(snapshot):
+                raise ValueError("probe source changed while retaining its bytes")
+            inputs[str(source.relative_to(root))] = dict(path=str(snapshot.relative_to(out)), sha256=digest(snapshot))
+        log = directory / "build.log"
+        shutil.copyfile(probe(root) / "build.log", log)
+        retained[role] = dict(inputs=inputs, diagnostics={"build.log": dict(path=str(log.relative_to(out)), sha256=digest(log))})
+    shutil.copyfile(Path(__file__), out / "original-driver.py")
+    return retained
+
+
+def verify_retained_inputs(out, identities, retained):
+    if set(retained) != set(identities):
+        raise ValueError("retained role inventory mismatch")
+    for role, info in retained.items():
+        expected = {str(Path("drafts/rust-pair-scout-probe") / name) for name in PROBE_INPUTS}
+        if set(info["inputs"]) != expected or set(info["diagnostics"]) != {"build.log"}:
+            raise ValueError("retained probe/diagnostic inventory mismatch")
+        for source, entry in info["inputs"].items():
+            if entry["path"] != str(Path("probe") / role / Path(source).name):
+                raise ValueError("retained probe path mismatch")
+            if digest(out / entry["path"]) != entry["sha256"] or entry["sha256"] != identities[role]["sources"].get(source):
+                raise ValueError("retained probe bytes do not match measured source")
+        entry = info["diagnostics"]["build.log"]
+        if entry["path"] != str(Path("probe") / role / "build.log") or digest(out / entry["path"]) != entry["sha256"]:
+            raise ValueError("retained diagnostic bytes changed")
+        if digest(out / "original-driver.py") != identities[role]["driver_sha256"]:
+            raise ValueError("retained driver bytes do not match measured driver")
+
+
 def collect(roots, out):
     out.mkdir(parents=True, exist_ok=False)
+    retained = retain_probe_inputs(roots, out)
     before = {key: identity(root) for key, root in roots.items()}
     if any(info["dirty"] for info in before.values()):
         raise ValueError("measured checkout changed during preparation")
+    verify_retained_inputs(out, before, retained)
     cases = [(n, shots, policy) for n in NAMES for shots in [1, 64, 1024] for policy in ["strict", "fused"]]
     header = dict(schema="exploratory.avx2-pair-ablation.v1", started=time.time(), identities=before,
                   pairs=5, observations_per_process=7, minimum_warm_observation_ns=50_000_000,
+                  retained=retained,
                   cases=cases, rustc=run(["rustc", "-Vv"]), host=platform.platform(),
                   affinity=sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
                   scope="Paired same-host warm Rust source effect only; all 24 cells retained, no peers or SOTA claim")
@@ -122,6 +164,7 @@ def collect(roots, out):
     after = {key: identity(root) for key, root in roots.items()}
     if before != after:
         raise ValueError("source/binary/driver/environment changed during measurement")
+    verify_retained_inputs(out, after, retained)
     summary = []
     for case in cases:
         values = measurements[str(case)]

@@ -114,6 +114,8 @@ jobs:
           rustup toolchain install 1.93.1 --profile minimal
           rustup default 1.93.1
           mkdir -p drafts
+          python benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-normal.log 2>&1
+          python -O benchmarks/near_clifford/test_rust_pair_scout.py > drafts/x86-scout-provenance-optimized.log 2>&1
           grep -m1 '^flags' /proc/cpuinfo > drafts/x86-scout-features.txt
           grep -qw avx2 drafts/x86-scout-features.txt
           grep -qw fma drafts/x86-scout-features.txt
