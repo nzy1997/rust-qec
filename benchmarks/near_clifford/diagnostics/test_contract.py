@@ -216,5 +216,29 @@ def main():
             else:
                 raise ValueError('resealed mutation accepted: '+mutate.__name__)
 
+    if header['schema']=='rstim.near-clifford-diagnostics.v2':
+        # Historical non-Git v1 replay attests a transcript, not source identity.
+        # Removing every v2 marker must still fail the v1 source-aware gate.
+        with tempfile.TemporaryDirectory() as temporary:
+            out=Path(temporary)
+            shutil.copytree(source/'circuits',out/'circuits')
+            h,c=copy.deepcopy(header),copy.deepcopy(closure)
+            h['schema']=h['manifest']['schema']='rstim.near-clifford-diagnostics.v1'
+            del h['production_contract']
+            del c['production_contract_after']
+            del h['sources']['benchmarks/near_clifford/diagnostics/source_contract.py']
+            c['sources_after']=copy.deepcopy(h['sources'])
+            (out/'events.jsonl').write_bytes(original)
+            (out/'header.json').write_text(json.dumps(h))
+            (out/'closure.json').write_text(json.dumps(c))
+            validate(out,allow_smoke=True)
+            print('PASS historical transcript-only replay; source identity unverified')
+            try:
+                validate(out,git_sources=True,allow_smoke=True)
+            except (ValueError,KeyError,TypeError):
+                print('PASS rejected combined_downgrade_with_git_sources')
+            else:
+                raise ValueError('source-aware combined downgrade accepted')
+
 
 if __name__=='__main__': main()
