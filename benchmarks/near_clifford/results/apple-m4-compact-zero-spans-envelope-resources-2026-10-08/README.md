@@ -13,3 +13,14 @@ historical Git inputs and recorded digests, not a current rebuilt executable.
 python3 -m benchmarks.atom_loss.readiness_resources --verify benchmarks/near_clifford/results/apple-m4-compact-zero-spans-envelope-resources-2026-10-08/manifest.json --historical-source
 python3 -O -m benchmarks.atom_loss.readiness_resources --verify benchmarks/near_clifford/results/apple-m4-compact-zero-spans-envelope-resources-2026-10-08/manifest.json --historical-source
 ```
+
+The default [CLI resource archive](../../../atom_loss/readiness/resources/manifest.json)
+contains the same unchanged 19-case measurements and retains the original producer
+revision. Its 200 measured source inputs match the current runtime, so the default
+CI verifier checks current source identity without `--historical-source`. The prior
+canonical measurements remain available in Git history.
+
+```sh
+python3 -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources/manifest.json
+python3 -O -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources/manifest.json
+```
