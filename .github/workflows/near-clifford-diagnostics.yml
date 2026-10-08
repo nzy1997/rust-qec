@@ -15,7 +15,7 @@ jobs:
   producer-smoke:
     # Run collection only for the evidence campaign and the native counts follow-up.
     # Historical v1 publications remain frozen; v2 binds optimized source bytes.
-    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay' || github.head_ref == 'codex/near-clifford-cache-reconvergence-scout' || github.head_ref == 'codex/near-clifford-zero-noise-spans' || github.head_ref == 'codex/near-clifford-signed-pairs' || github.head_ref == 'codex/near-clifford-avx2-pairs'
+    if: github.head_ref == 'codex/near-clifford-diagnostic-benchmarks' || github.head_ref == 'codex/near-clifford-native-counts' || github.head_ref == 'codex/near-clifford-counts-rejection' || github.head_ref == 'codex/near-clifford-packet-rejection' || github.head_ref == 'codex/near-clifford-linear-counts' || github.head_ref == 'codex/near-clifford-compact-counts-replay' || github.head_ref == 'codex/near-clifford-cache-reconvergence-scout' || github.head_ref == 'codex/near-clifford-zero-noise-spans' || github.head_ref == 'codex/near-clifford-signed-pairs' || github.head_ref == 'codex/near-clifford-avx2-pairs' || github.head_ref == 'codex/near-clifford-current-source-diagnostics' || github.head_ref == 'codex/near-clifford-conditional-beam'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -46,6 +46,18 @@ jobs:
         run: |
           python benchmarks/near_clifford/test_evidence_io.py
           python -O benchmarks/near_clifford/test_evidence_io.py
+      - name: Exercise current-source diagnostic contract
+        run: |
+          python benchmarks/near_clifford/diagnostics/run.py \
+            --out drafts/ci-diagnostics-smoke \
+            --python "$PWD/drafts/ci-clifft/bin/python" \
+            --symft-python "$PWD/drafts/ci-symft/bin/python" \
+            --symft-source "$PWD/drafts/ci-soft" \
+            --groups structure --only rank-4 --pairs 1 --repetitions 1
+          python benchmarks/near_clifford/diagnostics/verify.py drafts/ci-diagnostics-smoke --git-sources --allow-smoke
+          python -O benchmarks/near_clifford/diagnostics/verify.py drafts/ci-diagnostics-smoke --git-sources --allow-smoke
+          python benchmarks/near_clifford/diagnostics/test_contract.py drafts/ci-diagnostics-smoke
+          python -O benchmarks/near_clifford/diagnostics/test_contract.py drafts/ci-diagnostics-smoke
       - name: Exercise native counts metadata and independent raw oracle
         run: |
           python benchmarks/near_clifford/application_counts/run.py \
@@ -62,7 +74,9 @@ jobs:
         if: always()
         with:
           name: near-clifford-counts-producer-smoke-${{ github.sha }}
-          path: drafts/ci-counts-smoke/
+          path: |
+            drafts/ci-counts-smoke/
+            drafts/ci-diagnostics-smoke/
           retention-days: 14
   evidence:
     runs-on: ubuntu-latest
@@ -198,6 +212,7 @@ jobs:
         run: |
           python_flags=()
           if [[ "$PYTHON_MODE" == optimized ]]; then python_flags=(-O); fi
+          python3 "${python_flags[@]}" benchmarks/near_clifford/diagnostics/test_source_contract.py
           evidence=benchmarks/near_clifford/results/apple-m4-diagnostics-cache-lifetime-2026-10-07
           python3 "${python_flags[@]}" benchmarks/near_clifford/diagnostics/test_contract.py "$evidence"
   counts-corruption:
