@@ -1,17 +1,18 @@
 # Support and compatibility contract
 
-This document defines the support contract for the RustQEC 0.3 release line.
-The documentation edition banner identifies whether a rendered copy follows
-the development branch or a frozen stable release.
-The coordinated repository release and individual crate patch versions are
-separate: a requirement such as `rstim >=0.3.1,<0.4.0` applies to that
-package without renaming the whole documentation set. A decoder maturity is
-binding only for a published package release whose evidence bundle verifies
-it. This is a contract for using the shipped interfaces, not a claim that every
-research component, circuit dialect, decoder, or benchmark result is ready for
-publication-scale use.
+This contract covers the RustQEC 0.3 release line. The documentation version
+selects the development branch or a stable release; individual crates may have
+different patch versions. Package requirements such as `rstim >=0.3.1,<0.4.0`
+apply to that crate.
+
+Decoder support levels apply only when the published release's evidence bundle
+verifies them. Each interface also has the input limits described below.
 
 ## Support levels
+
+**Supported** means the documented behavior is checked within its declared
+limits. **Beta** means release verification is still pending. **Experimental**
+identifies research workflows without a supported-interface promise.
 
 | Surface | Level | Supported boundary |
 | --- | --- | --- |
@@ -60,14 +61,10 @@ machine-readable plan, [`docs/envelope-mle-scope.json`](envelope-mle-scope.json)
 r=2 at loss 0.002 and r=1 at loss 0.01, each at batches 1,024 and 16,384 —
 the required correctness/resource/installed-platform evidence for
 every declared point, the candidate-limit and solve-only timeout semantics,
-and the standing exclusion of the conventional family. An offline suite
-validates the plan and classifies decode jobs against the domain boundary
-(`in-domain` vs `outside-supported-domain`, a support statement rather than a
-decoder prediction):
-
-```sh
-python3 -m unittest tools.test_envelope_mle_scope
-```
+and the standing exclusion of the conventional family. The offline validation
+suite classifies jobs as `in-domain` or
+`outside-supported-domain`; these are support classifications, not logical
+predictions. Run that suite from the [maintainer reference](maintainer-reference.md).
 
 Out-of-domain inputs are unpromised, not automatically rejected: only the
 hard limits (candidate count, REPEAT blocks, unsupported instructions) produce
