@@ -243,6 +243,94 @@ mod tests {
         assert_eq!(cache.reserved, reserved);
         assert_eq!(cache.states.len(), states);
     }
+
+    #[test]
+    fn counts_reuse_full_cache_only_for_existing_exact_same_node_states() {
+        let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMY 0\n").unwrap();
+        let mut cache = CoefficientCache::new(&plan, DEFAULT_CACHE_BYTE_BUDGET).unwrap();
+        let mut values = vec![ComplexAmp::new(0.5, -0.0); 64];
+        values[11].re = f64::from_bits(0x7ff8_0000_0000_0173);
+        for node in 100.. {
+            if cache.states.len() >= MIN_STATES {
+                break;
+            }
+            cache.store(node, &values).unwrap();
+        }
+        let id = cache.store(23, &values).unwrap();
+        cache.budget = cache.reserved;
+        let reserved = cache.reserved;
+        let capacity = cache.states.capacity();
+        let states = cache.states.len();
+        let entries = cache.intern.as_ref().unwrap().entries.clone();
+        assert_eq!(cache.store(23, &values), None);
+        cache.counts_reuse_when_full = true;
+        assert_eq!(cache.store(23, &values), Some(id));
+        assert_eq!(cache.store(24, &values), None);
+        let mut different = values.clone();
+        different[11].re = f64::from_bits(0x7ff8_0000_0000_0174);
+        assert_eq!(
+            CoefficientIntern::fingerprint(23, &values),
+            CoefficientIntern::fingerprint(23, &different)
+        );
+        assert_eq!(cache.store(23, &different), None);
+        different = values.clone();
+        different[11].im = 0.0;
+        assert_eq!(cache.store(23, &different), None);
+        assert_eq!(cache.store(23, &values[..MIN_COEFFICIENTS - 1]), None);
+        assert_eq!(
+            cache.store(23, &vec![ComplexAmp::new(0.5, 0.0); MAX_COEFFICIENTS + 1]),
+            None
+        );
+        assert_eq!(cache.reserved, reserved);
+        assert_eq!(cache.states.len(), states);
+        assert_eq!(cache.states.capacity(), capacity);
+        for (a, b) in cache.intern.as_ref().unwrap().entries.iter().zip(entries) {
+            assert_eq!((a.node, a.fingerprint, a.id), (b.node, b.fingerprint, b.id));
+        }
+        assert_eq!(cache.full_cache_reuses, 1);
+        cache.intern = None;
+        assert_eq!(cache.store(23, &values), None);
+    }
+
+    #[test]
+    fn original_cultivation_counts_reconnect_full_cache_and_records_disable_lookup() {
+        use rand::{SeedableRng, rngs::StdRng};
+        let text = include_str!(
+            "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+        );
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let mut sampler = plan.prepare_sampler_with_cache_budget(1024 * 1024).unwrap();
+            let mut rng = StdRng::seed_from_u64(1739);
+            for shots in [64, 1024, 1024] {
+                sampler
+                    .sample_postselected_counts(shots, 0, &mut rng)
+                    .unwrap();
+            }
+            let cache = sampler.cache.as_ref().unwrap();
+            assert!(
+                cache.full_cache_reuses > 0,
+                "original d5 must witness an existing-state reuse after admission closes: {arithmetic:?}"
+            );
+            assert!(cache.reserved <= cache.budget);
+            assert!(cache.counts_reuse_when_full);
+            let reuses = cache.full_cache_reuses;
+            sampler.sample(0, &mut rng).unwrap();
+            assert!(!sampler.cache.as_ref().unwrap().counts_reuse_when_full);
+            sampler.sample(17, &mut rng).unwrap();
+            assert_eq!(sampler.cache.as_ref().unwrap().full_cache_reuses, reuses);
+            sampler.sample_postselected_counts(0, 0, &mut rng).unwrap();
+            assert!(sampler.cache.as_ref().unwrap().counts_reuse_when_full);
+            sampler.sample_measurements_u8(0, &mut rng).unwrap();
+            assert!(!sampler.cache.as_ref().unwrap().counts_reuse_when_full);
+            sampler.sample_measurements_u8(17, &mut rng).unwrap();
+            assert_eq!(sampler.cache.as_ref().unwrap().full_cache_reuses, reuses);
+        }
+    }
 }
 pub(super) struct CoefficientIntern {
     entries: Vec<Entry>,

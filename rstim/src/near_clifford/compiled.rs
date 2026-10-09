@@ -234,6 +234,9 @@ struct CoefficientCache {
     states: Vec<CachedState>,
     intern: Option<CoefficientIntern>,
     intern_attempted: bool,
+    counts_reuse_when_full: bool,
+    #[cfg(test)]
+    full_cache_reuses: usize,
     start: usize,
     reserved: usize,
     budget: usize,
@@ -278,6 +281,9 @@ impl CoefficientCache {
             states,
             intern: None,
             intern_attempted: false,
+            counts_reuse_when_full: false,
+            #[cfg(test)]
+            full_cache_reuses: 0,
             start,
             reserved: bytes,
             budget,
@@ -330,10 +336,23 @@ impl CoefficientCache {
             return Some(0);
         }
         let charge = Self::state_charge(coefficients)?;
-        // Once admission closes, avoid hashing a coefficient vector on every
-        // scalar replay. Interning is optional construction work, not a lookup
-        // route after the bounded cache has filled.
+        // Counts can reconnect a missing edge to an already indexed state after
+        // admission closes. This bounded lookup allocates and inserts nothing;
+        // record sampling keeps its original admission-only path.
         if !self.fits(charge) {
+            if self.counts_reuse_when_full
+                && (coefficient_intern::MIN_COEFFICIENTS..=coefficient_intern::MAX_COEFFICIENTS)
+                    .contains(&coefficients.len())
+            {
+                if let Some(intern) = &self.intern {
+                    let existing = intern.find_or_slot(node, coefficients, &self.states).0;
+                    #[cfg(test)]
+                    if existing.is_some() {
+                        self.full_cache_reuses += 1;
+                    }
+                    return existing;
+                }
+            }
             return None;
         }
         let internable = (coefficient_intern::MIN_COEFFICIENTS
@@ -3784,6 +3803,9 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
+        if let Some(cache) = &mut self.cache {
+            cache.counts_reuse_when_full = false;
+        }
         let mut output = Vec::new();
         output.try_reserve_exact(shots).map_err(|e| e.to_string())?;
         for _ in 0..shots {
@@ -3920,6 +3942,9 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
+        if let Some(cache) = &mut self.cache {
+            cache.counts_reuse_when_full = matches!(output, BatchOutput::Counts { .. });
+        }
         let packet_bytes = self
             .plan
             .random_kinds

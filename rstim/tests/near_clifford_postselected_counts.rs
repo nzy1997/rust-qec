@@ -25,6 +25,68 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn cultivation_counts_preserve_raw_records_and_rng_when_cache_admission_closes() {
+    for text in [
+        include_str!(
+            "../../benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim"
+        ),
+        include_str!(
+            "../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+        ),
+    ] {
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            for budget in [0, 1024 * 1024, 64 * 1024 * 1024] {
+                let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(1739);
+                let mut b = a.clone();
+                for shots in [0, 1, 32, 63, 64, 65, 1024, 1024] {
+                    let rows = scalar.sample(shots, &mut b).unwrap();
+                    assert_eq!(
+                        cached.sample_postselected_counts(shots, 0, &mut a).unwrap(),
+                        count_records(&rows, 0),
+                        "shots={shots} budget={budget} {arithmetic:?}"
+                    );
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+                assert_eq!(
+                    cached.sample(0, &mut a).unwrap(),
+                    scalar.sample(0, &mut b).unwrap()
+                );
+                assert_eq!(
+                    cached.sample(17, &mut a).unwrap(),
+                    scalar.sample(17, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                cached.sample_postselected_counts(0, 0, &mut a).unwrap();
+                scalar.sample(0, &mut b).unwrap();
+                assert_eq!(
+                    cached.sample_measurements_u8(0, &mut a).unwrap(),
+                    scalar.sample_measurements_u8(0, &mut b).unwrap()
+                );
+                assert_eq!(
+                    cached.sample_measurements_u8(129, &mut a).unwrap(),
+                    scalar.sample_measurements_u8(129, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+            }
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [
