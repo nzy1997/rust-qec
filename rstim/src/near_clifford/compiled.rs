@@ -15,6 +15,9 @@ use random_event_runs::RandomRunPlan;
 #[path = "linear_counts.rs"]
 mod linear_counts;
 use linear_counts::LinearCountsPlan;
+#[path = "real_scalar_fallback.rs"]
+mod real_scalar_fallback;
+use real_scalar_fallback::RealFallback;
 use std::sync::OnceLock;
 #[path = "independent_packet.rs"]
 mod independent_packet;
@@ -1731,6 +1734,9 @@ impl CompiledNearCliffordExecutor {
             coefficients,
             reduced_coefficients: Vec::new(),
             cache: CoefficientCache::new(self, cache_bytes),
+            real_fallback: None,
+            real_attempted: false,
+            real_enabled: false,
             pack_enabled: true,
             #[cfg(test)]
             last_packet_live: 0,
@@ -1773,6 +1779,9 @@ pub struct CompiledNearCliffordSampler<'a> {
     coefficients: Vec<ComplexAmp>,
     reduced_coefficients: Vec<ComplexAmp>,
     cache: Option<CoefficientCache>,
+    real_fallback: Option<RealFallback>,
+    real_attempted: bool,
+    real_enabled: bool,
     pack_enabled: bool,
     #[cfg(test)]
     last_packet_live: usize,
@@ -2334,12 +2343,35 @@ fn resize_packet(buffer: &mut Vec<u64>, len: usize) -> Result<(), String> {
     Ok(())
 }
 impl CompiledNearCliffordSampler<'_> {
+    fn try_start_real(&mut self, node: usize) {
+        if !self.real_enabled || self.coefficients.len() < 64 {
+            return;
+        }
+        if !self.real_attempted {
+            self.real_attempted = true;
+            self.real_fallback = RealFallback::build(self.plan);
+        }
+        if let Some(real) = &mut self.real_fallback {
+            if !real.active {
+                real.start(node, &self.coefficients);
+            }
+        }
+    }
+    fn sync_real(&mut self) -> Result<(), String> {
+        if let Some(real) = &mut self.real_fallback {
+            real.write_complex(&mut self.coefficients)?;
+        }
+        Ok(())
+    }
     /// Conservative admitted coefficient-cache bytes, excluding the static plan
     /// and arithmetic work buffers. This is not process memory usage.
     pub fn coefficient_cache_reserved_bytes(&self) -> usize {
         self.cache.as_ref().map_or(0, |cache| cache.reserved)
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
+        if let Some(real) = &mut self.real_fallback {
+            real.active = false;
+        }
         let state = self
             .cache
             .as_ref()
@@ -2459,6 +2491,13 @@ impl CompiledNearCliffordSampler<'_> {
             self.load_state(id)?;
         }
         self.project(p, index, y, fixed)?;
+        if self
+            .real_fallback
+            .as_ref()
+            .is_some_and(|real| real.active && real.len() == 1)
+        {
+            self.sync_real()?;
+        }
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(CachedOp::Measure(mut entry)) = cache.entry(id, node) {
@@ -2490,6 +2529,14 @@ impl CompiledNearCliffordSampler<'_> {
     ) -> Result<(), String> {
         if p.x == 0 && p.z == 0 {
             return Ok(());
+        }
+        if let Some(real) = &mut self.real_fallback {
+            if real.active {
+                if real.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic) {
+                    return Ok(());
+                }
+                self.sync_real()?;
+            }
         }
         if expand {
             let len = self
@@ -2853,6 +2900,11 @@ impl CompiledNearCliffordSampler<'_> {
         b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
+        if let Some(real) = &self.real_fallback {
+            if real.active {
+                return real.probability_zero(p);
+            }
+        }
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
         match p.physical.phase & 3 {
             0 => self.probability_zero_phase::<0>(p),
@@ -2883,6 +2935,11 @@ impl CompiledNearCliffordSampler<'_> {
         y: bool,
         fixed: bool,
     ) -> Result<(), String> {
+        if let Some(real) = &mut self.real_fallback {
+            if real.active {
+                return real.project(p, index, y, fixed);
+            }
+        }
         let pivot = 1 << index;
         let low = pivot - 1;
         let other = p.z & !pivot;
@@ -3089,6 +3146,17 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
+        let result = self.execute_row::<POSTSELECT, SKIP_NOISE>(sweep, random);
+        // Also synchronize rejected detectors and execution errors before any
+        // subsequent structured, flat, cached, or zero-shot call.
+        self.sync_real()?;
+        result
+    }
+    fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool>(
+        &mut self,
+        sweep: &[bool],
+        random: &mut impl RowDraw,
+    ) -> Result<NearCliffordShot, String> {
         self.x.fill(0);
         self.z.fill(0);
         let mut state = self.cache.as_ref().map(|cache| cache.start);
@@ -3145,6 +3213,9 @@ impl CompiledNearCliffordSampler<'_> {
                     expand,
                     dagger,
                 } => {
+                    if POSTSELECT && state.is_none() {
+                        self.try_start_real(node);
+                    }
                     if let Some(signs) = &plan.noise_signs {
                         let sign = pauli.physical.anticommutes(&self.x, &self.z)
                             ^ signs.scalar(node, random);
@@ -3202,6 +3273,12 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                 }
                 PlanOp::Measure(m) => {
+                    if POSTSELECT
+                        && state.is_none()
+                        && matches!(m.projection, Projection::Active { .. })
+                    {
+                        self.try_start_real(node);
+                    }
                     let anti = m.pauli.physical.anticommutes(&self.x, &self.z)
                         ^ plan
                             .noise_signs
@@ -3914,6 +3991,18 @@ impl CompiledNearCliffordSampler<'_> {
     }
 
     fn sample_batch(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+    ) -> Result<(), String> {
+        self.real_enabled = shots >= 64 && matches!(output, BatchOutput::Counts { .. });
+        let result = self.sample_batch_inner(shots, sweep, rng, output);
+        self.real_enabled = false;
+        result
+    }
+    fn sample_batch_inner(
         &mut self,
         shots: usize,
         sweep: &[bool],
