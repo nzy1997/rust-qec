@@ -12,6 +12,10 @@
 <p>Install this development version from a repository checkout once. After installation, the commands below work from any directory:</p>
 <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
 <p>This install includes all <code>rstim</code> commands used below.</p>
+<details class="loss-disclosure"><summary>Additional tool for the CSS-code tutorial</summary>
+<p>The CSS-code tutorial uses the separate <code>qec-code</code> executable. Install it once from the same repository checkout:</p>
+<pre data-language="Shell"><code>cargo install --locked --path qec-code --features cli</code></pre>
+</details>
 <p>After installation, restart your terminal and check that it works:</p>
 <pre data-language="Shell"><code>rstim --version</code></pre>
 <pre data-output="true"><code>rstim {{ docs_version.packages.rstim.version }}</code></pre>
