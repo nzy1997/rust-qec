@@ -12,6 +12,12 @@
   // Interactive widgets replace their headings and provide their own navigation.
   const headings = [...main.querySelectorAll('h2, h3, h4')].filter((heading) => !heading.closest('[data-toc-skip]'));
   const tocLinks = new Map();
+  toc?.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    toc.querySelector('.toc-disclosure').open = false;
+    requestAnimationFrame(revealFragment);
+  });
   if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && !['home', 'shot'].includes(document.body.dataset.page)) {
     let section;
     let children;
