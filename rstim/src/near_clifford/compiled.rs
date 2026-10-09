@@ -2343,6 +2343,7 @@ fn resize_packet(buffer: &mut Vec<u64>, len: usize) -> Result<(), String> {
     Ok(())
 }
 impl CompiledNearCliffordSampler<'_> {
+    #[inline(never)]
     fn try_start_real(&mut self, node: usize) {
         if !self.real_enabled || self.coefficients.len() < 64 {
             return;
@@ -2363,15 +2364,61 @@ impl CompiledNearCliffordSampler<'_> {
         }
         Ok(())
     }
+    #[inline(never)]
+    fn try_real_rotate(
+        &mut self,
+        node: usize,
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        flip: bool,
+    ) -> Result<bool, String> {
+        self.try_start_real(node);
+        if let Some(real) = &mut self.real_fallback {
+            if real.active {
+                if p.x == 0 && p.z == 0
+                    || real.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic)
+                {
+                    return Ok(true);
+                }
+                self.sync_real()?;
+            }
+        }
+        Ok(false)
+    }
+    #[inline(never)]
+    fn real_probability_zero(&mut self, node: usize, p: &CompactPauli) -> Option<f64> {
+        self.try_start_real(node);
+        self.real_fallback
+            .as_ref()
+            .filter(|real| real.active)
+            .map(|real| real.probability_zero(p))
+    }
+    #[inline(never)]
+    fn try_real_project(
+        &mut self,
+        p: &CompactPauli,
+        index: usize,
+        y: bool,
+        fixed: bool,
+        state: &mut Option<usize>,
+    ) -> Result<bool, String> {
+        let Some(real) = self.real_fallback.as_mut().filter(|real| real.active) else {
+            return Ok(false);
+        };
+        real.project(p, index, y, fixed)?;
+        if real.len() == 1 {
+            self.sync_real()?;
+            *state = self.cache.as_ref().map(|_| 0);
+        }
+        Ok(true)
+    }
     /// Conservative admitted coefficient-cache bytes, excluding the static plan
     /// and arithmetic work buffers. This is not process memory usage.
     pub fn coefficient_cache_reserved_bytes(&self) -> usize {
         self.cache.as_ref().map_or(0, |cache| cache.reserved)
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
-        if let Some(real) = &mut self.real_fallback {
-            real.active = false;
-        }
         let state = self
             .cache
             .as_ref()
@@ -2491,13 +2538,6 @@ impl CompiledNearCliffordSampler<'_> {
             self.load_state(id)?;
         }
         self.project(p, index, y, fixed)?;
-        if self
-            .real_fallback
-            .as_ref()
-            .is_some_and(|real| real.active && real.len() == 1)
-        {
-            self.sync_real()?;
-        }
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(CachedOp::Measure(mut entry)) = cache.entry(id, node) {
@@ -2529,14 +2569,6 @@ impl CompiledNearCliffordSampler<'_> {
     ) -> Result<(), String> {
         if p.x == 0 && p.z == 0 {
             return Ok(());
-        }
-        if let Some(real) = &mut self.real_fallback {
-            if real.active {
-                if real.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic) {
-                    return Ok(());
-                }
-                self.sync_real()?;
-            }
         }
         if expand {
             let len = self
@@ -2900,11 +2932,6 @@ impl CompiledNearCliffordSampler<'_> {
         b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
-        if let Some(real) = &self.real_fallback {
-            if real.active {
-                return real.probability_zero(p);
-            }
-        }
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
         match p.physical.phase & 3 {
             0 => self.probability_zero_phase::<0>(p),
@@ -2935,11 +2962,6 @@ impl CompiledNearCliffordSampler<'_> {
         y: bool,
         fixed: bool,
     ) -> Result<(), String> {
-        if let Some(real) = &mut self.real_fallback {
-            if real.active {
-                return real.project(p, index, y, fixed);
-            }
-        }
         let pivot = 1 << index;
         let low = pivot - 1;
         let other = p.z & !pivot;
@@ -3146,17 +3168,29 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
-        let result = self.execute_row::<POSTSELECT, SKIP_NOISE>(sweep, random);
-        // Also synchronize rejected detectors and execution errors before any
-        // subsequent structured, flat, cached, or zero-shot call.
-        self.sync_real()?;
-        result
+        if POSTSELECT && self.real_enabled {
+            let result = self.execute_row::<POSTSELECT, SKIP_NOISE, true>(sweep, random);
+            // Also synchronize rejected detectors and errors before subsequent
+            // structured, flat, cached, or zero-shot calls.
+            self.sync_real()?;
+            result
+        } else {
+            self.execute_row::<POSTSELECT, SKIP_NOISE, false>(sweep, random)
+        }
     }
-    fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool>(
+    fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
+        // Every row starts from the plan/cache state. Materialization may have
+        // failed on a previous row after clearing its complex destination; that
+        // row's real scratch must never be reused as this row's initial state.
+        if REAL {
+            if let Some(real) = &mut self.real_fallback {
+                real.active = false;
+            }
+        }
         self.x.fill(0);
         self.z.fill(0);
         let mut state = self.cache.as_ref().map(|cache| cache.start);
@@ -3213,15 +3247,27 @@ impl CompiledNearCliffordSampler<'_> {
                     expand,
                     dagger,
                 } => {
-                    if POSTSELECT && state.is_none() {
-                        self.try_start_real(node);
-                    }
                     if let Some(signs) = &plan.noise_signs {
                         let sign = pauli.physical.anticommutes(&self.x, &self.z)
                             ^ signs.scalar(node, random);
-                        self.cached_rotate_signed(node, pauli, *expand, *dagger, sign, &mut state)?;
+                        if !(REAL
+                            && state.is_none()
+                            && self.try_real_rotate(node, pauli, *expand, *dagger, sign)?)
+                        {
+                            self.cached_rotate_signed(
+                                node, pauli, *expand, *dagger, sign, &mut state,
+                            )?;
+                        }
                     } else {
-                        self.cached_rotate(node, pauli, *expand, *dagger, &mut state)?;
+                        let handled = if REAL && state.is_none() {
+                            let sign = pauli.physical.anticommutes(&self.x, &self.z);
+                            self.try_real_rotate(node, pauli, *expand, *dagger, sign)?
+                        } else {
+                            false
+                        };
+                        if !handled {
+                            self.cached_rotate(node, pauli, *expand, *dagger, &mut state)?;
+                        }
                     }
                 }
                 PlanOp::Noise {
@@ -3273,12 +3319,6 @@ impl CompiledNearCliffordSampler<'_> {
                     }
                 }
                 PlanOp::Measure(m) => {
-                    if POSTSELECT
-                        && state.is_none()
-                        && matches!(m.projection, Projection::Active { .. })
-                    {
-                        self.try_start_real(node);
-                    }
                     let anti = m.pauli.physical.anticommutes(&self.x, &self.z)
                         ^ plan
                             .noise_signs
@@ -3292,8 +3332,17 @@ impl CompiledNearCliffordSampler<'_> {
                         }
                         Projection::Active { .. } => {
                             event += 1;
-                            f64::from_bits(random.draw(RandomKind::Active))
-                                >= self.cached_probability_zero(node, &m.pauli, state)?
+                            let draw = f64::from_bits(random.draw(RandomKind::Active));
+                            let real_probability = if REAL && state.is_none() {
+                                self.real_probability_zero(node, &m.pauli)
+                            } else {
+                                None
+                            };
+                            let probability = match real_probability {
+                                Some(probability) => probability,
+                                None => self.cached_probability_zero(node, &m.pauli, state)?,
+                            };
+                            draw >= probability
                         }
                     };
                     let physical = branch ^ anti;
@@ -3301,15 +3350,26 @@ impl CompiledNearCliffordSampler<'_> {
                         index, y, offset, ..
                     } = m.projection
                     {
-                        self.cached_project(
-                            node,
-                            &m.pauli,
-                            index,
-                            y,
-                            branch ^ offset,
-                            branch,
-                            &mut state,
-                        )?;
+                        if !(REAL
+                            && state.is_none()
+                            && self.try_real_project(
+                                &m.pauli,
+                                index,
+                                y,
+                                branch ^ offset,
+                                &mut state,
+                            )?)
+                        {
+                            self.cached_project(
+                                node,
+                                &m.pauli,
+                                index,
+                                y,
+                                branch ^ offset,
+                                branch,
+                                &mut state,
+                            )?;
+                        }
                     }
                     if !m.basis.is_empty() {
                         plan.conjugate_scalar_basis(node, &m.basis, &mut self.x, &mut self.z);
@@ -3997,7 +4057,10 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
-        self.real_enabled = shots >= 64 && matches!(output, BatchOutput::Counts { .. });
+        self.real_enabled = shots >= 64
+            && matches!(output, BatchOutput::Counts { .. })
+            && (6..=10).contains(&self.plan.peak_active_rank)
+            && real_scalar_fallback::vector_supported();
         let result = self.sample_batch_inner(shots, sweep, rng, output);
         self.real_enabled = false;
         result

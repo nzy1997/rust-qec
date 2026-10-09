@@ -127,6 +127,67 @@ mod tests {
     }
 
     #[test]
+    fn four_lane_rotation_preserves_retained_complex_bits_through_rank_ten() {
+        eprintln!(
+            "real scalar kernel execution: arch={} avx2_fma={} ranks=2..10 strict_and_fused=true",
+            std::env::consts::ARCH,
+            vector_supported(),
+        );
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nMX 0\n",
+                policy,
+            )
+            .unwrap();
+            let mut original = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            for rank in 2..=10 {
+                let n = 1 << rank;
+                for mask in [0, 1, 2, 3, n / 2, n - 1] {
+                    for constant in [false, true] {
+                        for kind in 0..4 {
+                            for x in [
+                                0,
+                                1,
+                                2,
+                                3,
+                                n / 2,
+                                (n / 2 + 1) % n,
+                                (n / 2 + 2) % n,
+                                (n / 2 + 3) % n,
+                                n - 1,
+                            ] {
+                                for z in [0, 1, 2, 3, n - 1] {
+                                    let phase = if parity(x & mask) { 0 } else { 1 };
+                                    let p = pauli(x, z, phase);
+                                    if x == 0 && z == 0 {
+                                        continue;
+                                    }
+                                    for (dagger, flip) in
+                                        [(false, false), (true, false), (false, true)]
+                                    {
+                                        let mut r = real(mask, constant, values(n, kind));
+                                        original.coefficients = complex(&r);
+                                        original.rotate_signed(&p, false, dagger, flip).unwrap();
+                                        assert!(r.rotate(&p, false, dagger, flip, policy));
+                                        assert_eq!(
+                                            bits(&complex(&r)),
+                                            bits(&original.coefficients),
+                                            "four lanes {policy:?} rank={rank} mask={mask} constant={constant} kind={kind} x={x} z={z} dagger={dagger} flip={flip}"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn real_cdf_preserves_literal_complex_reduction_bits_and_phase_aliases() {
         let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMX 0\n").unwrap();
         let mut original = plan.prepare_sampler_with_cache_budget(0).unwrap();
@@ -255,15 +316,20 @@ mod tests {
                     assert_eq!(a.next_u64(), b.next_u64());
                 }
             }
-            let real = native
-                .real_fallback
-                .as_ref()
-                .expect("default 64 MiB cache must exercise real scratch");
-            assert!(
-                !real.values.is_empty(),
-                "model allocation alone is not an execution witness"
-            );
-            assert!(!real.active);
+            if vector_supported() {
+                let real = native
+                    .real_fallback
+                    .as_ref()
+                    .expect("default 64 MiB cache must exercise real scratch on AVX2/FMA");
+                assert!(
+                    !real.values.is_empty(),
+                    "allocation alone is not an execution witness"
+                );
+                assert!(!real.active);
+            } else {
+                assert!(!native.real_attempted);
+                assert!(native.real_fallback.is_none());
+            }
             let nc = native.cache.as_ref().unwrap();
             let oc = original.cache.as_ref().unwrap();
             assert_eq!(nc.reserved, oc.reserved);
@@ -282,10 +348,59 @@ mod tests {
                     original.sample_measurements_u8(shots, &mut b).unwrap()
                 );
                 assert!(!native.real_enabled);
-                assert!(!native.real_fallback.as_ref().unwrap().active);
+                assert!(
+                    native
+                        .real_fallback
+                        .as_ref()
+                        .is_none_or(|real| !real.active)
+                );
                 for _ in 0..16 {
                     assert_eq!(a.next_u64(), b.next_u64());
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn a_new_counts_row_discards_real_scratch_left_by_materialization_failure() {
+        use rand::{RngCore, SeedableRng, rngs::StdRng};
+        let text = include_str!(
+            "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+        );
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, policy).unwrap();
+            let mut native = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut original = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut stale = RealFallback::build(&plan).unwrap();
+            // Deterministically reproduce the state left when write_complex
+            // clears its destination and its subsequent allocation fails.
+            // This injects stale state without attempting host-memory exhaustion.
+            stale.values.resize(64, 0.);
+            stale.active = true;
+            native.real_fallback = Some(stale);
+            native.real_attempted = true;
+            native.coefficients.clear();
+            // Exercise the real-row control flow even on a scalar-only host;
+            // actual SIMD execution is validated separately on native x86.
+            native.real_enabled = true;
+            let mut a = StdRng::seed_from_u64(1739);
+            let mut b = a.clone();
+            let result =
+                native.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut a));
+            let expected =
+                original.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut b));
+            assert!(expected.is_ok());
+            assert_eq!(
+                result, expected,
+                "new row after unmaterialized real failure: {policy:?}"
+            );
+            assert!(!native.real_fallback.as_ref().unwrap().active);
+            for _ in 0..16 {
+                assert_eq!(a.next_u64(), b.next_u64());
             }
         }
     }
@@ -337,6 +452,169 @@ fn parity(value: usize) -> bool {
 fn drop_bit(value: usize, index: usize) -> usize {
     let low = (1usize << index) - 1;
     (value & low) | ((value >> (index + 1)) << index)
+}
+
+pub(super) fn vector_supported() -> bool {
+    #[cfg(target_arch = "x86_64")]
+    {
+        std::is_x86_feature_detected!("avx2") && std::is_x86_feature_detected!("fma")
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        false
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+mod vector {
+    use std::arch::x86_64::*;
+
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn permute<const LOW: usize>(v: __m256d) -> __m256d {
+        match LOW {
+            0 => v,
+            1 => _mm256_permute4x64_pd::<0b10_11_00_01>(v),
+            2 => _mm256_permute4x64_pd::<0b01_00_11_10>(v),
+            3 => _mm256_permute4x64_pd::<0b00_01_10_11>(v),
+            _ => unreachable!(),
+        }
+    }
+
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn update<const FUSED: bool>(
+        own: __m256d,
+        partner: __m256d,
+        negate: __m256d,
+        factor: __m256d,
+        cosine: __m256d,
+    ) -> __m256d {
+        let partner = _mm256_xor_pd(partner, negate);
+        let own = _mm256_mul_pd(own, cosine);
+        if FUSED {
+            _mm256_fmadd_pd(partner, factor, own)
+        } else {
+            _mm256_add_pd(own, _mm256_mul_pd(partner, factor))
+        }
+    }
+
+    // The four contiguous lanes share all high index bits. Hoist the low-bit
+    // sign patterns, and evaluate each remaining parity only once per group.
+    #[target_feature(enable = "avx2,fma")]
+    unsafe fn kernel<const FUSED: bool, const LOW: usize>(
+        values: &mut [f64],
+        mask: usize,
+        constant: bool,
+        x: usize,
+        z: usize,
+        imaginary: bool,
+        c: f64,
+        factor: f64,
+    ) {
+        unsafe {
+            let cosine = _mm256_set1_pd(c);
+            let sign = _mm256_castsi256_pd(_mm256_set1_epi64x(i64::MIN));
+            let zero = _mm256_setzero_pd();
+            let factor_bits =
+                |lane: usize| factor.to_bits() ^ (((lane & z).count_ones() as u64 & 1) << 63);
+            let factors = _mm256_castsi256_pd(_mm256_set_epi64x(
+                factor_bits(3) as i64,
+                factor_bits(2) as i64,
+                factor_bits(1) as i64,
+                factor_bits(0) as i64,
+            ));
+            let negate_bits = |lane: usize| {
+                let target_imag = ((lane & mask).count_ones() & 1 != 0) ^ constant;
+                (u64::from(imaginary && !target_imag) << 63) as i64
+            };
+            let negates = _mm256_castsi256_pd(_mm256_set_epi64x(
+                negate_bits(3),
+                negate_bits(2),
+                negate_bits(1),
+                negate_bits(0),
+            ));
+            let source_flip = if (x & z).count_ones() & 1 != 0 {
+                sign
+            } else {
+                zero
+            };
+            let gauge_flip = if imaginary { sign } else { zero };
+            let ptr = values.as_mut_ptr();
+            if x < 4 {
+                for base in (0..values.len()).step_by(4) {
+                    let z_flip = _mm256_castsi256_pd(_mm256_set1_epi64x(
+                        (((base & z).count_ones() as u64 & 1) << 63) as i64,
+                    ));
+                    let target_flip = _mm256_castsi256_pd(_mm256_set1_epi64x(
+                        ((u64::from(imaginary) * ((base & mask).count_ones() as u64 & 1)) << 63)
+                            as i64,
+                    ));
+                    let old = _mm256_loadu_pd(ptr.add(base));
+                    let partner = permute::<LOW>(old);
+                    let output = update::<FUSED>(
+                        old,
+                        partner,
+                        _mm256_xor_pd(negates, target_flip),
+                        _mm256_xor_pd(_mm256_xor_pd(factors, z_flip), source_flip),
+                        cosine,
+                    );
+                    _mm256_storeu_pd(ptr.add(base), output);
+                }
+            } else {
+                // Pair groups using the highest X bit. Each group is visited
+                // once and all eight original coefficients are loaded before
+                // either output is stored. The low XOR permutes within a group.
+                let pivot = 1usize << (usize::BITS - 1 - x.leading_zeros());
+                let other_x = x ^ pivot;
+                for block in (0..values.len()).step_by(pivot * 2) {
+                    for offset in (0..pivot).step_by(4) {
+                        let base = block + offset;
+                        let other = (base ^ x) & !3;
+                        debug_assert_eq!(other, block + pivot + (offset ^ (other_x & !3)));
+                        let z_flip = _mm256_castsi256_pd(_mm256_set1_epi64x(
+                            (((base & z).count_ones() as u64 & 1) << 63) as i64,
+                        ));
+                        let target_flip = _mm256_castsi256_pd(_mm256_set1_epi64x(
+                            ((u64::from(imaginary) * ((base & mask).count_ones() as u64 & 1)) << 63)
+                                as i64,
+                        ));
+                        let fa = _mm256_xor_pd(factors, z_flip);
+                        let na = _mm256_xor_pd(negates, target_flip);
+                        let a = _mm256_loadu_pd(ptr.add(base));
+                        let b = permute::<LOW>(_mm256_loadu_pd(ptr.add(other)));
+                        let out_a =
+                            update::<FUSED>(a, b, na, _mm256_xor_pd(fa, source_flip), cosine);
+                        let out_b =
+                            update::<FUSED>(b, a, _mm256_xor_pd(na, gauge_flip), fa, cosine);
+                        _mm256_storeu_pd(ptr.add(base), out_a);
+                        _mm256_storeu_pd(ptr.add(other), permute::<LOW>(out_b));
+                    }
+                }
+            }
+        }
+    }
+
+    #[target_feature(enable = "avx2,fma")]
+    pub(super) unsafe fn rotate<const FUSED: bool>(
+        values: &mut [f64],
+        mask: usize,
+        constant: bool,
+        x: usize,
+        z: usize,
+        imaginary: bool,
+        c: f64,
+        factor: f64,
+    ) {
+        // Dispatch the lane permutation once, outside the arithmetic loops.
+        unsafe {
+            match x & 3 {
+                0 => kernel::<FUSED, 0>(values, mask, constant, x, z, imaginary, c, factor),
+                1 => kernel::<FUSED, 1>(values, mask, constant, x, z, imaginary, c, factor),
+                2 => kernel::<FUSED, 2>(values, mask, constant, x, z, imaginary, c, factor),
+                3 => kernel::<FUSED, 3>(values, mask, constant, x, z, imaginary, c, factor),
+                _ => unreachable!(),
+            }
+        }
+    }
 }
 
 impl RealFallback {
@@ -533,8 +811,12 @@ impl RealFallback {
         } else if parity(p.x & mask) != imaginary {
             return false;
         }
+        let target_len = if expand { len * 2 } else { len };
+        if p.x >= target_len || p.z >= target_len {
+            return false;
+        }
         if expand {
-            self.values.resize(len * 2, 0.);
+            self.values.resize(target_len, 0.);
         }
         self.mask = mask;
         if policy == CompiledRotationArithmetic::Fused {
@@ -556,6 +838,25 @@ impl RealFallback {
         };
         if dagger ^ flip {
             factor = -factor;
+        }
+        #[cfg(target_arch = "x86_64")]
+        if self.values.len() >= 4 && vector_supported() {
+            // The runtime feature guard covers every intrinsic. The slice is
+            // a power-of-two vector; every four-lane group and XOR partner is
+            // in bounds, with disjoint stores for the high-bit paired case.
+            unsafe {
+                vector::rotate::<FUSED>(
+                    &mut self.values,
+                    self.mask,
+                    self.constant,
+                    p.x,
+                    p.z,
+                    imaginary,
+                    c,
+                    factor,
+                );
+            }
+            return;
         }
         let mask = self.mask;
         let constant = self.constant;
