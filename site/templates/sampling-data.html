@@ -47,7 +47,7 @@
 <section id="sample" class="task-section" aria-labelledby="sample-title">
   <div class="section-heading">
     <h2 id="sample-title">1. Generate and sample a loss-visible circuit</h2>
-    <p class="section-copy">Generate a distance-3, two-round Mid-SWAP Z-memory circuit. Mid-SWAP moves data between qubits during the checks so readout can reveal loss; each loss-visible measurement stores a <code>flag,value</code> pair.</p>
+    <p class="section-copy">Generate a distance-3, two-round Mid-SWAP Z-memory circuit. Mid-SWAP exchanges data/check roles during the checks so readout can reveal loss; each loss-visible measurement stores a <code>flag,value</code> pair.</p>
   </div>
 <pre class="quick-command"><code>rstim circuit gen \
   --code surface_code \

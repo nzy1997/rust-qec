@@ -1,20 +1,28 @@
 <details class="docs-navigation" open>
 <summary>Browse documentation</summary>
 <nav aria-label="Documentation sections">
-<p>Guides</p>
+<p>Tutorials</p>
 <a href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
-<a href="{{ root }}/atom-loss/"{% if current_nav == "loss" %} aria-current="page"{% endif %}>Atom loss</a>
-<a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS codes &amp; distance</a>
-<a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Circuit simulation</a>
-<a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
-<a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Decoding</a>
-<a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Sampling &amp; training data</a>
-<a href="{{ root }}/qp101/"{% if current_nav == "qp101" %} aria-current="page"{% endif %}>Circuit diagrams</a>
-<p>Reference</p>
-<a href="{{ root }}/reference/"{% if current_nav == "reference" %} aria-current="page"{% endif %}>CLI &amp; Rust APIs</a>
+<a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>Build a CSS experiment</a>
+<a href="{{ root }}/atom-loss/"{% if current_nav == "loss" %} aria-current="page"{% endif %}>Decode with atom loss</a>
+<a href="{{ root }}/decoding/"{% if current_nav == "decode" %} aria-current="page"{% endif %}>Compare decoders</a>
+<a href="{{ root }}/sampling-data/"{% if current_nav == "data" %} aria-current="page"{% endif %}>Create training data</a>
+<a href="{{ root }}/rust-api/"{% if current_nav == "rust" %} aria-current="page"{% endif %}>Run an experiment in Rust</a>
+<p>CLI &amp; formats</p>
+<a href="{{ root }}/reference/"{% if current_nav == "reference" %} aria-current="page"{% endif %}>rstim CLI</a>
+<a href="{{ root }}/qec-code-cli/"{% if current_nav == "qec-cli" %} aria-current="page"{% endif %}>qec-code CLI</a>
+<a href="{{ root }}/rsinter-cli/"{% if current_nav == "rsinter-cli" %} aria-current="page"{% endif %}>rsinter CLI</a>
+<a href="{{ root }}/circuit-format/"{% if current_nav == "circuit-format" %} aria-current="page"{% endif %}>Circuit & loss instructions</a>
+<a href="{{ root }}/data-formats/"{% if current_nav == "data-formats" %} aria-current="page"{% endif %}>Samples & datasets</a>
 <a href="{{ root }}/qp101/protocol/"{% if current_nav == "protocol" %} aria-current="page"{% endif %}>QP101 format</a>
-<a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP sample archives</a>
-<a href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Performance &amp; validation</a>
-<a href="{{ root }}/support/"{% if current_nav == "support" %} aria-current="page"{% endif %}>Support &amp; compatibility</a>
-<a href="{{ root }}/maintainers/"{% if current_nav == "maintainers" %} aria-current="page"{% endif %}>Maintainer reference</a>
+<a href="{{ root }}/rsmp-v1-showcase/"{% if current_nav == "rsmp" %} aria-current="page"{% endif %}>RSMP archive format</a>
+<a href="{{ root }}/rust-api-reference/"{% if current_nav == "api-reference" %} aria-current="page"{% endif %}>Rust API index</a>
+<p>Benchmarks</p>
+<a href="{{ root }}/validation/"{% if current_nav == "evidence" %} aria-current="page"{% endif %}>Overview & methodology</a>
+<a href="{{ root }}/benchmarks/simulation/"{% if current_nav == "simulation-bench" %} aria-current="page"{% endif %}>Circuit simulation</a>
+<a href="{{ root }}/benchmarks/decoders/"{% if current_nav == "decoder-bench" %} aria-current="page"{% endif %}>Decoder comparisons</a>
+<a href="{{ root }}/atom-loss-evidence/"{% if current_nav == "loss-bench" %} aria-current="page"{% endif %}>Atom-loss experiments</a>
+<p>Support &amp; versions</p>
+<a href="{{ root }}/support/"{% if current_nav == "support" %} aria-current="page"{% endif %}>Support & compatibility</a>
+<a href="{{ root }}/versions/"{% if current_nav == "versions" %} aria-current="page"{% endif %}>Versions & migration</a>
 </nav></details>

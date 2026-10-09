@@ -28,23 +28,28 @@ class PrepareSiteDocsTests(unittest.TestCase):
                                              ','.join(f'"{name}"' for name in members) + ']\n')
             pairs = [('rstim/doc/QP101-ZY.md', 'qp101-protocol.md'),
                      ('docs/support-compatibility.md', 'support-compatibility.md'),
-                     ('docs/maintainer-reference.md', 'maintainer-reference.md')]
+                     ('docs/maintainer-reference.md', 'maintainer-reference.md'),
+                     ('docs/specs/loss-visible-circuit-subset-v1.md', 'loss-visible-circuit-subset-v1.md'),
+                     ('rstim/doc/decoder-dataset.md', 'decoder-dataset.md'),
+                     ('rstim/doc/rsmp-v1.md', 'rsmp-v1.md')]
             for source, _ in pairs:
                 path = root / source
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('# Original\nUnicode: 量子\n')
+                path.write_text('# Original\nUnicode: 量子\n## Mid-SWAP configuration migration\nMigration body\n')
             prepare(root)
+            self.assertEqual((root / 'site/generated/support-core.md').read_text(), '# Original\nUnicode: 量子\n')
+            self.assertEqual((root / 'site/generated/version-migration.md').read_text(), '## Mid-SWAP configuration migration\nMigration body\n')
             version = json.loads((root / 'site/generated/docs-version.json').read_text())
             self.assertEqual(version['id'], 'master')
             self.assertEqual(version['release_line'], '0.3')
             self.assertEqual(version['packages']['rstim']['version'], '0.3.1')
             for source, target in pairs:
                 self.assertEqual((root / source).read_bytes(), (root / 'site/generated' / target).read_bytes())
-                (root / source).write_text('# Revised\n')
+                (root / source).write_text('# Revised\n## Mid-SWAP configuration migration\nNew migration\n')
             prepare(root)
             for source, target in pairs:
-                self.assertEqual((root / 'site/generated' / target).read_text(), '# Revised\n')
-                self.assertEqual((root / source).read_text(), '# Revised\n')
+                self.assertEqual((root / 'site/generated' / target).read_text(), '# Revised\n## Mid-SWAP configuration migration\nNew migration\n')
+                self.assertEqual((root / source).read_text(), '# Revised\n## Mid-SWAP configuration migration\nNew migration\n')
 
     def test_missing_contract_fails_build(self):
         with tempfile.TemporaryDirectory() as tmp:

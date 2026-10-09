@@ -211,3 +211,6 @@ body[data-page="start"] .start-requirements { margin: 12px 0 16px; color: var(--
   .documentation-frame .docs-sidebar { margin-bottom: 20px; }
   .documentation-frame .docs-navigation > summary { border: 0; padding: 6px 0; color: var(--muted); font-size: .875rem; font-weight: 500; }
 }
+
+.midswap-schedule .diagram-scroll { max-width: 100%; overflow-x: auto; }
+.midswap-schedule img { width: 100%; min-width: 720px; }

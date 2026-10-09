@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><h1>{{ section.title }}</h1><p class="hero-copy">This material now lives with the experiment or reference it belongs to.</p></div>{% endblock hero %}
+{% block main %}{{ section.content | safe }}{% endblock main %}
+{% block scripts %}<script src="{{ root }}/js/legacy-guides.js" defer></script>{% endblock scripts %}

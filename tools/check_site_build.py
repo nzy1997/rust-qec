@@ -60,6 +60,10 @@ PAGE_FILES = (
     "validation/index.html",
     "interactive/index.html",
     "interactive/local/index.html",
+    "rust-api/index.html", "rust-api-reference/index.html",
+    "qec-code-cli/index.html", "rsinter-cli/index.html",
+    "circuit-format/index.html", "data-formats/index.html", "versions/index.html",
+    "benchmarks/simulation/index.html", "benchmarks/decoders/index.html",
 )
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js", "js/shot-startup.js")
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
@@ -83,6 +87,15 @@ PAGE_REQUIRED_ANCHORS = {
         "compatibility-and-deprecation-policy",
         "maintainer-procedures",
     ),
+    "rust-api/index.html": ("rust-project", "rust-experiment", "rust-results"),
+    "rust-api-reference/index.html": ("rust-apis",),
+    "qec-code-cli/index.html": ("commands", "help-qec-code-code-css-distance-exact"),
+    "rsinter-cli/index.html": ("commands", "help-rsinter-replay", "help-rsinter-bench-run"),
+    "circuit-format/index.html": ("atom-loss-extensions", "loss-subset-v1"),
+    "data-formats/index.html": ("01-and-b8", "dataset-export-contract"),
+    "versions/index.html": ("mid-swap-configuration-migration", "compatibility-and-deprecation-policy"),
+    "benchmarks/simulation/index.html": ("simulation-results-title", "dem-results-title"),
+    "benchmarks/decoders/index.html": ("decoder-results-title", "benchmark-campaigns"),
     "reference/index.html": ("reference-boundary", "rustqec-commands", "command-circuit-stats", "command-decode", "common-options", "exit-codes", "machine-contract", "rust-apis"),
     "maintainers/index.html": ("atom-loss-regression-controls", "decoder-release-readiness-gate", "publication-evidence-bundle", "release-checklist"),
     "simulator/index.html": ("circuit-simulation",),
@@ -320,7 +333,7 @@ def check_pages(
         script_texts: list[str] = []
         page_scripts: set[str] = set()
         for src in collector.srcs:
-            if not src.endswith(".js"):
+            if not urlsplit(src).path.endswith(".js"):
                 continue
             _, candidate, _ = resolve_site_reference(site_root, page_dir, src)
             if candidate is not None and candidate.is_file():
@@ -589,9 +602,8 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
     results.append(check_checked_provenance(manifest, manifest_site_errors + read_errors))
 
     evidence_page_names = (
-        "simulator/index.html",
-        "detector-models/index.html",
-        "decoding/index.html",
+        "benchmarks/simulation/index.html",
+        "benchmarks/decoders/index.html",
         "css-codes/index.html",
         "validation/index.html",
     )
@@ -1338,8 +1350,16 @@ const copyBlocks = document.querySelectorAll("pre code");
     for page in ("atom-loss/index.html", "atom-loss-concepts/index.html", "atom-loss-evidence/index.html"):
         write_text(site_root / page, '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[page]) + '</main></body></html>')
 
+    for target, sources in (
+        ('benchmarks/simulation/index.html', ('simulator/index.html', 'detector-models/index.html')),
+        ('benchmarks/decoders/index.html', ('decoding/index.html',)),
+    ):
+        assignments = ' '.join(re.findall(r'data-evidence-items="([^"]+)"', '\n'.join((site_root / page).read_text() for page in sources)))
+        write_text(site_root / target, '<html><body><main><h1>Benchmarks</h1>' + ''.join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[target]) + f'<div data-evidence-items="{assignments}"></div><p>' + ' '.join(CLAIMS_POLICY_PHRASES) + '</p></main></body></html>')
     for page in PAGE_FILES:
         page_path = site_root / page
+        if not page_path.exists():
+            write_text(page_path, '<html><body><main><h1>Documentation</h1>' + ''.join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS.get(page, ())) + '</main></body></html>')
         page_text = page_path.read_text(encoding="utf-8")
         if "</body>" not in page_text:
             raise AssertionError(f"fixture page {page} has no closing body tag")

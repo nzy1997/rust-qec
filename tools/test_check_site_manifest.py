@@ -399,15 +399,17 @@ class SiteManifestTest(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(RSTIM_EXPANDED_FIXTURE_CONTENT, encoding="utf-8")
         (root / ".github/workflows/ci.yml").write_text("name: ci\n", encoding="utf-8")
-        (root / "_site/simulator/index.html").write_text(
+        (root / "_site/benchmarks/simulation").mkdir(parents=True, exist_ok=True)
+        (root / "_site/benchmarks/decoders").mkdir(parents=True, exist_ok=True)
+        (root / "_site/benchmarks/simulation/index.html").write_text(
             "<section>Current simulator guide.</section>\n",
             encoding="utf-8",
         )
-        (root / "_site/detector-models/index.html").write_text(
+        (root / "_site/benchmarks/simulation/index.html").write_text(
             "<section>Current detector-model guide.</section>\n",
             encoding="utf-8",
         )
-        (root / "_site/decoding/index.html").write_text(
+        (root / "_site/benchmarks/decoders/index.html").write_text(
             '<section data-evidence-items="surface-decoder-full bb-circuit-full"></section>\n',
             encoding="utf-8",
         )
@@ -1016,7 +1018,7 @@ class SiteManifestTest(unittest.TestCase):
 
     def test_rejects_built_site_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
-        index = repo / "_site/decoding/index.html"
+        index = repo / "_site/benchmarks/decoders/index.html"
         index.write_text(
             index.read_text(encoding="utf-8")
             + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
@@ -1050,7 +1052,7 @@ class SiteManifestTest(unittest.TestCase):
 
     def test_rejects_built_site_rstim_artifact_reference_not_listed_in_manifest(self) -> None:
         repo, _, built_manifest_path = self.write_fixture_manifest()
-        index = repo / "_site/simulator/index.html"
+        index = repo / "_site/benchmarks/simulation/index.html"
         missing_artifact = "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
         index.write_text(
             index.read_text(encoding="utf-8") + f'<a href="../{missing_artifact}">bad</a>\n',
