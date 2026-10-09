@@ -24,7 +24,7 @@ mod tests {
 
     fn state(values: &[ComplexAmp]) -> CachedState {
         CachedState {
-            coefficients: Arc::new(values.to_vec()),
+            coefficients: Arc::new(CachedCoefficients::Complex(values.to_vec())),
             next_node: None,
             transition: CachedOp::None,
         }
@@ -192,7 +192,7 @@ mod tests {
         let charge = CoefficientCache::state_charge(&values).unwrap();
         for node in 0..2 * MIN_STATES {
             let id = cache.store(node, &values).unwrap();
-            assert_eq!(&*cache.states[id].coefficients, &values);
+            assert_eq!(&cache.states[id].coefficients.materialize(), &values);
             assert!(cache.intern.is_none());
             assert!(!cache.intern_attempted);
             assert_eq!(cache.reserved, initial + (node + 1) * charge);
@@ -227,7 +227,10 @@ mod tests {
             assert!(cache.intern.is_none());
             assert!(!cache.intern_attempted);
         }
-        assert_eq!(&*cache.states[first_cold].coefficients, &values);
+        assert_eq!(
+            &cache.states[first_cold].coefficients.materialize(),
+            &values
+        );
         let first = cache.store(23, &values).unwrap();
         assert_ne!(first, first_cold);
         assert!(cache.intern.is_some());
@@ -318,11 +321,7 @@ impl CoefficientIntern {
             }
             if entry.node == node && entry.fingerprint == hash {
                 let prior = &states[entry.id].coefficients;
-                if prior.len() == coefficients.len()
-                    && prior.iter().zip(coefficients).all(|(a, b)| {
-                        a.re.to_bits() == b.re.to_bits() && a.im.to_bits() == b.im.to_bits()
-                    })
-                {
+                if prior.same_bits(coefficients) {
                     return (Some(entry.id), None);
                 }
             }
