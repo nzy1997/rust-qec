@@ -523,6 +523,36 @@ impl CoherentPacket {
     }
     #[inline]
     fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> [f64; 64] {
+        let count = self.len * self.lanes;
+        let bounded = self.re[..count]
+            .iter()
+            .chain(&self.im[..count])
+            .all(|value| value.abs() <= 1.);
+        if bounded {
+            let mut expectation = [0.; 64];
+            let mut norm = [0.; 64];
+            for amplitude in 0..self.len {
+                let sign = if (amplitude & p.z).count_ones() % 2 != 0 {
+                    -1.
+                } else {
+                    1.
+                };
+                let partner = amplitude ^ p.x;
+                for lane in 0..self.lanes {
+                    let i = amplitude * self.lanes + lane;
+                    let j = partner * self.lanes + lane;
+                    let amp = ComplexAmp::new(self.re[i], self.im[i]);
+                    let image = bounded_cdf_image::<PHASE>(ComplexAmp::new(self.re[j], self.im[j]));
+                    expectation[lane] += (image * (amp * sign)).re;
+                    norm[lane] += amp.norm_sqr();
+                }
+            }
+            let mut probabilities = [0.; 64];
+            for lane in 0..self.lanes {
+                probabilities[lane] = ((1. + expectation[lane] / norm[lane]) * 0.5).clamp(0., 1.);
+            }
+            return probabilities;
+        }
         let mut expectation = [0.; 64];
         let mut norm = [0.; 64];
         let phase = i_pow(PHASE);
@@ -1286,6 +1316,158 @@ mod phase_specialized_cdf_tests {
                         frozen_scalar_probability_zero(&scalar.coefficients, &p).to_bits(),
                         "phase alias kind={kind}; x={x}; z={z}; phase={phase}"
                     );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_cdfs_preserve_finite_bits_and_nonfinite_outcomes_at_boundaries() {
+        let plan = CompiledNearCliffordExecutor::compile_text("I 5\n").unwrap();
+        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut packet = CoherentPacket::default();
+        // Rust arithmetic does not preserve NaN signs/payloads, even for the
+        // unchanged literal baseline. Keep exact bits for every non-NaN CDF;
+        // require the same NaN outcome for zero-norm/nonfinite cases.
+        let boundary = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            f64::from_bits(1f64.to_bits() - 1),
+            -f64::from_bits(1f64.to_bits() - 1),
+            1.,
+            -1.,
+            f64::from_bits(1f64.to_bits() + 1),
+            -f64::from_bits(1f64.to_bits() + 1),
+            f64::MAX,
+            -f64::MAX,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0037),
+            f64::from_bits(0xfff8_0000_0000_0023),
+        ];
+        for len in [1usize, 2, 8, 64] {
+            let rank = len.trailing_zeros() as usize;
+            for lanes in [1, 7, 64] {
+                for (case, &value) in boundary.iter().enumerate() {
+                    let mut states = vec![vec![ComplexAmp::new(0., -0.); len]; lanes];
+                    for (lane, state) in states.iter_mut().enumerate() {
+                        if lane % 2 == 0 {
+                            for (i, amp) in state.iter_mut().enumerate() {
+                                *amp = ComplexAmp::new(
+                                    if i % 2 == 0 { 1. } else { -1. },
+                                    if i % 3 == 0 { -0. } else { f64::from_bits(1) },
+                                );
+                            }
+                        }
+                    }
+                    // Only one lane may decline the bounded path. Other lanes
+                    // must retain their literal probabilities under that fallback.
+                    states[lanes / 2][len / 2] = ComplexAmp::new(value, -value);
+                    packet.reset(&states[0], lanes, rank).unwrap();
+                    for (lane, state) in states.iter().enumerate() {
+                        for (i, amp) in state.iter().enumerate() {
+                            packet.re[i * lanes + lane] = amp.re;
+                            packet.im[i * lanes + lane] = amp.im;
+                        }
+                    }
+                    for (x, z) in [(0, 0), (0, len - 1), (len - 1, 0), (len - 1, len - 1)] {
+                        for phase in [0, 1, 2, 3, 4, 127, 128, 254, 255] {
+                            let p = compact(x, z, phase);
+                            // Packets accept canonical phases only. The scalar
+                            // API additionally preserves every unsigned alias.
+                            if phase < 4 {
+                                let expected = frozen_packet_probability_zero(&packet, &p);
+                                let actual = packet.probability_zero(&p);
+                                for lane in 0..64 {
+                                    assert!(
+                                        if expected[lane].is_nan() {
+                                            actual[lane].is_nan()
+                                        } else {
+                                            actual[lane].to_bits() == expected[lane].to_bits()
+                                        },
+                                        "packet len={len}; lanes={lanes}; case={case}; x={x}; z={z}; phase={phase}; lane={lane}"
+                                    );
+                                }
+                            }
+                            for (lane, state) in states.iter().enumerate() {
+                                scalar.coefficients.clone_from(state);
+                                let expected = frozen_scalar_probability_zero(state, &p);
+                                let actual = scalar.probability_zero(&p);
+                                assert!(
+                                    if expected.is_nan() {
+                                        actual.is_nan()
+                                    } else {
+                                        actual.to_bits() == expected.to_bits()
+                                    },
+                                    "scalar len={len}; lanes={lanes}; case={case}; x={x}; z={z}; phase={phase}; lane={lane}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bounded_cdfs_match_frozen_reductions_for_random_components_and_wide_rank() {
+        use rand::{RngCore, SeedableRng};
+        let plan = CompiledNearCliffordExecutor::compile_text("I 12\n").unwrap();
+        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut packet = CoherentPacket::default();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(20261010);
+        for len in [2usize, 8, 64, 4096] {
+            for lanes in [1, 7] {
+                let states = (0..lanes)
+                    .map(|_| {
+                        (0..len)
+                            .map(|_| {
+                                let mut component = || {
+                                    let word = rng.next_u64();
+                                    let bits = (word & ((1 << 63) | ((1 << 52) - 1)))
+                                        | (((word >> 52) % 1023) << 52);
+                                    f64::from_bits(bits)
+                                };
+                                ComplexAmp::new(component(), component())
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                packet
+                    .reset(&states[0], lanes, len.trailing_zeros() as usize)
+                    .unwrap();
+                for (lane, state) in states.iter().enumerate() {
+                    for (i, amp) in state.iter().enumerate() {
+                        packet.re[i * lanes + lane] = amp.re;
+                        packet.im[i * lanes + lane] = amp.im;
+                    }
+                }
+                for (x, z) in [(0, 0), (len - 1, len - 1), (1, len / 2), (len / 2, 1)] {
+                    for phase in 0..4 {
+                        let p = compact(x, z, phase);
+                        let expected = frozen_packet_probability_zero(&packet, &p);
+                        let actual = packet.probability_zero(&p);
+                        for lane in 0..64 {
+                            assert_eq!(
+                                actual[lane].to_bits(),
+                                expected[lane].to_bits(),
+                                "packet len={len}; lanes={lanes}; x={x}; z={z}; phase={phase}; lane={lane}"
+                            );
+                        }
+                        for (lane, state) in states.iter().enumerate() {
+                            scalar.coefficients.clone_from(state);
+                            let expected = frozen_scalar_probability_zero(state, &p);
+                            assert_eq!(
+                                scalar.probability_zero(&p).to_bits(),
+                                expected.to_bits(),
+                                "scalar len={len}; lanes={lanes}; x={x}; z={z}; phase={phase}; lane={lane}"
+                            );
+                        }
+                    }
                 }
             }
         }
