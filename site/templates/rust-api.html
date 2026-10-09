@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Run an experiment in Rust — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><h1>Run an experiment in Rust</h1><p class="hero-copy">Parse a circuit, sample shots, extract a DEM, decode and check predictions in one Rust program.</p></div>{% endblock hero %}
+{% block main %}
+
+<section class="task-section"><h2 id="rust-project">1. Create a standalone project</h2>
+<p>This example uses published <code>rstim</code> and <code>rmatching</code> crates. Their interfaces are pinned to 0.3.0. Download <a href="../examples/rust-experiment/tutorial.zip" download>the project with Cargo.lock</a>, or create these files:</p>
+<pre data-language="Shell"><code>mkdir rustqec-experiment
+cd rustqec-experiment
+mkdir src</code></pre>
+<p>Save as <code>Cargo.toml</code>:</p>
+<pre data-language="TOML"><code>{{ load_data(path="static/examples/rust-experiment/Cargo.toml",format="plain") }}</code></pre>
+<p>Library defaults are disabled for <code>rstim</code> because this example needs neither CLI parsing, viewer, CSS generation nor a native solver. See the <a href="../rust-api-reference/">API index</a> for the complete crate and feature boundaries.</p></section>
+<section class="task-section"><h2 id="rust-experiment">2. Simulate, decode and verify</h2>
+<p>Save as <code>src/main.rs</code>. The first experiment checks Bell parity. The second introduces one possible X error that flips both D0 and L0, so its matching prediction can be checked against the held-out observable.</p>
+<pre data-language="Rust"><code>{{ load_data(path="static/examples/rust-experiment/src/main.rs",format="plain") }}</code></pre>
+<p><code>sample_batch</code> stores matrices with detector/measurement index first and shot index second. Pass only <code>detections</code> to the decoder; <code>observable_flips</code> is the scoring truth. Extract the DEM from the same circuit that produced the shots.</p></section>
+<section class="task-section"><h2 id="rust-results">3. Run and interpret</h2>
+<pre data-language="Shell"><code>cargo run --quiet</code></pre>
+<pre data-output="true"><code>validated Bell parity and 128/128 observable predictions</code></pre>
+<p>The seed exercises both error and no-error outcomes. Perfect predictions are expected for this deliberately simple one-mechanism model; they do not imply a zero logical error rate for a surface code. Use <code>cargo run --quiet --locked</code> with the downloaded project to reproduce its dependency resolution.</p>
+<p>For your own experiment, replace the circuit, regenerate its DEM, check model dimensions and retain the observable labels for scoring. Matching rejects non-graphlike components; use another decoder when its assumptions do not hold. Under loss, use the <a href="../atom-loss/">loss-visible workflow</a> instead of interpreting placeholder parities as ordinary detectors.</p></section>
+
+{% endblock main %}

@@ -156,9 +156,8 @@ const CANONICAL_PROVENANCE_KEYS: &[&str] = &[
 ];
 
 const EVIDENCE_PAGE_TEMPLATES: &[&str] = &[
-    "site/templates/simulator.html",
-    "site/templates/detector-models.html",
-    "site/templates/decoding.html",
+    "site/templates/benchmark-simulation.html",
+    "site/templates/benchmark-decoders.html",
     "site/templates/css-codes.html",
     "site/templates/validation.html",
 ];
@@ -413,70 +412,58 @@ fn qp101_browser_resources_are_preserved() {
 
 #[test]
 fn task_oriented_content_pages_are_linked() {
-    let index = read_repo_file("site/templates/index.html");
-    let reference = read_repo_file("site/templates/docs.html");
-    let simulator = read_repo_file("site/templates/simulator.html");
-    let detector_models = read_repo_file("site/templates/detector-models.html");
-    let decoding = read_repo_file("site/templates/decoding.html");
-    let css_codes = read_repo_file("site/templates/css-codes.html");
-    let site_sources = format!("{index}\n{simulator}\n{detector_models}\n{decoding}\n{css_codes}");
-
+    let navigation = read_repo_file("site/templates/partials/docs-navigation.html");
+    assert_eq!(navigation.matches("<a href=").count(), 20);
     assert_contains_all(
-        &site_sources,
+        &navigation,
         &[
-            "id=\"capabilities\"",
-            "id=\"circuit-simulation\"",
-            "id=\"dem-extraction\"",
-            "id=\"decoder-families\"",
-            "id=\"benchmark-campaigns\"",
-            "id=\"css-construction\"",
-            "id=\"distance-search\"",
-            "rstim",
-            "rsinter",
-            "rmatching",
-            "rbposd",
-            "rilpqec",
-            "qec-code",
-            "--bin rstim -- detect",
-            "rstim analyze_errors",
-            "rstim sample_dem",
+            "Tutorials",
+            "CLI &amp; formats",
+            "Benchmarks",
+            "Support &amp; versions",
+            "/rust-api/",
+            "/qec-code-cli/",
+            "/rsinter-cli/",
+            "/circuit-format/",
+            "/data-formats/",
+            "/benchmarks/simulation/",
+            "/benchmarks/decoders/",
+            "/versions/",
         ],
-        "task-oriented content site source",
+        "twenty primary pages in four groups",
     );
-
+    for route in ["simulator", "detector-models", "atom-loss-concepts"] {
+        let content = read_repo_file(&format!("site/content/{route}/_index.md"));
+        assert!(content.contains("legacy-guide.html"));
+        assert!(!navigation.contains(&format!("/{route}/")));
+    }
     assert_contains_all(
-        &index,
-        &["href=\"docs/#reference\""],
-        "homepage library reference entry",
+        &read_repo_file("site/templates/get-started.html"),
+        &[
+            "rstim circuit dem",
+            "id=\"logical-error-rate\"",
+            "rstim surface-code-ler",
+        ],
+        "complete introductory workflow",
     );
     assert_contains_all(
-        &reference,
+        &read_repo_file("site/templates/css-codes.html"),
         &[
-            "id=\"reference\"",
-            "https://docs.rs/rstim/0.3.0/rstim/",
-            "https://docs.rs/rmatching/0.3.0/rmatching/",
-            "https://docs.rs/rbposd/0.3.0/rbposd/",
-            "https://docs.rs/rilpqec/0.3.0/rilpqec/",
-            "https://docs.rs/rsinter/0.3.0/rsinter/",
-            "https://docs.rs/qec-code/0.3.0/qec_code/",
-            "https://docs.rs/qec-ilp-core/0.3.0/qec_ilp_core/",
+            "num_cols",
+            "--hx hx.json --hz hz.json",
+            "bound_type: upper",
+            "rstim circuit detect",
         ],
-        "version-pinned library reference destinations",
+        "custom CSS experiment",
     );
-
-    assert_contains_all_case_insensitive(
-        &site_sources,
+    assert_contains_all(
+        &read_repo_file("site/templates/decoding.html"),
         &[
-            "sampling",
-            "detector error models",
-            "MWPM",
-            "BP-OSD",
-            "ILP",
-            "benchmark campaigns",
-            "css codes",
-            "distance search",
+            "--decoder rmatching",
+            "--decoder rbposd",
+            "Different decoder inputs",
         ],
-        "task-oriented content copy",
+        "frozen-input comparison",
     );
 }
 
@@ -511,7 +498,7 @@ fn new_documentation_routes_use_canonical_sources() {
     );
     assert_contains_all(
         &support,
-        &["generated/support-compatibility.md", "../qp101/protocol/"],
+        &["generated/support-core.md", "../qp101/protocol/"],
         "rendered support contract page",
     );
     assert_contains_all(
@@ -588,8 +575,8 @@ fn get_started_uses_one_noisy_circuit_for_definition_and_sampling() {
             "--shots 10000 --seed 86 --out-dir .",
             "logical error rate per round",
             "Distance 7</th>",
-            "href=\"../simulator/\"",
-            "href=\"../detector-models/\"",
+            "href=\"../css-codes/\"",
+            "href=\"../rust-api/\"",
             "href=\"../decoding/\"",
             "href=\"../qp101/\"",
             "https://github.com/quantumlib/Stim",
@@ -638,7 +625,11 @@ fn get_started_uses_one_noisy_circuit_for_definition_and_sampling() {
     );
     assert!(
         !page.contains("cargo run")
-            && !page.contains("rsinter")
+            && !page
+                .split_once("id=\"first-circuit\"")
+                .unwrap()
+                .1
+                .contains("rsinter")
             && !page.contains("repository root"),
         "get-started commands should use the installed rstim binary"
     );
@@ -730,19 +721,14 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
 }
 
 #[test]
-fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
+fn learning_paths_are_prose_and_homepage_describes_rust_and_cli() {
     let index = read_repo_file("site/templates/index.html");
     let get_started = read_repo_file("site/templates/get-started.html");
 
     assert_contains_all(
         &index,
-        &[
-            "id=\"why-rstim\"",
-            "Why rstim alongside Stim?",
-            "Rust tools for code construction, atom-loss sampling, dataset export, and decoding",
-            "href=\"validation/\"",
-        ],
-        "homepage explanation of rstim and Stim",
+        &["native Rust APIs and a unified CLI", "href=\"validation/\""],
+        "homepage Rust API and CLI value proposition",
     );
 
     let after_plot = get_started
@@ -752,8 +738,8 @@ fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
     assert_contains_all(
         after_plot,
         &[
-            "href=\"../simulator/\"",
-            "href=\"../detector-models/\"",
+            "href=\"../css-codes/\"",
+            "href=\"../rust-api/\"",
             "href=\"../decoding/\"",
             "href=\"../qp101/\"",
             "inspired by <a href=\"https://github.com/quantumlib/Stim\">Stim</a>",
@@ -768,7 +754,8 @@ fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
         "tutorial continuation should connect its links in prose",
     );
     assert!(
-        !after_plot.contains("getting_started.ipynb") && !after_plot.contains("follow that example"),
+        !after_plot.contains("getting_started.ipynb")
+            && !after_plot.contains("follow that example"),
         "further learning should describe the projects' relationship instead of attributing sweep parameters",
     );
 }
@@ -790,7 +777,6 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
             "id=\"loss-tensors\"",
             "id=\"marker-contract\"",
             "id=\"load-and-check\"",
-            "rstim -- \\",
             "circuit sample",
             "dataset export",
             "mkdir -p data",
@@ -841,7 +827,11 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
 fn decode_campaigns_navigation_and_validation_evidence_are_unified() {
     let index = read_repo_file("site/templates/index.html");
     let base = read_repo_file("site/templates/base.html");
-    let decoding = read_repo_file("site/templates/decoding.html");
+    let decoding = format!(
+        "{}\n{}",
+        read_repo_file("site/templates/decoding.html"),
+        read_repo_file("site/templates/benchmark-decoders.html")
+    );
     let validation = read_repo_file("site/templates/validation.html");
     let styles = read_repo_file("site/static/styles.css");
 
@@ -1412,7 +1402,7 @@ fn checked_benchmark_provenance_is_manifest_backed() {
 
 #[test]
 fn qec_code_and_future_benchmarks_are_classified() {
-    let simulator = read_repo_file("site/templates/simulator.html");
+    let simulator = read_repo_file("site/templates/benchmark-simulation.html");
     let css_codes = read_repo_file("site/templates/css-codes.html");
     let validation = read_repo_file("site/templates/validation.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
@@ -1429,7 +1419,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
         ],
         "qec-code benchmark content section",
     );
-    let detector_models = read_repo_file("site/templates/detector-models.html");
+    let detector_models = read_repo_file("site/templates/benchmark-simulation.html");
     let simulator_evidence = format!("{simulator}\n{detector_models}\n{validation}");
     assert_contains_all(
         &simulator_evidence,

@@ -1,102 +1,49 @@
 {% extends "base.html" %}
-
-{% block title %}Quantum error correction decoders — RustQEC{% endblock title %}
-{% block description %}Run MWPM, BP-OSD, and ILP decoders in the RustQEC workspace.{% endblock description %}
-
-{% block hero %}
-<div class="hero compact-hero">
-  <p class="eyebrow">Decoding</p>
-  <h1>Decode with three solver families</h1>
-  <p class="hero-copy">Use MWPM, BP-OSD, or ILP through a shared experiment path.</p>
-</div>
-{% endblock hero %}
-
+{% block title %}Compare decoders on the same data — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><h1>Compare decoders on the same data</h1><p class="hero-copy">Sample once, replay matching and BP-OSD, then score their predictions against private answers.</p></div>{% endblock hero %}
 {% block main %}
-<p class="content-links"><a href="../get-started/">First time here? Get started</a><a href="../validation/">How to interpret benchmark evidence</a></p>
-<section id="decoder-families" class="task-section" aria-labelledby="decoder-families-title">
-  <div class="section-heading">
-    <p class="eyebrow">Choose a decoder</p>
-    <h2 id="decoder-families-title">Three solvers, different trade-offs</h2>
-  </div>
-  <div class="table-wrap result-table">
-    <table>
-      <thead><tr><th>Crate</th><th>Method</th><th>Best fit</th></tr></thead>
-      <tbody>
-        <tr><td><code>rmatching</code></td><td>MWPM</td><td>Graphlike detector error models</td></tr>
-        <tr><td><code>rbposd</code></td><td>BP-OSD</td><td>Sparse parity checks and BB circuits</td></tr>
-        <tr><td><code>rilpqec</code></td><td>ILP</td><td>Exact and comparison-oriented cases</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
 
+<section id="decoder-families" class="task-section"><h2 id="decoder-families-title">Choose an input-compatible decoder</h2>
+<p>A decoder predicts observable flips from detector events and a detector error model. Minimum-weight perfect matching (MWPM, <code>rmatching</code>) uses graphlike error components; belief propagation with ordered-statistics decoding (BP-OSD, <code>rbposd</code>) works with parity-check models. Integer linear programming (ILP, <code>rilpqec</code>) is an optional solver path. None is universally best.</p>
+<p>This experiment uses <code>rsinter replay</code> with its matching and BP-OSD runner features. The <a href="../get-started/#install">central installation section</a> lists optional tools. Decoder choice and configuration are recorded in the replay statistics.</p></section>
+<section class="task-section"><h2 id="freeze-input">1. Freeze one model and one sample batch</h2>
+{% include "partials/example-circuit.html" %}
+<pre data-language="Shell"><code>rstim circuit dem --in circuit.stim --decompose-errors --out model.dem &gt; /dev/null
+rstim circuit detect --in circuit.stim --shots 128 --seed 7 \
+  --out detectors.b8 --out-format b8 \
+  --obs-out answers.b8 --obs-out-format b8 &gt; /dev/null</code></pre>
+<p>The DEM has two detectors and one observable. <code>b8</code> stores one byte per row for these widths; only the low two detector bits or low one observable bit are used. Keep <code>answers.b8</code> private. Both decoders must read exactly the same detector file and DEM.</p></section>
+<section class="task-section"><h2 id="replay-decoders">2. Replay both decoders</h2>
+<pre data-language="Shell"><code>rsinter replay --dem model.dem --dets detectors.b8 --decoder rmatching \
+  --predictions-out matching.b8 --stats-out matching.json --shots 128
+rsinter replay --dem model.dem --dets detectors.b8 --decoder rbposd \
+  --predictions-out bposd.b8 --stats-out bposd.json --shots 128</code></pre>
+<p>The commands read neither answers nor masks. Replay compiles once and streams batches; statistics include dimensions, normalized configuration, input/output hashes and timing. For a fair comparison, check those input hashes agree and separate compilation time from steady decoding time.</p></section>
+<section class="task-section"><h2 id="score-decoders">3. Score complete predictions</h2>
+<pre data-language="Shell"><code>python3 - &lt;&lt;'PYTHON'
+import json
+from pathlib import Path
 
-<section class="task-section" aria-labelledby="first-decode"><h2 id="first-decode">Decode your first detector rows</h2>
-<p class="doc-note">The <a href="../get-started/#decode">Get started guide</a> uses <code>rmatching</code> through the installed <code>rstim</code> command. This standalone example calls the <code>rmatching</code> Rust API directly; Cargo fetches its dependency when you run the project.</p>
-<p>Use a graphlike model with two detectors and one logical observable. For syndrome <code>11</code>, one joint error is more likely than two independent boundary errors, so matching predicts <code>L0=1</code>. The control row <code>00</code> predicts <code>L0=0</code>.</p>
-<p>This example uses a separate probability-0.1 model to show the Rust API. Detector inputs contain no observable answers.</p>
-<h3 id="decode-project">1. Create a standalone Rust project</h3>
-<pre data-language="Shell"><code>mkdir qec-first-decode
-cd qec-first-decode
-mkdir src</code></pre>
-<p>Save as <code>Cargo.toml</code>:</p>
-<pre data-language="TOML"><code>{{ load_data(path="static/examples/first-decode/Cargo.toml", format="plain") }}</code></pre>
-<h3 id="decode-input">2. Save the model and detector rows</h3>
-<pre data-language="Shell"><code>cat &gt; model.dem &lt;&lt;'DEM'
-{{ load_data(path="static/examples/first-decode/model.dem", format="plain") }}DEM
-cat &gt; detectors.01 &lt;&lt;'SHOTS'
-{{ load_data(path="static/examples/first-decode/detectors.01", format="plain") }}SHOTS</code></pre>
-<p>Each character in <code>detectors.01</code> is a detector bit, ordered D0 then D1. These are two explicit test cases, not a sampled logical-error-rate estimate.</p>
-<h3 id="decode-code">3. Decode and inspect the prediction</h3>
-<p>Save as <code>src/main.rs</code>:</p>
-<pre data-language="Rust"><code>{{ load_data(path="static/examples/first-decode/src/main.rs", format="plain") }}</code></pre>
-<pre data-language="Shell"><code>cargo run --quiet</code></pre>
-<pre data-output="true" data-language="Expected output"><code>row 1: predicted L0=1
-row 2: predicted L0=0</code></pre>
-<p>For these constructed cases, the predicted bits match the chosen error events. With real samples, compare predictions to held-out observable flips to count logical failures; the decoder must only receive detector bits.</p>
-<h3 id="decode-own-data">4. Use your own model</h3>
-<p>Replace the DEM and input rows together. The row width must equal the model's detector count, and rmatching supports graphlike error components with at most two detectors and probabilities <code>0 ≤ p &lt; 1</code>. Adapt this example's two-bit validation to your model; do not simply truncate rows. Under atom loss, first construct <a href="../sampling-data/#loss-tensors-title">loss-aware detector inputs</a>.</p>
-<div class="content-links"><a href="../examples/first-decode/src/main.rs" download>Download Rust example</a><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">rmatching {{ docs_version.packages.rmatching.version }} API</a><a href="../sampling-data/">Next: save aligned input and truth</a><a href="#benchmark-campaigns-title">Compare decoders</a></div>
-</section>
+answers = Path('answers.b8').read_bytes()
+assert len(answers) == 128 and all(b in (0, 1) for b in answers)
+input_hashes = []
+for name in ('matching', 'bposd'):
+    stats = json.loads(Path(name + '.json').read_text())
+    predictions = Path(name + '.b8').read_bytes()
+    assert stats['num_shots'] == 128
+    assert stats['num_detectors'] == 2 and stats['num_observables'] == 1
+    assert len(predictions) == len(answers)
+    assert all(b in (0, 1) for b in predictions)
+    input_hashes.append((stats['dem_sha256'], stats['detectors_sha256']))
+    failures = sum(p != a for p, a in zip(predictions, answers))
+    print(f'{name}: {failures} / {len(answers)} logical errors')
+assert input_hashes[0] == input_hashes[1], 'Different decoder inputs'
+PYTHON</code></pre>
+<pre data-output="true"><code>matching: 0 / 128 logical errors
+bposd: 0 / 128 logical errors</code></pre>
+<p>Each disagreement is one logical failure. This tiny graphlike case verifies wiring; it cannot establish a general ranking. An incomplete prediction file or nonzero replay exit is a failed experiment, not a decoder accuracy result.</p></section>
+<section class="task-section"><h2 id="first-decode">Earlier Rust decoder example</h2><p>The earlier <a href="../examples/first-decode/src/main.rs" download>two-row matching example</a> remains available. For a complete experiment, use the <a href="../rust-api/#rust-experiment">Rust tutorial</a>.</p><span id="decode-project"></span><span id="decode-input"></span><span id="decode-code"></span><span id="decode-own-data"></span></section>
+<section id="benchmark-campaigns" class="task-section"><h2 id="benchmark-campaigns-title">Scale the experiment</h2>
+<p>Use <a href="../benchmarks/decoders/">recorded decoder benchmarks</a> for full campaigns, conditions and reproduction. For parameter sweeps, use the <a href="../rsinter-cli/#commands">rsinter campaign reference</a>; retain circuit, noise model, seeds, configuration, shot counts and stopping rules. For a Rust consumer, <a href="../rust-api/">run the complete API experiment</a>. The earlier <a href="../examples/first-decode/src/main.rs" download>two-row Rust decoder example</a> remains downloadable.</p></section>
 
-<section id="benchmark-campaigns" class="task-section" aria-labelledby="benchmark-campaigns-title">
-  <div class="section-heading">
-    <p class="eyebrow">Benchmark campaigns</p>
-    <h2 id="benchmark-campaigns-title">Run and compare decoder cases</h2>
-    <p class="section-copy"><code>rsinter</code> runs cases, merges outputs, and produces comparison plots. Smoke runs check wiring; checked full artifacts support only the recorded cases and environments.</p>
-  </div>
-  <p class="doc-note">Run from a <a href="https://github.com/nzy1997/rust-qec/blob/master/README.md#build-from-source">configured repository checkout</a>. These commands are not included in the two-binary native archive. Install the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison Python environment</a> or follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a> before its matching command. Successful smoke runs produce local result files; they check wiring, not decoder ranking.</p>
-  <pre class="quick-command"><code>make surface-decoder-compare-smoke
-make bb-circuit-bposd-compare-smoke</code></pre>
-  <div class="table-wrap result-table">
-    <table>
-      <thead><tr><th>Campaign</th><th>What it checks</th><th>Evidence</th></tr></thead>
-      <tbody>
-        <tr><td>Surface decoder</td><td>End-to-end local wiring</td><td>Smoke and checked comparison</td></tr>
-        <tr><td>BB-circuit BP-OSD</td><td>Environment and dataset readiness</td><td>Readiness and checked comparison</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<section class="evidence-section" aria-labelledby="decoder-results-title">
-  <div class="section-heading">
-    <p class="eyebrow">Results</p>
-    <h2 id="decoder-results-title">Surface-code and BP-OSD comparisons</h2>
-    <p class="section-copy">The checked plots show only their named cases. Full reproduction details are available inside each result.</p>
-  </div>
-  <div class="evidence-stack decoder-evidence" data-evidence-items="surface-decoder-full bb-circuit-full" aria-live="polite">
-    <p>Loading decoder evidence.</p>
-  </div>
-</section>
-
-<section class="evidence-section" aria-labelledby="campaign-evidence-title">
-  <div class="section-heading">
-    <p class="eyebrow">Local workflow evidence</p>
-    <h2 id="campaign-evidence-title">Smoke and readiness checks</h2>
-  </div>
-  <p><a href="../validation/#local-workflows">Open local smoke and readiness evidence</a>. <a href="../validation/#historical-results">BP-OSD parity regression checks</a> are also listed in the evidence guide.</p>
-</section>
 {% endblock main %}
-
-{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

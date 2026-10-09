@@ -1,0 +1,4 @@
+{% extends "guide.html" %}
+{% block main %}<article class="prose">{{ section.content | safe }}
+<div id="dataset-export-contract"><h2>Dataset export contract</h2>{{ load_data(path="generated/decoder-dataset.md",format="plain") | replace(from="# Decoder Dataset Export",to="") | markdown | safe }}</div>
+</article>{% endblock main %}

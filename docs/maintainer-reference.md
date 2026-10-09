@@ -1,8 +1,12 @@
 # Maintainer reference
 
-This document contains release gates, regression commands, and evidence
-bookkeeping for RustQEC maintainers. User-facing compatibility promises live in
-`docs/support-compatibility.md`.
+Run these checks from a configured repository checkout. The release gate
+checks whether the evidence meets a decoder’s support promise; publication
+verification checks the files actually shipped. User-facing limits live in
+[Support and compatibility](support-compatibility.md).
+
+Envelope MLE (maximum-likelihood estimation) uses an ILP (integer linear
+programming) solver; the controls below build it explicitly.
 
 ## Atom-loss regression controls
 

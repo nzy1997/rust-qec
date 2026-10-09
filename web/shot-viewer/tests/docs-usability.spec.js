@@ -54,8 +54,8 @@ test('home routes first-time users to the workflow and docs links to the API ref
   await page.getByRole('link', { name: 'Construct circuits' }).click();
   await expect(page).toHaveURL(/\/get-started\/#first-circuit$/);
   await expect(page.getByRole('heading', { name: '2. Define the circuit' })).toBeInViewport();
-  await page.locator('.docs-sidebar').getByRole('link', { name: 'CLI & Rust APIs' }).click();
-  await expect(page.getByRole('heading', { name: 'CLI and Rust API reference' })).toBeInViewport();
+  await page.locator('.docs-sidebar').getByRole('link', { name: 'rstim CLI' }).click();
+  await expect(page.getByRole('heading', { name: 'rstim CLI reference' })).toBeInViewport();
   await page.goto('/get-started/');
   await expect(page.locator('section[aria-labelledby="install"]')).toContainText('cargo install --locked --path rstim');
 });
@@ -74,10 +74,10 @@ test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
   await expect(page.locator('.home-hero')).toContainText('simulate circuit noise and atom loss');
   await page.getByRole('link', { name: 'Atom-loss sampling and decoding' }).click();
   await expect(page).toHaveURL(/\/atom-loss\/$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss\./);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss/);
   await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
-  await expect(page.locator('[data-output]')).toContainText('Logical errors: 0 / 64');
-  await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Atom loss');
+  await expect(page.locator('[data-output]').filter({ hasText: 'Decoded shots' })).toContainText('Logical errors: 0 / 64');
+  await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Decode with atom loss');
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
@@ -150,7 +150,7 @@ test("documentation uses the home navigation with an added search", async ({ pag
 
 test("long protocol page supplies rendered content and usable table-of-contents anchors", async ({ page }) => {
   await page.goto("/qp101/protocol/");
-  await expect(page.getByRole("heading", { level: 1, name: /QP101-ZY: Quantum Circuit JSON Format/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^QP101 format$/ })).toBeVisible();
   await expect(page.locator("main")).not.toContainText("{{ load_data");
   await expect(page.locator(".page-toc")).toBeVisible();
   await page.locator(".toc-disclosure > summary").click();
@@ -162,7 +162,7 @@ test("long protocol page supplies rendered content and usable table-of-contents 
 });
 
 test("decoder evidence keeps provenance layered and never stringifies objects", async ({ page }) => {
-  await page.goto("/decoding/");
+  await page.goto("/benchmarks/decoders/");
   const evidence = page.locator(".decoder-evidence");
   await expect(evidence.locator(".evidence-provenance").first()).toBeAttached();
   await expect(evidence).not.toContainText("[object Object]");
@@ -182,7 +182,7 @@ test("dynamic evidence commands copy executable source-checkout commands", async
       value: { writeText: async (text) => { window.__copiedText = text; } },
     });
   });
-  await page.goto("/decoding/");
+  await page.goto("/benchmarks/decoders/");
   const reproduction = page.locator(".evidence-reproduction").filter({ hasText: "make surface-decoder-compare-full" });
   await reproduction.locator("summary").click();
   const block = await codeBlockFor(reproduction, "make surface-decoder-compare-full");
@@ -231,7 +231,7 @@ test("search finds commands and concepts, preserves queries, and handles no matc
   await page.getByRole("searchbox", { name: "Search documentation" }).fill("rmatching");
   await page.locator(".nav-search button").click();
   await expect(page).toHaveURL(/\/get-started\/\?q=rmatching/);
-  await expect(page.locator("#search-results")).toContainText("Quantum error correction decoders");
+  await expect(page.locator("#search-results")).toContainText("Compare decoders on the same data");
   const query = page.getByRole("searchbox", { name: "Search documentation" });
   await query.fill("b8");
   await expect(page.locator("#search-results")).toContainText("Sampling and training data");
@@ -279,10 +279,11 @@ test("terminal transcript keeps output out of copied commands", async ({ page })
   expect(await page.evaluate(() => window.__copiedText)).not.toContain("110");
 });
 
-test("advanced guides point to the source checkout", async ({ page }) => {
+test("advanced guides start with experiment steps and use installed commands", async ({ page }) => {
   await page.goto("/sampling-data/");
-  await page.getByRole("link", { name: "configured repository checkout" }).first().click();
-  await expect(page.locator("pre").filter({ hasText: "cargo build --locked --workspace" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("configured repository checkout");
+  await expect(page.locator("pre").filter({ hasText: "rstim circuit gen" })).toBeVisible();
+  await expect(page.locator(".docs-sidebar").getByRole("link", { name: "Get started", exact: true })).toBeVisible();
 });
 
 test("support table labels stay intact while the table, not the page, scrolls", async ({ page }) => {
@@ -296,7 +297,7 @@ test("support table labels stay intact while the table, not the page, scrolls", 
 });
 
 test("figures open in place, zoom, and return focus without losing the reading position", async ({ page }) => {
-  await page.goto("/decoding/");
+  await page.goto("/benchmarks/decoders/");
   const trigger = page.locator("[data-figure-viewer]").first();
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
@@ -307,7 +308,7 @@ test("figures open in place, zoom, and return focus without losing the reading p
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
   await expect(trigger).toBeFocused();
-  await expect(page).toHaveURL(/\/decoding\/$/);
+  await expect(page).toHaveURL(/\/benchmarks\/decoders\/$/);
 });
 
 test("desktop Shot Lab shows selected event details alongside the circuit", async ({ page }) => {
@@ -411,7 +412,7 @@ for (const width of [768, 1050]) {
 
 for (const [path, heading] of [
   ['/atom-loss/#sample-loss', '#sample-loss'],
-  ['/atom-loss-concepts/#supported-circuits', '#supported-circuits'],
+  ['/support/#atom-loss-support-boundary', '#atom-loss-support-boundary'],
   ['/atom-loss-evidence/#loss-accuracy-time', '#loss-accuracy-time'],
 ]) {
   test(`atom-loss chapter links clear the compact table of contents: ${path}`, async ({ page }) => {
@@ -436,9 +437,9 @@ for (const [path, heading] of [
 }
 
 test("highlighted decoder source is the exact downloadable runnable example", async ({ page, request }) => {
-  const source = await request.get("/examples/first-decode/src/main.rs");
+  const source = await request.get("/examples/rust-experiment/src/main.rs");
   expect(source.ok()).toBe(true);
-  await page.goto("/decoding/");
+  await page.goto("/rust-api/");
   await expect(page.locator('pre[data-language="Rust"] code')).toHaveText(await source.text(), { useInnerText: false });
 });
 

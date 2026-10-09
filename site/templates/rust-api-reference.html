@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Rust API index — RustQEC{% endblock title %}
+{% block description %}Choose a crate and open its versioned API documentation.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><h1>Rust API index</h1><p class="hero-copy">Choose a crate and open its versioned API documentation.</p></div>{% endblock hero %}
+{% block main %}
+<section class="task-section" aria-labelledby="rust-apis"><h2 id="rust-apis">Versioned Rust APIs</h2>
+<p>These versions are generated from the workspace manifests during the site build. They can differ by patch while remaining in the RustQEC {{ docs_version.release_line }} release line.</p>
+<div class="table-wrap"><table><thead><tr><th>Crate</th><th>Version</th><th>Primary surface</th><th>API</th></tr></thead><tbody>
+<tr><td><code>rstim</code></td><td>{{ docs_version.packages.rstim.version }}</td><td>Circuits, simulation, DEM, formats</td><td><a href="https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/">docs.rs ↗</a></td></tr>
+<tr><td><code>rmatching</code></td><td>{{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">docs.rs ↗</a></td></tr>
+<tr><td><code>rbposd</code></td><td>{{ docs_version.packages.rbposd.version }}</td><td>BP-OSD decoding</td><td><a href="https://docs.rs/rbposd/{{ docs_version.packages.rbposd.version }}/rbposd/">docs.rs ↗</a></td></tr>
+<tr><td><code>rilpqec</code></td><td>{{ docs_version.packages.rilpqec.version }}</td><td>ILP decoding</td><td><a href="https://docs.rs/rilpqec/{{ docs_version.packages.rilpqec.version }}/rilpqec/">docs.rs ↗</a></td></tr>
+<tr><td><code>rsinter</code></td><td>{{ docs_version.packages.rsinter.version }}</td><td>Experiments and decoder replay</td><td><a href="https://docs.rs/rsinter/{{ docs_version.packages.rsinter.version }}/rsinter/">docs.rs ↗</a></td></tr>
+<tr><td><code>qec-code</code></td><td>{{ docs_version.packages.qec_code.version }}</td><td>CSS construction and distance</td><td><a href="https://docs.rs/qec-code/{{ docs_version.packages.qec_code.version }}/qec_code/">docs.rs ↗</a></td></tr>
+<tr><td><code>qec-ilp-core</code></td><td>{{ docs_version.packages.qec_ilp_core.version }}</td><td>Shared ILP models</td><td><a href="https://docs.rs/qec-ilp-core/{{ docs_version.packages.qec_ilp_core.version }}/qec_ilp_core/">docs.rs ↗</a></td></tr>
+</tbody></table></div></section>
+
+{% endblock main %}

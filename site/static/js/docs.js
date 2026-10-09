@@ -9,9 +9,32 @@
   syncNavOffset();
   if (navShell) new ResizeObserver(syncNavOffset).observe(navShell);
   const toc = document.querySelector('.page-toc');
+  // Keep a deep link aligned while asynchronous evidence changes page height.
+  // Stop following as soon as the reader interacts with the page.
+  let followFragment = Boolean(location.hash);
+  let fragmentPending = false;
+  function queueFragment() {
+    if (!followFragment || fragmentPending) return;
+    fragmentPending = true;
+    requestAnimationFrame(() => {
+      fragmentPending = false;
+      if (followFragment) revealFragment();
+    });
+  }
+  for (const event of ['wheel', 'touchmove', 'pointerdown']) {
+    window.addEventListener(event, () => { followFragment = false; }, { passive: true });
+  }
+  window.addEventListener('keydown', () => { followFragment = false; });
   // Interactive widgets replace their headings and provide their own navigation.
   const headings = [...main.querySelectorAll('h2, h3, h4')].filter((heading) => !heading.closest('[data-toc-skip]'));
   const tocLinks = new Map();
+  toc?.addEventListener('click', (event) => {
+    const link = event.target.closest('a[href^="#"]');
+    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    toc.querySelector('.toc-disclosure').open = false;
+    followFragment = true;
+    queueFragment();
+  });
   if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && !['home', 'shot'].includes(document.body.dataset.page)) {
     let section;
     let children;
@@ -84,9 +107,12 @@
       target.scrollIntoView({ behavior: 'instant' });
     } catch { /* An invalid URL escape has no matching heading. */ }
   }
-  requestAnimationFrame(revealFragment);
-  window.addEventListener('load', revealFragment, { once: true });
-  window.addEventListener('hashchange', () => requestAnimationFrame(revealFragment));
+  queueFragment();
+  window.addEventListener('load', queueFragment, { once: true });
+  window.addEventListener('hashchange', () => {
+    followFragment = Boolean(location.hash);
+    queueFragment();
+  });
   function languageFor(pre, code) {
     if (pre.dataset.language) return pre.dataset.language;
     const lang = code.className.match(/language-([\w-]+)/)?.[1] || pre.dataset.lang;
@@ -115,6 +141,13 @@
     code.replaceChildren(fragment);
   }
   function enhanceContent() {
+    function addTerminalChrome(block) {
+      const chrome = document.createElement('div');
+      chrome.className = 'terminal-chrome';
+      chrome.setAttribute('aria-hidden', 'true');
+      chrome.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+      block.append(chrome);
+    }
     main.querySelectorAll('pre').forEach((pre) => {
       const code = pre.querySelector('code');
       if (!code || pre.dataset.enhanced) return;
@@ -124,32 +157,31 @@
       label.textContent = output ? (pre.dataset.language || 'Expected output') : languageFor(pre, code);
       if (output) {
         const terminal = pre.previousElementSibling;
+        const result = document.createElement('div');
+        result.className = 'terminal-output';
+        result.setAttribute('role', 'group');
+        result.setAttribute('aria-label', label.textContent);
+        pre.before(result);
+        result.append(pre);
         if (terminal?.classList.contains('terminal-block')) {
-          const result = document.createElement('div');
-          result.className = 'terminal-output';
-          pre.before(result);
-          result.append(pre);
           terminal.classList.add('has-output');
           terminal.append(result);
-          return;
+        } else {
+          const block = document.createElement('div');
+          block.className = 'terminal-block terminal-output-only';
+          addTerminalChrome(block);
+          result.before(block);
+          block.append(result);
         }
-        const bar = document.createElement('div');
-        bar.className = 'code-toolbar output-toolbar';
-        bar.append(label);
-        pre.before(bar);
         return;
       }
       highlight(code, label.textContent);
       const block = document.createElement('div');
       block.className = 'code-block';
-      const isShell = label.textContent.trim().toLowerCase() === 'shell';
+      const isShell = /^shell\b/i.test(label.textContent.trim());
       if (isShell) {
         block.classList.add('terminal-block');
-        const chrome = document.createElement('div');
-        chrome.className = 'terminal-chrome';
-        chrome.setAttribute('aria-hidden', 'true');
-        chrome.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
-        block.append(chrome);
+        addTerminalChrome(block);
       }
       pre.before(block);
       block.append(pre);
@@ -197,7 +229,7 @@
     });
   }
   enhanceContent();
-  new MutationObserver(enhanceContent).observe(main, { childList: true, subtree: true });
+  new MutationObserver(() => { enhanceContent(); queueFragment(); }).observe(main, { childList: true, subtree: true });
   let figureDialog;
   document.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-figure-viewer], .result-plot > a');
