@@ -523,6 +523,19 @@ impl CoherentPacket {
     }
     #[inline]
     fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> [f64; 64] {
+        if p.x == 0 {
+            self.probability_zero_coordinates::<PHASE, true>(p)
+        } else {
+            self.probability_zero_coordinates::<PHASE, false>(p)
+        }
+    }
+
+    #[inline]
+    fn probability_zero_coordinates<const PHASE: u8, const DIAGONAL: bool>(
+        &self,
+        p: &CompactPauli,
+    ) -> [f64; 64] {
+        debug_assert!(!DIAGONAL || p.x == 0);
         let mut expectation = [0.; 64];
         let mut norm = [0.; 64];
         let phase = i_pow(PHASE);
@@ -535,9 +548,15 @@ impl CoherentPacket {
             let partner = amplitude ^ p.x;
             for lane in 0..self.lanes {
                 let i = amplitude * self.lanes + lane;
-                let j = partner * self.lanes + lane;
                 let amp = ComplexAmp::new(self.re[i], self.im[i]);
-                let image = ComplexAmp::new(self.re[j], self.im[j]);
+                // Diagonal Paulis use this same amplitude as their image.
+                // Reuse its load, retaining the full floating expression below.
+                let image = if DIAGONAL {
+                    amp
+                } else {
+                    let j = partner * self.lanes + lane;
+                    ComplexAmp::new(self.re[j], self.im[j])
+                };
                 // Preserve the incumbent's exact left-associated complex expression
                 // and per-lane amplitude accumulation order, including roundoff.
                 expectation[lane] += (image.conj() * phase * (amp * sign)).re;
@@ -1264,6 +1283,52 @@ mod phase_specialized_cdf_tests {
                                     "scalar len={len}; x={x}; z={z}; phase={phase}; kind={kind}; lanes={lanes}; lane={lane}"
                                 );
                                 assert_eq!(expected[lane].to_bits(), scalar_expected.to_bits());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn full_packet_cdfs_keep_frozen_bits_at_high_rank_and_after_partial_reset() {
+        let mut packet = CoherentPacket::default();
+        for len in [1024usize, 4096] {
+            let rank = len.trailing_zeros() as usize;
+            // Reuse the allocation across full and partial packet strides.
+            for lanes in [64, 7, 64] {
+                packet.reset(&coefficients(len, 0, 0), lanes, rank).unwrap();
+                for lane in 0..lanes {
+                    let state = coefficients(len, lane % 5, lane);
+                    for (amplitude, amp) in state.into_iter().enumerate() {
+                        packet.re[amplitude * lanes + lane] = amp.re;
+                        packet.im[amplitude * lanes + lane] = amp.im;
+                    }
+                }
+                for (x, z) in [(0, len - 1), (len / 2, 0), (5, len - 2), (len - 1, len - 1)] {
+                    for phase in 0..4 {
+                        let p = compact(x, z, phase);
+                        let actual = packet.probability_zero(&p);
+                        let frozen = frozen_packet_probability_zero(&packet, &p);
+                        for lane in 0..64 {
+                            assert_eq!(
+                                actual[lane].to_bits(),
+                                frozen[lane].to_bits(),
+                                "len={len}; lanes={lanes}; x={x}; z={z}; phase={phase}; lane={lane}"
+                            );
+                            if lane < lanes {
+                                let state = (0..len)
+                                    .map(|amplitude| {
+                                        let index = amplitude * lanes + lane;
+                                        ComplexAmp::new(packet.re[index], packet.im[index])
+                                    })
+                                    .collect::<Vec<_>>();
+                                assert_eq!(
+                                    actual[lane].to_bits(),
+                                    frozen_scalar_probability_zero(&state, &p).to_bits(),
+                                    "independent scalar CDF len={len}; lanes={lanes}; lane={lane}"
+                                );
                             }
                         }
                     }
