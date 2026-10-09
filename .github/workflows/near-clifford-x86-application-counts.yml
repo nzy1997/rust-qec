@@ -21,13 +21,24 @@ on:
         required: false
         default: false
         type: boolean
+      cdf_source_pair:
+        description: 'Run the fixed 36-cell depth/rank/boundary/counts source-pair protocol with an identical-binary control'
+        required: false
+        default: false
+        type: boolean
+      candidate_ref:
+        description: 'Exact candidate source SHA for cdf_source_pair; both source refs are required'
+        required: false
+        default: ''
+        type: string
+
 
 permissions:
   contents: read
 
 jobs:
   benchmark:
-    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only }}
+    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only && !inputs.cdf_source_pair }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -135,7 +146,7 @@ jobs:
             drafts/x86-scout-*
             drafts/x86-application-counts/
   paired-scout:
-    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only }}
+    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only && !inputs.cdf_source_pair }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -198,7 +209,7 @@ jobs:
             drafts/rust-pair-scout-probe/build.log
             drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log
   cpu-profile:
-    if: ${{ inputs.profile_only }}
+    if: ${{ inputs.profile_only && !inputs.cdf_source_pair }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -242,3 +253,94 @@ jobs:
             drafts/x86-profile-*
             drafts/x86-scout-*
             drafts/x86-native-profile/
+  cdf-source-pair:
+    if: ${{ inputs.cdf_source_pair }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      RUSTFLAGS: '-C target-cpu=native'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+      VECLIB_MAXIMUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check contracts and install pinned compiler before any timings
+        env:
+          PROFILE_ONLY: ${{ inputs.profile_only }}
+        run: |
+          test "$PROFILE_ONLY" != true
+          mkdir -p drafts
+          python -I benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract.log 2>&1
+          python -I -O benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract-optimized.log 2>&1
+          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-cdf-toolchain.log 2>&1
+      - name: Record virtual host and select one logical CPU
+        run: |
+          python - <<'PY'
+          import json, os, platform, subprocess
+          from pathlib import Path
+          root = Path('drafts/x86-cdf')
+          root.mkdir()
+          affinity = sorted(os.sched_getaffinity(0))
+          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
+                         available_affinity=affinity, virtual_machine=True,
+                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
+                         meminfo=Path('/proc/meminfo').read_text(),
+                         cpuinfo=Path('/proc/cpuinfo').read_text())
+          (root/'host.json').write_text(json.dumps(receipt, indent=2)+'\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'BENCH_CPU={affinity[0]}\n')
+          PY
+      - name: Build and retain both exact sources and run native arithmetic and RNG tests
+        timeout-minutes: 25
+        env:
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+          CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        run: |
+          python -I benchmarks/near_clifford/cdf_source_pair/prepare.py \
+            --baseline-ref "$BASELINE_REF" --candidate-ref "$CANDIDATE_REF" \
+            --out drafts/x86-cdf/preparation > drafts/x86-cdf/prepare.log 2>&1
+      - name: Collect all 36 cells with balanced source and identical-binary controls
+        timeout-minutes: 40
+        run: |
+          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/cdf_source_pair/run_retained.py \
+            --preparation drafts/x86-cdf/preparation --out drafts/x86-cdf/output \
+            --control drafts/x86-cdf/control > drafts/x86-cdf/outer.log 2>&1
+      - name: Seal originals before external summary interpretation
+        run: |
+          python -I benchmarks/near_clifford/cdf_source_pair/verify.py --seal drafts/x86-cdf > drafts/x86-cdf-seal.log 2>&1
+      - name: Independently replay source bytes, finite witnesses, schedule and statistics
+        run: |
+          python -I benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify.log 2>&1
+          python -I -O benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify-optimized.log 2>&1
+      - name: Retain original streams, actual binaries, source snapshots and partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-clifford-x86-cdf-source-pair-${{ github.sha }}
+          retention-days: 30
+          path: |
+            drafts/x86-cdf-*.log
+            drafts/x86-cdf/*.json
+            drafts/x86-cdf/*.log
+            drafts/x86-cdf/output/
+            drafts/x86-cdf/control/
+            drafts/x86-cdf/preparation/*.json
+            drafts/x86-cdf/preparation/*.log
+            drafts/x86-cdf/preparation/production-sources/
+            drafts/x86-cdf/preparation/protocol/
+            drafts/x86-cdf/preparation/baseline/native-probes/
+            drafts/x86-cdf/preparation/baseline/*.bin
+            drafts/x86-cdf/preparation/baseline/*.json
+            drafts/x86-cdf/preparation/baseline/*.log
+            drafts/x86-cdf/preparation/candidate/native-probes/
+            drafts/x86-cdf/preparation/candidate/*.bin
+            drafts/x86-cdf/preparation/candidate/*.json
+            drafts/x86-cdf/preparation/candidate/*.log

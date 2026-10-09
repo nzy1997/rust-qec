@@ -1,0 +1,219 @@
+{
+  "schema": "rstim.near-clifford-cdf-source-pair.v1",
+  "purpose": "Single amplitude checked contiguous CDF sweep; original28targets plus8MSCbulk countscells promptedbynewCPUpeer gap; noSOTA/publicationclaim",
+  "structural_cases": [
+    [
+      "depth-32",
+      1,
+      "strict"
+    ],
+    [
+      "depth-32",
+      1,
+      "fused"
+    ],
+    [
+      "depth-32",
+      32,
+      "strict"
+    ],
+    [
+      "depth-32",
+      32,
+      "fused"
+    ],
+    [
+      "depth-32",
+      63,
+      "strict"
+    ],
+    [
+      "depth-32",
+      63,
+      "fused"
+    ],
+    [
+      "depth-32",
+      64,
+      "strict"
+    ],
+    [
+      "depth-32",
+      64,
+      "fused"
+    ],
+    [
+      "depth-32",
+      65,
+      "strict"
+    ],
+    [
+      "depth-32",
+      65,
+      "fused"
+    ],
+    [
+      "depth-32",
+      1024,
+      "strict"
+    ],
+    [
+      "depth-32",
+      1024,
+      "fused"
+    ],
+    [
+      "full-rank-4",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-4",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-8",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-8",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-12",
+      64,
+      "strict"
+    ],
+    [
+      "projected-rank-12",
+      64,
+      "fused"
+    ],
+    [
+      "projected-rank-12",
+      1024,
+      "strict"
+    ],
+    [
+      "projected-rank-12",
+      1024,
+      "fused"
+    ]
+  ],
+  "application_counts_cases": [
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      1,
+      "fused"
+    ],
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    [
+      "msc_d3_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "strict"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      64,
+      "fused"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "strict"
+    ],
+    [
+      "msc_d5_inject_cultivate_p1e-3",
+      1024,
+      "fused"
+    ]
+  ],
+  "pairs": 6,
+  "repetitions": 7,
+  "minimum_warm_observation_ns": 50000000,
+  "failures_retained": true,
+  "inputs": {
+    "msc_d3_inject_cultivate_p1e-3.stim": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+    "pure_surface_d7_r7_p1e-3.stim": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
+    "full-rank-16.stim": "d230557be9f4936b66adf3e19f12ceb7529e481c7c31f50dc083db64c7d41564",
+    "full-rank-4.stim": "386d3d5ce17747c3725919cbe3af5402914f83ceb9cba3f08d4cd8820ef851d1",
+    "full-rank-8.stim": "ca906c3aba57d51ecc2c81b1045514d28f4b1ead87670e42f12f83e42e48bb1c",
+    "projected-rank-16.stim": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc",
+    "full-rank-12.stim": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9",
+    "pure_surface_d9_r9_p1e-3.stim": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
+    "projected-rank-4.stim": "dc9a3954f01fa4570ca243879ecf3e038e467469a31626a86d1573e810e88d28",
+    "msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+    "depth-32.stim": "65e84894e0b927be163d80d73e2f99e2d140912765746e3193d69131e75606de",
+    "projected-rank-12.stim": "2f82a29316cbf67b61b38fcf060c8d62c3c6e540678acad63df01851a43d76f1",
+    "projected-rank-8.stim": "a855f518d7916d51507e63733ddb71e5caa1062b079fe72d37d1f153e5d4ddc8"
+  },
+  "structural_source": {
+    "path": "benchmarks/near_clifford/diagnostics/corpus.py",
+    "sha256": "eaeef5ca3b882f0cee1ae5e146ea6b0c7d1c025f9ffff1e6b919b50f53fe01a1"
+  },
+  "scope": "36cell source-only exploratory screen:24structure+12MSCcounts;6balancedrounds3roles7adaptive50msobs. Source refs are fixed40char SHAs and both complete builds close before timing. Nopeer/SOTAorPRadmission.",
+  "expected_events": 720,
+  "expected_finite": 72,
+  "expected_timing": 648,
+  "expected_observations": 4536,
+  "role_order": "Stableordinalshifts/reverse eachcandidateposition2/2/2 across6rounds",
+  "finite_witness_scope": "Each distinct structural input/policy: baseline and candidate scalar129 vs flat129, literal records and 16 RNG carry words. All12 MSC name/shots/policy counts cases: both sources native counts self-check and raw record replay; literal counts RNG words are not emitted.",
+  "fixture_scope": "13 exact frozen diagnostic/application inputs; execution consumes original bytes, no gate lowering. Copies retain expected SHA256. Original MSC/surface licenses remain in application_counts/manifest.json."
+}
