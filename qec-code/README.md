@@ -66,6 +66,17 @@ elimination code can evolve without breaking downstream crates.
 
 ## Signed stabilizer algebra
 
+`pauli_coset::PauliCosetSearch` caches a bounded exhaustive signed stabilizer
+coset for repeated minimum-support queries. Construct it from a validated
+`SignedStabilizerGroup` and an explicit product budget, then call
+`minimum_weight(&target)`. The returned operator is `target * stabilizer`,
+including its exact scalar; it has the same action on the signed +1 codespace.
+Ties use ascending subset-mask order on the original generator declaration.
+The cache permits at most 12 declared generators and 4,096 physical qubits;
+redundant generators also count toward the cap. It is not a scalable code
+distance algorithm. Targets need not centralize the group, so callers which
+require a Hermitian representative must check their own logical contract.
+
 `phased_pauli` represents `i^phase X^x Z^z`, with `Y = i XZ`. Its
 `SignedStabilizerGroup` checks generator signs as well as X/Z support, accepts
 consistent redundant checks, and returns original-generator product witnesses
