@@ -930,28 +930,142 @@ mod tests {
                     })
                     .count(),
             };
-            let mut counts_rng = StdRng::seed_from_u64(718293);
-            let mut counts_sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            counts_sampler.observe_lazy_error_producer = true;
-            assert_eq!(
-                counts_sampler
-                    .sample_postselected_counts(129, 0, &mut counts_rng)
-                    .unwrap(),
-                expected_counts,
-            );
-            assert!(
-                counts_sampler
-                    .last_packet_error_producer
-                    .as_ref()
-                    .unwrap()
-                    .coherent
-            );
-            let mut carry = expected_continuation;
-            for _ in 0..16 {
-                assert_eq!(counts_rng.next_u64(), carry.next_u64());
+            for cache in [0, 64 * 1024 * 1024] {
+                let mut counts_rng = StdRng::seed_from_u64(718293);
+                let mut counts_sampler = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                if cache != 0 {
+                    assert!(counts_sampler.coefficient_cache_reserved_bytes() > 0);
+                }
+                counts_sampler.observe_lazy_error_producer = true;
+                assert_eq!(
+                    counts_sampler
+                        .sample_postselected_counts(129, 0, &mut counts_rng)
+                        .unwrap(),
+                    expected_counts,
+                );
+                assert_eq!(
+                    counts_sampler
+                        .last_packet_error_producer
+                        .as_ref()
+                        .unwrap()
+                        .coherent,
+                    cache == 0,
+                    "last count packet is a one-shot tail, cache={cache}"
+                );
+                let mut carry = expected_continuation.clone();
+                for _ in 0..16 {
+                    assert_eq!(counts_rng.next_u64(), carry.next_u64());
+                }
             }
         }
     }
+    #[test]
+    fn cached_conditional_rank_two_prefers_full_coherent_packets_only() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                &conditional_fixture::circuit(8, 3, true),
+                policy,
+            )
+            .unwrap();
+            assert_eq!(plan.peak_active_rank(), 2);
+            assert!(plan.noise_signs.is_some());
+            for shots in [1, 31, 32, 63, 64, 65] {
+                let mut expected_rng = StdRng::seed_from_u64(718293);
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut expected = Vec::new();
+                for _ in 0..shots {
+                    expected.extend(
+                        reference.sample(1, &mut expected_rng).unwrap()[0]
+                            .measurements
+                            .iter()
+                            .copied()
+                            .map(u8::from),
+                    );
+                }
+                let mut actual_rng = StdRng::seed_from_u64(718293);
+                let mut sampler = plan
+                    .prepare_sampler_with_cache_budget(64 * 1024 * 1024)
+                    .unwrap();
+                assert!(sampler.coefficient_cache_reserved_bytes() > 0);
+                sampler.observe_lazy_error_producer = true;
+                let actual = sampler
+                    .sample_measurements_u8(shots, &mut actual_rng)
+                    .unwrap();
+                assert_eq!(actual.measurements, expected, "shots={shots}, {policy:?}");
+                assert_eq!(
+                    sampler
+                        .last_packet_error_producer
+                        .as_ref()
+                        .map(|producer| producer.coherent),
+                    match shots {
+                        1 | 31 => None,
+                        64 => Some(true),
+                        _ => Some(false),
+                    },
+                    "last packet route, shots={shots}, {policy:?}"
+                );
+                for _ in 0..16 {
+                    assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
+                }
+            }
+
+            // A larger conditional rank and an ordinary rank-two circuit keep
+            // using their admitted cache for complete packets.
+            for (text, rank, conditional) in [
+                (conditional_fixture::circuit(4, 3, true), 3, true),
+                (
+                    conditional_fixture::circuit(2, 3, true)
+                        .lines()
+                        .filter(|line| !line.starts_with("DEPOLARIZE1"))
+                        .map(|line| format!("{line}\n"))
+                        .collect(),
+                    2,
+                    false,
+                ),
+            ] {
+                let plan =
+                    CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, policy)
+                        .unwrap();
+                assert_eq!(plan.peak_active_rank(), rank);
+                assert_eq!(plan.noise_signs.is_some(), conditional);
+                let mut expected_rng = StdRng::seed_from_u64(718293);
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut expected = Vec::new();
+                for _ in 0..64 {
+                    expected.extend(
+                        reference.sample(1, &mut expected_rng).unwrap()[0]
+                            .measurements
+                            .iter()
+                            .copied()
+                            .map(u8::from),
+                    );
+                }
+                let mut actual_rng = StdRng::seed_from_u64(718293);
+                let mut sampler = plan
+                    .prepare_sampler_with_cache_budget(64 * 1024 * 1024)
+                    .unwrap();
+                assert!(sampler.coefficient_cache_reserved_bytes() > 0);
+                sampler.observe_lazy_error_producer = true;
+                let actual = sampler.sample_measurements_u8(64, &mut actual_rng).unwrap();
+                assert_eq!(actual.measurements, expected, "rank={rank}, {policy:?}");
+                assert_eq!(
+                    sampler
+                        .last_packet_error_producer
+                        .as_ref()
+                        .map(|producer| producer.coherent),
+                    Some(false),
+                    "cached route, rank={rank}, {policy:?}"
+                );
+                for _ in 0..16 {
+                    assert_eq!(actual_rng.next_u64(), expected_rng.next_u64());
+                }
+            }
+        }
+    }
+
     fn captured(text: &str) -> (Planner, Vec<TapeOp>) {
         let instr = crate::parser::parse_lines(text).unwrap();
         let incumbent = NearCliffordExecutor::compile_with_limit(

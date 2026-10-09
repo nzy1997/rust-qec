@@ -3274,6 +3274,24 @@ impl CompiledNearCliffordSampler<'_> {
         debug_assert_eq!(event, plan.random_kinds.len());
         Ok(shot)
     }
+    // Keep this choice outside sample_batch so scalar callers retain its
+    // existing control flow. Direct packet callers can still force cache replay.
+    #[inline(never)]
+    fn packet_with_rank_two_preference(
+        &mut self,
+        lanes: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+        coherent: bool,
+        noise_packet: Option<&mut NoisePacket>,
+    ) -> Result<(), String> {
+        // Admission already occurred in sample_batch. A complete conditional
+        // rank-two packet needs only 8 KiB of coherent coefficient storage.
+        let coherent = coherent
+            || (lanes == 64 && self.plan.peak_active_rank == 2 && self.plan.noise_signs.is_some());
+        self.packet(lanes, sweep, rng, output, coherent, noise_packet)
+    }
     // All random draws depend only on the fixed plan, not the coherent state.
     // Draw them in original row order, so packet size and fallback never change RNG.
     fn packet(
@@ -4035,7 +4053,9 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    self.packet_with_rank_two_preference(
+                        lanes, sweep, rng, output, coherent, compact,
+                    )?;
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
