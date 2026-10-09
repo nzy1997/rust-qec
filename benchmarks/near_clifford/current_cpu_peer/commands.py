@@ -5,6 +5,12 @@ PEER_URL = 'https://github.com/haoliri0/SOFT.git'
 HOST_SCRIPT = "import platform,os,json,subprocess; print(json.dumps({'uname':list(platform.uname()),'python':platform.python_version(),'cpu_count':os.cpu_count(),'cpu_brand':subprocess.check_output(['lscpu'],text=True),'affinity':sorted(os.sched_getaffinity(0)),'thread_environment':{k:os.environ.get(k) for k in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS','VECLIB_MAXIMUM_THREADS','NUMEXPR_NUM_THREADS']}}))"
 
 
+def require_peer_main(remote, revision):
+    main = [line for line in remote.splitlines() if line.endswith('\trefs/heads/main')]
+    if main != [revision+'\trefs/heads/main']:
+        raise ValueError('official main pin differs; update pin and review before comparing current peers')
+
+
 def package_script(names):
     return ("import importlib.metadata as m,pathlib,json,hashlib;names=" + repr(names) + ";"
             "print(json.dumps({n:{'version':m.version(n),'files':{str(pathlib.Path(m.distribution(n).locate_file(f)).resolve()):"
