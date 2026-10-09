@@ -115,6 +115,13 @@
     code.replaceChildren(fragment);
   }
   function enhanceContent() {
+    function addTerminalChrome(block) {
+      const chrome = document.createElement('div');
+      chrome.className = 'terminal-chrome';
+      chrome.setAttribute('aria-hidden', 'true');
+      chrome.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+      block.append(chrome);
+    }
     main.querySelectorAll('pre').forEach((pre) => {
       const code = pre.querySelector('code');
       if (!code || pre.dataset.enhanced) return;
@@ -124,32 +131,31 @@
       label.textContent = output ? (pre.dataset.language || 'Expected output') : languageFor(pre, code);
       if (output) {
         const terminal = pre.previousElementSibling;
+        const result = document.createElement('div');
+        result.className = 'terminal-output';
+        result.setAttribute('role', 'group');
+        result.setAttribute('aria-label', label.textContent);
+        pre.before(result);
+        result.append(pre);
         if (terminal?.classList.contains('terminal-block')) {
-          const result = document.createElement('div');
-          result.className = 'terminal-output';
-          pre.before(result);
-          result.append(pre);
           terminal.classList.add('has-output');
           terminal.append(result);
-          return;
+        } else {
+          const block = document.createElement('div');
+          block.className = 'terminal-block terminal-output-only';
+          addTerminalChrome(block);
+          result.before(block);
+          block.append(result);
         }
-        const bar = document.createElement('div');
-        bar.className = 'code-toolbar output-toolbar';
-        bar.append(label);
-        pre.before(bar);
         return;
       }
       highlight(code, label.textContent);
       const block = document.createElement('div');
       block.className = 'code-block';
-      const isShell = label.textContent.trim().toLowerCase() === 'shell';
+      const isShell = /^shell\b/i.test(label.textContent.trim());
       if (isShell) {
         block.classList.add('terminal-block');
-        const chrome = document.createElement('div');
-        chrome.className = 'terminal-chrome';
-        chrome.setAttribute('aria-hidden', 'true');
-        chrome.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
-        block.append(chrome);
+        addTerminalChrome(block);
       }
       pre.before(block);
       block.append(pre);

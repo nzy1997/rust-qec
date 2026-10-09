@@ -1,16 +1,15 @@
 {% extends "base.html" %}
 {% block title %}CLI and Rust API reference — RustQEC{% endblock title %}
 {% block description %}RustQEC command arguments, inputs, outputs, exit codes, structured errors, and versioned Rust API links.{% endblock description %}
-{% block hero %}<div class="hero compact-hero"><p class="eyebrow">Reference</p><h1>CLI and Rust API reference</h1><p class="hero-copy">Look up command contracts, machine-readable errors, and the crate versions represented by this documentation.</p></div>{% endblock hero %}
+{% block hero %}<div class="hero compact-hero"><h1>CLI and Rust API reference</h1><p class="hero-copy">Look up command arguments, files, error codes and Rust APIs.</p></div>{% endblock hero %}
 {% block main %}
 {% set cli_reference = load_data(path="generated/cli-reference.json") %}
 <section class="task-section" aria-labelledby="reference-boundary"><h2 id="reference-boundary">Reference boundary</h2>
-<p>This page describes <code>rstim</code> {{ docs_version.packages.rstim.version }} from the RustQEC {{ docs_version.release_line }} {{ docs_version.channel }} documentation edition. Run <code>rstim capabilities --format json</code> against an installed binary for its executable contract. Command help and capabilities output take precedence when a different package version is installed.</p>
-<p>The unified CLI is currently available from the repository checkout. The published crates.io package still has the earlier command set.</p>
+<p>Use <code>rstim capabilities --format json</code> to inspect your installed commands and optional decoders. If your binary differs from this documentation, its command help and capabilities describe the available interfaces.</p>
 <div class="content-links"><a href="#rust-apis">Rust API versions</a><a href="../support/#compatibility-and-deprecation-policy">Compatibility policy</a></div></section>
 
 <section class="task-section" aria-labelledby="rustqec-commands"><h2 id="rustqec-commands">rstim commands</h2>
-<p>The command contracts below are generated during every site build from <code>{{ cli_reference.source_command }}</code>. The page build fails if that contract is missing or malformed.</p>
+<p>The tables come from <code>{{ cli_reference.source_command }}</code>. A schema identifies the structure and version of a JSON status response; artifact formats describe the separate data files.</p>
 <div class="content-links"><a href="#machine-contract">Inspect your installed binary</a><a href="#rust-apis">Open Rust API links</a></div>
 {% for command in cli_reference.commands %}<article class="reference-command" aria-labelledby="{{ command.anchor }}">
 <h3 id="{{ command.anchor }}"><code>{{ command.command_line }}</code></h3>

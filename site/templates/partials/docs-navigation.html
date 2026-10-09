@@ -3,11 +3,7 @@
 <nav aria-label="Documentation sections">
 <p>Guides</p>
 <a href="{{ root }}/get-started/"{% if current_nav == "start" %} aria-current="page"{% endif %}>Get started</a>
-<a href="{{ root }}/atom-loss/"{% if current_nav == "loss" and loss_view == "tutorial" %} aria-current="page"{% endif %}>Atom loss</a>
-{% if current_nav == "loss" %}
-<a class="nav-child" href="{{ root }}/atom-loss-concepts/"{% if loss_view == "concepts" %} aria-current="page"{% endif %}>Concepts &amp; support</a>
-<a class="nav-child" href="{{ root }}/atom-loss-evidence/"{% if loss_view == "evidence" %} aria-current="page"{% endif %}>Validation &amp; performance</a>
-{% endif %}
+<a href="{{ root }}/atom-loss/"{% if current_nav == "loss" %} aria-current="page"{% endif %}>Atom loss</a>
 <a href="{{ root }}/css-codes/"{% if current_nav == "css" %} aria-current="page"{% endif %}>CSS codes &amp; distance</a>
 <a href="{{ root }}/simulator/"{% if current_nav == "simulate" %} aria-current="page"{% endif %}>Circuit simulation</a>
 <a href="{{ root }}/detector-models/"{% if current_nav == "dems" %} aria-current="page"{% endif %}>Detector error models</a>
