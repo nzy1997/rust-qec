@@ -4,7 +4,7 @@ mod fixture_catalog;
 use std::fs;
 use std::path::Path;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[test]
 fn fixture_catalog_manifest_covers_all_checked_in_lsd_and_bp_cases() {
@@ -538,9 +538,58 @@ fn copy_fixture_tree(from: &Path, to: &Path) {
 }
 
 fn unique_temp_fixture_root() -> std::path::PathBuf {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    std::env::temp_dir().join(format!("rbposd-fixture-catalog-{nanos}"))
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
+    loop {
+        let id = NEXT_ROOT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "rbposd-fixture-catalog-{}-{id}",
+            std::process::id()
+        ));
+        match fs::create_dir(&root) {
+            Ok(()) => return root,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!(
+                "cannot reserve fixture directory {}: {error}",
+                root.display()
+            ),
+        }
+    }
+}
+
+#[test]
+fn temporary_fixture_roots_are_reserved_and_isolated_across_threads() {
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(16));
+    let workers = (0..16)
+        .map(|id| {
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                let root = unique_temp_fixture_root();
+                assert!(root.is_dir(), "the helper must reserve the directory");
+                fs::write(root.join("sentinel"), id.to_string()).unwrap();
+                (root, id)
+            })
+        })
+        .collect::<Vec<_>>();
+    let roots = workers
+        .into_iter()
+        .map(|worker| worker.join().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        roots
+            .iter()
+            .map(|(root, _)| root)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        16
+    );
+    for (root, id) in roots {
+        assert_eq!(
+            fs::read_to_string(root.join("sentinel")).unwrap(),
+            id.to_string()
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 }
