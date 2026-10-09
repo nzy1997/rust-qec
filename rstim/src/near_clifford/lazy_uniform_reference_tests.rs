@@ -67,7 +67,7 @@ fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
                 .iter()
                 .map(|state| {
                     (
-                        amp_bits(&state.coefficients),
+                        amp_bits(&state.coefficients.materialize()),
                         state.next_node,
                         entry_snapshot(state.transition),
                     )

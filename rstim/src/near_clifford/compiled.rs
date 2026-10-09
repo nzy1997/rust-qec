@@ -6,6 +6,9 @@ use compile_frame::CompileFrame;
 #[path = "coefficient_intern.rs"]
 mod coefficient_intern;
 use coefficient_intern::CoefficientIntern;
+#[path = "cached_coefficients.rs"]
+mod cached_coefficients;
+use cached_coefficients::CachedCoefficients;
 #[path = "coherent_packet.rs"]
 mod coherent_packet;
 use coherent_packet::CoherentPacket;
@@ -223,7 +226,7 @@ enum CachedOp {
     Measure(CachedMeasurement),
 }
 struct CachedState {
-    coefficients: Arc<Vec<ComplexAmp>>,
+    coefficients: CachedCoefficients,
     next_node: Option<usize>,
     transition: CachedOp,
 }
@@ -259,7 +262,7 @@ impl CoefficientCache {
         let mut states = Vec::new();
         states.try_reserve_exact(2).ok()?;
         states.push(CachedState {
-            coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+            coefficients: CachedCoefficients::Complex(Arc::new(vec![ComplexAmp::new(1., 0.)])),
             next_node: None,
             transition: CachedOp::None,
         });
@@ -267,7 +270,7 @@ impl CoefficientCache {
             0
         } else {
             states.push(CachedState {
-                coefficients: plan.initial_coefficients.clone(),
+                coefficients: CachedCoefficients::Complex(plan.initial_coefficients.clone()),
                 next_node: None,
                 transition: CachedOp::None,
             });
@@ -367,13 +370,24 @@ impl CoefficientCache {
         } else {
             None
         };
-        let mut state = Vec::new();
-        state.try_reserve_exact(coefficients.len()).ok()?;
-        state.extend_from_slice(coefficients);
+        // Delay the optional scan/allocation until the cache has warmed. Keep
+        // small vectors and every mixed-axis state on the original storage path.
+        let packed = (self.states.len() >= coefficient_intern::MIN_STATES)
+            .then(|| CachedCoefficients::axis(coefficients))
+            .flatten()
+            .filter(|(_, packed_charge)| *packed_charge < charge && self.fits(*packed_charge));
+        let (state, charge) = if let Some(packed) = packed {
+            packed
+        } else {
+            let mut state = Vec::new();
+            state.try_reserve_exact(coefficients.len()).ok()?;
+            state.extend_from_slice(coefficients);
+            (CachedCoefficients::Complex(Arc::new(state)), charge)
+        };
         self.states.try_reserve(1).ok()?;
         let id = self.states.len();
         self.states.push(CachedState {
-            coefficients: Arc::new(state),
+            coefficients: state,
             next_node: None,
             transition: CachedOp::None,
         });
@@ -1048,6 +1062,9 @@ pub enum CompiledRotationArithmetic {
 /// before scheduling retains the existing compiler.
 /// The packed compilation frame reserves at most 9 MiB. Optional transitions
 /// reserve at most 64 MiB and packet event/frame work buffers 16 MiB.
+/// Warm coefficient caches may store pure-axis vectors with one FP64 value and
+/// two tag bits per coefficient. Both component bit patterns, including signed
+/// zero, are restored before arithmetic; mixed-axis vectors keep complex storage.
 /// Optional homogeneous random-event runs use at most 8 MiB within the plan budget; rejection
 /// retains the event-by-event generator with identical RNG and records.
 /// On the first nonempty counts call, a rotation-free plan may lazily build an affine
@@ -2347,12 +2364,7 @@ impl CompiledNearCliffordSampler<'_> {
             .states[id]
             .coefficients
             .clone();
-        self.coefficients.clear();
-        self.coefficients
-            .try_reserve_exact(state.len())
-            .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
-        self.coefficients.extend_from_slice(&state);
-        Ok(())
+        state.restore(&mut self.coefficients)
     }
     fn cached_rotate(
         &mut self,
