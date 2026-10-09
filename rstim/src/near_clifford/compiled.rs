@@ -3169,7 +3169,7 @@ impl CompiledNearCliffordSampler<'_> {
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
         if POSTSELECT && self.real_enabled {
-            let result = self.execute_row::<POSTSELECT, SKIP_NOISE, true>(sweep, random);
+            let result = self.execute_real_row::<POSTSELECT, SKIP_NOISE>(sweep, random);
             // Also synchronize rejected detectors and errors before subsequent
             // structured, flat, cached, or zero-shot calls.
             self.sync_real()?;
@@ -3178,8 +3178,16 @@ impl CompiledNearCliffordSampler<'_> {
             self.execute_row::<POSTSELECT, SKIP_NOISE, false>(sweep, random)
         }
     }
-    // Keep the complex and real row loops separate from the dispatch wrapper.
+    // Keep the optional real loop separate from the complex row callers.
     #[inline(never)]
+    fn execute_real_row<const POSTSELECT: bool, const SKIP_NOISE: bool>(
+        &mut self,
+        sweep: &[bool],
+        random: &mut impl RowDraw,
+    ) -> Result<NearCliffordShot, String> {
+        self.execute_row::<POSTSELECT, SKIP_NOISE, true>(sweep, random)
+    }
+
     fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
