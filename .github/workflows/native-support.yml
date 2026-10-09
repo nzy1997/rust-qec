@@ -6,6 +6,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      near_clifford_kernel_checks:
+        description: Record native near-Clifford scalar kernel bit checks
+        type: boolean
+        default: false
 
 concurrency:
   group: native-support-${{ github.head_ref || github.ref_name }}
@@ -94,6 +99,16 @@ jobs:
           if [ "$REQUESTED_TOOLCHAIN" != stable ]; then
             test "$("$RUSTC" --version | awk '{print $2}')" = "$REQUESTED_TOOLCHAIN"
           fi
+      - name: Record near-Clifford kernel bit checks
+        if: github.event_name == 'workflow_dispatch' && inputs.near_clifford_kernel_checks
+        env:
+          RUSTFLAGS: -C target-cpu=native
+        run: |
+          set -o pipefail
+          mkdir -p native-support-evidence
+          "$CARGO" test --release --locked -p rstim --no-default-features --lib \
+            real_scalar_fallback::tests -- --nocapture 2>&1 | \
+            tee native-support-evidence/near-clifford-kernel-tests.log
       - name: Run the one-qubit CLI integration fixture
         run: |
           "$CARGO" test --locked -p rstim --test unified_cli \
@@ -121,5 +136,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-support-${{ matrix.cell }}
-          path: native-support-evidence/evidence.json
+          path: |
+            native-support-evidence/evidence.json
+            native-support-evidence/near-clifford-kernel-tests.log
           if-no-files-found: error
