@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}RustQEC — quantum error correction in Rust{% endblock title %}
-{% block description %}Define codes, simulate circuit noise and atom loss, and benchmark decoders in one workspace. Quantum error correction in Rust.{% endblock description %}
+{% block description %}Define codes, simulate circuit noise and atom loss, and benchmark decoders through native Rust APIs and a unified CLI. Quantum error correction in Rust.{% endblock description %}
 {% block hero %}
 <div class="hero home-hero">
   <div class="home-intro" id="home-content" tabindex="-1">
     <h1>Quantum error correction in Rust</h1>
-    <p class="hero-copy">Define codes, simulate circuit noise and atom loss, and benchmark decoders in one workspace.</p>
+    <p class="hero-copy">Define codes, simulate circuit noise and atom loss, and benchmark decoders through native Rust APIs and a unified CLI.</p>
     <div class="actions">
       <a class="button primary" href="get-started/">Get started <span aria-hidden="true">→</span></a>
       <a id="atom-loss" class="button atom-loss-button" href="atom-loss/">Atom-loss sampling and decoding <span aria-hidden="true">→</span></a>
@@ -46,11 +46,6 @@ href="sampling-data/">Sampling &amp; training data</a>
       <p>Decode with MWPM, BP-OSD, or ILP, then compare logical error rates and decoding time on your cases.</p>
     </article>
   </div>
-</section>
-<section id="why-rstim" class="home-rationale" aria-labelledby="why-rstim-title">
-  <h2 id="why-rstim-title">Why rstim alongside Stim?</h2>
-  <p><a href="https://github.com/quantumlib/Stim">Stim</a> already provides fast stabilizer-circuit simulation and detector error models. RustQEC develops <code>rstim</code> so simulation can work directly with this workspace’s Rust tools for code construction, atom-loss sampling, dataset export, and decoding.</p>
-  <p><code>rstim</code> reads Stim-style circuits and carries the circuit-to-decoder workflow through one CLI or Rust application. Stim remains a reference for the overlapping behavior; see <a href="validation/">Performance &amp; validation</a> for comparisons on shared circuits.</p>
 </section>
 <section class="home-example" aria-labelledby="example-title">
   <div class="home-example-copy">

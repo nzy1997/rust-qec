@@ -131,12 +131,14 @@ def synchronize_version_navigation(primary: Path, snapshot: Path, version: dict)
     shutil.copyfile(source_script, destination_script)
     for page in snapshot.rglob("*.html"):
         html = page.read_text()
+        original_html = html
         if f'data-docs-version="{version["id"]}"' not in html:
             continue
         root_match = re.search(r'data-root="([^"]+)"', html)
         if not root_match:
             raise ValueError(f"Version-aware page is missing data-root: {page}")
         root = escape(root_match.group(1), quote=True)
+        html = html.replace(f'<a href="{root}/reference/#reference-boundary">About these docs</a>', '')
         label = escape(version["label"])
         additions = []
         if 'id="docs-version"' not in html:
@@ -146,7 +148,6 @@ def synchronize_version_navigation(primary: Path, snapshot: Path, version: dict)
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
-      <a href="{root}/reference/#reference-boundary">About these docs</a>
     </div></div>\n''')
         if version.get("channel") == "stable" and 'id="docs-edition-notice"' not in html:
             release_line = escape(version["release_line"])
@@ -155,6 +156,8 @@ def synchronize_version_navigation(primary: Path, snapshot: Path, version: dict)
       <div class="version-inner"><strong>Frozen stable edition:</strong> RustQEC {release_line}, coordinated release v{native_release}. Page text is preserved from that release; this edition banner defines its publication status.</div>
     </aside>\n''')
         if not additions:
+            if html != original_html:
+                page.write_text(html)
             continue
         insertion = html.find('<div class="site-frame')
         if insertion < 0:

@@ -61,7 +61,20 @@ class SiteVersionsTest(unittest.TestCase):
         html = (output / "versions/v1/index.html").read_text()
         self.assertIn('id="docs-version"', html)
         self.assertIn('Release v1', html)
-        self.assertIn('./reference/#reference-boundary', html)
+        self.assertNotIn('About these docs', html)
+
+    def test_frozen_home_removes_old_docs_link_and_keeps_version_control(self):
+        stable_home = self.sites["v1"] / "index.html"
+        stable_home.write_text('<body data-docs-version="v1" data-root=".">'
+                               '<select id="docs-version"></select>'
+                               '<a href="./reference/#reference-boundary">About these docs</a>'
+                               '<aside id="docs-edition-notice"></aside>'
+                               '<div class="site-frame"></div></body>')
+        output = self.root / "published"
+        assemble(self.catalog, self.sites, output)
+        html = (output / "versions/v1/index.html").read_text()
+        self.assertIn('id="docs-version"', html)
+        self.assertNotIn('About these docs', html)
 
     def test_every_frozen_page_receives_authoritative_stable_identity(self):
         output = self.root / "published"
