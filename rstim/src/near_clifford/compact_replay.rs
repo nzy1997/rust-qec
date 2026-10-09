@@ -300,11 +300,10 @@ mod tests {
                     let selected = plan
                         .prepare_sampler()
                         .unwrap()
-                        .core
-                        .row_with_random_kernel::<true, true, false>(
+                        .row_with_random_kernel::<true, true, _>(
                             &[true, false],
                             &mut replay,
-                            None,
+                            ComplexRows,
                         )
                         .unwrap();
                     assert!(
@@ -315,11 +314,10 @@ mod tests {
                     let expected = plan
                         .prepare_sampler()
                         .unwrap()
-                        .core
-                        .row_with_random_mode::<false, false>(
+                        .row_with_random_mode::<false, _>(
                             &[true, false],
                             &mut RowRandom::recorded(&tape, &mut caller),
-                            None,
+                            ComplexRows,
                         )
                         .unwrap();
                     if selected.detectors.iter().all(|&bit| !bit) {
@@ -375,7 +373,7 @@ mod tests {
                         }
                     );
                     assert_eq!(
-                        native.core.last_packet_live, 0,
+                        native.last_packet_live, 0,
                         "exercise admission-failure replay"
                     );
                     for _ in 0..16 {

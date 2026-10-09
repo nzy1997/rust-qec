@@ -482,7 +482,7 @@ fn original_cultivation_counts_preserve_raw_folds_and_rng_across_bulk_boundaries
                 let mut a = StdRng::seed_from_u64(583);
                 let mut b = a.clone();
                 for shots in [
-                    0, 1, 31, 32, 63, 64, 65, 127, 129, 1024, 1, 63, 64, 65, 0, 1024,
+                    0, 1, 31, 32, 63, 64, 65, 127, 129, 1024, 1, 63, 64, 65, 0, 1024, 64, 0, 64,
                 ] {
                     let rows = original.sample(shots, &mut b).unwrap();
                     assert_eq!(
