@@ -1,5 +1,19 @@
 //! Offline Clifford-frame plan; runtime carries a virtual Pauli and compact amplitudes.
 use super::*;
+
+// For unit-bounded finite components, the zero products in multiplication by
+// +/-1 or +/-i can only alter signed zeros. They cannot create an infinity or
+// NaN, and signed-zero terms disappear when accumulated from positive zero.
+// Keep the subsequent signed products and reduction order unchanged.
+#[inline]
+fn bounded_cdf_image<const PHASE: u8>(image: ComplexAmp) -> ComplexAmp {
+    match PHASE {
+        0 => image.conj(),
+        1 => ComplexAmp::new(image.im, image.re),
+        2 => ComplexAmp::new(-image.re, image.im),
+        _ => ComplexAmp::new(-image.im, -image.re),
+    }
+}
 #[path = "compile_frame.rs"]
 mod compile_frame;
 use compile_frame::CompileFrame;
@@ -2863,6 +2877,27 @@ impl CompiledNearCliffordSampler<'_> {
     }
     #[inline]
     fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
+        if self
+            .coefficients
+            .iter()
+            .all(|amp| amp.re.abs() <= 1. && amp.im.abs() <= 1.)
+        {
+            let mut expectation = 0.;
+            let mut norm = 0.;
+            for (i, &amp) in self.coefficients.iter().enumerate() {
+                let sign = if (i & p.z).count_ones() % 2 != 0 {
+                    -1.
+                } else {
+                    1.
+                };
+                let image = bounded_cdf_image::<PHASE>(self.coefficients[i ^ p.x]);
+                expectation += (image * (amp * sign)).re;
+                norm += amp.norm_sqr();
+            }
+            return ((1. + expectation / norm) * 0.5).clamp(0., 1.);
+        }
+        // Preserve the literal complex expression for larger or nonfinite
+        // components, including its zero*infinity and NaN propagation.
         let mut expectation = 0.;
         let mut norm = 0.;
         for (i, &amp) in self.coefficients.iter().enumerate() {
