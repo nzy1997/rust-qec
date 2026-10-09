@@ -23,7 +23,7 @@ Configurations are TOML. Unknown or inappropriate keys are rejected. Omitting th
 
 ## Campaign files and resuming
 
-`bench run --spec campaign.toml --out results` reads a TOML campaign specification. `--resume` continues the campaign using its recorded state; preserve the specification, input hashes, decoder configuration and state files together. `bench merge` combines compatible outputs; plot commands read their stated CSV or result files. The [campaign schema](https://github.com/nzy1997/rust-qec/blob/master/rsinter/src/bench/spec.rs) and [comparison benchmarks](../benchmarks/decoders/) document reproduction and interpretation.
+`rsinter bench run --spec campaign.toml --language rust --out results` reads a TOML campaign specification and selects its Rust runners. The required `--language` value must match a runner language in the specification. `--resume` continues the campaign using its recorded state; preserve the specification, input hashes, decoder configuration and state files together. `bench merge` combines compatible outputs; plot commands read their stated CSV or result files. The [campaign schema](https://github.com/nzy1997/rust-qec/blob/master/rsinter/src/bench/spec.rs) and [comparison benchmarks](../benchmarks/decoders/) document reproduction and interpretation.
 
 ## Feature availability and errors
 
