@@ -41,7 +41,7 @@ p { max-width: 76ch; }
 .docs-version-control { display: flex; align-items: center; }
 .docs-version-control select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; max-width: 100%; }
 .docs-version-control [hidden] { display: none; }
-.version-inner > :last-child { margin-left: auto; }
+.version-inner > :last-child:not(:first-child) { margin-left: auto; }
 .version-fallback-notice { width: min(100%, var(--page-width)); margin: 0 auto; padding: 10px var(--gutter); color: var(--text); background: var(--accent-soft); border-top: 1px solid var(--border); }
 .site-header { background: transparent; border: 0; }
 .hero, .compact-hero { max-width: none; margin: 0; padding: 0 0 36px; }
@@ -88,10 +88,16 @@ pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 /* Product home: one value proposition with atom loss integrated into it. */
 /* Source-bound legacy selectors: .home-atom-loss .loss-workflow .loss-workflow-actions */
+body[data-page="home"] { --home-title-size: 4rem; }
+body[data-page="home"] h2 { font-size: 1.75rem; }
+body[data-page="home"] .button { font-size: 1rem; }
+body[data-page="home"] :is(.version-strip, .version-inner, .site-footer) { font-size: .875rem; }
+body[data-page="home"] code { font-size: inherit; }
 .home-hero { display: block; padding: 80px 0; }
-.home-intro { max-width: 900px; }
-.home-hero h1 { font-size: clamp(2.75rem, 5.5vw, 4.5rem); max-width: 22ch; line-height: 1.08; }
-.home-hero .hero-copy { font-size: 1.25rem; max-width: 64ch; margin-top: 24px; }
+.home-intro { width: 100%; max-width: none; }
+.home-hero h1 { font-size: var(--home-title-size); max-width: none; line-height: 1.08; text-wrap: wrap; text-align: justify; text-align-last: start; }
+.home-hero .hero-copy { font-size: 1rem; max-width: none; margin-top: 24px; }
+body[data-page="home"] .page-content p { max-width: none; text-align: justify; text-align-last: start; text-wrap: wrap; hyphens: auto; }
 .home-hero .actions { margin-top: 28px; }
 .atom-loss-button { border-color: #d8b29d; background: var(--accent-soft); color: var(--accent-dark); }
 .atom-loss-button:hover { border-color: var(--brand-copper); background: #f1dccd; }
@@ -105,20 +111,17 @@ pre { padding: 18px; font-size: .875rem; line-height: 1.6; overflow-x: auto; }
 .home-capabilities { border-top: 1px solid var(--border); padding: 48px 0 56px; }
 .workflow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; margin-top: 32px; }
 .workflow-grid article { min-width: 0; }
-.step-number { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--accent-soft); font-size: .8125rem; font-weight: 600; color: var(--accent-dark); }
-.workflow-grid h3 { margin-top: 12px; font-size: 1.375rem; }
+.step-number { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--accent-soft); font-size: .875rem; font-weight: 600; color: var(--accent-dark); }
+.workflow-grid h3 { margin-top: 12px; font-size: 1.25rem; text-wrap: balance; }
 .workflow-grid h3 a { color: inherit; font-size: inherit; font-weight: inherit; line-height: inherit; }
-.workflow-grid h3 a span { color: var(--accent); font-size: .9em; }
-.workflow-grid p { color: var(--muted); font-size: .9375rem; min-height: 6.6em; }
+.workflow-grid h3 a span { color: var(--accent); font-size: inherit; }
+.workflow-grid p { color: var(--muted); font-size: 1rem; min-height: 6.6em; }
 .workflow-grid a { display: inline-block; text-decoration: none; }
 .workflow-grid a:hover { text-decoration: underline; }
-.home-rationale { border-top: 1px solid var(--border); padding: 40px 0 48px; }
-.home-rationale h2 { margin-top: 0; }
-.home-rationale p { max-width: 78ch; }
 .atom-loss-bundles { min-width: 580px; }
 .home-support { display: flex; justify-content: space-between; align-items: center; gap: 40px; }
-.home-support h2 { font-size: 1.65rem; }
-.home-support p { color: var(--muted); max-width: 64ch; }
+.home-support > div:first-child { flex: 1; min-width: 0; }
+.home-support p { color: var(--muted); }
 .home-support .content-links { flex-shrink: 0; display: grid; }
 /* Search results and help remain readable without decorative article framing. */
 .search-results li { padding-block: 20px; }
@@ -162,7 +165,7 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .docs-navigation:not([open]) > nav { display: none; }
   .docs-navigation nav { padding: 12px; background: var(--surface-muted); }
   .home-hero { padding: 56px 0; }
-  .home-hero h1 { font-size: 2.8rem; }
+  body[data-page="home"] { --home-title-size: 2.5rem; }
   .home-example { grid-template-columns: 1fr; gap: 28px; }
   .home-support { display: block; }
   .workflow-grid { gap: 24px; }
@@ -173,7 +176,7 @@ body[data-page="shot"] .shot-detail { font-size: .875rem; }
   .version-inner { font-size: .75rem; gap: 4px 16px; }
   .version-inner > :last-child { margin-left: 0; }
   .home-hero h1 { max-width: none; }
-  .home-hero .hero-copy { font-size: 1.125rem; }
+  .home-hero .actions .button { max-width: 100%; }
   .workflow-grid { grid-template-columns: 1fr; gap: 24px; }
   .workflow-grid p { min-height: 0; }
   .workflow-grid article + article { border-top: 1px solid var(--border); padding-top: 24px; }
