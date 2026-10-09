@@ -18,6 +18,7 @@ on:
       - "tools/build_shot_viewer.sh"
       - "tools/shot_viewer_assets.py"
       - "tools/prepare_site_docs.py"
+      - "tools/serve_site.py"
       - "tools/site_versions.py"
       - "tools/test_site_versions.py"
       - "tools/test_prepare_site_docs.py"
