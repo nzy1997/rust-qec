@@ -3178,6 +3178,8 @@ impl CompiledNearCliffordSampler<'_> {
             self.execute_row::<POSTSELECT, SKIP_NOISE, false>(sweep, random)
         }
     }
+    // Keep the complex and real row loops separate from the dispatch wrapper.
+    #[inline(never)]
     fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
