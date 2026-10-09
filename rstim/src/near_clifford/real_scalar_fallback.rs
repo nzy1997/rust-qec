@@ -97,12 +97,15 @@ mod tests {
                                 for (dagger, flip) in [(false, false), (false, true), (true, true)]
                                 {
                                     let mut r = real(mask, constant, values(n, kind));
-                                    original.coefficients = complex(&r);
-                                    original.rotate_signed(&p, false, dagger, flip).unwrap();
+                                    original.core.coefficients = complex(&r);
+                                    original
+                                        .core
+                                        .rotate_signed(&p, false, dagger, flip)
+                                        .unwrap();
                                     assert!(r.rotate(&p, false, dagger, flip, policy));
                                     assert_eq!(
                                         bits(&complex(&r)),
-                                        bits(&original.coefficients),
+                                        bits(&original.core.coefficients),
                                         "{policy:?} rank={rank} mask={mask} constant={constant} kind={kind} x={x} dagger={dagger} flip={flip}"
                                     );
                                 }
@@ -115,10 +118,10 @@ mod tests {
                         for phase in [0, 1, 2, 3, 4, 255] {
                             let mut r = real(mask, constant, values(n, 0));
                             let p = pauli(n | (n - 1), n - 1, phase);
-                            original.coefficients = complex(&r);
-                            original.rotate_signed(&p, true, false, true).unwrap();
+                            original.core.coefficients = complex(&r);
+                            original.core.rotate_signed(&p, true, false, true).unwrap();
                             assert!(r.rotate(&p, true, false, true, policy));
-                            assert_eq!(bits(&complex(&r)), bits(&original.coefficients));
+                            assert_eq!(bits(&complex(&r)), bits(&original.core.coefficients));
                         }
                     }
                 }
@@ -169,12 +172,15 @@ mod tests {
                                         [(false, false), (true, false), (false, true)]
                                     {
                                         let mut r = real(mask, constant, values(n, kind));
-                                        original.coefficients = complex(&r);
-                                        original.rotate_signed(&p, false, dagger, flip).unwrap();
+                                        original.core.coefficients = complex(&r);
+                                        original
+                                            .core
+                                            .rotate_signed(&p, false, dagger, flip)
+                                            .unwrap();
                                         assert!(r.rotate(&p, false, dagger, flip, policy));
                                         assert_eq!(
                                             bits(&complex(&r)),
-                                            bits(&original.coefficients),
+                                            bits(&original.core.coefficients),
                                             "four lanes {policy:?} rank={rank} mask={mask} constant={constant} kind={kind} x={x} z={z} dagger={dagger} flip={flip}"
                                         );
                                     }
@@ -197,14 +203,14 @@ mod tests {
                 for constant in [false, true] {
                     for kind in 0..4 {
                         let r = real(mask, constant, values(n, kind));
-                        original.coefficients = complex(&r);
+                        original.core.coefficients = complex(&r);
                         for x in 0..n {
                             for z in [0, 1, n - 1, (x * 13) % n] {
                                 for phase in [0, 1, 2, 3, 4, 5, 254, 255] {
                                     let p = pauli(x, z, phase);
                                     assert_eq!(
                                         r.probability_zero(&p).to_bits(),
-                                        original.probability_zero(&p).to_bits(),
+                                        original.core.probability_zero(&p).to_bits(),
                                         "rank={rank} mask={mask} constant={constant} kind={kind} x={x} z={z} phase={phase}"
                                     );
                                 }
@@ -231,14 +237,14 @@ mod tests {
                                 let p = pauli(x, ((x * 13) % n) | (1 << index), 0);
                                 for fixed in [false, true] {
                                     let mut r = real(mask, constant, values(n, kind));
-                                    original.coefficients = complex(&r);
-                                    let a = original.project(&p, index, y, fixed);
+                                    original.core.coefficients = complex(&r);
+                                    let a = original.core.project(&p, index, y, fixed);
                                     let b = r.project(&p, index, y, fixed);
                                     assert_eq!(a, b);
                                     if a.is_ok() {
                                         assert_eq!(
                                             bits(&complex(&r)),
-                                            bits(&original.coefficients),
+                                            bits(&original.core.coefficients),
                                             "rank={rank} mask={mask} constant={constant} kind={kind} index={index} x={x} fixed={fixed}"
                                         );
                                     }
@@ -302,7 +308,7 @@ mod tests {
                         .sample_postselected_counts(shots, 0, &mut b)
                         .unwrap()
                 );
-                assert!(!native.real_attempted);
+                assert!(!native.real.attempted);
             }
             for shots in [64, 65, 1024, 8192] {
                 assert_eq!(
@@ -311,14 +317,21 @@ mod tests {
                         .sample_postselected_counts(shots, 0, &mut b)
                         .unwrap()
                 );
-                assert!(!native.real_enabled);
+                assert!(
+                    native
+                        .real
+                        .fallback
+                        .as_ref()
+                        .is_none_or(|real| !real[0].active)
+                );
                 for _ in 0..16 {
                     assert_eq!(a.next_u64(), b.next_u64());
                 }
             }
             if vector_supported() {
                 let real = native
-                    .real_fallback
+                    .real
+                    .fallback
                     .as_ref()
                     .map(|real| &real[0])
                     .expect("default 64 MiB cache must exercise real scratch on AVX2/FMA");
@@ -328,11 +341,11 @@ mod tests {
                 );
                 assert!(!real.active);
             } else {
-                assert!(!native.real_attempted);
-                assert!(native.real_fallback.is_none());
+                assert!(!native.real.attempted);
+                assert!(native.real.fallback.is_none());
             }
-            let nc = native.cache.as_ref().unwrap();
-            let oc = original.cache.as_ref().unwrap();
+            let nc = native.core.cache.as_ref().unwrap();
+            let oc = original.core.cache.as_ref().unwrap();
             assert_eq!(nc.reserved, oc.reserved);
             assert_eq!(nc.states.len(), oc.states.len());
             for (n, o) in nc.states.iter().zip(&oc.states) {
@@ -348,10 +361,10 @@ mod tests {
                     native.sample_measurements_u8(shots, &mut a).unwrap(),
                     original.sample_measurements_u8(shots, &mut b).unwrap()
                 );
-                assert!(!native.real_enabled);
                 assert!(
                     native
-                        .real_fallback
+                        .real
+                        .fallback
                         .as_ref()
                         .is_none_or(|real| !real[0].active)
                 );
@@ -382,24 +395,29 @@ mod tests {
             // This injects stale state without attempting host-memory exhaustion.
             stale.values.resize(64, 0.);
             stale.active = true;
-            native.real_fallback = Some(Box::new([stale]));
-            native.real_attempted = true;
-            native.coefficients.clear();
+            native.real.fallback = Some(Box::new([stale]));
+            native.real.attempted = true;
+            native.core.coefficients.clear();
             // Exercise the real-row control flow even on a scalar-only host;
             // actual SIMD execution is validated separately on native x86.
-            native.real_enabled = true;
             let mut a = StdRng::seed_from_u64(1739);
             let mut b = a.clone();
-            let result =
-                native.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut a));
-            let expected =
-                original.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut b));
+            let result = native.core.row_with_random_kernel::<true, false, true>(
+                &[],
+                &mut RowRandom::live(&mut a),
+                Some(&mut native.real),
+            );
+            let expected = original.core.row_with_random_kernel::<true, false, false>(
+                &[],
+                &mut RowRandom::live(&mut b),
+                None,
+            );
             assert!(expected.is_ok());
             assert_eq!(
                 result, expected,
                 "new row after unmaterialized real failure: {policy:?}"
             );
-            assert!(!native.real_fallback.as_ref().unwrap()[0].active);
+            assert!(!native.real.fallback.as_ref().unwrap()[0].active);
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }
@@ -432,13 +450,13 @@ mod tests {
         );
         boundary.counts_plan_budget = 0;
         let mut sampler = boundary.prepare_sampler().unwrap();
-        sampler.real_enabled = true;
         sampler
+            .core
             .coefficients
             .resize(64, ComplexAmp { re: 1., im: 0. });
-        sampler.try_start_real(0);
-        assert!(sampler.real_attempted);
-        assert!(sampler.real_fallback.is_none());
+        sampler.core.try_start_real(&mut sampler.real, 0);
+        assert!(sampler.real.attempted);
+        assert!(sampler.real.fallback.is_none());
         let mut denied = plan.clone();
         denied.counts_plan_budget = 1;
         assert!(RealFallback::build(&denied).is_none());

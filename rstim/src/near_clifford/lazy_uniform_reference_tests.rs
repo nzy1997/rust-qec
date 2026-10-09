@@ -57,7 +57,7 @@ fn entry_snapshot(entry: CachedOp) -> EntrySnapshot {
 
 fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
     SamplerSnapshot {
-        cache: sampler.cache.as_ref().map(|cache| CacheSnapshot {
+        cache: sampler.core.cache.as_ref().map(|cache| CacheSnapshot {
             start: cache.start,
             reserved: cache.reserved,
             budget: cache.budget,
@@ -75,30 +75,31 @@ fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
                 .collect(),
         }),
         coefficients: (
-            amp_bits(&sampler.coefficients),
-            sampler.coefficients.capacity(),
+            amp_bits(&sampler.core.coefficients),
+            sampler.core.coefficients.capacity(),
         ),
         reduced: (
-            amp_bits(&sampler.reduced_coefficients),
-            sampler.reduced_coefficients.capacity(),
+            amp_bits(&sampler.core.reduced_coefficients),
+            sampler.core.reduced_coefficients.capacity(),
         ),
-        x: sampler.x.clone(),
-        z: sampler.z.clone(),
-        pack_enabled: sampler.pack_enabled,
-        live: sampler.last_packet_live,
-        live_mask: sampler.last_packet_live_mask,
-        scalar_prepared: sampler.last_scalar_prepared,
+        x: sampler.core.x.clone(),
+        z: sampler.core.z.clone(),
+        pack_enabled: sampler.core.pack_enabled,
+        live: sampler.core.last_packet_live,
+        live_mask: sampler.core.last_packet_live_mask,
+        scalar_prepared: sampler.core.last_scalar_prepared,
         packets: [
-            &sampler.packet_x,
-            &sampler.packet_z,
-            &sampler.packet_tape,
-            &sampler.packet_records,
-            &sampler.packet_noise_masks,
+            &sampler.core.packet_x,
+            &sampler.core.packet_z,
+            &sampler.core.packet_tape,
+            &sampler.core.packet_records,
+            &sampler.core.packet_noise_masks,
         ]
         .into_iter()
         .map(|v| (v.to_vec(), v.capacity()))
         .collect(),
         independent: sampler
+            .core
             .packet_independent
             .as_ref()
             .map(IndependentPacket::snapshot),
@@ -114,7 +115,7 @@ fn pair<'a>(
 ) {
     let lazy = plan.prepare_sampler_with_cache_budget(budget).unwrap();
     let mut reference = plan.prepare_sampler_with_cache_budget(budget).unwrap();
-    reference.materialized_packet_reference = true;
+    reference.core.materialized_packet_reference = true;
     (lazy, reference)
 }
 
@@ -256,7 +257,7 @@ fn diagnostic(
     shots: usize,
     call: usize,
 ) -> String {
-    let ids = sampler.cache.as_ref().map(|cache| {
+    let ids = sampler.core.cache.as_ref().map(|cache| {
         cache
             .states
             .iter()
@@ -266,8 +267,8 @@ fn diagnostic(
     });
     format!(
         "policy={policy:?}; seed={seed}; budget={budget}; shots={shots}; call={call}; live={:#018x}/{}; reserved={}; IDs={ids:?}",
-        sampler.last_packet_live_mask,
-        sampler.last_packet_live,
+        sampler.core.last_packet_live_mask,
+        sampler.core.last_packet_live,
         sampler.coefficient_cache_reserved_bytes(),
     )
 }
@@ -301,7 +302,7 @@ fn lazy_cache_bookkeeping_matches_materialized_s2_cold_warm_and_split_calls() {
                 for &seed in seeds {
                     let (mut lazy, mut reference) = pair(&plan, budget);
                     let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-                    scalar.pack_enabled = false;
+                    scalar.core.pack_enabled = false;
                     let mut a = StdRng::seed_from_u64(seed);
                     let mut b = a.clone();
                     let mut c = a.clone();
@@ -370,7 +371,7 @@ fn lazy_cache_bookkeeping_matches_actual_partial_admission_and_compact_replay() 
             for seed in [583, 0, 63] {
                 let (mut lazy, mut reference) = pair(&plan, initial + increment);
                 let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-                scalar.pack_enabled = false;
+                scalar.core.pack_enabled = false;
                 let mut a = StdRng::seed_from_u64(seed);
                 let mut b = a.clone();
                 let mut c = a.clone();
@@ -397,7 +398,7 @@ fn lazy_cache_bookkeeping_matches_actual_partial_admission_and_compact_replay() 
                     assert_eq!(a.clone().next_u64(), c.clone().next_u64(), "{context}");
                     if call == 0 && seed == 583 {
                         assert!(
-                            lazy.last_packet_live > 0 && lazy.last_packet_live < 64,
+                            lazy.core.last_packet_live > 0 && lazy.core.last_packet_live < 64,
                             "compact={compact}; fixture must show actual replay; {context}"
                         );
                         assert_eq!(
@@ -405,7 +406,7 @@ fn lazy_cache_bookkeeping_matches_actual_partial_admission_and_compact_replay() 
                             initial + increment,
                             "{context}"
                         );
-                        assert_eq!(lazy.packet_independent.is_some(), compact, "{context}");
+                        assert_eq!(lazy.core.packet_independent.is_some(), compact, "{context}");
                     }
                 }
             }
@@ -556,7 +557,7 @@ fn error_plan(
 }
 
 fn inject_inconsistent_cdf(sampler: &mut CompiledNearCliffordSampler<'_>, node: usize) {
-    let cache = sampler.cache.as_mut().unwrap();
+    let cache = sampler.core.cache.as_mut().unwrap();
     assert!(cache.set_entry(
         cache.start,
         node,
@@ -620,9 +621,9 @@ fn lazy_cache_bookkeeping_matches_first_and_second_cached_projection_errors() {
                     drawn.clone().next_u64(),
                     "no replay, retry or extra draw on Err; {context}"
                 );
-                assert_eq!(lazy.packet_independent.is_some(), compact, "{context}");
+                assert_eq!(lazy.core.packet_independent.is_some(), compact, "{context}");
                 // Inspect actual stored children to distinguish first from second Err.
-                let cache = lazy.cache.as_ref().unwrap();
+                let cache = lazy.core.cache.as_ref().unwrap();
                 let Some(CachedOp::Measure(entry)) = cache.entry(cache.start, node) else {
                     unreachable!()
                 };
@@ -644,7 +645,7 @@ fn lazy_cache_bookkeeping_matches_first_and_second_cached_projection_errors() {
                     let mut independent = 0;
                     for (event, kind) in plan.random_kinds.iter().enumerate() {
                         if matches!(kind, RandomKind::Independent) && compact {
-                            let sidecar = lazy.packet_independent.as_ref().unwrap();
+                            let sidecar = lazy.core.packet_independent.as_ref().unwrap();
                             assert_eq!(
                                 (sidecar.mask(independent) >> lane) & 1,
                                 row[event],
@@ -653,7 +654,7 @@ fn lazy_cache_bookkeeping_matches_first_and_second_cached_projection_errors() {
                             independent += 1;
                         } else {
                             assert_eq!(
-                                lazy.packet_tape[lane * plan.random_kinds.len() + event],
+                                lazy.core.packet_tape[lane * plan.random_kinds.len() + event],
                                 row[event],
                                 "lane={lane}; event={event}; {context}"
                             );
@@ -661,8 +662,8 @@ fn lazy_cache_bookkeeping_matches_first_and_second_cached_projection_errors() {
                     }
                 }
                 // Returning Err leaves packet live accounting at its pre-call value.
-                assert_eq!(lazy.last_packet_live, 0, "{context}");
-                assert_eq!(lazy.last_packet_live_mask, 0, "{context}");
+                assert_eq!(lazy.core.last_packet_live, 0, "{context}");
+                assert_eq!(lazy.core.last_packet_live_mask, 0, "{context}");
             }
         }
     }
