@@ -437,6 +437,7 @@ jobs:
         with:
           name: near-clifford-current-cpu-peer-${{ github.sha }}
           retention-days: 30
+          include-hidden-files: true
           path: |
             drafts/x86-current-peer-*.log
             drafts/x86-current-peer/
