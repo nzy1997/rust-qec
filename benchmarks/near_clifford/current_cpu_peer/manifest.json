@@ -1,0 +1,40 @@
+{
+  "schema": "rstim.current-cpu-peer.v1",
+  "symft_revision": "ec36cb722b17f452f47882d513d44b37bb9f28a4",
+  "versions": {
+    "symft": "2026.10.8",
+    "clifft": "0.11.0",
+    "numpy": "2.4.6"
+  },
+  "names": [
+    "msc_d3_inject_cultivate_p1e-3",
+    "msc_d5_inject_cultivate_p1e-3"
+  ],
+  "shots": [
+    1,
+    64,
+    1024
+  ],
+  "policies": [
+    "strict",
+    "fused"
+  ],
+  "pairs": 10,
+  "repetitions": 7,
+  "roles": [
+    "rstim",
+    "clifft",
+    "clifft-scheduled",
+    "symft",
+    "control"
+  ],
+  "finite_attempts_min": 8192,
+  "warm_ns_min": 50000000,
+  "peer_timeout_s": 180,
+  "raw_timeout_s": 600,
+  "scope": "Fixed12 Linux x86_64 CPU counts cells; pinned available SymFT compiled integration branch, Clifft direct/scheduled and Rust identical-binary control. No general SOTA or full distribution claim.",
+  "inputs": {
+    "msc_d3_inject_cultivate_p1e-3": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+    "msc_d5_inject_cultivate_p1e-3": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
+  }
+}
