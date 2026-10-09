@@ -5,31 +5,38 @@
 
 {% block hero %}
 <div class="hero compact-hero rsmp-hero">
-  <p class="eyebrow">Sample archives</p>
   <h1>RSMP v1</h1>
-  <p class="hero-copy">Compress QEC measurement samples without losing the data needed to recover measurements, detectors, and observables.</p>
-  <div class="rsmp-hero-grid" aria-label="Pinned RSMP compression result">
-    <article class="rsmp-metric primary"><span>RSMP / raw b8</span><strong>11.98%</strong><small>remaining size · lower is smaller</small></article>
-    <article class="rsmp-metric"><span>RSMP / direct Zstd</span><strong>57.14%</strong><small>remaining size · lower is smaller</small></article>
-    <article class="rsmp-case"><span class="badge measured">Measured</span><p>Surface code d=11, rounds=100</p><small>1,024 shots</small></article>
-  </div>
+  <p class="hero-copy">Pack measurement samples into an RSMP archive and recover them with the original circuit.</p>
+
 </div>
 {% endblock hero %}
 
 {% block main %}
 <section id="rsmp-overview" class="rsmp-section" aria-labelledby="rsmp-overview-title">
   <div class="section-heading">
-    <p class="eyebrow">What it does</p>
     <h2 id="rsmp-overview-title">Measurements in, decoder data back out</h2>
-    <p class="section-copy">RSMP stores a reversible, circuit-derived representation. Unpacking with the original circuit recovers the measurement stream and derives detector and observable outputs.</p>
+    <p class="section-copy">RSMP is a lossless binary archive format for measurement samples. It stores a reversible, circuit-derived representation. Unpacking with the original circuit recovers the measurement stream and derives detector and observable outputs.</p>
   </div>
 </section>
 
+<section id="rsmp-workflow" class="rsmp-section" aria-labelledby="rsmp-workflow-title">
+  <div class="section-heading"><h2 id="rsmp-workflow-title">Pack and verify</h2></div>
+  {% include "partials/example-circuit.html" %}
+  <pre class="quick-command"><code>rstim circuit sample --in circuit.stim --shots 4 --seed 7 \
+  --out-format b8 --out samples.b8 &gt; /dev/null
+rstim pack_samples --circuit circuit.stim --shots 4 --in samples.b8 --in_format b8 --out samples.rsmp
+rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only
+rstim unpack_samples --circuit circuit.stim --in samples.rsmp \
+  --measurements_out recovered.b8 --measurements_out_format b8
+cmp samples.b8 recovered.b8</code></pre>
+  <p><code>samples.b8</code> contains four two-bit rows (4 bytes); <code>samples.rsmp</code> stores the same measurement data. Unpacking writes <code>recovered.b8</code>; <code>cmp</code> checks that it matches the original bytes and prints nothing when they match. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
+</section>
+
+<section id="rsmp-compression" class="task-section"><h2 id="rsmp-compression-title">Compression measurements</h2><p><a href="../validation/#rsmp-compression">Read the recorded RSMP compression case</a>. Ratios are properties of its specific circuit, shots and codec settings.</p></section>
 <section id="decoder-datasets" class="rsmp-section" aria-labelledby="decoder-datasets-title">
   <div class="section-heading">
-    <p class="eyebrow">Public contests</p>
     <h2 id="decoder-datasets-title">Need a dataset contestants cannot score from directly?</h2>
-    <p class="section-copy">RSMP is intentionally lossless and private. For public decoder benchmarks, use <code>rstim export_decoder_dataset</code> instead: publish only contestant inputs, and keep the answer bundle private.</p>
+    <p class="section-copy">RSMP is intentionally lossless and private. For public decoder benchmarks, use <code>rstim dataset export</code> instead: publish only contestant inputs, and keep the answer bundle private.</p>
   </div>
   <div class="rsmp-command-grid">
     <article class="compact-card">
@@ -44,38 +51,10 @@
   </div>
 </section>
 
-<section id="rsmp-workflow" class="rsmp-section" aria-labelledby="rsmp-workflow-title">
-  <div class="section-heading"><p class="eyebrow">Run it</p><h2 id="rsmp-workflow-title">Pack and verify</h2></div>
-  {% include "partials/installed-example.html" %}
-  <pre class="quick-command"><code>rstim sample --in circuit.stim --shots 4 --out_format b8 --out samples.b8
-rstim pack_samples --circuit circuit.stim --shots 4 --in samples.b8 --in_format b8 --out samples.rsmp
-rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only</code></pre>
-  <p><strong>Expected:</strong> <code>samples.b8</code> contains four two-bit rows (4 bytes); <code>samples.rsmp</code> is created and verification exits successfully. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
-</section>
-
-<section id="rsmp-compression" class="rsmp-section" aria-labelledby="rsmp-compression-title">
-  <div class="section-heading">
-    <p class="eyebrow">Measured result</p>
-    <h2 id="rsmp-compression-title">88.02% smaller than raw b8</h2>
-    <p class="section-copy">Pinned surface-code case: d=11, 100 rounds, 1,024 shots.</p>
-  </div>
-  <div class="table-wrap result-table">
-    <table>
-      <thead><tr><th>Format</th><th>Bytes</th><th>Share of raw</th></tr></thead>
-      <tbody>
-        <tr><td>Raw b8</td><td>1,552,384</td><td>100.00%</td></tr>
-        <tr><td>Direct Zstandard</td><td>325,565</td><td>20.97%</td></tr>
-        <tr><td><strong>RSMP v1</strong></td><td><strong>186,028</strong></td><td><strong>11.98%</strong></td></tr>
-      </tbody>
-    </table>
-  </div>
-  <figure class="rsmp-share"><img src="og.png" alt="RSMP v1 measured compression summary"></figure>
-</section>
-
 <section id="rsmp-transform" class="rsmp-section compact-reference" aria-labelledby="rsmp-transform-title">
   <details>
     <summary id="rsmp-transform-title">How the reversible transform works</summary>
-    <p>Measurements are XORed with a noiseless reference and separated into detector syndromes plus free coordinates. The decoder rebuilds the same transform from the circuit.</p>
+    <p>Measurements are XORed with a noiseless reference and separated into detector syndromes plus free coordinates. Unpacking rebuilds the same transform from the circuit; this is archive decompression, separate from QEC decoding.</p>
   </details>
 </section>
 
@@ -96,4 +75,5 @@ rstim unpack_samples --circuit circuit.stim --in samples.rsmp --verify_only</cod
     </div>
   </details>
 </section>
+<section class="prose" id="rsmp-format-contract"><h2>Binary format contract</h2>{{ load_data(path="generated/rsmp-v1.md",format="plain") | replace(from="# RSMP v1 Binary Envelope",to="") | markdown | safe }}</section>
 {% endblock main %}

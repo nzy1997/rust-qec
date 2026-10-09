@@ -1,0 +1,4 @@
+{% extends "guide.html" %}
+{% block main %}<article class="prose">{{ section.content | safe }}
+<div id="loss-subset-v1">{{ load_data(path="generated/loss-visible-circuit-subset-v1.md",format="plain") | replace(from="# Loss-Visible Circuit Subset v1",to="") | replace(from="(../../rstim/src/unified_cli/decode/compiler.rs)",to="(https://github.com/nzy1997/rust-qec/blob/master/rstim/src/unified_cli/decode/compiler.rs)") | markdown | safe }}</div>
+</article>{% endblock main %}

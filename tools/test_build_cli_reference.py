@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from tools import build_cli_reference
 from tools.build_cli_reference import normalize, write_reference
 
 
@@ -75,6 +76,42 @@ class BuildCliReferenceTest(unittest.TestCase):
             value = json.loads(output.read_text())
             self.assertEqual(value["source_command"], "rstim capabilities --format json")
             self.assertTrue(output.read_text().endswith("\n"))
+
+
+class RecursiveHelpTests(unittest.TestCase):
+    def test_lists_nested_and_additional_groups_without_parsing_options(self):
+        help_text = """Usage: rstim [OPTIONS] <COMMAND>
+Commands:
+  gen       Generate a circuit
+  help      Print help
+Options:
+  --code <CODE>
+          Possible values: css, surface_code
+Additional command groups:
+  circuit   Structured circuit commands
+  dataset   Public/private bundles
+"""
+        self.assertEqual(build_cli_reference.help_subcommands(help_text), ['gen', 'circuit', 'dataset'])
+
+    def test_capture_walks_each_nested_command_once_and_fails_bad_help(self):
+        from unittest.mock import patch
+        import subprocess
+        help_texts = {
+            (): 'Usage: tool <COMMAND>\nCommands:\n  code  Codes\n  help Help',
+            ('code',): 'Usage: tool code <COMMAND>\nCommands:\n  css CSS',
+            ('code', 'css'): 'Usage: tool code css [OPTIONS]\nOptions:\n  --json',
+        }
+        calls = []
+        def run(argv, **kwargs):
+            path = tuple(argv[1:-1]); calls.append(path)
+            return subprocess.CompletedProcess(argv, 0, help_texts[path], '')
+        with patch.object(build_cli_reference.subprocess, 'run', side_effect=run):
+            entries = build_cli_reference.collect_help('tool', ['tool'], Path('.'))
+        self.assertEqual(calls, [(), ('code',), ('code', 'css')])
+        self.assertEqual(entries[-1]['anchor'], 'help-tool-code-css')
+        with patch.object(build_cli_reference.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, '', '')):
+            with self.assertRaises(ValueError):
+                build_cli_reference.collect_help('tool', ['tool'], Path('.'))
 
 
 if __name__ == "__main__":

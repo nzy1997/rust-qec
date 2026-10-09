@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><h1>{{ section.title }}</h1></div>{% endblock hero %}
+{% block main %}<article class="prose">{{ section.content | safe }}</article>
+{% set all_help = load_data(path="generated/cli-help.json") %}
+{% set entries = all_help[section.extra.cli_key] %}
+<section class="task-section"><h2 id="commands">Command index</h2><ul>{% for entry in entries %}<li><a href="#{{ entry.anchor }}"><code>{{ entry.command_line }}</code></a></li>{% endfor %}</ul></section>
+{% for entry in entries %}<section class="task-section"><h2 id="{{ entry.anchor }}"><code>{{ entry.command_line }}</code></h2><pre data-language="Command help" data-output="true"><code>{{ entry.help }}</code></pre></section>{% endfor %}
+{% endblock main %}

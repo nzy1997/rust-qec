@@ -76,6 +76,7 @@
             ? Math.max(0, 30 - (pageTitle.length - phrase.length))
             : 0;
           return { ...entry, score: focusedPageBonus
+            + (entry.kind === 'tutorial' && terms.every((term) => pageTitle.includes(term)) ? 15 : 0)
             + terms.filter((term) => pageTitle.includes(term)).length * 5
             + (normalize(entry.title).includes(phrase) ? 20 : 0)
             + terms.filter((term) => normalize(entry.title).includes(term)).length * 5

@@ -28,6 +28,7 @@ class Document(HTMLParser):
     def __init__(self, ids=()):
         super().__init__(convert_charrefs=True)
         self.in_main = False
+        self.page_kind = ''
         self.in_title = False
         self.skipped = []
         self.dense = 0
@@ -40,6 +41,8 @@ class Document(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if tag == 'body':
+            self.page_kind = 'tutorial' if attrs.get('data-page') in {'start', 'css', 'loss', 'decode', 'data', 'rust'} else ''
         if self.skipped or tag in ('script', 'style', 'noscript', 'nav', 'aside') or 'data-toc-skip' in attrs:
             if tag not in VOID_TAGS:
                 self.skipped.append(tag)
@@ -116,7 +119,7 @@ def build(site_root):
     records = []
     for path in sorted(site_root.rglob('index.html')):
         relative = path.relative_to(site_root).as_posix()
-        if relative == 'index.html' or relative.startswith(('gallery/', 'examples/', 'docs/', 'interactive/')):
+        if relative == 'index.html' or relative.startswith(('gallery/', 'examples/', 'docs/', 'interactive/', 'simulator/', 'detector-models/', 'atom-loss-concepts/')):
             continue
         html = path.read_text(encoding='utf-8')
         ids = IdCollector()
@@ -130,7 +133,8 @@ def build(site_root):
                             'page_title': page_title,
                             'path': relative.removesuffix('index.html') + (f"#{section['anchor']}" if section['anchor'] else ''),
                             'text': text,
-                            'excerpt': compact(section['prose'])})
+                            'excerpt': compact(section['prose']),
+                            **({'kind': document.page_kind} if document.page_kind else {})})
     destination = site_root / 'data' / 'docs-search.json'
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(records, ensure_ascii=False), encoding='utf-8')

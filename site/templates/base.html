@@ -15,9 +15,9 @@
     <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="{{ root }}/favicon.ico?v=01c-1">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ root }}/brand/favicon-32.png?v=01c-1">
     <link rel="icon" type="image/svg+xml" sizes="any" href="{{ root }}/brand/rustqec-mark.svg?v=01c-1">
-    <link rel="stylesheet" href="{{ root }}/styles.css">
+    <link rel="stylesheet" href="{{ root }}/styles.css?v={{ get_hash(path="static/styles.css", sha_type=256) | truncate(length=12, end="") }}">
     {% block head %}{% endblock head %}
-    <link rel="stylesheet" href="{{ root }}/layout.css">
+    <link rel="stylesheet" href="{{ root }}/layout.css?v={{ get_hash(path="static/layout.css", sha_type=256) | truncate(length=12, end="") }}">
   </head>
   <body data-docs-version="{{ docs_version.id }}" data-root="{{ root }}" data-page="{{ current_nav }}">
     <a class="skip-link" href="{% if current_nav == 'home' %}#home-content{% else %}#main{% endif %}">Skip to content</a>
@@ -57,7 +57,6 @@
         <label class="visually-hidden" for="docs-version" hidden>Documentation version</label>
         <select id="docs-version" hidden></select>
       </div>
-      <a href="{{ root }}/reference/#reference-boundary">About these docs</a>
     </div></div>
     {% if docs_version.channel == "stable" %}<aside class="version-strip docs-edition-notice" id="docs-edition-notice" aria-label="Documentation edition"><div class="version-inner"><strong>Frozen stable edition:</strong> RustQEC {{ docs_version.release_line }}, coordinated release v{{ docs_version.native_release }}. Page text is preserved from that release; this edition banner defines its publication status.</div></aside>{% endif %}
     <div class="site-frame{% if current_nav not in ["home", "shot"] %} documentation-frame{% endif %}">
@@ -68,7 +67,6 @@
       {% endif %}
       <div class="page-content">
         <header class="site-header">
-          {% if current_nav not in ["home", "shot", "start"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/get-started/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
           {% block hero %}{% endblock hero %}
         </header>
         <div class="reading-layout">
@@ -84,7 +82,7 @@
       <div class="footer-brand"><a href="{{ root }}/" aria-label="RustQEC home"><img src="{{ root }}/brand/rustqec-lockup.svg" width="128" height="32" alt="RustQEC" loading="lazy"></a><span>A quantum error correction workspace in Rust</span></div>
       <div class="footer-links"><a href="{{ root }}/support/#get-help">Get help</a><a href="https://github.com/nzy1997/rust-qec/releases/tag/v{{ docs_version.native_release }}">RustQEC {{ docs_version.release_line }} release notes ↗</a><a href="https://github.com/nzy1997/rust-qec">GitHub ↗</a><a href="#top">Back to top</a></div>
     </footer>
-    <script src="{{ root }}/js/docs.js" defer></script>
+    <script src="{{ root }}/js/docs.js?v={{ get_hash(path="static/js/docs.js", sha_type=256) | truncate(length=12, end="") }}" defer></script>
     <script src="{{ root }}/js/versions.js" defer></script>
     {% block scripts %}{% endblock scripts %}
   </body>

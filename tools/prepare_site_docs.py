@@ -54,8 +54,16 @@ def prepare(repo_root: Path) -> None:
         ('rstim/doc/QP101-ZY.md', 'qp101-protocol.md'),
         ('docs/support-compatibility.md', 'support-compatibility.md'),
         ('docs/maintainer-reference.md', 'maintainer-reference.md'),
+        ('docs/specs/loss-visible-circuit-subset-v1.md', 'loss-visible-circuit-subset-v1.md'),
+        ('rstim/doc/decoder-dataset.md', 'decoder-dataset.md'),
+        ('rstim/doc/rsmp-v1.md', 'rsmp-v1.md'),
     ):
         shutil.copyfile(repo_root / source, destination / filename)
+
+    support = (repo_root / 'docs/support-compatibility.md').read_text()
+    migration_heading = '## Mid-SWAP configuration migration'
+    (destination / 'version-migration.md').write_text(support[support.index(migration_heading):])
+    (destination / 'support-core.md').write_text(support[:support.index(migration_heading)])
 
 
 if __name__ == '__main__':

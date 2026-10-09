@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 
 
@@ -200,13 +201,72 @@ def write_reference(document: object, output: Path) -> None:
     output.write_text(json.dumps(normalize(document), indent=2, ensure_ascii=False) + "\n")
 
 
+def help_subcommands(help_text: str) -> list[str]:
+    """Read Clap's command sections, including rstim's extra command groups."""
+    names = []
+    in_commands = False
+    for line in help_text.splitlines():
+        if line in {"Commands:", "Additional command groups:"}:
+            in_commands = True
+            continue
+        if in_commands and line and not line.startswith(" "):
+            in_commands = False
+        if in_commands:
+            match = re.match(r"^  ([a-zA-Z][a-zA-Z0-9_-]*)(?:\s|$)", line)
+            if match and match[1] != "help" and match[1] not in names:
+                names.append(match[1])
+    return names
+
+
+def collect_help(name: str, executable: list[str], repo_root: Path) -> list[dict]:
+    """Walk public command help; never execute a workload to discover its API."""
+    entries = []
+    pending = [()]
+    seen = set()
+    while pending:
+        argv = pending.pop(0)
+        if argv in seen:
+            continue
+        seen.add(argv)
+        result = subprocess.run(executable + list(argv) + ["--help"], cwd=repo_root,
+                                text=True, capture_output=True, timeout=300)
+        if result.returncode:
+            raise RuntimeError(f"{name} {' '.join(argv)} --help failed: {result.stderr}")
+        help_text = result.stdout.strip()
+        if "Usage:" not in help_text:
+            raise ValueError(f"{name} {' '.join(argv)} did not return command help")
+        entries.append({"command_line": " ".join([name, *argv]),
+                        "argv": list(argv), "anchor": "help-" + "-".join([name, *argv]),
+                        "help": help_text})
+        pending.extend((*argv, child) for child in help_subcommands(help_text))
+    return entries
+
+
+def write_help_reference(repo_root: Path, output: Path, binary: Path | None = None) -> None:
+    commands = {
+        "rstim": [str(binary)] if binary else ["cargo", "run", "--quiet", "--locked",
+                    "-p", "rstim", "--bin", "rstim", "--"],
+        "qec_code": ["cargo", "run", "--quiet", "--locked", "-p", "qec-code",
+                     "--features", "cli", "--bin", "qec-code", "--"],
+        "rsinter": ["cargo", "run", "--quiet", "--locked", "-p", "rsinter",
+                    "--no-default-features", "--bin", "rsinter", "--"],
+    }
+    names = {"rstim": "rstim", "qec_code": "qec-code", "rsinter": "rsinter"}
+    document = {key: collect_help(names[key], executable, repo_root)
+                for key, executable in commands.items()}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=REPO)
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--output", type=Path, default=REPO / "site/generated/cli-reference.json")
+    parser.add_argument("--help-output", type=Path, default=REPO / "site/generated/cli-help.json")
     args = parser.parse_args()
     write_reference(capabilities(args.binary, args.repo_root), args.output)
+    write_help_reference(args.repo_root, args.help_output, args.binary)
 
 
 if __name__ == "__main__":

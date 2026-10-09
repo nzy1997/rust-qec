@@ -1,0 +1,2 @@
+{% extends "guide.html" %}
+{% block main %}<article class="prose">{{ section.content | safe }}{{ load_data(path="generated/version-migration.md",format="plain") | replace(from="(../rstim/doc/QP101-ZY.md)",to="(../qp101/protocol/)") | markdown | safe }}</article>{% endblock main %}

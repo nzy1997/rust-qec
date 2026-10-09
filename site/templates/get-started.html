@@ -12,6 +12,18 @@
 <p>Install this development version from a repository checkout once. After installation, the commands below work from any directory:</p>
 <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
 <p>This install includes all <code>rstim</code> commands used below.</p>
+<details class="loss-disclosure"><summary>Additional tool for the CSS-code tutorial</summary>
+<p>The CSS-code tutorial uses the separate <code>qec-code</code> executable. Install it once from the same repository checkout:</p>
+<pre data-language="Shell"><code>cargo install --locked --path qec-code --features cli</code></pre>
+</details>
+<details class="loss-disclosure"><summary>Additional tools for decoder replay and optional solvers</summary>
+<p>The comparison tutorial uses <code>rsinter</code> with two runner features:</p>
+<pre data-language="Shell"><code>cargo install --locked --path rsinter --features rbposd-runner,rmatching-runner</code></pre>
+<p>Add <code>plotting</code> for rsinter plots; it needs native font dependencies. Native HiGHS builds need a C/C++ toolchain and CMake. To enable the optional MLE loss decoder and exact CSS distance solver:</p>
+<pre data-language="Shell"><code>cargo install --locked --path rstim --features ilp --force
+cargo install --locked --path qec-code --features cli,distance-ilp-highs --force</code></pre>
+<p><code>rsinter/ilp-runner</code> enables ILP replay; <code>full</code> enables every runner and plotting. Choose only the features needed by your experiment. See <a href="../versions/#cargo-features-in-the-0-3-release-line">feature migration</a> for library defaults.</p>
+</details>
 <p>After installation, restart your terminal and check that it works:</p>
 <pre data-language="Shell"><code>rstim --version</code></pre>
 <pre data-output="true"><code>rstim {{ docs_version.packages.rstim.version }}</code></pre>
@@ -128,11 +140,12 @@ cat surface-predictions.01</code></pre>
 </figure>
 </section>
 <section class="task-section" aria-labelledby="continue-rustqec"><h2 id="continue-rustqec">Continue with RustQEC</h2>
-<nav aria-label="More RustQEC guides"><p>To continue this workflow, use <a href="../simulator/">Circuit simulation</a> to generate and sample other circuits, then <a href="../detector-models/">Detector error models</a> to see how faults produce detector events. <a href="../decoding/">Decoding</a> goes further into predicting logical flips and comparing decoders. For a closer look at the circuit itself, <a href="../qp101/">Circuit diagrams</a> explains its visual notation and rendering tools.</p></nav>
+<nav aria-label="More RustQEC guides"><p>Next, <a href="../css-codes/">define your own CSS checks</a>, <a href="../atom-loss/">run an atom-loss experiment</a>, <a href="../decoding/">compare decoders on frozen inputs</a>, <a href="../sampling-data/">create training data</a>, or <a href="../rust-api/">run the workflow in Rust</a>. <a href="../qp101/">Circuit diagrams</a> explains visual notation and rendering.</p></nav>
+<p>For lookup, use the <a href="../reference/#all-commands">CLI reference</a>. For measured results, use the <a href="../validation/">benchmark overview</a>.</p>
 </section>
 <section class="task-section" aria-labelledby="further-learning"><h2 id="further-learning">Further learning</h2>
 <p><code>rstim</code> is inspired by <a href="https://github.com/quantumlib/Stim">Stim</a>, especially its way of representing circuits and detector error models. It reads Stim-style circuits and implements simulation, sampling, and DEM extraction in Rust so these steps connect with the other tools in this repository.</p>
 <p>For more on the matching decoder, see <a href="https://github.com/oscarhiggott/PyMatching">PyMatching</a>. For the code behind the experiment, the Error Correction Zoo introduces the <a href="https://errorcorrectionzoo.org/c/rotated_surface">rotated surface code</a>, and <a href="https://arxiv.org/abs/1208.0928">Surface codes: Towards practical large-scale quantum computation</a> provides a broader review.</p>
 </section>
 {% endblock main %}
-{% block scripts %}<script src="{{ root }}/js/search.js" defer></script>{% endblock scripts %}
+{% block scripts %}<script src="{{ root }}/js/search.js?v={{ get_hash(path="static/js/search.js", sha_type=256) | truncate(length=12,end="") }}" defer></script>{% endblock scripts %}

@@ -4,6 +4,6 @@ template = "atom-loss-evidence.html"
 
 [extra]
 root = ".."
-nav = "loss"
+nav = "loss-bench"
 loss_view = "evidence"
 +++
