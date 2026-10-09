@@ -24,7 +24,7 @@ mod tests {
 
     fn state(values: &[ComplexAmp]) -> CachedState {
         CachedState {
-            coefficients: CachedCoefficients::Complex(Arc::new(values.to_vec())),
+            coefficients: Arc::new(CachedCoefficients::Complex(values.to_vec())),
             next_node: None,
             transition: CachedOp::None,
         }

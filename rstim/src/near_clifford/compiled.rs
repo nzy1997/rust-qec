@@ -226,7 +226,7 @@ enum CachedOp {
     Measure(CachedMeasurement),
 }
 struct CachedState {
-    coefficients: CachedCoefficients,
+    coefficients: Arc<CachedCoefficients>,
     next_node: Option<usize>,
     transition: CachedOp,
 }
@@ -237,6 +237,8 @@ struct CoefficientCache {
     states: Vec<CachedState>,
     intern: Option<CoefficientIntern>,
     intern_attempted: bool,
+    // Optional storage is enabled only while native counts are being sampled.
+    axis_enabled: bool,
     start: usize,
     reserved: usize,
     budget: usize,
@@ -262,7 +264,7 @@ impl CoefficientCache {
         let mut states = Vec::new();
         states.try_reserve_exact(2).ok()?;
         states.push(CachedState {
-            coefficients: CachedCoefficients::Complex(Arc::new(vec![ComplexAmp::new(1., 0.)])),
+            coefficients: Arc::new(CachedCoefficients::Complex(vec![ComplexAmp::new(1., 0.)])),
             next_node: None,
             transition: CachedOp::None,
         });
@@ -270,7 +272,9 @@ impl CoefficientCache {
             0
         } else {
             states.push(CachedState {
-                coefficients: CachedCoefficients::Complex(plan.initial_coefficients.clone()),
+                coefficients: Arc::new(CachedCoefficients::Shared(
+                    plan.initial_coefficients.clone(),
+                )),
                 next_node: None,
                 transition: CachedOp::None,
             });
@@ -281,6 +285,7 @@ impl CoefficientCache {
             states,
             intern: None,
             intern_attempted: false,
+            axis_enabled: false,
             start,
             reserved: bytes,
             budget,
@@ -372,7 +377,7 @@ impl CoefficientCache {
         };
         // Delay the optional scan/allocation until the cache has warmed. Keep
         // small vectors and every mixed-axis state on the original storage path.
-        let packed = (self.states.len() >= coefficient_intern::MIN_STATES)
+        let packed = (self.axis_enabled && self.states.len() >= coefficient_intern::MIN_STATES)
             .then(|| CachedCoefficients::axis(coefficients))
             .flatten()
             .filter(|(_, packed_charge)| *packed_charge < charge && self.fits(*packed_charge));
@@ -382,12 +387,12 @@ impl CoefficientCache {
             let mut state = Vec::new();
             state.try_reserve_exact(coefficients.len()).ok()?;
             state.extend_from_slice(coefficients);
-            (CachedCoefficients::Complex(Arc::new(state)), charge)
+            (CachedCoefficients::Complex(state), charge)
         };
         self.states.try_reserve(1).ok()?;
         let id = self.states.len();
         self.states.push(CachedState {
-            coefficients: state,
+            coefficients: Arc::new(state),
             next_node: None,
             transition: CachedOp::None,
         });
@@ -1062,8 +1067,8 @@ pub enum CompiledRotationArithmetic {
 /// before scheduling retains the existing compiler.
 /// The packed compilation frame reserves at most 9 MiB. Optional transitions
 /// reserve at most 64 MiB and packet event/frame work buffers 16 MiB.
-/// Warm coefficient caches may store pure-axis vectors with one FP64 value and
-/// two tag bits per coefficient. Both component bit patterns, including signed
+/// Warm native-counts coefficient caches may store pure-axis vectors with one
+/// FP64 value and two tag bits per coefficient. Both component bit patterns, including signed
 /// zero, are restored before arithmetic; mixed-axis vectors keep complex storage.
 /// Optional homogeneous random-event runs use at most 8 MiB within the plan budget; rejection
 /// retains the event-by-event generator with identical RNG and records.
@@ -3796,6 +3801,10 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         rng: &mut impl Rng,
     ) -> Result<Vec<NearCliffordShot>, String> {
+        // Structured rows bypass sample_batch, including zero-shot calls.
+        if let Some(cache) = &mut self.cache {
+            cache.axis_enabled = false;
+        }
         let mut output = Vec::new();
         output.try_reserve_exact(shots).map_err(|e| e.to_string())?;
         for _ in 0..shots {
@@ -3932,6 +3941,9 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
+        if let Some(cache) = &mut self.cache {
+            cache.axis_enabled = matches!(output, BatchOutput::Counts { .. });
+        }
         let packet_bytes = self
             .plan
             .random_kinds
