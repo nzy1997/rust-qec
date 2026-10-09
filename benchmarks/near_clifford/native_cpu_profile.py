@@ -19,7 +19,16 @@ ROOT = scout.ROOT
 NAME = "msc_d5_inject_cultivate_p1e-3"
 CASES = [("baseline", "strict"), ("candidate", "strict"), ("candidate", "fused"), ("baseline", "fused")]
 ENV = {"RUSTFLAGS": "-C target-cpu=native", **{k: "1" for k in scout.ENV_KEYS[1:]}}
-PREFLIGHT = ["direct-bits", "highest-gather", "gather-cdf", "frozen-bits", "both-policy-bits", "public-counts"]
+PREFLIGHT_COUNTS = {
+    "direct-bits": 1,
+    "highest-gather": 1,
+    "gather-cdf": 1,
+    "frozen-bits": 1,
+    "both-policy-bits": 1,
+    "public-counts": 11,
+    "real-kernels": 8,
+}
+PREFLIGHT = list(PREFLIGHT_COUNTS)
 EXPORTS = {"perf-script.txt": ["script", "--header", "-F", "comm,pid,tid,cpu,time,event,ip,sym,dso"],
            "perf-report.txt": ["report", "--stdio", "--no-children", "--percent-limit", "0"],
            "perf-buildids.txt": ["buildid-list"], "perf-header.txt": ["report", "--header-only"]}
@@ -148,14 +157,14 @@ def profile(baseline_ref, out):
     preflight = {}
     for name in PREFLIGHT:
         source = ROOT / ("drafts/x86-scout-" + name + ".log")
-        expected = 10 if name == "public-counts" else 1
+        expected = PREFLIGHT_COUNTS[name]
         require(f"test result: ok. {expected} passed;" in source.read_text(), "native preflight missing: " + name)
         target = out / ("preflight-" + name + ".log")
         shutil.copyfile(source, target)
         preflight[name] = dict(path=target.name, sha256=scout.digest(target))
     before = {role: scout.identity(root) for role, root in roots.items()}
     require(all(i["dirty"] == "" for i in before.values()), "clean sources required")
-    header = dict(schema="diagnostic.native-cpu-sampling.v1", started=time.time(), performance_valid=False,
+    header = dict(schema="diagnostic.native-cpu-sampling.v2", started=time.time(), performance_valid=False,
                   scope="Whole-process software CPU samples, including setup/warmup/teardown; instrumented observation timings are invalid; no peer comparison",
                   identities=before, retained=retained, preflight=preflight,
                   profile_driver_sha256=scout.digest(Path(__file__)), available_affinity=available, affinity=[cpu],
@@ -216,7 +225,7 @@ def verify(out, *, git_sources=True, replay=True):
     out = Path(out)
     h, c = read(out / "header.json"), read(out / "closure.json")
     require(scout.digest(out / "header.json") == c["header_sha256"], "original header digest")
-    require(h["schema"] == "diagnostic.native-cpu-sampling.v1" and h["performance_valid"] is False
+    require(h["schema"] == "diagnostic.native-cpu-sampling.v2" and h["performance_valid"] is False
             and c["performance_valid"] is False, "instrumented timings must never be performance evidence")
     require(h["cases"] == [list(t) for t in CASES] and (h["event"], h["frequency"], h["call_graph"], h["observations"]) == ("cpu-clock:u", 499, "dwarf,8192", 101), "fixed profile protocol")
     require(h["host"].startswith("Linux-") and "release: 1.93.1\n" in h["rustc"]
@@ -257,7 +266,7 @@ def verify(out, *, git_sources=True, replay=True):
     require(set(h["preflight"]) == set(PREFLIGHT), "all native gate logs required")
     for name, entry in h["preflight"].items():
         require(entry["path"] == "preflight-" + name + ".log" and scout.digest(out / entry["path"]) == entry["sha256"], "native log bytes")
-        require(f"test result: ok. {10 if name == 'public-counts' else 1} passed;" in (out / entry["path"]).read_text(), "native gate result")
+        require(f"test result: ok. {PREFLIGHT_COUNTS[name]} passed;" in (out / entry["path"]).read_text(), "native gate result")
     buildids = {}
     require(set(h["binaries"]) == {"baseline", "candidate"}, "binary command inventory")
     for role in ["baseline", "candidate"]:
