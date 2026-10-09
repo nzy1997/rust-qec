@@ -230,8 +230,7 @@ mod tests {
             let selected = plan
                 .prepare_sampler()
                 .unwrap()
-                .core
-                .row_with_random_kernel::<true, true, false>(&[], &mut replay, None)
+                .row_with_random_kernel::<true, true, _>(&[], &mut replay, ComplexRows)
                 .unwrap();
             assert!(
                 replay.skipped >= 128,
@@ -241,11 +240,10 @@ mod tests {
             let expected = plan
                 .prepare_sampler()
                 .unwrap()
-                .core
-                .row_with_random_mode::<false, false>(
+                .row_with_random_mode::<false, _>(
                     &[],
                     &mut RowRandom::recorded(&tape, &mut b),
-                    None,
+                    ComplexRows,
                 )
                 .unwrap();
             if selected.detectors.iter().all(|&bit| !bit) {
