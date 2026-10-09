@@ -59,6 +59,12 @@ fn cultivation_cache_storage_keeps_records_counts_flat_outputs_and_literal_rng()
                         cached.sample_measurements_u8(17, &mut a).unwrap(),
                         reference.sample_measurements_u8(17, &mut b).unwrap()
                     );
+                    // Re-enable counts after restoring packed cache entries in a raw call.
+                    let rows = reference.sample(65, &mut b).unwrap();
+                    assert_eq!(
+                        cached.sample_postselected_counts(65, 0, &mut a).unwrap(),
+                        count_records(&rows, 0)
+                    );
                     for _ in 0..16 {
                         assert_eq!(a.next_u64(), b.next_u64());
                     }

@@ -1,10 +1,11 @@
 //! Lossless optional storage for coefficient vectors whose entries lie on an axis.
 use super::*;
 
-#[derive(Clone)]
 pub(super) enum CachedCoefficients {
-    Complex(Arc<Vec<ComplexAmp>>),
-    Axis(Arc<AxisCoefficients>),
+    Complex(Vec<ComplexAmp>),
+    Axis(AxisCoefficients),
+    // Preserve sharing of the compiled deterministic prefix.
+    Shared(Arc<Vec<ComplexAmp>>),
 }
 
 pub(super) struct AxisCoefficients {
@@ -17,6 +18,7 @@ impl CachedCoefficients {
     pub(super) fn len(&self) -> usize {
         match self {
             Self::Complex(values) => values.len(),
+            Self::Shared(values) => values.len(),
             Self::Axis(values) => values.values.len(),
         }
     }
@@ -24,6 +26,7 @@ impl CachedCoefficients {
     fn at(&self, index: usize) -> ComplexAmp {
         match self {
             Self::Complex(values) => values[index],
+            Self::Shared(values) => values[index],
             Self::Axis(axis) => {
                 let tag = (axis.tags[index / 32] >> (2 * (index % 32))) & 3;
                 let zero = f64::from_bits((tag >> 1) << 63);
@@ -51,6 +54,7 @@ impl CachedCoefficients {
             .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
         match self {
             Self::Complex(values) => output.extend_from_slice(values),
+            Self::Shared(values) => output.extend_from_slice(values),
             Self::Axis(_) => output.extend((0..self.len()).map(|i| self.at(i))),
         }
         Ok(())
@@ -82,10 +86,10 @@ impl CachedCoefficients {
             .checked_mul(size_of::<u64>())?
             .checked_add(256)?;
         Some((
-            Self::Axis(Arc::new(AxisCoefficients {
+            Self::Axis(AxisCoefficients {
                 values: packed,
                 tags,
-            })),
+            }),
             charge,
         ))
     }
@@ -143,6 +147,8 @@ mod tests {
     fn warmed_cache_compresses_exact_states_without_weakening_alias_checks_or_budget() {
         let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nMY 0\n").unwrap();
         let mut cache = CoefficientCache::new(&plan, DEFAULT_CACHE_BYTE_BUDGET).unwrap();
+        assert!(!cache.axis_enabled);
+        cache.axis_enabled = true;
         let small = [ComplexAmp::new(0.5, 0.25); 2];
         for node in 100..100 + coefficient_intern::MIN_STATES {
             cache.store(node, &small).unwrap();
@@ -158,7 +164,7 @@ mod tests {
             .collect();
         let id = cache.store(23, &values).unwrap();
         assert!(matches!(
-            cache.states[id].coefficients,
+            cache.states[id].coefficients.as_ref(),
             CachedCoefficients::Axis(_)
         ));
         let reserved = cache.reserved;
@@ -177,6 +183,26 @@ mod tests {
         assert!(cache.reserved <= cache.budget);
     }
 
+    fn count_records(rows: &[NearCliffordShot]) -> NearCliffordPostselectedCounts {
+        let accepted: Vec<_> = rows
+            .iter()
+            .filter(|r| r.detectors.iter().all(|&bit| !bit))
+            .collect();
+        NearCliffordPostselectedCounts {
+            attempted: rows.len(),
+            accepted: accepted.len(),
+            logical_errors: accepted
+                .iter()
+                .filter(|r| {
+                    r.observables
+                        .iter()
+                        .filter(|(index, _)| *index == 0)
+                        .fold(false, |parity, (_, bit)| parity ^ bit)
+                })
+                .count(),
+        }
+    }
+
     #[test]
     fn cultivation_cache_actually_uses_axis_storage_and_keeps_native_counts_rng() {
         use rand::{RngCore, SeedableRng, rngs::StdRng};
@@ -191,47 +217,66 @@ mod tests {
                 .unwrap();
             let mut native = plan.prepare_sampler().unwrap();
             let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut records = plan.prepare_sampler().unwrap();
+            let mut records_rng = StdRng::seed_from_u64(2026100937);
             let mut a = StdRng::seed_from_u64(2026100937);
             let mut b = a.clone();
             for shots in [1, 32, 63, 64, 65, 1024, 8192, 1] {
                 let rows = reference.sample(shots, &mut b).unwrap();
-                let accepted: Vec<_> = rows
-                    .iter()
-                    .filter(|r| r.detectors.iter().all(|&bit| !bit))
-                    .collect();
-                let expected = NearCliffordPostselectedCounts {
-                    attempted: shots,
-                    accepted: accepted.len(),
-                    logical_errors: accepted
-                        .iter()
-                        .filter(|r| {
-                            r.observables
-                                .iter()
-                                .filter(|(index, _)| *index == 0)
-                                .fold(false, |parity, (_, bit)| parity ^ bit)
-                        })
-                        .count(),
-                };
+                assert_eq!(records.sample(shots, &mut records_rng).unwrap(), rows);
+                let expected = count_records(&rows);
                 assert_eq!(
                     native.sample_postselected_counts(shots, 0, &mut a).unwrap(),
                     expected
                 );
                 for _ in 0..16 {
-                    assert_eq!(a.next_u64(), b.next_u64());
+                    let expected_word = b.next_u64();
+                    assert_eq!(a.next_u64(), expected_word);
+                    assert_eq!(records_rng.next_u64(), expected_word);
                 }
             }
-            let cache = native.cache.as_ref().unwrap();
+            let records_cache = records.cache.as_ref().unwrap();
+            assert!(!records_cache.axis_enabled);
             assert!(
-                cache
-                    .states
-                    .iter()
-                    .any(|state| matches!(state.coefficients, CachedCoefficients::Axis(_)))
+                records_cache.states.iter().all(|state| !matches!(
+                    state.coefficients.as_ref(),
+                    CachedCoefficients::Axis(_)
+                ))
+            );
+            let cache = native.cache.as_ref().unwrap();
+            assert!(cache.axis_enabled);
+            assert!(
+                cache.states.iter().any(|state| matches!(
+                    state.coefficients.as_ref(),
+                    CachedCoefficients::Axis(_)
+                ))
             );
             assert!(cache.reserved <= DEFAULT_CACHE_BYTE_BUDGET);
+            // Structured rows bypass sample_batch, so exercise that entry after counts.
+            assert_eq!(
+                native.sample_with_sweep(65, &[], &mut a).unwrap(),
+                reference.sample_with_sweep(65, &[], &mut b).unwrap()
+            );
+            assert!(!native.cache.as_ref().unwrap().axis_enabled);
+            let rows = reference.sample(65, &mut b).unwrap();
+            assert_eq!(
+                native.sample_postselected_counts(65, 0, &mut a).unwrap(),
+                count_records(&rows)
+            );
+            assert!(native.cache.as_ref().unwrap().axis_enabled);
+            assert!(native.sample(0, &mut a).unwrap().is_empty());
+            assert!(!native.cache.as_ref().unwrap().axis_enabled);
             assert_eq!(
                 native.sample_measurements_u8(129, &mut a).unwrap(),
                 reference.sample_measurements_u8(129, &mut b).unwrap()
             );
+            assert!(!native.cache.as_ref().unwrap().axis_enabled);
+            let rows = reference.sample(65, &mut b).unwrap();
+            assert_eq!(
+                native.sample_postselected_counts(65, 0, &mut a).unwrap(),
+                count_records(&rows)
+            );
+            assert!(native.cache.as_ref().unwrap().axis_enabled);
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }
