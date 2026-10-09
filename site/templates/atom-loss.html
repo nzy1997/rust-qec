@@ -3,19 +3,15 @@
 {% block description %}Run a complete atom-loss experiment in four steps: generate a circuit, sample records, decode and check the results.{% endblock description %}
 {% block hero %}
 <div class="hero compact-hero loss-hero">
-  <p class="eyebrow">ATOM LOSS <span class="loss-badge" data-decoder-badge="envelope-matching">Envelope matching · Beta</span></p>
-  <h1>Decode with<br>atom loss.</h1>
-  <p class="hero-copy">Run your first loss-aware decoding experiment.<br>One circuit, 64 shots, four steps from sample to score.</p>
-  <div class="loss-meta"><span>Requires the current rstim source build</span><span>Python 3</span><span>Mid-SWAP · d = 3 · 2 rounds</span></div>
-  <div class="actions"><a class="button primary" href="#model-loss">Start the tutorial <span aria-hidden="true">→</span></a><a class="button" href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
-  <p class="loss-hero-note">This tutorial uses envelope matching, <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span>, within its verified Mid-SWAP scope. Envelope MLE is separately <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span>, with a declared scope limited to four exact measured points and requiring ILP; this walkthrough is one generated Mid-SWAP case. <a href="../atom-loss-concepts/#supported-circuits">Supported circuits →</a></p>
+  <h1>Decode with atom loss</h1>
+  <p class="hero-copy">Run your first loss-aware decoding experiment: one circuit, 64 shots, four steps from sample to score.</p>
 </div>
-{% include "partials/atom-loss-nav.html" %}
 {% endblock hero %}
 {% block main %}
 <section class="task-section" aria-labelledby="loss-information">
   <h2 id="loss-information">The experiment at a glance</h2>
-  <p>Keep the loss flag alongside each measurement. The decoder uses that information to predict the logical outcome.</p>
+  <p>Atom loss removes a qubit until reset. A loss flag records whether its measurement is missing; a decoder uses these flags and surviving measurements to predict the logical flip.</p>
+  <div class="content-links"><a href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
   <ol class="loss-flow" aria-label="Experiment workflow">
     <li><span>01</span><strong>Generate</strong><small>circuit.stim</small></li>
     <li><span>02</span><strong>Sample</strong><small>public + private</small></li>
@@ -23,25 +19,25 @@
     <li><span>04</span><strong>Check</strong><small>predictions + answers</small></li>
   </ol>
   <p class="loss-inline-note"><strong>Data boundary</strong> Only public records enter the decoder. Private answers are used at the final scoring step.</p>
-  <details class="loss-disclosure"><summary>Before you start: install &amp; working directory</summary>
-    <p>Install the CLI from this repository checkout. The default CLI includes envelope matching; no optional ILP solver is needed.</p>
-    <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
-    <p>Run the steps in order in a fresh directory, with <code>rstim</code> on PATH and Python 3 installed. The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README; after extracting it, run <code>sh run.sh</code> to execute all four steps.</p>
+  <details class="loss-disclosure"><summary>Run the downloaded example</summary>
+    <p>The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README. Extract it, then run all four steps:</p>
+    <pre data-language="Shell"><code>sh run.sh</code></pre>
+  </details>
+  <details class="loss-disclosure"><summary>Decoder support and scope</summary>
+    <p>Envelope matching is <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> within its declared Mid-SWAP scope. This tutorial exercises one generated case. <a href="../atom-loss-concepts/#supported-circuits">Decoder choices and exact support limits →</a></p>
   </details>
 </section>
-<section class="task-section loss-step" aria-labelledby="model-loss">
-  <p class="eyebrow">STEP 01 / 04</p><h2 id="model-loss">Generate the circuit</h2>
-  <p>Create a distance-3 Mid-SWAP memory circuit. Set Pauli noise and atom-loss probabilities separately.</p>
+<section class="task-section loss-step" aria-labelledby="model-loss"><h2 id="model-loss">1. Generate the circuit</h2>
+  <p>Create a distance-3, two-round Mid-SWAP memory circuit. Mid-SWAP moves data between qubits during the checks so readout can reveal loss.</p>
 <pre data-language="Shell" data-atom-loss-step="model"><code>rstim circuit gen \
   --code surface_code --task rotated_memory_z_midswap \
   --distance 3 --rounds 2 --after-clifford-depolarization 0.002 \
   --operation-loss-probability 0.002 \
   --measurement-loss-probability 0.003 \
   --out circuit.stim</code></pre>
-  <p class="loss-output"><strong>Creates</strong> <code>circuit.stim</code> — the circuit used throughout this tutorial.</p>
+  <p><code>--after-clifford-depolarization</code> sets Pauli noise after Clifford gates. <code>--operation-loss-probability</code> sets loss on gate targets; <code>--measurement-loss-probability</code> sets loss at readout. All four steps use <code>circuit.stim</code>.</p>
 </section>
-<section class="task-section loss-step" aria-labelledby="sample-loss">
-  <p class="eyebrow">STEP 02 / 04</p><h2 id="sample-loss">Sample 64 shots</h2>
+<section class="task-section loss-step" aria-labelledby="sample-loss"><h2 id="sample-loss">2. Sample 64 shots</h2>
   <p>Export loss-visible measurements and keep the answer key in a separate bundle.</p>
 <pre data-language="Shell" data-atom-loss-step="sample"><code>mkdir -p data
 rstim dataset export \
@@ -54,19 +50,21 @@ rstim dataset export \
   </div>
   <p class="loss-inline-note"><strong>Changing the layout?</strong> The logical-X support <code>1,8,15</code> is specific to this circuit. Recompute it and regenerate both bundles together.</p>
 </section>
-<section class="task-section loss-step" aria-labelledby="decode-loss">
-  <p class="eyebrow">STEP 03 / 04</p><h2 id="decode-loss">Decode public records</h2>
-  <p>Envelope matching reads the public bundle and predicts one logical outcome per shot.</p>
+<section class="task-section loss-step" aria-labelledby="decode-loss"><h2 id="decode-loss">3. Decode public records</h2>
+  <p>Envelope matching builds a graph conditioned on the observed loss pattern, then predicts one logical flip per shot from the public records.</p>
 <pre data-language="Shell" data-atom-loss-step="decode"><code>rstim decode --decoder envelope-matching \
   --dataset data/public \
   --out predictions.b8 --stats-out decode-stats.json</code></pre>
   <p class="loss-output"><strong>Creates</strong> <code>predictions.b8</code> and <code>decode-stats.json</code>.</p>
   <details class="loss-disclosure"><summary>What is in the output?</summary><p>The prediction file contains one byte per shot in this one-observable example. Statistics report shot counts, distinct loss patterns, compilation and decoding time, and failures.</p><p><a href="../atom-loss-concepts/#choose-decoder">Compare matching and exact MLE →</a></p></details>
 </section>
-<section class="task-section loss-step" aria-labelledby="check-predictions">
-  <p class="eyebrow">STEP 04 / 04</p><h2 id="check-predictions">Check the predictions</h2>
+<section class="task-section loss-step" aria-labelledby="check-predictions"><h2 id="check-predictions">4. Check the predictions</h2>
   <p>Save <a href="../examples/atom-loss/check.py" download>check.py ↓</a> in your working directory (also included in the example ZIP), then run:</p>
   <pre data-language="Shell"><code>python3 check.py</code></pre>
+  <pre data-output="true" data-language="Expected output · seed 7"><code>Decoded shots: 64
+Loss patterns: 10
+Logical errors: 0 / 64</code></pre>
+  <p>Each disagreement between a prediction and its private answer counts as one logical error.</p>
   <details class="loss-disclosure"><summary>Or copy the complete check into your terminal</summary>
 <pre data-language="Shell" data-atom-loss-step="check"><code>python3 - &lt;&lt;'PY'
 import json
@@ -89,11 +87,6 @@ print(f"Loss patterns: {stats['distinct_loss_patterns']}")
 print(f"Logical errors: {errors} / {public['shots']}")
 PY</code></pre>
   </details>
-  <div class="loss-success"><span class="loss-label">EXPECTED RESULT · SEED 7</span>
-  <pre data-output="true" data-language="Expected output"><code>Decoded shots: 64
-Loss patterns: 10
-Logical errors: 0 / 64</code></pre>
-  <p>You have completed the full circuit → sample → decode → score workflow.</p></div>
   <p class="loss-inline-note"><strong>Interpretation</strong> Zero errors in 64 shots checks this example. It does not establish a zero logical error rate.</p>
 </section>
 <section class="task-section" aria-labelledby="supported-circuits">

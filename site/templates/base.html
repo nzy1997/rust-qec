@@ -67,7 +67,6 @@
       {% endif %}
       <div class="page-content">
         <header class="site-header">
-          {% if current_nav not in ["home", "shot", "start"] %}<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="{{ root }}/get-started/">Documentation</a><span aria-hidden="true">/</span>{% if current_nav == "loss" and loss_view != "tutorial" %}<a href="{{ root }}/atom-loss/">Atom loss</a><span aria-hidden="true">/</span><span>{% if loss_view == "concepts" %}Concepts &amp; support{% else %}Validation &amp; performance{% endif %}</span>{% else %}<span>{{ section.title }}</span>{% endif %}</nav>{% endif %}
           {% block hero %}{% endblock hero %}
         </header>
         <div class="reading-layout">
