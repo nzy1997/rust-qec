@@ -2597,6 +2597,8 @@ impl CompiledNearCliffordSampler<'_> {
         }
         Ok(())
     }
+    // Keep the Fused kernel separate from the shared Strict dispatch.
+    #[inline(never)]
     fn rotate_signed_fused(
         &mut self,
         p: &CompactPauli,
