@@ -5,7 +5,6 @@
 
 {% block hero %}
 <div class="hero compact-hero">
-  <p class="eyebrow">Detector error models</p>
   <h1>Extract a DEM, then sample it</h1>
   <p class="hero-copy">Turn a noisy circuit into detector-error mechanisms for downstream decoders.</p>
 </div>
@@ -14,18 +13,25 @@
 {% block main %}
 <section id="dem-extraction" class="task-section" aria-labelledby="dem-extraction-title">
   <div class="section-heading">
-    <p class="eyebrow">Run it</p>
-    <h2 id="dem-extraction-title">Analyze once, sample directly</h2>
+    <h2 id="dem-extraction-title">1. Extract the error model</h2>
   </div>
-  {% include "partials/installed-example.html" %}
-  <pre class="quick-command"><code>rstim analyze_errors --in circuit.stim --out model.dem
-rstim sample_dem --in model.dem --shots 1 --out_format dets</code></pre>
-  <p><strong>Expected:</strong> <code>model.dem</code> contains <code>error(1) D0 D1</code> and <code>error(1) D1 L0</code>; sampling prints <code>shot D0 L0</code>. <a href="../decoding/">Next: choose a decoder</a>.</p>
+  {% include "partials/example-circuit.html" %}
+  <p>A detector error model (DEM) lists independent error mechanisms and the detector or logical bits each can flip.</p>
+  <pre data-language="Shell"><code>rstim circuit dem --in circuit.stim --out model.dem &gt; /dev/null
+cat model.dem</code></pre>
+  <pre data-output="true"><code>error(0.1) D0 D1
+error(0.1) D1 L0</code></pre>
+  <p>An X error on <code>q0</code> flips <code>D0</code> and <code>D1</code>; an X error on <code>q1</code> flips <code>D1</code> and the logical observable <code>L0</code>. Each mechanism has probability <code>0.1</code>.</p>
+  <h3 id="sample-dem">2. Sample the extracted model</h3>
+  <pre data-language="Shell"><code>rstim sample_dem --in model.dem --shots 1 --seed 86 --out_format dets</code></pre>
+  <pre data-output="true"><code>shot D0 L0</code></pre>
+  <p>The <code>dets</code> format lists only labels that flipped. Here both mechanisms occurred: their two <code>D1</code> flips cancel, leaving <code>D0</code> and <code>L0</code>. DEM sampling uses its own random stream; its seed does not identify the same physical shot as circuit sampling.</p>
+  <p>For matching, extract with <code>--decompose-errors</code> and use components involving at most two detectors. <a href="../decoding/">Choose a decoder →</a></p>
+
 </section>
 
 <section class="task-section" aria-labelledby="dem-results-title">
   <div class="section-heading">
-    <p class="eyebrow">Example results</p>
     <h2 id="dem-results-title">Detection and DEM sampling</h2>
   </div>
   <p>These are separate, recorded workloads. Compare implementations only within the same workload and metric; reproduction details and limits are below.</p>
@@ -43,7 +49,7 @@ rstim sample_dem --in model.dem --shots 1 --out_format dets</code></pre>
 </section>
 
 <section class="evidence-section" aria-labelledby="dem-evidence-title">
-  <div class="section-heading"><p class="eyebrow">Benchmark evidence</p><h2 id="dem-evidence-title">Checked DEM results</h2></div>
+  <div class="section-heading"><h2 id="dem-evidence-title">Checked DEM results</h2></div>
   <div class="evidence-stack" data-evidence-items="rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample" aria-live="polite"><p>Loading detector-model evidence.</p></div>
 </section>
 {% endblock main %}

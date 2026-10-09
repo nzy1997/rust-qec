@@ -437,8 +437,8 @@ fn task_oriented_content_pages_are_linked() {
             "rbposd",
             "rilpqec",
             "qec-code",
-            "--bin rstim -- detect",
-            "rstim analyze_errors",
+            "rstim circuit detect",
+            "rstim circuit dem",
             "rstim sample_dem",
         ],
         "task-oriented content site source",
@@ -472,7 +472,7 @@ fn task_oriented_content_pages_are_linked() {
             "MWPM",
             "BP-OSD",
             "ILP",
-            "benchmark campaigns",
+            "run and compare decoder cases",
             "css codes",
             "distance search",
         ],
@@ -730,19 +730,14 @@ fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
 }
 
 #[test]
-fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
+fn learning_paths_are_prose_and_homepage_describes_rust_and_cli() {
     let index = read_repo_file("site/templates/index.html");
     let get_started = read_repo_file("site/templates/get-started.html");
 
     assert_contains_all(
         &index,
-        &[
-            "id=\"why-rstim\"",
-            "Why rstim alongside Stim?",
-            "Rust tools for code construction, atom-loss sampling, dataset export, and decoding",
-            "href=\"validation/\"",
-        ],
-        "homepage explanation of rstim and Stim",
+        &["native Rust APIs and a unified CLI", "href=\"validation/\""],
+        "homepage Rust API and CLI value proposition",
     );
 
     let after_plot = get_started
@@ -768,7 +763,8 @@ fn learning_paths_are_prose_and_stim_rationale_is_on_the_homepage() {
         "tutorial continuation should connect its links in prose",
     );
     assert!(
-        !after_plot.contains("getting_started.ipynb") && !after_plot.contains("follow that example"),
+        !after_plot.contains("getting_started.ipynb")
+            && !after_plot.contains("follow that example"),
         "further learning should describe the projects' relationship instead of attributing sweep parameters",
     );
 }
@@ -790,7 +786,6 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
             "id=\"loss-tensors\"",
             "id=\"marker-contract\"",
             "id=\"load-and-check\"",
-            "rstim -- \\",
             "circuit sample",
             "dataset export",
             "mkdir -p data",
