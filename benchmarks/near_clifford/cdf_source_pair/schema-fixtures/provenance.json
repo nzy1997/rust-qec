@@ -1,0 +1,22 @@
+{
+  "counts": {
+    "source_head": "674394b74a589965803bb48cd91977347962e9d0",
+    "original_raw_sha256": "12deafca7415478ac0ed3896c9602cfbc73e7f863a6aa853775d100865161ac6",
+    "case": [
+      "msc_d3_inject_cultivate_p1e-3",
+      1,
+      "strict"
+    ],
+    "scope": "Schema regression fixture extracted from actual baseline674 benchmark output; structural config path replaced with test fixture token, all measurement/timing values unchanged; no performance evidence claim"
+  },
+  "structural": {
+    "source_head": "674394b74a589965803bb48cd91977347962e9d0",
+    "original_raw_sha256": "d435a947165a1533c5531201554391c2fd440b800991d39e7d5dde369de410d8",
+    "case": [
+      "depth-32",
+      1,
+      "strict"
+    ],
+    "scope": "Schema regression fixture extracted from actual baseline674 benchmark output; structural config path replaced with test fixture token, all measurement/timing values unchanged; no performance evidence claim"
+  }
+}

@@ -12,6 +12,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cdf-source-pair-contract:
+    name: CDF source-pair controller contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -I benchmarks/near_clifford/cdf_source_pair/test_contract.py
+          python -I -O benchmarks/near_clifford/cdf_source_pair/test_contract.py
   current-evidence:
     name: Current evidence (${{ matrix.publication }})
     runs-on: ubuntu-latest
