@@ -837,11 +837,11 @@ mod tests {
             assert_eq!(ordinary.peak_active_rank(), 1);
             assert!(ordinary.noise_signs.is_none());
             let mut ordinary_sampler = ordinary.prepare_sampler_with_cache_budget(0).unwrap();
-            ordinary_sampler.observe_lazy_error_producer = true;
+            ordinary_sampler.core.observe_lazy_error_producer = true;
             ordinary_sampler
                 .sample_measurements_u8(64, &mut StdRng::seed_from_u64(718293))
                 .unwrap();
-            assert!(ordinary_sampler.last_packet_error_producer.is_none());
+            assert!(ordinary_sampler.core.last_packet_error_producer.is_none());
             let plan =
                 CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, policy).unwrap();
             assert_eq!(plan.peak_active_rank(), 2);
@@ -855,7 +855,7 @@ mod tests {
                     .unwrap();
                 let mut actual_rng = StdRng::seed_from_u64(718293);
                 let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
-                sampler.observe_lazy_error_producer = true;
+                sampler.core.observe_lazy_error_producer = true;
                 let actual = sampler
                     .sample_measurements_u8(shots, &mut actual_rng)
                     .unwrap();
@@ -869,6 +869,7 @@ mod tests {
                 );
                 assert_eq!(
                     sampler
+                        .core
                         .last_packet_error_producer
                         .as_ref()
                         .map(|producer| producer.coherent),
@@ -892,7 +893,7 @@ mod tests {
                 .collect();
             let mut rng = StdRng::seed_from_u64(718293);
             let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            sampler.observe_lazy_error_producer = true;
+            sampler.core.observe_lazy_error_producer = true;
             let mut actual = Vec::new();
             for shots in [64, 0, 65] {
                 actual.extend(
@@ -905,6 +906,7 @@ mod tests {
             assert_eq!(actual, expected);
             assert!(
                 sampler
+                    .core
                     .last_packet_error_producer
                     .as_ref()
                     .unwrap()
@@ -932,7 +934,7 @@ mod tests {
             };
             let mut counts_rng = StdRng::seed_from_u64(718293);
             let mut counts_sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            counts_sampler.observe_lazy_error_producer = true;
+            counts_sampler.core.observe_lazy_error_producer = true;
             assert_eq!(
                 counts_sampler
                     .sample_postselected_counts(129, 0, &mut counts_rng)
@@ -941,6 +943,7 @@ mod tests {
             );
             assert!(
                 counts_sampler
+                    .core
                     .last_packet_error_producer
                     .as_ref()
                     .unwrap()
@@ -1377,10 +1380,11 @@ mod tests {
             // packet request itself fits; admission must use actual capacities
             // and discard optional storage before drawing any random events.
             candidate
+                .core
                 .packet_tape
                 .try_reserve_exact(PACKET_BYTE_BUDGET / size_of::<u64>() + 1)
                 .unwrap();
-            let row_capacity = candidate.conditional_tape.capacity();
+            let row_capacity = candidate.core.conditional_tape.capacity();
             let mut a = StdRng::seed_from_u64(1082740);
             let mut b = a.clone();
             let rows = reference.sample(65, &mut a).unwrap();
@@ -1391,10 +1395,10 @@ mod tests {
                     .flat_map(|s| s.measurements.iter().map(|&v| u8::from(v)))
                     .collect::<Vec<_>>()
             );
-            assert_eq!(candidate.packet_tape.capacity(), 0);
-            assert_eq!(candidate.packet_x.capacity(), 0);
-            assert!(candidate.packet_independent.is_none());
-            assert_eq!(candidate.conditional_tape.capacity(), row_capacity);
+            assert_eq!(candidate.core.packet_tape.capacity(), 0);
+            assert_eq!(candidate.core.packet_x.capacity(), 0);
+            assert!(candidate.core.packet_independent.is_none());
+            assert_eq!(candidate.core.conditional_tape.capacity(), row_capacity);
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }

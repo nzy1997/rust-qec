@@ -22,16 +22,19 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                     for lanes in [63, 64] {
                         let (mut lazy, mut reference) = pair(&plan, budget);
                         for sampler in [&mut lazy, &mut reference] {
-                            sampler.observe_lazy_error_producer = true;
-                            let cache = sampler.cache.as_ref().unwrap();
+                            sampler.core.observe_lazy_error_producer = true;
+                            let cache = sampler.core.cache.as_ref().unwrap();
                             assert_ne!(cache.start, 0, "actual rank-one input must be admitted");
                             assert_eq!(cache.states.len(), 2);
-                            assert!(sampler.pack_enabled);
+                            assert!(sampler.core.pack_enabled);
                             // Sentinel proves omitted Noise/Independent slots are
                             // observed through sidecars, not stale retained tape.
-                            resize_packet(&mut sampler.packet_tape, 64 * plan.random_kinds.len())
-                                .unwrap();
-                            sampler.packet_tape.fill(u64::MAX);
+                            resize_packet(
+                                &mut sampler.core.packet_tape,
+                                64 * plan.random_kinds.len(),
+                            )
+                            .unwrap();
+                            sampler.core.packet_tape.fill(u64::MAX);
                             inject_inconsistent_cdf(sampler, node);
                         }
                         let mut a = StdRng::seed_from_u64(583);
@@ -69,11 +72,13 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                         assert_eq!(actual, expected, "{context}");
                         assert_eq!(snapshot(&lazy), snapshot(&reference), "{context}");
                         let observation = lazy
+                            .core
                             .last_packet_error_producer
                             .as_ref()
                             .expect("public packet actually executed");
                         assert_eq!(
-                            lazy.last_packet_error_producer, reference.last_packet_error_producer,
+                            lazy.core.last_packet_error_producer,
+                            reference.core.last_packet_error_producer,
                             "{context}"
                         );
                         assert_eq!(observation.lanes, lanes, "{context}");
@@ -88,8 +93,8 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                             observation.noise_admitted,
                             "{context}"
                         );
-                        let occupied = lazy.scalar_tape_other_bytes().unwrap()
-                            + lazy.packet_tape.capacity() * size_of::<u64>();
+                        let occupied = lazy.core.scalar_tape_other_bytes().unwrap()
+                            + lazy.core.packet_tape.capacity() * size_of::<u64>();
                         assert!(
                             occupied + observation.noise_reserved_bytes <= PACKET_BYTE_BUDGET,
                             "actual retained capacities plus admitted Noise; {context}"
@@ -98,12 +103,13 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                             observation.rows, rows,
                             "every typed producer slot including omitted Noise and >128 Independent bits; {context}"
                         );
-                        assert!(lazy.packet_independent.is_some(), "{context}");
+                        assert!(lazy.core.packet_independent.is_some(), "{context}");
                         for (lane, row) in rows.iter().enumerate() {
                             for (event, kind) in plan.random_kinds.iter().enumerate() {
                                 if matches!(kind, RandomKind::Noise { .. }) {
                                     assert_eq!(
-                                        lazy.packet_tape[lane * plan.random_kinds.len() + event],
+                                        lazy.core.packet_tape
+                                            [lane * plan.random_kinds.len() + event],
                                         if observation.noise_admitted {
                                             u64::MAX
                                         } else {
@@ -114,7 +120,7 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                                 }
                             }
                         }
-                        let cache = lazy.cache.as_ref().unwrap();
+                        let cache = lazy.core.cache.as_ref().unwrap();
                         let Some(CachedOp::Measure(entry)) = cache.entry(cache.start, node) else {
                             unreachable!()
                         };
@@ -137,10 +143,10 @@ fn lazy_cache_noise_independent_producer_matches_frozen_rows_on_first_and_second
                             "only a successful scalar alias before second Err; {context}"
                         );
                         assert_eq!(cache.states.len(), 2, "{context}");
-                        assert_eq!(lazy.last_packet_live_mask, 0, "{context}");
-                        assert_eq!(lazy.last_packet_live, 0, "{context}");
+                        assert_eq!(lazy.core.last_packet_live_mask, 0, "{context}");
+                        assert_eq!(lazy.core.last_packet_live, 0, "{context}");
                         assert!(
-                            lazy.pack_enabled,
+                            lazy.core.pack_enabled,
                             "Err precedes strategy-accounting; {context}"
                         );
                         assert_eq!(a.clone().next_u64(), b.clone().next_u64(), "{context}");

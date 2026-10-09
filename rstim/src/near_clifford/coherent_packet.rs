@@ -720,19 +720,21 @@ mod coherent_packet_kernel_tests {
                     let mut expected = Vec::new();
                     for lane in 0..lanes {
                         let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-                        scalar.coefficients = prefix.clone();
+                        scalar.core.coefficients = prefix.clone();
                         scalar
+                            .core
                             .rotate_signed(&rotation, expand, dagger, anti >> lane & 1 != 0)
                             .unwrap();
-                        compare_density(&packet, lane, &scalar.coefficients);
+                        compare_density(&packet, lane, &scalar.core.coefficients);
                         assert_eq!(
                             probabilities[lane].to_bits(),
-                            scalar.probability_zero(&measurement).to_bits()
+                            scalar.core.probability_zero(&measurement).to_bits()
                         );
                         scalar
+                            .core
                             .project(&measurement, index, y, fixed >> lane & 1 != 0)
                             .unwrap();
-                        expected.push(scalar.coefficients);
+                        expected.push(scalar.core.coefficients);
                     }
                     packet.project(&measurement, index, y, fixed).unwrap();
                     for (lane, state) in expected.iter().enumerate() {
@@ -982,12 +984,15 @@ mod frozen_rotation_coefficient_bits_tests {
                                 let mut expected = before.clone();
                                 frozen_v24_scalar_rotate(&mut expected, &p, expand, dagger, flip)
                                     .unwrap();
-                                sampler.coefficients.clone_from(&before);
-                                sampler.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                sampler.core.coefficients.clone_from(&before);
+                                sampler
+                                    .core
+                                    .rotate_signed(&p, expand, dagger, flip)
+                                    .unwrap();
                                 let context = format!(
                                     "rank={rank}; x={x}; z={z}; phase={phase}; expand={expand}; kind={kind}; dagger={dagger}; flip={flip}"
                                 );
-                                assert_scalar_bits(&sampler.coefficients, &expected, &context);
+                                assert_scalar_bits(&sampler.core.coefficients, &expected, &context);
                             }
                         }
                     }
@@ -1078,13 +1083,16 @@ mod frozen_rotation_coefficient_bits_tests {
                     packet.rotate(&p, expand, dagger, anti).unwrap();
                     for (lane, state) in expected.iter_mut().enumerate() {
                         let flip = anti >> lane & 1 != 0;
-                        sampler.coefficients.clone_from(state);
-                        sampler.rotate_signed(&p, expand, dagger, flip).unwrap();
+                        sampler.core.coefficients.clone_from(state);
+                        sampler
+                            .core
+                            .rotate_signed(&p, expand, dagger, flip)
+                            .unwrap();
                         frozen_v24_scalar_rotate(state, &p, expand, dagger, flip).unwrap();
                         let context = format!(
                             "sequence step={step}; kind={kind}; lanes={lanes}; lane={lane}"
                         );
-                        assert_scalar_bits(&sampler.coefficients, state, &context);
+                        assert_scalar_bits(&sampler.core.coefficients, state, &context);
                         assert_packet_bits(&packet, lane, state, &context);
                     }
                 }
@@ -1250,16 +1258,16 @@ mod phase_specialized_cdf_tests {
                                 );
                             }
                             for lane in 0..lanes {
-                                scalar.coefficients = (0..len)
+                                scalar.core.coefficients = (0..len)
                                     .map(|amplitude| {
                                         let i = amplitude * lanes + lane;
                                         ComplexAmp::new(packet.re[i], packet.im[i])
                                     })
                                     .collect();
                                 let scalar_expected =
-                                    frozen_scalar_probability_zero(&scalar.coefficients, &p);
+                                    frozen_scalar_probability_zero(&scalar.core.coefficients, &p);
                                 assert_eq!(
-                                    scalar.probability_zero(&p).to_bits(),
+                                    scalar.core.probability_zero(&p).to_bits(),
                                     scalar_expected.to_bits(),
                                     "scalar len={len}; x={x}; z={z}; phase={phase}; kind={kind}; lanes={lanes}; lane={lane}"
                                 );
@@ -1277,13 +1285,13 @@ mod phase_specialized_cdf_tests {
         let plan = CompiledNearCliffordExecutor::compile_text("I 5\n").unwrap();
         let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
         for kind in 0..5 {
-            scalar.coefficients = coefficients(32, kind, 7);
+            scalar.core.coefficients = coefficients(32, kind, 7);
             for (x, z) in [(0, 0), (0, 31), (31, 0), (31, 31), (5, 19)] {
                 for phase in u8::MIN..=u8::MAX {
                     let p = compact(x, z, phase);
                     assert_eq!(
-                        scalar.probability_zero(&p).to_bits(),
-                        frozen_scalar_probability_zero(&scalar.coefficients, &p).to_bits(),
+                        scalar.core.probability_zero(&p).to_bits(),
+                        frozen_scalar_probability_zero(&scalar.core.coefficients, &p).to_bits(),
                         "phase alias kind={kind}; x={x}; z={z}; phase={phase}"
                     );
                 }
@@ -1527,7 +1535,7 @@ mod rotation_arithmetic_policy_bits_tests {
                 let p = compact(x, z, phase);
                 let bits = frozen_scalar_probability_zero(expected, &p).to_bits();
                 assert_eq!(
-                    sampler.probability_zero(&p).to_bits(),
+                    sampler.core.probability_zero(&p).to_bits(),
                     bits,
                     "{context}; scalar CDF x={x}, z={z}, phase={phase}"
                 );
@@ -1584,9 +1592,13 @@ mod rotation_arithmetic_policy_bits_tests {
                                         flip,
                                         policy,
                                     );
-                                    scalar.coefficients = before.clone();
-                                    scalar.rotate_signed(&p, expand, dagger, flip).unwrap();
-                                    assert_scalar_bits(&scalar.coefficients, &expected, &context);
+                                    scalar.core.coefficients = before.clone();
+                                    scalar.core.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                    assert_scalar_bits(
+                                        &scalar.core.coefficients,
+                                        &expected,
+                                        &context,
+                                    );
                                     for (cdf_x, cdf_z) in [(0, 1023), (x, 0), (1023, 1023)] {
                                         for cdf_phase in 0..4 {
                                             let query = compact(cdf_x, cdf_z, cdf_phase);
@@ -1594,7 +1606,7 @@ mod rotation_arithmetic_policy_bits_tests {
                                                 frozen_scalar_probability_zero(&expected, &query)
                                                     .to_bits();
                                             assert_eq!(
-                                                scalar.probability_zero(&query).to_bits(),
+                                                scalar.core.probability_zero(&query).to_bits(),
                                                 expected_bits,
                                                 "{context}; CDF x={cdf_x}; z={cdf_z}; phase={cdf_phase}"
                                             );
@@ -1734,13 +1746,20 @@ mod rotation_arithmetic_policy_bits_tests {
                                         .unwrap();
                                     for lane in 0..lanes {
                                         let flip = anti >> lane & 1 != 0;
-                                        scalar.coefficients.clone_from(&before);
-                                        scalar.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                        scalar.core.coefficients.clone_from(&before);
+                                        scalar
+                                            .core
+                                            .rotate_signed(&p, expand, dagger, flip)
+                                            .unwrap();
                                         let state = &expected[usize::from(flip)];
                                         let context = format!(
                                             "policy={policy:?}; rank={rank}; x={x}; z={z}; phase={phase}; expand={expand}; kind={kind}; dagger={dagger}; lane={lane}"
                                         );
-                                        assert_scalar_bits(&scalar.coefficients, state, &context);
+                                        assert_scalar_bits(
+                                            &scalar.core.coefficients,
+                                            state,
+                                            &context,
+                                        );
                                         assert_packet_bits(&packet, lane, state, &context);
                                         // Bound duplicate work while retaining both lane signs,
                                         // high lanes, every mask/input, and exact accumulation bits.
@@ -1800,13 +1819,13 @@ mod rotation_arithmetic_policy_bits_tests {
                             .unwrap();
                         for (lane, state) in expected.iter_mut().enumerate() {
                             let flip = anti >> lane & 1 != 0;
-                            scalar.coefficients.clone_from(state);
-                            scalar.rotate_signed(&p, expand, dagger, flip).unwrap();
+                            scalar.core.coefficients.clone_from(state);
+                            scalar.core.rotate_signed(&p, expand, dagger, flip).unwrap();
                             reference_rotate(state, &p, expand, dagger, flip, policy);
                             let context = format!(
                                 "policy={policy:?}; step={step}; kind={kind}; lanes={lanes}; lane={lane}"
                             );
-                            assert_scalar_bits(&scalar.coefficients, state, &context);
+                            assert_scalar_bits(&scalar.core.coefficients, state, &context);
                             assert_packet_bits(&packet, lane, state, &context);
                             if lane == 0 || lane + 1 == lanes {
                                 check_cdf(&scalar, &packet, lane, state, &context);
@@ -1884,7 +1903,7 @@ mod rotation_arithmetic_policy_bits_tests {
             );
             let prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
             assert_scalar_bits(
-                &prepared.coefficients,
+                &prepared.core.coefficients,
                 &expected,
                 "prepared prefix reference",
             );

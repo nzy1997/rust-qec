@@ -128,7 +128,7 @@ mod tests {
                     expected
                 );
                 if shots == 1 {
-                    assert!(cached.cache.as_ref().unwrap().intern.is_none());
+                    assert!(cached.core.cache.as_ref().unwrap().intern.is_none());
                 }
                 for _ in 0..16 {
                     assert_eq!(a.next_u64(), b.next_u64());
@@ -141,7 +141,7 @@ mod tests {
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }
-            let cache = cached.cache.as_ref().unwrap();
+            let cache = cached.core.cache.as_ref().unwrap();
             assert!(
                 cache.intern.is_some(),
                 "bulk calls must actually activate the optional index"

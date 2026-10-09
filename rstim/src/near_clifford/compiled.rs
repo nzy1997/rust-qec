@@ -1542,7 +1542,7 @@ impl CompiledNearCliffordExecutor {
                         .is_none_or(|s| !s.has_refs(logical_ids[*node]))
             })
             .count();
-        let mut sampler = plan.prepare_sampler_with_cache_budget(0)?;
+        let mut sampler = plan.prepare_sampler_with_cache_budget(0)?.core;
         for op in &plan.operations[..prefix] {
             if let PlanOp::Rotate {
                 pauli,
@@ -1727,37 +1727,37 @@ impl CompiledNearCliffordExecutor {
             conditional_tape.resize(count, 0);
         }
         Ok(CompiledNearCliffordSampler {
-            conditional_tape,
-            plan: self,
-            x: vec![0; self.num_qubits.div_ceil(64)],
-            z: vec![0; self.num_qubits.div_ceil(64)],
-            coefficients,
-            reduced_coefficients: Vec::new(),
-            cache: CoefficientCache::new(self, cache_bytes),
-            real_fallback: None,
-            real_attempted: false,
-            real_enabled: false,
-            pack_enabled: true,
-            #[cfg(test)]
-            last_packet_live: 0,
-            #[cfg(test)]
-            last_packet_live_mask: 0,
-            #[cfg(test)]
-            last_packet_error_producer: None,
-            #[cfg(test)]
-            observe_lazy_error_producer: false,
-            #[cfg(test)]
-            materialized_packet_reference: false,
-            #[cfg(test)]
-            last_scalar_prepared: false,
-            packet_x: Vec::new(),
-            packet_z: Vec::new(),
-            packet_tape: Vec::new(),
-            packet_records: Vec::new(),
-            packet_noise_masks: Vec::new(),
-            packet_independent: None,
-            coherent: CoherentPacket::default(),
-            counts_outputs: Vec::new(),
+            core: CompiledSamplerCore {
+                conditional_tape,
+                plan: self,
+                x: vec![0; self.num_qubits.div_ceil(64)],
+                z: vec![0; self.num_qubits.div_ceil(64)],
+                coefficients,
+                reduced_coefficients: Vec::new(),
+                cache: CoefficientCache::new(self, cache_bytes),
+                pack_enabled: true,
+                #[cfg(test)]
+                last_packet_live: 0,
+                #[cfg(test)]
+                last_packet_live_mask: 0,
+                #[cfg(test)]
+                last_packet_error_producer: None,
+                #[cfg(test)]
+                observe_lazy_error_producer: false,
+                #[cfg(test)]
+                materialized_packet_reference: false,
+                #[cfg(test)]
+                last_scalar_prepared: false,
+                packet_x: Vec::new(),
+                packet_z: Vec::new(),
+                packet_tape: Vec::new(),
+                packet_records: Vec::new(),
+                packet_noise_masks: Vec::new(),
+                packet_independent: None,
+                coherent: CoherentPacket::default(),
+                counts_outputs: Vec::new(),
+            },
+            real: RealWorkspace::default(),
         })
     }
     pub fn sample(
@@ -1773,15 +1773,24 @@ impl CompiledNearCliffordExecutor {
 /// On an execution error, RNG events may already have been drawn for the current
 /// row or packet; no exact failed-call RNG prefix is promised across strategies.
 pub struct CompiledNearCliffordSampler<'a> {
+    core: CompiledSamplerCore<'a>,
+    real: RealWorkspace,
+}
+
+#[derive(Default)]
+struct RealWorkspace {
+    fallback: Option<Box<[RealFallback; 1]>>,
+    attempted: bool,
+}
+
+// Default kernels borrow only this core; optional real state stays in the facade.
+struct CompiledSamplerCore<'a> {
     plan: &'a CompiledNearCliffordExecutor,
     x: Vec<u64>,
     z: Vec<u64>,
     coefficients: Vec<ComplexAmp>,
     reduced_coefficients: Vec<ComplexAmp>,
     cache: Option<CoefficientCache>,
-    real_fallback: Option<Box<[RealFallback; 1]>>,
-    real_attempted: bool,
-    real_enabled: bool,
     pack_enabled: bool,
     #[cfg(test)]
     last_packet_live: usize,
@@ -2343,53 +2352,131 @@ fn resize_packet(buffer: &mut Vec<u64>, len: usize) -> Result<(), String> {
     Ok(())
 }
 impl CompiledNearCliffordSampler<'_> {
+    /// Conservative admitted coefficient-cache bytes, excluding the static plan
+    /// and arithmetic work buffers. This is not process memory usage.
+    pub fn coefficient_cache_reserved_bytes(&self) -> usize {
+        self.core.coefficient_cache_reserved_bytes()
+    }
+    pub fn sample(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<Vec<NearCliffordShot>, String> {
+        self.core.sample(shots, rng)
+    }
+    pub fn sample_with_sweep(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<Vec<NearCliffordShot>, String> {
+        self.core.sample_with_sweep(shots, sweep, rng)
+    }
+    pub fn sample_measurements_u8(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        self.core.sample_measurements_u8(shots, rng)
+    }
+    pub fn sample_measurements_u8_with_sweep(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        self.core
+            .sample_measurements_u8_with_sweep(shots, sweep, rng)
+    }
+    /// Counts all-zero raw detector shots and their XOR-folded raw observable parity.
+    ///
+    /// The observable index must occur in the compiled circuit, even for zero shots.
+    /// No reference normalization is performed. Scalar and admission-fallback rows
+    /// skip remaining physics after a nonzero detector, while consuming all remaining
+    /// typed random events. Packed counts also reject lanes when a raw detector
+    /// is nonzero, and stop suffix physics once no live lanes remain. Sampling
+    /// preserves the random stream of [`Self::sample`] without batch output records.
+    /// Rejected scalar suffixes do not perform physics or its fallible allocations.
+    pub fn sample_postselected_counts(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        self.sample_postselected_counts_with_sweep(shots, observable_index, &[], rng)
+    }
+    /// The counts contract of [`Self::sample_postselected_counts`] with sweep controls.
+    pub fn sample_postselected_counts_with_sweep(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        self.core.sample_postselected_counts_with_sweep(
+            shots,
+            observable_index,
+            sweep,
+            rng,
+            &mut self.real,
+        )
+    }
+}
+
+impl CompiledSamplerCore<'_> {
     #[inline(never)]
-    fn try_start_real(&mut self, node: usize) {
-        if !self.real_enabled || self.coefficients.len() < 64 {
+    fn try_start_real(&mut self, real: &mut RealWorkspace, node: usize) {
+        if self.coefficients.len() < 64 {
             return;
         }
-        if !self.real_attempted {
-            self.real_attempted = true;
-            self.real_fallback = RealFallback::build_owned(self.plan);
+        if !real.attempted {
+            real.attempted = true;
+            real.fallback = RealFallback::build_owned(self.plan);
         }
-        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
-            if !real.active {
-                real.start(node, &self.coefficients);
+        if let Some(owner) = real.fallback.as_mut().map(|real| &mut real[0]) {
+            if !owner.active {
+                owner.start(node, &self.coefficients);
             }
         }
     }
-    fn sync_real(&mut self) -> Result<(), String> {
-        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
-            real.write_complex(&mut self.coefficients)?;
+    fn sync_real(&mut self, real: &mut RealWorkspace) -> Result<(), String> {
+        if let Some(owner) = real.fallback.as_mut().map(|real| &mut real[0]) {
+            owner.write_complex(&mut self.coefficients)?;
         }
         Ok(())
     }
     #[inline(never)]
     fn try_real_rotate(
         &mut self,
+        real: &mut RealWorkspace,
         node: usize,
         p: &CompactPauli,
         expand: bool,
         dagger: bool,
         flip: bool,
     ) -> Result<bool, String> {
-        self.try_start_real(node);
-        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
-            if real.active {
+        self.try_start_real(real, node);
+        if let Some(owner) = real.fallback.as_mut().map(|real| &mut real[0]) {
+            if owner.active {
                 if p.x == 0 && p.z == 0
-                    || real.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic)
+                    || owner.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic)
                 {
                     return Ok(true);
                 }
-                self.sync_real()?;
+                self.sync_real(real)?;
             }
         }
         Ok(false)
     }
     #[inline(never)]
-    fn real_probability_zero(&mut self, node: usize, p: &CompactPauli) -> Option<f64> {
-        self.try_start_real(node);
-        self.real_fallback
+    fn real_probability_zero(
+        &mut self,
+        real: &mut RealWorkspace,
+        node: usize,
+        p: &CompactPauli,
+    ) -> Option<f64> {
+        self.try_start_real(real, node);
+        real.fallback
             .as_ref()
             .map(|real| &real[0])
             .filter(|real| real.active)
@@ -2398,23 +2485,24 @@ impl CompiledNearCliffordSampler<'_> {
     #[inline(never)]
     fn try_real_project(
         &mut self,
+        real: &mut RealWorkspace,
         p: &CompactPauli,
         index: usize,
         y: bool,
         fixed: bool,
         state: &mut Option<usize>,
     ) -> Result<bool, String> {
-        let Some(real) = self
-            .real_fallback
+        let Some(owner) = real
+            .fallback
             .as_mut()
             .map(|real| &mut real[0])
             .filter(|real| real.active)
         else {
             return Ok(false);
         };
-        real.project(p, index, y, fixed)?;
-        if real.len() == 1 {
-            self.sync_real()?;
+        owner.project(p, index, y, fixed)?;
+        if owner.len() == 1 {
+            self.sync_real(real)?;
             *state = self.cache.as_ref().map(|_| 0);
         }
         Ok(true)
@@ -3077,27 +3165,34 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         byte_budget: usize,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_scalar_tape_budget_mode::<false>(sweep, rng, byte_budget)
+        self.row_with_scalar_tape_budget_mode::<false, false>(sweep, rng, byte_budget, None)
     }
 
-    fn row_for_output(
+    fn row_for_output<const REAL: bool>(
         &mut self,
         sweep: &[bool],
         rng: &mut impl Rng,
         output: &BatchOutput<'_>,
+        real: Option<&mut RealWorkspace>,
     ) -> Result<NearCliffordShot, String> {
         if matches!(output, BatchOutput::Counts { .. }) {
-            self.row_with_scalar_tape_budget_mode::<true>(sweep, rng, PACKET_BYTE_BUDGET)
+            self.row_with_scalar_tape_budget_mode::<true, REAL>(
+                sweep,
+                rng,
+                PACKET_BYTE_BUDGET,
+                real,
+            )
         } else {
             self.row(sweep, rng)
         }
     }
 
-    fn row_with_scalar_tape_budget_mode<const POSTSELECT: bool>(
+    fn row_with_scalar_tape_budget_mode<const POSTSELECT: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         rng: &mut impl Rng,
         byte_budget: usize,
+        mut real: Option<&mut RealWorkspace>,
     ) -> Result<NearCliffordShot, String> {
         #[cfg(test)]
         {
@@ -3117,20 +3212,36 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
             let mut replay = RowRandom::recorded(&tape, &mut *rng);
-            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
+            let result = self.row_with_random_kernel::<POSTSELECT, true, REAL>(
+                sweep,
+                &mut replay,
+                real.as_deref_mut(),
+            );
             debug_assert!(result.is_err() || replay.cursor == count);
             self.conditional_tape = tape;
             return result;
         }
         if plan.noise_event_count < MIN_SCALAR_PREPARED_NOISE_EVENTS || plan.random_kinds.is_empty()
         {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(
+                sweep,
+                &mut RowRandom::live(rng),
+                real.as_deref_mut(),
+            );
         }
         let Some(runs) = &plan.random_runs else {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(
+                sweep,
+                &mut RowRandom::live(rng),
+                real.as_deref_mut(),
+            );
         };
         if !self.try_prepare_scalar_tape(byte_budget) {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(
+                sweep,
+                &mut RowRandom::live(rng),
+                real.as_deref_mut(),
+            );
         }
         #[cfg(test)]
         {
@@ -3145,7 +3256,11 @@ impl CompiledNearCliffordSampler<'_> {
                 &mut tape[..count],
             );
             let mut replay = RowRandom::recorded(&tape[..count], &mut *rng);
-            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
+            let result = self.row_with_random_kernel::<POSTSELECT, true, REAL>(
+                sweep,
+                &mut replay,
+                real.as_deref_mut(),
+            );
             debug_assert!(result.is_err() || replay.cursor == count);
             result
         };
@@ -3158,30 +3273,36 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         random: &mut RowRandom<'_, impl Rng>,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_random_mode::<false>(sweep, random)
+        self.row_with_random_mode::<false, false>(sweep, random, None)
     }
 
-    fn row_with_random_mode<const POSTSELECT: bool>(
+    fn row_with_random_mode<const POSTSELECT: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
+        real: Option<&mut RealWorkspace>,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_random_kernel::<POSTSELECT, false>(sweep, random)
+        self.row_with_random_kernel::<POSTSELECT, false, REAL>(sweep, random, real)
     }
 
-    fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool>(
+    fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
+        mut real: Option<&mut RealWorkspace>,
     ) -> Result<NearCliffordShot, String> {
-        if POSTSELECT && self.real_enabled {
-            let result = self.execute_real_row::<POSTSELECT, SKIP_NOISE>(sweep, random);
+        if POSTSELECT && REAL {
+            let result = self.execute_real_row::<POSTSELECT, SKIP_NOISE>(
+                sweep,
+                random,
+                real.as_deref_mut().expect("enabled real workspace"),
+            );
             // Also synchronize rejected detectors and errors before subsequent
             // structured, flat, cached, or zero-shot calls.
-            self.sync_real()?;
+            self.sync_real(real.expect("enabled real workspace"))?;
             result
         } else {
-            self.execute_row::<POSTSELECT, SKIP_NOISE, false>(sweep, random)
+            self.execute_row::<POSTSELECT, SKIP_NOISE, false>(sweep, random, None)
         }
     }
     // Keep the optional real loop separate from the complex row callers.
@@ -3190,21 +3311,29 @@ impl CompiledNearCliffordSampler<'_> {
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
+        real: &mut RealWorkspace,
     ) -> Result<NearCliffordShot, String> {
-        self.execute_row::<POSTSELECT, SKIP_NOISE, true>(sweep, random)
+        self.execute_row::<POSTSELECT, SKIP_NOISE, true>(sweep, random, Some(real))
     }
 
     fn execute_row<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
+        mut real: Option<&mut RealWorkspace>,
     ) -> Result<NearCliffordShot, String> {
         // Every row starts from the plan/cache state. Materialization may have
         // failed on a previous row after clearing its complex destination; that
         // row's real scratch must never be reused as this row's initial state.
         if REAL {
-            if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
-                real.active = false;
+            if let Some(owner) = real
+                .as_deref_mut()
+                .expect("enabled real workspace")
+                .fallback
+                .as_mut()
+                .map(|real| &mut real[0])
+            {
+                owner.active = false;
             }
         }
         self.x.fill(0);
@@ -3268,7 +3397,14 @@ impl CompiledNearCliffordSampler<'_> {
                             ^ signs.scalar(node, random);
                         if !(REAL
                             && state.is_none()
-                            && self.try_real_rotate(node, pauli, *expand, *dagger, sign)?)
+                            && self.try_real_rotate(
+                                real.as_deref_mut().expect("enabled real workspace"),
+                                node,
+                                pauli,
+                                *expand,
+                                *dagger,
+                                sign,
+                            )?)
                         {
                             self.cached_rotate_signed(
                                 node, pauli, *expand, *dagger, sign, &mut state,
@@ -3277,7 +3413,14 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         let handled = if REAL && state.is_none() {
                             let sign = pauli.physical.anticommutes(&self.x, &self.z);
-                            self.try_real_rotate(node, pauli, *expand, *dagger, sign)?
+                            self.try_real_rotate(
+                                real.as_deref_mut().expect("enabled real workspace"),
+                                node,
+                                pauli,
+                                *expand,
+                                *dagger,
+                                sign,
+                            )?
                         } else {
                             false
                         };
@@ -3350,7 +3493,11 @@ impl CompiledNearCliffordSampler<'_> {
                             event += 1;
                             let draw = f64::from_bits(random.draw(RandomKind::Active));
                             let real_probability = if REAL && state.is_none() {
-                                self.real_probability_zero(node, &m.pauli)
+                                self.real_probability_zero(
+                                    real.as_deref_mut().expect("enabled real workspace"),
+                                    node,
+                                    &m.pauli,
+                                )
                             } else {
                                 None
                             };
@@ -3369,6 +3516,7 @@ impl CompiledNearCliffordSampler<'_> {
                         if !(REAL
                             && state.is_none()
                             && self.try_real_project(
+                                real.as_deref_mut().expect("enabled real workspace"),
                                 &m.pauli,
                                 index,
                                 y,
@@ -3429,7 +3577,7 @@ impl CompiledNearCliffordSampler<'_> {
     }
     // All random draws depend only on the fixed plan, not the coherent state.
     // Draw them in original row order, so packet size and fallback never change RNG.
-    fn packet(
+    fn packet<const REAL: bool>(
         &mut self,
         lanes: usize,
         sweep: &[bool],
@@ -3437,6 +3585,7 @@ impl CompiledNearCliffordSampler<'_> {
         output: &mut BatchOutput<'_>,
         coherent: bool,
         mut noise_packet: Option<&mut NoisePacket>,
+        mut real: Option<&mut RealWorkspace>,
     ) -> Result<(), String> {
         let mut x = std::mem::take(&mut self.packet_x);
         let mut z = std::mem::take(&mut self.packet_z);
@@ -3886,7 +4035,11 @@ impl CompiledNearCliffordSampler<'_> {
                             independent_packet.as_ref(),
                             lane,
                         );
-                        let shot = self.row_with_random_kernel::<true, true>(sweep, &mut random)?;
+                        let shot = self.row_with_random_kernel::<true, true, REAL>(
+                            sweep,
+                            &mut random,
+                            real.as_deref_mut(),
+                        )?;
                         output.row(shot);
                         debug_assert_eq!(random.cursor(), random_count);
                     } else {
@@ -3977,31 +4130,14 @@ impl CompiledNearCliffordSampler<'_> {
         })
     }
 
-    /// Counts all-zero raw detector shots and their XOR-folded raw observable parity.
-    ///
-    /// The observable index must occur in the compiled circuit, even for zero shots.
-    /// No reference normalization is performed. Scalar and admission-fallback rows
-    /// skip remaining physics after a nonzero detector, while consuming all remaining
-    /// typed random events. Packed counts also reject lanes when a raw detector
-    /// is nonzero, and stop suffix physics once no live lanes remain. Sampling
-    /// preserves the random stream of [`Self::sample`] without batch output records.
-    /// Rejected scalar suffixes do not perform physics or its fallible allocations.
-    pub fn sample_postselected_counts(
-        &mut self,
-        shots: usize,
-        observable_index: u32,
-        rng: &mut impl Rng,
-    ) -> Result<NearCliffordPostselectedCounts, String> {
-        self.sample_postselected_counts_with_sweep(shots, observable_index, &[], rng)
-    }
-
-    /// The counts contract of [`Self::sample_postselected_counts`] with sweep controls.
-    pub fn sample_postselected_counts_with_sweep(
+    // Counts entry keeps the persistent optional workspace outside the core.
+    fn sample_postselected_counts_with_sweep(
         &mut self,
         shots: usize,
         observable_index: u32,
         sweep: &[bool],
         rng: &mut impl Rng,
+        real: &mut RealWorkspace,
     ) -> Result<NearCliffordPostselectedCounts, String> {
         if !self.plan.annotation_positions.iter().any(|&position| {
             matches!(&self.plan.operations[position],
@@ -4054,15 +4190,11 @@ impl CompiledNearCliffordSampler<'_> {
             attempted: shots,
             ..Default::default()
         };
-        self.sample_batch(
-            shots,
-            sweep,
-            rng,
-            &mut BatchOutput::Counts {
-                observable_index,
-                counts: &mut counts,
-            },
-        )?;
+        let mut output = BatchOutput::Counts {
+            observable_index,
+            counts: &mut counts,
+        };
+        self.sample_real_batch(shots, sweep, rng, &mut output, real)?;
         Ok(counts)
     }
 
@@ -4073,20 +4205,33 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
-        self.real_enabled = shots >= 64
-            && matches!(output, BatchOutput::Counts { .. })
-            && (6..=10).contains(&self.plan.peak_active_rank)
-            && real_scalar_fallback::vector_supported();
-        let result = self.sample_batch_inner(shots, sweep, rng, output);
-        self.real_enabled = false;
-        result
+        self.sample_batch_inner::<false>(shots, sweep, rng, output, None)
     }
-    fn sample_batch_inner(
+    fn sample_real_batch(
         &mut self,
         shots: usize,
         sweep: &[bool],
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
+        real: &mut RealWorkspace,
+    ) -> Result<(), String> {
+        if shots >= 64
+            && matches!(output, BatchOutput::Counts { .. })
+            && (6..=10).contains(&self.plan.peak_active_rank)
+            && real_scalar_fallback::vector_supported()
+        {
+            self.sample_batch_inner::<true>(shots, sweep, rng, output, Some(real))
+        } else {
+            self.sample_batch_inner::<false>(shots, sweep, rng, output, None)
+        }
+    }
+    fn sample_batch_inner<const REAL: bool>(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+        mut real: Option<&mut RealWorkspace>,
     ) -> Result<(), String> {
         let packet_bytes = self
             .plan
@@ -4143,7 +4288,12 @@ impl CompiledNearCliffordSampler<'_> {
                 self.packet_tape = Vec::new();
                 self.packet_independent = None;
                 for _ in 0..shots {
-                    output.row(self.row_for_output(sweep, rng, output)?);
+                    output.row(self.row_for_output::<REAL>(
+                        sweep,
+                        rng,
+                        output,
+                        real.as_deref_mut(),
+                    )?);
                 }
                 return Ok(());
             }
@@ -4203,17 +4353,30 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    self.packet::<REAL>(
+                        lanes,
+                        sweep,
+                        rng,
+                        output,
+                        coherent,
+                        compact,
+                        real.as_deref_mut(),
+                    )?;
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
-                        output.row(self.row_for_output(sweep, rng, output)?);
+                        output.row(self.row_for_output::<REAL>(
+                            sweep,
+                            rng,
+                            output,
+                            real.as_deref_mut(),
+                        )?);
                     }
                 }
             }
         } else {
             for _ in 0..shots {
-                output.row(self.row_for_output(sweep, rng, output)?);
+                output.row(self.row_for_output::<REAL>(sweep, rng, output, real.as_deref_mut())?);
             }
         }
         Ok(())
@@ -4576,7 +4739,7 @@ mod tests {
                                     counts_plan_budget: 0,
                                     rotation_arithmetic: policy,
                                 };
-                                let mut sampler = plan.prepare_sampler().unwrap();
+                                let mut sampler = plan.prepare_sampler().unwrap().core;
                                 sampler.coefficients = coeff.clone();
                                 sampler.x[0] = frame_x;
                                 sampler.z[0] = frame_z;
@@ -4702,7 +4865,7 @@ mod tests {
                         .zip(&image)
                         .map(|(&a, &b)| a * c + b * rotation)
                         .collect::<Vec<_>>();
-                    let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
                     sampler.coefficients = coefficients.clone();
                     sampler.x[0] = frame_x;
                     sampler.z[0] = frame_z;
@@ -4763,11 +4926,13 @@ mod tests {
         let initial = plan
             .prepare_sampler()
             .unwrap()
+            .core
             .coefficient_cache_reserved_bytes();
         let mut packed = plan
             .prepare_sampler_with_cache_budget(initial + 288)
-            .unwrap();
-        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            .unwrap()
+            .core;
+        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         let mut a = StdRng::seed_from_u64(583);
         let mut b = a.clone();
         for _ in 0..4 {
@@ -4789,8 +4954,8 @@ mod tests {
         let plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
         assert!(plan.peak_active_rank >= 4);
         assert!(plan.independent_event_count >= 129);
-        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-        let mut flat = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
+        let mut flat = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         let mut a = StdRng::seed_from_u64(461);
         let mut b = a.clone();
         for shots in [64, 1, 31, 32, 63, 65, 129, 64] {
@@ -4838,13 +5003,15 @@ mod tests {
             let initial = plan
                 .prepare_sampler()
                 .unwrap()
+                .core
                 .coefficient_cache_reserved_bytes();
             for extra in [0, 896] {
                 let mut packed = plan
                     .prepare_sampler_with_cache_budget(initial + extra)
-                    .unwrap();
+                    .unwrap()
+                    .core;
                 assert!(packed.cache.is_some());
-                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
                 let mut a = StdRng::seed_from_u64(1606);
                 let mut b = a.clone();
                 let expected = scalar.sample(64, &mut a).unwrap();
@@ -4889,8 +5056,11 @@ mod tests {
             }
             // ONE call must drop its local Noise allocation after the first
             // all-dead packet, before preparing scalar rows for 64 + 1 shots.
-            let mut packed = plan.prepare_sampler_with_cache_budget(initial).unwrap();
-            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut packed = plan
+                .prepare_sampler_with_cache_budget(initial)
+                .unwrap()
+                .core;
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
             let mut a = StdRng::seed_from_u64(1607);
             let mut b = a.clone();
             let expected = scalar.sample(129, &mut a).unwrap();
@@ -4918,12 +5088,14 @@ mod tests {
         let initial = plan
             .prepare_sampler()
             .unwrap()
+            .core
             .coefficient_cache_reserved_bytes();
         for shots in [64, 65, 127, 129] {
             let mut packed = plan
                 .prepare_sampler_with_cache_budget(initial + 896)
-                .unwrap();
-            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                .unwrap()
+                .core;
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
             let mut a = StdRng::seed_from_u64(583);
             let mut b = a.clone();
             // Fresh first packet gives an actual mixed-live replay witness;
@@ -5281,7 +5453,7 @@ mod tests {
             linear_counts: Arc::new(OnceLock::new()),
             counts_plan_budget: 0,
         };
-        let mut sampler = plan.prepare_sampler().unwrap();
+        let mut sampler = plan.prepare_sampler().unwrap().core;
         sampler.coefficients = vec![ComplexAmp::new(1., 0.), ComplexAmp::new(1e-16, 0.)];
         let p = CompactPauli {
             physical: PackedPauli {
@@ -5805,14 +5977,18 @@ mod scalar_prepared_tape_tests {
         let initial = plan
             .prepare_sampler()
             .unwrap()
+            .core
             .coefficient_cache_reserved_bytes();
         let sweep = [false, true];
         for cache in [0, 1, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
             for shots in [0, 1, 31, 32, 64, 65, 129] {
                 let mut a = StdRng::seed_from_u64(3715);
                 let mut b = a.clone();
-                let mut old = baseline.prepare_sampler_with_cache_budget(cache).unwrap();
-                let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                let mut old = baseline
+                    .prepare_sampler_with_cache_budget(cache)
+                    .unwrap()
+                    .core;
+                let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
                 let expected = old.sample_with_sweep(shots, &sweep, &mut a).unwrap();
                 let actual = prepared.sample_with_sweep(shots, &sweep, &mut b).unwrap();
                 assert_eq!(actual, expected); // Includes annotation fields, not only bits.
@@ -5830,6 +6006,7 @@ mod scalar_prepared_tape_tests {
         let initial = plan
             .prepare_sampler()
             .unwrap()
+            .core
             .coefficient_cache_reserved_bytes();
         for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
             for sweep in [vec![], vec![false, true]] {
@@ -5839,11 +6016,13 @@ mod scalar_prepared_tape_tests {
                     let expected = baseline
                         .prepare_sampler_with_cache_budget(cache)
                         .unwrap()
+                        .core
                         .sample_with_sweep(shots, &sweep, &mut a)
                         .unwrap();
                     let actual = plan
                         .prepare_sampler_with_cache_budget(cache)
                         .unwrap()
+                        .core
                         .sample_measurements_u8_with_sweep(shots, &sweep, &mut b)
                         .unwrap();
                     assert_eq!(actual.measurements, flatten(&expected));
@@ -5863,10 +6042,12 @@ mod scalar_prepared_tape_tests {
                     let expected = baseline
                         .prepare_sampler_with_cache_budget(cache)
                         .unwrap()
+                        .core
                         .sample_with_sweep(129, &sweep, &mut a)
                         .unwrap();
-                    let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap();
-                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut prepared = plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
+                    let mut structured =
+                        plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
                     let mut c = StdRng::seed_from_u64(3717);
                     let mut actual = Vec::new();
                     let mut structured_actual = Vec::new();
@@ -5896,8 +6077,8 @@ mod scalar_prepared_tape_tests {
         let baseline = without_runs(&plan);
         let mut a = StdRng::seed_from_u64(3718);
         let mut b = a.clone();
-        let mut old = baseline.prepare_sampler().unwrap();
-        let mut mixed = plan.prepare_sampler().unwrap();
+        let mut old = baseline.prepare_sampler().unwrap().core;
+        let mut mixed = plan.prepare_sampler().unwrap().core;
         let sweep = [false, true];
         assert_eq!(
             mixed
@@ -5930,7 +6111,7 @@ mod scalar_prepared_tape_tests {
     fn actual_shared_capacity_budget_rejection_falls_back_to_original_live_scalar() {
         let plan = mixed_plan();
         let baseline = without_runs(&plan);
-        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         resize_packet(&mut prepared.packet_x, plan.num_qubits).unwrap();
         resize_packet(&mut prepared.packet_z, plan.num_qubits).unwrap();
         resize_packet(&mut prepared.packet_records, plan.measurement_count).unwrap();
@@ -5949,6 +6130,7 @@ mod scalar_prepared_tape_tests {
             let expected = baseline
                 .prepare_sampler_with_cache_budget(0)
                 .unwrap()
+                .core
                 .row(&[], &mut a)
                 .unwrap();
             let actual = prepared
@@ -5959,7 +6141,7 @@ mod scalar_prepared_tape_tests {
             assert_eq!(prepared.packet_tape.capacity(), capacity);
             assert_eq!(a.next_u64(), b.next_u64());
         }
-        let mut fresh = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut fresh = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         assert!(!fresh.try_prepare_scalar_tape(0));
         assert_eq!(fresh.packet_tape.capacity(), 0); // Rejects before allocation/growth.
     }
@@ -5971,7 +6153,7 @@ mod scalar_prepared_tape_tests {
         let plan = CompiledNearCliffordExecutor::compile_text(&text).unwrap();
         let baseline = without_runs(&plan);
         assert_eq!(plan.noise_event_count, count);
-        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         let mut a = StdRng::seed_from_u64(3723);
         let mut b = a.clone();
         assert_eq!(
@@ -5979,6 +6161,7 @@ mod scalar_prepared_tape_tests {
             baseline
                 .prepare_sampler_with_cache_budget(0)
                 .unwrap()
+                .core
                 .sample(1, &mut b)
                 .unwrap()
         );
@@ -5990,7 +6173,7 @@ mod scalar_prepared_tape_tests {
     #[test]
     fn zero_calls_and_output_errors_do_not_draw_or_allocate_scalar_tape() {
         let plan = mixed_plan();
-        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         let mut a = StdRng::seed_from_u64(3720);
         let mut b = a.clone();
         assert!(prepared.sample(0, &mut a).unwrap().is_empty());
@@ -6008,7 +6191,7 @@ mod scalar_prepared_tape_tests {
         assert_eq!(prepared.packet_tape.capacity(), 0);
         assert_eq!(a.next_u64(), b.next_u64());
         let empty = CompiledNearCliffordExecutor::compile_text("I 0\n").unwrap();
-        let mut sampler = empty.prepare_sampler().unwrap();
+        let mut sampler = empty.prepare_sampler().unwrap().core;
         let mut a = StdRng::seed_from_u64(3721);
         let mut b = a.clone();
         assert!(
@@ -6033,7 +6216,7 @@ mod scalar_prepared_tape_tests {
         // Failed-call prefix equality is not a cross-strategy API contract.
         plan.initial_coefficients =
             Arc::new(vec![ComplexAmp::default(); plan.initial_coefficients.len()]);
-        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut prepared = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
         let mut a = StdRng::seed_from_u64(3722);
         let mut expected_rng = a.clone();
         {
@@ -6047,6 +6230,7 @@ mod scalar_prepared_tape_tests {
         let old_error = baseline
             .prepare_sampler_with_cache_budget(0)
             .unwrap()
+            .core
             .row(&[], &mut old_rng)
             .unwrap_err();
         let prepared_error = prepared.row(&[], &mut a).unwrap_err();
@@ -6080,12 +6264,14 @@ mod scalar_prepared_tape_tests {
             let initial = plan
                 .prepare_sampler()
                 .unwrap()
+                .core
                 .coefficient_cache_reserved_bytes();
             for cache_budget in [initial, DEFAULT_CACHE_BYTE_BUDGET] {
                 for compact_independent in [false, true] {
                     let mut packed = plan
                         .prepare_sampler_with_cache_budget(cache_budget)
-                        .unwrap();
+                        .unwrap()
+                        .core;
                     assert!(packed.cache.is_some());
                     resize_packet(&mut packed.packet_x, plan.num_qubits).unwrap();
                     resize_packet(&mut packed.packet_z, plan.num_qubits).unwrap();
@@ -6105,7 +6291,7 @@ mod scalar_prepared_tape_tests {
                     let sweep = [false, true];
                     let mut a = StdRng::seed_from_u64(1613);
                     let mut b = a.clone();
-                    let mut scalar = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut scalar = baseline.prepare_sampler_with_cache_budget(0).unwrap().core;
                     let mut expected = Vec::new();
                     for _ in 0..64 {
                         let values = {
@@ -6129,12 +6315,13 @@ mod scalar_prepared_tape_tests {
                     let mut actual = Vec::new();
                     // None is also the public mode after optional Noise rejection.
                     packed
-                        .packet(
+                        .packet::<false>(
                             64,
                             &sweep,
                             &mut b,
                             &mut BatchOutput::Measurements(&mut actual),
                             false,
+                            None,
                             None,
                         )
                         .unwrap();
@@ -6162,16 +6349,18 @@ mod scalar_prepared_tape_tests {
             let initial = plan
                 .prepare_sampler()
                 .unwrap()
+                .core
                 .coefficient_cache_reserved_bytes();
             for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
                 for seed in [0, 63, 3716] {
                     let mut a = StdRng::seed_from_u64(seed);
                     let mut b = a.clone();
                     let mut c = a.clone();
-                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap().core;
                     old.pack_enabled = false;
-                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap();
-                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
+                    let mut structured =
+                        plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
                     structured.pack_enabled = false;
                     // First call is cold; repeated 64/65 calls retain warmed
                     // transition state. Measurements include physical resets,
@@ -6216,6 +6405,7 @@ mod scalar_prepared_tape_tests {
             let initial = plan
                 .prepare_sampler()
                 .unwrap()
+                .core
                 .coefficient_cache_reserved_bytes();
             for cache in [0, initial + 288, DEFAULT_CACHE_BYTE_BUDGET] {
                 for parts in [
@@ -6230,11 +6420,12 @@ mod scalar_prepared_tape_tests {
                     let mut a = StdRng::seed_from_u64(3717);
                     let mut b = a.clone();
                     let mut c = a.clone();
-                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut old = baseline.prepare_sampler_with_cache_budget(0).unwrap().core;
                     old.pack_enabled = false;
                     let expected = old.sample_with_sweep(129, &[false, true], &mut a).unwrap();
-                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap();
-                    let mut structured = plan.prepare_sampler_with_cache_budget(cache).unwrap();
+                    let mut flat = plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
+                    let mut structured =
+                        plan.prepare_sampler_with_cache_budget(cache).unwrap().core;
                     structured.pack_enabled = false;
                     let mut raw = Vec::new();
                     let mut actual = Vec::new();
@@ -6295,8 +6486,8 @@ mod postselected_packet_tests {
                     pauli.physical.phase = 4;
                 }
                 let mut native = candidate.prepare_sampler_with_cache_budget(budget).unwrap();
-                let initial_states = native.cache.as_ref().map(|cache| cache.states.len());
-                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let initial_states = native.core.cache.as_ref().map(|cache| cache.states.len());
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
                 let mut a = StdRng::seed_from_u64(719);
                 let mut b = a.clone();
                 for shots in [64, 65, 129, 64] {
@@ -6310,19 +6501,19 @@ mod postselected_packet_tests {
                             logical_errors: 0
                         }
                     );
-                    assert_eq!(native.last_packet_live, 0);
+                    assert_eq!(native.core.last_packet_live, 0);
                     assert!(
-                        native.pack_enabled,
+                        native.core.pack_enabled,
                         "postselection must not look like failed cache admission"
                     );
                     assert_eq!(
-                        native.cache.as_ref().map(|cache| cache.states.len()),
+                        native.core.cache.as_ref().map(|cache| cache.states.len()),
                         initial_states
                     );
-                    if let Some(cache) = &native.cache {
+                    if let Some(cache) = &native.core.cache {
                         assert!(cache.nodes.iter().all(|op| matches!(op, CachedOp::None)));
                     }
-                    assert!(native.packet_independent.is_some());
+                    assert!(native.core.packet_independent.is_some());
                     for _ in 0..16 {
                         assert_eq!(a.next_u64(), b.next_u64());
                     }
@@ -6343,11 +6534,12 @@ mod postselected_packet_tests {
             let initial = plan
                 .prepare_sampler()
                 .unwrap()
+                .core
                 .coefficient_cache_reserved_bytes();
             let mut native = plan
                 .prepare_sampler_with_cache_budget(initial + 288)
                 .unwrap();
-            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap().core;
             let mut a = StdRng::seed_from_u64(583);
             let mut b = a.clone();
             for shots in [64, 64, 65, 129] {
@@ -6376,7 +6568,7 @@ mod postselected_packet_tests {
                 );
                 assert!(counts.accepted > 0 && counts.accepted < shots);
                 assert_eq!(
-                    native.last_packet_live, 0,
+                    native.core.last_packet_live, 0,
                     "accepted rows must come from admission-failure replay"
                 );
                 for _ in 0..16 {
@@ -6522,14 +6714,14 @@ mod highest_rotation_gather_tests {
                         .collect();
                     let mut actual = before.clone();
                     if x & 1 != 0 {
-                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, true>(
+                        CompiledSamplerCore::rotate_highest_z0::<FUSED, IMAGINARY, true>(
                             &mut actual,
                             x,
                             c,
                             factor,
                         );
                     } else {
-                        CompiledNearCliffordSampler::rotate_highest_z0::<FUSED, IMAGINARY, false>(
+                        CompiledSamplerCore::rotate_highest_z0::<FUSED, IMAGINARY, false>(
                             &mut actual,
                             x,
                             c,
@@ -6615,14 +6807,14 @@ mod avx2_rotation_bits_tests {
                         // helper's CPU precondition; x is inside this vector.
                         unsafe {
                             if x & 1 != 0 {
-                                CompiledNearCliffordSampler::rotate_highest_z0_avx2::<true>(
+                                CompiledSamplerCore::rotate_highest_z0_avx2::<true>(
                                     &mut actual,
                                     x,
                                     c,
                                     factor,
                                 );
                             } else {
-                                CompiledNearCliffordSampler::rotate_highest_z0_avx2::<false>(
+                                CompiledSamplerCore::rotate_highest_z0_avx2::<false>(
                                     &mut actual,
                                     x,
                                     c,
