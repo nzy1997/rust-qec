@@ -1,5 +1,16 @@
 //! Offline Clifford-frame plan; runtime carries a virtual Pauli and compact amplitudes.
 use super::*;
+
+// Multiplication by +/-1 changes only the sign bit of every non-NaN
+// component, including signed zeros, subnormals and infinities. Arithmetic
+// NaNs have no payload/sign contract; the subsequent products retain NaN.
+#[inline]
+fn cdf_signed_amplitude(amp: ComplexAmp, sign_mask: u64) -> ComplexAmp {
+    ComplexAmp::new(
+        f64::from_bits(amp.re.to_bits() ^ sign_mask),
+        f64::from_bits(amp.im.to_bits() ^ sign_mask),
+    )
+}
 #[path = "compile_frame.rs"]
 mod compile_frame;
 use compile_frame::CompileFrame;
@@ -2866,12 +2877,9 @@ impl CompiledNearCliffordSampler<'_> {
         let mut expectation = 0.;
         let mut norm = 0.;
         for (i, &amp) in self.coefficients.iter().enumerate() {
-            let sign = if (i & p.z).count_ones() % 2 != 0 {
-                -1.
-            } else {
-                1.
-            };
-            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
+            let sign_mask = u64::from((i & p.z).count_ones() & 1) << 63;
+            let signed_amp = cdf_signed_amplitude(amp, sign_mask);
+            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * signed_amp).re;
             norm += amp.norm_sqr();
         }
         ((1. + expectation / norm) * 0.5).clamp(0., 1.)
