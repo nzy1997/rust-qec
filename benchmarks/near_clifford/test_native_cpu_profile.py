@@ -54,9 +54,9 @@ def fixture(out):
     preflight = {}
     for name in profile.PREFLIGHT:
         path = out / ("preflight-" + name + ".log")
-        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 1} passed; fixture only\n")
+        path.write_text(f"test result: ok. {profile.PREFLIGHT_COUNTS[name]} passed; fixture only\n")
         preflight[name] = dict(path=path.name, sha256=profile.scout.digest(path))
-    h = dict(schema="diagnostic.native-cpu-sampling.v1", started=1, performance_valid=False,
+    h = dict(schema="diagnostic.native-cpu-sampling.v2", started=1, performance_valid=False,
              scope="fixture-only metadata, no real samples", identities=identities, retained=retained, preflight=preflight,
              profile_driver_sha256=profile.scout.digest(out / "original-profile-driver.py"),
              native_preflight_sha256=profile.scout.digest(out / "original-native-preflight.sh"), features_sha256=profile.scout.digest(out / "features.txt"),
@@ -117,13 +117,18 @@ class ProfileContract(unittest.TestCase):
             profile.verify(out, git_sources=False, replay=False)
 
     def test_resealed_semantic_corruptions_are_rejected(self):
-        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout", "cpu_attribute"]:
+        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout", "cpu_attribute", "old_public_count", "missing_real_kernel"]:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
                 out = Path(temporary)
                 h, c, events = fixture(out)
                 e = events[0]
                 directory = out / e["directory"]
-                if kind == "scope": h["performance_valid"] = True
+                if kind in ["old_public_count", "missing_real_kernel"]:
+                    name = "public-counts" if kind == "old_public_count" else "real-kernels"
+                    path = out / h["preflight"][name]["path"]
+                    path.write_text("test result: ok. 10 passed; fixture only\n" if kind == "old_public_count" else "test result: ok. 7 passed; fixture only\n")
+                    h["preflight"][name]["sha256"] = profile.scout.digest(path)
+                elif kind == "scope": h["performance_valid"] = True
                 elif kind == "source_closure": c["identities_after"]["candidate"]["binary"] = "0" * 64
                 elif kind == "source_root": h["roots"]["baseline"] = "/unexpected"
                 elif kind == "escaped_out": h["original_out"] = "/fixture/drafts/../../escaped-profile"
