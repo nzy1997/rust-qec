@@ -300,7 +300,7 @@ mod tests {
                     let selected = plan
                         .prepare_sampler()
                         .unwrap()
-                        .row_with_random_kernel::<true, true>(&[true, false], &mut replay)
+                        .row_with_random_kernel::<true, true, false>(&[true, false], &mut replay)
                         .unwrap();
                     assert!(
                         replay.skipped >= 160,
@@ -310,7 +310,7 @@ mod tests {
                     let expected = plan
                         .prepare_sampler()
                         .unwrap()
-                        .row_with_random_mode::<false>(
+                        .row_with_random_mode::<false, false>(
                             &[true, false],
                             &mut RowRandom::recorded(&tape, &mut caller),
                         )

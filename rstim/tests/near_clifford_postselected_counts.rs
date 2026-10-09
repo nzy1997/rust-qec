@@ -481,7 +481,9 @@ fn original_cultivation_counts_preserve_raw_folds_and_rng_across_bulk_boundaries
                 let mut original = plan.prepare_sampler_with_cache_budget(0).unwrap();
                 let mut a = StdRng::seed_from_u64(583);
                 let mut b = a.clone();
-                for shots in [0, 1, 32, 63, 64, 65, 1024, 1, 63, 64, 65, 0, 1024] {
+                for shots in [
+                    0, 1, 31, 32, 63, 64, 65, 127, 129, 1024, 1, 63, 64, 65, 0, 1024,
+                ] {
                     let rows = original.sample(shots, &mut b).unwrap();
                     assert_eq!(
                         native.sample_postselected_counts(shots, 0, &mut a).unwrap(),
@@ -503,6 +505,14 @@ fn original_cultivation_counts_preserve_raw_folds_and_rng_across_bulk_boundaries
                     assert_eq!(
                         native.sample_measurements_u8(3, &mut a).unwrap(),
                         original.sample_measurements_u8(3, &mut b).unwrap()
+                    );
+                    assert_eq!(
+                        native.sample(64, &mut a).unwrap(),
+                        original.sample(64, &mut b).unwrap()
+                    );
+                    assert_eq!(
+                        native.sample_measurements_u8(65, &mut a).unwrap(),
+                        original.sample_measurements_u8(65, &mut b).unwrap()
                     );
                     for _ in 0..16 {
                         assert_eq!(a.next_u64(), b.next_u64());

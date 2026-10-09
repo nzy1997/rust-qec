@@ -3071,23 +3071,23 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         byte_budget: usize,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_scalar_tape_budget_mode::<false>(sweep, rng, byte_budget)
+        self.row_with_scalar_tape_budget_mode::<false, false>(sweep, rng, byte_budget)
     }
 
-    fn row_for_output(
+    fn row_for_output<const REAL: bool>(
         &mut self,
         sweep: &[bool],
         rng: &mut impl Rng,
         output: &BatchOutput<'_>,
     ) -> Result<NearCliffordShot, String> {
         if matches!(output, BatchOutput::Counts { .. }) {
-            self.row_with_scalar_tape_budget_mode::<true>(sweep, rng, PACKET_BYTE_BUDGET)
+            self.row_with_scalar_tape_budget_mode::<true, REAL>(sweep, rng, PACKET_BYTE_BUDGET)
         } else {
             self.row(sweep, rng)
         }
     }
 
-    fn row_with_scalar_tape_budget_mode<const POSTSELECT: bool>(
+    fn row_with_scalar_tape_budget_mode<const POSTSELECT: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         rng: &mut impl Rng,
@@ -3111,20 +3111,20 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
             let mut replay = RowRandom::recorded(&tape, &mut *rng);
-            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
+            let result = self.row_with_random_kernel::<POSTSELECT, true, REAL>(sweep, &mut replay);
             debug_assert!(result.is_err() || replay.cursor == count);
             self.conditional_tape = tape;
             return result;
         }
         if plan.noise_event_count < MIN_SCALAR_PREPARED_NOISE_EVENTS || plan.random_kinds.is_empty()
         {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(sweep, &mut RowRandom::live(rng));
         }
         let Some(runs) = &plan.random_runs else {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(sweep, &mut RowRandom::live(rng));
         };
         if !self.try_prepare_scalar_tape(byte_budget) {
-            return self.row_with_random_mode::<POSTSELECT>(sweep, &mut RowRandom::live(rng));
+            return self.row_with_random_mode::<POSTSELECT, REAL>(sweep, &mut RowRandom::live(rng));
         }
         #[cfg(test)]
         {
@@ -3139,7 +3139,7 @@ impl CompiledNearCliffordSampler<'_> {
                 &mut tape[..count],
             );
             let mut replay = RowRandom::recorded(&tape[..count], &mut *rng);
-            let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
+            let result = self.row_with_random_kernel::<POSTSELECT, true, REAL>(sweep, &mut replay);
             debug_assert!(result.is_err() || replay.cursor == count);
             result
         };
@@ -3152,23 +3152,23 @@ impl CompiledNearCliffordSampler<'_> {
         sweep: &[bool],
         random: &mut RowRandom<'_, impl Rng>,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_random_mode::<false>(sweep, random)
+        self.row_with_random_mode::<false, false>(sweep, random)
     }
 
-    fn row_with_random_mode<const POSTSELECT: bool>(
+    fn row_with_random_mode<const POSTSELECT: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
-        self.row_with_random_kernel::<POSTSELECT, false>(sweep, random)
+        self.row_with_random_kernel::<POSTSELECT, false, REAL>(sweep, random)
     }
 
-    fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool>(
+    fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool, const REAL: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
-        if POSTSELECT && self.real_enabled {
+        if POSTSELECT && REAL {
             let result = self.execute_real_row::<POSTSELECT, SKIP_NOISE>(sweep, random);
             // Also synchronize rejected detectors and errors before subsequent
             // structured, flat, cached, or zero-shot calls.
@@ -3423,7 +3423,7 @@ impl CompiledNearCliffordSampler<'_> {
     }
     // All random draws depend only on the fixed plan, not the coherent state.
     // Draw them in original row order, so packet size and fallback never change RNG.
-    fn packet(
+    fn packet<const REAL: bool>(
         &mut self,
         lanes: usize,
         sweep: &[bool],
@@ -3880,7 +3880,8 @@ impl CompiledNearCliffordSampler<'_> {
                             independent_packet.as_ref(),
                             lane,
                         );
-                        let shot = self.row_with_random_kernel::<true, true>(sweep, &mut random)?;
+                        let shot =
+                            self.row_with_random_kernel::<true, true, REAL>(sweep, &mut random)?;
                         output.row(shot);
                         debug_assert_eq!(random.cursor(), random_count);
                     } else {
@@ -4071,11 +4072,16 @@ impl CompiledNearCliffordSampler<'_> {
             && matches!(output, BatchOutput::Counts { .. })
             && (6..=10).contains(&self.plan.peak_active_rank)
             && real_scalar_fallback::vector_supported();
-        let result = self.sample_batch_inner(shots, sweep, rng, output);
+        // Select the optional row route once per call, including packet fallback.
+        let result = if self.real_enabled {
+            self.sample_batch_inner::<true>(shots, sweep, rng, output)
+        } else {
+            self.sample_batch_inner::<false>(shots, sweep, rng, output)
+        };
         self.real_enabled = false;
         result
     }
-    fn sample_batch_inner(
+    fn sample_batch_inner<const REAL: bool>(
         &mut self,
         shots: usize,
         sweep: &[bool],
@@ -4137,7 +4143,7 @@ impl CompiledNearCliffordSampler<'_> {
                 self.packet_tape = Vec::new();
                 self.packet_independent = None;
                 for _ in 0..shots {
-                    output.row(self.row_for_output(sweep, rng, output)?);
+                    output.row(self.row_for_output::<REAL>(sweep, rng, output)?);
                 }
                 return Ok(());
             }
@@ -4197,17 +4203,17 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    self.packet::<REAL>(lanes, sweep, rng, output, coherent, compact)?;
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
-                        output.row(self.row_for_output(sweep, rng, output)?);
+                        output.row(self.row_for_output::<REAL>(sweep, rng, output)?);
                     }
                 }
             }
         } else {
             for _ in 0..shots {
-                output.row(self.row_for_output(sweep, rng, output)?);
+                output.row(self.row_for_output::<REAL>(sweep, rng, output)?);
             }
         }
         Ok(())
@@ -6123,7 +6129,7 @@ mod scalar_prepared_tape_tests {
                     let mut actual = Vec::new();
                     // None is also the public mode after optional Noise rejection.
                     packed
-                        .packet(
+                        .packet::<false>(
                             64,
                             &sweep,
                             &mut b,
