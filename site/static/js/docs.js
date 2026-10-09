@@ -9,6 +9,22 @@
   syncNavOffset();
   if (navShell) new ResizeObserver(syncNavOffset).observe(navShell);
   const toc = document.querySelector('.page-toc');
+  // Keep a deep link aligned while asynchronous evidence changes page height.
+  // Stop following as soon as the reader interacts with the page.
+  let followFragment = Boolean(location.hash);
+  let fragmentPending = false;
+  function queueFragment() {
+    if (!followFragment || fragmentPending) return;
+    fragmentPending = true;
+    requestAnimationFrame(() => {
+      fragmentPending = false;
+      if (followFragment) revealFragment();
+    });
+  }
+  for (const event of ['wheel', 'touchmove', 'pointerdown']) {
+    window.addEventListener(event, () => { followFragment = false; }, { passive: true });
+  }
+  window.addEventListener('keydown', () => { followFragment = false; });
   // Interactive widgets replace their headings and provide their own navigation.
   const headings = [...main.querySelectorAll('h2, h3, h4')].filter((heading) => !heading.closest('[data-toc-skip]'));
   const tocLinks = new Map();
@@ -16,7 +32,8 @@
     const link = event.target.closest('a[href^="#"]');
     if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     toc.querySelector('.toc-disclosure').open = false;
-    requestAnimationFrame(revealFragment);
+    followFragment = true;
+    queueFragment();
   });
   if (toc && headings.filter((h) => h.tagName === 'H2').length > 1 && !['home', 'shot'].includes(document.body.dataset.page)) {
     let section;
@@ -90,9 +107,12 @@
       target.scrollIntoView({ behavior: 'instant' });
     } catch { /* An invalid URL escape has no matching heading. */ }
   }
-  requestAnimationFrame(revealFragment);
-  window.addEventListener('load', revealFragment, { once: true });
-  window.addEventListener('hashchange', () => requestAnimationFrame(revealFragment));
+  queueFragment();
+  window.addEventListener('load', queueFragment, { once: true });
+  window.addEventListener('hashchange', () => {
+    followFragment = Boolean(location.hash);
+    queueFragment();
+  });
   function languageFor(pre, code) {
     if (pre.dataset.language) return pre.dataset.language;
     const lang = code.className.match(/language-([\w-]+)/)?.[1] || pre.dataset.lang;
@@ -209,7 +229,7 @@
     });
   }
   enhanceContent();
-  new MutationObserver(enhanceContent).observe(main, { childList: true, subtree: true });
+  new MutationObserver(() => { enhanceContent(); queueFragment(); }).observe(main, { childList: true, subtree: true });
   let figureDialog;
   document.addEventListener('click', (event) => {
     const trigger = event.target.closest('[data-figure-viewer], .result-plot > a');
