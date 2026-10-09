@@ -68,62 +68,39 @@ async function serveVerifiedPublication(page, published, supported = 'envelope-m
   }));
 }
 
-const matchingBadge = page => page.locator('[data-decoder-badge="envelope-matching"]');
-const mleBadge = page => page.locator('[data-decoder-badge="envelope-mle"]');
+const matchingCopy = page => page.locator('[data-decoder-support-copy="envelope-matching"]').first();
+const mleCopy = page => page.locator('[data-decoder-support-copy="envelope-mle"]').first();
 
-test('tutorial and concepts render the version-bound Supported label with evidence links', async ({ page, request }, testInfo) => {
+test('support remains version-bound in body text while hero badges stay removed', async ({ page, request }, testInfo) => {
   const matrix = await servedMatrix(request);
   const published = matchingPublication(matrix);
   const mlePublished = mlePublication(matrix);
-  await serveVerifiedPublication(page, published);
-  await serveVerifiedPublication(page, mlePublished, 'envelope-matching,envelope-mle');
-
+  await serveVerifiedPublication(page, published, 'envelope-matching,envelope-mle');
+  await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  const conceptBadge = matchingBadge(page);
-  await expect(conceptBadge.locator('a')).toHaveText(`Envelope matching · Supported · ${published.release}`);
-  await expect(conceptBadge.locator('a')).toHaveAttribute('href', published.release_url);
-  await expect(conceptBadge).toHaveAttribute('data-release', published.release);
-  await expect(conceptBadge).toHaveAttribute('data-evidence-asset', published.evidence_asset);
-  const evidenceLink = page.locator('[data-evidence-link="envelope-matching"]');
-  await expect(evidenceLink).toHaveAttribute('href', published.release_url);
-  const boundary = page.locator('.task-section').filter({ has: page.locator('#supported-circuits') });
-  await expect(boundary).toContainText('Supported since');
-  await expect(boundary).toContainText(published.release.slice(1));
-  const conceptMle = mleBadge(page);
-  await expect(conceptMle.locator('a')).toHaveText(`Envelope MLE · Supported · ${mlePublished.release}`);
-  await expect(conceptMle.locator('a')).toHaveAttribute('href', mlePublished.release_url);
-  await expect(conceptMle).toHaveAttribute('data-release', mlePublished.release);
-  await expect(conceptMle).toHaveAttribute('data-evidence-asset', mlePublished.evidence_asset);
+  await expect(matchingCopy(page)).toHaveText(`Supported since ${published.release}`);
+  await expect(mleCopy(page)).toHaveText(`Supported since ${mlePublished.release}`);
+  await expect(page.locator('[data-evidence-link="envelope-matching"]')).toHaveAttribute('href', published.release_url);
   await expect(page.locator('[data-evidence-link="envelope-mle"]')).toHaveAttribute('href', mlePublished.release_url);
-  await expect(boundary).toContainText('four exact measured points');
-  await expect(boundary).toContainText('requires an ILP-capable build');
-  await page.screenshot({ path: testInfo.outputPath('atom-loss-concepts-support.png'), fullPage: true });
-
+  await expect(page.locator('[data-decoder-badge]')).toHaveCount(0);
   await page.goto('/atom-loss/');
-  const tutorialBadge = matchingBadge(page);
-  await expect(tutorialBadge.locator('a')).toHaveText(`Envelope matching · Supported · ${published.release}`);
-  await expect(tutorialBadge.locator('a')).toHaveAttribute('href', published.release_url);
-  await expect(page.locator('.loss-hero-note')).toContainText(`Supported since ${published.release}`);
+  await expect(matchingCopy(page)).toHaveText(`Supported since ${published.release}`);
+  await expect(page.locator('[data-decoder-badge]')).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath('atom-loss-tutorial-support.png'), fullPage: true });
-
   await page.goto('/support/');
-  const supportCopies = page.locator('[data-decoder-support-copy="envelope-matching"]');
-  await expect(supportCopies).toHaveCount(2);
-  await expect(supportCopies.first()).toHaveText(`Supported since ${published.release}`);
-  await expect(supportCopies.last()).toHaveText(`Supported since ${published.release}`);
-  const mleSupportCopies = page.locator('[data-decoder-support-copy="envelope-mle"]');
-  await expect(mleSupportCopies).toHaveCount(2);
-  await expect(mleSupportCopies.first()).toHaveText(`Supported since ${mlePublished.release}`);
-  await expect(mleSupportCopies.last()).toHaveText(`Supported since ${mlePublished.release}`);
+  for (const name of ['envelope-matching', 'envelope-mle']) {
+    const copies = page.locator(`[data-decoder-support-copy="${name}"]`);
+    await expect(copies).toHaveCount(2);
+    await expect(copies.first()).toHaveText(`Supported since ${published.release}`);
+    await expect(copies.last()).toHaveText(`Supported since ${published.release}`);
+  }
 });
 
 test('missing support evidence keeps the Beta label', async ({ page }) => {
   await page.route(MATRIX_ROUTE, route => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
-  await expect(matchingBadge(page).locator('a')).toHaveCount(0);
-  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
-  await expect(mleBadge(page).locator('a')).toHaveCount(0);
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
+  await expect(mleCopy(page)).toHaveText('Beta unless publication verification succeeds');
 });
 
 test('missing publication verification marker keeps badge and body at Beta', async ({ page, request }) => {
@@ -134,8 +111,7 @@ test('missing publication verification marker keeps badge and body at Beta', asy
   await page.route(mlePublished.verification_url, route => route.fulfill({ status: 404, body: 'not found' }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
-  await expect(matchingBadge(page).locator('a')).toHaveCount(0);
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]')).toContainText('Beta');
   await expect(page.locator('[data-evidence-link="envelope-matching"]')).toContainText('not published');
   await expect(page.locator('[data-evidence-link="envelope-matching"]')).not.toHaveAttribute('href');
@@ -152,7 +128,7 @@ test('marker metadata without Matching support keeps the Beta label', async ({ p
   }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]')).toContainText('Beta');
 });
 
@@ -165,7 +141,7 @@ test('marker metadata for a different evidence hash keeps the Beta label', async
   await page.route(published.verification_url, route => route.fulfill({ json: release }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
   await expect(page.locator('[data-decoder-support-copy="envelope-matching"]')).toContainText('Beta');
 });
 
@@ -177,8 +153,8 @@ test('a prerelease with a verification marker keeps both decoders at Beta', asyn
   await page.route(published.verification_url, route => route.fulfill({ json: release }));
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
-  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
+  await expect(mleCopy(page)).toHaveText('Beta unless publication verification succeeds');
 });
 
 test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => {
@@ -188,9 +164,8 @@ test('failed MLE evidence keeps only MLE at Beta', async ({ page, request }) => 
   await serveVerifiedPublication(page, matching);
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page).locator('a')).toHaveText(`Envelope matching · Supported · ${matching.release}`);
-  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
-  await expect(mleBadge(page).locator('a')).toHaveCount(0);
+  await expect(matchingCopy(page)).toHaveText(`Supported since ${matching.release}`);
+  await expect(mleCopy(page)).toHaveText('Beta unless publication verification succeeds');
 });
 
 test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, request }) => {
@@ -203,12 +178,10 @@ test('a v0.3.0 edition cannot render the new Supported claim', async ({ page, re
   }
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page)).toHaveText('Envelope matching · Beta');
-  await expect(matchingBadge(page).locator('a')).toHaveCount(0);
-  await expect(matchingBadge(page)).not.toContainText('Supported');
-  await expect(mleBadge(page)).toHaveText('Envelope MLE · Beta');
-  await expect(mleBadge(page).locator('a')).toHaveCount(0);
-  await expect(mleBadge(page)).not.toContainText('Supported');
+  await expect(matchingCopy(page)).toHaveText('Beta unless publication verification succeeds');
+  await expect(matchingCopy(page)).not.toContainText('Supported');
+  await expect(mleCopy(page)).toHaveText('Beta unless publication verification succeeds');
+  await expect(mleCopy(page)).not.toContainText('Supported');
 });
 
 test('the previous Matching-only release does not promote MLE', async ({ page, request }) => {
@@ -221,9 +194,8 @@ test('the previous Matching-only release does not promote MLE', async ({ page, r
   await serveVerifiedPublication(page, published);
   await page.route(MATRIX_ROUTE, route => route.fulfill({ json: matrix }));
   await page.goto('/atom-loss-concepts/');
-  await expect(matchingBadge(page).locator('a')).toHaveText(`Envelope matching · Supported · ${published.release}`);
-  const mle = mleBadge(page);
-  await expect(mle).toHaveText('Envelope MLE · Beta');
-  await expect(mle.locator('a')).toHaveCount(0);
+  await expect(matchingCopy(page)).toHaveText(`Supported since ${published.release}`);
+  const mle = mleCopy(page);
+  await expect(mle).toHaveText('Beta unless publication verification succeeds');
   await expect(mle).not.toContainText('Supported');
 });
