@@ -822,6 +822,136 @@ impl NoiseSigns {
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+    #[test]
+    fn reduced_conditional_rank_uses_coherent_packets_with_exact_records_and_carry() {
+        let text = conditional_fixture::circuit(8, 3, true);
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let ordinary = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nMX 0\n",
+                policy,
+            )
+            .unwrap();
+            assert_eq!(ordinary.peak_active_rank(), 1);
+            assert!(ordinary.noise_signs.is_none());
+            let mut ordinary_sampler = ordinary.prepare_sampler_with_cache_budget(0).unwrap();
+            ordinary_sampler.observe_lazy_error_producer = true;
+            ordinary_sampler
+                .sample_measurements_u8(64, &mut StdRng::seed_from_u64(718293))
+                .unwrap();
+            assert!(ordinary_sampler.last_packet_error_producer.is_none());
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, policy).unwrap();
+            assert_eq!(plan.peak_active_rank(), 2);
+            assert!(plan.noise_signs.is_some());
+            for shots in [1, 31, 32, 64] {
+                let mut scalar_rng = StdRng::seed_from_u64(718293);
+                let expected = plan
+                    .prepare_sampler_with_cache_budget(0)
+                    .unwrap()
+                    .sample(shots, &mut scalar_rng)
+                    .unwrap();
+                let mut actual_rng = StdRng::seed_from_u64(718293);
+                let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                sampler.observe_lazy_error_producer = true;
+                let actual = sampler
+                    .sample_measurements_u8(shots, &mut actual_rng)
+                    .unwrap();
+                let expected: Vec<u8> = expected
+                    .iter()
+                    .flat_map(|row| row.measurements.iter().map(|&value| u8::from(value)))
+                    .collect();
+                assert_eq!(
+                    actual.measurements, expected,
+                    "packet boundary records, shots={shots}"
+                );
+                assert_eq!(
+                    sampler
+                        .last_packet_error_producer
+                        .as_ref()
+                        .map(|producer| producer.coherent),
+                    (shots >= 32).then_some(true),
+                    "packet boundary route, shots={shots}"
+                );
+                for _ in 0..16 {
+                    assert_eq!(actual_rng.next_u64(), scalar_rng.next_u64());
+                }
+            }
+            let mut expected_rng = StdRng::seed_from_u64(718293);
+            let rows = plan
+                .prepare_sampler_with_cache_budget(0)
+                .unwrap()
+                .sample(129, &mut expected_rng)
+                .unwrap();
+            let expected_continuation = expected_rng.clone();
+            let expected: Vec<u8> = rows
+                .iter()
+                .flat_map(|row| row.measurements.iter().copied().map(u8::from))
+                .collect();
+            let mut rng = StdRng::seed_from_u64(718293);
+            let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            sampler.observe_lazy_error_producer = true;
+            let mut actual = Vec::new();
+            for shots in [64, 0, 65] {
+                actual.extend(
+                    sampler
+                        .sample_measurements_u8(shots, &mut rng)
+                        .unwrap()
+                        .measurements,
+                );
+            }
+            assert_eq!(actual, expected);
+            assert!(
+                sampler
+                    .last_packet_error_producer
+                    .as_ref()
+                    .unwrap()
+                    .coherent
+            );
+            for _ in 0..16 {
+                assert_eq!(rng.next_u64(), expected_rng.next_u64());
+            }
+            let accepted: Vec<_> = rows
+                .iter()
+                .filter(|row| row.detectors.iter().all(|bit| !bit))
+                .collect();
+            let expected_counts = NearCliffordPostselectedCounts {
+                attempted: 129,
+                accepted: accepted.len(),
+                logical_errors: accepted
+                    .iter()
+                    .filter(|row| {
+                        row.observables
+                            .iter()
+                            .filter(|(index, _)| *index == 0)
+                            .fold(false, |parity, (_, bit)| parity ^ bit)
+                    })
+                    .count(),
+            };
+            let mut counts_rng = StdRng::seed_from_u64(718293);
+            let mut counts_sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            counts_sampler.observe_lazy_error_producer = true;
+            assert_eq!(
+                counts_sampler
+                    .sample_postselected_counts(129, 0, &mut counts_rng)
+                    .unwrap(),
+                expected_counts,
+            );
+            assert!(
+                counts_sampler
+                    .last_packet_error_producer
+                    .as_ref()
+                    .unwrap()
+                    .coherent
+            );
+            let mut carry = expected_continuation;
+            for _ in 0..16 {
+                assert_eq!(counts_rng.next_u64(), carry.next_u64());
+            }
+        }
+    }
     fn captured(text: &str) -> (Planner, Vec<TapeOp>) {
         let instr = crate::parser::parse_lines(text).unwrap();
         let incumbent = NearCliffordExecutor::compile_with_limit(

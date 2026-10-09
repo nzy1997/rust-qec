@@ -1,0 +1,1352 @@
+{
+  "schema_version": "rustqec.envelope-resources-manifest.v1",
+  "generated_by": "python3 -m benchmarks.atom_loss.readiness_resources --profile full",
+  "generated_at": "2026-10-08T23:05:51Z",
+  "checkout_revision": "674394b74a589965803bb48cd91977347962e9d0",
+  "source_inputs": {
+    "Cargo.lock": {
+      "mode": "100644",
+      "git_blob": "1ee9a6be8c4a2049d08bb9055257650a0d305169"
+    },
+    "Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "c63f51a2f2c44e110bf5701617f44b02ac0c338e"
+    },
+    "benchmarks/atom_loss/accuracy_seeds.py": {
+      "mode": "100644",
+      "git_blob": "9b68a862702a5cd7e4d6b73da0665402b27b3124"
+    },
+    "benchmarks/atom_loss/artifacts.py": {
+      "mode": "100644",
+      "git_blob": "4237abb70f3518ef13a9ac5babfeaa91550fba21"
+    },
+    "benchmarks/atom_loss/chain_contract.py": {
+      "mode": "100644",
+      "git_blob": "f9606ba2d7aaa1c416923402a77baccfcec86fe4"
+    },
+    "benchmarks/atom_loss/chain_reference.py": {
+      "mode": "100644",
+      "git_blob": "c26e20e174fbf388f8d38d3f429cd943f3d1303f"
+    },
+    "benchmarks/atom_loss/channel_probes.py": {
+      "mode": "100644",
+      "git_blob": "f6afcf7f734a2e614521c7dc477c534a3b0afe86"
+    },
+    "benchmarks/atom_loss/correctness.py": {
+      "mode": "100644",
+      "git_blob": "7fabddcfe7c5d3e53396ea2eed42f31b50a89940"
+    },
+    "benchmarks/atom_loss/decoder_contract.py": {
+      "mode": "100644",
+      "git_blob": "4951cbc5292f0d8bf774200719fe4741f7d6c6a0"
+    },
+    "benchmarks/atom_loss/decoder_reference.py": {
+      "mode": "100644",
+      "git_blob": "de07e71ce921a7cb0804c3420aca9e0e601d7f1b"
+    },
+    "benchmarks/atom_loss/decoder_replay.py": {
+      "mode": "100644",
+      "git_blob": "d42995ba6d9a531443f2bdd081c537be7ea692f8"
+    },
+    "benchmarks/atom_loss/evidence_run.py": {
+      "mode": "100644",
+      "git_blob": "494b0290bd918649da663315b545f4762edc01c0"
+    },
+    "benchmarks/atom_loss/figure_contract.py": {
+      "mode": "100644",
+      "git_blob": "3187a2c07d9f1f8c17561ed38c407454b3a20c46"
+    },
+    "benchmarks/atom_loss/fixtures/midswap_d3_r2.stim": {
+      "mode": "100644",
+      "git_blob": "db61c193d903f7e1aa9a265092283c08292c6323"
+    },
+    "benchmarks/atom_loss/low_probability.py": {
+      "mode": "100644",
+      "git_blob": "29920a6b4ecf6cce20524adf7e767648cf5d678d"
+    },
+    "benchmarks/atom_loss/mle_candidate_resources.py": {
+      "mode": "100644",
+      "git_blob": "9ca5b99f68e14e8d577f069d3a5e49fa00bbb919"
+    },
+    "benchmarks/atom_loss/noise_controls.py": {
+      "mode": "100644",
+      "git_blob": "9c9371608dddf5ac02daf43a6214265b78222fb7"
+    },
+    "benchmarks/atom_loss/output_rules.py": {
+      "mode": "100644",
+      "git_blob": "381f163b6a6eecc500842df82224a4fe80e77bfb"
+    },
+    "benchmarks/atom_loss/plot.py": {
+      "mode": "100644",
+      "git_blob": "933010a5f2e36a35f2ab4914ddc5cdb71cbad6d2"
+    },
+    "benchmarks/atom_loss/probe_specs.py": {
+      "mode": "100644",
+      "git_blob": "b9a67c91ac86d27d1b94580e0c83f063ca6eb9dc"
+    },
+    "benchmarks/atom_loss/publish.py": {
+      "mode": "100644",
+      "git_blob": "724eaae5699f9e2fdce06b5b190307f6d10b3889"
+    },
+    "benchmarks/atom_loss/readiness_correctness.py": {
+      "mode": "100644",
+      "git_blob": "af26a3fdcc6feedc470011cd4e42c56601f7ce65"
+    },
+    "benchmarks/atom_loss/readiness_resources.py": {
+      "mode": "100644",
+      "git_blob": "12dd9c4793465b81948e4082dbed3ab30ba908a0"
+    },
+    "benchmarks/atom_loss/reference.py": {
+      "mode": "100644",
+      "git_blob": "820d01f5b31133fe5dddf698f758ddc4860a4c79"
+    },
+    "benchmarks/atom_loss/remeasure.py": {
+      "mode": "100644",
+      "git_blob": "aa6ed42c480b8269910e3adb97df256282aa66e7"
+    },
+    "benchmarks/atom_loss/replay.py": {
+      "mode": "100644",
+      "git_blob": "60b64e808e4d640397b63a80494321ed4bc3f371"
+    },
+    "benchmarks/atom_loss/report_contract.py": {
+      "mode": "100644",
+      "git_blob": "a24aa297d8962de84d4c811e5a4a2a1212b5a60a"
+    },
+    "benchmarks/atom_loss/requirements.txt": {
+      "mode": "100644",
+      "git_blob": "85408164f3c34eb6ee00a89eb1e3912da986d18b"
+    },
+    "benchmarks/atom_loss/retained_source.py": {
+      "mode": "100644",
+      "git_blob": "f807fd9e591e1500fa69182abf934c1443f3ebb1"
+    },
+    "benchmarks/atom_loss/run.py": {
+      "mode": "100644",
+      "git_blob": "515cac8f259fa0d07f130705fe05fdc80849fc61"
+    },
+    "benchmarks/atom_loss/shot_data.py": {
+      "mode": "100644",
+      "git_blob": "9e4bc19bdbfd977be6744d95fac2b862723e73ee"
+    },
+    "benchmarks/atom_loss/source_contract.py": {
+      "mode": "100644",
+      "git_blob": "4d9d61b12b8fe4bc57eaa245847a305410298e15"
+    },
+    "benchmarks/atom_loss/test_chain_reference.py": {
+      "mode": "100644",
+      "git_blob": "70ed3e5bd51417693cfdf229527cf05c608e9bf6"
+    },
+    "benchmarks/atom_loss/test_decoder_contract.py": {
+      "mode": "100644",
+      "git_blob": "1517944e3cec9174d4fb9d5b6173c7c83ad2bd87"
+    },
+    "benchmarks/atom_loss/test_figure_contract.py": {
+      "mode": "100644",
+      "git_blob": "204f427f2998a95b5da7fecd9bc7bc3866efee37"
+    },
+    "benchmarks/atom_loss/test_reference.py": {
+      "mode": "100644",
+      "git_blob": "8d10c59af59d6eaa5282a33e41966c1e8a96230e"
+    },
+    "benchmarks/atom_loss/test_sampler_mutations.py": {
+      "mode": "100644",
+      "git_blob": "99e4d611aa45b2ed3fffe7b6d4604a07cedb693f"
+    },
+    "benchmarks/atom_loss/test_source_contract.py": {
+      "mode": "100644",
+      "git_blob": "92a1621de3fa5382c54c6b1a0ee340943142820c"
+    },
+    "benchmarks/atom_loss/test_standalone_contract.py": {
+      "mode": "100644",
+      "git_blob": "615317c9c1b15b5486b5986d81fa422dfb44b23d"
+    },
+    "benchmarks/atom_loss/test_workload_contract.py": {
+      "mode": "100644",
+      "git_blob": "a50178bffcbe31df95286f1343f75680296a6d09"
+    },
+    "benchmarks/atom_loss/verify.py": {
+      "mode": "100644",
+      "git_blob": "d2157fe09293270a921a3217f5d11bcb115ba21a"
+    },
+    "benchmarks/atom_loss/workload_contract.py": {
+      "mode": "100644",
+      "git_blob": "bbc9eb536c0ff36748ad3486d22a66da415584da"
+    },
+    "docs/envelope-support.json": {
+      "mode": "100644",
+      "git_blob": "7d2d9a5eb05d62916b8c664223b0fdf750059859"
+    },
+    "qec-ilp-core/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "622aba773c41acb2e1e3572f9771d99ac731fc04"
+    },
+    "qec-ilp-core/src/backend/gurobi.rs": {
+      "mode": "100644",
+      "git_blob": "c84ea61d812ebfc241666705338165da34b5f489"
+    },
+    "qec-ilp-core/src/backend/highs.rs": {
+      "mode": "100644",
+      "git_blob": "52262f56b484331a4c4d3a568a6488d9b496b76e"
+    },
+    "qec-ilp-core/src/backend/mod.rs": {
+      "mode": "100644",
+      "git_blob": "a22581227f7a34145dbaff27a47f620a56580748"
+    },
+    "qec-ilp-core/src/config.rs": {
+      "mode": "100644",
+      "git_blob": "18a45a6dbdcb1c8af46eb212ddc2d42c60de4c3e"
+    },
+    "qec-ilp-core/src/error.rs": {
+      "mode": "100644",
+      "git_blob": "961e81cdde9b15f48040de5cd573db2789d81a0c"
+    },
+    "qec-ilp-core/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "e2d6d5e33b9c249cc9484177dc469c905979c033"
+    },
+    "qec-ilp-core/src/model.rs": {
+      "mode": "100644",
+      "git_blob": "c31102d4d3423fd9d9bf010046e44524b51e900c"
+    },
+    "renvelope/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "950dc0c10b3ea4cc579bc67ab869a3528fe52499"
+    },
+    "renvelope/src/decode.rs": {
+      "mode": "100644",
+      "git_blob": "078cf3418d08c31c0d11603ed26ff8e2cf5730a6"
+    },
+    "renvelope/src/error.rs": {
+      "mode": "100644",
+      "git_blob": "87faf316d79dc3dcddc245373973950b7bf0ddfc"
+    },
+    "renvelope/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "d4be4aa2a0c07ed1a4dfa8dc4c7ab558c2474b7e"
+    },
+    "renvelope/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "8c63ec52e3508072fd9f8fbff016d25229d93042"
+    },
+    "renvelope/src/matching.rs": {
+      "mode": "100644",
+      "git_blob": "f3fbe1abb96e8868d8dc7f175aab50eef300f59a"
+    },
+    "renvelope/src/prepare.rs": {
+      "mode": "100644",
+      "git_blob": "cc6e722b6bcd25061da3c8c8b753b394a18e6f8a"
+    },
+    "renvelope/src/schema.rs": {
+      "mode": "100644",
+      "git_blob": "974b83f4df1d970788717dd9c5a809ceac1d8a7e"
+    },
+    "rmatching/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "d686ab7840ac4c42c28fe421e45c6d5ce7f3091a"
+    },
+    "rmatching/src/bin/rmatching_cli.rs": {
+      "mode": "100644",
+      "git_blob": "a71a659299dcf22eeefdb378d85a5f7e4c4f65c6"
+    },
+    "rmatching/src/driver/decoding.rs": {
+      "mode": "100644",
+      "git_blob": "2a7fee34801ee824fe112ace24944f8bd545b5cd"
+    },
+    "rmatching/src/driver/dem_parse.rs": {
+      "mode": "100644",
+      "git_blob": "a6c1f2ba44901ac74331d545bea6031ba52fce74"
+    },
+    "rmatching/src/driver/mod.rs": {
+      "mode": "100644",
+      "git_blob": "ed93cff59f4d20b06026415b93cb8d28c615d7f5"
+    },
+    "rmatching/src/driver/user_graph.rs": {
+      "mode": "100644",
+      "git_blob": "f8be3323b6a9ccefab6a0dff71fe6acc9600a1f7"
+    },
+    "rmatching/src/flooder/detector_node.rs": {
+      "mode": "100644",
+      "git_blob": "499eff9c063a2b3ed2c75952b4dd68a597579ad5"
+    },
+    "rmatching/src/flooder/fill_region.rs": {
+      "mode": "100644",
+      "git_blob": "da6ab830f80ed0b14decda65e1d4c935d9cfb574"
+    },
+    "rmatching/src/flooder/graph.rs": {
+      "mode": "100644",
+      "git_blob": "cc225140a346cd3ea01f669d6b8b43b2c512f868"
+    },
+    "rmatching/src/flooder/graph_flooder.rs": {
+      "mode": "100644",
+      "git_blob": "2f8855a57ea216975c69ab925671b86558986fe2"
+    },
+    "rmatching/src/flooder/mod.rs": {
+      "mode": "100644",
+      "git_blob": "f7132695daafeedbb1aac9e75eec1b0b26f63c1a"
+    },
+    "rmatching/src/interop/compressed_edge.rs": {
+      "mode": "100644",
+      "git_blob": "b0da40530c85584bf67e82d19ec8ea5761ab73b1"
+    },
+    "rmatching/src/interop/event.rs": {
+      "mode": "100644",
+      "git_blob": "cfa25099700676ef391e80ec3308a1529e7bfa18"
+    },
+    "rmatching/src/interop/flood_check_event.rs": {
+      "mode": "100644",
+      "git_blob": "c50797a299422c62103ae75baff758930fa905eb"
+    },
+    "rmatching/src/interop/mod.rs": {
+      "mode": "100644",
+      "git_blob": "e96002fcfe7de32f021cc9ac134f327bc16924bb"
+    },
+    "rmatching/src/interop/queued_event_tracker.rs": {
+      "mode": "100644",
+      "git_blob": "5c3a737cac8b8ef4365341e5df33e2e0b787cc18"
+    },
+    "rmatching/src/interop/region_edge.rs": {
+      "mode": "100644",
+      "git_blob": "36a3afaa435c9bb7e63b74540b8092892835960c"
+    },
+    "rmatching/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "fe5909c9c9a666a3294c0b3f8682979c31432a66"
+    },
+    "rmatching/src/matcher/alt_tree.rs": {
+      "mode": "100644",
+      "git_blob": "de87e7169615382b2586b91b10f987c757f48e2f"
+    },
+    "rmatching/src/matcher/mod.rs": {
+      "mode": "100644",
+      "git_blob": "70d970033672324397192dd3da94b2f9231aed2c"
+    },
+    "rmatching/src/matcher/mwpm.rs": {
+      "mode": "100644",
+      "git_blob": "f531d6f23a246437b88e79195df04e16b3360795"
+    },
+    "rmatching/src/search/mod.rs": {
+      "mode": "100644",
+      "git_blob": "212748d82f220fdc917abfe09bc4947a0b708800"
+    },
+    "rmatching/src/search/search_flooder.rs": {
+      "mode": "100644",
+      "git_blob": "13eb5e6c78674f069e705ab45e114b06c90d367c"
+    },
+    "rmatching/src/search/search_graph.rs": {
+      "mode": "100644",
+      "git_blob": "8e3290dec65e8035ce59d8e15e3ded304be2d91e"
+    },
+    "rmatching/src/test_alloc.rs": {
+      "mode": "100644",
+      "git_blob": "53db043d2a896664d88ab68850dca65d66a095ce"
+    },
+    "rmatching/src/types.rs": {
+      "mode": "100644",
+      "git_blob": "f4ddebc20f5e2fbe2639aeed1401c43d37e0986f"
+    },
+    "rmatching/src/util/arena.rs": {
+      "mode": "100644",
+      "git_blob": "be551c4c0b6b8589ee4a3dbd972e946ce2a8c909"
+    },
+    "rmatching/src/util/mod.rs": {
+      "mode": "100644",
+      "git_blob": "3e7d1ac71679a3c99759b5c7dba0d4c3c9670a7e"
+    },
+    "rmatching/src/util/radix_heap.rs": {
+      "mode": "100644",
+      "git_blob": "b56ad07e9f0e499cd9f05a0122c126604f448b34"
+    },
+    "rmatching/src/util/varying.rs": {
+      "mode": "100644",
+      "git_blob": "11c8340e28214ff74f403f388b95a9d7077817d7"
+    },
+    "rstim/Cargo.toml": {
+      "mode": "100644",
+      "git_blob": "b2f17cd7a90a8cf89637bb6ed16c39fe7e59a532"
+    },
+    "rstim/src/bin/rstim_compiled_steady_worker.rs": {
+      "mode": "100644",
+      "git_blob": "a6aa4c95b2b9d5991b2db52e3b883d743bed5e0f"
+    },
+    "rstim/src/bin/rstim_reference_build_worker.rs": {
+      "mode": "100644",
+      "git_blob": "6eedacdfbbcbc0ada328551713d39343b48f32ba"
+    },
+    "rstim/src/circuit_gen.rs": {
+      "mode": "100644",
+      "git_blob": "a1d3669e142ac1dfb23738ff57209029e6026ca6"
+    },
+    "rstim/src/cli.rs": {
+      "mode": "100644",
+      "git_blob": "4d034a1817132d3481191cb99aef0daeb00abb0a"
+    },
+    "rstim/src/codegen/color_code.rs": {
+      "mode": "100644",
+      "git_blob": "e12a52810aef471dd872b823021bd7d8e0c8df70"
+    },
+    "rstim/src/codegen/css.rs": {
+      "mode": "100644",
+      "git_blob": "98e32327aa711f0a6da827be1ddcfbed966f6743"
+    },
+    "rstim/src/codegen/midswap.rs": {
+      "mode": "100644",
+      "git_blob": "a058c284adfd5dd211dfcb136c3f8f89535caf44"
+    },
+    "rstim/src/codegen/mod.rs": {
+      "mode": "100644",
+      "git_blob": "b712a3dc0c4118b4179a0f7e5f6f773d7322d603"
+    },
+    "rstim/src/codegen/noise_params.rs": {
+      "mode": "100644",
+      "git_blob": "63747570f58b7777e404874968d4d17bad5ec081"
+    },
+    "rstim/src/codegen/rep_code.rs": {
+      "mode": "100644",
+      "git_blob": "0a750e692c994ffc2972c1f2836cb4009da85bfc"
+    },
+    "rstim/src/codegen/surface_code.rs": {
+      "mode": "100644",
+      "git_blob": "fd1398a102c11ae96f0f7800245c4c3fe658715a"
+    },
+    "rstim/src/compiled/analyzer.rs": {
+      "mode": "100644",
+      "git_blob": "2d25a2b5b5841bb11158ee112b88b63d65efc169"
+    },
+    "rstim/src/compiled/circuit.rs": {
+      "mode": "100644",
+      "git_blob": "358645217fb158c5bfa0ff0b0d6a1e5f4b7c094e"
+    },
+    "rstim/src/compiled/mod.rs": {
+      "mode": "100644",
+      "git_blob": "50bbc00e75d92a62f47ca7324ebc92a97f288c68"
+    },
+    "rstim/src/compiled/path.rs": {
+      "mode": "100644",
+      "git_blob": "5e0d8bf8cc6a0c46900330cde125484a51f576ce"
+    },
+    "rstim/src/compiled/sampler.rs": {
+      "mode": "100644",
+      "git_blob": "e24500d24429f8275345be5ef572d0543b8a6551"
+    },
+    "rstim/src/coords.rs": {
+      "mode": "100644",
+      "git_blob": "75df242c3fd02e76bc060ffa955855709b2bcb13"
+    },
+    "rstim/src/data_path.rs": {
+      "mode": "100644",
+      "git_blob": "928eaa3c7ca0842af2a73a115c4acbef9e12ba6e"
+    },
+    "rstim/src/decoder_dataset.rs": {
+      "mode": "100644",
+      "git_blob": "1038248291f2b8c3948b1d4bbcd4f9ec23368d7c"
+    },
+    "rstim/src/dem.rs": {
+      "mode": "100644",
+      "git_blob": "1633972c6b40e643c07cd590c9a15ad252d0d01c"
+    },
+    "rstim/src/dem_provenance.rs": {
+      "mode": "100644",
+      "git_blob": "d79000bb3bc017249c3dd8f8fd5b717bcbbf8541"
+    },
+    "rstim/src/detect_trace.rs": {
+      "mode": "100644",
+      "git_blob": "53d24ef79411f9ff65ec155f69bda4f193b71c1d"
+    },
+    "rstim/src/error_analyzer.rs": {
+      "mode": "100644",
+      "git_blob": "9caa130009d77fdf809428333c47132fd291b4e7"
+    },
+    "rstim/src/executor.rs": {
+      "mode": "100644",
+      "git_blob": "f2929af8720e524a934fbfd454a76657c9974fc4"
+    },
+    "rstim/src/explain_errors.rs": {
+      "mode": "100644",
+      "git_blob": "742abb78e6e42f46be55fdc566a1b6974c20d71b"
+    },
+    "rstim/src/interactive_shot.rs": {
+      "mode": "100644",
+      "git_blob": "9f42a4b29a77d0201d98b7a57ee0d1b93098ded8"
+    },
+    "rstim/src/ir.rs": {
+      "mode": "100644",
+      "git_blob": "e44509a0bb9e79489205e9051731b3861fe73dfa"
+    },
+    "rstim/src/lib.rs": {
+      "mode": "100644",
+      "git_blob": "4dc9cdca87bdfb1f2349441c5a4d8103721c250c"
+    },
+    "rstim/src/loss_sampler.rs": {
+      "mode": "100644",
+      "git_blob": "4553339f6b935e5d0f48e7f20b6a627c1e8f9664"
+    },
+    "rstim/src/m2d.rs": {
+      "mode": "100644",
+      "git_blob": "4f6f076e2e200dfb6e25a273e801938b983ab6e1"
+    },
+    "rstim/src/main.rs": {
+      "mode": "100644",
+      "git_blob": "e605ea687b6ddd5244204500ef76bd25f96ec08c"
+    },
+    "rstim/src/measurement_transform.rs": {
+      "mode": "100644",
+      "git_blob": "a9e734187ba072747b5d1afa4a529efdba04c31e"
+    },
+    "rstim/src/near_clifford.rs": {
+      "mode": "100644",
+      "git_blob": "82ee3c04f49fff4ef07c1c2839fc6ad3cbb44fae"
+    },
+    "rstim/src/near_clifford/coefficient_intern.rs": {
+      "mode": "100644",
+      "git_blob": "50f078ddb3952b59d42f97184a511128130e6955"
+    },
+    "rstim/src/near_clifford/coherent_packet.rs": {
+      "mode": "100644",
+      "git_blob": "ba1505ae46504f795901ceb75b6213cb3af92285"
+    },
+    "rstim/src/near_clifford/compact_replay.rs": {
+      "mode": "100644",
+      "git_blob": "ac2b5e24a67df7fea680da6a0348eabdc820d8d7"
+    },
+    "rstim/src/near_clifford/compile_frame.rs": {
+      "mode": "100644",
+      "git_blob": "c88027f4ee2252332d2658f897d77bfa5cca7f55"
+    },
+    "rstim/src/near_clifford/compiled.rs": {
+      "mode": "100644",
+      "git_blob": "ca222353c7375dd059a15b6234422bd179d3a0dc"
+    },
+    "rstim/src/near_clifford/independent_packet.rs": {
+      "mode": "100644",
+      "git_blob": "051cbbe5f34f15855bd208404a6060f9a44188b3"
+    },
+    "rstim/src/near_clifford/lazy_uniform_noise_error_tests.rs": {
+      "mode": "100644",
+      "git_blob": "3f2629c1e9e6f22fdb9886ac602cf3f6b82b6d65"
+    },
+    "rstim/src/near_clifford/lazy_uniform_reference_tests.rs": {
+      "mode": "100644",
+      "git_blob": "41cf90dba10cfe09fb4670c732b761f495900b12"
+    },
+    "rstim/src/near_clifford/linear_counts.rs": {
+      "mode": "100644",
+      "git_blob": "906b3e3bcd7023b00996d36d4962c450a6c8c9e8"
+    },
+    "rstim/src/near_clifford/noise_packet.rs": {
+      "mode": "100644",
+      "git_blob": "fc792645d68ec8b2df865e1e3e8d5a3754ea7c83"
+    },
+    "rstim/src/near_clifford/noise_schedule.rs": {
+      "mode": "100644",
+      "git_blob": "29fa07caf11ad5f4174a1ecc0cf6edccf57d5e8f"
+    },
+    "rstim/src/near_clifford/noise_spans.rs": {
+      "mode": "100644",
+      "git_blob": "c130019a202c5cdcfdbf4e7a868987c86d6644e3"
+    },
+    "rstim/src/near_clifford/random_event_runs.rs": {
+      "mode": "100644",
+      "git_blob": "0050f8de75a1e804388e5c9c05fefc0c26709a92"
+    },
+    "rstim/src/near_clifford/scalar_basis.rs": {
+      "mode": "100644",
+      "git_blob": "3db00204dfe66fd4871d1fb3a93c5de017f4ec43"
+    },
+    "rstim/src/operations.rs": {
+      "mode": "100644",
+      "git_blob": "9b7ea804d26eaf3f6117900c561c4a91e7f83b47"
+    },
+    "rstim/src/output.rs": {
+      "mode": "100644",
+      "git_blob": "92d67f9b246cf40b6e8a0133b9cb552aa387bcc9"
+    },
+    "rstim/src/parser.rs": {
+      "mode": "100644",
+      "git_blob": "925b0ae59145d28391d648d8d6493d9d96c47095"
+    },
+    "rstim/src/perf.rs": {
+      "mode": "100644",
+      "git_blob": "25c8c6632bb512e8d2233af443e2375e10ab5726"
+    },
+    "rstim/src/perf/cases.rs": {
+      "mode": "100644",
+      "git_blob": "b45855b298c2f62ffd8338267ddcd45c52600b8e"
+    },
+    "rstim/src/perf/gate.rs": {
+      "mode": "100644",
+      "git_blob": "c00b74f5b85cc1758b7533f941197d0b7e407192"
+    },
+    "rstim/src/perf/record.rs": {
+      "mode": "100644",
+      "git_blob": "502d4b3dad413fe39a29b6f4f994e3b85a39edc4"
+    },
+    "rstim/src/perf/report.rs": {
+      "mode": "100644",
+      "git_blob": "9b85bb232f49bfd79ffaf7b482c25b4c7612d3f1"
+    },
+    "rstim/src/perf/runner.rs": {
+      "mode": "100644",
+      "git_blob": "a13550aed90f141539c0dd6c768f77b91696ee56"
+    },
+    "rstim/src/perf/summary.rs": {
+      "mode": "100644",
+      "git_blob": "3135250f5e69812d9067625ac12ea23d038a91c4"
+    },
+    "rstim/src/qp101.rs": {
+      "mode": "100644",
+      "git_blob": "5ca489da130a22fe35e96e55af353f8af6855fac"
+    },
+    "rstim/src/qp101_svg.rs": {
+      "mode": "100644",
+      "git_blob": "c1c637b4555135ddba8b9a6cfea9f9778a71d2bf"
+    },
+    "rstim/src/rare_error_iterator.rs": {
+      "mode": "100644",
+      "git_blob": "3cb6204654698606ba6a3c8104a0c2a6bfa297a9"
+    },
+    "rstim/src/recorder.rs": {
+      "mode": "100644",
+      "git_blob": "b580f41dfe8edf160b5b4f096ebd178ff14209de"
+    },
+    "rstim/src/reference_sample_tree.rs": {
+      "mode": "100644",
+      "git_blob": "8b212ee9663d80b668e4d894b800e886761e59a8"
+    },
+    "rstim/src/result_stream.rs": {
+      "mode": "100644",
+      "git_blob": "99d7760b233dd84d149a9025f1d44eec106e905b"
+    },
+    "rstim/src/sample_archive/corruption_corpus.rs": {
+      "mode": "100644",
+      "git_blob": "df531b2ef9a5f62fc17d0ccac2c8e25cae7e703c"
+    },
+    "rstim/src/sample_archive/dense.rs": {
+      "mode": "100644",
+      "git_blob": "134b6c275ca164dfadfcf1cc108774baa5977ed6"
+    },
+    "rstim/src/sample_archive/format.rs": {
+      "mode": "100644",
+      "git_blob": "178b7d606d6d7314a6d434f86ea9a89b9a12d039"
+    },
+    "rstim/src/sample_archive/integrity.rs": {
+      "mode": "100644",
+      "git_blob": "bf67adef8f42cab01e6be046359265d4d82ddc62"
+    },
+    "rstim/src/sample_archive/limits.rs": {
+      "mode": "100644",
+      "git_blob": "4f506aecb5c31b53786bbe494b36c735c6ecfc51"
+    },
+    "rstim/src/sample_archive/mod.rs": {
+      "mode": "100644",
+      "git_blob": "cab29b4737bb6c5bde6108a3a27bf66c10a2a9b8"
+    },
+    "rstim/src/sample_archive/reader.rs": {
+      "mode": "100644",
+      "git_blob": "c97ea4a3541a50abb589df1cb37f430f1b70b972"
+    },
+    "rstim/src/sample_archive/syndrome.rs": {
+      "mode": "100644",
+      "git_blob": "0ba7a0ac65a47db09894a50a5d8f8c15d796668f"
+    },
+    "rstim/src/sample_archive/telemetry.rs": {
+      "mode": "100644",
+      "git_blob": "25d6c85b00979c25778fd5b4b175b9b2b9894a2f"
+    },
+    "rstim/src/sample_archive/writer.rs": {
+      "mode": "100644",
+      "git_blob": "e9d8831792dd19139b66f959f421f72cd232192c"
+    },
+    "rstim/src/sample_archive/zstd_frame.rs": {
+      "mode": "100644",
+      "git_blob": "f51f17d26b305c3657bb5615d275b074b9ecade2"
+    },
+    "rstim/src/sample_trace.rs": {
+      "mode": "100644",
+      "git_blob": "c871b217c5bb57abfac2cade0d8af41beb410a0f"
+    },
+    "rstim/src/sampler.rs": {
+      "mode": "100644",
+      "git_blob": "c9deb040c06a6e80dccdfc627a2fea7be13fe0ea"
+    },
+    "rstim/src/shot_viewer.rs": {
+      "mode": "100644",
+      "git_blob": "e69faa8b0a5cddfa1bb5db623feeee8f99dcfbfd"
+    },
+    "rstim/src/showcase.rs": {
+      "mode": "100644",
+      "git_blob": "e0401b55921e3310390de44d7520af09eeedfe5e"
+    },
+    "rstim/src/sim/bit_table.rs": {
+      "mode": "100644",
+      "git_blob": "69e816334228648f56fb09bc1556a4705e88a155"
+    },
+    "rstim/src/sim/bit_transpose.rs": {
+      "mode": "100644",
+      "git_blob": "738e4ba61eae4749ee8ef4ceebb8ee1e92dcf6f5"
+    },
+    "rstim/src/sim/frame.rs": {
+      "mode": "100644",
+      "git_blob": "1bb5f50d97f56e01bf8d99057480f5541aa119f4"
+    },
+    "rstim/src/sim/measure_record_batch.rs": {
+      "mode": "100644",
+      "git_blob": "bccaabc5a5558d40f3957ee38e54ec14771dee66"
+    },
+    "rstim/src/sim/mod.rs": {
+      "mode": "100644",
+      "git_blob": "d2b1fa65740ea303b56de17a48a3a7c8c384b50a"
+    },
+    "rstim/src/sim/packed_inverse_tableau.rs": {
+      "mode": "100644",
+      "git_blob": "56039f3db411a0105afddcd52eb1e36ca00c84a9"
+    },
+    "rstim/src/sim/symbolic_mask.rs": {
+      "mode": "100644",
+      "git_blob": "aa558efe9fadcf2a9dfb2ad2208e91a3d82cef6f"
+    },
+    "rstim/src/sim/tableau.rs": {
+      "mode": "100644",
+      "git_blob": "181a9ac45c68f54ab62b1d53e2945dfd4b8ff818"
+    },
+    "rstim/src/stats.rs": {
+      "mode": "100644",
+      "git_blob": "a0227c40eb189cd7fe629b8f17e9b9998fd58f7b"
+    },
+    "rstim/src/surface_code_ler.rs": {
+      "mode": "100644",
+      "git_blob": "362b2b2dbb930d24648e69d2d18b607cfb6be8b0"
+    },
+    "rstim/src/transforms.rs": {
+      "mode": "100644",
+      "git_blob": "77debeaa98e43f2a5b23ab4e4b8d874f31427eb5"
+    },
+    "rstim/src/unified_cli/decode.rs": {
+      "mode": "100644",
+      "git_blob": "4996356d861fde87f0f3a4c32862a96e33b44f77"
+    },
+    "rstim/src/unified_cli/decode/benchmark.rs": {
+      "mode": "100644",
+      "git_blob": "820e862a03ee021eb51f7365fca3f26ec151a937"
+    },
+    "rstim/src/unified_cli/decode/compiler.rs": {
+      "mode": "100644",
+      "git_blob": "bd8373b5586309b5b2152e698bd83dc401cd5006"
+    },
+    "rstim/src/unified_cli/decode/dataset.rs": {
+      "mode": "100644",
+      "git_blob": "59b3725519d8de31250167ee5a3715bd33ae616f"
+    },
+    "rstim/src/unified_cli/decode/matching.rs": {
+      "mode": "100644",
+      "git_blob": "d1efe1f82af1234e77650771962c98ae284f2ca1"
+    },
+    "rstim/src/unified_cli/decode/mle.rs": {
+      "mode": "100644",
+      "git_blob": "a48c351b68b5c6a2ba11b5fbf1b566c05839b8f2"
+    },
+    "rstim/src/unified_cli/matching.rs": {
+      "mode": "100644",
+      "git_blob": "2ee2fb6153186bd54c551cb264adac6a064dc8b5"
+    },
+    "rstim/src/unified_cli/mod.rs": {
+      "mode": "100644",
+      "git_blob": "dfda67aa1d4d50f1cf099151d69d9e74a3ef37d5"
+    },
+    "rstim/src/unified_cli/pipeline.rs": {
+      "mode": "100644",
+      "git_blob": "94b583512e54f56f1362330f5cf652ea50d9c2ca"
+    },
+    "rstim/src/validation.rs": {
+      "mode": "100644",
+      "git_blob": "ca0e0cebe41121474fa34fb644e7ac4dcc8223d3"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "7fb82c41085ff45af54d744e5cb0dd8cc76699c6"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/manifest.json": {
+      "mode": "100644",
+      "git_blob": "6ba39e31485f47ce0381258e432fecf6eca1e005"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/conventional/shots.b8": {
+      "mode": "100644",
+      "git_blob": "1585a74028dd98ec18c315649206a3565ac0c6c4"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "7f9903212e7c681c92216bef75041cb5d03fdb6b"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/manifest.json": {
+      "mode": "100644",
+      "git_blob": "fc9350b3761e17a8938222aa85a9612b8b7c1e53"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap/shots.b8": {
+      "mode": "100644",
+      "git_blob": "30b3526f6688be5f9ac9d167bb9472dade58dc98"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/circuit.stim": {
+      "mode": "100644",
+      "git_blob": "e826b63adb86d5cc7021380659688cbe20d0b1ee"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/manifest.json": {
+      "mode": "100644",
+      "git_blob": "2a912361f4080111f57759259ae13235af7b684b"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/provenance.json": {
+      "mode": "100644",
+      "git_blob": "aac447b96966d826a3e212c1a46b46a3f1afd6cf"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/reference_cases.json.zst": {
+      "mode": "100644",
+      "git_blob": "1c80d414b7648f48d126a3ac26ab0c0ed1ac87c1"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle/shots.b8": {
+      "mode": "100644",
+      "git_blob": "56f1dda4be0f649a804cf4dc0bd1b28811e5ee49"
+    },
+    "rstim/tests/fixtures/current_rstim_atom_loss/unsupported_non_metadata.stim": {
+      "mode": "100644",
+      "git_blob": "2fbd677c4316adaf33427e010990acb8ca29c75d"
+    }
+  },
+  "machine": {
+    "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.7",
+    "cpu_count": 10,
+    "memory_bytes": 34359738368
+  },
+  "build": {
+    "path": "/Users/nzy/.codex/worktrees/near-clifford-four-coefficients/rstim/drafts/selective-coherent-guard-envelope-resources-prep/rstim-current-coherent-envelope.bin",
+    "sha256": "6e7aecf622eefd64f8a870708e5705a977814abc965bf638bda5de9948315a13",
+    "version": "rstim 0.3.0",
+    "advertised_decoders": [
+      "envelope-matching",
+      "envelope-mle"
+    ]
+  },
+  "matrix": {
+    "path": "docs/envelope-support.json",
+    "sha256": "c5ff1cf5fa54452fcde40ff31a7ed0d3de6c194e822b2feecd987f0aa9ee92c0",
+    "source_revision": "f8ed9348da62dba72205e24a826ce75965f3c2b2"
+  },
+  "stress_budget": {
+    "declared_before_run": true,
+    "values": {
+      "per_case_wall_seconds": 900,
+      "total_wall_seconds": 3600,
+      "peak_rss_bytes": 4294967296
+    }
+  },
+  "total_wall_seconds": 58.450306582963094,
+  "cases": [
+    {
+      "id": "matching-d3r2-p002-b1024",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.002,
+      "shots": 1024,
+      "seed": 715247,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.008647417067550123,
+      "compile_seconds": 0.00116775,
+      "decode_seconds": 0.001953209,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 8617984,
+      "observed_pattern_count": 49,
+      "cache": {
+        "builds": 49,
+        "hits": 975,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 1024,
+      "raw": "raw/matching-d3r2-p002-b1024.json",
+      "raw_sha256": "51b72003b9a7f097ccbd7f7ee7d58473bb9ed0dd4770e5c912fc4b58519a8721",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p002-b16384",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.002,
+      "shots": 16384,
+      "seed": 715652,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.026172959012910724,
+      "compile_seconds": 0.00101775,
+      "decode_seconds": 0.018716542,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 14532608,
+      "observed_pattern_count": 245,
+      "cache": {
+        "builds": 245,
+        "hits": 16139,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 16384,
+      "raw": "raw/matching-d3r2-p002-b16384.json",
+      "raw_sha256": "570a32878b3a109b04412418802e646cf2e3cb9f73e88bde8b86449735f8de7d",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p002-b65536",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.002,
+      "shots": 65536,
+      "seed": 715951,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.07177858403883874,
+      "compile_seconds": 0.000928833,
+      "decode_seconds": 0.063817875,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 18792448,
+      "observed_pattern_count": 433,
+      "cache": {
+        "builds": 433,
+        "hits": 65103,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 65536,
+      "raw": "raw/matching-d3r2-p002-b65536.json",
+      "raw_sha256": "3923b932eb579680b623ddf6fb5a9bad804a1003eb8cb29027a16f446738e24e",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p020-b1024",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.02,
+      "shots": 1024,
+      "seed": 715427,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.02013570803683251,
+      "compile_seconds": 0.000976959,
+      "decode_seconds": 0.01342425,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 24166400,
+      "observed_pattern_count": 598,
+      "cache": {
+        "builds": 598,
+        "hits": 426,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 1024,
+      "raw": "raw/matching-d3r2-p020-b1024.json",
+      "raw_sha256": "905327f65e3b6277d6f5b3e184e8dfe6aa90f5506c0523d2435ff4dc76b5be81",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p020-b16384",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.02,
+      "shots": 16384,
+      "seed": 715832,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.17694245802704245,
+      "compile_seconds": 0.000912583,
+      "decode_seconds": 0.168446042,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 44990464,
+      "observed_pattern_count": 4684,
+      "cache": {
+        "builds": 7219,
+        "hits": 9165,
+        "eviction_rebuilds_observed": 2535
+      },
+      "completed_shots": 16384,
+      "raw": "raw/matching-d3r2-p020-b16384.json",
+      "raw_sha256": "f5568ccd2ef36f2fce8104c1639ffd9ecefd6fd3d5904be9212df900b162aa3d",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p020-b65536",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.02,
+      "shots": 65536,
+      "seed": 716131,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.6682747500017285,
+      "compile_seconds": 0.000956583,
+      "decode_seconds": 0.658753958,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 45088768,
+      "observed_pattern_count": 11669,
+      "cache": {
+        "builds": 28107,
+        "hits": 37429,
+        "eviction_rebuilds_observed": 16438
+      },
+      "completed_shots": 65536,
+      "raw": "raw/matching-d3r2-p020-b65536.json",
+      "raw_sha256": "c0e291e78fb0e804ed49e4eded336a297e4c0aacc3a3900cfc41438d1b18d3ec",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p100-b1024",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.1,
+      "shots": 1024,
+      "seed": 716227,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.0355516659328714,
+      "compile_seconds": 0.0009875,
+      "decode_seconds": 0.027589125,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 45088768,
+      "observed_pattern_count": 1024,
+      "cache": {
+        "builds": 1024,
+        "hits": 0,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 1024,
+      "raw": "raw/matching-d3r2-p100-b1024.json",
+      "raw_sha256": "91d19aaf722247424f5e1b1a52ef47835b7a27e4e54ab2dedca20ac9b3729743",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p100-b16384",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.1,
+      "shots": 16384,
+      "seed": 716632,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.44781879091169685,
+      "compile_seconds": 0.000982333,
+      "decode_seconds": 0.438694708,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 46727168,
+      "observed_pattern_count": 16244,
+      "cache": {
+        "builds": 16381,
+        "hits": 3,
+        "eviction_rebuilds_observed": 137
+      },
+      "completed_shots": 16384,
+      "raw": "raw/matching-d3r2-p100-b16384.json",
+      "raw_sha256": "f18494173b2f51cc235e2394e1a2550b4eb31f8eca07e5a93e409287beb00868",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r2-p100-b65536",
+      "decoder": "envelope-matching",
+      "kind": "batch-scale",
+      "loss_rate": 0.1,
+      "shots": 65536,
+      "seed": 716931,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 1.7782319999532774,
+      "compile_seconds": 0.000949667,
+      "decode_seconds": 1.767510375,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 46891008,
+      "observed_pattern_count": 65536,
+      "cache": {
+        "builds": 65519,
+        "hits": 17,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 65536,
+      "raw": "raw/matching-d3r2-p100-b65536.json",
+      "raw_sha256": "64d505b7ef651540c38634f43cad38396c5170684bfc816743d25abca751adef",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d3r3-p020-b16384",
+      "decoder": "envelope-matching",
+      "kind": "circuit-scale",
+      "loss_rate": 0.02,
+      "shots": 16384,
+      "seed": 715301,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.5648404159583151,
+      "compile_seconds": 0.00152675,
+      "decode_seconds": 0.551769792,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 72204288,
+      "observed_pattern_count": 9059,
+      "cache": {
+        "builds": 12326,
+        "hits": 4058,
+        "eviction_rebuilds_observed": 3267
+      },
+      "completed_shots": 16384,
+      "raw": "raw/matching-d3r3-p020-b16384.json",
+      "raw_sha256": "c52ca4dca183ef80e16149c3b80492f95a6999de8c0023470145e1aa846ac6ac",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-d5r3-p020-b16384",
+      "decoder": "envelope-matching",
+      "kind": "circuit-scale",
+      "loss_rate": 0.02,
+      "shots": 16384,
+      "seed": 715302,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 2.4599080410553142,
+      "compile_seconds": 0.004488083,
+      "decode_seconds": 2.431617,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": 16314,
+      "cache": {
+        "builds": 16384,
+        "hits": 0,
+        "eviction_rebuilds_observed": 70
+      },
+      "completed_shots": 16384,
+      "raw": "raw/matching-d5r3-p020-b16384.json",
+      "raw_sha256": "a8954fff7e6a1e13c4a93c004f137c25025e2c1a8f124fb6c3ca1b1bc34d369f",
+      "output_rule_problems": []
+    },
+    {
+      "id": "matching-eviction-wires24",
+      "decoder": "envelope-matching",
+      "kind": "cache-eviction",
+      "loss_rate": null,
+      "shots": 1601,
+      "seed": null,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.018011749954894185,
+      "compile_seconds": 0.000260875,
+      "decode_seconds": 0.01004725,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": 1401,
+      "cache": {
+        "builds": 1402,
+        "hits": 199,
+        "eviction_rebuilds_observed": 1
+      },
+      "completed_shots": 1601,
+      "raw": "raw/matching-eviction-wires24.json",
+      "raw_sha256": "ae7bb4803aa529757f109692f768c0b88b9663c4060ba5931a48349762e6a3bf",
+      "output_rule_problems": []
+    },
+    {
+      "id": "mle-d3r2-p002-b1024",
+      "decoder": "envelope-mle",
+      "kind": "repeated-patterns",
+      "loss_rate": 0.002,
+      "shots": 1024,
+      "seed": 715401,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 2.2813759580021724,
+      "compile_seconds": 0.002582041,
+      "decode_seconds": 2.2721284170000002,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": 45,
+      "cache": {
+        "builds": 45,
+        "hits": 979,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 1024,
+      "raw": "raw/mle-d3r2-p002-b1024.json",
+      "raw_sha256": "ebcb64e0183d8d97f41aa7345f0654218fb78bcb361fca2ffc04c0f79f50ae3c",
+      "output_rule_problems": []
+    },
+    {
+      "id": "mle-d3r2-p002-b16384",
+      "decoder": "envelope-mle",
+      "kind": "repeated-patterns",
+      "loss_rate": 0.002,
+      "shots": 16384,
+      "seed": 715402,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 36.31141724996269,
+      "compile_seconds": 0.002528042,
+      "decode_seconds": 36.299531167,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": 267,
+      "cache": {
+        "builds": 267,
+        "hits": 16117,
+        "eviction_rebuilds_observed": 0
+      },
+      "completed_shots": 16384,
+      "raw": "raw/mle-d3r2-p002-b16384.json",
+      "raw_sha256": "f528c32c86a5ac8e5a5e19be04aebd25973e3de52b094bfb57e8856bf5d3eee3",
+      "output_rule_problems": []
+    },
+    {
+      "id": "mle-eviction-wires24",
+      "decoder": "envelope-mle",
+      "kind": "cache-eviction",
+      "loss_rate": null,
+      "shots": 1601,
+      "seed": null,
+      "exit_code": 0,
+      "error_code": null,
+      "wall_seconds": 0.934890583041124,
+      "compile_seconds": 0.000280083,
+      "decode_seconds": 0.919117917,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": 1401,
+      "cache": {
+        "builds": 1402,
+        "hits": 199,
+        "eviction_rebuilds_observed": 1
+      },
+      "completed_shots": 1601,
+      "raw": "raw/mle-eviction-wires24.json",
+      "raw_sha256": "4cbdc5a898322964ad6f0806ca57cdc89bbd00d45293de5a7968dc2076b3cea9",
+      "output_rule_problems": []
+    },
+    {
+      "id": "fail-mle-candidate-limit",
+      "decoder": "envelope-mle",
+      "kind": "failure-semantics",
+      "loss_rate": null,
+      "shots": 0,
+      "seed": null,
+      "exit_code": 2,
+      "error_code": "unsupported_circuit",
+      "wall_seconds": 0.16789170808624476,
+      "compile_seconds": null,
+      "decode_seconds": null,
+      "stats_written": false,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": null,
+      "cache": null,
+      "completed_shots": 0,
+      "raw": "raw/fail-mle-candidate-limit.json",
+      "raw_sha256": "95964b6c0999a1de7c35cdb65b6268ddcaafa9d27c43692663f2e479423652e3",
+      "output_rule_problems": []
+    },
+    {
+      "id": "fail-mle-solve-timeout",
+      "decoder": "envelope-mle",
+      "kind": "failure-semantics",
+      "loss_rate": null,
+      "shots": 4,
+      "seed": null,
+      "exit_code": 3,
+      "error_code": "decode_timeout",
+      "wall_seconds": 0.006240250077098608,
+      "compile_seconds": 0.000116167,
+      "decode_seconds": null,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": null,
+      "cache": null,
+      "completed_shots": 0,
+      "raw": "raw/fail-mle-solve-timeout.json",
+      "raw_sha256": "b307bf7bfa018c847ccd9e09afdd18d1718b186908823a7a315a7ecf870223cd",
+      "output_rule_problems": []
+    },
+    {
+      "id": "fail-mle-infeasible",
+      "decoder": "envelope-mle",
+      "kind": "failure-semantics",
+      "loss_rate": null,
+      "shots": 1,
+      "seed": null,
+      "exit_code": 3,
+      "error_code": "decode_infeasible",
+      "wall_seconds": 0.004961166996508837,
+      "compile_seconds": 9.6958e-05,
+      "decode_seconds": null,
+      "stats_written": true,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": null,
+      "cache": null,
+      "completed_shots": 0,
+      "raw": "raw/fail-mle-infeasible.json",
+      "raw_sha256": "78232ae403cad8736ef3445c292f580eeab9b5116286426c9f9cf2b0d9bedda3",
+      "output_rule_problems": []
+    },
+    {
+      "id": "fail-stale-output-overwrite",
+      "decoder": "envelope-matching",
+      "kind": "failure-semantics",
+      "loss_rate": null,
+      "shots": 0,
+      "seed": null,
+      "exit_code": 2,
+      "error_code": "output_error",
+      "wall_seconds": 0.004031292046420276,
+      "compile_seconds": null,
+      "decode_seconds": null,
+      "stats_written": false,
+      "peak_rss_watermark_bytes": 212500480,
+      "observed_pattern_count": null,
+      "cache": null,
+      "completed_shots": 0,
+      "raw": "raw/fail-stale-output-overwrite.json",
+      "raw_sha256": "bc4f1cf48d09a37588d39b989c5b18e673db26030368d4cfb61e5ce8007bfd0e",
+      "output_rule_problems": []
+    }
+  ],
+  "exclusions": [
+    {
+      "case": "mle-d3r2-p020/p100-batches",
+      "reason": "ILP model build+solve per distinct loss pattern (~1.4e-1 s each on the reference machine) times tens of thousands of patterns exceeds the declared stress budget; no timing is invented for these omitted points"
+    },
+    {
+      "case": "mle-scale-beyond-d3r2-real-circuits",
+      "reason": "larger real circuits widen the ILP model per pattern; only the synthetic 24-wire eviction corpus is measured at scale for MLE in this campaign"
+    },
+    {
+      "case": "matching-batches-above-65536",
+      "reason": "not measured in this campaign; the recommended range stops at the largest measured successful batch"
+    }
+  ],
+  "recommended": {
+    "basis": "workload- and machine-specific measurements in this manifest; not universal latency guarantees; hard code limits are listed separately",
+    "envelope-matching": {
+      "max_shots_per_batch": 65536,
+      "max_loss_rate_measured": 0.1,
+      "circuits_measured": [
+        "benchmarks.atom_loss.decoder_reference.circuit_for(24)",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.1 --measurement-loss-probability 0.1 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 3 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 5 --rounds 3 --after-clifford-depolarization 0.001 --operation-loss-probability 0.02 --measurement-loss-probability 0.02 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
+      ],
+      "scale_note": "decode stays near-linear in shots at fixed pattern count; cache eviction rebuilds were measured and remained within budget"
+    },
+    "envelope-mle": {
+      "max_shots_per_batch": 16384,
+      "max_loss_rate_measured": 0.002,
+      "circuits_measured": [
+        "benchmarks.atom_loss.decoder_reference.circuit_for(24)",
+        "rstim circuit gen --task rotated_memory_z_midswap --distance 3 --rounds 2 --after-clifford-depolarization 0.001 --operation-loss-probability 0.002 --measurement-loss-probability 0.002 --before-measure-flip-probability 0.001 --after-reset-flip-probability 0.001"
+      ],
+      "scale_note": "cost is dominated by ILP build+solve per distinct loss pattern; use --shot-timeout-ms so a slow pattern stops the batch with decode_timeout instead of running unbounded"
+    },
+    "hard_code_limits": {
+      "max_envelope_candidates": 100000,
+      "max_primitive_probes": 100000,
+      "max_primitive_symptom_terms": 10000000,
+      "max_conditioned_decoder_artifacts": 1024,
+      "observables": "1..=64",
+      "sweep_bits": 0
+    }
+  },
+  "status": "pass",
+  "problems": []
+}
