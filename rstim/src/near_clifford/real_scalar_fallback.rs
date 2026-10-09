@@ -319,7 +319,7 @@ mod tests {
             if vector_supported() {
                 let real = native
                     .real_fallback
-                    .as_ref()
+                    .first()
                     .expect("default 64 MiB cache must exercise real scratch on AVX2/FMA");
                 assert!(
                     !real.values.is_empty(),
@@ -328,7 +328,7 @@ mod tests {
                 assert!(!real.active);
             } else {
                 assert!(!native.real_attempted);
-                assert!(native.real_fallback.is_none());
+                assert!(native.real_fallback.is_empty());
             }
             let nc = native.cache.as_ref().unwrap();
             let oc = original.cache.as_ref().unwrap();
@@ -348,12 +348,7 @@ mod tests {
                     original.sample_measurements_u8(shots, &mut b).unwrap()
                 );
                 assert!(!native.real_enabled);
-                assert!(
-                    native
-                        .real_fallback
-                        .as_ref()
-                        .is_none_or(|real| !real.active)
-                );
+                assert!(native.real_fallback.first().is_none_or(|real| !real.active));
                 for _ in 0..16 {
                     assert_eq!(a.next_u64(), b.next_u64());
                 }
@@ -381,7 +376,7 @@ mod tests {
             // This injects stale state without attempting host-memory exhaustion.
             stale.values.resize(64, 0.);
             stale.active = true;
-            native.real_fallback = Some(stale);
+            native.real_fallback = vec![stale];
             native.real_attempted = true;
             native.coefficients.clear();
             // Exercise the real-row control flow even on a scalar-only host;
@@ -398,7 +393,7 @@ mod tests {
                 result, expected,
                 "new row after unmaterialized real failure: {policy:?}"
             );
-            assert!(!native.real_fallback.as_ref().unwrap().active);
+            assert!(!native.real_fallback.first().unwrap().active);
             for _ in 0..16 {
                 assert_eq!(a.next_u64(), b.next_u64());
             }
@@ -412,12 +407,45 @@ mod tests {
         );
         let plan = CompiledNearCliffordExecutor::compile_text(text).unwrap();
         assert!(RealFallback::build(&plan).is_some());
+        let owned = RealFallback::build_owned(&plan).unwrap();
+        assert_eq!(owned.len(), 1);
+        let required = owned[0]
+            .reserved_bytes()
+            .unwrap()
+            .checked_add(size_of::<Vec<RealFallback>>())
+            .unwrap()
+            .checked_add((owned.capacity() - 1) * size_of::<RealFallback>())
+            .unwrap();
+        let mut boundary = plan.clone();
+        boundary.counts_plan_budget = required - 1;
+        assert!(RealFallback::build(&boundary).is_some());
+        assert!(RealFallback::build_owned(&boundary).is_none());
+        boundary.counts_plan_budget = required;
+        let exact = RealFallback::build_owned(&boundary).unwrap();
+        assert!(
+            exact[0].reserved_bytes().unwrap()
+                + size_of::<Vec<RealFallback>>()
+                + (exact.capacity() - 1) * size_of::<RealFallback>()
+                <= boundary.counts_plan_budget
+        );
+        boundary.counts_plan_budget = 0;
+        let mut sampler = boundary.prepare_sampler().unwrap();
+        sampler.real_enabled = true;
+        sampler
+            .coefficients
+            .resize(64, ComplexAmp { re: 1., im: 0. });
+        sampler.try_start_real(0);
+        assert!(sampler.real_attempted);
+        assert!(sampler.real_fallback.is_empty());
+        assert_eq!(sampler.real_fallback.capacity(), 0);
         let mut denied = plan.clone();
         denied.counts_plan_budget = 1;
         assert!(RealFallback::build(&denied).is_none());
+        assert!(RealFallback::build_owned(&denied).is_none());
         denied = plan.clone();
         denied.peak_active_rank = 11;
         assert!(RealFallback::build(&denied).is_none());
+        assert!(RealFallback::build_owned(&denied).is_none());
         denied = plan.clone();
         let first = denied
             .operations
@@ -438,6 +466,7 @@ mod tests {
         first.x = 0;
         first.z = 1;
         assert!(RealFallback::build(&denied).is_none());
+        assert!(RealFallback::build_owned(&denied).is_none());
         let original = include_str!(
             "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim"
         );
@@ -618,12 +647,40 @@ mod vector {
 }
 
 impl RealFallback {
-    pub(super) fn build(plan: &CompiledNearCliffordExecutor) -> Option<Self> {
+    pub(super) fn build_owned(plan: &CompiledNearCliffordExecutor) -> Option<Vec<Self>> {
+        if !(6..=10).contains(&plan.peak_active_rank) {
+            return None;
+        }
+        let header = size_of::<Vec<Self>>();
+        if header.checked_add(size_of::<Self>())? > plan.counts_plan_budget {
+            return None;
+        }
+        let mut owned = Vec::<Self>::new();
+        owned.try_reserve_exact(1).ok()?;
+        // The model budget already charges one Self. Charge the owner header
+        // and any excess slot capacity before constructing the model.
+        let extra = header.checked_add(
+            owned
+                .capacity()
+                .checked_sub(1)?
+                .checked_mul(size_of::<Self>())?,
+        )?;
+        let budget = plan.counts_plan_budget.checked_sub(extra)?;
+        let model = Self::build_with_budget(plan, budget)?;
+        owned.push(model);
+        Some(owned)
+    }
+
+    #[cfg(test)]
+    fn build(plan: &CompiledNearCliffordExecutor) -> Option<Self> {
+        Self::build_with_budget(plan, plan.counts_plan_budget)
+    }
+
+    fn build_with_budget(plan: &CompiledNearCliffordExecutor, budget: usize) -> Option<Self> {
         if !(6..=10).contains(&plan.peak_active_rank) {
             return None;
         }
         let width = 1usize << plan.peak_active_rank;
-        let budget = plan.counts_plan_budget;
         let requested = plan
             .operations
             .len()
