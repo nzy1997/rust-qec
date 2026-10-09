@@ -18,7 +18,7 @@ export default defineConfig({
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },
   ],
   webServer: {
-    command: "python3 -m http.server 8765 --bind 127.0.0.1 --directory ../../_site",
+    command: "python3 ../../tools/serve_site.py --directory ../../_site",
     url: "http://127.0.0.1:8765/interactive/",
     reuseExistingServer: !process.env.CI,
   },
