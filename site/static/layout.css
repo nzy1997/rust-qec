@@ -214,3 +214,5 @@ body[data-page="start"] .start-requirements { margin: 12px 0 16px; color: var(--
 
 .midswap-schedule .diagram-scroll { max-width: 100%; overflow-x: auto; }
 .midswap-schedule img { width: 100%; min-width: 720px; }
+.documentation-frame .evidence-stack { grid-template-columns: minmax(0, 1fr); }
+.documentation-frame .result-card { min-width: 0; grid-template-columns: minmax(0, 1fr); overflow-wrap: anywhere; }

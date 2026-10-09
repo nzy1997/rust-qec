@@ -20,7 +20,10 @@ for (const width of [390, 1280]) {
       ]);
       await expect(nav.locator('a')).toHaveCount(20);
       await expect(nav.locator('a[aria-current="page"]')).toHaveCount(1);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBe(width);
+      for (const stack of await page.locator('.evidence-stack[data-evidence-items]').all()) {
+        await expect(stack.locator('.result-card').first()).toBeAttached();
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth), { message: path }).toBe(width);
       expect(await page.locator('main').innerText()).not.toContain('{{ load_data');
     }
   });

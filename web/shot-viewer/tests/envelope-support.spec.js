@@ -71,6 +71,55 @@ async function serveVerifiedPublication(page, published, supported = 'envelope-m
 const matchingCopy = page => page.locator('[data-decoder-support-copy="envelope-matching"]').last();
 const mleCopy = page => page.locator('[data-decoder-support-copy="envelope-mle"]').first();
 
+for (const readerIntent of ['none', 'scroll', 'keyboard']) {
+  test(`delayed support verification respects ${readerIntent === 'none' ? 'the deep link' : readerIntent + ' navigation'}`, async ({ page, request }) => {
+    const matrix = await servedMatrix(request);
+    const published = matchingPublication(matrix);
+    await serveVerifiedPublication(page, published, 'envelope-matching,envelope-mle');
+    let releaseMatrix;
+    const ready = new Promise(resolve => { releaseMatrix = resolve; });
+    await page.route(MATRIX_ROUTE, async route => {
+      await ready;
+      await route.fulfill({ json: matrix });
+    });
+    try {
+      await page.goto('/support/#atom-loss-support-boundary');
+      const heading = page.locator('#atom-loss-support-boundary');
+      await expect(heading).toBeInViewport({ ratio: 1 });
+      await expect(matchingCopy(page)).toContainText('Beta');
+      if (readerIntent === 'scroll') {
+        await page.keyboard.press('PageDown');
+        await expect(heading).not.toBeInViewport();
+      } else if (readerIntent === 'keyboard') {
+        const footer = page.locator('.site-footer a').first();
+        for (let n = 0; n < 80 && !await footer.evaluate(el => el === document.activeElement); n++) {
+          await page.keyboard.press('Tab');
+        }
+        await expect(footer).toBeFocused();
+        await expect(footer).toBeInViewport();
+        await expect(heading).not.toBeInViewport();
+      }
+      releaseMatrix();
+      await expect(matchingCopy(page)).toHaveText(`Supported since ${published.release}`);
+      if (readerIntent !== 'none') {
+        await expect(heading).not.toBeInViewport();
+        if (readerIntent === 'keyboard') {
+          await expect(page.locator('.site-footer a').first()).toBeFocused();
+          await expect(page.locator('.site-footer a').first()).toBeInViewport();
+        }
+      } else {
+        await expect(heading).toBeInViewport({ ratio: 1 });
+        await expect.poll(async () => {
+          const [target, nav] = await Promise.all([heading.boundingBox(), page.locator('.nav-shell').boundingBox()]);
+          return target.y - nav.y - nav.height;
+        }).toBeGreaterThanOrEqual(0);
+      }
+    } finally {
+      releaseMatrix();
+    }
+  });
+}
+
 test('support remains version-bound in body text while hero badges stay removed', async ({ page, request }, testInfo) => {
   const matrix = await servedMatrix(request);
   const published = matchingPublication(matrix);
