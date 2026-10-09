@@ -1734,7 +1734,7 @@ impl CompiledNearCliffordExecutor {
             coefficients,
             reduced_coefficients: Vec::new(),
             cache: CoefficientCache::new(self, cache_bytes),
-            real_fallback: Vec::new(),
+            real_fallback: None,
             real_attempted: false,
             real_enabled: false,
             pack_enabled: true,
@@ -1779,7 +1779,7 @@ pub struct CompiledNearCliffordSampler<'a> {
     coefficients: Vec<ComplexAmp>,
     reduced_coefficients: Vec<ComplexAmp>,
     cache: Option<CoefficientCache>,
-    real_fallback: Vec<RealFallback>,
+    real_fallback: Option<Box<[RealFallback; 1]>>,
     real_attempted: bool,
     real_enabled: bool,
     pack_enabled: bool,
@@ -2350,16 +2350,16 @@ impl CompiledNearCliffordSampler<'_> {
         }
         if !self.real_attempted {
             self.real_attempted = true;
-            self.real_fallback = RealFallback::build_owned(self.plan).unwrap_or_default();
+            self.real_fallback = RealFallback::build_owned(self.plan);
         }
-        if let Some(real) = self.real_fallback.first_mut() {
+        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
             if !real.active {
                 real.start(node, &self.coefficients);
             }
         }
     }
     fn sync_real(&mut self) -> Result<(), String> {
-        if let Some(real) = self.real_fallback.first_mut() {
+        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
             real.write_complex(&mut self.coefficients)?;
         }
         Ok(())
@@ -2374,7 +2374,7 @@ impl CompiledNearCliffordSampler<'_> {
         flip: bool,
     ) -> Result<bool, String> {
         self.try_start_real(node);
-        if let Some(real) = self.real_fallback.first_mut() {
+        if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
             if real.active {
                 if p.x == 0 && p.z == 0
                     || real.rotate(p, expand, dagger, flip, self.plan.rotation_arithmetic)
@@ -2390,7 +2390,8 @@ impl CompiledNearCliffordSampler<'_> {
     fn real_probability_zero(&mut self, node: usize, p: &CompactPauli) -> Option<f64> {
         self.try_start_real(node);
         self.real_fallback
-            .first()
+            .as_ref()
+            .map(|real| &real[0])
             .filter(|real| real.active)
             .map(|real| real.probability_zero(p))
     }
@@ -2403,7 +2404,12 @@ impl CompiledNearCliffordSampler<'_> {
         fixed: bool,
         state: &mut Option<usize>,
     ) -> Result<bool, String> {
-        let Some(real) = self.real_fallback.first_mut().filter(|real| real.active) else {
+        let Some(real) = self
+            .real_fallback
+            .as_mut()
+            .map(|real| &mut real[0])
+            .filter(|real| real.active)
+        else {
             return Ok(false);
         };
         real.project(p, index, y, fixed)?;
@@ -3197,7 +3203,7 @@ impl CompiledNearCliffordSampler<'_> {
         // failed on a previous row after clearing its complex destination; that
         // row's real scratch must never be reused as this row's initial state.
         if REAL {
-            if let Some(real) = self.real_fallback.first_mut() {
+            if let Some(real) = self.real_fallback.as_mut().map(|real| &mut real[0]) {
                 real.active = false;
             }
         }
