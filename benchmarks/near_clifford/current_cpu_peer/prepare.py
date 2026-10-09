@@ -6,8 +6,8 @@ HERE=Path(__file__).resolve().parent
 sys.path.insert(0,str(HERE))
 from wheel_bindings import bind_wheel
 from peer_evidence import seal_preparation
-from commands import THREADS, PEER_URL, package_script
-PEER='ec36cb722b17f452f47882d513d44b37bb9f28a4'
+from commands import THREADS, PEER_URL, package_script, require_peer_main
+PEER='3f718e9e0c58b277a8fb506b4170863db5c3dbe6'
 URL=PEER_URL
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def require(value,message):
@@ -44,7 +44,7 @@ def main():
     protocol=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     for compiler in ['gcc','g++']:invoke(out,compiler+'-version',[compiler,'--version'],ROOT,env)
     remote=invoke(out,'peer-official-refs',['git','ls-remote',URL,'refs/heads/main','refs/heads/symft-26-10-08'],ROOT,env).decode()
-    require(PEER+'\trefs/heads/symft-26-10-08' in remote,'performance branch moved; update pin/review before using latest label')
+    require_peer_main(remote,PEER)
     source=out/'source';invoke(out,'peer-clone',['git','clone','--no-checkout',URL,str(source)],ROOT,env);invoke(out,'peer-checkout',['git','checkout','--detach',PEER],source,env)
     archive=invoke(out,'peer-git-archive',['git','archive',PEER],source,env)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:

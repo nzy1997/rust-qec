@@ -1,13 +1,14 @@
 # Original counts comparison against current CPU peers
 
 This manual Linux x86_64 screen compares Rust native postselected counts with
-Clifft 0.11.0, its active-width scheduler, and SymFT's pinned compiled CPU
-integration branch `symft-26-10-08` at
-`ec36cb722b17f452f47882d513d44b37bb9f28a4` (package 2026.10.8).
-Preparation records the official main and integration-branch refs and refuses a
-moved integration pin. It measures the available integration implementation;
-this is separate from the published main release. Revisit pins before claiming
-that a result covers currently available peers.
+Clifft 0.11.0, its active-width scheduler, and SymFT's pinned official `main`
+compiled CPU implementation at
+`3f718e9e0c58b277a8fb506b4170863db5c3dbe6` (source package 2026.10.8).
+Preparation records the official main and integration-branch refs and requires
+exactly one matching `refs/heads/main` record. The offline verifier also requires
+the reviewed manifest pin. A matching integration-branch ref cannot substitute
+for main. This source build is separate from the PyPI release; revisit pins
+before claiming that a result covers currently available peers.
 
 The twelve fixed cells use original MSC distance 3 and 5 circuits, 1/64/1024
 attempted shots per call, and separate Strict/Fused Rust arithmetic. All backends

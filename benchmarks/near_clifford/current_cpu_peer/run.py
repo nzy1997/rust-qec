@@ -223,7 +223,7 @@ def main():
     require(packages['numpy']['version'] == packages['clifft_environment']['numpy']['version'] == manifest['versions']['numpy'], 'NumPy mismatch')
     header = dict(schema=manifest['schema'], manifest=manifest, before=before, preparation_seal_sha256=preparation_seal,
                   packages=packages, identities=identities, host=host, controller_pid=os.getpid(), started=time.time(),
-                  scope='Prespecified first12 Linux x86_64 counts cells. NewSymFT performance branch, not new main release. No general SOTA claim.',
+                  scope='Prespecified first12 Linux x86_64 counts cells. Pinned official SymFT main compiled CPU implementation. No general SOTA claim.',
                   counts_rng_scope='Retained Rust executable self-attests carry; literal RNG words absent in counts output.')
     (OUT / 'header.json').write_text(json.dumps(header, indent=2) + '\n')
 
