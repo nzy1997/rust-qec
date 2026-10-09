@@ -8,7 +8,7 @@ import tarfile
 
 from peer_evidence import inventory, read, require, sha, verify_preparation
 from wheel_bindings import bind_wheel
-from commands import setup_commands
+from commands import setup_commands, require_peer_main
 
 
 def git_inventory(repo, revision):
@@ -30,6 +30,7 @@ def verify_prepared(prep, root, *, git_sources=False):
     for key in ['protocol_revision', 'rust_source_head', 'symft_revision']:
         require(re.fullmatch('[0-9a-f]{40}', meta[key]) is not None and manifest[key] == meta[key], 'exact source refs differ')
     golden = read(Path(__file__).resolve().parent/'manifest.json')
+    require(meta['symft_revision'] == golden['symft_revision'], 'reviewed official main revision differs')
     require(manifest == dict(golden, protocol_revision=meta['protocol_revision'], rust_source_head=meta['rust_source_head'], symft_revision=meta['symft_revision']), 'fixed native matrix differs')
     setup = []
     for path in sorted(prep.glob('*.receipt.json')):
@@ -44,7 +45,7 @@ def verify_prepared(prep, root, *, git_sources=False):
     require(set(setup) == required, 'complete native setup receipt set differs')
     require(read(prep/'peer-checkout.receipt.json')['command'] == ['git','checkout','--detach',meta['symft_revision']], 'peer checkout command differs')
     require(read(prep/'peer-clone.receipt.json')['command'] == ['git','clone','--no-checkout','https://github.com/haoliri0/SOFT.git',str(original/'source')], 'official peer clone command differs')
-    require(meta['symft_revision']+'\trefs/heads/symft-26-10-08' in (prep/'peer-official-refs.stdout').read_text(), 'available performance branch pin differs')
+    require_peer_main((prep/'peer-official-refs.stdout').read_text(),meta['symft_revision'])
     candidates = list((prep/'wheels').glob('symft-*.whl'))
     require(len(candidates) == 1, 'unique native SymFT wheel required')
     interpreter = read(prep/'clifft-venv.receipt.json')['command'][0]

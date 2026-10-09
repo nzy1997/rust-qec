@@ -107,7 +107,7 @@ def build_preparation(prep):
     for index,(label,command) in enumerate(commands.items()):
         stdout=prep/(label+'.stdout');stderr=prep/(label+'.stderr');stderr.write_bytes(b'')
         if label=='peer-git-archive':stdout.write_bytes(buffer.getvalue())
-        elif label=='peer-official-refs':stdout.write_text(manifest['symft_revision']+'\trefs/heads/symft-26-10-08\n')
+        elif label=='peer-official-refs':stdout.write_text(manifest['symft_revision']+'\trefs/heads/main\n')
         elif label=='native-symft-wheel':stdout.write_text('synthetic -march=native SYMFT_CPP_NATIVE_BUILD=1\n')
         elif label.endswith('-package-inspection'):write(stdout,packages[label.split('-')[0]])
         elif label.endswith('-import-inspection'):write(stdout,dict(isolated=True,loaded_files=identities[label.split('-')[0]]))

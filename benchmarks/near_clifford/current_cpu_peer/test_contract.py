@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 from peer_evidence import inventory, seal_preparation, verify_files, verify_preparation
@@ -17,6 +18,42 @@ from verify import schedule
 
 
 class ProtocolContracts(unittest.TestCase):
+    def test_preparation_requires_reviewed_main_before_cloning(self):
+        import prepare
+        pin = json.loads((Path(__file__).parent/'manifest.json').read_text())['symft_revision']
+        self.assertEqual(prepare.PEER,pin)
+        cases = [
+            (pin+'\trefs/heads/main\n',True),
+            ('a'*40+'\trefs/heads/symft-26-10-08\n'+pin+'\trefs/heads/main\n',True),
+            (pin+'\trefs/heads/symft-26-10-08\n',False),
+            (pin+'\trefs/heads/main-extra\n',False),
+            ('a'*40+'\trefs/heads/main\n'+pin+'\trefs/heads/symft-26-10-08\n',False),
+            (pin+'\trefs/heads/main\n'+'a'*40+'\trefs/heads/main\n',False),
+        ]
+        class CloneReached(RuntimeError):pass
+        with tempfile.TemporaryDirectory() as directory:
+            for number,(remote,valid) in enumerate(cases):
+                labels = []
+                def invoke(out,label,command,cwd,env,**kwargs):
+                    labels.append(label)
+                    if label=='peer-clone':raise CloneReached()
+                    return remote.encode() if label=='peer-official-refs' else b''
+                def git_output(command,**kwargs):
+                    return b'' if command[1]=='status' else 'c'*40+'\n'
+                with self.subTest(remote=remote), \
+                     mock.patch.object(sys,'argv',['prepare.py','--out',str(Path(directory)/str(number)),'--rust-ref','b'*40]), \
+                     mock.patch.object(sys,'version_info',(3,12)), \
+                     mock.patch.object(prepare.platform,'system',return_value='Linux'), \
+                     mock.patch.object(prepare.platform,'machine',return_value='x86_64'), \
+                     mock.patch.object(prepare.signal,'signal'), \
+                     mock.patch.object(prepare.subprocess,'check_output',side_effect=git_output), \
+                     mock.patch.object(prepare,'invoke',side_effect=invoke):
+                    if valid:
+                        with self.assertRaises(CloneReached):prepare.main()
+                    else:
+                        with self.assertRaisesRegex(ValueError,'official main pin differs'):prepare.main()
+                    self.assertEqual(labels,['gcc-version','g++-version','peer-official-refs']+(['peer-clone'] if valid else []))
+
     def test_complete_offline_bundle_relocates_and_rejects_semantic_mutations(self):
         import test_bundle_fixture as fixture
         with tempfile.TemporaryDirectory() as directory:
@@ -24,10 +61,11 @@ class ProtocolContracts(unittest.TestCase):
             fixture.build_bundle(original)
             moved = Path(directory)/'moved'
             shutil.copytree(original,moved);shutil.rmtree(original)
-            def execute(expected, optimized=False):
+            def execute(expected, optimized=False, message=None):
                 command = [sys.executable,'-I']+(['-O'] if optimized else [])+[str(Path(__file__).parent/'verify.py'),str(moved)]
                 result = subprocess.run(command,capture_output=True,timeout=45)
                 self.assertEqual(result.returncode,expected,result.stderr.decode())
+                if message is not None:self.assertIn(message,result.stderr.decode())
             execute(0);execute(0,True)
             snapshots = {p.relative_to(moved):p.read_bytes() for p in moved.rglob('*') if p.is_file()}
             def rewrite(relative,change):
@@ -52,6 +90,28 @@ class ProtocolContracts(unittest.TestCase):
                 with self.subTest(mutation=number):
                     for relative,data in snapshots.items():(moved/relative).write_bytes(data)
                     mutation();fixture.reseal(moved);execute(1)
+            pin = fixture.read(moved/'preparation/manifest.json')['symft_revision']
+            invalid_refs = [
+                pin+'\trefs/heads/symft-26-10-08\n',
+                pin+'\trefs/heads/main-extra\n',
+                'a'*40+'\trefs/heads/main\n'+pin+'\trefs/heads/symft-26-10-08\n',
+                pin+'\trefs/heads/main\n'+'a'*40+'\trefs/heads/main\n',
+            ]
+            for remote in invalid_refs:
+                with self.subTest(remote=remote):
+                    for relative,data in snapshots.items():(moved/relative).write_bytes(data)
+                    path = moved/'preparation/peer-official-refs.stdout'
+                    path.write_text(remote)
+                    rewrite('preparation/peer-official-refs.receipt.json',lambda r:r.update(stdout_sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+                    fixture.reseal(moved)
+                    execute(1,message='official main pin differs')
+                    execute(1,True,message='official main pin differs')
+            for relative,data in snapshots.items():(moved/relative).write_bytes(data)
+            for relative in ['preparation/preparation.json','preparation/manifest.json']:
+                rewrite(relative,lambda r:r.update(symft_revision='a'*40))
+            fixture.reseal(moved)
+            execute(1,message='reviewed official main revision differs')
+            execute(1,True,message='reviewed official main revision differs')
 
     def test_full_schedule_keeps_all_roles_and_counterbalances_each_case(self):
         manifest = json.loads((Path(__file__).parent/'manifest.json').read_text())
