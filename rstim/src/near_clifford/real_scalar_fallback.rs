@@ -384,10 +384,10 @@ mod tests {
             native.real_enabled = true;
             let mut a = StdRng::seed_from_u64(1739);
             let mut b = a.clone();
-            let result =
-                native.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut a));
-            let expected =
-                original.row_with_random_kernel::<true, false>(&[], &mut RowRandom::live(&mut b));
+            let result = native
+                .row_with_random_kernel::<true, false, true>(&[], &mut RowRandom::live(&mut a));
+            let expected = original
+                .row_with_random_kernel::<true, false, false>(&[], &mut RowRandom::live(&mut b));
             assert!(expected.is_ok());
             assert_eq!(
                 result, expected,
