@@ -1,5 +1,20 @@
 //! Offline Clifford-frame plan; runtime carries a virtual Pauli and compact amplitudes.
 use super::*;
+
+// Direct unit-phase images preserve every nonzero finite component. Possible
+// zero-sign differences vanish in the CDF's ordered sum starting at +0. With
+// an infinite or NaN input component, both literal and direct expressions give
+// a NaN final CDF. Keep own signed products and reduction order unchanged;
+// this equivalence is for final CDF bits/NaN outcomes, not intermediate flags.
+#[inline]
+fn cdf_phase_image<const PHASE: u8>(amp: ComplexAmp) -> ComplexAmp {
+    match PHASE {
+        0 => amp.conj(),
+        1 => ComplexAmp::new(amp.im, amp.re),
+        2 => ComplexAmp::new(-amp.re, amp.im),
+        _ => ComplexAmp::new(-amp.im, -amp.re),
+    }
+}
 #[path = "compile_frame.rs"]
 mod compile_frame;
 use compile_frame::CompileFrame;
@@ -2871,7 +2886,8 @@ impl CompiledNearCliffordSampler<'_> {
             } else {
                 1.
             };
-            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
+            let image = cdf_phase_image::<PHASE>(self.coefficients[i ^ p.x]);
+            expectation += (image * (amp * sign)).re;
             norm += amp.norm_sqr();
         }
         ((1. + expectation / norm) * 0.5).clamp(0., 1.)
