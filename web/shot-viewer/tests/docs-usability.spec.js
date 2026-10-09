@@ -74,7 +74,7 @@ test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
   await expect(page.locator('.home-hero')).toContainText('simulate circuit noise and atom loss');
   await page.getByRole('link', { name: 'Atom-loss sampling and decoding' }).click();
   await expect(page).toHaveURL(/\/atom-loss\/$/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss\./);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss/);
   await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
   await expect(page.locator('[data-output]')).toContainText('Logical errors: 0 / 64');
   await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Atom loss');
@@ -150,7 +150,7 @@ test("documentation uses the home navigation with an added search", async ({ pag
 
 test("long protocol page supplies rendered content and usable table-of-contents anchors", async ({ page }) => {
   await page.goto("/qp101/protocol/");
-  await expect(page.getByRole("heading", { level: 1, name: /QP101-ZY: Quantum Circuit JSON Format/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^QP101 format$/ })).toBeVisible();
   await expect(page.locator("main")).not.toContainText("{{ load_data");
   await expect(page.locator(".page-toc")).toBeVisible();
   await page.locator(".toc-disclosure > summary").click();
@@ -279,10 +279,11 @@ test("terminal transcript keeps output out of copied commands", async ({ page })
   expect(await page.evaluate(() => window.__copiedText)).not.toContain("110");
 });
 
-test("advanced guides point to the source checkout", async ({ page }) => {
+test("advanced guides start with experiment steps and use installed commands", async ({ page }) => {
   await page.goto("/sampling-data/");
-  await page.getByRole("link", { name: "configured repository checkout" }).first().click();
-  await expect(page.locator("pre").filter({ hasText: "cargo build --locked --workspace" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("configured repository checkout");
+  await expect(page.locator("pre").filter({ hasText: "rstim circuit gen" })).toBeVisible();
+  await expect(page.locator(".docs-sidebar").getByRole("link", { name: "Get started", exact: true })).toBeVisible();
 });
 
 test("support table labels stay intact while the table, not the page, scrolls", async ({ page }) => {
