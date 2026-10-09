@@ -2865,6 +2865,23 @@ impl CompiledNearCliffordSampler<'_> {
     fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
         let mut expectation = 0.;
         let mut norm = 0.;
+        // Small states retain the literal kernel; amortize this path on large states.
+        if self.coefficients.len() >= 256 && p.x == 0 && PHASE & 1 == 0 {
+            for (i, &amp) in self.coefficients.iter().enumerate() {
+                let squared_norm = amp.norm_sqr();
+                let negative = ((i & p.z).count_ones() & 1 != 0) ^ (PHASE == 2);
+                // Diagonal real phases contribute +/-norm_sqr. Keep both
+                // sequential reductions and the final CDF expression intact.
+                // Nonfinite inputs retain the literal CDF's NaN outcome.
+                expectation += if negative {
+                    -squared_norm
+                } else {
+                    squared_norm
+                };
+                norm += squared_norm;
+            }
+            return ((1. + expectation / norm) * 0.5).clamp(0., 1.);
+        }
         for (i, &amp) in self.coefficients.iter().enumerate() {
             let sign = if (i & p.z).count_ones() % 2 != 0 {
                 -1.
