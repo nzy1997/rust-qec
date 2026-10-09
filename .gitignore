@@ -38,3 +38,5 @@ drafts/
 /docs/test-reports/
 /site/static/data/atom-loss/
 /site/static/rsmp-v1-showcase/og.png
+
+/site/static/examples/rust-experiment/target/

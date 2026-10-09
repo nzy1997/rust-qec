@@ -47,3 +47,16 @@ class DocsSearchTest(unittest.TestCase):
         self.assertEqual([r['path'] for r in records], ['qp101/protocol/#gallery', 'qp101/protocol/#operations'])
         self.assertEqual(records[0]['text'], 'Examples.')
         self.assertEqual(records[1]['text'], 'Gates and noise.')
+
+    def test_tutorial_kind_is_indexed_for_topic_ranking(self):
+        records = self.index('<body data-page="loss"><title>Atom loss</title><main><h2 id="model">Model</h2><p>Loss flags.</p></main></body>')
+        self.assertEqual(records[0]['kind'], 'tutorial')
+
+    def test_legacy_pages_are_excluded_from_search(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for route in ('simulator', 'detector-models', 'atom-loss-concepts'):
+                folder = root / route
+                folder.mkdir()
+                (folder / 'index.html').write_text('<main><h2>Duplicate</h2><p>Old destination</p></main>')
+            self.assertEqual(build(root), [])

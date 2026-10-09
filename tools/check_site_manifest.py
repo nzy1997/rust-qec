@@ -708,9 +708,8 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     errors: list[str] = []
     scope = "site root"
     evidence_page_names = (
-        "simulator/index.html",
-        "detector-models/index.html",
-        "decoding/index.html",
+        "benchmarks/simulation/index.html",
+        "benchmarks/decoders/index.html",
         "css-codes/index.html",
         "validation/index.html",
     )
@@ -817,9 +816,8 @@ def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any],
         "index.html",
         "get-started/index.html",
         "support/index.html",
-        "simulator/index.html",
-        "detector-models/index.html",
-        "decoding/index.html",
+        "benchmarks/simulation/index.html",
+        "benchmarks/decoders/index.html",
         "css-codes/index.html",
         "qp101/index.html",
         "qp101/protocol/index.html",

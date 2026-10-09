@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} — RustQEC{% endblock title %}
+{% block description %}{{ section.description | default(value=section.title) }}{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><h1>{{ section.title }}</h1></div>{% endblock hero %}
+{% block main %}<article class="prose">{{ section.content | safe }}</article>{% endblock main %}

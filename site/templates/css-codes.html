@@ -1,62 +1,52 @@
 {% extends "base.html" %}
-
-{% block title %}CSS code construction — RustQEC{% endblock title %}
-{% block description %}Construct CSS codes and run exact or randomized distance searches.{% endblock description %}
-
-{% block hero %}
-<div class="hero compact-hero">
-  <h1>Construct CSS codes and check distance</h1>
-  <p class="hero-copy">Build X/Z parity checks and find the smallest undetectable logical error.</p>
-</div>
-{% endblock hero %}
-
+{% block title %}Build a CSS code and check distance — RustQEC{% endblock title %}
+{% block hero %}<div class="hero compact-hero"><h1>Build a CSS code and check distance</h1><p class="hero-copy">Define your own parity checks, generate a noisy memory circuit and test a logical-distance bound.</p></div>{% endblock hero %}
 {% block main %}
-<section id="css-construction" class="task-section" aria-labelledby="css-construction-title">
-  <div class="section-heading"><h2 id="css-construction-title">Build and inspect a code</h2></div>
-  <p>A Calderbank–Shor–Steane (CSS) code uses separate X and Z stabilizer checks. Its distance is the smallest weight of a logical operator that the checks cannot detect.</p>
-  <p>List the built-in codes with <code>qec-code</code>:</p>
-  <pre data-language="Shell"><code>qec-code code css list</code></pre>
-  <p>Inspect the Steane code:</p>
-  <pre data-language="Shell"><code>qec-code code steane summary</code></pre>
-  <pre data-output="true"><code>name: steane
-n: 7
-stabilizer_rank: 6
-k: 1</code></pre>
-  <p><code>n</code> counts physical qubits; <code>k</code> counts encoded logical qubits. Six independent stabilizer checks leave one logical qubit.</p>
 
+<section id="css-construction" class="task-section"><h2 id="css-construction-title">1. Define X and Z checks</h2>
+<p>CSS codes use two binary parity-check matrices, Hx and Hz. Each row specifies one stabilizer; columns identify data qubits. Valid checks commute when Hx · Hzᵀ = 0 over GF(2). The encoded-qubit count is n − rank(Hx) − rank(Hz).</p>
+<p>Define the seven-qubit Steane checks explicitly. Here both matrices have three independent rows, all X/Z overlaps have even weight, and k = 7 − 3 − 3 = 1. Replace these files with your own commuting checks to construct another code.</p>
+<pre data-language="Shell"><code>cat &gt; hx.json &lt;&lt;'JSON'
+{"format":"sparse_rows","num_cols":7,"rows":[[0,3,5,6],[1,3,4,6],[2,4,5,6]]}
+JSON
+cp hx.json hz.json</code></pre>
+<p>Row indices are zero-based. An omitted column is 0; a listed column is 1. You can export a built-in family with <code>qec-code code css export steane hx</code>, or look up construction specifications in the <a href="../qec-code-cli/#commands">qec-code reference</a>.</p>
 </section>
-
-<section id="distance-search" class="task-section" aria-labelledby="distance-search-title">
-  <div class="section-heading">
-    <h2 id="distance-search-title">Compute an exact distance</h2>
-    <p class="section-copy">Run an exact search on the small Steane code:</p>
-  </div>
-  <pre class="quick-command" data-language="Shell · exact distance"><code>qec-code code steane distance</code></pre>
-  <pre data-output="true" data-language="Expected output"><code>distance: 3
+<section class="task-section"><h2 id="css-memory">2. Generate the memory circuit</h2>
+<p>The direct <code>rstim gen</code> interface accepts custom CSS matrices. Its options use underscores; the structured <code>circuit gen</code> interface does not currently expose these custom matrix arguments.</p>
+<pre data-language="Shell"><code>rstim gen --code css --task memory \
+  --hx hx.json --hz hz.json --basis z --rounds 3 \
+  --after_clifford_depolarization 0.002 --out css-memory.stim
+rstim circuit stats --in css-memory.stim</code></pre>
+<pre data-output="true"><code>instruction_count: 229
+repeat_blocks: 0
+max_repeat_depth: 0
+num_qubits: 13
+num_measurements: 25
+num_detectors: 18
+num_observables: 1
+num_ticks: 49
+num_sweep_bits: 0</code></pre>
+<p>Seven data qubits and six check ancillas produce 18 detector events over three rounds, followed by seven data measurements. Generation rejects mismatched dimensions or noncommuting checks.</p>
+</section>
+<section class="task-section"><h2 id="css-sampling">3. Sample and export a model</h2>
+<pre data-language="Shell"><code>rstim circuit detect --in css-memory.stim --shots 128 --seed 7 \
+  --out-format b8 --out css-detectors.b8 \
+  --obs-out css-answers.b8 --obs-out-format b8
+rstim circuit dem --in css-memory.stim --out css-model.dem</code></pre>
+<p>Keep the detector rows, DEM and private answers together. A CSS code is not necessarily graphlike: matching needs each decomposed error component to involve at most two detectors. For non-graphlike models use a suitable BP-based or solver backend rather than silently discarding correlations.</p>
+<p><a href="../decoding/">Continue with frozen-input decoder comparison</a>.</p>
+</section>
+<section id="distance-search" class="task-section"><h2 id="distance-search-title">4. Check a distance bound</h2>
+<pre data-language="Shell"><code>qec-code code css-distance randomized-upper-bound \
+  --hx hx.json --hz hz.json --iterations 100 --seed 7 --json</code></pre>
+<p>The seeded run finds a weight-3 X-like witness and reports <code>bound_type: upper</code>. It proves distance ≤ 3 for these matrices; it does not certify exact distance.</p>
+<p>For the built-in small Steane code, run a separate exhaustive search:</p>
+<pre data-language="Shell"><code>qec-code code steane distance</code></pre>
+<pre data-output="true"><code>distance: 3
 logical_class: XLike
 witness: x=[1, 1, 0, 1, 0, 0, 0] z=[0, 0, 0, 0, 0, 0, 0] weight=3</code></pre>
-  <p><code>XLike</code> identifies an X-type logical operator. The witness lists its X and Z support; its weight counts non-identity qubits. The exact search finds weight 3 and rules out every smaller weight.</p>
-  <h3 id="reference-distance-results">Reference results and larger searches</h3>
-  <p>The small Steane example uses the default exact search. Integer linear programming (ILP) solves larger distance searches with an optional solver; random-window searches find candidate upper bounds and do not certify the exact distance. See <code>qec-code code css-distance --help</code> for inputs and solver options.</p>
-  <div class="table-wrap result-table">
-    <table>
-      <thead><tr><th>Code</th><th>Method</th><th>Distance</th></tr></thead>
-      <tbody>
-        <tr><td>Steane</td><td>Default exact search</td><td>3</td></tr>
-        <tr><td>Toric d=4</td><td>Exact ILP</td><td>4</td></tr>
-        <tr><td>Larger constructed codes</td><td>Random windows</td><td>Upper bound only</td></tr>
-      </tbody>
-    </table>
-  </div>
+<p>This exact result rules out lower weights. Larger custom exact searches require an optional ILP backend; see <a href="../qec-code-cli/#help-qec-code-code-css-distance-exact">exact-search inputs and solver options</a>. The random-window benchmark pipeline is <a href="../validation/#local-workflows">local-only workflow evidence</a>, rather than a published distance claim.</p>
 </section>
 
-<section class="evidence-section" aria-labelledby="random-window-evidence-title">
-  <div class="section-heading">
-    <h2 id="random-window-evidence-title">Random-window search</h2>
-    <p class="section-copy">This workflow is local-only; generated outputs are not published as checked benchmark claims.</p>
-  </div>
-  <p><a href="../validation/#local-workflows">Open the random-window local pipeline evidence and reproduction instructions</a>.</p>
-</section>
 {% endblock main %}
-
-{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

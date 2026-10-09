@@ -32,29 +32,7 @@ cmp samples.b8 recovered.b8</code></pre>
   <p><code>samples.b8</code> contains four two-bit rows (4 bytes); <code>samples.rsmp</code> stores the same measurement data. Unpacking writes <code>recovered.b8</code>; <code>cmp</code> checks that it matches the original bytes and prints nothing when they match. Use the original circuit for unpacking. The compression ratios below belong to a different, named benchmark fixture.</p>
 </section>
 
-<section id="rsmp-compression" class="rsmp-section" aria-labelledby="rsmp-compression-title">
-  <div class="section-heading">
-    <h2 id="rsmp-compression-title">88.02% smaller than raw b8</h2>
-    <p class="section-copy">Pinned surface-code case: d=11, 100 rounds, 1,024 shots.</p>
-  </div>
-  <div class="rsmp-hero-grid" aria-label="Pinned RSMP compression result">
-    <article class="rsmp-metric primary"><span>RSMP / raw b8</span><strong>11.98%</strong><small>remaining size · lower is smaller</small></article>
-    <article class="rsmp-metric"><span>RSMP / direct Zstd</span><strong>57.14%</strong><small>remaining size · lower is smaller</small></article>
-    <article class="rsmp-case"><span class="badge measured">Measured</span><p>Surface code d=11, rounds=100</p><small>1,024 shots</small></article>
-  </div>
-  <div class="table-wrap result-table">
-    <table>
-      <thead><tr><th>Format</th><th>Bytes</th><th>Share of raw</th></tr></thead>
-      <tbody>
-        <tr><td>Raw b8</td><td>1,552,384</td><td>100.00%</td></tr>
-        <tr><td>Direct Zstandard</td><td>325,565</td><td>20.97%</td></tr>
-        <tr><td><strong>RSMP v1</strong></td><td><strong>186,028</strong></td><td><strong>11.98%</strong></td></tr>
-      </tbody>
-    </table>
-  </div>
-  <figure class="rsmp-share"><img src="og.png" alt="RSMP v1 measured compression summary"></figure>
-</section>
-
+<section id="rsmp-compression" class="task-section"><h2 id="rsmp-compression-title">Compression measurements</h2><p><a href="../validation/#rsmp-compression">Read the recorded RSMP compression case</a>. Ratios are properties of its specific circuit, shots and codec settings.</p></section>
 <section id="decoder-datasets" class="rsmp-section" aria-labelledby="decoder-datasets-title">
   <div class="section-heading">
     <h2 id="decoder-datasets-title">Need a dataset contestants cannot score from directly?</h2>
@@ -97,4 +75,5 @@ cmp samples.b8 recovered.b8</code></pre>
     </div>
   </details>
 </section>
+<section class="prose" id="rsmp-format-contract"><h2>Binary format contract</h2>{{ load_data(path="generated/rsmp-v1.md",format="plain") | replace(from="# RSMP v1 Binary Envelope",to="") | markdown | safe }}</section>
 {% endblock main %}

@@ -1,37 +1,8 @@
 {% extends "base.html" %}
-
-{% block title %}Circuit simulation — RustQEC{% endblock title %}
-{% block description %}Parse Stim circuits and sample measurement or detector shots with rstim.{% endblock description %}
-
-{% block hero %}
-<div class="hero compact-hero">
-  <h1>Simulate and sample circuits</h1>
-  <p class="hero-copy">Read Stim-format circuits, inspect their structure, and produce measurement or detector shots.</p>
-</div>
-{% endblock hero %}
-
+{% block title %}Circuit simulation benchmarks — RustQEC{% endblock title %}
+{% block description %}Compare sampling, detector sampling and DEM sampling within each recorded workload.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><h1>Circuit simulation benchmarks</h1><p class="hero-copy">Compare sampling, detector sampling and DEM sampling within each recorded workload.</p></div>{% endblock hero %}
 {% block main %}
-<section id="circuit-simulation" class="task-section" aria-labelledby="circuit-simulation-title">
-  <div class="section-heading">
-    <h2 id="circuit-simulation-title">1. Sample detector events</h2>
-  </div>
-  {% include "partials/example-circuit.html" %}
-  <p>A shot is one simulated run. A detector fires when its measurement parity differs from the noiseless reference; a logical observable tracks the logical parity.</p>
-  <pre data-language="Shell"><code>rstim circuit detect --in circuit.stim --shots 1 --seed 16 \
-  --out-format 01 --append-observables --out events.01 &gt; /dev/null
-cat events.01</code></pre>
-  <pre data-output="true"><code>110</code></pre>
-  <p>The bits are <code>D0 D1 L0</code>: both detectors fire, while the logical parity stays 0. See <a href="../get-started/#first-circuit">Get started</a> for the circuit notation.</p>
-  <h3 id="save-samples">2. Save raw measurements</h3>
-  <pre data-language="Shell"><code>rstim circuit sample --in circuit.stim --shots 1 --seed 16 \
-  --out-format 01 --out measurements.01 &gt; /dev/null
-cat measurements.01</code></pre>
-  <pre data-output="true"><code>11</code></pre>
-  <p>These bits are the two raw measurement outcomes, ordered <code>q0 q1</code>. <code>01</code> writes readable text; <a href="../sampling-data/#b8-title"><code>b8</code></a> packs bits into bytes for larger batches.</p>
-  <p>To reproduce these results, keep the circuit, seed and shot count unchanged. Different seeds or batch sizes can produce different samples.</p>
-  <div class="content-links"><a href="../sampling-data/">How to save shots for decoding and neural-network training</a></div>
-</section>
-
 <section class="task-section" aria-labelledby="simulation-results-title">
   <div class="section-heading">
     <h2 id="simulation-results-title">Compare the surface-code sampling paths</h2>
@@ -64,7 +35,30 @@ cat measurements.01</code></pre>
     <p>Loading simulator evidence.</p>
   </div></details>
 </section>
-<p><a href="../validation/#historical-results">Historical measurements and CI regression checks</a></p>
-{% endblock main %}
+<p><a href="../../validation/#historical-results">Historical measurements and CI regression checks</a></p>
 
+<section class="task-section" aria-labelledby="dem-results-title">
+  <div class="section-heading">
+    <h2 id="dem-results-title">Detection and DEM sampling</h2>
+  </div>
+  <p>These are separate, recorded workloads. Compare implementations only within the same workload and metric; reproduction details and limits are below.</p>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Workload</th><th>Implementation</th><th>Metric</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Surface d=13, r=13 detect</td><td>rstim compiled</td><td>Elapsed time · lower is better</td><td>34.339 ms</td></tr>
+        <tr><td>Surface d=13, r=13 detect</td><td>Stim CLI</td><td>Elapsed time · lower is better</td><td>266.172 ms</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>rstim</td><td>Throughput · higher is better</td><td>329 shots/s</td></tr>
+        <tr><td>Surface d=11, r=100 DEM sample</td><td>Stim</td><td>Throughput · higher is better</td><td>2,669 shots/s</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="dem-evidence-title">
+  <div class="section-heading"><h2 id="dem-evidence-title">Checked DEM results</h2></div>
+  <div class="evidence-stack" data-evidence-items="rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample" aria-live="polite"><p>Loading detector-model evidence.</p></div>
+</section>
+
+{% endblock main %}
 {% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}

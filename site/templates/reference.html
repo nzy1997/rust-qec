@@ -1,12 +1,18 @@
 {% extends "base.html" %}
-{% block title %}CLI and Rust API reference — RustQEC{% endblock title %}
+{% block title %}rstim CLI reference — RustQEC{% endblock title %}
 {% block description %}RustQEC command arguments, inputs, outputs, exit codes, structured errors, and versioned Rust API links.{% endblock description %}
-{% block hero %}<div class="hero compact-hero"><h1>CLI and Rust API reference</h1><p class="hero-copy">Look up command arguments, files, error codes and Rust APIs.</p></div>{% endblock hero %}
+{% block hero %}<div class="hero compact-hero"><h1>rstim CLI reference</h1><p class="hero-copy">Look up every command; inspect structured interfaces and artifact contracts.</p></div>{% endblock hero %}
 {% block main %}
 {% set cli_reference = load_data(path="generated/cli-reference.json") %}
 <section class="task-section" aria-labelledby="reference-boundary"><h2 id="reference-boundary">Reference boundary</h2>
 <p>Use <code>rstim capabilities --format json</code> to inspect your installed commands and optional decoders. If your binary differs from this documentation, its command help and capabilities describe the available interfaces.</p>
 <div class="content-links"><a href="#rust-apis">Rust API versions</a><a href="../support/#compatibility-and-deprecation-policy">Compatibility policy</a></div></section>
+
+{% set all_help = load_data(path="generated/cli-help.json") %}
+<section class="task-section"><h2 id="all-commands">All command help</h2>
+<p>Help is captured recursively from this checkout during the site build, including direct commands such as <code>gen</code>, <code>render_svg</code> and <code>pack_samples</code>. The structured <code>circuit</code> and <code>dataset</code> interfaces use hyphenated options; direct interfaces may use underscores. Use the spelling listed for the command you run. Optional features can change available decoder choices.</p>
+<ul>{% for entry in all_help.rstim %}<li><a href="#{{ entry.anchor }}"><code>{{ entry.command_line }}</code></a></li>{% endfor %}</ul>
+{% for entry in all_help.rstim %}<details class="loss-disclosure"><summary id="{{ entry.anchor }}"><code>{{ entry.command_line }}</code></summary><pre data-language="Command help" data-output="true"><code>{{ entry.help }}</code></pre></details>{% endfor %}</section>
 
 <section class="task-section" aria-labelledby="rustqec-commands"><h2 id="rustqec-commands">rstim commands</h2>
 <p>The tables come from <code>{{ cli_reference.source_command }}</code>. A schema identifies the structure and version of a JSON status response; artifact formats describe the separate data files.</p>
@@ -48,17 +54,7 @@
 <section class="task-section" aria-labelledby="machine-contract"><h2 id="machine-contract">Inspect the installed binary</h2>
 <pre data-language="Shell"><code>rstim capabilities --format json &gt; capabilities.json
 rstim --version</code></pre>
-<p>The capabilities document lists every command’s argument values, output schema, artifact format, success code, structured errors, and available decoders. Optional features such as <code>ilp</code> change that document. This rendered page was generated from schema <code>{{ cli_reference.schema_version }}</code>.</p></section>
+<p>The capabilities document lists the structured command interfaces and their argument values, output schema, artifact format, success code, structured errors, and available decoders. Optional features such as <code>ilp</code> change that document. This rendered page was generated from schema <code>{{ cli_reference.schema_version }}</code>.</p></section>
 
-<section class="task-section" aria-labelledby="rust-apis"><h2 id="rust-apis">Versioned Rust APIs</h2>
-<p>These versions are generated from the workspace manifests during the site build. They can differ by patch while remaining in the RustQEC {{ docs_version.release_line }} release line.</p>
-<div class="table-wrap"><table><thead><tr><th>Crate</th><th>Version</th><th>Primary surface</th><th>API</th></tr></thead><tbody>
-<tr><td><code>rstim</code></td><td>{{ docs_version.packages.rstim.version }}</td><td>Circuits, simulation, DEM, formats</td><td><a href="https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/">docs.rs ↗</a></td></tr>
-<tr><td><code>rmatching</code></td><td>{{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">docs.rs ↗</a></td></tr>
-<tr><td><code>rbposd</code></td><td>{{ docs_version.packages.rbposd.version }}</td><td>BP-OSD decoding</td><td><a href="https://docs.rs/rbposd/{{ docs_version.packages.rbposd.version }}/rbposd/">docs.rs ↗</a></td></tr>
-<tr><td><code>rilpqec</code></td><td>{{ docs_version.packages.rilpqec.version }}</td><td>ILP decoding</td><td><a href="https://docs.rs/rilpqec/{{ docs_version.packages.rilpqec.version }}/rilpqec/">docs.rs ↗</a></td></tr>
-<tr><td><code>rsinter</code></td><td>{{ docs_version.packages.rsinter.version }}</td><td>Experiments and decoder replay</td><td><a href="https://docs.rs/rsinter/{{ docs_version.packages.rsinter.version }}/rsinter/">docs.rs ↗</a></td></tr>
-<tr><td><code>qec-code</code></td><td>{{ docs_version.packages.qec_code.version }}</td><td>CSS construction and distance</td><td><a href="https://docs.rs/qec-code/{{ docs_version.packages.qec_code.version }}/qec_code/">docs.rs ↗</a></td></tr>
-<tr><td><code>qec-ilp-core</code></td><td>{{ docs_version.packages.qec_ilp_core.version }}</td><td>Shared ILP models</td><td><a href="https://docs.rs/qec-ilp-core/{{ docs_version.packages.qec_ilp_core.version }}/qec_ilp_core/">docs.rs ↗</a></td></tr>
-</tbody></table></div></section>
+<section class="task-section"><h2 id="rust-apis">Rust APIs</h2><p><a href="../rust-api-reference/">Open the versioned Rust API index</a>, or <a href="../rust-api/">run a complete experiment in Rust</a>.</p></section>
 {% endblock main %}

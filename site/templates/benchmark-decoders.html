@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Decoder benchmarks — RustQEC{% endblock title %}
+{% block description %}Inspect logical failure rates, decoding time and the recorded comparison conditions.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><h1>Decoder benchmarks</h1><p class="hero-copy">Inspect logical failure rates, decoding time and the recorded comparison conditions.</p></div>{% endblock hero %}
+{% block main %}
+<section id="benchmark-campaigns" class="task-section" aria-labelledby="benchmark-campaigns-title">
+  <div class="section-heading">
+    <h2 id="benchmark-campaigns-title">Run and compare decoder cases</h2>
+    <p class="section-copy"><code>rsinter</code> runs cases, merges outputs, and produces comparison plots. Smoke runs check wiring; checked full artifacts support only the recorded cases and environments.</p>
+  </div>
+  <p class="doc-note">These benchmark harnesses require a source checkout and reference Python packages. Follow the <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface comparison setup</a> or <a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/bb_circuit_bposd_compare/README.md">BB comparison setup</a>, then run from the repository root. A smoke run is a small check that the workflow works; it does not establish a decoder ranking.</p>
+  <pre class="quick-command"><code>make surface-decoder-compare-smoke
+make bb-circuit-bposd-compare-smoke</code></pre>
+  <p>A decoder predicts a logical flip from detector events and an error model. Actual logical outcomes are held out for scoring.</p>
+  <div class="table-wrap result-table">
+    <table>
+      <thead><tr><th>Campaign</th><th>What it checks</th><th>Evidence</th></tr></thead>
+      <tbody>
+        <tr><td>Surface decoder</td><td>End-to-end local wiring</td><td>Smoke and checked comparison</td></tr>
+        <tr><td>BB-circuit BP-OSD</td><td>Environment and dataset readiness</td><td>Readiness and checked comparison</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="decoder-results-title">
+  <div class="section-heading">
+    <h2 id="decoder-results-title">Surface-code and BP-OSD comparisons</h2>
+    <p class="section-copy">The checked plots show only their named cases. Full reproduction details are available inside each result.</p>
+  </div>
+  <div class="evidence-stack decoder-evidence" data-evidence-items="surface-decoder-full bb-circuit-full" aria-live="polite">
+    <p>Loading decoder evidence.</p>
+  </div>
+</section>
+
+<section class="evidence-section" aria-labelledby="campaign-evidence-title">
+  <div class="section-heading">
+    <h2 id="campaign-evidence-title">Smoke and readiness checks</h2>
+  </div>
+  <p><a href="../../validation/#local-workflows">Open local smoke and readiness evidence</a>. <a href="../../validation/#historical-results">BP-OSD parity regression checks</a> are also listed in the evidence guide.</p>
+</section>
+
+{% endblock main %}
+{% block scripts %}<script src="{{ root }}/js/benchmarks.js"></script>{% endblock scripts %}
