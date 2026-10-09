@@ -1729,6 +1729,9 @@ impl CompiledNearCliffordExecutor {
             x: vec![0; self.num_qubits.div_ceil(64)],
             z: vec![0; self.num_qubits.div_ceil(64)],
             coefficients,
+            loaded_state: usize::MAX,
+            #[cfg(test)]
+            state_restores: 0,
             reduced_coefficients: Vec::new(),
             cache: CoefficientCache::new(self, cache_bytes),
             pack_enabled: true,
@@ -1771,6 +1774,11 @@ pub struct CompiledNearCliffordSampler<'a> {
     x: Vec<u64>,
     z: Vec<u64>,
     coefficients: Vec<ComplexAmp>,
+    // Cached states are immutable and never evicted. MAX means this arithmetic
+    // buffer has not been identified with a cached state's exact bits.
+    loaded_state: usize,
+    #[cfg(test)]
+    state_restores: usize,
     reduced_coefficients: Vec<ComplexAmp>,
     cache: Option<CoefficientCache>,
     pack_enabled: bool,
@@ -2340,18 +2348,26 @@ impl CompiledNearCliffordSampler<'_> {
         self.cache.as_ref().map_or(0, |cache| cache.reserved)
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
-        let state = self
+        if self.loaded_state == id {
+            return Ok(());
+        }
+        let state = &self
             .cache
             .as_ref()
             .expect("admitted state belongs to a cache")
             .states[id]
-            .coefficients
-            .clone();
+            .coefficients;
+        self.loaded_state = usize::MAX;
         self.coefficients.clear();
         self.coefficients
             .try_reserve_exact(state.len())
             .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
-        self.coefficients.extend_from_slice(&state);
+        self.coefficients.extend_from_slice(state);
+        self.loaded_state = id;
+        #[cfg(test)]
+        {
+            self.state_restores += 1;
+        }
         Ok(())
     }
     fn cached_rotate(
@@ -2403,6 +2419,7 @@ impl CompiledNearCliffordSampler<'_> {
                     children[usize::from(sign)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Rotate(children)) {
                         *state = Some(next);
+                        self.loaded_state = next;
                     }
                 }
             }
@@ -2466,13 +2483,16 @@ impl CompiledNearCliffordSampler<'_> {
                     entry.next[usize::from(branch)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Measure(entry)) {
                         *state = Some(next);
+                        self.loaded_state = next;
                     }
                 }
             } else if self.coefficients.len() == 1 {
                 *state = Some(0);
+                self.loaded_state = 0;
             }
         } else if self.coefficients.len() == 1 && self.cache.is_some() {
             *state = Some(0);
+            self.loaded_state = 0;
         }
         Ok(())
     }
@@ -2491,6 +2511,7 @@ impl CompiledNearCliffordSampler<'_> {
         if p.x == 0 && p.z == 0 {
             return Ok(());
         }
+        self.loaded_state = usize::MAX;
         if expand {
             let len = self
                 .coefficients
@@ -2883,6 +2904,7 @@ impl CompiledNearCliffordSampler<'_> {
         y: bool,
         fixed: bool,
     ) -> Result<(), String> {
+        self.loaded_state = usize::MAX;
         let pivot = 1 << index;
         let low = pivot - 1;
         let other = p.z & !pivot;
@@ -3093,6 +3115,7 @@ impl CompiledNearCliffordSampler<'_> {
         self.z.fill(0);
         let mut state = self.cache.as_ref().map(|cache| cache.start);
         if state.is_none() {
+            self.loaded_state = usize::MAX;
             self.coefficients.clear();
             self.coefficients
                 .try_reserve_exact(self.plan.initial_coefficients.len())
@@ -4051,6 +4074,10 @@ impl CompiledNearCliffordSampler<'_> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "state_restore_tests.rs"]
+mod state_restore_tests;
 
 #[cfg(test)]
 mod tests {
