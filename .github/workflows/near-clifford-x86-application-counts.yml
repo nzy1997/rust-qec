@@ -26,6 +26,16 @@ on:
         required: false
         default: false
         type: boolean
+      current_cpu_peer:
+        description: 'Run all twelve original counts cells against pinned native CPU peers and an identical Rust-binary control'
+        required: false
+        default: false
+        type: boolean
+      rust_ref:
+        description: 'Exact 40-character Rust source commit for current_cpu_peer'
+        required: false
+        default: ''
+        type: string
       candidate_ref:
         description: 'Exact candidate source SHA for cdf_source_pair; both source refs are required'
         required: false
@@ -38,7 +48,7 @@ permissions:
 
 jobs:
   benchmark:
-    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only && !inputs.cdf_source_pair }}
+    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only && !inputs.cdf_source_pair && !inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -146,7 +156,7 @@ jobs:
             drafts/x86-scout-*
             drafts/x86-application-counts/
   paired-scout:
-    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only && !inputs.cdf_source_pair }}
+    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only && !inputs.cdf_source_pair && !inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -209,7 +219,7 @@ jobs:
             drafts/rust-pair-scout-probe/build.log
             drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log
   cpu-profile:
-    if: ${{ inputs.profile_only && !inputs.cdf_source_pair }}
+    if: ${{ inputs.profile_only && !inputs.cdf_source_pair && !inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -254,7 +264,7 @@ jobs:
             drafts/x86-scout-*
             drafts/x86-native-profile/
   cdf-source-pair:
-    if: ${{ inputs.cdf_source_pair }}
+    if: ${{ inputs.cdf_source_pair && !inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
@@ -344,3 +354,96 @@ jobs:
             drafts/x86-cdf/preparation/candidate/*.bin
             drafts/x86-cdf/preparation/candidate/*.json
             drafts/x86-cdf/preparation/candidate/*.log
+  current-cpu-peer:
+    if: ${{ inputs.current_cpu_peer }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      RUSTFLAGS: '-C target-cpu=native'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      RAYON_NUM_THREADS: '1'
+      VECLIB_MAXIMUM_THREADS: '1'
+      NUMEXPR_NUM_THREADS: '1'
+      SYMFT_PY_ENABLE_CUDA: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check contracts and install the pinned Rust compiler
+        env:
+          PROFILE_ONLY: ${{ inputs.profile_only }}
+          CDF_SOURCE_PAIR: ${{ inputs.cdf_source_pair }}
+        run: |
+          test "$PROFILE_ONLY" != true
+          test "$CDF_SOURCE_PAIR" != true
+          mkdir -p drafts
+          python -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py' > drafts/x86-current-peer-contract.log 2>&1
+          python -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py' > drafts/x86-current-peer-contract-optimized.log 2>&1
+          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-current-peer-toolchain.log 2>&1
+      - name: Record the VM and select one logical CPU
+        run: |
+          python - <<'PY'
+          import json, os, platform, subprocess
+          from pathlib import Path
+          root = Path('drafts/x86-current-peer')
+          root.mkdir()
+          affinity = sorted(os.sched_getaffinity(0))
+          receipt = dict(platform=platform.platform(), virtual_machine=True,
+                         selected_cpu=affinity[0], available_affinity=affinity,
+                         lscpu=json.loads(subprocess.check_output(['lscpu','--json'])),
+                         cpuinfo=Path('/proc/cpuinfo').read_text(),
+                         meminfo=Path('/proc/meminfo').read_text())
+          (root/'host.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          with open(os.environ['GITHUB_ENV'],'a') as file:
+              file.write(f'BENCH_CPU={affinity[0]}\n')
+          PY
+      - name: Retain source, native compiler commands, wheels, imports and Rust probes
+        timeout-minutes: 35
+        env:
+          RUST_REF: ${{ inputs.rust_ref }}
+        run: |
+          python -I benchmarks/near_clifford/current_cpu_peer/prepare.py \
+            --rust-ref "$RUST_REF" --out drafts/x86-current-peer/preparation \
+            > drafts/x86-current-peer/prepare.log 2>&1
+      - name: Tune, freeze, validate and compare all twelve original counts cells
+        timeout-minutes: 65
+        run: |
+          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/current_cpu_peer/run_retained.py \
+            --preparation drafts/x86-current-peer/preparation \
+            --out drafts/x86-current-peer/output --control drafts/x86-current-peer/control \
+            > drafts/x86-current-peer/outer.log 2>&1
+      - name: Seal original bytes before interpreting performance
+        run: |
+          python -I benchmarks/near_clifford/current_cpu_peer/verify.py \
+            drafts/x86-current-peer --seal > drafts/x86-current-peer-seal.log 2>&1
+      - name: Replay all source bindings, finite counts and timing observations
+        run: |
+          python -I benchmarks/near_clifford/current_cpu_peer/verify.py \
+            drafts/x86-current-peer --git-sources \
+            --analysis drafts/x86-current-peer/analysis/verified.json \
+            > drafts/x86-current-peer-verify.log 2>&1
+          python -I -O benchmarks/near_clifford/current_cpu_peer/verify.py \
+            drafts/x86-current-peer --git-sources \
+            > drafts/x86-current-peer-verify-optimized.log 2>&1
+      - name: Retain originals, actual native binaries and partial failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: near-clifford-current-cpu-peer-${{ github.sha }}
+          retention-days: 30
+          path: |
+            drafts/x86-current-peer-*.log
+            drafts/x86-current-peer/
+            !drafts/x86-current-peer/preparation/source/
+            !drafts/x86-current-peer/preparation/symft/
+            !drafts/x86-current-peer/preparation/clifft/
+            !drafts/x86-current-peer/preparation/rust/source/
+            !drafts/x86-current-peer/preparation/rust/**/native-target/
+            !drafts/x86-current-peer/preparation/rust/**/test-target/
+            !drafts/x86-current-peer/**/__pycache__/
