@@ -1217,7 +1217,13 @@ fn compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tail
                         .flat_map(|shot| shot.measurements.iter().copied().map(u8::from))
                         .collect::<Vec<_>>()
                 );
-                assert_eq!(a.next_u64(), b.next_u64());
+                for word in 0..16 {
+                    assert_eq!(
+                        a.next_u64(),
+                        b.next_u64(),
+                        "policy={arithmetic:?}; budget={budget}; shots={shots}; RNG word={word}"
+                    );
+                }
             }
         }
     }
