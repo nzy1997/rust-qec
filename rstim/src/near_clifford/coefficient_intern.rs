@@ -27,6 +27,7 @@ mod tests {
             coefficients: Arc::new(values.to_vec()),
             next_node: None,
             transition: CachedOp::None,
+            replay_next: [None; 2],
         }
     }
 
