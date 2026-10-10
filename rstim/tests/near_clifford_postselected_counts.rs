@@ -25,6 +25,59 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn cached_rotations_preserve_msc_counts_raw_calls_and_rng_at_budget_boundaries() {
+    for text in [
+        include_str!(
+            "../../benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim"
+        ),
+        include_str!(
+            "../../benchmarks/near_clifford/application_counts/fixtures/msc_d5_inject_cultivate_p1e-3.stim"
+        ),
+    ] {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, policy).unwrap();
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for budget in [0, initial, initial + 288, 64 * 1024 * 1024] {
+                for seed in [583, 1739] {
+                    let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                    let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                    let mut a = StdRng::seed_from_u64(seed);
+                    let mut b = a.clone();
+                    for shots in [0, 1, 63, 64, 65, 129, 1024, 64] {
+                        let records = reference.sample(shots, &mut b).unwrap();
+                        assert_eq!(
+                            cached.sample_postselected_counts(shots, 0, &mut a).unwrap(),
+                            count_records(&records, 0),
+                            "{policy:?} budget={budget} seed={seed} shots={shots}"
+                        );
+                        let records = reference.sample(shots, &mut b).unwrap();
+                        assert_eq!(cached.sample(shots, &mut a).unwrap(), records);
+                        assert_eq!(
+                            cached.sample_measurements_u8(17, &mut a).unwrap(),
+                            reference.sample_measurements_u8(17, &mut b).unwrap()
+                        );
+                        for _ in 0..16 {
+                            assert_eq!(a.next_u64(), b.next_u64());
+                        }
+                        assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+                    }
+                    if budget == 64 * 1024 * 1024 {
+                        assert!(cached.coefficient_cache_reserved_bytes() > initial);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [
