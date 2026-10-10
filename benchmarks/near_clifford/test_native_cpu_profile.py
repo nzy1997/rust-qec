@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import native_cpu_profile as profile
 
@@ -54,7 +55,7 @@ def fixture(out):
     preflight = {}
     for name in profile.PREFLIGHT:
         path = out / ("preflight-" + name + ".log")
-        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 1} passed; fixture only\n")
+        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 1} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fixture only\n")
         preflight[name] = dict(path=path.name, sha256=profile.scout.digest(path))
     h = dict(schema="diagnostic.native-cpu-sampling.v1", started=1, performance_valid=False,
              scope="fixture-only metadata, no real samples", identities=identities, retained=retained, preflight=preflight,
@@ -110,6 +111,90 @@ def seal(out, h, c, events):
 
 
 class ProfileContract(unittest.TestCase):
+    def test_profile_producer_uses_complete_public_suite_preflight(self):
+        cases = [(10, 0, 0, 0, True), (11, 0, 0, 0, True),
+                 (0, 0, 0, 0, False), (11, 1, 0, 0, False),
+                 (11, 0, 1, 0, False), (11, 0, 0, 1, False)]
+        for passed, failed, ignored, filtered, valid in cases:
+            with self.subTest(case=(passed, failed, ignored, filtered)), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                script = root / "benchmarks/near_clifford/verify_x86_rotations.sh"
+                script.parent.mkdir(parents=True)
+                script.write_text("fixture preflight, never executed\n")
+                (root / "drafts").mkdir()
+                (root / "drafts/x86-scout-features.txt").write_text("fixture flags: avx2 fma\n")
+                for name in profile.PREFLIGHT:
+                    text = "test result: ok. 1 passed; fixture only\n"
+                    if name == "public-counts":
+                        text = f"test result: ok. {passed} passed; {failed} failed; {ignored} ignored; 0 measured; {filtered} filtered out; fixture only\n"
+                    (root / ("drafts/x86-scout-" + name + ".log")).write_text(text)
+                roots = dict(candidate=root, baseline=root / "drafts/rust-pair-scout-baseline")
+                with mock.patch.object(profile, "ROOT", root), \
+                     mock.patch.dict(os.environ, profile.ENV), \
+                     mock.patch.object(profile.platform, "system", return_value="Linux"), \
+                     mock.patch.object(profile.platform, "machine", return_value="x86_64"), \
+                     mock.patch.object(profile.os, "sched_getaffinity", return_value={0}, create=True), \
+                     mock.patch.object(profile.os, "sched_setaffinity", create=True), \
+                     mock.patch.object(profile.scout, "prepare", return_value=roots), \
+                     mock.patch.object(profile, "choose_perf", return_value=(root / "fixture-perf", "fixture")), \
+                     mock.patch.object(profile.scout, "retain_probe_inputs", return_value={}), \
+                     mock.patch.object(profile.scout, "identity", side_effect=RuntimeError("past preflight; no perf execution")) as identity:
+                    if valid:
+                        with self.assertRaisesRegex(RuntimeError, "past preflight"):
+                            profile.profile("1" * 40, root / "drafts/profile")
+                        identity.assert_called_once()
+                    else:
+                        with self.assertRaisesRegex(ValueError, "native gate result: public-counts"):
+                            profile.profile("1" * 40, root / "drafts/profile")
+                        identity.assert_not_called()
+
+    def test_single_test_gates_keep_exactly_one_passing_test(self):
+        for name in profile.PREFLIGHT:
+            if name == "public-counts":
+                continue
+            with self.subTest(name=name):
+                profile.verify_preflight(name, "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 288 filtered out;\n")
+                for passed in [0, 2, 10, 11]:
+                    with self.assertRaisesRegex(ValueError, "native gate result: " + name):
+                        profile.verify_preflight(name, f"test result: ok. {passed} passed; fixture only\n")
+
+    def test_growing_public_suite_passes_preflight_and_retained_verification(self):
+        for passed in [10, 11, 101]:
+            with self.subTest(passed=passed), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                path = out / "preflight-public-counts.log"
+                text = f"running {passed} tests\ntest result: ok. {passed} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
+                profile.verify_preflight("public-counts", text)
+                path.write_text(text)
+                h["preflight"]["public-counts"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                profile.verify(out, git_sources=False, replay=False)
+
+    def test_incomplete_public_suite_is_rejected_by_preflight_and_retained_verification(self):
+        summary = "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
+        logs = [summary.replace("11 passed", "0 passed"),
+                summary.replace("0 failed", "1 failed"),
+                summary.replace("0 ignored", "1 ignored"),
+                summary.replace("0 measured", "1 measured"),
+                summary.replace("0 filtered out", "1 filtered out"),
+                summary.replace("result: ok.", "result: FAILED."),
+                "unrelated " + summary,
+                summary.replace("ok.", "okX"),
+                "running 11 tests\n"]
+        for text in logs:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                with self.assertRaisesRegex(ValueError, "native gate result: public-counts"):
+                    profile.verify_preflight("public-counts", text)
+                path = out / "preflight-public-counts.log"
+                path.write_text(text)
+                h["preflight"]["public-counts"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                with self.assertRaisesRegex(ValueError, "native gate result: public-counts"):
+                    profile.verify(out, git_sources=False, replay=False)
+
     def test_fixture_metadata_only_passes_explicit_non_execution_check(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)
