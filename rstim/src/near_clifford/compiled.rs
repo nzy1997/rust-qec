@@ -227,6 +227,114 @@ struct CachedState {
     next_node: Option<usize>,
     transition: CachedOp,
 }
+
+// These identities retain only deterministic branch provenance and probabilities.
+// Transforms still run on the mutable coefficients; packet lanes keep real IDs.
+struct ReplayState {
+    next_node: Option<usize>,
+    transition: CachedOp,
+}
+struct ReplayAnchor {
+    // Real snapshot IDs never equal this empty sentinel.
+    snapshot: usize,
+    next: [Option<usize>; 2],
+}
+struct ReplayProbabilityCache {
+    states: Vec<ReplayState>,
+    scalar_next: Vec<[Option<usize>; 2]>,
+    snapshot_anchors: Vec<ReplayAnchor>,
+}
+impl ReplayProbabilityCache {
+    fn new(nodes: usize, budget: usize) -> Option<Self> {
+        let roots = nodes.checked_mul(size_of::<[Option<usize>; 2]>())?;
+        let remaining = budget.checked_sub(roots)?;
+        // Anchor capacity is independent of the number of real snapshots. The
+        // table and arena never grow, including after later snapshot admissions.
+        let anchors = (remaining / 4 / size_of::<ReplayAnchor>()).max(2);
+        let anchor_bytes = anchors.checked_mul(size_of::<ReplayAnchor>())?;
+        let limit = remaining.checked_sub(anchor_bytes)? / size_of::<ReplayState>();
+        if limit < 2 {
+            return None;
+        }
+        let mut scalar_next = Vec::new();
+        scalar_next.try_reserve_exact(nodes).ok()?;
+        let mut snapshot_anchors = Vec::new();
+        snapshot_anchors.try_reserve_exact(anchors).ok()?;
+        let mut states = Vec::new();
+        states.try_reserve_exact(limit).ok()?;
+        let bytes = scalar_next
+            .capacity()
+            .checked_mul(size_of::<[Option<usize>; 2]>())?
+            .checked_add(
+                snapshot_anchors
+                    .capacity()
+                    .checked_mul(size_of::<ReplayAnchor>())?,
+            )?
+            .checked_add(states.capacity().checked_mul(size_of::<ReplayState>())?)?;
+        if bytes > budget {
+            return None;
+        }
+        scalar_next.resize(nodes, [None; 2]);
+        snapshot_anchors.resize_with(anchors, || ReplayAnchor {
+            snapshot: usize::MAX,
+            next: [None; 2],
+        });
+        Some(Self {
+            states,
+            scalar_next,
+            snapshot_anchors,
+        })
+    }
+    fn reserved_bytes(&self) -> usize {
+        self.states.capacity() * size_of::<ReplayState>()
+            + self.scalar_next.capacity() * size_of::<[Option<usize>; 2]>()
+            + self.snapshot_anchors.capacity() * size_of::<ReplayAnchor>()
+    }
+    fn snapshot_slot(&self, snapshot: usize) -> Option<usize> {
+        if snapshot == usize::MAX {
+            return None;
+        }
+        let len = self.snapshot_anchors.len();
+        let start = snapshot.wrapping_mul(0x9e37_79b9) % len;
+        // Admission is optional. Refuse excessive collisions instead of growing
+        // the table or making every fallback scan an unbounded chain.
+        for offset in 0..len.min(8) {
+            let slot = (start + offset) % len;
+            let entry = &self.snapshot_anchors[slot];
+            if entry.snapshot == snapshot || entry.snapshot == usize::MAX {
+                return Some(slot);
+            }
+        }
+        None
+    }
+    fn allocate(&mut self) -> Option<usize> {
+        if self.states.len() == self.states.capacity() {
+            return None;
+        }
+        let id = self.states.len();
+        self.states.push(ReplayState {
+            next_node: None,
+            transition: CachedOp::None,
+        });
+        Some(id)
+    }
+    fn entry(&self, id: usize, node: usize) -> Option<CachedOp> {
+        let state = &self.states[id];
+        match state.next_node {
+            Some(expected) if expected != node => None,
+            _ => Some(state.transition),
+        }
+    }
+    fn set_entry(&mut self, id: usize, node: usize, entry: CachedOp) -> bool {
+        let state = &mut self.states[id];
+        if state.next_node.is_some_and(|expected| expected != node) {
+            return false;
+        }
+        state.next_node = Some(node);
+        state.transition = entry;
+        true
+    }
+}
 struct CoefficientCache {
     // Scalar state 0 is shared across positions. Optional interning only shares
     // exact coefficient bits produced at the same coherent node.
@@ -237,6 +345,9 @@ struct CoefficientCache {
     start: usize,
     reserved: usize,
     budget: usize,
+    replay_budget: usize,
+    replay_attempted: bool,
+    replay: Option<ReplayProbabilityCache>,
 }
 impl CoefficientCache {
     fn new(plan: &CompiledNearCliffordExecutor, budget: usize) -> Option<Self> {
@@ -253,6 +364,19 @@ impl CoefficientCache {
         if bytes > budget {
             return None;
         }
+        // Reserve one sixty-fourth for optional probability metadata after
+        // snapshot saturation, up to 1 MiB inside the same total budget.
+        // Tiny caches disable metadata rather than displacing real snapshots.
+        let quota = ((budget - bytes) / 64).min(1024 * 1024);
+        let replay_budget = plan
+            .operations
+            .len()
+            .checked_mul(size_of::<[Option<usize>; 2]>())
+            .and_then(|n| {
+                n.checked_add(2 * size_of::<ReplayState>() + 2 * size_of::<ReplayAnchor>())
+            })
+            .filter(|&minimum| minimum <= quota)
+            .map_or(0, |_| quota);
         let mut nodes = Vec::new();
         nodes.try_reserve_exact(plan.operations.len()).ok()?;
         nodes.resize(plan.operations.len(), CachedOp::None);
@@ -281,7 +405,81 @@ impl CoefficientCache {
             start,
             reserved: bytes,
             budget,
+            replay_budget,
+            replay_attempted: false,
+            replay: None,
         })
+    }
+    fn replay_child(
+        &mut self,
+        input: Option<usize>,
+        parent: Option<usize>,
+        node: usize,
+        choice: usize,
+        measurement: bool,
+    ) -> Option<usize> {
+        if let Some(id) = input {
+            let entry = self.entry(id, node)?;
+            match (measurement, entry) {
+                (true, CachedOp::Measure(_)) | (false, CachedOp::Rotate(_)) => {}
+                (false, CachedOp::None) => {
+                    if !self.set_entry(id, node, CachedOp::Rotate([None; 2])) {
+                        return None;
+                    }
+                }
+                _ => return None,
+            }
+            if !self.replay_attempted {
+                self.replay_attempted = true;
+                self.replay = ReplayProbabilityCache::new(self.nodes.len(), self.replay_budget);
+            }
+            let replay = self.replay.as_mut()?;
+            let anchor = if id == 0 {
+                None
+            } else {
+                Some(replay.snapshot_slot(id)?)
+            };
+            let existing = if let Some(slot) = anchor {
+                replay.snapshot_anchors[slot].next[choice]
+            } else {
+                replay.scalar_next[node][choice]
+            };
+            if existing.is_some() {
+                return existing;
+            }
+            let child = replay.allocate()?;
+            if let Some(slot) = anchor {
+                replay.snapshot_anchors[slot].snapshot = id;
+                replay.snapshot_anchors[slot].next[choice] = Some(child);
+            } else {
+                replay.scalar_next[node][choice] = Some(child);
+            }
+            Some(child)
+        } else {
+            let id = parent?;
+            let replay = self.replay.as_mut()?;
+            let entry = replay.entry(id, node)?;
+            let mut next = match (measurement, entry) {
+                (true, CachedOp::Measure(m)) => m.next,
+                (false, CachedOp::Rotate(next)) => next,
+                (false, CachedOp::None) => [None; 2],
+                _ => return None,
+            };
+            if next[choice].is_some() {
+                return next[choice];
+            }
+            let child = replay.allocate()?;
+            next[choice] = Some(child);
+            let updated = match entry {
+                CachedOp::Measure(mut m) => {
+                    m.next = next;
+                    CachedOp::Measure(m)
+                }
+                _ => CachedOp::Rotate(next),
+            };
+            replay.set_entry(id, node, updated);
+            Some(child)
+        }
     }
     fn entry(&self, id: usize, node: usize) -> Option<CachedOp> {
         if id == 0 {
@@ -323,6 +521,7 @@ impl CoefficientCache {
     fn fits(&self, bytes: usize) -> bool {
         self.reserved
             .checked_add(bytes)
+            .and_then(|sum| sum.checked_add(self.replay_budget))
             .is_some_and(|sum| sum <= self.budget)
     }
     fn store(&mut self, node: usize, coefficients: &[ComplexAmp]) -> Option<usize> {
@@ -347,7 +546,7 @@ impl CoefficientCache {
             && internable
         {
             self.intern_attempted = true;
-            let remaining = self.budget - self.reserved - charge;
+            let remaining = self.budget - self.reserved - self.replay_budget - charge;
             self.intern = CoefficientIntern::new(remaining);
             self.reserved += self
                 .intern
@@ -1731,6 +1930,9 @@ impl CompiledNearCliffordExecutor {
             coefficients,
             reduced_coefficients: Vec::new(),
             cache: CoefficientCache::new(self, cache_bytes),
+            probability_replay_state: None,
+            #[cfg(test)]
+            probability_replay_hits: 0,
             pack_enabled: true,
             #[cfg(test)]
             last_packet_live: 0,
@@ -1773,6 +1975,9 @@ pub struct CompiledNearCliffordSampler<'a> {
     coefficients: Vec<ComplexAmp>,
     reduced_coefficients: Vec<ComplexAmp>,
     cache: Option<CoefficientCache>,
+    probability_replay_state: Option<usize>,
+    #[cfg(test)]
+    probability_replay_hits: usize,
     pack_enabled: bool,
     #[cfg(test)]
     last_packet_live: usize,
@@ -2337,7 +2542,13 @@ impl CompiledNearCliffordSampler<'_> {
     /// Conservative admitted coefficient-cache bytes, excluding the static plan
     /// and arithmetic work buffers. This is not process memory usage.
     pub fn coefficient_cache_reserved_bytes(&self) -> usize {
-        self.cache.as_ref().map_or(0, |cache| cache.reserved)
+        self.cache.as_ref().map_or(0, |cache| {
+            cache.reserved
+                + cache
+                    .replay
+                    .as_ref()
+                    .map_or(0, ReplayProbabilityCache::reserved_bytes)
+        })
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
         let state = self
@@ -2386,6 +2597,10 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
         }
+        let replay_input = self.probability_replay_state;
+        if state.is_some() {
+            self.probability_replay_state = None;
+        }
         let input = *state;
         if let Some(id) = input {
             self.load_state(id)?;
@@ -2407,6 +2622,13 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
         }
+        self.probability_replay_state = if state.is_none() {
+            self.cache.as_mut().and_then(|cache| {
+                cache.replay_child(input, replay_input, node, usize::from(sign), false)
+            })
+        } else {
+            None
+        };
         Ok(())
     }
     fn cached_probability_zero(
@@ -2417,6 +2639,20 @@ impl CompiledNearCliffordSampler<'_> {
     ) -> Result<f64, String> {
         if let (Some(id), Some(cache)) = (state, self.cache.as_ref()) {
             if let Some(CachedOp::Measure(entry)) = cache.entry(id, node) {
+                return Ok(entry.probability_zero);
+            }
+        }
+        if state.is_some() {
+            self.probability_replay_state = None;
+        } else if let (Some(id), Some(replay)) = (
+            self.probability_replay_state,
+            self.cache.as_ref().and_then(|cache| cache.replay.as_ref()),
+        ) {
+            if let Some(CachedOp::Measure(entry)) = replay.entry(id, node) {
+                #[cfg(test)]
+                {
+                    self.probability_replay_hits += 1;
+                }
                 return Ok(entry.probability_zero);
             }
         }
@@ -2433,6 +2669,23 @@ impl CompiledNearCliffordSampler<'_> {
                     next: [None; 2],
                 }),
             );
+        }
+        if state.is_none() {
+            if let (Some(id), Some(replay)) = (
+                self.probability_replay_state,
+                self.cache.as_mut().and_then(|cache| cache.replay.as_mut()),
+            ) {
+                if matches!(replay.entry(id, node), Some(CachedOp::None)) {
+                    replay.set_entry(
+                        id,
+                        node,
+                        CachedOp::Measure(CachedMeasurement {
+                            probability_zero: probability,
+                            next: [None; 2],
+                        }),
+                    );
+                }
+            }
         }
         Ok(probability)
     }
@@ -2454,6 +2707,10 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
         }
+        let replay_input = self.probability_replay_state;
+        if state.is_some() {
+            self.probability_replay_state = None;
+        }
         let input = *state;
         if let Some(id) = input {
             self.load_state(id)?;
@@ -2474,6 +2731,13 @@ impl CompiledNearCliffordSampler<'_> {
         } else if self.coefficients.len() == 1 && self.cache.is_some() {
             *state = Some(0);
         }
+        self.probability_replay_state = if state.is_none() {
+            self.cache.as_mut().and_then(|cache| {
+                cache.replay_child(input, replay_input, node, usize::from(branch), true)
+            })
+        } else {
+            None
+        };
         Ok(())
     }
 
@@ -3091,6 +3355,7 @@ impl CompiledNearCliffordSampler<'_> {
     ) -> Result<NearCliffordShot, String> {
         self.x.fill(0);
         self.z.fill(0);
+        self.probability_replay_state = None;
         let mut state = self.cache.as_ref().map(|cache| cache.start);
         if state.is_none() {
             self.coefficients.clear();
@@ -6475,6 +6740,456 @@ mod avx2_rotation_bits_tests {
                             );
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod probability_replay_tests {
+    use super::*;
+    use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        CompactPauli {
+            physical: PackedPauli {
+                x: vec![x as u64],
+                z: vec![z as u64],
+                phase,
+            },
+            x,
+            z,
+        }
+    }
+    fn bits(values: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        values
+            .iter()
+            .map(|a| (a.re.to_bits(), a.im.to_bits()))
+            .collect()
+    }
+    fn plan(arithmetic: CompiledRotationArithmetic) -> CompiledNearCliffordExecutor {
+        CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+            "H 0 1 2\nX_ERROR(0.1) 0\nT 0 1 2\nMY 0\nMX 1\nMY 2\n",
+            arithmetic,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn replay_arena_bounds_storage_and_refuses_wrong_nodes() {
+        let roots = 3 * size_of::<[Option<usize>; 2]>();
+        let budget = roots + 2 * size_of::<ReplayAnchor>() + 2 * size_of::<ReplayState>();
+        assert!(ReplayProbabilityCache::new(3, budget - 1).is_none());
+        assert!(ReplayProbabilityCache::new(usize::MAX, usize::MAX).is_none());
+        let mut arena = ReplayProbabilityCache::new(3, budget).unwrap();
+        let id = arena.allocate().unwrap();
+        assert!(arena.set_entry(id, 1, CachedOp::Rotate([None; 2])));
+        assert!(arena.entry(id, 2).is_none());
+        assert!(!arena.set_entry(id, 2, CachedOp::None));
+        assert!(matches!(arena.entry(id, 1), Some(CachedOp::Rotate(_))));
+        assert!(arena.allocate().is_some());
+        assert!(arena.allocate().is_none());
+        assert_eq!(arena.reserved_bytes(), budget);
+        assert!(arena.snapshot_slot(usize::MAX).is_none());
+        arena.snapshot_anchors[0].snapshot = 1;
+        arena.snapshot_anchors[1].snapshot = 2;
+        assert!(arena.snapshot_slot(1).is_some());
+        assert!(arena.snapshot_slot(2).is_some());
+        assert!(arena.snapshot_slot(3).is_none());
+        let mut crowded = ReplayProbabilityCache::new(1, 4096).unwrap();
+        let len = crowded.snapshot_anchors.len();
+        assert!(len > 8);
+        let start = 7usize.wrapping_mul(0x9e37_79b9) % len;
+        for offset in 0..8 {
+            crowded.snapshot_anchors[(start + offset) % len].snapshot = 100 + offset;
+        }
+        assert_eq!(
+            crowded.snapshot_anchors[(start + 8) % len].snapshot,
+            usize::MAX
+        );
+        assert!(crowded.snapshot_slot(7).is_none());
+        // Real snapshots retain the baseline structure and conservative ledger.
+        // A small quota refuses metadata without eagerly allocating the arena;
+        // a sufficient quota remains usable within the same total cache bound.
+        let p = plan(CompiledRotationArithmetic::Strict);
+        let tiny = CoefficientCache::new(&p, 4096).unwrap();
+        assert_eq!(tiny.replay_budget, 0);
+        assert!(tiny.replay.is_none());
+        let ample = CoefficientCache::new(&p, 128 * 1024).unwrap();
+        assert!(ample.replay_budget > 0);
+        assert!(ample.replay.is_none());
+        assert!(ample.fits(0));
+        assert!(
+            ReplayProbabilityCache::new(ample.nodes.len(), ample.replay_budget)
+                .unwrap()
+                .reserved_bytes()
+                <= ample.replay_budget
+        );
+
+        assert!(
+            2 * size_of::<CachedState>() + size_of::<Vec<ComplexAmp>>() + 2 * size_of::<usize>()
+                <= 256
+        );
+    }
+
+    #[test]
+    fn replay_probabilities_keep_exact_bits_through_both_transform_branches() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            for sign in [false, true] {
+                for dagger in [false, true] {
+                    for branch in [false, true] {
+                        let mut plan = plan(policy);
+                        plan.initial_coefficients = Arc::new(
+                            (0..8)
+                                .map(|i| {
+                                    ComplexAmp::new((i + 1) as f64 / 20., (7 - i) as f64 / 25.)
+                                })
+                                .collect(),
+                        );
+                        let mut cached =
+                            plan.prepare_sampler_with_cache_budget(128 * 1024).unwrap();
+                        let mut literal = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                        let cache = cached.cache.as_mut().unwrap();
+                        cache.reserved = cache.budget - cache.replay_budget;
+                        assert!(cache.replay_budget > 0);
+                        let start = cache.start;
+                        let r = pauli(1, 3, 1);
+                        let m = pauli(0, 1, 0);
+                        let mut first = Vec::new();
+                        for repeat in 0..2 {
+                            cached.probability_replay_state = None;
+                            let mut state = Some(start);
+                            literal.coefficients = plan.initial_coefficients.as_ref().clone();
+                            cached
+                                .cached_rotate_signed(0, &r, false, dagger, sign, &mut state)
+                                .unwrap();
+                            literal.rotate_signed(&r, false, dagger, sign).unwrap();
+                            assert!(state.is_none());
+                            assert_eq!(bits(&cached.coefficients), bits(&literal.coefficients));
+                            assert!(cached.probability_replay_state.is_some());
+                            let expected = literal.probability_zero(&m);
+                            let before = cached.coefficients.clone();
+                            if repeat == 1 {
+                                cached
+                                    .coefficients
+                                    .fill(ComplexAmp::new(f64::NAN, f64::INFINITY));
+                            }
+                            assert_eq!(
+                                cached
+                                    .cached_probability_zero(1, &m, state)
+                                    .unwrap()
+                                    .to_bits(),
+                                expected.to_bits()
+                            );
+                            cached.coefficients = before;
+                            cached
+                                .cached_project(1, &m, 0, false, branch, branch, &mut state)
+                                .unwrap();
+                            literal.project(&m, 0, false, branch).unwrap();
+                            assert!(state.is_none());
+                            assert_eq!(bits(&cached.coefficients), bits(&literal.coefficients));
+                            let value = cached
+                                .cached_probability_zero(2, &pauli(1, 1, 1), state)
+                                .unwrap();
+                            assert_eq!(
+                                value.to_bits(),
+                                literal.probability_zero(&pauli(1, 1, 1)).to_bits()
+                            );
+                            if repeat == 0 {
+                                first = bits(&cached.coefficients);
+                            } else {
+                                assert_eq!(first, bits(&cached.coefficients));
+                            }
+                            assert!(cached.coefficient_cache_reserved_bytes() <= 128 * 1024);
+                        }
+                        assert_eq!(cached.probability_replay_hits, 2);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn replay_projection_anchors_preserve_reexpansion_and_global_phase_noops() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            for y in [false, true] {
+                for branch in [false, true] {
+                    let mut p = plan(policy);
+                    p.initial_coefficients = Arc::new(
+                        (0..8)
+                            .map(|i| ComplexAmp::new((i + 1) as f64 / 20., (7 - i) as f64 / 25.))
+                            .collect(),
+                    );
+                    let mut cached = p.prepare_sampler_with_cache_budget(128 * 1024).unwrap();
+                    let mut literal = p.prepare_sampler_with_cache_budget(0).unwrap();
+                    let cache = cached.cache.as_mut().unwrap();
+                    cache.reserved = cache.budget - cache.replay_budget;
+                    let start = cache.start;
+                    let m = pauli(usize::from(y), 1, u8::from(y));
+                    for _ in 0..2 {
+                        cached.probability_replay_state = None;
+                        let mut state = Some(start);
+                        literal.coefficients = p.initial_coefficients.as_ref().clone();
+                        assert_eq!(
+                            cached
+                                .cached_probability_zero(0, &m, state)
+                                .unwrap()
+                                .to_bits(),
+                            literal.probability_zero(&m).to_bits()
+                        );
+                        cached
+                            .cached_project(0, &m, 0, y, branch, branch, &mut state)
+                            .unwrap();
+                        literal.project(&m, 0, y, branch).unwrap();
+                        assert!(state.is_none());
+                        assert!(cached.probability_replay_state.is_some());
+                        assert_eq!(bits(&cached.coefficients), bits(&literal.coefficients));
+                        let cursor = cached.probability_replay_state;
+                        cached
+                            .cached_rotate_signed(
+                                1,
+                                &pauli(0, 0, 0),
+                                false,
+                                false,
+                                true,
+                                &mut state,
+                            )
+                            .unwrap();
+                        assert_eq!(cached.probability_replay_state, cursor);
+                        let diagonal = pauli(0, 1, 0);
+                        assert_eq!(
+                            cached
+                                .cached_probability_zero(1, &diagonal, state)
+                                .unwrap()
+                                .to_bits(),
+                            literal.probability_zero(&diagonal).to_bits()
+                        );
+                        // A second actual projection advances the measurement
+                        // child; unlike frame changes it changes coherent state.
+                        cached
+                            .cached_project(1, &diagonal, 0, false, branch, branch, &mut state)
+                            .unwrap();
+                        literal.project(&diagonal, 0, false, branch).unwrap();
+                        cached
+                            .cached_rotate_signed(
+                                2,
+                                &pauli(2, 0, 0),
+                                true,
+                                false,
+                                false,
+                                &mut state,
+                            )
+                            .unwrap();
+                        literal
+                            .rotate_signed(&pauli(2, 0, 0), true, false, false)
+                            .unwrap();
+                        assert_eq!(bits(&cached.coefficients), bits(&literal.coefficients));
+                        assert_eq!(
+                            cached
+                                .cached_probability_zero(3, &diagonal, state)
+                                .unwrap()
+                                .to_bits(),
+                            literal.probability_zero(&diagonal).to_bits()
+                        );
+                    }
+                    assert_eq!(cached.probability_replay_hits, 2);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn replay_cdf_bits_preserve_special_coefficients_and_phase_aliases() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            for phase in 0..=u8::MAX {
+                for x in [0, 1] {
+                    for values in [
+                        vec![
+                            ComplexAmp::new(-0., 0.),
+                            ComplexAmp::new(f64::from_bits(1), -0.),
+                        ],
+                        vec![
+                            ComplexAmp::new(f64::INFINITY, 0.),
+                            ComplexAmp::new(f64::NAN, -0.),
+                        ],
+                        vec![ComplexAmp::new(0.6, -0.8), ComplexAmp::new(-0., 0.)],
+                    ] {
+                        let mut p = plan(policy);
+                        p.initial_coefficients = Arc::new(values.clone());
+                        let mut s = p.prepare_sampler_with_cache_budget(128 * 1024).unwrap();
+                        let cache = s.cache.as_mut().unwrap();
+                        cache.reserved = cache.budget - cache.replay_budget;
+                        let id = cache
+                            .replay_child(Some(cache.start), None, 0, 0, false)
+                            .unwrap();
+                        s.probability_replay_state = Some(id);
+                        s.coefficients = values;
+                        let op = pauli(x, 1, phase);
+                        let expected = s.probability_zero(&op).to_bits();
+                        // Every accepted u8 alias must agree with its canonical
+                        // phase, including wrap boundaries and special values.
+                        assert_eq!(
+                            expected,
+                            s.probability_zero(&pauli(x, 1, phase & 3)).to_bits()
+                        );
+                        assert_eq!(
+                            s.cached_probability_zero(1, &op, None).unwrap().to_bits(),
+                            expected
+                        );
+                        s.coefficients.fill(ComplexAmp::new(0.3, 0.7));
+                        assert_eq!(
+                            s.cached_probability_zero(1, &op, None).unwrap().to_bits(),
+                            expected
+                        );
+                        assert_eq!(s.probability_replay_hits, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn replay_links_distinguish_choices_and_stop_at_capacity_or_unknown_provenance() {
+        let p = plan(CompiledRotationArithmetic::Strict);
+        let mut cache = CoefficientCache::new(&p, 128 * 1024).unwrap();
+        cache.replay_budget = p.operations.len() * size_of::<[Option<usize>; 2]>()
+            + 2 * size_of::<ReplayAnchor>()
+            + 4 * size_of::<ReplayState>();
+        let left = cache.replay_child(Some(0), None, 0, 0, false).unwrap();
+        let right = cache.replay_child(Some(0), None, 0, 1, false).unwrap();
+        assert_ne!(left, right);
+        assert_eq!(cache.replay_child(Some(0), None, 0, 0, false), Some(left));
+        let m = CachedOp::Measure(CachedMeasurement {
+            probability_zero: 0.5,
+            next: [None; 2],
+        });
+        assert!(cache.replay.as_mut().unwrap().set_entry(left, 1, m));
+        let a = cache.replay_child(None, Some(left), 1, 0, true).unwrap();
+        let b = cache.replay_child(None, Some(left), 1, 1, true).unwrap();
+        assert_ne!(a, b);
+        assert_eq!(cache.replay_child(None, Some(left), 1, 0, true), Some(a));
+        assert!(cache.replay_child(None, Some(right), 2, 0, false).is_none());
+        assert!(cache.replay_child(None, Some(left), 2, 0, true).is_none());
+        assert!(cache.replay_child(None, None, 1, 0, true).is_none());
+        assert!(cache.replay_child(Some(0), None, 2, 0, true).is_none());
+        // A non-scalar snapshot binds its first coherent node and cannot be
+        // anchored again at another position, even if the scalar arena has space.
+        let id = cache.store(0, &[ComplexAmp::new(0.5, 0.); 2]).unwrap();
+        cache.replay_child(Some(id), None, 1, 0, false);
+        assert!(cache.replay_child(Some(id), None, 2, 0, false).is_none());
+        // Snapshots admitted after lazy allocation can acquire sparse anchors
+        // without resizing either metadata allocation or changing real IDs.
+        let mut late = CoefficientCache::new(&p, 128 * 1024).unwrap();
+        late.replay_child(Some(0), None, 0, 0, false).unwrap();
+        let initial_capacity = {
+            let replay = late.replay.as_ref().unwrap();
+            (replay.snapshot_anchors.capacity(), replay.states.capacity())
+        };
+        let snapshot = late.store(0, &[ComplexAmp::new(0.5, 0.); 2]).unwrap();
+        let a = late
+            .replay_child(Some(snapshot), None, 1, 0, false)
+            .unwrap();
+        let b = late
+            .replay_child(Some(snapshot), None, 1, 1, false)
+            .unwrap();
+        assert_ne!(a, b);
+        assert_eq!(
+            late.replay_child(Some(snapshot), None, 1, 0, false),
+            Some(a)
+        );
+        assert_eq!(
+            late.replay_child(Some(snapshot), None, 1, 1, false),
+            Some(b)
+        );
+        assert!(
+            late.replay_child(Some(snapshot), None, 2, 0, false)
+                .is_none()
+        );
+        let replay = late.replay.as_ref().unwrap();
+        assert_eq!(
+            initial_capacity,
+            (replay.snapshot_anchors.capacity(), replay.states.capacity())
+        );
+        assert!(replay.reserved_bytes() <= late.replay_budget);
+    }
+
+    #[test]
+    fn saturated_replay_cache_keeps_mixed_packet_scalar_calls_and_rng_identical() {
+        let text = "REPEAT 5 {\nR 0 1 2 3 4\nH 0 1 2 3 4\nT 0 1 2 3 4\nCX 0 1 1 2 2 3 3 4\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nMX 3\nMY 4\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let p =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, policy).unwrap();
+            let initial = p
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for budget in [initial + 32 * 1024, initial + 256 * 1024] {
+                let mut cached = p.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut literal = p.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(1739);
+                let mut b = a.clone();
+                for shots in [1, 63, 64, 65, 129, 1024, 64, 1, 129] {
+                    assert_eq!(
+                        cached.sample(shots, &mut a).unwrap(),
+                        literal.sample(shots, &mut b).unwrap()
+                    );
+                    assert_eq!(
+                        cached.sample_measurements_u8(17, &mut a).unwrap(),
+                        literal.sample_measurements_u8(17, &mut b).unwrap()
+                    );
+                    assert_eq!(
+                        cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                        literal
+                            .sample_postselected_counts(shots, 7, &mut b)
+                            .unwrap()
+                    );
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                    assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+                }
+                let cache = cached.cache.as_ref().unwrap();
+                if budget == initial + 32 * 1024 {
+                    // The smaller quota cannot hold this plan's roots and minimum
+                    // arena. Exercise the original small-cache fallback explicitly.
+                    assert_eq!(cache.replay_budget, 0);
+                    assert!(cache.replay.is_none());
+                    assert_eq!(cached.probability_replay_hits, 0);
+                } else {
+                    assert!(cache.replay_budget > 0);
+                    assert!(
+                        cache
+                            .replay
+                            .as_ref()
+                            .unwrap()
+                            .states
+                            .iter()
+                            .any(|s| matches!(s.transition, CachedOp::Measure(_)))
+                    );
+                    assert!(cached.probability_replay_hits > 0, "{policy:?}");
+                }
+                // Public rows always reset the cursor, including after an unrelated
+                // packet history; this bogus cursor must never be dereferenced.
+                cached.probability_replay_state = Some(usize::MAX);
+                assert_eq!(
+                    cached.sample(1, &mut a).unwrap(),
+                    literal.sample(1, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
                 }
             }
         }
