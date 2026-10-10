@@ -40,16 +40,13 @@ def require(value, message):
         raise ValueError(message)
 
 
-def require_replay_tests(log):
-    expected = {
-        'replay_arena_bounds_storage_and_refuses_wrong_nodes',
-        'replay_probabilities_keep_exact_bits_through_both_transform_branches',
-        'replay_projection_anchors_preserve_reexpansion_and_global_phase_noops',
-        'replay_cdf_bits_preserve_special_coefficients_and_phase_aliases',
-        'replay_links_distinguish_choices_and_stop_at_capacity_or_unknown_provenance',
-        'saturated_replay_cache_keeps_mixed_packet_scalar_calls_and_rng_identical',
+def require_candidate_tests(log, *, layout=False):
+    expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
+        'near_clifford::compiled::random_event_runs::random_event_runs_tests::zero_noise_summary_keeps_every_event_and_frozen_rng_continuation',
+        'near_clifford::compiled::noise_schedule::tests::zero_noise_summary_skips_sign_refs_but_unknown_rows_still_scan',
+        'near_clifford::compiled::noise_schedule::tests::zero_noise_summary_preserves_scheduled_records_counts_and_carry'
     }
-    expected = {'near_clifford::compiled::probability_replay_tests::' + name for name in expected}
+    count = len(expected)
     records, summaries = [], []
     for line in log.splitlines():
         if not line.startswith('test '):
@@ -59,15 +56,15 @@ def require_replay_tests(log):
         else:
             record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
             if record is None:
-                raise ValueError('malformed probability replay test result record')
+                raise ValueError('malformed zero-noise candidate test result record')
             records.append(record.groups())
     valid_summary = len(summaries) == 1 and re.fullmatch(
-        r'test result: ok\. 6 passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
+        rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
         summaries[0],
     )
-    if (len(records) != len(expected) or {name for name, _ in records} != expected
+    if (len(records) != count or {name for name, _ in records} != expected
             or any(status != 'ok' for _, status in records) or not valid_summary):
-        raise ValueError('all six named probability replay tests must execute successfully')
+        raise ValueError('every named zero-noise candidate test must execute successfully')
 
 def receipt_pids(receipt):
     pids = [receipt['controller_pid'], receipt['child_pid']]
@@ -274,13 +271,14 @@ def verify_bundle(root, git_sources=False):
                     receipt['binary']['mode'] == '0o755', 'native target/flags/executable binding differs')
             require(evidence.sha(prep / role / ('native-build-' + kind + '.log')) ==
                     receipt['log_sha256'], 'build log differs')
-    for index in [0, 1, 2]:
+    for index in [0, 1, 2, 3]:
         receipt = read(prep / ('native-check-' + str(index) + '.receipt.json'))
         preparation_pids.extend(receipt_pids(receipt))
         selection = (['--lib', 'phase_specialized_cdf_tests'] if index == 0 else
                      ['--test', 'near_clifford_compiled',
                       'compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails', '--', '--exact'] if index == 1 else
-                     ['--lib', 'near_clifford::compiled::probability_replay_tests'])
+                     ['--lib', 'zero_noise_summary'] if index == 2 else
+                     ['--lib', 'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage', '--', '--exact'])
         require(receipt['command'] == ['rustup', 'run', '1.93.1', 'cargo', 'test', '--release', '--locked',
                                         '-p', 'rstim', '--no-default-features', *selection] and
                 receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and
@@ -291,7 +289,7 @@ def verify_bundle(root, git_sources=False):
                 receipt['exit_code'] == 0 and evidence.sha(log) == receipt['log_sha256'],
                 'native arithmetic/public RNG check differs')
         evidence.require_executed_tests(log.read_text())
-        if index == 2:require_replay_tests(log.read_text())
+        if index >= 2:require_candidate_tests(log.read_text(), layout=index == 3)
     verify_absence(read(root / 'control/preparation-process-absence.json'), preparation_pids, waited=False)
     require(evidence.sha(output / 'events.jsonl') == closure['events_sha256'], 'ledger hash differs')
     events = [json.loads(line) for line in (output / 'events.jsonl').read_text().splitlines()]
