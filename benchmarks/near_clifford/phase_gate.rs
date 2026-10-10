@@ -13,6 +13,7 @@ mod unix {
         acknowledgement: File,
         report: File,
         start_ns: u64,
+        enable_ack: [u8; 5],
     }
 
     fn monotonic_ns() -> Result<u64, String> {
@@ -40,7 +41,7 @@ mod unix {
         acknowledgement: &mut File,
         command: &[u8],
         timeout: Duration,
-    ) -> Result<(), String> {
+    ) -> Result<[u8; 5], String> {
         control
             .write_all(command)
             .and_then(|_| control.flush())
@@ -48,7 +49,9 @@ mod unix {
         let deadline = Instant::now()
             .checked_add(timeout)
             .ok_or("phase acknowledgement deadline overflow")?;
-        let mut reply = [0u8; 4];
+        // Linux perf writes sizeof("ack\n"), including its terminating NUL.
+        // Consume the entire frame before a subsequent command can be sent.
+        let mut reply = [0u8; 5];
         for byte in &mut reply {
             loop {
                 let remaining = deadline
@@ -82,10 +85,10 @@ mod unix {
                 break;
             }
         }
-        if reply != *b"ack\n" {
+        if reply != *b"ack\n\0" {
             return Err("invalid perf phase acknowledgement".into());
         }
-        Ok(())
+        Ok(reply)
     }
 
     impl Gate {
@@ -148,7 +151,7 @@ mod unix {
                 .write(true)
                 .open(acknowledgement)
                 .map_err(|e| e.to_string())?;
-            exchange(
+            let enable_ack = exchange(
                 &mut control,
                 &mut acknowledgement,
                 b"enable\n",
@@ -160,6 +163,7 @@ mod unix {
                 acknowledgement,
                 report,
                 start_ns,
+                enable_ack,
             })
         }
 
@@ -168,7 +172,7 @@ mod unix {
             if end_ns <= self.start_ns {
                 return Err("nonpositive warm phase span".into());
             }
-            exchange(
+            let disable_ack = exchange(
                 &mut self.control,
                 &mut self.acknowledgement,
                 b"disable\n",
@@ -176,7 +180,8 @@ mod unix {
             )?;
             let value = serde_json::json!({"schema":"rstim.perf-warm-loop.v1", "completed":true,
                 "pid":std::process::id(), "clock":"CLOCK_MONOTONIC", "start_ns":self.start_ns,
-                "end_ns":end_ns, "scope":"warm observation loop including RNG, output drops, timer and observation bookkeeping; excludes cold setup and final serialization"});
+                "end_ns":end_ns, "acknowledgements":{"enable":self.enable_ack,"disable":disable_ack},
+                "scope":"warm observation loop including RNG, output drops, timer and observation bookkeeping; excludes cold setup and final serialization"});
             self.report
                 .seek(SeekFrom::Start(0))
                 .and_then(|_| self.report.set_len(0))
@@ -210,59 +215,67 @@ mod unix {
                 peer.write_all(b"ac").unwrap();
                 thread::sleep(Duration::from_millis(20));
                 peer.write_all(b"k\n").unwrap();
+                thread::sleep(Duration::from_millis(20));
+                peer.write_all(b"\0").unwrap();
             });
-            exchange(
+            let reply = exchange(
                 &mut control,
                 &mut acknowledgement,
                 b"enable\n",
                 Duration::from_secs(1),
             )
             .unwrap();
+            assert_eq!(&reply, b"ack\n\0");
             actor.join().unwrap();
         }
 
         #[test]
         fn phase_command_rejects_wrong_acknowledgement() {
-            let (mut control, mut acknowledgement, mut peer) = channel();
-            let actor = thread::spawn(move || {
-                let mut command = [0; 8];
-                peer.read_exact(&mut command).unwrap();
-                assert_eq!(&command, b"disable\n");
-                peer.write_all(b"bad\n").unwrap();
-            });
-            assert!(
-                exchange(
-                    &mut control,
-                    &mut acknowledgement,
-                    b"disable\n",
-                    Duration::from_secs(1)
-                )
-                .unwrap_err()
-                .contains("invalid")
-            );
-            actor.join().unwrap();
+            for invalid in [*b"bad\n\0", *b"ack\nx"] {
+                let (mut control, mut acknowledgement, mut peer) = channel();
+                let actor = thread::spawn(move || {
+                    let mut command = [0; 8];
+                    peer.read_exact(&mut command).unwrap();
+                    assert_eq!(&command, b"disable\n");
+                    peer.write_all(&invalid).unwrap();
+                });
+                assert!(
+                    exchange(
+                        &mut control,
+                        &mut acknowledgement,
+                        b"disable\n",
+                        Duration::from_secs(1)
+                    )
+                    .unwrap_err()
+                    .contains("invalid")
+                );
+                actor.join().unwrap();
+            }
         }
 
         #[test]
         fn partial_acknowledgement_has_a_total_deadline() {
-            let (mut control, mut acknowledgement, mut peer) = channel();
-            let actor = thread::spawn(move || {
-                let mut command = [0; 7];
-                peer.read_exact(&mut command).unwrap();
-                peer.write_all(b"ac").unwrap();
-                thread::sleep(Duration::from_millis(100));
-            });
-            assert!(
-                exchange(
-                    &mut control,
-                    &mut acknowledgement,
-                    b"enable\n",
-                    Duration::from_millis(30)
-                )
-                .unwrap_err()
-                .contains("timed out")
-            );
-            actor.join().unwrap();
+            for partial in [&b"ac"[..], &b"ack\n"[..]] {
+                let (mut control, mut acknowledgement, mut peer) = channel();
+                let actor = thread::spawn(move || {
+                    let mut command = [0; 7];
+                    peer.read_exact(&mut command).unwrap();
+                    assert_eq!(&command, b"enable\n");
+                    peer.write_all(partial).unwrap();
+                    thread::sleep(Duration::from_millis(100));
+                });
+                assert!(
+                    exchange(
+                        &mut control,
+                        &mut acknowledgement,
+                        b"enable\n",
+                        Duration::from_millis(30)
+                    )
+                    .unwrap_err()
+                    .contains("timed out")
+                );
+                actor.join().unwrap();
+            }
         }
 
         #[test]
@@ -322,6 +335,8 @@ mod unix {
                     ack.write_all(b"ac").unwrap();
                     thread::sleep(Duration::from_millis(2));
                     ack.write_all(b"k\n").unwrap();
+                    thread::sleep(Duration::from_millis(2));
+                    ack.write_all(b"\0").unwrap();
                 }
             });
             let before = monotonic_ns().unwrap();
@@ -335,6 +350,14 @@ mod unix {
             assert_eq!(report["completed"], true);
             assert_eq!(report["pid"], std::process::id());
             assert_eq!(report["clock"], "CLOCK_MONOTONIC");
+            assert_eq!(
+                report["acknowledgements"]["enable"],
+                serde_json::json!([97, 99, 107, 10, 0])
+            );
+            assert_eq!(
+                report["acknowledgements"]["disable"],
+                serde_json::json!([97, 99, 107, 10, 0])
+            );
             assert!(before <= report["start_ns"].as_u64().unwrap());
             assert!(report["start_ns"].as_u64().unwrap() < report["end_ns"].as_u64().unwrap());
             assert!(report["end_ns"].as_u64().unwrap() <= after);
