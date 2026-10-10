@@ -3334,7 +3334,7 @@ impl CompiledNearCliffordSampler<'_> {
     }
     // All random draws depend only on the fixed plan, not the coherent state.
     // Draw them in original row order, so packet size and fallback never change RNG.
-    fn packet(
+    fn packet<const CHECKPOINT: bool>(
         &mut self,
         lanes: usize,
         sweep: &[bool],
@@ -3345,11 +3345,15 @@ impl CompiledNearCliffordSampler<'_> {
     ) -> Result<(), String> {
         // Account existing packet/sidecar capacities before taking buffers.
         // Only counts can consume restart points; records keep full replay.
-        let checkpoint_bytes = self
-            .counts_replay
-            .as_ref()
-            .map_or(Some(0), CountsReplay::reserved_bytes);
-        let mut checkpoint_budget = if !coherent && matches!(output, BatchOutput::Counts { .. }) {
+        debug_assert!(!CHECKPOINT || (!coherent && matches!(output, BatchOutput::Counts { .. })));
+        let checkpoint_bytes = if CHECKPOINT {
+            self.counts_replay
+                .as_ref()
+                .map_or(Some(0), CountsReplay::reserved_bytes)
+        } else {
+            Some(0)
+        };
+        let mut checkpoint_budget = if CHECKPOINT {
             self.scalar_tape_other_bytes()
                 .and_then(|n| n.checked_sub(checkpoint_bytes?))
                 .and_then(|n| {
@@ -3374,7 +3378,11 @@ impl CompiledNearCliffordSampler<'_> {
             checkpoint_budget =
                 checkpoint_budget.map(|budget| budget.min(self.replay_checkpoint_budget));
         }
-        let mut checkpoints = self.counts_replay.take();
+        let mut checkpoints = if CHECKPOINT {
+            self.counts_replay.take()
+        } else {
+            None
+        };
         if checkpoint_budget
             .is_none_or(|budget| checkpoint_bytes.is_none_or(|bytes| bytes > budget))
         {
@@ -3978,7 +3986,9 @@ impl CompiledNearCliffordSampler<'_> {
             }
             Ok(())
         })();
-        self.counts_replay = checkpoints;
+        if CHECKPOINT {
+            self.counts_replay = checkpoints;
+        }
         self.packet_x = x;
         self.packet_z = z;
         self.packet_tape = tape;
@@ -4272,7 +4282,15 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    if !coherent && matches!(output, BatchOutput::Counts { .. }) {
+                        self.packet::<true>(lanes, sweep, rng, output, coherent, compact)?;
+                    } else {
+                        // Counts restart storage is useful only on the cache packet
+                        // route. Keep ordinary records and coherent packets free of
+                        // checkpoint capture and restart code at compile time.
+                        self.counts_replay = None;
+                        self.packet::<false>(lanes, sweep, rng, output, coherent, compact)?;
+                    }
                 } else {
                     drop(noise_packet.take());
                     for _ in 0..lanes {
@@ -6198,7 +6216,7 @@ mod scalar_prepared_tape_tests {
                     let mut actual = Vec::new();
                     // None is also the public mode after optional Noise rejection.
                     packed
-                        .packet(
+                        .packet::<false>(
                             64,
                             &sweep,
                             &mut b,
