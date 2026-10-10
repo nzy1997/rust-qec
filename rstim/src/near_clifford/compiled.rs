@@ -2561,6 +2561,27 @@ impl CompiledNearCliffordSampler<'_> {
             let pivot = 1 << p.x.trailing_zeros();
             let parity_swap = (p.x & p.z).count_ones() % 2 != 0;
             let uniform = p.z & (pivot - 1) == 0;
+            // Keep small uniform arrays in the caller's constant-sign pair loop.
+            if self.coefficients.len() >= 32 && uniform {
+                if imaginary {
+                    Self::rotate_uniform_pairs::<false, true>(
+                        &mut self.coefficients,
+                        p.x,
+                        p.z,
+                        c,
+                        factor,
+                    );
+                } else {
+                    Self::rotate_uniform_pairs::<false, false>(
+                        &mut self.coefficients,
+                        p.x,
+                        p.z,
+                        c,
+                        factor,
+                    );
+                }
+                return Ok(());
+            }
             for block in (0..self.coefficients.len()).step_by(pivot * 2) {
                 let other = block ^ p.x;
                 // The chosen pivot bit is zero in block and one in other, so
@@ -2669,6 +2690,27 @@ impl CompiledNearCliffordSampler<'_> {
             let pivot = 1 << p.x.trailing_zeros();
             let parity_swap = (p.x & p.z).count_ones() % 2 != 0;
             let uniform = p.z & (pivot - 1) == 0;
+            // Keep small uniform arrays in the caller's constant-sign pair loop.
+            if self.coefficients.len() >= 32 && uniform {
+                if imaginary {
+                    Self::rotate_uniform_pairs::<true, true>(
+                        &mut self.coefficients,
+                        p.x,
+                        p.z,
+                        c,
+                        factor,
+                    );
+                } else {
+                    Self::rotate_uniform_pairs::<true, false>(
+                        &mut self.coefficients,
+                        p.x,
+                        p.z,
+                        c,
+                        factor,
+                    );
+                }
+                return Ok(());
+            }
             for block in (0..self.coefficients.len()).step_by(pivot * 2) {
                 let other = block ^ p.x;
                 // The chosen pivot bit is zero in block and one in other, so
@@ -2704,6 +2746,62 @@ impl CompiledNearCliffordSampler<'_> {
             }
         }
         Ok(())
+    }
+    // No compact Z bit lies below the lowest X pivot. Each disjoint pair of
+    // blocks has two constant signs, so phase dispatch stays outside the loop.
+    #[inline(never)]
+    fn rotate_uniform_pairs<const FUSED: bool, const IMAGINARY: bool>(
+        coefficients: &mut [ComplexAmp],
+        x: usize,
+        z: usize,
+        c: f64,
+        factor: f64,
+    ) {
+        let pivot = 1usize << x.trailing_zeros();
+        let parity_swap = (x & z).count_ones() % 2 != 0;
+        for block in (0..coefficients.len()).step_by(pivot * 2) {
+            let other = block ^ x;
+            let (a, b) = if block < other {
+                let (left, right) = coefficients.split_at_mut(other);
+                (&mut left[block..block + pivot], &mut right[..pivot])
+            } else {
+                let (left, right) = coefficients.split_at_mut(block);
+                (&mut right[..pivot], &mut left[other..other + pivot])
+            };
+            let parity_a = (block & z).count_ones() % 2 != 0;
+            let factor_a = if parity_a { -factor } else { factor };
+            let factor_b = if parity_a ^ parity_swap {
+                -factor
+            } else {
+                factor
+            };
+            for (a, b) in a.iter_mut().zip(b) {
+                let old_a = *a;
+                let old_b = *b;
+                *a = Self::rotate_uniform_update::<FUSED, IMAGINARY>(old_a, old_b, c, factor_b);
+                *b = Self::rotate_uniform_update::<FUSED, IMAGINARY>(old_b, old_a, c, factor_a);
+            }
+        }
+    }
+    fn rotate_uniform_update<const FUSED: bool, const IMAGINARY: bool>(
+        own: ComplexAmp,
+        partner: ComplexAmp,
+        c: f64,
+        factor: f64,
+    ) -> ComplexAmp {
+        let (re, im) = if IMAGINARY {
+            (-partner.im, partner.re)
+        } else {
+            (partner.re, partner.im)
+        };
+        if FUSED {
+            ComplexAmp::new(
+                re.mul_add(factor, own.re * c),
+                im.mul_add(factor, own.im * c),
+            )
+        } else {
+            ComplexAmp::new(own.re * c + re * factor, own.im * c + im * factor)
+        }
     }
     fn rotate_highest_z0<const FUSED: bool, const IMAGINARY: bool, const SWAP: bool>(
         coefficients: &mut [ComplexAmp],
@@ -6478,5 +6576,190 @@ mod avx2_rotation_bits_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod uniform_rotation_phase_tests {
+    use super::*;
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        let mut physical = Pauli::identity(12);
+        for q in 0..12 {
+            physical.x[q] = x >> q & 1 != 0;
+            physical.z[q] = z >> q & 1 != 0;
+        }
+        physical.phase = phase;
+        CompactPauli {
+            physical: PackedPauli::new(&physical),
+            x,
+            z,
+        }
+    }
+    // Full snapshot gather is independent of block borrowing, pivot choice and
+    // paired writes. Keep the literal component operation and operand order.
+    fn literal(
+        before: &[ComplexAmp],
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        flip: bool,
+        fused: bool,
+    ) -> Vec<ComplexAmp> {
+        if p.x == 0 && p.z == 0 {
+            return before.to_vec();
+        }
+        let mut input = before.to_vec();
+        if expand {
+            input.resize(2 * input.len(), ComplexAmp::default());
+        }
+        let c = (std::f64::consts::PI / 8.).cos();
+        let s = (std::f64::consts::PI / 8.).sin();
+        let mut factor = if matches!(p.physical.phase, 0 | 3) {
+            -s
+        } else {
+            s
+        };
+        if dagger ^ flip {
+            factor = -factor;
+        }
+        (0..input.len())
+            .map(|i| {
+                let own = input[i];
+                let partner = input[i ^ p.x];
+                let factor = if ((i ^ p.x) & p.z).count_ones() % 2 != 0 {
+                    -factor
+                } else {
+                    factor
+                };
+                let (re, im) = if p.physical.phase % 2 == 0 {
+                    (-partner.im, partner.re)
+                } else {
+                    (partner.re, partner.im)
+                };
+                if fused {
+                    ComplexAmp::new(
+                        re.mul_add(factor, own.re * c),
+                        im.mul_add(factor, own.im * c),
+                    )
+                } else {
+                    ComplexAmp::new(own.re * c + re * factor, own.im * c + im * factor)
+                }
+            })
+            .collect()
+    }
+    fn check(values: &[f64]) {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 11\n", policy)
+                .unwrap();
+            let mut sampler = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            for len in [2, 4, 8, 16, 32, 64, 256, 1024] {
+                let input: Vec<_> = (0..len)
+                    .map(|i| {
+                        ComplexAmp::new(
+                            values[(i * 3) % values.len()],
+                            values[(i * 7 + 1) % values.len()],
+                        )
+                    })
+                    .collect();
+                for expand in [false, true] {
+                    let extent = len * if expand { 2 } else { 1 };
+                    let masks: Vec<_> = if extent <= 32 {
+                        (0..extent).collect()
+                    } else {
+                        vec![
+                            0,
+                            1,
+                            2,
+                            3,
+                            7,
+                            8,
+                            extent / 4,
+                            extent / 2,
+                            extent / 2 + 1,
+                            extent - 2,
+                            extent - 1,
+                        ]
+                    };
+                    for &x in &masks {
+                        for &z in &masks {
+                            for phase in [0, 1, 2, 3, 4, 7, 254, 255] {
+                                let p = pauli(x, z, phase);
+                                for dagger in [false, true] {
+                                    for flip in [false, true] {
+                                        let expected = literal(
+                                            &input,
+                                            &p,
+                                            expand,
+                                            dagger,
+                                            flip,
+                                            policy == CompiledRotationArithmetic::Fused,
+                                        );
+                                        sampler.coefficients.clone_from(&input);
+                                        sampler.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                        assert_eq!(sampler.coefficients.len(), expected.len());
+                                        for (i, (actual, expected)) in
+                                            sampler.coefficients.iter().zip(&expected).enumerate()
+                                        {
+                                            for (actual, expected) in
+                                                [(actual.re, expected.re), (actual.im, expected.im)]
+                                            {
+                                                if expected.is_nan() {
+                                                    assert!(
+                                                        actual.is_nan(),
+                                                        "{policy:?} len{len} x{x} z{z} phase{phase} expand{expand} dagger{dagger} flip{flip} i{i}"
+                                                    );
+                                                } else {
+                                                    assert_eq!(
+                                                        actual.to_bits(),
+                                                        expected.to_bits(),
+                                                        "{policy:?} len{len} x{x} z{z} phase{phase} expand{expand} dagger{dagger} flip{flip} i{i}"
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn signed_rotations_match_snapshot_gather_bits_across_phase_and_mask_boundaries() {
+        check(&[
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            1.,
+            -1.,
+            f64::MAX,
+            -f64::MAX,
+        ]);
+    }
+    #[test]
+    fn signed_rotations_preserve_non_nan_bits_and_exceptional_classes() {
+        check(&[
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            0.75,
+            -0.25,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0002),
+            f64::from_bits(0x7ff0_0000_0000_0001),
+        ]);
     }
 }
