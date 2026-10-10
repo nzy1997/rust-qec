@@ -1,0 +1,106 @@
+{
+  "arithmetic": "strict",
+  "cache_bytes": 67108864,
+  "cache_reserved_bytes": 67108776,
+  "cold": [
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11639417,
+      "first_ns": 452375,
+      "prepare_ns": 1334
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11440125,
+      "first_ns": 317625,
+      "prepare_ns": 1042
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11485084,
+      "first_ns": 303250,
+      "prepare_ns": 1209
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11412291,
+      "first_ns": 303625,
+      "prepare_ns": 1042
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11360625,
+      "first_ns": 298708,
+      "prepare_ns": 917
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11349792,
+      "first_ns": 298875,
+      "prepare_ns": 791
+    },
+    {
+      "cache_reserved_bytes": 2697896,
+      "compile_ns": 11554416,
+      "first_ns": 305542,
+      "prepare_ns": 1250
+    }
+  ],
+  "compile_ns": 12029458,
+  "config": {
+    "action": "bench",
+    "arithmetic": "strict",
+    "cache_bytes": 67108864,
+    "call_kind": "flat",
+    "circuit": "FIXTURE_DIRECTORY/depth-32.stim",
+    "repetitions": 7,
+    "shots": 1,
+    "total": 1
+  },
+  "input_sha256": "65e84894e0b927be163d80d73e2f99e2d140912765746e3193d69131e75606de",
+  "peak_active_rank": 12,
+  "peak_rss_bytes": 70778880,
+  "prepare_ns": 1125,
+  "rng": "SmallRng/rand-0.8.7",
+  "rss_scope": "whole probe process high-water mark, includes validation/output bookkeeping where present",
+  "schema": "rstim.near-clifford-diagnostic-probe.v1",
+  "shots": 1,
+  "status": "ok",
+  "warm": [
+    {
+      "calls": 228,
+      "elapsed_ns": 50157626,
+      "ns_per_call": 219989.58771929826
+    },
+    {
+      "calls": 257,
+      "elapsed_ns": 50138962,
+      "ns_per_call": 195093.2373540856
+    },
+    {
+      "calls": 258,
+      "elapsed_ns": 50127501,
+      "ns_per_call": 194292.63953488372
+    },
+    {
+      "calls": 258,
+      "elapsed_ns": 50107884,
+      "ns_per_call": 194216.60465116278
+    },
+    {
+      "calls": 258,
+      "elapsed_ns": 50022117,
+      "ns_per_call": 193884.17441860464
+    },
+    {
+      "calls": 256,
+      "elapsed_ns": 50082916,
+      "ns_per_call": 195636.390625
+    },
+    {
+      "calls": 259,
+      "elapsed_ns": 50155285,
+      "ns_per_call": 193649.74903474902
+    }
+  ]
+}
