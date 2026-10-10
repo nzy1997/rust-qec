@@ -154,6 +154,53 @@ mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
 
+    #[test]
+    fn counts_packets_skip_restart_with_headroom_and_keep_tight_cache_replay_exact() {
+        let text = include_str!(
+            "../../../benchmarks/near_clifford/application_counts/fixtures/msc_d3_inject_cultivate_p1e-3.stim"
+        );
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for budget in [initial, DEFAULT_CACHE_BYTE_BUDGET] {
+                let mut candidate = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(1739);
+                let mut b = a.clone();
+                for shots in [64, 65, 129, 1024] {
+                    let records = reference.sample(shots, &mut b).unwrap();
+                    assert_eq!(
+                        candidate
+                            .sample_postselected_counts(shots, 0, &mut a)
+                            .unwrap(),
+                        counts_from_raw_records(&records, 0)
+                    );
+                    // Tight caches can switch later packets to the existing
+                    // coherent fallback. Check the initial cache packet only.
+                    if shots == 64 {
+                        assert_eq!(candidate.last_packet_checkpoint, budget == initial);
+                    }
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+                if budget == initial {
+                    assert!(candidate.checkpoint_replay_rows > 0);
+                } else {
+                    assert_eq!(candidate.checkpoint_replay_rows, 0);
+                    assert!(candidate.counts_replay.is_none());
+                }
+            }
+        }
+    }
+
     fn counts_from_raw_records(
         rows: &[NearCliffordShot],
         observable: u32,

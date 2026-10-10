@@ -25,6 +25,42 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn low_rank_counts_and_mixed_records_keep_rng_across_cache_budgets() {
+    let text = "REPEAT 5 {\nRX 0 1\nT 0 1\nCX 0 1\nDEPOLARIZE2(0.01) 0 1\nMX 0 1\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-1]\n}\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        for budget in [0, initial, 64 * 1024 * 1024] {
+            let mut native = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(583);
+            let mut b = a.clone();
+            for shots in [0, 1, 32, 63, 64, 65, 129, 1024, 64] {
+                let records = reference.sample(shots, &mut b).unwrap();
+                assert_eq!(
+                    native.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                    count_records(&records, 7)
+                );
+                assert_eq!(
+                    native.sample_measurements_u8(65, &mut a).unwrap(),
+                    reference.sample_measurements_u8(65, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [
