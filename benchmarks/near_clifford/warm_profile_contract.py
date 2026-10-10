@@ -38,14 +38,19 @@ def perf_clock(data):
             required_fields = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 7)
             require(flags & (1 << 5) and not flags & (1 << 4), 'user-only sampling required')
             require(sample_type & required_fields == required_fields, 'IP/TID/TIME/CPU sample fields required')
-        else:
-            # perf record adds this sideband tracker when --delay=-1 is set.
-            # Linux SW_DUMMY never overflows; it retains exec/mmap metadata.
-            require(period == 1 and not flags & (1 << 10), 'dummy tracker must not use frequency sampling')
         attributes.append(dict(event_type=event_type, config=config, clock_id=clock_id,
                                flags=flags, sample_type=sample_type, period=period))
     require([attr['config'] for attr in attributes].count(0) == 1 and
             [attr['config'] for attr in attributes].count(9) <= 1, 'exactly one cpu-clock sampler required')
+    sampler = next(attr for attr in attributes if attr['config'] == 0)
+    for tracker in (attr for attr in attributes if attr['config'] == 9):
+        # Delayed perf record adds a SW_DUMMY sideband tracker. Some versions
+        # retain its minimal period; others copy the cpu-clock frequency.
+        # Selection still rejects any actual event other than cpu-clock:u.
+        minimal = tracker['period'] == 1 and not tracker['flags'] & (1 << 10)
+        inherited = (tracker['flags'] & (1 << 10) and sampler['flags'] & (1 << 10)
+                     and tracker['period'] == sampler['period'] > 0)
+        require(minimal or inherited, 'dummy tracker parameters must be minimal or inherit the sampler frequency')
     return dict(clock='CLOCK_MONOTONIC', clock_id=1, use_clockid=True, attributes=attributes)
 
 
