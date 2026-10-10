@@ -1,4 +1,4 @@
-name: Near-Clifford replay CPU profile
+name: Near-Clifford warm-loop CPU profile
 
 # Exact-source diagnostic campaign. Sampled timings never establish speedups.
 on:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   profile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 50
     env:
       RUSTFLAGS: '-C target-cpu=native'
       OMP_NUM_THREADS: '1'
@@ -48,10 +48,13 @@ jobs:
             --baseline-ref 6e079197ce9ba62079744417f3f701d4562fa149 \
             --candidate-ref f2b1a474093728d0ec31c32faf5a533c65a370ac \
             > drafts/profile-prepare.log 2>&1
-      - name: Sample all fourteen diagnostic cells and both exact source versions
-        timeout-minutes: 12
+      - name: Build warm probes, compare finite outputs and sample fourteen cells
+        timeout-minutes: 22
         run: |
-          python3 -I -B benchmarks/near_clifford/cdf_cpu_profile.py \
+          python3 -I -B benchmarks/near_clifford/test_warm_profile_contract.py
+          python3 -I -B benchmarks/near_clifford/cdf_warm_profile.py \
+            --warm-root "$PWD" \
+            --warm-revision "${{ github.sha }}" \
             --protocol-root "$PWD/drafts/cdf-profile-protocol" \
             --preparation "$PWD/drafts/cdf-profile-protocol/drafts/profile-preparation" \
             --out "$PWD/drafts/cdf-profile-protocol/drafts/profile-output" \
@@ -60,7 +63,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: near-clifford-replay-profile-${{ github.sha }}
+          name: near-clifford-warm-profile-${{ github.sha }}
           retention-days: 30
           if-no-files-found: error
           path: |
