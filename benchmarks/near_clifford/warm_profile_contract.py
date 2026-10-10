@@ -54,6 +54,12 @@ def phase_span(phase, pid):
             'completed warm-loop receipt required')
     require(type(phase.get('pid')) is int and phase['pid'] == pid and
             phase.get('clock') == 'CLOCK_MONOTONIC', 'warm-loop task/clock differs')
+    acknowledgements = phase.get('acknowledgements')
+    require(type(acknowledgements) is dict and set(acknowledgements) == {'enable', 'disable'},
+            'both actual perf acknowledgement frames required')
+    for frame in acknowledgements.values():
+        require(type(frame) is list and all(type(byte) is int for byte in frame) and
+                frame == [97, 99, 107, 10, 0], 'complete NUL-terminated perf acknowledgement required')
     begin, end = phase.get('start_ns'), phase.get('end_ns')
     require(type(begin) is int and type(end) is int and 0 < begin < end,
             'positive integer warm-loop interval required')

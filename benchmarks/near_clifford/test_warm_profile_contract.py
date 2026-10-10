@@ -22,6 +22,7 @@ def raw_attr():
 
 def phase():
     return dict(schema='rstim.perf-warm-loop.v1', completed=True, pid=77,
+                acknowledgements=dict(enable=[97, 99, 107, 10, 0], disable=[97, 99, 107, 10, 0]),
                 clock='CLOCK_MONOTONIC', start_ns=10_000_000_005, end_ns=10_000_000_009)
 
 
@@ -132,6 +133,17 @@ class WarmContractTests(unittest.TestCase):
                      sample(6).replace('.000000006', '.000006'), sample(6).replace('cpu-clock:u', 'cycles:u')]:
             with self.subTest(text=text), self.assertRaises(ValueError):
                 contract.select_samples(text, phase(), 2, 77, '/native/probe.bin', minimum=1)
+
+    def test_partial_or_malformed_perf_acknowledgements_cannot_certify_a_window(self):
+        for value in [None, {}, {'enable': [97, 99, 107, 10, 0]},
+                      {'enable': [97, 99, 107, 10, 0], 'disable': [97, 99, 107, 10]},
+                      {'enable': [97, 99, 107, 10], 'disable': [97, 99, 107, 10, 0]},
+                      {'enable': [97, 99, 107, 10, 0], 'disable': [97, 99, 107, 10, 120]},
+                      {'enable': [97, 99, 107, 10, False], 'disable': [97, 99, 107, 10, 0]}]:
+            receipt = phase()
+            receipt['acknowledgements'] = value
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                contract.select_samples(sample(6), receipt, 2, 77, '/native/probe.bin', minimum=1)
 
     def test_finite_counts_equality_ignores_only_diagnostic_timing_fields(self):
         original = dict(backend='rstim', status='ok', input_sha256='abc', arithmetic='strict', shots=8192,
