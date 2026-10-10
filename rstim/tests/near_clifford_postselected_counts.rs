@@ -26,7 +26,7 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 
 #[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
-    let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
+    let text = "REPEAT 5 {\nR 0 1 2 3 4\nH 0 1 2 3 4\nT 0 1 2 3 4\nCX 0 1 1 2 2 3 3 4\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nMX 3\nMY 4\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [
         CompiledRotationArithmetic::Strict,
         CompiledRotationArithmetic::Fused,
@@ -34,26 +34,34 @@ fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
         let plan =
             CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
         for seed in [1739, 583] {
-            let mut cached = plan.prepare_sampler().unwrap();
-            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            let initial = cached.coefficient_cache_reserved_bytes();
-            let mut a = StdRng::seed_from_u64(seed);
-            let mut b = a.clone();
-            for shots in [1, 63, 64, 65, 129, 1024, 64] {
-                let expected = scalar.sample(shots, &mut b).unwrap();
-                assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
-                let expected = scalar.sample(shots, &mut b).unwrap();
-                assert_eq!(
-                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
-                    count_records(&expected, 7)
-                );
-                let expected = scalar.sample_measurements_u8(17, &mut b).unwrap();
-                assert_eq!(cached.sample_measurements_u8(17, &mut a).unwrap(), expected);
-                for _ in 0..16 {
-                    assert_eq!(a.next_u64(), b.next_u64());
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            // Small enough to saturate snapshots, large enough for probability
+            // metadata; the private route witness asserts actual replay hits.
+            for budget in [initial + 32 * 1024, 64 * 1024 * 1024] {
+                let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                for shots in [1, 63, 64, 65, 129, 1024, 64] {
+                    let expected = scalar.sample(shots, &mut b).unwrap();
+                    assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
+                    let expected = scalar.sample(shots, &mut b).unwrap();
+                    assert_eq!(
+                        cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                        count_records(&expected, 7)
+                    );
+                    let expected = scalar.sample_measurements_u8(17, &mut b).unwrap();
+                    assert_eq!(cached.sample_measurements_u8(17, &mut a).unwrap(), expected);
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
                 }
+                assert!(cached.coefficient_cache_reserved_bytes() > initial);
+                assert!(cached.coefficient_cache_reserved_bytes() <= budget);
             }
-            assert!(cached.coefficient_cache_reserved_bytes() > initial);
         }
     }
 }
