@@ -1,74 +1,42 @@
-name: Near-Clifford replay CPU profile
-
-# Exact-source diagnostic campaign. Sampled timings never establish speedups.
+name: Near-Clifford raw profile replay
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
+  actions: read
 jobs:
-  profile:
+  raw-replay:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    env:
-      RUSTFLAGS: '-C target-cpu=native'
-      OMP_NUM_THREADS: '1'
-      OPENBLAS_NUM_THREADS: '1'
-      MKL_NUM_THREADS: '1'
-      RAYON_NUM_THREADS: '1'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Check out the frozen full36 protocol
-        uses: actions/checkout@v4
-        with:
-          ref: 02ad5e9993a032b73f64f4950ae96e5a4bd0b8de
-          path: drafts/cdf-profile-protocol
-          fetch-depth: 0
-          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install the pinned compiler and Linux sampling tools
+      - name: Install Linux symbolic decoder tools
         timeout-minutes: 5
         run: |
-          rustup toolchain install 1.93.1 --profile minimal
           sudo apt-get update
           sudo apt-get install -y linux-tools-common linux-tools-generic
-      - name: Build the exact source pair and execute native FP/RNG preflight
-        working-directory: drafts/cdf-profile-protocol
-        timeout-minutes: 20
+      - name: Re-export the exact original raw samples
+        timeout-minutes: 12
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p drafts
-          python3 -B benchmarks/near_clifford/cdf_source_pair/prepare.py \
-            --out drafts/profile-preparation \
-            --baseline-ref 6e079197ce9ba62079744417f3f701d4562fa149 \
-            --candidate-ref f2b1a474093728d0ec31c32faf5a533c65a370ac \
-            > drafts/profile-prepare.log 2>&1
-      - name: Sample all fourteen diagnostic cells and both exact source versions
-        timeout-minutes: 12
-        run: |
-          python3 -I -B benchmarks/near_clifford/cdf_cpu_profile.py \
-            --protocol-root "$PWD/drafts/cdf-profile-protocol" \
-            --preparation "$PWD/drafts/cdf-profile-protocol/drafts/profile-preparation" \
-            --out "$PWD/drafts/cdf-profile-protocol/drafts/profile-output" \
-            > drafts/profile-driver.log 2>&1
-      - name: Retain raw samples, exact sources, native tests and partial failures
+          python3 -I -B benchmarks/near_clifford/cdf_perf_replay.py \
+            --out "$PWD/drafts/raw-profile-replay" \
+            > drafts/raw-profile-replay.log 2>&1
+      - name: Retain complete replay results and partial failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: near-clifford-replay-profile-${{ github.sha }}
+          name: near-clifford-raw-replay-${{ github.sha }}
           retention-days: 30
           if-no-files-found: error
           path: |
-            drafts/profile-driver.log
-            drafts/cdf-profile-protocol/drafts/profile-prepare.log
-            drafts/cdf-profile-protocol/drafts/profile-output/
-            drafts/cdf-profile-protocol/drafts/profile-preparation/
-            !drafts/cdf-profile-protocol/drafts/profile-preparation/source/
-            !drafts/cdf-profile-protocol/drafts/profile-preparation/baseline/native-target/
-            !drafts/cdf-profile-protocol/drafts/profile-preparation/candidate/native-target/
-            !drafts/cdf-profile-protocol/drafts/profile-preparation/candidate/test-target/
+            drafts/raw-profile-replay.log
+            drafts/raw-profile-replay/
