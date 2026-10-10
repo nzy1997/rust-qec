@@ -53,12 +53,31 @@ class ContractTests(unittest.TestCase):
                 ledger=moved/'output/events.jsonl';rows=[json.loads(line) for line in ledger.read_text().splitlines()]
                 rows[0]['command']=['/wrong/native-probe']
                 ledger.write_text(''.join(json.dumps(row,separators=(',',':'))+'\n' for row in rows))
+            def wrong_replay_log():
+                log=moved/'preparation/native-check-2.log'
+                log.write_text('test result: ok. 1 passed; 0 failed; 0 ignored;\n')
+                rewrite(log.with_suffix('.receipt.json'),lambda d:d.update(log_sha256=evidence.sha(log)))
+            def append_replay_record(record):
+                log=moved/'preparation/native-check-2.log'
+                log.write_text(log.read_text()+record+'\n')
+                rewrite(log.with_suffix('.receipt.json'),lambda d:d.update(log_sha256=evidence.sha(log)))
             mutations=[
                 wrong_worker,
                 lambda:rewrite(moved/'output/00000.config.json',lambda d:d.update(cache_bytes=0)),
                 lambda:rewrite(moved/'preparation/baseline/native-build-counts.receipt.json',lambda d:d.update(command=['echo','not a build'])),
                 lambda:rewrite(moved/'preparation/native-check-1.receipt.json',lambda d:d.update(command=['echo','not a test'])),
                 lambda:rewrite(moved/'preparation/native-check-1.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d.update(command=['echo','not replay tests'])),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d.update(exit_code=17)),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
+                wrong_replay_log,
+                lambda:append_replay_record('test near_clifford::compiled::probability_replay_tests::replay_arena_bounds_storage_and_refuses_wrong_nodes ... ignored'),
+                lambda:append_replay_record('test near_clifford::compiled::probability_replay_tests::replay_arena_bounds_storage_and_refuses_wrong_nodes ... FAILED'),
+                lambda:append_replay_record('test result: FAILED. 0 passed; 1 failed; 0 ignored;'),
+                lambda:append_replay_record('test extra ... '),
+                lambda:append_replay_record('test result: '),
+                lambda:append_replay_record('test broken'),
+                lambda:append_replay_record('test result:'),
                 lambda:rewrite(moved/'preparation/preparation.json',lambda d:d.update(compiler='rustc unexpected')),
                 lambda:rewrite(moved/'process-absence.json',lambda d:d.update(pids=[],command=['true'])),
                 lambda:rewrite(moved/'control/preparation-process-absence.json',lambda d:d.update(pids=[32169])),
@@ -68,6 +87,22 @@ class ContractTests(unittest.TestCase):
                 with self.subTest(mutation=mutations.index(mutation)):
                     for relative,data in original.items():(moved/relative).write_bytes(data)
                     mutation();reseal();execute(1)
+
+    def test_replay_preflight_requires_every_named_test_and_successful_summary(self):
+        names=['replay_arena_bounds_storage_and_refuses_wrong_nodes', 'replay_probabilities_keep_exact_bits_through_both_transform_branches', 'replay_projection_anchors_preserve_reexpansion_and_global_phase_noops', 'replay_cdf_bits_preserve_special_coefficients_and_phase_aliases', 'replay_links_distinguish_choices_and_stop_at_capacity_or_unknown_provenance', 'saturated_replay_cache_keeps_mixed_packet_scalar_calls_and_rng_identical']
+        good=''.join('test near_clifford::compiled::probability_replay_tests::'+n+' ... ok\n' for n in names)+'test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 288 filtered out\n'
+        for validate in [prepare.require_replay_tests,verifier.require_replay_tests]:
+            validate(good)
+            for bad in [good.replace(names[0],'different_test'),good.replace('6 passed','0 passed'),good.replace('0 ignored','1 ignored'),good.replace('0 failed','1 failed'),good+good,good.replace(' ... ok',' ... ignored',1),good.split('test result:')[0],
+                        good+'test near_clifford::compiled::probability_replay_tests::'+names[0]+' ... ignored\n',
+                        good+'test near_clifford::compiled::probability_replay_tests::'+names[0]+' ... FAILED\n',
+                        good+'test result: FAILED. 0 passed; 1 failed; 0 ignored;\n',
+                        good+'test unrelated::test ... ok\n',
+                        good.replace('0 measured','1 measured'),
+                        good+'test extra ... \n',good+'test result: \n',
+                        good+'test broken\n',good+'test result:\n']:
+                with self.subTest(validator=validate.__module__,log=bad):
+                    with self.assertRaises(ValueError):validate(bad)
 
     def test_preparation_changes_only_rstim_dependency_and_rejects_zero_tests(self):
         original = (HERE.parent/'diagnostics/Cargo.toml').read_text()

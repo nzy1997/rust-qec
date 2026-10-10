@@ -39,8 +39,11 @@ production or performance evidence.
 
 Use a clean committed protocol checkout, Python 3.10 or later, Rust toolchain
 1.93.1, and two locally available exact 40-character source SHAs. The candidate
-must contain the `phase_specialized_cdf_tests` and wide-packet raw-record/RNG
-tests; preparation rejects a filter that executes zero tests. Both sources build
+must contain the `phase_specialized_cdf_tests`, wide-packet raw-record/RNG
+test, and all six `near_clifford::compiled::probability_replay_tests`. This
+preflight revision is for replay-cache candidates; it rejects missing, ignored,
+duplicated or failed named replay tests. All three checks use native Release.
+Preparation still rejects an old filter that executes zero tests. Both sources build
 the same public probe implementation with `-C target-cpu=native` before timings.
 Each source's complete Rust/Cargo inventory, probe inputs, actual binaries,
 compiler version, build logs and actual process receipts are retained.

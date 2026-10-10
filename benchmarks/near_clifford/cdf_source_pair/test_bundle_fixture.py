@@ -45,9 +45,10 @@ def build_bundle(root):
             probes[kind]=dict(hashes,binary=e.sha(retained))
         identities[role]=dict(head=heads[role],sources=source,probes=probes)
     identities['control']=copy.deepcopy(identities['baseline'])
-    for index in [0,1]:
+    for index in [0,1,2]:
         log=prep/('native-check-'+str(index)+'.log');log.write_text('test result: ok. 1 passed; 0 failed\n')
-        selection=['--lib','phase_specialized_cdf_tests'] if index==0 else ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact']
+        selection=['--lib','phase_specialized_cdf_tests'] if index==0 else ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'] if index==1 else ['--lib','near_clifford::compiled::probability_replay_tests']
+        if index == 2:log.write_text('test near_clifford::compiled::probability_replay_tests::replay_arena_bounds_storage_and_refuses_wrong_nodes ... ok\ntest near_clifford::compiled::probability_replay_tests::replay_probabilities_keep_exact_bits_through_both_transform_branches ... ok\ntest near_clifford::compiled::probability_replay_tests::replay_projection_anchors_preserve_reexpansion_and_global_phase_noops ... ok\ntest near_clifford::compiled::probability_replay_tests::replay_cdf_bits_preserve_special_coefficients_and_phase_aliases ... ok\ntest near_clifford::compiled::probability_replay_tests::replay_links_distinguish_choices_and_stop_at_capacity_or_unknown_provenance ... ok\ntest near_clifford::compiled::probability_replay_tests::saturated_replay_cache_keeps_mixed_packet_scalar_calls_and_rng_identical ... ok\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n')
         write(log.with_suffix('.receipt.json'),dict(receipt_base,head=heads['candidate'],log_sha256=e.sha(log),command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection],environment={'RUSTFLAGS':'-C target-cpu=native'}))
     manifest=v.read(HERE/'manifest.json');cases,schedule=v.schedule(manifest);events=[];values={(k,c):{role:[] for role in identities} for k,c in cases}
     for index,(route,kind,case,action,pair,call) in enumerate(schedule):
