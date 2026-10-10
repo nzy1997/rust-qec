@@ -2388,9 +2388,37 @@ impl CompiledNearCliffordSampler<'_> {
         }
         let input = *state;
         if let Some(id) = input {
-            self.load_state(id)?;
+            if expand || p.z != 0 || p.x < 2 || p.x & 7 == 0 {
+                self.load_state(id)?;
+                self.rotate_signed(p, expand, dagger, sign)?;
+            } else {
+                let parent = self
+                    .cache
+                    .as_ref()
+                    .expect("admitted state belongs to a cache")
+                    .states[id]
+                    .coefficients
+                    .clone();
+                match self.plan.rotation_arithmetic {
+                    CompiledRotationArithmetic::Strict => Self::rotate_cached_pairs::<false>(
+                        &mut self.coefficients,
+                        &parent,
+                        p,
+                        dagger,
+                        sign,
+                    )?,
+                    CompiledRotationArithmetic::Fused => Self::rotate_cached_pairs::<true>(
+                        &mut self.coefficients,
+                        &parent,
+                        p,
+                        dagger,
+                        sign,
+                    )?,
+                }
+            }
+        } else {
+            self.rotate_signed(p, expand, dagger, sign)?;
         }
-        self.rotate_signed(p, expand, dagger, sign)?;
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(entry) = cache.entry(id, node) {
@@ -2408,6 +2436,80 @@ impl CompiledNearCliffordSampler<'_> {
             }
         }
         Ok(())
+    }
+    /// A missing fixed-extent transition can read the immutable cached parent
+    /// directly instead of first copying the whole parent into working storage.
+    #[inline(never)]
+    fn rotate_cached_pairs<const FUSED: bool>(
+        output: &mut Vec<ComplexAmp>,
+        input: &[ComplexAmp],
+        p: &CompactPauli,
+        dagger: bool,
+        flip: bool,
+    ) -> Result<(), String> {
+        // Match the existing highest-bit zero-Z specialization. Other
+        // geometries retain materialization and the original rotation route.
+        debug_assert_eq!(p.z, 0);
+        debug_assert!(p.x >= 2 && p.x & 7 != 0);
+        output.clear();
+        output
+            .try_reserve_exact(input.len())
+            .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
+        let c = (std::f64::consts::PI / 8.).cos();
+        let s = (std::f64::consts::PI / 8.).sin();
+        let imaginary = p.physical.phase % 2 == 0;
+        let mut factor = if matches!(p.physical.phase, 0 | 3) {
+            -s
+        } else {
+            s
+        };
+        if dagger ^ flip {
+            factor = -factor;
+        }
+        match (imaginary, p.x & 1 != 0) {
+            (true, true) => {
+                Self::rotate_cached_pair_groups::<FUSED, true, true>(output, input, p.x, c, factor)
+            }
+            (true, false) => {
+                Self::rotate_cached_pair_groups::<FUSED, true, false>(output, input, p.x, c, factor)
+            }
+            (false, true) => {
+                Self::rotate_cached_pair_groups::<FUSED, false, true>(output, input, p.x, c, factor)
+            }
+            (false, false) => Self::rotate_cached_pair_groups::<FUSED, false, false>(
+                output, input, p.x, c, factor,
+            ),
+        }
+        Ok(())
+    }
+
+    #[inline(never)]
+    fn rotate_cached_pair_groups<const FUSED: bool, const IMAGINARY: bool, const SWAP: bool>(
+        output: &mut Vec<ComplexAmp>,
+        input: &[ComplexAmp],
+        x: usize,
+        c: f64,
+        factor: f64,
+    ) {
+        debug_assert_eq!(input.len() % 2, 0);
+        // Iterate output groups in order. The immutable input allows either
+        // half of a paired rotation to be emitted without changing its partner.
+        // The existing helper preserves Strict rounding and Fused mul_add;
+        // its unneeded local partner output can be eliminated by the compiler.
+        output.extend(
+            input
+                .chunks_exact(2)
+                .enumerate()
+                .flat_map(move |(group, own)| {
+                    let partner = (group ^ (x >> 1)) * 2;
+                    let mut own = [own[0], own[1]];
+                    let mut other = [input[partner], input[partner + 1]];
+                    Self::rotate_adjacent_pair::<FUSED, IMAGINARY, SWAP>(
+                        &mut own, &mut other, c, factor,
+                    );
+                    own
+                }),
+        );
     }
     fn cached_probability_zero(
         &mut self,
@@ -6386,6 +6488,250 @@ mod highest_rotation_gather_tests {
         check::<false, true>();
         check::<true, false>();
         check::<true, true>();
+    }
+}
+
+#[cfg(test)]
+mod cached_rotation_output_tests {
+    use super::*;
+
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        let mut physical = Pauli::identity(10);
+        for q in 0..10 {
+            physical.x[q] = x >> q & 1 != 0;
+            physical.z[q] = z >> q & 1 != 0;
+        }
+        physical.phase = phase;
+        CompactPauli {
+            physical: PackedPauli::new(&physical),
+            x,
+            z,
+        }
+    }
+
+    fn bits(values: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        values
+            .iter()
+            .map(|a| (a.re.to_bits(), a.im.to_bits()))
+            .collect()
+    }
+
+    #[test]
+    fn immutable_rotations_match_materialized_coefficients_at_mask_and_phase_boundaries() {
+        let finite_values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+        ];
+        let exceptional_values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::from_bits(0x7ff8_0000_0000_0001),
+            f64::from_bits(0xfff8_0000_0000_0002),
+        ];
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 9\n", policy)
+                .unwrap();
+            let mut materialized = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut output = Vec::new();
+            for (dataset, values) in [
+                ("finite", finite_values.as_slice()),
+                ("exceptional", exceptional_values.as_slice()),
+            ] {
+                for len in [4, 8, 16, 64, 256, 1024] {
+                    let input: Vec<_> = (0..len)
+                        .map(|i| {
+                            ComplexAmp::new(
+                                values[(i * 3) % values.len()],
+                                values[(i * 7 + 1) % values.len()],
+                            )
+                        })
+                        .collect();
+                    let xs: Vec<_> = if len <= 64 {
+                        (0..len).collect()
+                    } else {
+                        vec![
+                            0,
+                            1,
+                            2,
+                            3,
+                            len / 4 - 1,
+                            len / 4,
+                            len / 4 + 1,
+                            len / 2 - 1,
+                            len / 2,
+                            len / 2 + 1,
+                            len - 2,
+                            len - 1,
+                        ]
+                    };
+                    let zs = [0];
+                    for &x in &xs {
+                        if x < 2 || x & 7 == 0 {
+                            continue;
+                        }
+                        for &z in &zs {
+                            for phase in 0..4 {
+                                let p = pauli(x, z, phase);
+                                for dagger in [false, true] {
+                                    for flip in [false, true] {
+                                        materialized.coefficients.clone_from(&input);
+                                        materialized
+                                            .rotate_signed(&p, false, dagger, flip)
+                                            .unwrap();
+                                        match policy {
+                                            CompiledRotationArithmetic::Strict => {
+                                                CompiledNearCliffordSampler::rotate_cached_pairs::<
+                                                    false,
+                                                >(
+                                                    &mut output, &input, &p, dagger, flip
+                                                )
+                                                .unwrap()
+                                            }
+                                            CompiledRotationArithmetic::Fused => {
+                                                CompiledNearCliffordSampler::rotate_cached_pairs::<
+                                                    true,
+                                                >(
+                                                    &mut output, &input, &p, dagger, flip
+                                                )
+                                                .unwrap()
+                                            }
+                                        }
+                                        assert_eq!(output.len(), materialized.coefficients.len());
+                                        for (i, (actual, expected)) in output
+                                            .iter()
+                                            .zip(&materialized.coefficients)
+                                            .enumerate()
+                                        {
+                                            for (component, actual, expected) in [
+                                                ("re", actual.re, expected.re),
+                                                ("im", actual.im, expected.im),
+                                            ] {
+                                                // Rust permits arithmetic NaNs to choose different signs
+                                                // and payloads. Require NaN in both results; every other
+                                                // result stays bit exact.
+                                                // https://doc.rust-lang.org/std/primitive.f64.html#nan-bit-patterns
+                                                if expected.is_nan() {
+                                                    assert!(
+                                                        actual.is_nan(),
+                                                        "{dataset} {policy:?} len={len} x={x} z={z} phase={phase} dagger={dagger} flip={flip} i={i} {component}"
+                                                    );
+                                                    continue;
+                                                }
+                                                assert_eq!(
+                                                    actual.to_bits(),
+                                                    expected.to_bits(),
+                                                    "{dataset} {policy:?} len={len} x={x} z={z} phase={phase} dagger={dagger} flip={flip} i={i} {component}"
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn cached_rotation_misses_hits_and_closed_admission_keep_parent_and_output_exact() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic("I 9\n", policy)
+                .unwrap();
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            for len in [2, 16, 64, 1024] {
+                let input: Vec<_> = (0..len)
+                    .map(|i| {
+                        ComplexAmp::new(
+                            (i as f64 - 0.5) / len as f64,
+                            -(i as f64 + 0.25) / len as f64,
+                        )
+                    })
+                    .collect();
+                let mut xs = vec![1, 2, 3, len / 2, len / 2 + 1, len - 1];
+                xs.retain(|&x| x < len);
+                xs.sort_unstable();
+                xs.dedup();
+                for x in xs {
+                    for z in [0, len - 1] {
+                        for phase in [0, 1] {
+                            for budget in [
+                                initial + CoefficientCache::state_charge(&input).unwrap(),
+                                64 * 1024 * 1024,
+                            ] {
+                                let mut actual =
+                                    plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                                let parent =
+                                    actual.cache.as_mut().unwrap().store(0, &input).unwrap();
+                                let p = pauli(x, z, phase);
+                                let mut materialized =
+                                    plan.prepare_sampler_with_cache_budget(0).unwrap();
+                                materialized.coefficients.clone_from(&input);
+                                materialized.rotate_signed(&p, false, true, false).unwrap();
+                                let mut state = Some(parent);
+                                actual
+                                    .cached_rotate_signed(0, &p, false, true, false, &mut state)
+                                    .unwrap();
+                                assert_eq!(
+                                    bits(&actual.coefficients),
+                                    bits(&materialized.coefficients)
+                                );
+                                assert_eq!(
+                                    bits(
+                                        &actual.cache.as_ref().unwrap().states[parent].coefficients
+                                    ),
+                                    bits(&input)
+                                );
+                                assert!(actual.coefficient_cache_reserved_bytes() <= budget);
+                                if budget == 64 * 1024 * 1024 {
+                                    let child = state.unwrap();
+                                    assert_ne!(parent, child);
+                                    actual.coefficients.fill(ComplexAmp::new(0.25, -0.75));
+                                    let untouched = bits(&actual.coefficients);
+                                    state = Some(parent);
+                                    actual
+                                        .cached_rotate_signed(0, &p, false, true, false, &mut state)
+                                        .unwrap();
+                                    assert_eq!(state, Some(child));
+                                    assert_eq!(bits(&actual.coefficients), untouched);
+                                    actual.load_state(child).unwrap();
+                                    assert_eq!(
+                                        bits(&actual.coefficients),
+                                        bits(&materialized.coefficients)
+                                    );
+                                } else {
+                                    assert_eq!(state, None);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
