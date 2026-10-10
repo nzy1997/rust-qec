@@ -33,27 +33,111 @@ pub(super) struct CountsReplay {
     record_count: usize,
 }
 
-#[derive(Default)]
-pub(super) struct CountsReplayStorage {
-    storage: Vec<CountsReplay>,
+// Both counts strategies use one out-of-line owner. Ordinary sampling keeps
+// the original sampler header without a second counts-specific Vec field.
+enum CountsStorage {
+    Affine(Vec<u64>),
+    Replay(CountsReplay),
 }
 
-impl CountsReplayStorage {
+#[derive(Default)]
+pub(super) struct CountsWorkspace {
+    storage: Vec<CountsStorage>,
+}
+
+impl CountsWorkspace {
     pub(super) fn as_ref(&self) -> Option<&CountsReplay> {
-        self.storage.first()
+        match self.storage.first() {
+            Some(CountsStorage::Replay(buffer)) => Some(buffer),
+            _ => None,
+        }
     }
 
     pub(super) fn as_mut(&mut self) -> Option<&mut CountsReplay> {
-        self.storage.first_mut()
+        match self.storage.first_mut() {
+            Some(CountsStorage::Replay(buffer)) => Some(buffer),
+            _ => None,
+        }
     }
 
     pub(super) fn is_none(&self) -> bool {
-        self.storage.is_empty()
+        self.as_ref().is_none()
     }
 
     #[cfg(test)]
     pub(super) fn is_some(&self) -> bool {
         !self.is_none()
+    }
+
+    pub(super) fn clear_replay(&mut self) {
+        if self.as_ref().is_some() {
+            *self = Self::default();
+        }
+    }
+
+    // Optional affine admission counts actual owner and inner capacities.
+    // A failed switch leaves any admitted replay snapshot untouched.
+    pub(super) fn affine_outputs(&mut self, count: usize, budget: usize) -> Option<&mut Vec<u64>> {
+        if matches!(self.storage.first(), Some(CountsStorage::Affine(_))) {
+            let overhead = self
+                .storage
+                .capacity()
+                .checked_mul(size_of::<CountsStorage>())?
+                .checked_add(size_of::<Self>())?;
+            let Some(CountsStorage::Affine(outputs)) = self.storage.first_mut() else {
+                unreachable!()
+            };
+            if count.checked_mul(size_of::<u64>())?.checked_add(overhead)? > budget {
+                return None;
+            }
+            if outputs.capacity() < count {
+                outputs.try_reserve_exact(count - outputs.len()).ok()?;
+            }
+            if outputs
+                .capacity()
+                .checked_mul(size_of::<u64>())?
+                .checked_add(overhead)?
+                > budget
+            {
+                return None;
+            }
+            outputs.resize(count, 0);
+            Some(outputs)
+        } else {
+            let requested = count
+                .checked_mul(size_of::<u64>())?
+                .checked_add(size_of::<CountsStorage>())?
+                .checked_add(size_of::<Self>())?;
+            if requested > budget {
+                return None;
+            }
+            let mut holder = Vec::new();
+            holder.try_reserve_exact(1).ok()?;
+            let overhead = holder
+                .capacity()
+                .checked_mul(size_of::<CountsStorage>())?
+                .checked_add(size_of::<Self>())?;
+            if count.checked_mul(size_of::<u64>())?.checked_add(overhead)? > budget {
+                return None;
+            }
+            let mut outputs = Vec::new();
+            outputs.try_reserve_exact(count).ok()?;
+            if outputs
+                .capacity()
+                .checked_mul(size_of::<u64>())?
+                .checked_add(overhead)?
+                > budget
+            {
+                return None;
+            }
+            outputs.resize(count, 0);
+            holder.push(CountsStorage::Affine(outputs));
+            self.storage = holder;
+            let Some(CountsStorage::Affine(outputs)) = self.storage.first_mut() else {
+                unreachable!()
+            };
+            Some(outputs)
+        }
     }
 
     pub(super) fn take(&mut self) -> Self {
@@ -66,7 +150,7 @@ impl CountsReplayStorage {
         };
         self.storage
             .capacity()
-            .checked_mul(size_of::<CountsReplay>())?
+            .checked_mul(size_of::<CountsStorage>())?
             .checked_add(size_of::<Self>())?
             .checked_add(
                 buffer
@@ -131,7 +215,7 @@ impl CountsReplay {
     // Allocation is optional and precedes snapshot mutation. On rejection the
     // already drawn packet still has its complete original replay contract.
     pub(super) fn capture_into(
-        storage: &mut CountsReplayStorage,
+        storage: &mut CountsWorkspace,
         mask: u64,
         position: ReplayPosition,
         prefix: PacketPrefix<'_>,
@@ -147,16 +231,16 @@ impl CountsReplay {
             // the snapshot arrays; failure leaves the original replay intact.
             let overhead = holder
                 .capacity()
-                .checked_mul(size_of::<Self>())
+                .checked_mul(size_of::<CountsStorage>())
                 .and_then(|bytes| bytes.checked_sub(size_of::<Self>()))
-                .and_then(|bytes| bytes.checked_add(size_of::<CountsReplayStorage>()));
+                .and_then(|bytes| bytes.checked_add(size_of::<CountsWorkspace>()));
             let Some(inner_budget) = overhead.and_then(|bytes| budget.checked_sub(bytes)) else {
                 return false;
             };
             let Some(buffer) = Self::new(prefix.x.len(), prefix.records.len(), inner_budget) else {
                 return false;
             };
-            holder.push(buffer);
+            holder.push(CountsStorage::Replay(buffer));
             storage.storage = holder;
         }
         if storage.reserved_bytes().is_none_or(|bytes| bytes > budget) {
@@ -290,7 +374,7 @@ mod tests {
                     );
                     assert!(candidate.checkpoint_replay_rows > 0);
                     if shots <= 64 {
-                        let saved = candidate.counts_replay.as_ref().unwrap();
+                        let saved = candidate.counts_workspace.as_ref().unwrap();
                         assert!(
                             saved.frames.iter().any(|&bits| bits != 0),
                             "restart must preserve a nonzero physical frame"
@@ -329,7 +413,7 @@ mod tests {
                     records: &r,
                     logical: 1 | (1 << 32),
                 };
-                let mut storage = CountsReplayStorage::default();
+                let mut storage = CountsWorkspace::default();
                 assert!(!CountsReplay::capture_into(
                     &mut storage,
                     u64::MAX,
@@ -392,6 +476,107 @@ mod tests {
     }
 
     #[test]
+    fn affine_admission_rejects_before_replacing_an_existing_restart() {
+        let mut workspace = CountsWorkspace::default();
+        let position = ReplayPosition {
+            parent: 7,
+            node: 17,
+            event: 23,
+            noise_event: 11,
+            independent_event: 5,
+            logical: false,
+        };
+        assert!(CountsReplay::capture_into(
+            &mut workspace,
+            1,
+            position,
+            PacketPrefix {
+                x: &[1, 0, 1],
+                z: &[0, 1, 1],
+                records: &[1, 0, 1],
+                logical: 1,
+            },
+            PACKET_BYTE_BUDGET,
+        ));
+        let reserved = workspace.reserved_bytes();
+        let required = size_of::<CountsWorkspace>() + size_of::<CountsStorage>() + 8 * 8;
+        assert!(workspace.affine_outputs(8, required - 1).is_none());
+        assert!(workspace.affine_outputs(usize::MAX, usize::MAX).is_none());
+        assert_eq!(workspace.reserved_bytes(), reserved);
+        let restart = workspace.as_ref().unwrap().resume(0, 0).unwrap();
+        assert_eq!(restart.position.node, 17);
+        assert_eq!(restart.x, &[5]);
+        assert_eq!(restart.z, &[6]);
+        assert_eq!(restart.records, &[true, false, true]);
+        assert!(restart.position.logical);
+        let outputs = workspace.affine_outputs(8, PACKET_BYTE_BUDGET).unwrap();
+        outputs[0] = u64::MAX;
+        let pointer = outputs.as_ptr();
+        let capacity = outputs.capacity();
+        let actual = size_of::<CountsWorkspace>()
+            + workspace.storage.capacity() * size_of::<CountsStorage>()
+            + capacity * size_of::<u64>();
+        assert!(workspace.affine_outputs(8, actual - 1).is_none());
+        workspace.clear_replay();
+        let outputs = workspace.affine_outputs(8, actual).unwrap();
+        assert_eq!(outputs.as_ptr(), pointer);
+        assert_eq!(outputs[0], u64::MAX);
+        assert!(workspace.is_none());
+    }
+
+    #[test]
+    fn affine_workspace_survives_flat_records_and_preserves_counts_rng() {
+        let plan = CompiledNearCliffordExecutor::compile_text(
+            "H 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        )
+        .unwrap();
+        let mut candidate = plan.prepare_sampler().unwrap();
+        let mut reference = plan.prepare_sampler().unwrap();
+        let mut a = StdRng::seed_from_u64(39519);
+        let mut b = a.clone();
+        let expected = reference.sample(64, &mut a).unwrap();
+        assert_eq!(
+            candidate.sample_postselected_counts(64, 0, &mut b).unwrap(),
+            counts_from_raw_records(&expected, 0)
+        );
+        let Some(CountsStorage::Affine(outputs)) = candidate.counts_workspace.storage.first()
+        else {
+            panic!("Clifford counts must use the affine workspace");
+        };
+        let pointer = outputs.as_ptr();
+        let capacity = outputs.capacity();
+        for _ in 0..16 {
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+        let rows = reference.sample(65, &mut a).unwrap();
+        assert_eq!(
+            candidate
+                .sample_measurements_u8(65, &mut b)
+                .unwrap()
+                .measurements,
+            rows.iter()
+                .flat_map(|row| row.measurements.iter().copied().map(u8::from))
+                .collect::<Vec<_>>()
+        );
+        let Some(CountsStorage::Affine(outputs)) = candidate.counts_workspace.storage.first()
+        else {
+            panic!("flat records must preserve affine capacity");
+        };
+        assert_eq!((outputs.as_ptr(), outputs.capacity()), (pointer, capacity));
+        for _ in 0..16 {
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+        let rows = reference.sample(65, &mut a).unwrap();
+        assert_eq!(
+            candidate.sample_postselected_counts(65, 0, &mut b).unwrap(),
+            counts_from_raw_records(&rows, 0)
+        );
+        for _ in 0..16 {
+            assert_eq!(a.next_u64(), b.next_u64());
+        }
+    }
+
+    #[test]
     fn owner_capacity_admission_precedes_snapshot_mutation() {
         let x = [1u64, 2, 3];
         let z = [3u64, 2, 1];
@@ -410,7 +595,7 @@ mod tests {
             records: &records,
             logical: 1,
         };
-        let mut storage = CountsReplayStorage::default();
+        let mut storage = CountsWorkspace::default();
         assert_eq!(storage.reserved_bytes(), Some(0));
         assert!(CountsReplay::capture_into(
             &mut storage,
@@ -425,9 +610,9 @@ mod tests {
         let reserved = storage.reserved_bytes().unwrap();
         assert_eq!(
             reserved,
-            inner
-                + size_of::<CountsReplayStorage>()
-                + (storage.storage.capacity() - 1) * size_of::<CountsReplay>()
+            inner - size_of::<CountsReplay>()
+                + size_of::<CountsWorkspace>()
+                + storage.storage.capacity() * size_of::<CountsStorage>()
         );
         assert!(!CountsReplay::capture_into(
             &mut storage,
@@ -500,13 +685,13 @@ mod tests {
                         }
                         if budget == 0 {
                             assert_eq!(candidate.checkpoint_replay_rows, 0);
-                            assert!(candidate.counts_replay.is_none());
+                            assert!(candidate.counts_workspace.is_none());
                         } else {
                             assert!(
                                 candidate.checkpoint_replay_rows > 0,
                                 "restart must be exercised: extra={extra} shots={shots}"
                             );
-                            let buffer = candidate.counts_replay.as_ref().unwrap();
+                            let buffer = candidate.counts_workspace.as_ref().unwrap();
                             for saved in buffer.positions.iter().flatten() {
                                 match plan.operations[saved.node] {
                                     PlanOp::Rotate { .. } => observed_rotate = true,
@@ -537,7 +722,7 @@ mod tests {
                                 .flat_map(|row| row.measurements.iter().copied().map(u8::from))
                                 .collect::<Vec<_>>()
                         );
-                        assert!(candidate.counts_replay.is_none());
+                        assert!(candidate.counts_workspace.is_none());
                         for _ in 0..16 {
                             assert_eq!(a.next_u64(), b.next_u64());
                         }
@@ -593,7 +778,7 @@ mod tests {
                 .unwrap_err()
         );
         assert!(candidate.checkpoint_replay_rows > 0);
-        assert!(candidate.counts_replay.is_some());
+        assert!(candidate.counts_workspace.is_some());
         assert_eq!(candidate.packet_x.len(), plan.num_qubits);
         assert_eq!(candidate.packet_records.len(), plan.measurement_count);
         assert_eq!(candidate.packet_tape.len(), 64 * plan.random_kinds.len());
