@@ -33,6 +33,49 @@ pub(super) struct CountsReplay {
     record_count: usize,
 }
 
+#[derive(Default)]
+pub(super) struct CountsReplayStorage {
+    storage: Vec<CountsReplay>,
+}
+
+impl CountsReplayStorage {
+    pub(super) fn as_ref(&self) -> Option<&CountsReplay> {
+        self.storage.first()
+    }
+
+    pub(super) fn as_mut(&mut self) -> Option<&mut CountsReplay> {
+        self.storage.first_mut()
+    }
+
+    pub(super) fn is_none(&self) -> bool {
+        self.storage.is_empty()
+    }
+
+    #[cfg(test)]
+    pub(super) fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    pub(super) fn take(&mut self) -> Self {
+        std::mem::take(self)
+    }
+
+    pub(super) fn reserved_bytes(&self) -> Option<usize> {
+        let Some(buffer) = self.as_ref() else {
+            return Some(0);
+        };
+        self.storage
+            .capacity()
+            .checked_mul(size_of::<CountsReplay>())?
+            .checked_add(size_of::<Self>())?
+            .checked_add(
+                buffer
+                    .reserved_bytes()?
+                    .checked_sub(size_of::<CountsReplay>())?,
+            )
+    }
+}
+
 impl CountsReplay {
     fn new(qubits: usize, record_count: usize, budget: usize) -> Option<Self> {
         let words = qubits.div_ceil(64);
@@ -88,21 +131,40 @@ impl CountsReplay {
     // Allocation is optional and precedes snapshot mutation. On rejection the
     // already drawn packet still has its complete original replay contract.
     pub(super) fn capture_into(
-        storage: &mut Option<Self>,
+        storage: &mut CountsReplayStorage,
         mask: u64,
         position: ReplayPosition,
         prefix: PacketPrefix<'_>,
         budget: usize,
     ) -> bool {
         if storage.is_none() {
-            *storage = Self::new(prefix.x.len(), prefix.records.len(), budget);
+            let mut holder = Vec::new();
+            if holder.try_reserve_exact(1).is_err() {
+                return false;
+            }
+            // The inner admission includes one CountsReplay header already.
+            // Count the owner and any rounded outer capacity before allocating
+            // the snapshot arrays; failure leaves the original replay intact.
+            let overhead = holder
+                .capacity()
+                .checked_mul(size_of::<Self>())
+                .and_then(|bytes| bytes.checked_sub(size_of::<Self>()))
+                .and_then(|bytes| bytes.checked_add(size_of::<CountsReplayStorage>()));
+            let Some(inner_budget) = overhead.and_then(|bytes| budget.checked_sub(bytes)) else {
+                return false;
+            };
+            let Some(buffer) = Self::new(prefix.x.len(), prefix.records.len(), inner_budget) else {
+                return false;
+            };
+            holder.push(buffer);
+            storage.storage = holder;
+        }
+        if storage.reserved_bytes().is_none_or(|bytes| bytes > budget) {
+            return false;
         }
         let Some(buffer) = storage.as_mut() else {
             return false;
         };
-        if buffer.reserved_bytes().is_none_or(|bytes| bytes > budget) {
-            return false;
-        }
         debug_assert_eq!(prefix.x.len(), prefix.z.len());
         debug_assert_eq!(buffer.words, prefix.x.len().div_ceil(64));
         debug_assert_eq!(buffer.record_count, prefix.records.len());
@@ -267,7 +329,7 @@ mod tests {
                     records: &r,
                     logical: 1 | (1 << 32),
                 };
-                let mut storage = None;
+                let mut storage = CountsReplayStorage::default();
                 assert!(!CountsReplay::capture_into(
                     &mut storage,
                     u64::MAX,
@@ -327,6 +389,74 @@ mod tests {
         }
         assert!(CountsReplay::new(usize::MAX, 0, usize::MAX).is_none());
         assert!(CountsReplay::new(0, usize::MAX, usize::MAX).is_none());
+    }
+
+    #[test]
+    fn owner_capacity_admission_precedes_snapshot_mutation() {
+        let x = [1u64, 2, 3];
+        let z = [3u64, 2, 1];
+        let records = [1u64, 2, 3, 0];
+        let position = ReplayPosition {
+            parent: 7,
+            node: 17,
+            event: 23,
+            noise_event: 11,
+            independent_event: 5,
+            logical: false,
+        };
+        let prefix = || PacketPrefix {
+            x: &x,
+            z: &z,
+            records: &records,
+            logical: 1,
+        };
+        let mut storage = CountsReplayStorage::default();
+        assert_eq!(storage.reserved_bytes(), Some(0));
+        assert!(CountsReplay::capture_into(
+            &mut storage,
+            1,
+            position,
+            prefix(),
+            PACKET_BYTE_BUDGET
+        ));
+        // Exercise actual retained outer capacity, including vacant slots.
+        storage.storage.try_reserve_exact(3).unwrap();
+        let inner = storage.as_ref().unwrap().reserved_bytes().unwrap();
+        let reserved = storage.reserved_bytes().unwrap();
+        assert_eq!(
+            reserved,
+            inner
+                + size_of::<CountsReplayStorage>()
+                + (storage.storage.capacity() - 1) * size_of::<CountsReplay>()
+        );
+        assert!(!CountsReplay::capture_into(
+            &mut storage,
+            2,
+            position,
+            prefix(),
+            reserved - 1
+        ));
+        let buffer = storage.as_ref().unwrap();
+        let first = buffer.resume(0, 0).unwrap();
+        assert_eq!(first.position.node, 17);
+        assert_eq!(first.x, &[5]);
+        assert_eq!(first.z, &[5]);
+        assert_eq!(first.records, &[true, false, true, false]);
+        assert!(first.position.logical);
+        assert!(buffer.resume(1, 0).is_none());
+        assert!(CountsReplay::capture_into(
+            &mut storage,
+            2,
+            position,
+            prefix(),
+            reserved
+        ));
+        assert_eq!(storage.reserved_bytes(), Some(reserved));
+        let second = storage.as_ref().unwrap().resume(1, 0).unwrap();
+        assert_eq!(second.x, &[6]);
+        assert_eq!(second.z, &[3]);
+        assert_eq!(second.records, &[false, true, true, false]);
+        assert!(!second.position.logical);
     }
 
     #[test]
