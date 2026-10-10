@@ -2420,10 +2420,18 @@ impl CompiledNearCliffordSampler<'_> {
                 return Ok(entry.probability_zero);
             }
         }
-        if let Some(id) = state {
-            self.load_state(id)?;
-        }
-        let probability = self.probability_zero(p);
+        // A cached ID owns immutable coefficients. Probability queries do not
+        // need the mutable work buffer; later projection/rotation misses load
+        // their input independently, just as they do after a probability hit.
+        let probability = if let Some(id) = state {
+            let cache = self
+                .cache
+                .as_ref()
+                .expect("admitted state belongs to a cache");
+            Self::probability_zero_coefficients(&cache.states[id].coefficients, p)
+        } else {
+            self.probability_zero(p)
+        };
         if let (Some(id), Some(cache)) = (state, self.cache.as_mut()) {
             cache.set_entry(
                 id,
@@ -2853,25 +2861,31 @@ impl CompiledNearCliffordSampler<'_> {
         b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
+        Self::probability_zero_coefficients(&self.coefficients, p)
+    }
+    fn probability_zero_coefficients(coefficients: &[ComplexAmp], p: &CompactPauli) -> f64 {
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
         match p.physical.phase & 3 {
-            0 => self.probability_zero_phase::<0>(p),
-            1 => self.probability_zero_phase::<1>(p),
-            2 => self.probability_zero_phase::<2>(p),
-            _ => self.probability_zero_phase::<3>(p),
+            0 => Self::probability_zero_phase::<0>(coefficients, p),
+            1 => Self::probability_zero_phase::<1>(coefficients, p),
+            2 => Self::probability_zero_phase::<2>(coefficients, p),
+            _ => Self::probability_zero_phase::<3>(coefficients, p),
         }
     }
     #[inline]
-    fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
+    fn probability_zero_phase<const PHASE: u8>(
+        coefficients: &[ComplexAmp],
+        p: &CompactPauli,
+    ) -> f64 {
         let mut expectation = 0.;
         let mut norm = 0.;
-        for (i, &amp) in self.coefficients.iter().enumerate() {
+        for (i, &amp) in coefficients.iter().enumerate() {
             let sign = if (i & p.z).count_ones() % 2 != 0 {
                 -1.
             } else {
                 1.
             };
-            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
+            expectation += (coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
             norm += amp.norm_sqr();
         }
         ((1. + expectation / norm) * 0.5).clamp(0., 1.)
@@ -4056,6 +4070,172 @@ impl CompiledNearCliffordSampler<'_> {
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    // Retain the pre-borrow expression and accumulation order independently.
+    fn literal_cached_probability(coefficients: &[ComplexAmp], p: &CompactPauli) -> f64 {
+        let mut expectation = 0.;
+        let mut norm = 0.;
+        for (i, &amp) in coefficients.iter().enumerate() {
+            let sign = if (i & p.z).count_ones() % 2 != 0 {
+                -1.
+            } else {
+                1.
+            };
+            expectation +=
+                (coefficients[i ^ p.x].conj() * i_pow(p.physical.phase) * (amp * sign)).re;
+            norm += amp.norm_sqr();
+        }
+        ((1. + expectation / norm) * 0.5).clamp(0., 1.)
+    }
+
+    #[test]
+    fn cached_probability_misses_preserve_work_buffer_and_literal_bits() {
+        let mut plan =
+            CompiledNearCliffordExecutor::compile_text("H 0 1\nT 0 1\nMY 0\nMX 1\n").unwrap();
+        let mut p = plan
+            .operations
+            .iter()
+            .find_map(|op| match op {
+                PlanOp::Measure(m) => Some(m.pauli.clone()),
+                _ => None,
+            })
+            .unwrap();
+        let finite = vec![
+            ComplexAmp::new(0.25, -0.),
+            ComplexAmp::new(-0.125, 0.5),
+            ComplexAmp::new(0.375, -0.25),
+            ComplexAmp::new(-0.5, 0.125),
+        ];
+        for coefficients in [
+            finite,
+            vec![ComplexAmp::new(0., -0.); 4],
+            vec![ComplexAmp::new(f64::INFINITY, 0.); 4],
+            vec![ComplexAmp::new(f64::from_bits(0x7ff8_0000_0000_0042), 0.); 4],
+        ] {
+            plan.initial_coefficients = Arc::new(coefficients.clone());
+            for phase in 0..=u8::MAX {
+                for (x, z) in [(0, 0), (0, 3), (1, 0), (1, 3), (3, 2)] {
+                    p.physical.phase = phase;
+                    p.x = x;
+                    p.z = z;
+                    let mut sampler = plan.prepare_sampler().unwrap();
+                    let id = sampler.cache.as_ref().unwrap().start;
+                    // A different lane/transition may have left any work state.
+                    // An empty buffer would panic if the query read it directly.
+                    sampler.coefficients = Vec::new();
+                    let expected = literal_cached_probability(&coefficients, &p);
+                    let actual = sampler.cached_probability_zero(0, &p, Some(id)).unwrap();
+                    if expected.is_nan() {
+                        assert!(actual.is_nan());
+                    } else {
+                        assert_eq!(actual.to_bits(), expected.to_bits());
+                    }
+                    assert_eq!(sampler.coefficients.capacity(), 0);
+                    assert!(sampler.coefficients.is_empty());
+                    let hit = sampler.cached_probability_zero(0, &p, Some(id)).unwrap();
+                    assert_eq!(hit.to_bits(), actual.to_bits());
+                    // Refusal to reuse a transition at a different node must
+                    // still compute from the ID, without materializing it.
+                    let miss = sampler.cached_probability_zero(1, &p, Some(id)).unwrap();
+                    assert_eq!(miss.to_bits(), actual.to_bits());
+                    assert_eq!(sampler.coefficients.capacity(), 0);
+                    // No admitted ID uses the current mutable state instead.
+                    sampler.coefficients = coefficients.clone();
+                    let uncached = sampler.cached_probability_zero(1, &p, None).unwrap();
+                    assert_eq!(uncached.to_bits(), actual.to_bits());
+                }
+            }
+        }
+        // Canonical scalar ID zero is shared across nodes and has no work state.
+        plan.initial_coefficients = Arc::new(vec![ComplexAmp::new(1., 0.)]);
+        let mut sampler = plan.prepare_sampler().unwrap();
+        sampler.coefficients.clear();
+        p.x = 0;
+        p.z = 0;
+        for (node, phase, expected) in [(0, 0, 1f64), (1, 2, 0f64)] {
+            p.physical.phase = phase;
+            assert_eq!(
+                sampler
+                    .cached_probability_zero(node, &p, Some(0))
+                    .unwrap()
+                    .to_bits(),
+                expected.to_bits()
+            );
+            assert!(sampler.coefficients.is_empty());
+        }
+    }
+
+    #[test]
+    fn cached_probability_miss_leaves_projection_and_rotation_inputs_valid() {
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let mut plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0 1\nT 0 1\nMY 0\nMX 1\n",
+                arithmetic,
+            )
+            .unwrap();
+            plan.initial_coefficients = Arc::new(vec![
+                ComplexAmp::new(0.25, -0.125),
+                ComplexAmp::new(-0.125, 0.5),
+                ComplexAmp::new(0.375, -0.25),
+                ComplexAmp::new(-0.5, 0.125),
+            ]);
+            let initial = plan
+                .prepare_sampler()
+                .unwrap()
+                .coefficient_cache_reserved_bytes();
+            let mut p = plan
+                .operations
+                .iter()
+                .find_map(|op| match op {
+                    PlanOp::Measure(m) => Some(m.pauli.clone()),
+                    _ => None,
+                })
+                .unwrap();
+            p.x = 1;
+            p.z = 0;
+            p.physical.phase = 0;
+            for budget in [initial, DEFAULT_CACHE_BYTE_BUDGET] {
+                for branch in [false, true] {
+                    for rotate in [false, true] {
+                        let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                        let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                        let mut state = Some(cached.cache.as_ref().unwrap().start);
+                        cached.coefficients.clear();
+                        let probability = cached.cached_probability_zero(0, &p, state).unwrap();
+                        assert_eq!(
+                            probability.to_bits(),
+                            reference.probability_zero(&p).to_bits()
+                        );
+                        if rotate {
+                            cached
+                                .cached_rotate_signed(1, &p, false, false, branch, &mut state)
+                                .unwrap();
+                            reference.rotate_signed(&p, false, false, branch).unwrap();
+                        } else {
+                            cached
+                                .cached_project(0, &p, 0, false, branch, branch, &mut state)
+                                .unwrap();
+                            reference.project(&p, 0, false, branch).unwrap();
+                        }
+                        if let Some(id) = state {
+                            cached.load_state(id).unwrap();
+                        }
+                        assert_eq!(cached.coefficients.len(), reference.coefficients.len());
+                        for (a, b) in cached.coefficients.iter().zip(&reference.coefficients) {
+                            assert_eq!(
+                                (a.re.to_bits(), a.im.to_bits()),
+                                (b.re.to_bits(), b.im.to_bits())
+                            );
+                        }
+                        assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+                    }
+                }
+            }
+        }
+    }
 
     // Literal S2 array bookkeeping. Keep these loops independent of the
     // production uniform scan/broadcast helpers and lazy-state hint.
