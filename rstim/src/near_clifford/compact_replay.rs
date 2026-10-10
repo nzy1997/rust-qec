@@ -77,6 +77,15 @@ impl<'a> CompactReplay<'a> {
     pub(super) fn cursor(&self) -> usize {
         self.cursor
     }
+    pub(super) fn resume_at(&mut self, event: usize, noise: usize, independent: usize) {
+        assert!(
+            event <= self.tape.len(),
+            "recorded random tape is incomplete"
+        );
+        self.cursor = event;
+        self.noise_event = noise;
+        self.independent_event = independent;
+    }
 }
 impl RowDraw for CompactReplay<'_> {
     fn noise_value(&self, event: usize, ordinal: usize) -> u64 {
@@ -226,6 +235,48 @@ mod tests {
                         replay.independent_event,
                         if use_independent { 129 } else { 0 }
                     );
+                    for start in 0..=kinds.len() {
+                        let mut replay = CompactReplay::new(
+                            &tape,
+                            use_noise.then_some(&noise),
+                            use_independent.then_some(&independent),
+                            lane,
+                        );
+                        let n = kinds[..start]
+                            .iter()
+                            .filter(|kind| matches!(kind, RandomKind::Noise { .. }))
+                            .count();
+                        let i = kinds[..start]
+                            .iter()
+                            .filter(|kind| matches!(kind, RandomKind::Independent))
+                            .count();
+                        replay.resume_at(start, n, i);
+                        while replay.cursor() < kinds.len() {
+                            let event = replay.cursor();
+                            if matches!(kinds[event], RandomKind::Noise { .. }) {
+                                let maximum = kinds[event..]
+                                    .iter()
+                                    .take_while(|kind| matches!(kind, RandomKind::Noise { .. }))
+                                    .count();
+                                let skipped = replay.skip_zero_noise(maximum);
+                                assert!(
+                                    expected[event..event + skipped]
+                                        .iter()
+                                        .all(|&value| value == 0)
+                                );
+                                if skipped == maximum {
+                                    continue;
+                                }
+                            }
+                            let event = replay.cursor();
+                            assert_eq!(
+                                replay.draw(kinds[event]),
+                                expected[event],
+                                "lane={lane} start={start} noise={use_noise} independent={use_independent}"
+                            );
+                        }
+                        assert_eq!(replay.cursor(), expected.len());
+                    }
                 }
             }
         }
@@ -441,20 +492,33 @@ mod tests {
                             }
                         })
                         .collect();
-                    let mut replay = CompactReplay::new(
-                        &tape,
-                        use_noise.then_some(&noise),
-                        use_independent.then_some(&independent),
-                        63,
-                    );
-                    for (&kind, &value) in kinds.iter().zip(&expected) {
-                        assert_eq!(
-                            replay.draw(kind),
-                            value,
-                            "seed={seed} noise={use_noise} independent={use_independent}"
+                    // Every possible restart, including the 64/128-bit
+                    // Independent seams, must decode the literal suffix.
+                    for start in 0..=kinds.len() {
+                        let mut replay = CompactReplay::new(
+                            &tape,
+                            use_noise.then_some(&noise),
+                            use_independent.then_some(&independent),
+                            63,
                         );
+                        let noise_prefix = kinds[..start]
+                            .iter()
+                            .filter(|kind| matches!(kind, RandomKind::Noise { .. }))
+                            .count();
+                        let independent_prefix = kinds[..start]
+                            .iter()
+                            .filter(|kind| matches!(kind, RandomKind::Independent))
+                            .count();
+                        replay.resume_at(start, noise_prefix, independent_prefix);
+                        for (&kind, &value) in kinds[start..].iter().zip(&expected[start..]) {
+                            assert_eq!(
+                                replay.draw(kind),
+                                value,
+                                "seed={seed} noise={use_noise} independent={use_independent} start={start}"
+                            );
+                        }
+                        assert_eq!(replay.cursor(), kinds.len());
                     }
-                    assert_eq!(replay.cursor(), kinds.len());
                 }
             }
             for _ in 0..16 {

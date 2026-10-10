@@ -7,7 +7,6 @@ pub(super) struct NoisePacket {
 }
 
 impl NoisePacket {
-    #[cfg(test)]
     pub(super) fn lazy_error_reserved_bytes(&self) -> usize {
         self.planes
             .capacity()
