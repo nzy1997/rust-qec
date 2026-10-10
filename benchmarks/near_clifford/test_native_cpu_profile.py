@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import native_cpu_profile as profile
 
@@ -54,7 +55,7 @@ def fixture(out):
     preflight = {}
     for name in profile.PREFLIGHT:
         path = out / ("preflight-" + name + ".log")
-        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 1} passed; fixture only\n")
+        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 2 if name == 'uniform-rotation-phase' else 1} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fixture only\n")
         preflight[name] = dict(path=path.name, sha256=profile.scout.digest(path))
     h = dict(schema="diagnostic.native-cpu-sampling.v1", started=1, performance_valid=False,
              scope="fixture-only metadata, no real samples", identities=identities, retained=retained, preflight=preflight,
@@ -110,6 +111,143 @@ def seal(out, h, c, events):
 
 
 class ProfileContract(unittest.TestCase):
+    def test_profile_producer_checks_complete_suite_gates(self):
+        cases = [
+            ("public-counts", 10, 0, 0, 0, 0, True),
+            ("public-counts", 11, 0, 0, 0, 0, True),
+            ("public-counts", 0, 0, 0, 0, 0, False),
+            ("public-counts", 11, 1, 0, 0, 0, False),
+            ("public-counts", 11, 0, 1, 0, 0, False),
+            ("public-counts", 11, 0, 0, 1, 0, False),
+            ("public-counts", 11, 0, 0, 0, 1, False),
+            ("uniform-rotation-phase", 2, 0, 0, 0, 0, True),
+            ("uniform-rotation-phase", 2, 0, 0, 0, 349, True),
+            ("uniform-rotation-phase", 0, 0, 0, 0, 349, False),
+            ("uniform-rotation-phase", 1, 0, 0, 0, 349, False),
+            ("uniform-rotation-phase", 3, 0, 0, 0, 349, False),
+            ("uniform-rotation-phase", 2, 1, 0, 0, 349, False),
+            ("uniform-rotation-phase", 2, 0, 1, 0, 349, False),
+            ("uniform-rotation-phase", 2, 0, 0, 1, 349, False),
+        ]
+        for gate, passed, failed, ignored, measured, filtered, valid in cases:
+            with self.subTest(case=(gate, passed, failed, ignored, measured, filtered)), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                script = root / "benchmarks/near_clifford/verify_x86_rotations.sh"
+                script.parent.mkdir(parents=True)
+                script.write_text("fixture preflight, never executed\n")
+                (root / "drafts").mkdir()
+                (root / "drafts/x86-scout-features.txt").write_text("fixture flags: avx2 fma\n")
+                for name in profile.PREFLIGHT:
+                    count = 11 if name == "public-counts" else 2 if name == "uniform-rotation-phase" else 1
+                    text = f"test result: ok. {count} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fixture only\n"
+                    if name == gate:
+                        text = f"test result: ok. {passed} passed; {failed} failed; {ignored} ignored; {measured} measured; {filtered} filtered out; fixture only\n"
+                    (root / ("drafts/x86-scout-" + name + ".log")).write_text(text)
+                roots = dict(candidate=root, baseline=root / "drafts/rust-pair-scout-baseline")
+                with mock.patch.object(profile, "ROOT", root), \
+                     mock.patch.dict(os.environ, profile.ENV), \
+                     mock.patch.object(profile.platform, "system", return_value="Linux"), \
+                     mock.patch.object(profile.platform, "machine", return_value="x86_64"), \
+                     mock.patch.object(profile.os, "sched_getaffinity", return_value={0}, create=True), \
+                     mock.patch.object(profile.os, "sched_setaffinity", create=True), \
+                     mock.patch.object(profile.scout, "prepare", return_value=roots), \
+                     mock.patch.object(profile, "choose_perf", return_value=(root / "fixture-perf", "fixture")), \
+                     mock.patch.object(profile.scout, "retain_probe_inputs", return_value={}), \
+                     mock.patch.object(profile.scout, "identity", side_effect=RuntimeError("past preflight; no perf execution")) as identity:
+                    if valid:
+                        with self.assertRaisesRegex(RuntimeError, "past preflight"):
+                            profile.profile("1" * 40, root / "drafts/profile")
+                        identity.assert_called_once()
+                    else:
+                        with self.assertRaisesRegex(ValueError, "native gate result: " + gate):
+                            profile.profile("1" * 40, root / "drafts/profile")
+                        identity.assert_not_called()
+
+    def test_single_test_gates_keep_exactly_one_passing_test(self):
+        for name in profile.PREFLIGHT:
+            if name in ["public-counts", "uniform-rotation-phase"]:
+                continue
+            with self.subTest(name=name):
+                profile.verify_preflight(name, "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 288 filtered out;\n")
+                for passed in [0, 2, 10, 11]:
+                    with self.assertRaisesRegex(ValueError, "native gate result: " + name):
+                        profile.verify_preflight(name, f"test result: ok. {passed} passed; fixture only\n")
+
+    def test_growing_public_suite_passes_preflight_and_retained_verification(self):
+        for passed in [10, 11, 101]:
+            with self.subTest(passed=passed), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                path = out / "preflight-public-counts.log"
+                text = f"running {passed} tests\ntest result: ok. {passed} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
+                profile.verify_preflight("public-counts", text)
+                path.write_text(text)
+                h["preflight"]["public-counts"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                profile.verify(out, git_sources=False, replay=False)
+
+    def test_incomplete_public_suite_is_rejected_by_preflight_and_retained_verification(self):
+        summary = "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
+        logs = [summary.replace("11 passed", "0 passed"),
+                summary.replace("0 failed", "1 failed"),
+                summary.replace("0 ignored", "1 ignored"),
+                summary.replace("0 measured", "1 measured"),
+                summary.replace("0 filtered out", "1 filtered out"),
+                summary.replace("result: ok.", "result: FAILED."),
+                "unrelated " + summary,
+                summary.replace("ok.", "okX"),
+                "running 11 tests\n"]
+        for text in logs:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                with self.assertRaisesRegex(ValueError, "native gate result: public-counts"):
+                    profile.verify_preflight("public-counts", text)
+                path = out / "preflight-public-counts.log"
+                path.write_text(text)
+                h["preflight"]["public-counts"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                with self.assertRaisesRegex(ValueError, "native gate result: public-counts"):
+                    profile.verify(out, git_sources=False, replay=False)
+
+    def test_uniform_suite_retains_both_tests_and_allows_other_lib_tests_filtered(self):
+        for filtered in [0, 1, 349]:
+            with self.subTest(filtered=filtered), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                path = out / "preflight-uniform-rotation-phase.log"
+                text = f"test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; {filtered} filtered out; finished in 0.01s\n"
+                profile.verify_preflight("uniform-rotation-phase", text)
+                path.write_text(text)
+                h["preflight"]["uniform-rotation-phase"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                profile.verify(out, git_sources=False, replay=False)
+
+    def test_incomplete_uniform_suite_is_rejected_even_with_resealed_log(self):
+        summary = "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 349 filtered out; finished in 0.01s\n"
+        logs = [summary.replace("2 passed", "0 passed"),
+                summary.replace("2 passed", "1 passed"),
+                summary.replace("2 passed", "3 passed"),
+                summary.replace("0 failed", "1 failed"),
+                summary.replace("0 ignored", "1 ignored"),
+                summary.replace("0 measured", "1 measured"),
+                summary.replace("result: ok.", "result: FAILED."),
+                "unrelated " + summary,
+                summary.replace("ok.", "okX"),
+                "running 2 tests\n"]
+        for text in logs:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                with self.assertRaisesRegex(ValueError, "native gate result: uniform-rotation-phase"):
+                    profile.verify_preflight("uniform-rotation-phase", text)
+                path = out / "preflight-uniform-rotation-phase.log"
+                path.write_text(text)
+                h["preflight"]["uniform-rotation-phase"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                with self.assertRaisesRegex(ValueError, "native gate result: uniform-rotation-phase"):
+                    profile.verify(out, git_sources=False, replay=False)
+
     def test_fixture_metadata_only_passes_explicit_non_execution_check(self):
         with tempfile.TemporaryDirectory() as temporary:
             out = Path(temporary)
@@ -117,13 +255,14 @@ class ProfileContract(unittest.TestCase):
             profile.verify(out, git_sources=False, replay=False)
 
     def test_resealed_semantic_corruptions_are_rejected(self):
-        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout", "cpu_attribute"]:
+        for kind in ["scope", "validation", "duration", "observations", "samples", "buildid", "cpu_command", "exit", "output_inventory", "output_path", "source_closure", "source_root", "binary", "event_order", "sample_cpu", "sample_pid", "sample_tid", "sample_executable", "sample_comm", "task_pid", "task_binary", "task_affinity", "escaped_out", "timeout", "cpu_attribute", "uniform_gate_omitted"]:
             with self.subTest(kind=kind), tempfile.TemporaryDirectory() as temporary:
                 out = Path(temporary)
                 h, c, events = fixture(out)
                 e = events[0]
                 directory = out / e["directory"]
-                if kind == "scope": h["performance_valid"] = True
+                if kind == "uniform_gate_omitted": h["preflight"].pop("uniform-rotation-phase")
+                elif kind == "scope": h["performance_valid"] = True
                 elif kind == "source_closure": c["identities_after"]["candidate"]["binary"] = "0" * 64
                 elif kind == "source_root": h["roots"]["baseline"] = "/unexpected"
                 elif kind == "escaped_out": h["original_out"] = "/fixture/drafts/../../escaped-profile"

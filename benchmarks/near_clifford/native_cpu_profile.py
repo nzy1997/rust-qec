@@ -19,7 +19,7 @@ ROOT = scout.ROOT
 NAME = "msc_d5_inject_cultivate_p1e-3"
 CASES = [("baseline", "strict"), ("candidate", "strict"), ("candidate", "fused"), ("baseline", "fused")]
 ENV = {"RUSTFLAGS": "-C target-cpu=native", **{k: "1" for k in scout.ENV_KEYS[1:]}}
-PREFLIGHT = ["direct-bits", "highest-gather", "gather-cdf", "frozen-bits", "both-policy-bits", "public-counts"]
+PREFLIGHT = ["direct-bits", "highest-gather", "gather-cdf", "frozen-bits", "both-policy-bits", "public-counts", "uniform-rotation-phase"]
 EXPORTS = {"perf-script.txt": ["script", "--header", "-F", "comm,pid,tid,cpu,time,event,ip,sym,dso"],
            "perf-report.txt": ["report", "--stdio", "--no-children", "--percent-limit", "0"],
            "perf-buildids.txt": ["buildid-list"], "perf-header.txt": ["report", "--header-only"]}
@@ -28,6 +28,16 @@ EXPORTS = {"perf-script.txt": ["script", "--header", "-F", "comm,pid,tid,cpu,tim
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def verify_preflight(name, text):
+    if name == "public-counts":
+        passed = re.search(r"(?m)^test result: ok\. [1-9][0-9]* passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;", text)
+    elif name == "uniform-rotation-phase":
+        passed = re.search(r"(?m)^test result: ok\. 2 passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out;", text)
+    else:
+        passed = "test result: ok. 1 passed;" in text
+    require(passed, "native gate result: " + name)
 
 
 def read(path):
@@ -148,8 +158,7 @@ def profile(baseline_ref, out):
     preflight = {}
     for name in PREFLIGHT:
         source = ROOT / ("drafts/x86-scout-" + name + ".log")
-        expected = 10 if name == "public-counts" else 1
-        require(f"test result: ok. {expected} passed;" in source.read_text(), "native preflight missing: " + name)
+        verify_preflight(name, source.read_text())
         target = out / ("preflight-" + name + ".log")
         shutil.copyfile(source, target)
         preflight[name] = dict(path=target.name, sha256=scout.digest(target))
@@ -257,7 +266,7 @@ def verify(out, *, git_sources=True, replay=True):
     require(set(h["preflight"]) == set(PREFLIGHT), "all native gate logs required")
     for name, entry in h["preflight"].items():
         require(entry["path"] == "preflight-" + name + ".log" and scout.digest(out / entry["path"]) == entry["sha256"], "native log bytes")
-        require(f"test result: ok. {10 if name == 'public-counts' else 1} passed;" in (out / entry["path"]).read_text(), "native gate result")
+        verify_preflight(name, (out / entry["path"]).read_text())
     buildids = {}
     require(set(h["binaries"]) == {"baseline", "candidate"}, "binary command inventory")
     for role in ["baseline", "candidate"]:
