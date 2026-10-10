@@ -82,6 +82,29 @@ class WarmContractTests(unittest.TestCase):
         self.assertIn('[unknown]', selected)
         self.assertEqual(result['counts']['missing_leaf'], 1)
 
+    def test_delayed_dummy_accepts_inherited_frequency_but_rejects_unrelated_parameters(self):
+        data = raw_attr()
+        struct.pack_into('<Q', data, 104 + 16, 499)
+        struct.pack_into('<Q', data, 104 + 40, (1 << 25) | (1 << 5) | (1 << 10))
+        data += data[104:248]
+        struct.pack_into('<Q', data, 32, 288)
+        struct.pack_into('<Q', data, 248 + 8, 9)
+        result = contract.perf_clock(data)
+        self.assertEqual([row['period'] for row in result['attributes']], [499, 499])
+        for offset, value in [(248 + 16, 498), (248 + 16, 0),
+                              (248 + 40, (1 << 25) | (1 << 5)),
+                              (104 + 40, (1 << 25) | (1 << 5))]:
+            bad = bytearray(data)
+            struct.pack_into('<Q', bad, offset, value)
+            with self.subTest(offset=offset, value=value), self.assertRaises(ValueError):
+                contract.perf_clock(bad)
+        # Recognizing tracker attributes never admits dummy samples into the
+        # selected population, including samples outside the warm interval.
+        for nanos in [4, 6, 9]:
+            with self.assertRaises(ValueError):
+                contract.select_samples(sample(nanos).replace('cpu-clock:u', 'dummy:u'),
+                                        phase(), 2, 77, '/native/probe.bin', minimum=1)
+
     def test_mixed_unrecognized_blocks_cannot_enter_the_selection_or_evade_the_ledger(self):
         good = sample(6) * 100
         bad_blocks = [sample(9, comm='foreign task', pid=88), sample(9, comm='# foreign', pid=88),
