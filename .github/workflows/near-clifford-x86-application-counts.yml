@@ -1,154 +1,16 @@
-name: Near-Clifford x86 application counts
+name: Near-Clifford replay CPU profile
 
-# Independent VM budget: structural timeouts cannot starve application counts.
-# Remeasure explicitly; evidence/validator publications reuse closed receipts.
+# Exact-source diagnostic campaign. Sampled timings never establish speedups.
 on:
   workflow_dispatch:
-    inputs:
-      baseline_ref:
-        description: 'Exact baseline commit for paired scouts or CPU profiles; empty runs the peer benchmark unless profile_only is set'
-        required: false
-        default: ''
-        type: string
-      diagnostic_followup:
-        description: 'After paired scouts close, retain actual binaries/assembly and run two identical-binary A/A controls'
-        required: false
-        default: false
-        type: boolean
-
-      profile_only:
-        description: Collect diagnostic CPU samples instead of application timings
-        required: false
-        default: false
-        type: boolean
-      cdf_source_pair:
-        description: 'Run the fixed 36-cell depth/rank/boundary/counts source-pair protocol with an identical-binary control'
-        required: false
-        default: false
-        type: boolean
-      candidate_ref:
-        description: 'Exact candidate source SHA for cdf_source_pair; both source refs are required'
-        required: false
-        default: ''
-        type: string
-
 
 permissions:
   contents: read
 
 jobs:
-  benchmark:
-    if: ${{ inputs.baseline_ref == '' && !inputs.profile_only && !inputs.cdf_source_pair }}
+  profile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
-    env:
-      RUSTFLAGS: '-C target-cpu=native'
-      OMP_NUM_THREADS: '1'
-      OPENBLAS_NUM_THREADS: '1'
-      MKL_NUM_THREADS: '1'
-      SYMFT_PY_ENABLE_CUDA: '0'
-      RAYON_NUM_THREADS: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepare pinned CPU backends and probes
-        id: prepare
-        timeout-minutes: 20
-        run: |
-          bash benchmarks/near_clifford/verify_x86_rotations.sh
-          python -m venv drafts/x86-clifft
-          drafts/x86-clifft/bin/python -m pip install numpy==2.4.6 clifft==0.11.0
-          python -m venv drafts/x86-symft
-          drafts/x86-symft/bin/python -m pip install numpy==2.4.6 setuptools==80.9.0 wheel==0.45.1
-          git clone https://github.com/haoliri0/SOFT.git drafts/x86-soft
-          git -C drafts/x86-soft checkout c89b98514a919240b8afa53a271e08d926d3c987
-          drafts/x86-symft/bin/python -m pip install --no-build-isolation drafts/x86-soft/python > drafts/x86-soft-build.log 2>&1
-          cargo build --release --locked --manifest-path benchmarks/near_clifford/diagnostics/Cargo.toml
-          cargo build --release --locked --manifest-path benchmarks/near_clifford/application_counts/Cargo.toml
-      - name: Record virtual host and select one logical CPU
-        id: host
-        run: |
-          python - <<'PY'
-          import json, os, platform, subprocess
-          from pathlib import Path
-          affinity = sorted(os.sched_getaffinity(0))
-          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
-                         available_affinity=affinity, virtual_machine=True,
-                         rustflags=os.environ['RUSTFLAGS'],
-                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
-                         meminfo=Path('/proc/meminfo').read_text(),
-                         cpuinfo=Path('/proc/cpuinfo').read_text())
-          Path('drafts/x86-host.json').write_text(json.dumps(receipt, indent=2)+'\n')
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'BENCH_CPU={affinity[0]}\n')
-          PY
-      - name: Measure original application counts contracts
-        timeout-minutes: 75
-        run: |
-          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/application_counts/run.py \
-            --out drafts/x86-application-counts \
-            --python "$PWD/drafts/x86-clifft/bin/python" \
-            --symft-python "$PWD/drafts/x86-symft/bin/python" \
-            --symft-source "$PWD/drafts/x86-soft" \
-            > drafts/x86-application-counts.log 2>&1
-      - name: Verify closed evidence and derive reports
-        timeout-minutes: 20
-        if: ${{ !cancelled() }}
-        run: |
-          python benchmarks/near_clifford/analyze_diagnostics.py drafts/x86-application-counts --kind application_counts
-          python -O benchmarks/near_clifford/application_counts/verify.py drafts/x86-application-counts --git-sources
-      - name: Retain closed measured production probes
-        run: |
-          python - <<'PYBIN'
-          import hashlib, json
-          from pathlib import Path
-          evidence = Path('drafts/x86-application-counts')
-          header_bytes = (evidence / 'header.json').read_bytes()
-          closure_bytes = (evidence / 'closure.json').read_bytes()
-          header, closure = json.loads(header_bytes), json.loads(closure_bytes)
-          hashes = header['binary_sha256']
-          if hashes != closure['binary_sha256']:
-              raise ValueError('measured binaries changed before closure')
-          paths = {name: Path('benchmarks/near_clifford') / package / 'target/release' / name
-                   for name, package in [('near-clifford-application-counts', 'application_counts'),
-                                         ('near-clifford-diagnostics', 'diagnostics')]}
-          if set(hashes) != set(paths):
-              raise ValueError('unexpected measured binary inventory')
-          binaries = {name: path.read_bytes() for name, path in paths.items()}
-          for name, data in binaries.items():
-              if hashlib.sha256(data).hexdigest() != hashes[name]:
-                  raise ValueError('actual production binary differs: ' + name)
-          out = evidence / 'production-binaries'
-          out.mkdir()
-          receipt = dict(source_revision=header['source_revision'],
-                         measured_header_sha256=hashlib.sha256(header_bytes).hexdigest(),
-                         measured_closure_sha256=hashlib.sha256(closure_bytes).hexdigest(), binaries={})
-          for name, data in binaries.items():
-              filename = name + '.bin'
-              (out / filename).write_bytes(data)
-              receipt['binaries'][name] = dict(path=filename, sha256=hashes[name], bytes=len(data))
-          (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-          PYBIN
-      - name: Retain results, setup logs and partial failures
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: near-clifford-x86-counts-${{ github.sha }}
-          retention-days: 30
-          path: |
-            drafts/x86-host.json
-            drafts/x86-*.log
-            drafts/x86-scout-*
-            drafts/x86-application-counts/
-  paired-scout:
-    if: ${{ inputs.baseline_ref != '' && !inputs.profile_only && !inputs.cdf_source_pair }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 40
     env:
       RUSTFLAGS: '-C target-cpu=native'
       OMP_NUM_THREADS: '1'
@@ -159,188 +21,54 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out the frozen full36 protocol
+        uses: actions/checkout@v4
+        with:
+          ref: 02ad5e9993a032b73f64f4950ae96e5a4bd0b8de
+          path: drafts/cdf-profile-protocol
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Prepare pinned Rust and verify coefficients and public RNG
-        timeout-minutes: 20
+      - name: Install the pinned compiler and Linux sampling tools
+        timeout-minutes: 5
         run: |
-          bash benchmarks/near_clifford/verify_x86_rotations.sh
-      - name: Record virtual host and pin paired campaigns to one CPU
-        run: |
-          python - <<'PY'
-          import json, os, platform, subprocess
-          from pathlib import Path
-          affinity = sorted(os.sched_getaffinity(0))
-          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
-                         available_affinity=affinity, virtual_machine=True,
-                         rustflags=os.environ['RUSTFLAGS'],
-                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
-                         meminfo=Path('/proc/meminfo').read_text(),
-                         cpuinfo=Path('/proc/cpuinfo').read_text())
-          Path('drafts/x86-scout-host.json').write_text(json.dumps(receipt, indent=2)+'\n')
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'BENCH_CPU={affinity[0]}\n')
-          PY
-      - name: Collect all paired warm cells and independent confirmation
-        timeout-minutes: 20
-        env:
-          BASELINE_REF: ${{ inputs.baseline_ref }}
-        run: |
-          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-warm > drafts/x86-scout-warm.log 2>&1
-          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/rust_pair_scout.py --baseline-ref "$BASELINE_REF" --out drafts/x86-pair-confirmation > drafts/x86-scout-confirmation.log 2>&1
-      - name: Retain actual binaries and measure identical-binary null controls
-        if: ${{ inputs.diagnostic_followup }}
-        timeout-minutes: 15
-        run: |
-          taskset -c "$BENCH_CPU" python benchmarks/near_clifford/x86_pair_followup.py --closed-campaign drafts/x86-pair-confirmation --out drafts/x86-pair-followup > drafts/x86-scout-followup.log 2>&1
-      - name: Retain full paired evidence and partial failures
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: near-clifford-x86-pair-scout-${{ github.sha }}
-          retention-days: 30
-          path: |
-            drafts/x86-scout-*
-            drafts/x86-pair-warm/
-            drafts/x86-pair-confirmation/
-            drafts/x86-pair-followup/
-            drafts/rust-pair-scout-probe/build.log
-            drafts/rust-pair-scout-baseline/drafts/rust-pair-scout-probe/build.log
-  cpu-profile:
-    if: ${{ inputs.profile_only && !inputs.cdf_source_pair }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      RUSTFLAGS: '-C target-cpu=native'
-      OMP_NUM_THREADS: '1'
-      OPENBLAS_NUM_THREADS: '1'
-      MKL_NUM_THREADS: '1'
-      RAYON_NUM_THREADS: '1'
-      LC_ALL: C
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Prepare profiling tool and verify native arithmetic and public RNG
+          rustup toolchain install 1.93.1 --profile minimal
+          sudo apt-get update
+          sudo apt-get install -y linux-tools-common linux-tools-generic
+      - name: Build the exact source pair and execute native FP/RNG preflight
+        working-directory: drafts/cdf-profile-protocol
         timeout-minutes: 20
         run: |
           mkdir -p drafts
-          sudo apt-get update > drafts/x86-profile-tool-setup.log 2>&1
-          sudo apt-get install -y linux-tools-generic binutils >> drafts/x86-profile-tool-setup.log 2>&1
-          bash benchmarks/near_clifford/verify_x86_rotations.sh
-          python benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-normal.log 2>&1
-          python -O benchmarks/near_clifford/test_native_cpu_profile.py > drafts/x86-profile-contract-optimized.log 2>&1
-      - name: Sample fixed native production binaries
-        timeout-minutes: 15
-        env:
-          BASELINE_REF: ${{ inputs.baseline_ref }}
+          python3 -B benchmarks/near_clifford/cdf_source_pair/prepare.py \
+            --out drafts/profile-preparation \
+            --baseline-ref 6e079197ce9ba62079744417f3f701d4562fa149 \
+            --candidate-ref f2b1a474093728d0ec31c32faf5a533c65a370ac \
+            > drafts/profile-prepare.log 2>&1
+      - name: Sample all fourteen diagnostic cells and both exact source versions
+        timeout-minutes: 12
         run: |
-          python benchmarks/near_clifford/native_cpu_profile.py --baseline-ref "$BASELINE_REF" --out drafts/x86-native-profile > drafts/x86-profile-run.log 2>&1
-          python -O benchmarks/near_clifford/native_cpu_profile.py --verify drafts/x86-native-profile > drafts/x86-profile-verify.log 2>&1
-      - name: Retain original samples, binaries, sources and partial failures
+          python3 -I -B benchmarks/near_clifford/cdf_cpu_profile.py \
+            --protocol-root "$PWD/drafts/cdf-profile-protocol" \
+            --preparation "$PWD/drafts/cdf-profile-protocol/drafts/profile-preparation" \
+            --out "$PWD/drafts/cdf-profile-protocol/drafts/profile-output" \
+            > drafts/profile-driver.log 2>&1
+      - name: Retain raw samples, exact sources, native tests and partial failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: near-clifford-x86-native-profile-${{ github.sha }}
+          name: near-clifford-replay-profile-${{ github.sha }}
           retention-days: 30
+          if-no-files-found: error
           path: |
-            drafts/x86-profile-*
-            drafts/x86-scout-*
-            drafts/x86-native-profile/
-  cdf-source-pair:
-    if: ${{ inputs.cdf_source_pair }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 75
-    env:
-      RUSTFLAGS: '-C target-cpu=native'
-      OMP_NUM_THREADS: '1'
-      OPENBLAS_NUM_THREADS: '1'
-      MKL_NUM_THREADS: '1'
-      RAYON_NUM_THREADS: '1'
-      VECLIB_MAXIMUM_THREADS: '1'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Check contracts and install pinned compiler before any timings
-        env:
-          PROFILE_ONLY: ${{ inputs.profile_only }}
-        run: |
-          test "$PROFILE_ONLY" != true
-          mkdir -p drafts
-          python -I benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract-optimized.log 2>&1
-          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-cdf-toolchain.log 2>&1
-      - name: Record virtual host and select one logical CPU
-        run: |
-          python - <<'PY'
-          import json, os, platform, subprocess
-          from pathlib import Path
-          root = Path('drafts/x86-cdf')
-          root.mkdir()
-          affinity = sorted(os.sched_getaffinity(0))
-          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
-                         available_affinity=affinity, virtual_machine=True,
-                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
-                         meminfo=Path('/proc/meminfo').read_text(),
-                         cpuinfo=Path('/proc/cpuinfo').read_text())
-          (root/'host.json').write_text(json.dumps(receipt, indent=2)+'\n')
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'BENCH_CPU={affinity[0]}\n')
-          PY
-      - name: Build and retain both exact sources and run native arithmetic and RNG tests
-        timeout-minutes: 25
-        env:
-          BASELINE_REF: ${{ inputs.baseline_ref }}
-          CANDIDATE_REF: ${{ inputs.candidate_ref }}
-        run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/prepare.py \
-            --baseline-ref "$BASELINE_REF" --candidate-ref "$CANDIDATE_REF" \
-            --out drafts/x86-cdf/preparation > drafts/x86-cdf/prepare.log 2>&1
-      - name: Collect all 36 cells with balanced source and identical-binary controls
-        timeout-minutes: 40
-        run: |
-          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/cdf_source_pair/run_retained.py \
-            --preparation drafts/x86-cdf/preparation --out drafts/x86-cdf/output \
-            --control drafts/x86-cdf/control > drafts/x86-cdf/outer.log 2>&1
-      - name: Seal originals before external summary interpretation
-        run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py --seal drafts/x86-cdf > drafts/x86-cdf-seal.log 2>&1
-      - name: Independently replay source bytes, finite witnesses, schedule and statistics
-        run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify-optimized.log 2>&1
-      - name: Retain original streams, actual binaries, source snapshots and partial failures
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: near-clifford-x86-cdf-source-pair-${{ github.sha }}
-          retention-days: 30
-          path: |
-            drafts/x86-cdf-*.log
-            drafts/x86-cdf/*.json
-            drafts/x86-cdf/*.log
-            drafts/x86-cdf/output/
-            drafts/x86-cdf/control/
-            drafts/x86-cdf/preparation/*.json
-            drafts/x86-cdf/preparation/*.log
-            drafts/x86-cdf/preparation/production-sources/
-            drafts/x86-cdf/preparation/protocol/
-            drafts/x86-cdf/preparation/baseline/native-probes/
-            drafts/x86-cdf/preparation/baseline/*.bin
-            drafts/x86-cdf/preparation/baseline/*.json
-            drafts/x86-cdf/preparation/baseline/*.log
-            drafts/x86-cdf/preparation/candidate/native-probes/
-            drafts/x86-cdf/preparation/candidate/*.bin
-            drafts/x86-cdf/preparation/candidate/*.json
-            drafts/x86-cdf/preparation/candidate/*.log
+            drafts/profile-driver.log
+            drafts/cdf-profile-protocol/drafts/profile-prepare.log
+            drafts/cdf-profile-protocol/drafts/profile-output/
+            drafts/cdf-profile-protocol/drafts/profile-preparation/
+            !drafts/cdf-profile-protocol/drafts/profile-preparation/source/
+            !drafts/cdf-profile-protocol/drafts/profile-preparation/baseline/native-target/
+            !drafts/cdf-profile-protocol/drafts/profile-preparation/candidate/native-target/
+            !drafts/cdf-profile-protocol/drafts/profile-preparation/candidate/test-target/
