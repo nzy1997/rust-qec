@@ -1,0 +1,80 @@
+{
+  "arithmetic": "strict",
+  "backend": "rstim",
+  "cache_reserved_bytes": 4399248,
+  "compile_ns": 3076958,
+  "execution": "native raw postselected counts; optional affine model and scalar/packed early rejection",
+  "first_ns": 11000,
+  "input_sha256": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+  "observations": [
+    {
+      "accepted": 38569,
+      "attempted": 56109,
+      "calls": 56109,
+      "discarded": 17540,
+      "elapsed_ns": 50000638,
+      "logical_errors": 0,
+      "ns_per_call": 891.1340070220464
+    },
+    {
+      "accepted": 38850,
+      "attempted": 56671,
+      "calls": 56671,
+      "discarded": 17821,
+      "elapsed_ns": 50000259,
+      "logical_errors": 0,
+      "ns_per_call": 882.2900425261597
+    },
+    {
+      "accepted": 38606,
+      "attempted": 56206,
+      "calls": 56206,
+      "discarded": 17600,
+      "elapsed_ns": 50000027,
+      "logical_errors": 0,
+      "ns_per_call": 889.5852222182685
+    },
+    {
+      "accepted": 38965,
+      "attempted": 56787,
+      "calls": 56787,
+      "discarded": 17822,
+      "elapsed_ns": 50000000,
+      "logical_errors": 0,
+      "ns_per_call": 880.4832091852008
+    },
+    {
+      "accepted": 38910,
+      "attempted": 56630,
+      "calls": 56630,
+      "discarded": 17720,
+      "elapsed_ns": 50000567,
+      "logical_errors": 0,
+      "ns_per_call": 882.9342574607099
+    },
+    {
+      "accepted": 38678,
+      "attempted": 56247,
+      "calls": 56247,
+      "discarded": 17569,
+      "elapsed_ns": 50000620,
+      "logical_errors": 0,
+      "ns_per_call": 888.9473216349317
+    },
+    {
+      "accepted": 38815,
+      "attempted": 56521,
+      "calls": 56521,
+      "discarded": 17706,
+      "elapsed_ns": 50000805,
+      "logical_errors": 0,
+      "ns_per_call": 884.6411953079387
+    }
+  ],
+  "output_contract": "all-zero raw detector postselection; raw observable 0 counts; no reference normalization",
+  "peak_active_rank": 4,
+  "peak_rss_bytes": 6635520,
+  "prepare_ns": 500,
+  "shots": 1,
+  "status": "ok"
+}
