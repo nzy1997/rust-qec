@@ -1,0 +1,265 @@
+{
+  "schema": "rstim.near-clifford-zero-noise-source-pair.v1",
+  "purpose": "Supplementary zero/low/high-noise scalar sign guard and original low-noise packet controls; nopeer/SOTA/productionclaim",
+  "structural_cases": [
+    [
+      "full-rank-12-noise-0",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-0.0001",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0.0001",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-0.001",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0.001",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-0.01",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0.01",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-0.1",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0.1",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-1",
+      1,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-1",
+      1,
+      "fused"
+    ],
+    [
+      "full-rank-12-noise-0.001",
+      64,
+      "strict"
+    ],
+    [
+      "full-rank-12-noise-0.001",
+      64,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0.0001",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0.0001",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0.001",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0.001",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0.01",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0.01",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0.1",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0.1",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-1",
+      1,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-1",
+      1,
+      "fused"
+    ],
+    [
+      "projected-rank-16-noise-0.001",
+      64,
+      "strict"
+    ],
+    [
+      "projected-rank-16-noise-0.001",
+      64,
+      "fused"
+    ]
+  ],
+  "application_counts_cases": [],
+  "pairs": 6,
+  "repetitions": 7,
+  "minimum_warm_observation_ns": 50000000,
+  "failures_retained": true,
+  "inputs": {
+    "msc_d3_inject_cultivate_p1e-3.stim": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+    "pure_surface_d7_r7_p1e-3.stim": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
+    "full-rank-12-noise-0.001.stim": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9",
+    "full-rank-16.stim": "d230557be9f4936b66adf3e19f12ceb7529e481c7c31f50dc083db64c7d41564",
+    "projected-rank-16-noise-0.0001.stim": "f68d6f365a0bbf8f536ca874c92102d7b9955c9bb83946442b953b0f8c0be879",
+    "projected-rank-16-noise-0.01.stim": "af24fde38065c43da255e898feb32011cd799cdc46c48ea1c0f4b2b0d143933e",
+    "full-rank-4.stim": "386d3d5ce17747c3725919cbe3af5402914f83ceb9cba3f08d4cd8820ef851d1",
+    "full-rank-8.stim": "ca906c3aba57d51ecc2c81b1045514d28f4b1ead87670e42f12f83e42e48bb1c",
+    "projected-rank-16-noise-0.001.stim": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc",
+    "projected-rank-16-noise-0.1.stim": "432d354865c3f637d1312a499e8f0e50c98e4d7eb53fc049fcaba260e114e7ad",
+    "full-rank-12-noise-1.stim": "3ae60021e8df22b186f534dc3ad31ca026e52a4bc4a3fc6771233e302ba713ee",
+    "full-rank-12-noise-0.stim": "681d6ce2cc40295d6044325d855fbd6b9f6905b42414580b44974c351b610d8b",
+    "full-rank-12-noise-0.1.stim": "9c7ed2acf0323255857f8ae4d23d428e8d96ea319c8f6ff549bff07765e97232",
+    "projected-rank-16.stim": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc",
+    "full-rank-12.stim": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9",
+    "pure_surface_d9_r9_p1e-3.stim": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
+    "projected-rank-16-noise-0.stim": "0ede134332b95a39879d54f4b0f5348f72fe9ae89e6069556f86d65690052747",
+    "full-rank-12-noise-0.01.stim": "1a9b691144769c417ecb1e5bc7840c67ec7001733265f69e2c1e62d150b6ce09",
+    "full-rank-12-noise-0.0001.stim": "cf36936d9e06a02ca1c12e7069bf5a62cd7e780d8c3f76c50b93a4664ca66f7b",
+    "projected-rank-16-noise-1.stim": "c572b34d3c60a62f3273c269e72142aa5493fe99515273529a70acae14de5e9f",
+    "projected-rank-4.stim": "dc9a3954f01fa4570ca243879ecf3e038e467469a31626a86d1573e810e88d28",
+    "msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+    "depth-32.stim": "65e84894e0b927be163d80d73e2f99e2d140912765746e3193d69131e75606de",
+    "projected-rank-12.stim": "2f82a29316cbf67b61b38fcf060c8d62c3c6e540678acad63df01851a43d76f1",
+    "projected-rank-8.stim": "a855f518d7916d51507e63733ddb71e5caa1062b079fe72d37d1f153e5d4ddc8"
+  },
+  "structural_source": {
+    "path": "benchmarks/near_clifford/diagnostics/corpus.py",
+    "sha256": "eaeef5ca3b882f0cee1ae5e146ea6b0c7d1c025f9ffff1e6b919b50f53fe01a1"
+  },
+  "scope": "28cell supplementary source-only screen:24 scalar(2originalinputnames x6p xStrict/Fused)+4low-noise packetcontrols;6balancedrounds3roles7adaptive50msobs. Separate from frozen36, neverpool results/weights.",
+  "expected_events": 600,
+  "expected_finite": 96,
+  "expected_timing": 504,
+  "expected_observations": 3528,
+  "role_order": "Stableordinalshifts/reverse eachcandidateposition2/2/2 across6rounds",
+  "finite_witness_scope": "24distinct input/policy combinations x2sources xscalar129/flat129 =96 finite workers. Literal129records+16RNGcarry within eachsource; sourcepair guard additionally requires identical finitepayload across baseline/candidate. No distribution certificate.",
+  "fixture_scope": "Exact12noisevariants from frozen2inputs via eight probability substitutions, all other bytes unchanged. Original13fixture inventory retained for source provenance and historical schema regressions; only12noisevariants consumed.",
+  "noise_controls": {
+    "source_protocol": "3ee3f528ad2e260834e5b7300068649b69c76cac",
+    "planned_inputs": {
+      "full-rank-12-noise-0.stim": {
+        "bytes": 2623,
+        "sha256": "681d6ce2cc40295d6044325d855fbd6b9f6905b42414580b44974c351b610d8b"
+      },
+      "full-rank-12-noise-0.0001.stim": {
+        "bytes": 2663,
+        "sha256": "cf36936d9e06a02ca1c12e7069bf5a62cd7e780d8c3f76c50b93a4664ca66f7b"
+      },
+      "full-rank-12-noise-0.001.stim": {
+        "bytes": 2655,
+        "sha256": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9"
+      },
+      "full-rank-12-noise-0.01.stim": {
+        "bytes": 2647,
+        "sha256": "1a9b691144769c417ecb1e5bc7840c67ec7001733265f69e2c1e62d150b6ce09"
+      },
+      "full-rank-12-noise-0.1.stim": {
+        "bytes": 2639,
+        "sha256": "9c7ed2acf0323255857f8ae4d23d428e8d96ea319c8f6ff549bff07765e97232"
+      },
+      "full-rank-12-noise-1.stim": {
+        "bytes": 2623,
+        "sha256": "3ae60021e8df22b186f534dc3ad31ca026e52a4bc4a3fc6771233e302ba713ee"
+      },
+      "projected-rank-16-noise-0.stim": {
+        "bytes": 3317,
+        "sha256": "0ede134332b95a39879d54f4b0f5348f72fe9ae89e6069556f86d65690052747"
+      },
+      "projected-rank-16-noise-0.0001.stim": {
+        "bytes": 3357,
+        "sha256": "f68d6f365a0bbf8f536ca874c92102d7b9955c9bb83946442b953b0f8c0be879"
+      },
+      "projected-rank-16-noise-0.001.stim": {
+        "bytes": 3349,
+        "sha256": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc"
+      },
+      "projected-rank-16-noise-0.01.stim": {
+        "bytes": 3341,
+        "sha256": "af24fde38065c43da255e898feb32011cd799cdc46c48ea1c0f4b2b0d143933e"
+      },
+      "projected-rank-16-noise-0.1.stim": {
+        "bytes": 3333,
+        "sha256": "432d354865c3f637d1312a499e8f0e50c98e4d7eb53fc049fcaba260e114e7ad"
+      },
+      "projected-rank-16-noise-1.stim": {
+        "bytes": 3317,
+        "sha256": "c572b34d3c60a62f3273c269e72142aa5493fe99515273529a70acae14de5e9f"
+      }
+    },
+    "original_sources": {
+      "full-rank-12": {
+        "bytes": 2655,
+        "sha256": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9"
+      },
+      "projected-rank-16": {
+        "bytes": 3349,
+        "sha256": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc"
+      }
+    },
+    "probabilities": [
+      "0",
+      "0.0001",
+      "0.001",
+      "0.01",
+      "0.1",
+      "1"
+    ],
+    "seed": 739,
+    "rng": "SmallRng/rand-0.8.7",
+    "labels": "inputnames are not active-rank certificates; actual peak rank retained per probe",
+    "plan_seal_sha256": "92dc3a7b05cb6363a893bce60c32c1618e385f7d5c775bfb4cb1971d37fa9459"
+  }
+}
