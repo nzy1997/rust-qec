@@ -573,30 +573,67 @@ impl CoherentPacket {
         self.reduced_re.resize(count, 0.);
         self.reduced_im.resize(count, 0.);
         let mut norm = [0.; 64];
-        for amplitude in 0..len {
-            let without = (amplitude & low) | ((amplitude & !low) << 1);
-            let parity = (without & other).count_ones() % 2 != 0;
-            let a_base = without * self.lanes;
-            let b_base = (without ^ p.x) * self.lanes;
+        if p.x == 0 && self.len >= 64 {
+            // At least 32 output amplitudes amortize two small lane-offset tables.
+            // Fixed outcome bits are unchanged across amplitudes; only the common
+            // Pauli parity selects which table to use. Preserve amplitude order.
+            let mut offsets = [0usize; 64];
+            let mut flipped = [0usize; 64];
             for lane in 0..self.lanes {
-                let fixed = fixed_mask >> lane & 1 != 0;
-                let value = if p.x == 0 {
-                    let bit = fixed ^ parity;
-                    let input = (without | ((bit as usize) << index)) * self.lanes + lane;
-                    ComplexAmp::new(self.re[input], self.im[input])
+                let bit = (fixed_mask >> lane & 1) as usize;
+                offsets[lane] = (bit * pivot) * self.lanes + lane;
+                flipped[lane] = ((bit ^ 1) * pivot) * self.lanes + lane;
+            }
+            for amplitude in 0..len {
+                let without = (amplitude & low) | ((amplitude & !low) << 1);
+                let selected = if (without & other).count_ones() % 2 != 0 {
+                    &flipped[..self.lanes]
                 } else {
-                    let a = ComplexAmp::new(self.re[a_base + lane], self.im[a_base + lane]);
-                    let mut b = ComplexAmp::new(self.re[b_base + lane], self.im[b_base + lane]);
-                    if y {
-                        b = ComplexAmp::new(b.im, -b.re);
-                    }
-                    let sign = if fixed ^ parity { -1. } else { 1. };
-                    (a + b * sign) * std::f64::consts::FRAC_1_SQRT_2
+                    &offsets[..self.lanes]
                 };
-                norm[lane] += value.norm_sqr();
-                let output = amplitude * self.lanes + lane;
-                self.reduced_re[output] = value.re;
-                self.reduced_im[output] = value.im;
+                let input_base = without * self.lanes;
+                let output_base = amplitude * self.lanes;
+                let out_re = &mut self.reduced_re[output_base..output_base + self.lanes];
+                let out_im = &mut self.reduced_im[output_base..output_base + self.lanes];
+                for (((&offset, norm), out_re), out_im) in selected
+                    .iter()
+                    .zip(&mut norm[..self.lanes])
+                    .zip(out_re)
+                    .zip(out_im)
+                {
+                    let value =
+                        ComplexAmp::new(self.re[input_base + offset], self.im[input_base + offset]);
+                    *norm += value.norm_sqr();
+                    *out_re = value.re;
+                    *out_im = value.im;
+                }
+            }
+        } else {
+            for amplitude in 0..len {
+                let without = (amplitude & low) | ((amplitude & !low) << 1);
+                let parity = (without & other).count_ones() % 2 != 0;
+                let a_base = without * self.lanes;
+                let b_base = (without ^ p.x) * self.lanes;
+                for lane in 0..self.lanes {
+                    let fixed = fixed_mask >> lane & 1 != 0;
+                    let value = if p.x == 0 {
+                        let bit = fixed ^ parity;
+                        let input = (without | ((bit as usize) << index)) * self.lanes + lane;
+                        ComplexAmp::new(self.re[input], self.im[input])
+                    } else {
+                        let a = ComplexAmp::new(self.re[a_base + lane], self.im[a_base + lane]);
+                        let mut b = ComplexAmp::new(self.re[b_base + lane], self.im[b_base + lane]);
+                        if y {
+                            b = ComplexAmp::new(b.im, -b.re);
+                        }
+                        let sign = if fixed ^ parity { -1. } else { 1. };
+                        (a + b * sign) * std::f64::consts::FRAC_1_SQRT_2
+                    };
+                    norm[lane] += value.norm_sqr();
+                    let output = amplitude * self.lanes + lane;
+                    self.reduced_re[output] = value.re;
+                    self.reduced_im[output] = value.im;
+                }
             }
         }
         let mut scales = [0.; 64];
@@ -1901,5 +1938,213 @@ mod rotation_arithmetic_policy_bits_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod diagonal_projection_offset_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng, rngs::StdRng};
+
+    impl CoherentPacket {
+        fn frozen_project_before_offsets(
+            &mut self,
+            p: &CompactPauli,
+            index: usize,
+            y: bool,
+            fixed_mask: u64,
+        ) -> Result<(), String> {
+            self.check_pauli(p, self.len)?;
+            if self.len < 2 || index >= self.len.trailing_zeros() as usize {
+                return Err("coherent packet projection pivot outside active coordinates".into());
+            }
+            let pivot = 1usize << index;
+            if (if p.x == 0 { p.z } else { p.x }) & pivot == 0 {
+                return Err("coherent packet projection pivot absent from Pauli".into());
+            }
+            let low = pivot - 1;
+            let other = p.z & !pivot;
+            let len = self.len / 2;
+            let count = len * self.lanes;
+            self.reduced_re.resize(count, 0.);
+            self.reduced_im.resize(count, 0.);
+            let mut norm = [0.; 64];
+            for amplitude in 0..len {
+                let without = (amplitude & low) | ((amplitude & !low) << 1);
+                let parity = (without & other).count_ones() % 2 != 0;
+                let a_base = without * self.lanes;
+                let b_base = (without ^ p.x) * self.lanes;
+                for lane in 0..self.lanes {
+                    let fixed = fixed_mask >> lane & 1 != 0;
+                    let value = if p.x == 0 {
+                        let bit = fixed ^ parity;
+                        let input = (without | ((bit as usize) << index)) * self.lanes + lane;
+                        ComplexAmp::new(self.re[input], self.im[input])
+                    } else {
+                        let a = ComplexAmp::new(self.re[a_base + lane], self.im[a_base + lane]);
+                        let mut b = ComplexAmp::new(self.re[b_base + lane], self.im[b_base + lane]);
+                        if y {
+                            b = ComplexAmp::new(b.im, -b.re);
+                        }
+                        let sign = if fixed ^ parity { -1. } else { 1. };
+                        (a + b * sign) * std::f64::consts::FRAC_1_SQRT_2
+                    };
+                    norm[lane] += value.norm_sqr();
+                    let output = amplitude * self.lanes + lane;
+                    self.reduced_re[output] = value.re;
+                    self.reduced_im[output] = value.im;
+                }
+            }
+            let mut scales = [0.; 64];
+            for lane in 0..self.lanes {
+                if !norm[lane].is_finite() || norm[lane] <= 0. {
+                    return Err(format!(
+                        "coherent packet zero-probability measurement at lane {lane}"
+                    ));
+                }
+                scales[lane] = 1. / norm[lane].sqrt();
+            }
+            for amplitude in 0..len {
+                let range = amplitude * self.lanes..(amplitude + 1) * self.lanes;
+                for (lane, (re, im)) in self.reduced_re[range.clone()]
+                    .iter_mut()
+                    .zip(&mut self.reduced_im[range])
+                    .enumerate()
+                {
+                    *re *= scales[lane];
+                    *im *= scales[lane];
+                }
+            }
+            std::mem::swap(&mut self.re, &mut self.reduced_re);
+            std::mem::swap(&mut self.im, &mut self.reduced_im);
+            self.len = len;
+            if len == 1 {
+                self.re.fill(1.);
+                self.im.fill(0.);
+            }
+            Ok(())
+        }
+    }
+
+    fn clone_packet(p: &CoherentPacket) -> CoherentPacket {
+        CoherentPacket {
+            re: p.re.clone(),
+            im: p.im.clone(),
+            reduced_re: p.reduced_re.clone(),
+            reduced_im: p.reduced_im.clone(),
+            len: p.len,
+            lanes: p.lanes,
+        }
+    }
+    fn bits(p: &[f64]) -> Vec<u64> {
+        p.iter().map(|v| v.to_bits()).collect()
+    }
+    fn compare(mut packet: CoherentPacket, p: &CompactPauli, index: usize, y: bool, mask: u64) {
+        let mut frozen = clone_packet(&packet);
+        let expected = frozen.frozen_project_before_offsets(p, index, y, mask);
+        let actual = packet.project(p, index, y, mask);
+        assert_eq!(
+            actual, expected,
+            "len={} lanes={} index={index} y={y} mask={mask:x}",
+            frozen.len, frozen.lanes
+        );
+        assert_eq!((packet.len, packet.lanes), (frozen.len, frozen.lanes));
+        assert_eq!(bits(&packet.re), bits(&frozen.re));
+        assert_eq!(bits(&packet.im), bits(&frozen.im));
+        assert_eq!(bits(&packet.reduced_re), bits(&frozen.reduced_re));
+        assert_eq!(bits(&packet.reduced_im), bits(&frozen.reduced_im));
+    }
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        CompactPauli {
+            physical: PackedPauli {
+                x: vec![x as u64],
+                z: vec![z as u64],
+                phase,
+            },
+            x,
+            z,
+        }
+    }
+    fn packet(len: usize, lanes: usize, rng: &mut StdRng) -> CoherentPacket {
+        let prefix = vec![ComplexAmp::new(1., 0.); len];
+        let mut packet = CoherentPacket::default();
+        packet
+            .reset(&prefix, lanes, len.trailing_zeros() as usize)
+            .unwrap();
+        for (i, (re, im)) in packet.re.iter_mut().zip(&mut packet.im).enumerate() {
+            *re = match i % 11 {
+                0 => 0.,
+                1 => -0.,
+                2 => 1e-150,
+                3 => -1e-150,
+                _ => rng.gen_range(-1.0..1.0),
+            };
+            *im = match i % 13 {
+                0 => -0.,
+                1 => 0.,
+                2 => f64::from_bits(1),
+                _ => rng.gen_range(-1.0..1.0),
+            };
+        }
+        packet.reduced_re.resize(len * lanes, -9.);
+        packet.reduced_im.resize(len * lanes, 7.);
+        packet
+    }
+    #[test]
+    fn large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots() {
+        let mut rng = StdRng::seed_from_u64(2026101105);
+        for len in [2usize, 4, 32, 64, 128, 512] {
+            for lanes in [1, 3, 17, 32, 63, 64] {
+                let packet = packet(len, lanes, &mut rng);
+                let rank = len.trailing_zeros() as usize;
+                for index in [0, rank / 2, rank - 1] {
+                    let pivot = 1usize << index;
+                    for z in [pivot, pivot | ((len - 1) & !pivot)] {
+                        for phase in [0, 2] {
+                            let p = pauli(0, z, phase);
+                            for y in [false, true] {
+                                for mask in [0, u64::MAX, 0xaaaaaaaaaaaaaaaa, rng.r#gen::<u64>()] {
+                                    compare(clone_packet(&packet), &p, index, y, mask);
+                                }
+                            }
+                        }
+                    }
+                }
+                // The retained general path also handles non-diagonal X/Y projections.
+                for y in [false, true] {
+                    compare(
+                        clone_packet(&packet),
+                        &pauli(1, 1, 0),
+                        0,
+                        y,
+                        0x5555555555555555,
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn diagonal_projection_preserves_first_error_and_partial_scratch_bits() {
+        let mut rng = StdRng::seed_from_u64(2026101106);
+        let packet = packet(128, 17, &mut rng);
+        for (p, index) in [
+            (pauli(0, 0, 0), 0),
+            (pauli(0, 1, 0), 7),
+            (pauli(0, 1, 4), 0),
+            (pauli(128, 1, 0), 0),
+        ] {
+            compare(clone_packet(&packet), &p, index, false, 0);
+        }
+        for bad in [0., -0., f64::from_bits(1), f64::INFINITY, f64::NAN] {
+            let mut invalid = clone_packet(&packet);
+            for amplitude in 0..invalid.len {
+                for lane in [3, 11] {
+                    invalid.re[amplitude * invalid.lanes + lane] = bad;
+                    invalid.im[amplitude * invalid.lanes + lane] = bad;
+                }
+            }
+            compare(invalid, &pauli(0, 1, 0), 0, false, 0xaaaaaaaaaaaaaaaa);
+        }
+        compare(CoherentPacket::default(), &pauli(0, 1, 0), 0, false, 0);
     }
 }
