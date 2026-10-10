@@ -143,9 +143,28 @@ impl RandomRunPlan {
         kinds: &[RandomKind],
         output: &mut [u64],
     ) {
+        self.fill_row_impl::<false, R>(random, kinds, output);
+    }
+    // Summarize only freshly produced Noise cells, never Active/Independent
+    // values or the stale cells of a compact packet producer.
+    pub(super) fn fill_row_with_zero_noise<R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        output: &mut [u64],
+    ) -> bool {
+        self.fill_row_impl::<true, R>(random, kinds, output)
+    }
+    fn fill_row_impl<const SUMMARIZE: bool, R: Rng>(
+        &self,
+        random: &mut RowRandom<'_, R>,
+        kinds: &[RandomKind],
+        output: &mut [u64],
+    ) -> bool {
         assert_eq!(output.len(), self.event_count);
         assert_eq!(kinds.len(), self.event_count);
         let mut offset = 0;
+        let mut noise_is_zero = true;
         for run in &self.runs {
             let end = offset + run.count;
             random.fill_prepared_impl(
@@ -154,9 +173,19 @@ impl RandomRunPlan {
                 None,
                 Some(&kinds[offset..end]),
             );
+            if SUMMARIZE
+                && noise_is_zero
+                && matches!(
+                    run.kind,
+                    PreparedRandom::Noise { .. } | PreparedRandom::Sparse { .. }
+                )
+            {
+                noise_is_zero = !output[offset..end].iter().any(|&value| value != 0);
+            }
             offset = end;
         }
         debug_assert_eq!(offset, output.len());
+        noise_is_zero
     }
 }
 
@@ -507,6 +536,55 @@ fn write_noise_event<const COMPACT: bool>(
 mod random_event_runs_tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn zero_noise_summary_keeps_every_event_and_frozen_rng_continuation() {
+        let mut cases = vec![vec![], vec![RandomKind::Active, RandomKind::Independent]];
+        for probability in [0., 0.001, 0.01, 0.1, 1.] {
+            let mut kinds = vec![RandomKind::Active];
+            for index in 0..192 {
+                kinds.push(RandomKind::Noise {
+                    probability,
+                    choices: [1, 3, 15][index % 3],
+                });
+                if index % 17 == 0 {
+                    kinds.extend([RandomKind::Independent, RandomKind::Active]);
+                }
+            }
+            cases.push(kinds);
+        }
+        let (mut saw_zero, mut saw_hit) = (false, false);
+        for kinds in cases {
+            let plan = RandomRunPlan::build(&kinds, usize::MAX).unwrap();
+            for seed in [739, 1739, 9173] {
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                let mut actual = vec![u64::MAX; kinds.len()];
+                for _ in 0..64 {
+                    let expected =
+                        scalar_prepared_tape_tests::draw_frozen_packet_rows(&kinds, 1, &mut a);
+                    actual.fill(u64::MAX);
+                    let zero = plan.fill_row_with_zero_noise(
+                        &mut RowRandom::live(&mut b),
+                        &kinds,
+                        &mut actual,
+                    );
+                    assert_eq!(actual, expected[0]);
+                    let expected_zero = kinds.iter().zip(&expected[0]).all(|(kind, &value)| {
+                        !matches!(kind, RandomKind::Noise { .. }) || value == 0
+                    });
+                    assert_eq!(zero, expected_zero);
+                    saw_zero |= zero && !kinds.is_empty();
+                    saw_hit |= !zero;
+                    let (mut carry_a, mut carry_b) = (a.clone(), b.clone());
+                    for _ in 0..16 {
+                        assert_eq!(carry_a.next_u64(), carry_b.next_u64());
+                    }
+                }
+            }
+        }
+        assert!(saw_zero && saw_hit);
+    }
 
     #[test]
     fn sparse_run_borrows_success_choices_without_changing_rng_or_masks() {

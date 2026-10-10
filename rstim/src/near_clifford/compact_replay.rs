@@ -6,6 +6,9 @@ pub(super) trait RowDraw {
     fn noise_value(&self, _event: usize, _ordinal: usize) -> u64 {
         panic!("scheduled noise requires a complete recorded row")
     }
+    fn noise_is_zero(&self) -> bool {
+        false // Unknown/live/compact rows keep their original sign scans.
+    }
     fn discard_remaining(&mut self, kinds: &[RandomKind]);
     fn skip_zero_noise(&mut self, _maximum: usize) -> usize {
         0 // Live consumers retain their original draw path.
@@ -13,6 +16,9 @@ pub(super) trait RowDraw {
 }
 
 impl<R: Rng> RowDraw for RowRandom<'_, R> {
+    fn noise_is_zero(&self) -> bool {
+        self.noise_is_zero
+    }
     fn noise_value(&self, event: usize, _ordinal: usize) -> u64 {
         self.tape.expect("scheduled noise requires a recorded row")[event]
     }

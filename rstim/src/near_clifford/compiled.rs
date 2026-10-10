@@ -80,6 +80,8 @@ struct RowRandom<'a, R> {
     rng: &'a mut R,
     bit_word: u64,
     bits_left: u8,
+    // Known only after producing a complete immutable row; live draws are unknown.
+    noise_is_zero: bool,
     noise_probability: u64,
     // Zero is an uninitialized sentinel: every valid sparse log(1-p) is finite and negative.
     noise_log_failure: f64,
@@ -93,6 +95,7 @@ impl<'a, R: Rng> RowRandom<'a, R> {
             rng,
             bit_word: 0,
             bits_left: 0,
+            noise_is_zero: false,
             noise_probability: 0,
             noise_log_failure: 0.,
             noise_skip: None,
@@ -102,6 +105,12 @@ impl<'a, R: Rng> RowRandom<'a, R> {
         Self {
             tape: Some(tape),
             ..Self::live(rng)
+        }
+    }
+    fn recorded_with_zero_noise(tape: &'a [u64], rng: &'a mut R, noise_is_zero: bool) -> Self {
+        Self {
+            noise_is_zero,
+            ..Self::recorded(tape, rng)
         }
     }
     #[inline]
@@ -3024,14 +3033,19 @@ impl CompiledNearCliffordSampler<'_> {
             let count = plan.random_kinds.len();
             assert_eq!(tape.len(), count, "scheduled row buffer is incomplete");
             let mut live = RowRandom::live(&mut *rng);
-            if let Some(runs) = &plan.random_runs {
-                runs.fill_row(&mut live, &plan.random_kinds, &mut tape);
+            let noise_is_zero = if let Some(runs) = &plan.random_runs {
+                runs.fill_row_with_zero_noise(&mut live, &plan.random_kinds, &mut tape)
             } else {
+                let mut noise_is_zero = true;
                 for (&kind, value) in plan.random_kinds.iter().zip(&mut tape) {
                     *value = live.draw(kind);
+                    if matches!(kind, RandomKind::Noise { .. }) && *value != 0 {
+                        noise_is_zero = false;
+                    }
                 }
-            }
-            let mut replay = RowRandom::recorded(&tape, &mut *rng);
+                noise_is_zero
+            };
+            let mut replay = RowRandom::recorded_with_zero_noise(&tape, &mut *rng, noise_is_zero);
             let result = self.row_with_random_kernel::<POSTSELECT, true>(sweep, &mut replay);
             debug_assert!(result.is_err() || replay.cursor == count);
             self.conditional_tape = tape;
