@@ -25,6 +25,9 @@ use noise_packet::NoisePacket;
 #[path = "compact_replay.rs"]
 mod compact_replay;
 use compact_replay::{CompactReplay, RowDraw};
+#[path = "counts_replay.rs"]
+mod counts_replay;
+use counts_replay::{CountsReplay, CountsResume, PacketPrefix, ReplayPosition};
 #[path = "noise_spans.rs"]
 mod noise_spans;
 use noise_spans::NoiseSpans;
@@ -1752,6 +1755,11 @@ impl CompiledNearCliffordExecutor {
             packet_independent: None,
             coherent: CoherentPacket::default(),
             counts_outputs: Vec::new(),
+            counts_replay: None,
+            #[cfg(test)]
+            checkpoint_replay_rows: 0,
+            #[cfg(test)]
+            replay_checkpoint_budget: PACKET_BYTE_BUDGET,
         })
     }
     pub fn sample(
@@ -1795,6 +1803,11 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
     counts_outputs: Vec<u64>,
+    counts_replay: Option<CountsReplay>,
+    #[cfg(test)]
+    checkpoint_replay_rows: usize,
+    #[cfg(test)]
+    replay_checkpoint_budget: usize,
 }
 
 #[cfg(test)]
@@ -2941,11 +2954,18 @@ impl CompiledNearCliffordSampler<'_> {
             .packet_independent
             .as_ref()
             .map_or(Some(0), IndependentPacket::reserved_bytes)?;
-        vectors.checked_add(independent)?.checked_add(
-            self.conditional_tape
-                .capacity()
-                .checked_mul(size_of::<u64>())?,
-        )
+        vectors
+            .checked_add(independent)?
+            .checked_add(
+                self.counts_replay
+                    .as_ref()
+                    .map_or(Some(0), CountsReplay::reserved_bytes)?,
+            )?
+            .checked_add(
+                self.conditional_tape
+                    .capacity()
+                    .checked_mul(size_of::<u64>())?,
+            )
     }
 
     fn try_prepare_scalar_tape(&mut self, byte_budget: usize) -> bool {
@@ -3084,14 +3104,35 @@ impl CompiledNearCliffordSampler<'_> {
         self.row_with_random_kernel::<POSTSELECT, false>(sweep, random)
     }
 
+    #[inline]
     fn row_with_random_kernel<const POSTSELECT: bool, const SKIP_NOISE: bool>(
         &mut self,
         sweep: &[bool],
         random: &mut impl RowDraw,
     ) -> Result<NearCliffordShot, String> {
-        self.x.fill(0);
-        self.z.fill(0);
-        let mut state = self.cache.as_ref().map(|cache| cache.start);
+        self.row_with_random_kernel_from::<POSTSELECT, SKIP_NOISE, false>(sweep, random, None)
+    }
+
+    fn row_with_random_kernel_from<
+        const POSTSELECT: bool,
+        const SKIP_NOISE: bool,
+        const RESUME: bool,
+    >(
+        &mut self,
+        sweep: &[bool],
+        random: &mut impl RowDraw,
+        resume: Option<CountsResume<'_>>,
+    ) -> Result<NearCliffordShot, String> {
+        let mut state = if RESUME {
+            let resume = resume.as_ref().expect("counts restart point is complete");
+            self.x.copy_from_slice(resume.x);
+            self.z.copy_from_slice(resume.z);
+            Some(resume.position.parent)
+        } else {
+            self.x.fill(0);
+            self.z.fill(0);
+            self.cache.as_ref().map(|cache| cache.start)
+        };
         if state.is_none() {
             self.coefficients.clear();
             self.coefficients
@@ -3105,15 +3146,32 @@ impl CompiledNearCliffordSampler<'_> {
             detectors: Vec::new(),
             observables: Vec::new(),
         };
+        if RESUME {
+            let resume = resume.as_ref().expect("counts restart point is complete");
+            shot.measurements.copy_from_slice(resume.records);
+            // A previously live lane has no rejected prefix detector. Counts
+            // need only the selected observable's original annotation parity.
+            shot.observables
+                .push((resume.observable, resume.position.logical));
+        }
         let plan = self.plan;
-        let mut event = 0;
-        let mut spans = plan
-            .noise_spans
-            .as_ref()
-            .map_or(&[][..], NoiseSpans::spans)
-            .iter()
-            .peekable();
-        let mut node = plan.prefix_len;
+        let mut event = if RESUME {
+            resume.as_ref().unwrap().position.event
+        } else {
+            0
+        };
+        let mut node = if RESUME {
+            resume.as_ref().unwrap().position.node
+        } else {
+            plan.prefix_len
+        };
+        let spans = plan.noise_spans.as_ref().map_or(&[][..], NoiseSpans::spans);
+        let spans = if RESUME {
+            &spans[spans.partition_point(|span| span.end <= node)..]
+        } else {
+            spans
+        };
+        let mut spans = spans.iter().peekable();
         while node < plan.operations.len() {
             if POSTSELECT && SKIP_NOISE {
                 if let Some(span) = spans.peek() {
@@ -3285,6 +3343,46 @@ impl CompiledNearCliffordSampler<'_> {
         coherent: bool,
         mut noise_packet: Option<&mut NoisePacket>,
     ) -> Result<(), String> {
+        // Account existing packet/sidecar capacities before taking buffers.
+        // Only counts can consume restart points; records keep full replay.
+        let checkpoint_bytes = self
+            .counts_replay
+            .as_ref()
+            .map_or(Some(0), CountsReplay::reserved_bytes);
+        let mut checkpoint_budget = if !coherent && matches!(output, BatchOutput::Counts { .. }) {
+            self.scalar_tape_other_bytes()
+                .and_then(|n| n.checked_sub(checkpoint_bytes?))
+                .and_then(|n| {
+                    self.packet_tape
+                        .capacity()
+                        .checked_mul(size_of::<u64>())
+                        .and_then(|t| n.checked_add(t))
+                })
+                .and_then(|n| {
+                    n.checked_add(
+                        noise_packet
+                            .as_ref()
+                            .map_or(0, |p| p.lazy_error_reserved_bytes()),
+                    )
+                })
+                .and_then(|n| PACKET_BYTE_BUDGET.checked_sub(n))
+        } else {
+            None
+        };
+        #[cfg(test)]
+        {
+            checkpoint_budget =
+                checkpoint_budget.map(|budget| budget.min(self.replay_checkpoint_budget));
+        }
+        let mut checkpoints = self.counts_replay.take();
+        if checkpoint_budget
+            .is_none_or(|budget| checkpoint_bytes.is_none_or(|bytes| bytes > budget))
+        {
+            checkpoints = None;
+        }
+        if let Some(buffer) = &mut checkpoints {
+            buffer.reset();
+        }
         let mut x = std::mem::take(&mut self.packet_x);
         let mut z = std::mem::take(&mut self.packet_z);
         let mut tape = std::mem::take(&mut self.packet_tape);
@@ -3453,6 +3551,29 @@ impl CompiledNearCliffordSampler<'_> {
                                 #[cfg(test)]
                                 states.reference_transition(mask, next);
                                 if next.is_none() {
+                                    if let Some(budget) = checkpoint_budget {
+                                        if !CountsReplay::capture_into(
+                                            &mut checkpoints,
+                                            mask,
+                                            ReplayPosition {
+                                                parent: id,
+                                                node,
+                                                event,
+                                                noise_event,
+                                                independent_event,
+                                                logical: false,
+                                            },
+                                            PacketPrefix {
+                                                x: &x,
+                                                z: &z,
+                                                records: &records,
+                                                logical,
+                                            },
+                                            budget,
+                                        ) {
+                                            checkpoint_budget = None;
+                                        }
+                                    }
                                     live &= !mask;
                                 }
                             }
@@ -3462,6 +3583,8 @@ impl CompiledNearCliffordSampler<'_> {
                             while remaining != 0 {
                                 let lane = remaining.trailing_zeros() as usize;
                                 remaining &= remaining - 1;
+                                let parent =
+                                    states.lanes[lane].expect("live lane has an admitted parent");
                                 self.cached_rotate_signed(
                                     node,
                                     pauli,
@@ -3471,6 +3594,29 @@ impl CompiledNearCliffordSampler<'_> {
                                     &mut states.lanes[lane],
                                 )?;
                                 if states.lanes[lane].is_none() {
+                                    if let Some(budget) = checkpoint_budget {
+                                        if !CountsReplay::capture_into(
+                                            &mut checkpoints,
+                                            1 << lane,
+                                            ReplayPosition {
+                                                parent: parent,
+                                                node,
+                                                event,
+                                                noise_event,
+                                                independent_event,
+                                                logical: false,
+                                            },
+                                            PacketPrefix {
+                                                x: &x,
+                                                z: &z,
+                                                records: &records,
+                                                logical,
+                                            },
+                                            budget,
+                                        ) {
+                                            checkpoint_budget = None;
+                                        }
+                                    }
                                     live &= !(1 << lane);
                                 }
                             }
@@ -3638,6 +3784,29 @@ impl CompiledNearCliffordSampler<'_> {
                                         #[cfg(test)]
                                         states.reference_transition(mask, next);
                                         if next.is_none() {
+                                            if let Some(budget) = checkpoint_budget {
+                                                if !CountsReplay::capture_into(
+                                                    &mut checkpoints,
+                                                    mask,
+                                                    ReplayPosition {
+                                                        parent: id,
+                                                        node,
+                                                        event,
+                                                        noise_event,
+                                                        independent_event,
+                                                        logical: false,
+                                                    },
+                                                    PacketPrefix {
+                                                        x: &x,
+                                                        z: &z,
+                                                        records: &records,
+                                                        logical,
+                                                    },
+                                                    budget,
+                                                ) {
+                                                    checkpoint_budget = None;
+                                                }
+                                            }
                                             live &= !mask;
                                         }
                                     }
@@ -3656,6 +3825,8 @@ impl CompiledNearCliffordSampler<'_> {
                                         if bit {
                                             branch |= 1 << lane;
                                         }
+                                        let parent = states.lanes[lane]
+                                            .expect("live lane has an admitted parent");
                                         self.cached_project(
                                             node,
                                             &m.pauli,
@@ -3666,6 +3837,29 @@ impl CompiledNearCliffordSampler<'_> {
                                             &mut states.lanes[lane],
                                         )?;
                                         if states.lanes[lane].is_none() {
+                                            if let Some(budget) = checkpoint_budget {
+                                                if !CountsReplay::capture_into(
+                                                    &mut checkpoints,
+                                                    1 << lane,
+                                                    ReplayPosition {
+                                                        parent: parent,
+                                                        node,
+                                                        event,
+                                                        noise_event,
+                                                        independent_event,
+                                                        logical: false,
+                                                    },
+                                                    PacketPrefix {
+                                                        x: &x,
+                                                        z: &z,
+                                                        records: &records,
+                                                        logical,
+                                                    },
+                                                    budget,
+                                                ) {
+                                                    checkpoint_budget = None;
+                                                }
+                                            }
                                             live &= !(1 << lane);
                                         }
                                     }
@@ -3733,7 +3927,28 @@ impl CompiledNearCliffordSampler<'_> {
                             independent_packet.as_ref(),
                             lane,
                         );
-                        let shot = self.row_with_random_kernel::<true, true>(sweep, &mut random)?;
+                        let observable = selected_observable.expect("counts select an observable");
+                        let restart = checkpoints
+                            .as_ref()
+                            .and_then(|buffer| buffer.resume(lane, observable));
+                        let shot = if let Some(restart) = restart {
+                            random.resume_at(
+                                restart.position.event,
+                                restart.position.noise_event,
+                                restart.position.independent_event,
+                            );
+                            #[cfg(test)]
+                            {
+                                self.checkpoint_replay_rows += 1;
+                            }
+                            self.row_with_random_kernel_from::<true, true, true>(
+                                sweep,
+                                &mut random,
+                                Some(restart),
+                            )?
+                        } else {
+                            self.row_with_random_kernel::<true, true>(sweep, &mut random)?
+                        };
                         output.row(shot);
                         debug_assert_eq!(random.cursor(), random_count);
                     } else {
@@ -3763,6 +3978,7 @@ impl CompiledNearCliffordSampler<'_> {
             }
             Ok(())
         })();
+        self.counts_replay = checkpoints;
         self.packet_x = x;
         self.packet_z = z;
         self.packet_tape = tape;
@@ -3920,6 +4136,9 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
+        if !matches!(output, BatchOutput::Counts { .. }) {
+            self.counts_replay = None;
+        }
         let packet_bytes = self
             .plan
             .random_kinds
@@ -3951,6 +4170,12 @@ impl CompiledNearCliffordSampler<'_> {
                         .checked_mul(size_of::<u64>())
                         .and_then(|c| n.checked_add(c))
                 })
+                .and_then(|n| {
+                    self.counts_replay
+                        .as_ref()
+                        .map_or(Some(0), CountsReplay::reserved_bytes)
+                        .and_then(|c| n.checked_add(c))
+                })
                 .is_some_and(|n| n <= PACKET_BYTE_BUDGET)
             && (coherent_eligible || (self.pack_enabled && self.cache.is_some()));
         if packed {
@@ -3974,6 +4199,7 @@ impl CompiledNearCliffordSampler<'_> {
                 self.packet_noise_masks = Vec::new();
                 self.packet_tape = Vec::new();
                 self.packet_independent = None;
+                self.counts_replay = None;
                 for _ in 0..shots {
                     output.row(self.row_for_output(sweep, rng, output)?);
                 }
@@ -3998,6 +4224,12 @@ impl CompiledNearCliffordSampler<'_> {
                             .and_then(|c| n.checked_add(c))
                     });
                 self.packet_independent = occupied
+                    .and_then(|n| {
+                        self.counts_replay
+                            .as_ref()
+                            .map_or(Some(0), CountsReplay::reserved_bytes)
+                            .and_then(|c| n.checked_add(c))
+                    })
                     .and_then(|n| PACKET_BYTE_BUDGET.checked_sub(n))
                     .and_then(|remaining| {
                         IndependentPacket::new(self.plan.independent_event_count, remaining)
@@ -4030,6 +4262,11 @@ impl CompiledNearCliffordSampler<'_> {
                 let coherent = coherent_eligible && (!self.pack_enabled || self.cache.is_none());
                 if coherent || (self.pack_enabled && self.cache.is_some()) {
                     // Tails retain the original fill/consumer without compact clearing.
+                    // Retire the unused local allocation before a tail can
+                    // admit counts restart storage against the packet budget.
+                    if lanes != 64 {
+                        drop(noise_packet.take());
+                    }
                     let compact = if lanes == 64 {
                         noise_packet.as_mut()
                     } else {
