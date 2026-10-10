@@ -328,6 +328,27 @@ impl CoefficientCache {
             .checked_add(bytes)
             .is_some_and(|sum| sum <= self.budget)
     }
+    // Use the original packet when the cache has room for every lane to
+    // produce a new maximum-size state at every node. Restrict this bound to
+    // vectors below the interning floor, where no optional index can consume
+    // additional headroom. Failed allocations still use ordinary full replay.
+    fn has_packet_headroom(&self, plan: &CompiledNearCliffordExecutor, lanes: usize) -> bool {
+        let Some(coefficients) = u32::try_from(plan.peak_active_rank)
+            .ok()
+            .and_then(|rank| 1usize.checked_shl(rank))
+        else {
+            return false;
+        };
+        if coefficients >= coefficient_intern::MIN_COEFFICIENTS {
+            return false;
+        }
+        coefficients
+            .checked_mul(size_of::<ComplexAmp>())
+            .and_then(|bytes| bytes.checked_add(256))
+            .and_then(|charge| charge.checked_mul(plan.operations.len()))
+            .and_then(|bytes| bytes.checked_mul(lanes))
+            .is_some_and(|bytes| self.fits(bytes))
+    }
     fn store(&mut self, node: usize, coefficients: &[ComplexAmp]) -> Option<usize> {
         if coefficients.len() == 1 {
             return Some(0);
@@ -1738,6 +1759,8 @@ impl CompiledNearCliffordExecutor {
             #[cfg(test)]
             last_packet_live: 0,
             #[cfg(test)]
+            last_packet_checkpoint: false,
+            #[cfg(test)]
             last_packet_live_mask: 0,
             #[cfg(test)]
             last_packet_error_producer: None,
@@ -1784,6 +1807,8 @@ pub struct CompiledNearCliffordSampler<'a> {
     pack_enabled: bool,
     #[cfg(test)]
     last_packet_live: usize,
+    #[cfg(test)]
+    last_packet_checkpoint: bool,
     #[cfg(test)]
     last_packet_live_mask: u64,
     #[cfg(test)]
@@ -3346,6 +3371,10 @@ impl CompiledNearCliffordSampler<'_> {
         // Account existing packet/sidecar capacities before taking buffers.
         // Only counts can consume restart points; records keep full replay.
         debug_assert!(!CHECKPOINT || (!coherent && matches!(output, BatchOutput::Counts { .. })));
+        #[cfg(test)]
+        {
+            self.last_packet_checkpoint = CHECKPOINT;
+        }
         let checkpoint_bytes = if CHECKPOINT {
             self.counts_replay
                 .as_ref()
@@ -4282,7 +4311,13 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    if !coherent && matches!(output, BatchOutput::Counts { .. }) {
+                    if !coherent
+                        && matches!(output, BatchOutput::Counts { .. })
+                        && !self
+                            .cache
+                            .as_ref()
+                            .is_some_and(|cache| cache.has_packet_headroom(self.plan, lanes))
+                    {
                         self.packet::<true>(lanes, sweep, rng, output, coherent, compact)?;
                     } else {
                         // Counts restart storage is useful only on the cache packet
