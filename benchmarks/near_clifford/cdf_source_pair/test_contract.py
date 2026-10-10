@@ -3,6 +3,7 @@ import collections
 import copy
 import importlib.util
 import json
+import hashlib
 import os
 from pathlib import Path
 import signal
@@ -53,12 +54,34 @@ class ContractTests(unittest.TestCase):
                 ledger=moved/'output/events.jsonl';rows=[json.loads(line) for line in ledger.read_text().splitlines()]
                 rows[0]['command']=['/wrong/native-probe']
                 ledger.write_text(''.join(json.dumps(row,separators=(',',':'))+'\n' for row in rows))
+            def wrong_candidate_log():
+                log=moved/'preparation/native-check-2.log'
+                log.write_text('test result: ok. 1 passed; 0 failed; 0 ignored;\n')
+                rewrite(log.with_suffix('.receipt.json'),lambda d:d.update(log_sha256=evidence.sha(log)))
+            def append_candidate_record(record):
+                log=moved/'preparation/native-check-2.log'
+                log.write_text(log.read_text()+record+'\n')
+                rewrite(log.with_suffix('.receipt.json'),lambda d:d.update(log_sha256=evidence.sha(log)))
             mutations=[
                 wrong_worker,
                 lambda:rewrite(moved/'output/00000.config.json',lambda d:d.update(cache_bytes=0)),
                 lambda:rewrite(moved/'preparation/baseline/native-build-counts.receipt.json',lambda d:d.update(command=['echo','not a build'])),
                 lambda:rewrite(moved/'preparation/native-check-1.receipt.json',lambda d:d.update(command=['echo','not a test'])),
                 lambda:rewrite(moved/'preparation/native-check-1.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d.update(command=['echo','not candidate tests'])),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d.update(exit_code=17)),
+                lambda:rewrite(moved/'preparation/native-check-2.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
+                lambda:rewrite(moved/'preparation/native-check-3.receipt.json',lambda d:d.update(command=['echo','not layout test'])),
+                lambda:rewrite(moved/'preparation/native-check-3.receipt.json',lambda d:d.update(exit_code=17)),
+                lambda:rewrite(moved/'preparation/native-check-3.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
+                wrong_candidate_log,
+                lambda:append_candidate_record('test near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots ... ignored'),
+                lambda:append_candidate_record('test near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots ... FAILED'),
+                lambda:append_candidate_record('test result: FAILED. 0 passed; 1 failed; 0 ignored;'),
+                lambda:append_candidate_record('test extra ... '),
+                lambda:append_candidate_record('test result: '),
+                lambda:append_candidate_record('test broken'),
+                lambda:append_candidate_record('test result:'),
                 lambda:rewrite(moved/'preparation/preparation.json',lambda d:d.update(compiler='rustc unexpected')),
                 lambda:rewrite(moved/'process-absence.json',lambda d:d.update(pids=[],command=['true'])),
                 lambda:rewrite(moved/'control/preparation-process-absence.json',lambda d:d.update(pids=[32169])),
@@ -68,6 +91,37 @@ class ContractTests(unittest.TestCase):
                 with self.subTest(mutation=mutations.index(mutation)):
                     for relative,data in original.items():(moved/relative).write_bytes(data)
                     mutation();reseal();execute(1)
+
+    def test_actual_native_projection_stdout_binds_the_compiled_parent_module(self):
+        """Actual native output catches module-path mistakes hidden by synthetic names."""
+        path = HERE/'schema-fixtures/native-projection-tests.stdout.json'
+        provenance = json.loads((HERE/'schema-fixtures/native-projection-tests.provenance.json').read_text())
+        raw = json.loads(path.read_text())['stdout'].encode()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), provenance['stdout_sha256'])
+        self.assertEqual(provenance['native_test_exit_code'], 0)
+        self.assertEqual(provenance['workflow_conclusion'], 'failure')
+        for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
+            validate(raw.decode())
+            # The original mistaken namespace must remain rejected, even with
+            # the same successful test count and unchanged stdout scaffolding.
+            wrong = raw.decode().replace('near_clifford::compiled::coherent_packet::', 'near_clifford::coherent_packet::')
+            with self.assertRaises(ValueError):
+                validate(wrong)
+
+    def test_candidate_preflight_requires_every_named_test_and_successful_summary(self):
+        names = ['near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots', 'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::diagonal_projection_preserves_first_error_and_partial_scratch_bits']
+        for layout in [False, True]:
+            selected = ['near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'] if layout else names
+            count = len(selected)
+            good = ''.join('test '+name+' ... ok\n' for name in selected)+f'test result: ok. {count} passed; 0 failed; 0 ignored; 0 measured; 288 filtered out\n'
+            for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
+                validate(good, layout=layout)
+                for bad in [good.replace(selected[0], 'different_test'),good.replace(f'{count} passed','0 passed'),good.replace('0 ignored','1 ignored'),good.replace('0 failed','1 failed'),good+good,good.replace(' ... ok',' ... ignored',1),good.split('test result:')[0],
+                            good+'test '+selected[0]+' ... ignored\n', good+'test '+selected[0]+' ... FAILED\n',
+                            good+'test result: FAILED. 0 passed; 1 failed; 0 ignored;\n',good+'test unrelated::test ... ok\n',
+                            good.replace('0 measured','1 measured'),good+'test extra ... \n',good+'test result: \n',good+'test broken\n',good+'test result:\n']:
+                    with self.subTest(validator=validate.__module__,layout=layout,log=bad):
+                        with self.assertRaises(ValueError):validate(bad, layout=layout)
 
     def test_preparation_changes_only_rstim_dependency_and_rejects_zero_tests(self):
         original = (HERE.parent/'diagnostics/Cargo.toml').read_text()

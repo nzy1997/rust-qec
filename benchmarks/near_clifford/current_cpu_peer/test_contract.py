@@ -18,6 +18,17 @@ from verify import schedule
 
 
 class ProtocolContracts(unittest.TestCase):
+    def test_worker_bootstraps_local_helpers_in_actual_isolated_processes(self):
+        worker=Path(__file__).resolve().parent/'worker.py'
+        with tempfile.TemporaryDirectory() as directory:
+            for flags in [[],['-O']]:
+                with self.subTest(flags=flags):
+                    result=subprocess.run([sys.executable,'-I','-B',*flags,str(worker),'--help'],
+                                          cwd=directory,capture_output=True,timeout=10)
+                    self.assertEqual(result.returncode,0,result.stderr.decode())
+                    self.assertIn(b'clifft-scheduled',result.stdout)
+                    self.assertIn(b'--cpu-backend',result.stdout)
+
     def test_preparation_requires_reviewed_main_before_cloning(self):
         import prepare
         pin = json.loads((Path(__file__).parent/'manifest.json').read_text())['symft_revision']
@@ -41,7 +52,7 @@ class ProtocolContracts(unittest.TestCase):
                 def git_output(command,**kwargs):
                     return b'' if command[1]=='status' else 'c'*40+'\n'
                 with self.subTest(remote=remote), \
-                     mock.patch.object(sys,'argv',['prepare.py','--out',str(Path(directory)/str(number)),'--rust-ref','b'*40]), \
+                     mock.patch.object(sys,'argv',['prepare.py','--out',str(Path(directory)/str(number)),'--rust-ref','b'*40,'--baseline-ref','a'*40]), \
                      mock.patch.object(sys,'version_info',(3,12)), \
                      mock.patch.object(prepare.platform,'system',return_value='Linux'), \
                      mock.patch.object(prepare.platform,'machine',return_value='x86_64'), \
@@ -74,6 +85,17 @@ class ProtocolContracts(unittest.TestCase):
                 path=moved/'output/events.jsonl';events=[json.loads(line) for line in path.read_text().splitlines()]
                 change(events)
                 path.write_text(''.join(json.dumps(event,separators=(',',':'))+'\n' for event in events))
+            def payload_change(change):
+                # Change actual stdout and its compact ledger copy together;
+                # resealing must reach the semantic timing check, not a digest.
+                path=moved/'output/events.jsonl'
+                events=[json.loads(line) for line in path.read_text().splitlines()]
+                event=next(e for e in events if e['kind']=='timing')
+                raw=moved/'output'/f"{event['index']:05d}.stdout"
+                payload=json.loads(raw.read_text());change(payload);fixture.write(raw,payload)
+                event['result']=payload
+                event['stdout_sha256']=hashlib.sha256(raw.read_bytes()).hexdigest()
+                path.write_text(''.join(json.dumps(e,separators=(',',':'))+'\n' for e in events))
             mutations = [
                 lambda:worker_change(lambda e:e[0].update(command=['echo','fake package inspection'])),
                 lambda:worker_change(lambda e:e[5].update(timed_out=True,process_status='timeout-group-killed-and-waited')),
@@ -86,10 +108,22 @@ class ProtocolContracts(unittest.TestCase):
                 lambda:rewrite('output/header.json',lambda r:r['before']['harness'].pop(next(iter(r['before']['harness'])))),
                 lambda:rewrite('output/frozen-selections.json',lambda r:r[0]['backends']['symft'].update(cpu_backend='legacy',batch='scalar')),
             ]
+            mutations += [
+                lambda:worker_change(lambda events:next(e for e in events if e['kind']=='timing' and e['backend']=='rstim')['command'].__setitem__(0,next(e for e in events if e['kind']=='timing' and e['backend']=='rstim')['command'][0].replace('/candidate/','/baseline/'))),
+                lambda:rewrite('preparation/rust/candidate/native-build-counts.receipt.json',lambda r:r.update(head='a'*40)),
+                lambda:rewrite('preparation/rust/native-check-2.receipt.json',lambda r:r.update(head='a'*40)),
+            ]
             for number,mutation in enumerate(mutations):
                 with self.subTest(mutation=number):
                     for relative,data in snapshots.items():(moved/relative).write_bytes(data)
                     mutation();fixture.reseal(moved);execute(1)
+            for value in [None,'historical-probe-v1']:
+                with self.subTest(timing_contract=value):
+                    for relative,data in snapshots.items():(moved/relative).write_bytes(data)
+                    payload_change(lambda p: p.pop('timing_contract') if value is None else p.update(timing_contract=value))
+                    fixture.reseal(moved)
+                    execute(1,message='matched timing contract differs')
+                    execute(1,True,message='matched timing contract differs')
             pin = fixture.read(moved/'preparation/manifest.json')['symft_revision']
             invalid_refs = [
                 pin+'\trefs/heads/symft-26-10-08\n',
@@ -120,20 +154,48 @@ class ProtocolContracts(unittest.TestCase):
                     for n in manifest['names'] for s in manifest['shots']}
         cases, events = schedule(manifest,selected)
         self.assertEqual(len(cases),12)
-        self.assertEqual(len(events),759)
+        self.assertEqual(len(events),1035)
         self.assertEqual(collections.Counter(e['kind'] for e in events),
                          {'package-inspection':4,'import-inspection':4,'host-inspection':1,
-                          'tuning':102,'counts-validation':30,'raw-validation':18,'timing':600})
+                          'tuning':102,'counts-validation':42,'raw-validation':18,'timing':864})
         for name,shots,policy in cases:
             matching = [e for e in events if e['kind']=='timing' and (e['name'],e['shots'],e['policy'])==(name,shots,policy)]
-            self.assertEqual(len(matching),50)
+            self.assertEqual(len(matching),72)
             positions = collections.defaultdict(collections.Counter)
-            for pair in range(10):
+            for pair in range(12):
                 round = [e for e in matching if e['pair']==pair]
                 self.assertEqual({e['backend'] for e in round},set(manifest['roles']))
                 for position,event in enumerate(round):
                     positions[event['backend']][position] += 1
-            self.assertTrue(all(dict(v)=={p:2 for p in range(5)} for v in positions.values()))
+            self.assertTrue(all(dict(v)=={p:2 for p in range(6)} for v in positions.values()))
+
+    def test_seeded_clock_releases_each_temporary_result_in_its_own_span(self):
+        import timing
+        events = []
+        class Native:
+            def __del__(self): events.append('native-release')
+        class Counts(dict):
+            def __getitem__(self, key):
+                events.append('read-'+key)
+                return super().__getitem__(key)
+            def __del__(self): events.append('dict-release')
+        def sample(seed):
+            events.append(('rng-seed',seed))
+            native = Native()
+            result = Counts(attempted=64,accepted=32,discarded=32,logical_errors=3)
+            del native
+            return result
+        ticks = iter([10,40,100,145])
+        def now():
+            tick = next(ticks)
+            events.append(('clock',tick))
+            return tick
+        with mock.patch.object(timing.time,'perf_counter_ns',side_effect=now):
+            self.assertEqual(timing.timed_counts(sample,7),(30,64,32,32,3))
+            self.assertEqual(timing.timed_counts(sample,8),(45,64,32,32,3))
+        inside = ['native-release','read-attempted','read-accepted','read-discarded','read-logical_errors','dict-release']
+        self.assertEqual(events,[('clock',10),('rng-seed',7),*inside,('clock',40),
+                                 ('clock',100),('rng-seed',8),*inside,('clock',145)])
 
     def test_literal_raw_parities_include_xor_cancellation_and_all_detector_rejection(self):
         text = 'M 0 1 2\nDETECTOR rec[-1] rec[-1]\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-3]\nOBSERVABLE_INCLUDE(0) rec[-1]\n'
@@ -171,6 +233,7 @@ class ProtocolContracts(unittest.TestCase):
         o = dict(calls=1024,elapsed_ns=50_000_000,attempted=65536,accepted=32768,discarded=32768,logical_errors=71,ns_per_call=50_000_000/1024)
         p = dict(status='ok',backend='rstim',shots=64,compile_ns=32,prepare_ns=16,first_ns=8,
                  peak_rss_bytes=1024,peak_active_rank=4,arithmetic='strict',cache_reserved_bytes=1<<20,
+                 timing_contract='seeded-counts-invocation-v1',
                  output_contract='all-zero raw detector postselection; raw observable 0 counts; no reference normalization',observations=[dict(o) for _ in range(7)])
         return e,p
 
@@ -182,7 +245,7 @@ class ProtocolContracts(unittest.TestCase):
             changed['observations'][0][key] = value
             with self.subTest(key=key),self.assertRaises(ValueError):
                 validate_observations(changed,e)
-        for key,value in [('arithmetic','fused'),('cache_reserved_bytes',64*1024**2+1),('output_contract','normalized')]:
+        for key,value in [('timing_contract','historical-probe-v1'),('arithmetic','fused'),('cache_reserved_bytes',64*1024**2+1),('output_contract','normalized')]:
             changed = dict(p,**{key:value})
             with self.subTest(key=key),self.assertRaises(ValueError):
                 validate_observations(changed,e)

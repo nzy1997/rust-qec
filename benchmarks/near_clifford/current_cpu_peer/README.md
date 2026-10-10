@@ -20,7 +20,7 @@ never substituted with legacy timings.
 Each of six circuit/call-size combinations tunes five Clifft batches, five
 scheduled Clifft batches and seven SymFT executor/batch choices. It freezes the
 lowest median of seven valid observations before comparisons. Selected peers
-and both Rust policies validate at least 8192 attempts. Rust literal records are
+and both Rust policies at each of two exact source revisions validate at least 8192 attempts. Rust literal records are
 folded independently through the original annotations; peer counts are checked
 against Rust and each peer's own raw-record executor using unconditional
 Hoeffding bounds with total family alpha 0.001. These finite checks do not certify
@@ -28,37 +28,51 @@ rare conditional errors or the full joint distribution. Counts probes retain
 an executable RNG carry self-check but do not emit literal continuation words;
 no cross-source or cross-backend RNG identity follows from these receipts.
 
-Ten rotated/reversed rounds measure five roles: Rust, direct Clifft, scheduled
-Clifft, selected SymFT and an identical Rust-binary control. Each role occupies
-each position twice in every cell. The complete ledger retains 759 events:
-102 tuning children, 30 selected finite counts children, 18 raw-record children,
-600 timing children and nine environment/host inspection children. Each timing
-child produces seven adaptive observations of at least 50 ms: 4200 total.
+Twelve rounds measure six roles: baseline Rust, candidate Rust, direct Clifft,
+scheduled Clifft, selected SymFT and an identical baseline-binary control.
+Two complete six-position rotations reverse the role order in the second block;
+each role occupies each position twice in every cell. The complete ledger retains
+1035 events: 102 tuning children, 42 selected finite counts children, 18 raw-record
+children, 864 timing children and nine environment/host inspection children.
+Each timing child produces seven adaptive observations of at least 50 ms:
+6048 total. Baseline/control ratios remain separate from candidate ratios.
 Failed tuning trials and every timing outlier stay in the artifact.
 
 Compilation, preparation, first calls and process high-water RSS are retained
 separately. Linux RSS includes interpreter/launcher allocations and does not
-establish simulator-only memory costs. The primary comparison is warm counts
-work, including the adapters' count conversion. Peer RNGs differ; finite
-statistical validation accommodates this while preserving the output contract.
+establish simulator-only memory costs. The primary comparison uses the explicit
+`seeded-counts-invocation-v1` contract: choose the scalar seed before the clock,
+then initialize the backend RNG, call public counts, materialize attempted,
+accepted, discarded and logical-error integers, and release this invocation's
+temporary result wrapper before the end timestamp. The four integer references
+remain available for aggregation outside the clock. Rust's native result is a
+Copy struct without heap fields; Python includes its adapter conversion and
+temporary dictionary release. These are seeded public invocations, not isolated
+kernels, and no claim that every internal backend allocation is released follows.
+The same helper times Python first calls. Rust finite witness simulation and RNG
+carry checks remain outside the native clock. Legacy probe users retain the
+default `historical-probe-v1` boundary. Receipts with different timing contracts
+are rejected. Peer RNGs differ; finite statistical validation accommodates this
+while preserving the output contract.
 
 ## Collect and verify
 
 Use a clean committed checkout, Python 3.12, gcc/g++, Rust 1.93.1 and an exact
-locally available Rust source SHA. Preparation builds native SymFT CPU wheels
+locally available baseline and candidate Rust source SHAs. Preparation builds native SymFT CPU wheels
 with CUDA disabled and verifies the actual verbose compiler flags. It binds
 complete wheel code inventories to installed bytes and the wrappers/extensions
 actually imported in isolated Python. Rust probes use the reviewed source-pair
 preparation with `-C target-cpu=native`, retaining full source inventories,
-actual ELF binaries, compiler commands and nonzero arithmetic/RNG test results.
-The Rust source must include the required phase-CDF and wide-packet tests.
+actual ELF binaries, compiler commands and four nonzero native check groups.
+The candidate must include the phase-CDF, wide-packet, diagonal-projection and
+inline-cache-layout tests; exact mounted test names are checked.
 
 ```sh
 python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
 python3 -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
 mkdir -p drafts/current-peer
 python3 -I benchmarks/near_clifford/current_cpu_peer/prepare.py \
-  --rust-ref "$RUST_SHA" --out drafts/current-peer/preparation
+  --baseline-ref "$BASELINE_SHA" --rust-ref "$CANDIDATE_SHA" --out drafts/current-peer/preparation
 # Choose one permitted logical CPU on a quiet host; preparation must have exited.
 taskset -c "$BENCH_CPU" python3 -I benchmarks/near_clifford/current_cpu_peer/run_retained.py \
   --preparation drafts/current-peer/preparation \
@@ -70,7 +84,7 @@ python3 -I -O benchmarks/near_clifford/current_cpu_peer/verify.py drafts/current
 ```
 
 Alternatively dispatch **Near-Clifford x86 application counts** at the committed
-protocol branch with `current_cpu_peer=true` and `rust_ref`. Leave
+protocol branch with `current_cpu_peer=true`, `baseline_ref` and candidate `rust_ref`. Leave
 `profile_only=false` and `cdf_source_pair=false`. Its independent Ubuntu VM builds, pins one CPU,
 collects, seals before interpretation, verifies normally and under `-O`, and
 uploads native originals and partial failures. Existing source-pair and historical

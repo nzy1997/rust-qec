@@ -1,5 +1,5 @@
 {
-  "schema": "rstim.current-cpu-peer.v1",
+  "schema": "rstim.current-cpu-peer.v2",
   "symft_revision": "3f718e9e0c58b277a8fb506b4170863db5c3dbe6",
   "versions": {
     "symft": "2026.10.8",
@@ -19,9 +19,10 @@
     "strict",
     "fused"
   ],
-  "pairs": 10,
+  "pairs": 12,
   "repetitions": 7,
   "roles": [
+    "baseline",
     "rstim",
     "clifft",
     "clifft-scheduled",
@@ -32,9 +33,10 @@
   "warm_ns_min": 50000000,
   "peer_timeout_s": 180,
   "raw_timeout_s": 600,
-  "scope": "Fixed12 Linux x86_64 CPU counts cells; pinned official SymFT main compiled CPU implementation, Clifft direct/scheduled and Rust identical-binary control. No general SOTA or full distribution claim.",
+  "scope": "Fixed12 matched seeded public counts invocations with two exact Rust sources and identical baseline control; language adapter work included, no isolated-kernel or general SOTA claim.",
   "inputs": {
     "msc_d3_inject_cultivate_p1e-3": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
     "msc_d5_inject_cultivate_p1e-3": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
-  }
+  },
+  "timing_contract": "seeded-counts-invocation-v1"
 }

@@ -22,6 +22,7 @@ from peer_evidence import inventory, preparation_pids, read, seal_preparation, s
 from wheel_bindings import bind_wheel
 from validation import compare, counts, masks
 from verify import schedule
+from timing import TIMING_CONTRACT, RUST_ROLES
 
 
 def write(path, value):
@@ -51,28 +52,29 @@ def build_preparation(prep):
             path.write_text(path.read_text().replace(original_rust,str(rust)))
     shutil.rmtree(template)
     meta = read(rust/'preparation.json')
-    meta['heads'] = {role:'a'*40 for role in ['baseline','candidate','control']}
+    heads = dict(baseline='a'*40,candidate='b'*40,control='a'*40)
+    meta['heads'] = heads
     write(rust/'preparation.json',meta)
     for role in ['baseline','candidate']:
-        (rust/'production-sources'/role/'toy.rs').write_text('// synthetic Rust source\n')
+        (rust/'production-sources'/role/'toy.rs').write_text('// synthetic Rust source '+role+'\n')
         sources = {'toy.rs':sha(rust/'production-sources'/role/'toy.rs')}
         for kind,binary in [('counts','near-clifford-application-counts'),('structural','near-clifford-diagnostics')]:
-            retained = rust/role/(binary+'.bin');retained.write_bytes(elf())
+            retained = rust/role/(binary+'.bin');retained.write_bytes(elf()+role.encode())
             path = rust/role/('native-build-'+kind+'.receipt.json');receipt=read(path)
-            receipt.update(head='a'*40,sources=sources,sources_after=sources,
+            receipt.update(head=heads[role],sources=sources,sources_after=sources,
                            probe={n:sha(rust/role/'native-probes'/kind/n) for n in ['Cargo.toml','Cargo.lock','main.rs']})
             receipt['binary'].update(bytes=retained.stat().st_size,sha256=sha(retained))
             write(path,receipt)
     (rust/'seal.json').unlink();seal_preparation(rust,'c'*40)
-    for path in [*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py','compiled_sota/manifest.json']]]:
+    for path in [*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['cdf_source_pair/prepare.py','cdf_source_pair/evidence.py','application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py','compiled_sota/manifest.json']]]:
         target=prep/'protocol'/path.relative_to(ROOT);target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
     manifest=read(HERE/'manifest.json')
-    manifest.update(protocol_revision='c'*40,rust_source_head='a'*40)
+    manifest.update(protocol_revision='c'*40,rust_baseline_head='a'*40,rust_source_head='b'*40)
     for name in manifest['names']:
         target=prep/'protocol/benchmarks/near_clifford/application_counts/fixtures'/(name+'.stim')
         target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(HERE.parent/'application_counts/fixtures'/(name+'.stim'),target)
     write(prep/'manifest.json',manifest)
-    write(prep/'preparation.json',dict(protocol_revision='c'*40,rust_source_head='a'*40,symft_revision=manifest['symft_revision'],preparation_directory=str(prep),repository_directory=str(ROOT),protocol_directory=str(HERE)))
+    write(prep/'preparation.json',dict(protocol_revision='c'*40,rust_baseline_head='a'*40,rust_source_head='b'*40,symft_revision=manifest['symft_revision'],preparation_directory=str(prep),repository_directory=str(ROOT),protocol_directory=str(HERE)))
     peer_data=b'# synthetic peer source\n'
     (prep/'peer-sources').mkdir();(prep/'peer-sources/toy.py').write_bytes(peer_data)
     buffer=io.BytesIO()
@@ -139,11 +141,11 @@ def build_bundle(root):
     parsed={}
     for n in manifest['names']:
         parsed[n],projection=masks((HERE.parent/'application_counts/fixtures'/(n+'.stim')).read_text());(output/(n+'.records.stim')).write_text(projection)
-    source=read(prep/'rust/baseline/native-build-counts.receipt.json')
-    harness=[*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py']]]
-    before=dict(protocol_revision='c'*40,rust_build_head='a'*40,rust_sources=source['sources'],peer_sources={n:v['sha256'] for n,v in inventory(prep/'peer-sources').items()},rust_binary_sha256=source['binary']['sha256'],inputs=manifest['inputs'],harness={str(p):sha(p) for p in harness}|{str(prep/n):sha(prep/n) for n in ['manifest.json','expected-environment.json']})
+    sources={role:read(prep/'rust'/role/'native-build-counts.receipt.json') for role in ['baseline','candidate']}
+    harness=[*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['cdf_source_pair/prepare.py','cdf_source_pair/evidence.py','application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py']]]
+    before=dict(protocol_revision='c'*40,rust_build_heads=dict(baseline='a'*40,candidate='b'*40),rust_sources={r:s['sources'] for r,s in sources.items()},peer_sources={n:v['sha256'] for n,v in inventory(prep/'peer-sources').items()},rust_binary_sha256={r:s['binary']['sha256'] for r,s in sources.items()},inputs=manifest['inputs'],harness={str(p):sha(p) for p in harness}|{str(prep/n):sha(prep/n) for n in ['manifest.json','expected-environment.json']})
     host=dict(uname=['Linux','test','0','0','x86_64',''],python='3.12.0',affinity=[0],thread_environment={k:'1' for k in THREADS})
-    write(output/'header.json',dict(schema=manifest['schema'],manifest=manifest,before=before,preparation_seal_sha256=sha(prep/'seal.json'),controller_pid=32179,packages=expected['packages'],identities=expected['identities'],host=host))
+    write(output/'header.json',dict(schema=manifest['schema'],manifest=manifest,before=before,preparation_seal_sha256=sha(prep/'seal.json'),controller_pid=32179,packages=expected['packages'],identities=expected['identities'],host=host,timing_contract=TIMING_CONTRACT))
     _,schedule_events=schedule(manifest,selected);events=[];payloads={}
     for index,item in enumerate(schedule_events):
         kind,backend=item['kind'],item.get('backend')
@@ -152,16 +154,16 @@ def build_bundle(root):
             payload=read(prep/(backend+'-'+kind+'.stdout'))
         elif kind=='host-inspection':command=[sys.executable,'-I','-c',HOST_SCRIPT];payload=host
         else:
-            name,shots=item['name'],item['shots'];finite=kind=='counts-validation';rust=backend in {'rstim','control'}
+            name,shots=item['name'],item['shots'];finite=kind=='counts-validation';rust=backend in RUST_ROLES
             circuit=str(HERE.parent/'application_counts/fixtures'/(name+'.stim'))
-            if rust:command=[str(prep/'rust/baseline/near-clifford-application-counts.bin'),circuit,str(shots),'1' if finite else '7',item['policy'],'validate' if finite else 'bench','native']
+            if rust:command=[str(prep/'rust'/('candidate' if backend=='rstim' else 'baseline')/'near-clifford-application-counts.bin'),circuit,str(shots),'1' if finite else '7',item['policy'],'validate' if finite else 'bench','native',TIMING_CONTRACT]
             else:
                 selection=item['selection'];interpreter=str(prep/('symft' if backend=='symft' else 'clifft')/'bin/python')
                 if kind=='raw-validation':command=[interpreter,'-I',str(HERE.parent/'compiled_sota/worker.py'),backend,str(output/(name+'.records.stim')),str(shots),'--batch',str(selection['batch']),'--mode','dump','--dump-total','8192']
                 else:command=[interpreter,'-I',str(HERE/'worker.py'),backend,circuit,str(shots),'--batch',str(selection['batch']),'--cpu-backend',selection.get('cpu_backend','legacy'),'--repetitions','1' if finite else '7']+(['--validate'] if finite else [])
             calls=8192//shots if finite else (4 if kind=='tuning' and item['selection']==selected[name,shots][backend] else 2);attempted=calls*shots
             observation=dict(calls=calls,elapsed_ns=50_000_000,ns_per_call=50_000_000/calls,attempted=attempted,accepted=attempted,discarded=0,logical_errors=0)
-            payload=dict(status='ok',backend='rstim' if rust else backend,shots=shots,compile_ns=1,prepare_ns=0,first_ns=0 if finite and rust else 1,peak_rss_bytes=1,input_sha256=manifest['inputs'][name],output_contract='all-zero raw detector postselection; raw observable 0 counts; no reference normalization',observations=[observation]*(1 if finite else 7))
+            payload=dict(status='ok',backend='rstim' if rust else backend,shots=shots,compile_ns=1,prepare_ns=0,first_ns=0 if finite and rust else 1,peak_rss_bytes=1,input_sha256=manifest['inputs'][name],output_contract='all-zero raw detector postselection; raw observable 0 counts; no reference normalization',observations=[observation]*(1 if finite else 7),timing_contract=TIMING_CONTRACT)
             if rust:payload.update(arithmetic=item['policy'],peak_active_rank=1,cache_reserved_bytes=0)
             else:
                 module='symft' if backend=='symft' else 'clifft';payload.update(batch=selection['batch'],isolated=True,loaded_files=expected['identities'][module],peak_active_width=1)
@@ -176,12 +178,12 @@ def build_bundle(root):
         events.append(dict(item,index=index,command=command,controller_pid=32179,child_pid=34000+index,child_waited=True,exit_code=0,timed_out=False,cancellation=None,result_compaction_error=None,start=index*2,end=index*2+1,process_status='closed',stdout_sha256=sha(output/f'{index:05d}.stdout'),stderr_sha256=sha(output/f'{index:05d}.stderr'),result=compact))
         payloads[index]=payload
     (output/'events.jsonl').write_text(''.join(json.dumps(e,separators=(',',':'))+'\n' for e in events))
-    rows=[];alpha=.001/(12*3*12)
+    rows=[];alpha=.001/(12*3*20)
     for (name,shots),backends in selected.items():
         own=dict(attempted=8192,accepted=8192,discarded=0,logical_errors=0)
-        for backend in backends:rows.append(dict(name=name,shots=shots,backend=backend,selection=backends[backend],counts=own,own_records=own,rust={p:own for p in manifest['policies']},alpha_per_population=alpha,checks=dict(own_records=compare(own,own,alpha),against_rust={p:compare(own,own,alpha) for p in manifest['policies']})))
+        for backend in backends:rows.append(dict(name=name,shots=shots,backend=backend,selection=backends[backend],counts=own,own_records=own,rust={r+'/'+p:own for r in ['baseline','rstim'] for p in manifest['policies']},alpha_per_population=alpha,checks=dict(own_records=compare(own,own,alpha),against_rust={r+'/'+p:compare(own,own,alpha) for r in ['baseline','rstim'] for p in manifest['policies']})))
     (output/'validation-checks.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in rows))
-    write(output/'closure.json',dict(before=before,after=before,preparation_seal_after=sha(prep/'seal.json'),controller_pid=32179,all_children_waited=True,events=759,events_sha256=sha(output/'events.jsonl'),timing_children=600,packages_after=expected['packages'],identities_after=expected['identities']))
+    write(output/'closure.json',dict(before=before,after=before,preparation_seal_after=sha(prep/'seal.json'),controller_pid=32179,all_children_waited=True,events=1035,events_sha256=sha(output/'events.jsonl'),timing_children=864,packages_after=expected['packages'],identities_after=expected['identities']))
     (control/'producer.log').write_text('synthetic fixture\n')
     write(control/'closure.json',dict(command=[sys.executable,'-I',str(HERE/'run.py'),'--preparation',str(prep),'--out',str(output)],controller_pid=32169,child_pid=32179,child_waited=True,exit_code=0,timed_out=False,cancellation=None,post_run_seal_error=None,preparation_seal_before=sha(prep/'seal.json'),preparation_seal_after=sha(prep/'seal.json'),producer_log_sha256=sha(control/'producer.log'),thread_environment={k:'1' for k in THREADS}))
     pids=sorted(set(preparation_pids(prep)));write(control/'preparation-process-absence.json',dict(pids=pids,command=['ps','-p',','.join(map(str,pids)),'-o','pid=,comm='],exit_code=1,stdout='',stderr=''))

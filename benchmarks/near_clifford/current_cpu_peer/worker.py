@@ -13,8 +13,10 @@ import sys
 import time
 
 ROOT=Path(__file__).resolve().parents[3]
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 sys.path.insert(0,str(ROOT/'benchmarks/near_clifford/compiled_sota'))
 from worker import loaded_files
+from timing import TIMING_CONTRACT, timed_counts
 
 
 def main():
@@ -72,20 +74,21 @@ def main():
                         discarded=int(r['discarded']),logical_errors=int(r['logical_errors']))
         execution='native counts; actual SymFT CPU '+args.cpu_backend
     compile_ns=time.perf_counter_ns()-start
-    start=time.perf_counter_ns()
-    sample(739)
-    first_ns=time.perf_counter_ns()-start
+    first_ns, *_ = timed_counts(sample, 739)
     observations=[]
     for rep in range(args.repetitions):
         elapsed=calls=0
         counts=dict(attempted=0,accepted=0,discarded=0,logical_errors=0)
         while calls==0 or (args.validate and counts['attempted']<8192) or (not args.validate and elapsed<50_000_000):
-            start=time.perf_counter_ns()
-            r=sample(1739+rep*1_000_000+calls)
-            elapsed+=time.perf_counter_ns()-start
-            if r['attempted']!=args.shots or r['accepted']+r['discarded']!=args.shots or not 0<=r['logical_errors']<=r['accepted']:
+            seed = 1739+rep*1_000_000+calls
+            ns, attempted, accepted, discarded, logical_errors = timed_counts(sample, seed)
+            elapsed += ns
+            if attempted != args.shots or accepted+discarded != args.shots or not 0<=logical_errors<=accepted:
                 raise ValueError('invalid counts semantics')
-            for key in counts: counts[key]+=r[key]
+            counts['attempted'] += attempted
+            counts['accepted'] += accepted
+            counts['discarded'] += discarded
+            counts['logical_errors'] += logical_errors
             calls+=1
             if calls>=1_000_000: raise ValueError('timing call bound exceeded')
         observations.append(dict(elapsed_ns=elapsed,calls=calls,ns_per_call=elapsed/calls,**counts))
@@ -93,7 +96,7 @@ def main():
     rss=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*(1024 if sys.platform.startswith('linux') else 1)
     print(json.dumps(dict(backend=args.backend,status='ok',input_sha256=hashlib.sha256(data).hexdigest(),
         loaded_files=identity,isolated=True,batch=batch,shots=args.shots,
-        compile_ns=compile_ns,prepare_ns=0,first_ns=first_ns,observations=observations,
+        compile_ns=compile_ns,prepare_ns=0,first_ns=first_ns,observations=observations,timing_contract=TIMING_CONTRACT,
         peak_active_width=rank,peak_rss_bytes=rss,execution=execution,sampler_info=sampler_info,
         cpu_backend=args.cpu_backend if args.backend=='symft' else None,
         output_contract='all-zero raw detector postselection; raw observable 0 counts; no reference normalization')))
