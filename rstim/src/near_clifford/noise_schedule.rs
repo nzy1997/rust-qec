@@ -782,6 +782,9 @@ impl NoiseSigns {
             .checked_add(size_of::<Self>())
     }
     pub(super) fn scalar(&self, node: usize, draw: &impl RowDraw) -> bool {
+        if draw.noise_is_zero() {
+            return false;
+        }
         self.refs[self.offsets[node]..self.offsets[node + 1]]
             .iter()
             .fold(false, |p, r| {
@@ -822,6 +825,136 @@ impl NoiseSigns {
 mod tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn zero_noise_summary_skips_sign_refs_but_unknown_rows_still_scan() {
+        struct Observed {
+            zero: bool,
+            values: [u64; 2],
+            reads: std::cell::Cell<usize>,
+        }
+        impl RowDraw for Observed {
+            fn draw(&mut self, _: RandomKind) -> u64 {
+                unreachable!()
+            }
+            fn discard_remaining(&mut self, _: &[RandomKind]) {
+                unreachable!()
+            }
+            fn noise_is_zero(&self) -> bool {
+                self.zero
+            }
+            fn noise_value(&self, event: usize, _: usize) -> u64 {
+                assert!(!self.zero, "a certified zero row must not read sign refs");
+                self.reads.set(self.reads.get() + 1);
+                self.values[event]
+            }
+        }
+        let signs = NoiseSigns {
+            offsets: vec![0, 1, 3],
+            refs: vec![
+                NoiseRef {
+                    event: 0,
+                    ordinal: 0,
+                    mask: 1,
+                    choices: 3,
+                },
+                NoiseRef {
+                    event: 0,
+                    ordinal: 0,
+                    mask: 2,
+                    choices: 3,
+                },
+                NoiseRef {
+                    event: 1,
+                    ordinal: 1,
+                    mask: 1,
+                    choices: 3,
+                },
+            ],
+        };
+        for (zero, values, expected, reads) in [
+            (true, [0, 0], [false, false], 0),
+            (false, [0, 0], [false, false], 3),
+            (false, [1, 2], [true, false], 3),
+            (false, [2, 1], [false, false], 3),
+        ] {
+            let draw = Observed {
+                zero,
+                values,
+                reads: std::cell::Cell::new(0),
+            };
+            assert_eq!([signs.scalar(0, &draw), signs.scalar(1, &draw)], expected);
+            assert_eq!(draw.reads.get(), reads);
+        }
+        let mut rng = StdRng::seed_from_u64(739);
+        assert!(!RowRandom::live(&mut rng).noise_is_zero());
+        assert!(!RowRandom::recorded(&[0, 0], &mut rng).noise_is_zero());
+    }
+
+    #[test]
+    fn zero_noise_summary_preserves_scheduled_records_counts_and_carry() {
+        let text = conditional_fixture::circuit(8, 3, true);
+        assert!(text.contains("DEPOLARIZE1(0.001)"));
+        for probability in ["0", "0.001", "0.1", "1"] {
+            let text = text.replace("DEPOLARIZE1(0.001)", &format!("DEPOLARIZE1({probability})"));
+            for policy in [
+                CompiledRotationArithmetic::Strict,
+                CompiledRotationArithmetic::Fused,
+            ] {
+                let plan =
+                    CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, policy)
+                        .unwrap();
+                assert!(plan.noise_signs.is_some());
+                let mut fallback = plan.clone();
+                fallback.random_runs = None;
+                for selected in [&plan, &fallback] {
+                    for budget in [0, DEFAULT_CACHE_BYTE_BUDGET] {
+                        let mut reference = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                        let mut rows = selected.prepare_sampler_with_cache_budget(budget).unwrap();
+                        let mut counts =
+                            selected.prepare_sampler_with_cache_budget(budget).unwrap();
+                        let mut a = StdRng::seed_from_u64(739);
+                        let mut b = a.clone();
+                        let mut c = a.clone();
+                        for _ in 0..64 {
+                            let frozen = scalar_prepared_tape_tests::draw_frozen_packet_rows(
+                                &plan.random_kinds,
+                                1,
+                                &mut a,
+                            );
+                            let mut replay = RowRandom::recorded(&frozen[0], &mut a);
+                            let expected = reference
+                                .row_with_random_mode::<false>(&[], &mut replay)
+                                .unwrap();
+                            assert_eq!(replay.cursor, plan.random_kinds.len());
+                            assert_eq!(rows.row(&[], &mut b).unwrap(), expected);
+                            let accepted = usize::from(expected.detectors.iter().all(|&bit| !bit));
+                            let logical = expected
+                                .observables
+                                .iter()
+                                .filter(|(index, _)| *index == 0)
+                                .fold(false, |parity, (_, bit)| parity ^ bit);
+                            assert_eq!(
+                                counts.sample_postselected_counts(1, 0, &mut c).unwrap(),
+                                NearCliffordPostselectedCounts {
+                                    attempted: 1,
+                                    accepted,
+                                    logical_errors: accepted * usize::from(logical),
+                                }
+                            );
+                            let (mut carry_a, mut carry_b, mut carry_c) =
+                                (a.clone(), b.clone(), c.clone());
+                            for _ in 0..16 {
+                                let word = carry_a.next_u64();
+                                assert_eq!(word, carry_b.next_u64());
+                                assert_eq!(word, carry_c.next_u64());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
     #[test]
     fn reduced_conditional_rank_uses_coherent_packets_with_exact_records_and_carry() {
         let text = conditional_fixture::circuit(8, 3, true);
