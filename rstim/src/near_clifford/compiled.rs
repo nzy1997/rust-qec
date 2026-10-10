@@ -27,9 +27,7 @@ mod compact_replay;
 use compact_replay::{CompactReplay, RowDraw};
 #[path = "counts_replay.rs"]
 mod counts_replay;
-use counts_replay::{
-    CountsReplay, CountsReplayStorage, CountsResume, PacketPrefix, ReplayPosition,
-};
+use counts_replay::{CountsReplay, CountsResume, CountsWorkspace, PacketPrefix, ReplayPosition};
 #[path = "noise_spans.rs"]
 mod noise_spans;
 use noise_spans::NoiseSpans;
@@ -1756,8 +1754,7 @@ impl CompiledNearCliffordExecutor {
             packet_noise_masks: Vec::new(),
             packet_independent: None,
             coherent: CoherentPacket::default(),
-            counts_outputs: Vec::new(),
-            counts_replay: CountsReplayStorage::default(),
+            counts_workspace: CountsWorkspace::default(),
             #[cfg(test)]
             checkpoint_replay_rows: 0,
             #[cfg(test)]
@@ -1804,8 +1801,7 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_noise_masks: Vec<u64>,
     packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
-    counts_outputs: Vec<u64>,
-    counts_replay: CountsReplayStorage,
+    counts_workspace: CountsWorkspace,
     #[cfg(test)]
     checkpoint_replay_rows: usize,
     #[cfg(test)]
@@ -2958,7 +2954,7 @@ impl CompiledNearCliffordSampler<'_> {
             .map_or(Some(0), IndependentPacket::reserved_bytes)?;
         vectors
             .checked_add(independent)?
-            .checked_add(self.counts_replay.reserved_bytes()?)?
+            .checked_add(self.counts_workspace.reserved_bytes()?)?
             .checked_add(
                 self.conditional_tape
                     .capacity()
@@ -3345,7 +3341,7 @@ impl CompiledNearCliffordSampler<'_> {
         // Only counts can consume restart points; records keep full replay.
         debug_assert!(!CHECKPOINT || (!coherent && matches!(output, BatchOutput::Counts { .. })));
         let checkpoint_bytes = if CHECKPOINT {
-            self.counts_replay.reserved_bytes()
+            self.counts_workspace.reserved_bytes()
         } else {
             Some(0)
         };
@@ -3375,14 +3371,14 @@ impl CompiledNearCliffordSampler<'_> {
                 checkpoint_budget.map(|budget| budget.min(self.replay_checkpoint_budget));
         }
         let mut checkpoints = if CHECKPOINT {
-            self.counts_replay.take()
+            self.counts_workspace.take()
         } else {
-            CountsReplayStorage::default()
+            CountsWorkspace::default()
         };
         if checkpoint_budget
             .is_none_or(|budget| checkpoint_bytes.is_none_or(|bytes| bytes > budget))
         {
-            checkpoints = CountsReplayStorage::default();
+            checkpoints = CountsWorkspace::default();
         }
         if let Some(buffer) = checkpoints.as_mut() {
             buffer.reset();
@@ -3983,7 +3979,7 @@ impl CompiledNearCliffordSampler<'_> {
             Ok(())
         })();
         if CHECKPOINT {
-            self.counts_replay = checkpoints;
+            self.counts_workspace = checkpoints;
         }
         self.packet_x = x;
         self.packet_z = z;
@@ -4089,33 +4085,18 @@ impl CompiledNearCliffordSampler<'_> {
                 .linear_counts
                 .get_or_init(|| LinearCountsPlan::build(self.plan, self.plan.counts_plan_budget))
             {
-                if model
-                    .output_count()
-                    .checked_mul(size_of::<u64>())
-                    .is_some_and(|bytes| bytes <= PACKET_BYTE_BUDGET)
+                if let Some(outputs) = self
+                    .counts_workspace
+                    .affine_outputs(model.output_count(), PACKET_BYTE_BUDGET)
                 {
-                    let admitted = self.counts_outputs.capacity() >= model.output_count()
-                        || self
-                            .counts_outputs
-                            .try_reserve_exact(model.output_count() - self.counts_outputs.len())
-                            .is_ok();
-                    if admitted
-                        && self
-                            .counts_outputs
-                            .capacity()
-                            .checked_mul(size_of::<u64>())
-                            .is_some_and(|bytes| bytes <= PACKET_BYTE_BUDGET)
-                    {
-                        self.counts_outputs.resize(model.output_count(), 0);
-                        return Ok(model.sample(
-                            self.plan,
-                            &mut self.counts_outputs,
-                            shots,
-                            observable_index,
-                            sweep,
-                            rng,
-                        ));
-                    }
+                    return Ok(model.sample(
+                        self.plan,
+                        outputs,
+                        shots,
+                        observable_index,
+                        sweep,
+                        rng,
+                    ));
                 }
             }
         }
@@ -4143,7 +4124,7 @@ impl CompiledNearCliffordSampler<'_> {
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
         if !matches!(output, BatchOutput::Counts { .. }) {
-            self.counts_replay = CountsReplayStorage::default();
+            self.counts_workspace.clear_replay();
         }
         let packet_bytes = self
             .plan
@@ -4177,7 +4158,7 @@ impl CompiledNearCliffordSampler<'_> {
                         .and_then(|c| n.checked_add(c))
                 })
                 .and_then(|n| {
-                    self.counts_replay
+                    self.counts_workspace
                         .reserved_bytes()
                         .and_then(|c| n.checked_add(c))
                 })
@@ -4204,7 +4185,7 @@ impl CompiledNearCliffordSampler<'_> {
                 self.packet_noise_masks = Vec::new();
                 self.packet_tape = Vec::new();
                 self.packet_independent = None;
-                self.counts_replay = CountsReplayStorage::default();
+                self.counts_workspace.clear_replay();
                 for _ in 0..shots {
                     output.row(self.row_for_output(sweep, rng, output)?);
                 }
@@ -4230,7 +4211,7 @@ impl CompiledNearCliffordSampler<'_> {
                     });
                 self.packet_independent = occupied
                     .and_then(|n| {
-                        self.counts_replay
+                        self.counts_workspace
                             .reserved_bytes()
                             .and_then(|c| n.checked_add(c))
                     })
@@ -4282,7 +4263,7 @@ impl CompiledNearCliffordSampler<'_> {
                         // Counts restart storage is useful only on the cache packet
                         // route. Keep ordinary records and coherent packets free of
                         // checkpoint capture and restart code at compile time.
-                        self.counts_replay = CountsReplayStorage::default();
+                        self.counts_workspace.clear_replay();
                         self.packet::<false>(lanes, sweep, rng, output, coherent, compact)?;
                     }
                 } else {
