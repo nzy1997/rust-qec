@@ -22,7 +22,7 @@ on:
         default: false
         type: boolean
       cdf_source_pair:
-        description: 'Run the fixed 36-cell depth/rank/boundary/counts source-pair protocol with an identical-binary control'
+        description: 'Run the fixed 12-cell pure-surface affine counts source-pair protocol with an identical-binary control'
         required: false
         default: false
         type: boolean
@@ -278,15 +278,15 @@ jobs:
         run: |
           test "$PROFILE_ONLY" != true
           mkdir -p drafts
-          python -I benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract-optimized.log 2>&1
-          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-cdf-toolchain.log 2>&1
+          python -I benchmarks/near_clifford/affine_source_pair/test_contract.py > drafts/x86-affine-contract.log 2>&1
+          python -I -O benchmarks/near_clifford/affine_source_pair/test_contract.py > drafts/x86-affine-contract-optimized.log 2>&1
+          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-affine-toolchain.log 2>&1
       - name: Record virtual host and select one logical CPU
         run: |
           python - <<'PY'
           import json, os, platform, subprocess
           from pathlib import Path
-          root = Path('drafts/x86-cdf')
+          root = Path('drafts/x86-affine')
           root.mkdir()
           affinity = sorted(os.sched_getaffinity(0))
           receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
@@ -304,43 +304,43 @@ jobs:
           BASELINE_REF: ${{ inputs.baseline_ref }}
           CANDIDATE_REF: ${{ inputs.candidate_ref }}
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/prepare.py \
+          python -I benchmarks/near_clifford/affine_source_pair/prepare.py \
             --baseline-ref "$BASELINE_REF" --candidate-ref "$CANDIDATE_REF" \
-            --out drafts/x86-cdf/preparation > drafts/x86-cdf/prepare.log 2>&1
-      - name: Collect all 36 cells with balanced source and identical-binary controls
+            --out drafts/x86-affine/preparation > drafts/x86-affine/prepare.log 2>&1
+      - name: Collect all 12 affine-eligible counts cells with balanced source and identical-binary controls
         timeout-minutes: 40
         run: |
-          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/cdf_source_pair/run_retained.py \
-            --preparation drafts/x86-cdf/preparation --out drafts/x86-cdf/output \
-            --control drafts/x86-cdf/control > drafts/x86-cdf/outer.log 2>&1
+          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/affine_source_pair/run_retained.py \
+            --preparation drafts/x86-affine/preparation --out drafts/x86-affine/output \
+            --control drafts/x86-affine/control > drafts/x86-affine/outer.log 2>&1
       - name: Seal originals before external summary interpretation
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py --seal drafts/x86-cdf > drafts/x86-cdf-seal.log 2>&1
+          python -I benchmarks/near_clifford/affine_source_pair/verify.py --seal drafts/x86-affine > drafts/x86-affine-seal.log 2>&1
       - name: Independently replay source bytes, finite witnesses, schedule and statistics
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify-optimized.log 2>&1
+          python -I benchmarks/near_clifford/affine_source_pair/verify.py drafts/x86-affine --git-sources > drafts/x86-affine-verify.log 2>&1
+          python -I -O benchmarks/near_clifford/affine_source_pair/verify.py drafts/x86-affine --git-sources > drafts/x86-affine-verify-optimized.log 2>&1
       - name: Retain original streams, actual binaries, source snapshots and partial failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: near-clifford-x86-cdf-source-pair-${{ github.sha }}
+          name: near-clifford-x86-affine-source-pair-${{ github.sha }}
           retention-days: 30
           path: |
-            drafts/x86-cdf-*.log
-            drafts/x86-cdf/*.json
-            drafts/x86-cdf/*.log
-            drafts/x86-cdf/output/
-            drafts/x86-cdf/control/
-            drafts/x86-cdf/preparation/*.json
-            drafts/x86-cdf/preparation/*.log
-            drafts/x86-cdf/preparation/production-sources/
-            drafts/x86-cdf/preparation/protocol/
-            drafts/x86-cdf/preparation/baseline/native-probes/
-            drafts/x86-cdf/preparation/baseline/*.bin
-            drafts/x86-cdf/preparation/baseline/*.json
-            drafts/x86-cdf/preparation/baseline/*.log
-            drafts/x86-cdf/preparation/candidate/native-probes/
-            drafts/x86-cdf/preparation/candidate/*.bin
-            drafts/x86-cdf/preparation/candidate/*.json
-            drafts/x86-cdf/preparation/candidate/*.log
+            drafts/x86-affine-*.log
+            drafts/x86-affine/*.json
+            drafts/x86-affine/*.log
+            drafts/x86-affine/output/
+            drafts/x86-affine/control/
+            drafts/x86-affine/preparation/*.json
+            drafts/x86-affine/preparation/*.log
+            drafts/x86-affine/preparation/production-sources/
+            drafts/x86-affine/preparation/protocol/
+            drafts/x86-affine/preparation/baseline/native-probes/
+            drafts/x86-affine/preparation/baseline/*.bin
+            drafts/x86-affine/preparation/baseline/*.json
+            drafts/x86-affine/preparation/baseline/*.log
+            drafts/x86-affine/preparation/candidate/native-probes/
+            drafts/x86-affine/preparation/candidate/*.bin
+            drafts/x86-affine/preparation/candidate/*.json
+            drafts/x86-affine/preparation/candidate/*.log

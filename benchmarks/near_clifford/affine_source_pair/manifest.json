@@ -1,0 +1,98 @@
+{
+  "schema": "rstim.near-clifford-affine-source-pair.v1",
+  "purpose": "Separate regression guard for counts-workspace ownership on original pure Clifford inputs; no structure/SOTA claim",
+  "structural_cases": [],
+  "application_counts_cases": [
+    [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "strict"
+    ],
+    [
+      "pure_surface_d7_r7_p1e-3",
+      1,
+      "fused"
+    ],
+    [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "strict"
+    ],
+    [
+      "pure_surface_d7_r7_p1e-3",
+      64,
+      "fused"
+    ],
+    [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "strict"
+    ],
+    [
+      "pure_surface_d7_r7_p1e-3",
+      1024,
+      "fused"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "strict"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      1,
+      "fused"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "strict"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      64,
+      "fused"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "strict"
+    ],
+    [
+      "pure_surface_d9_r9_p1e-3",
+      1024,
+      "fused"
+    ]
+  ],
+  "pairs": 6,
+  "repetitions": 7,
+  "minimum_warm_observation_ns": 50000000,
+  "failures_retained": true,
+  "inputs": {
+    "msc_d3_inject_cultivate_p1e-3.stim": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
+    "pure_surface_d7_r7_p1e-3.stim": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583",
+    "full-rank-16.stim": "d230557be9f4936b66adf3e19f12ceb7529e481c7c31f50dc083db64c7d41564",
+    "full-rank-4.stim": "386d3d5ce17747c3725919cbe3af5402914f83ceb9cba3f08d4cd8820ef851d1",
+    "full-rank-8.stim": "ca906c3aba57d51ecc2c81b1045514d28f4b1ead87670e42f12f83e42e48bb1c",
+    "projected-rank-16.stim": "465be3550bac6f1f20785936648076cfd6c9cf6a9cb257e7d0dd88ccb31addcc",
+    "full-rank-12.stim": "26b0da5dc2d434b6bbf12caf1ab7307cc11c93d24c105041b87b414b1d944db9",
+    "pure_surface_d9_r9_p1e-3.stim": "8d93c8ab2ad82edcf7850981dee62a4de88cfe58782d86e68fe1eaeb6b8d777c",
+    "projected-rank-4.stim": "dc9a3954f01fa4570ca243879ecf3e038e467469a31626a86d1573e810e88d28",
+    "msc_d5_inject_cultivate_p1e-3.stim": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+    "depth-32.stim": "65e84894e0b927be163d80d73e2f99e2d140912765746e3193d69131e75606de",
+    "projected-rank-12.stim": "2f82a29316cbf67b61b38fcf060c8d62c3c6e540678acad63df01851a43d76f1",
+    "projected-rank-8.stim": "a855f518d7916d51507e63733ddb71e5caa1062b079fe72d37d1f153e5d4ddc8"
+  },
+  "structural_source": {
+    "path": "benchmarks/near_clifford/diagnostics/corpus.py",
+    "sha256": "eaeef5ca3b882f0cee1ae5e146ea6b0c7d1c025f9ffff1e6b919b50f53fe01a1"
+  },
+  "scope": "12 original pure-surface native counts cells on affine-eligible circuits; six balanced rounds, three source roles, seven adaptive >=50ms observations. Source refs fixed40SHAs. First-call cost separate from warm throughput; no peer/SOTA admission.",
+  "expected_events": 240,
+  "expected_finite": 24,
+  "expected_timing": 216,
+  "expected_observations": 1512,
+  "role_order": "Stableordinalshifts/reverse eachcandidateposition2/2/2 across6rounds",
+  "finite_witness_scope": "For each of12 exact call-size/policy cases, both sources native counts self-check against structured records with16 compared RNG carry words percall; full raw measurements emitted for annotation replay over8192 attempts. Literal RNG carry words are not emitted. No cross-source seeded-row/joint/rare-error proof.",
+  "fixture_scope": "Retains exact13-file inventory inherited from cdf_source_pair; consumes two original pure-surface stimuli byte-for-byte. Unused structural/MSC files retained as provenance/control inventory; no timing or correctness claim for unused cases."
+}
