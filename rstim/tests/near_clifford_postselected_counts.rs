@@ -33,27 +33,35 @@ fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     ] {
         let plan =
             CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
         for seed in [1739, 583] {
-            let mut cached = plan.prepare_sampler().unwrap();
-            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
-            let initial = cached.coefficient_cache_reserved_bytes();
-            let mut a = StdRng::seed_from_u64(seed);
-            let mut b = a.clone();
-            for shots in [1, 63, 64, 65, 129, 1024, 64] {
-                let expected = scalar.sample(shots, &mut b).unwrap();
-                assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
-                let expected = scalar.sample(shots, &mut b).unwrap();
-                assert_eq!(
-                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
-                    count_records(&expected, 7)
-                );
-                let expected = scalar.sample_measurements_u8(17, &mut b).unwrap();
-                assert_eq!(cached.sample_measurements_u8(17, &mut a).unwrap(), expected);
-                for _ in 0..16 {
-                    assert_eq!(a.next_u64(), b.next_u64());
+            for budget in [initial, initial + 288, 64 * 1024 * 1024] {
+                let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                for shots in [1, 63, 64, 65, 129, 1024, 64] {
+                    let expected = scalar.sample(shots, &mut b).unwrap();
+                    assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
+                    let expected = scalar.sample(shots, &mut b).unwrap();
+                    assert_eq!(
+                        cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                        count_records(&expected, 7)
+                    );
+                    let expected = scalar.sample_measurements_u8(17, &mut b).unwrap();
+                    assert_eq!(cached.sample_measurements_u8(17, &mut a).unwrap(), expected);
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+                assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+                if budget == 64 * 1024 * 1024 {
+                    assert!(cached.coefficient_cache_reserved_bytes() > initial);
                 }
             }
-            assert!(cached.coefficient_cache_reserved_bytes() > initial);
         }
     }
 }
