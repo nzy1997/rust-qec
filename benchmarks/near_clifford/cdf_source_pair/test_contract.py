@@ -74,8 +74,8 @@ class ContractTests(unittest.TestCase):
                 lambda:rewrite(moved/'preparation/native-check-3.receipt.json',lambda d:d.update(exit_code=17)),
                 lambda:rewrite(moved/'preparation/native-check-3.receipt.json',lambda d:d['environment'].update(RUSTFLAGS='-C target-cpu=generic')),
                 wrong_candidate_log,
-                lambda:append_candidate_record('test near_clifford::compiled::random_event_runs::random_event_runs_tests::zero_noise_summary_keeps_every_event_and_frozen_rng_continuation ... ignored'),
-                lambda:append_candidate_record('test near_clifford::compiled::random_event_runs::random_event_runs_tests::zero_noise_summary_keeps_every_event_and_frozen_rng_continuation ... FAILED'),
+                lambda:append_candidate_record('test near_clifford::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots ... ignored'),
+                lambda:append_candidate_record('test near_clifford::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots ... FAILED'),
                 lambda:append_candidate_record('test result: FAILED. 0 passed; 1 failed; 0 ignored;'),
                 lambda:append_candidate_record('test extra ... '),
                 lambda:append_candidate_record('test result: '),
@@ -92,7 +92,7 @@ class ContractTests(unittest.TestCase):
                     mutation();reseal();execute(1)
 
     def test_candidate_preflight_requires_every_named_test_and_successful_summary(self):
-        names = ['near_clifford::compiled::random_event_runs::random_event_runs_tests::zero_noise_summary_keeps_every_event_and_frozen_rng_continuation', 'near_clifford::compiled::noise_schedule::tests::zero_noise_summary_skips_sign_refs_but_unknown_rows_still_scan', 'near_clifford::compiled::noise_schedule::tests::zero_noise_summary_preserves_scheduled_records_counts_and_carry']
+        names = ['near_clifford::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots', 'near_clifford::coherent_packet::diagonal_projection_offset_tests::diagonal_projection_preserves_first_error_and_partial_scratch_bits']
         for layout in [False, True]:
             selected = ['near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'] if layout else names
             count = len(selected)
