@@ -1,5 +1,6 @@
 """Independent raw parity, finite bounds and observation validators."""
 import base64, hashlib, math, re, zlib
+from timing import TIMING_CONTRACT, RUST_ROLES
 
 def require(value,message):
     if not value: raise ValueError(message)
@@ -54,8 +55,9 @@ def compare(a,b,alpha):
     delta=max(abs(a[k]/n-b[k]/m) for k in ['accepted','logical_errors'])
     return dict(bound=bound,max_delta=delta,passed=delta<=bound)
 def validate_observations(p,e):
-    validate=e['kind']=='counts-validation';shots=e['shots'];rust=e['backend'] in ['rstim','control']
+    validate=e['kind']=='counts-validation';shots=e['shots'];rust=e['backend'] in RUST_ROLES
     require(p['status']=='ok' and p['backend']==('rstim' if rust else e['backend']),'status/backend')
+    require(p.get('timing_contract') == TIMING_CONTRACT, 'matched timing contract differs')
     require(p['output_contract']=='all-zero raw detector postselection; raw observable 0 counts; no reference normalization','output semantics')
     require(len(p['observations'])==(1 if validate else 7),'observations')
     require(p['shots']==shots if not (rust and validate) else p['call_shots']==shots and p['shots']==sum(o['attempted'] for o in p['observations']),'shots')

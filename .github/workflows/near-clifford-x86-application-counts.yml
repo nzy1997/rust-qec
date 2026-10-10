@@ -27,7 +27,7 @@ on:
         default: false
         type: boolean
       current_cpu_peer:
-        description: 'Run all twelve original counts cells against pinned native CPU peers and an identical Rust-binary control'
+        description: 'Run twelve matched seeded counts cells with two exact Rust sources, pinned peers and an identical baseline control'
         required: false
         default: false
         type: boolean
@@ -407,9 +407,10 @@ jobs:
         timeout-minutes: 35
         env:
           RUST_REF: ${{ inputs.rust_ref }}
+          BASELINE_REF: ${{ inputs.baseline_ref }}
         run: |
           python -I benchmarks/near_clifford/current_cpu_peer/prepare.py \
-            --rust-ref "$RUST_REF" --out drafts/x86-current-peer/preparation \
+            --rust-ref "$RUST_REF" --baseline-ref "$BASELINE_REF" --out drafts/x86-current-peer/preparation \
             > drafts/x86-current-peer/prepare.log 2>&1
       - name: Tune, freeze, validate and compare all twelve original counts cells
         timeout-minutes: 65

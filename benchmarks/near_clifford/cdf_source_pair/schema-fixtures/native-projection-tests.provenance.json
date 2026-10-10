@@ -1,0 +1,24 @@
+{
+  "scope": "Native test stdout regression input only. Tests passed; original workflow failed exact-name verification. No benchmark/performance admission.",
+  "original_workflow_run": 38094553443,
+  "original_artifact_id": 11685846618,
+  "workflow_conclusion": "failure",
+  "source_head": "31f5eb2692867ea99903a2ed733b23fec77354c9",
+  "native_test_exit_code": 0,
+  "native_flags": "-C target-cpu=native",
+  "command": [
+    "rustup",
+    "run",
+    "1.93.1",
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "rstim",
+    "--no-default-features",
+    "--lib",
+    "diagonal_projection_offset_tests"
+  ],
+  "stdout_sha256": "15a204bdfafe79626cdf469a0106e17588c2fe174f61f9fcd77e2d6275b1a37f"
+}

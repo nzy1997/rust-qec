@@ -34,6 +34,31 @@ def probe_manifest(original, library):
         raise ValueError('probe library path missing or ambiguous')
     return original.replace(needle, 'path = ' + json.dumps(str(library)))
 
+def require_candidate_tests(log, *, layout=False):
+    expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
+        'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots',
+        'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::diagonal_projection_preserves_first_error_and_partial_scratch_bits'
+    }
+    count = len(expected)
+    records, summaries = [], []
+    for line in log.splitlines():
+        if not line.startswith('test '):
+            continue
+        if line.startswith('test result:'):
+            summaries.append(line)
+        else:
+            record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
+            if record is None:
+                raise ValueError('malformed diagonal-projection candidate test result record')
+            records.append(record.groups())
+    valid_summary = len(summaries) == 1 and re.fullmatch(
+        rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
+        summaries[0],
+    )
+    if (len(records) != count or {name for name, _ in records} != expected
+            or any(status != 'ok' for _, status in records) or not valid_summary):
+        raise ValueError('every named diagonal-projection candidate test must execute successfully')
+
 class Cancelled(RuntimeError):pass
 def cancel(signum,frame):raise Cancelled('prepare cancelled by signal '+str(signum))
 def invoke(command,cwd,env,path,context):
@@ -99,11 +124,13 @@ def main():
     roots['control']=roots['baseline']
     # Exercise the candidate's native arithmetic/public RNG before performance collection.
     candidate=Path(roots['candidate']);test_env=dict(env,CARGO_TARGET_DIR=str(out/'candidate/test-target'))
-    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact']]
+    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'],['--lib','diagonal_projection_offset_tests'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
     for index,selection in enumerate(tests):
         command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection]
         invoke(command,candidate,test_env,out/f'native-check-{index}.log',dict(head=heads['candidate'],environment={'RUSTFLAGS':env['RUSTFLAGS']}))
-        evidence.require_executed_tests((out/f'native-check-{index}.log').read_text())
+        log=(out/f'native-check-{index}.log').read_text()
+        evidence.require_executed_tests(log)
+        if index >= 2:require_candidate_tests(log, layout=index == 3)
     metadata=dict(protocol_revision=protocol,protocol_directory=str(HERE),preparation_directory=str(out),roots=roots,heads=heads,created=time.time(),compiler=subprocess.check_output(['rustup','run','1.93.1','rustc','-Vv'],text=True))
     (out/'preparation.json').write_text(json.dumps(metadata,indent=2)+'\n')
     protocol_paths = [path for path in HERE.rglob('*') if path.is_file() and '__pycache__' not in path.parts]

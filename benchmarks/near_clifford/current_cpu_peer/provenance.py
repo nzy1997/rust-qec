@@ -1,5 +1,6 @@
 """Verify retained native builds, source snapshots, wheels, and actual imports."""
 import hashlib
+import importlib.util
 import io
 from pathlib import Path
 import re
@@ -27,11 +28,11 @@ def verify_prepared(prep, root, *, git_sources=False):
     repository = Path(meta['repository_directory'])
     protocol = Path(meta['protocol_directory'])
     require(original.is_absolute() and repository.is_absolute() and protocol == repository/'benchmarks/near_clifford/current_cpu_peer', 'original protocol paths differ')
-    for key in ['protocol_revision', 'rust_source_head', 'symft_revision']:
+    for key in ['protocol_revision', 'rust_baseline_head', 'rust_source_head', 'symft_revision']:
         require(re.fullmatch('[0-9a-f]{40}', meta[key]) is not None and manifest[key] == meta[key], 'exact source refs differ')
     golden = read(Path(__file__).resolve().parent/'manifest.json')
     require(meta['symft_revision'] == golden['symft_revision'], 'reviewed official main revision differs')
-    require(manifest == dict(golden, protocol_revision=meta['protocol_revision'], rust_source_head=meta['rust_source_head'], symft_revision=meta['symft_revision']), 'fixed native matrix differs')
+    require(manifest == dict(golden, protocol_revision=meta['protocol_revision'], rust_baseline_head=meta['rust_baseline_head'], rust_source_head=meta['rust_source_head'], symft_revision=meta['symft_revision']), 'fixed native matrix differs')
     setup = []
     for path in sorted(prep.glob('*.receipt.json')):
         receipt = read(path)
@@ -100,20 +101,21 @@ def verify_prepared(prep, root, *, git_sources=False):
     verify_preparation(rust)
     rust_meta = read(rust/'preparation.json')
     require(rust_meta['protocol_revision'] == meta['protocol_revision'] and rust_meta['compiler'].startswith('rustc 1.93.1 ('), 'native Rust compiler/protocol differs')
-    require(rust_meta['heads'] == {role:meta['rust_source_head'] for role in ['baseline','candidate','control']}, 'Rust source roles differ')
+    heads = dict(baseline=meta['rust_baseline_head'], candidate=meta['rust_source_head'], control=meta['rust_baseline_head'])
+    require(rust_meta['heads'] == heads, 'Rust source roles differ')
     require(rust_meta['preparation_directory'] == str(original/'rust') and rust_meta['protocol_directory'] == str(repository/'benchmarks/near_clifford/cdf_source_pair')
             and rust_meta['roots'] == {role:str(original/'rust/source'/('baseline' if role == 'control' else role)) for role in ['baseline','candidate','control']}, 'native Rust directories differ')
-    source_hashes = None
+    source_hashes = {}
     for role in ['baseline','candidate']:
         actual_sources = {name:entry['sha256'] for name,entry in inventory(rust/'production-sources'/role).items()}
         if git_sources:
-            require(actual_sources == git_inventory(root,meta['rust_source_head']), 'Git/Rust source snapshot differs')
-        source_hashes = actual_sources
+            require(actual_sources == git_inventory(root,heads[role]), 'Git/Rust source snapshot differs')
+        source_hashes[role] = actual_sources
         for kind, binary in [('counts','near-clifford-application-counts'),('structural','near-clifford-diagnostics')]:
             receipt = read(rust/role/('native-build-'+kind+'.receipt.json'))
             original_probe = original/'rust'/role/'native-probes'/kind
             require(receipt['command'] == ['rustup','run','1.93.1','cargo','build','--release','--locked','--manifest-path',str(original_probe/'Cargo.toml')]
-                    and receipt['head'] == meta['rust_source_head'] and receipt['sources'] == receipt['sources_after'] == actual_sources
+                    and receipt['head'] == heads[role] and receipt['sources'] == receipt['sources_after'] == actual_sources
                     and receipt['child_waited'] is True and receipt['exit_code'] == 0 and receipt['timed_out'] is False and receipt['cancellation'] is None, 'native Rust build/source binding differs')
             require(receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and receipt['environment']['CARGO_ENCODED_RUSTFLAGS'] is None and receipt['environment']['CARGO_PROFILE_RELEASE_OPT_LEVEL'] is None
                     and receipt['environment']['CARGO_TARGET_DIR'] == str(original/'rust'/role/'native-target')
@@ -132,14 +134,23 @@ def verify_prepared(prep, root, *, git_sources=False):
             original_manifest = (public/'Cargo.toml').read_text()
             needle = 'path = "../../../rstim"'
             require(original_manifest.count(needle) == 1 and (probe/'Cargo.toml').read_text() == original_manifest.replace(needle,'path = '+__import__('json').dumps(str(original/'rust/source'/role/'rstim'))), 'probe dependency path differs')
-    for index in [0,1]:
+    spec = importlib.util.spec_from_file_location('matched_projection_preflight', Path(__file__).resolve().parents[1]/'cdf_source_pair/prepare.py')
+    native_contract = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(native_contract)
+    for index in [0,1,2,3]:
         receipt = read(rust/('native-check-'+str(index)+'.receipt.json'))
         log = (rust/('native-check-'+str(index)+'.log')).read_text()
         require(receipt['child_waited'] is True and receipt['exit_code'] == 0 and receipt['cancellation'] is None
+                and receipt['timed_out'] is False and receipt['head'] == heads['candidate']
                 and receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and sha(rust/('native-check-'+str(index)+'.log')) == receipt['log_sha256'], 'native arithmetic/RNG check receipt differs')
-        selection = (['--lib','phase_specialized_cdf_tests'] if index == 0 else ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'])
+        selection = (['--lib','phase_specialized_cdf_tests'] if index == 0 else
+                     ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'] if index == 1 else
+                     ['--lib','diagonal_projection_offset_tests'] if index == 2 else
+                     ['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact'])
         require(receipt['command'] == ['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection], 'native check command/filter differs')
         require(sum(map(int,re.findall(r'test result: ok\. ([0-9]+) passed',log))) > 0, 'native check ran zero tests')
+        if index >= 2:
+            native_contract.require_candidate_tests(log, layout=index == 3)
     if git_sources:
         for subtree in [prep,rust]:
             for name,entry in read(subtree/'seal.json')['files'].items():

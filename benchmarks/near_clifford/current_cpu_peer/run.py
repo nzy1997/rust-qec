@@ -13,12 +13,13 @@ import time
 
 ROOT = Path(__file__).resolve().parents[3]
 HERE = ROOT / 'benchmarks/near_clifford/current_cpu_peer'
-PREP = OUT = SOURCE = PYTHON = CLIFFT_PYTHON = BIN = None
+PREP = OUT = SOURCE = PYTHON = CLIFFT_PYTHON = BINS = None
 COUNTS = ROOT / 'benchmarks/near_clifford/application_counts'
 SOTA = ROOT / 'benchmarks/near_clifford/compiled_sota'
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from peer_evidence import verify_preparation
 from commands import HOST_SCRIPT, package_script
+from timing import TIMING_CONTRACT, RUST_ROLES
 sys.path.insert(0, str(COUNTS))
 from common import annotations, check_result, compare, counts, raw_counts, require
 sys.path.insert(0, str(SOTA))
@@ -38,7 +39,7 @@ def sha(path):
 def role_order(roles, pair):
     offset = pair % len(roles)
     ordered = roles[offset:] + roles[:offset]
-    return ordered[::-1] if pair % 2 else ordered
+    return ordered[::-1] if (pair // len(roles)) % 2 else ordered
 
 
 def git(*args, root=ROOT):
@@ -54,20 +55,25 @@ def source_state(manifest):
     peer_sources = {name: sha(SOURCE / name) for name in files if (SOURCE / name).is_file()}
     checkout = json.loads((PREP / 'checkout-receipt.json').read_text())['source_inventory']
     require(peer_sources == {name: data['sha256'] for name, data in checkout.items()}, 'peer checkout byte mutation')
-    rust = production_inventory(manifest['rust_source_head'])
-    receipt = json.loads((PREP / 'rust/baseline/native-build-counts.receipt.json').read_text())
-    require(receipt['exit_code'] == 0 and receipt['head'] == manifest['rust_source_head'], 'wrong Rust build')
-    require(rust == receipt['sources'], 'merged Rust differs from retained original build')
-    require(sha(BIN) == receipt['binary']['sha256'], 'Rust executable changed')
-    require({name: sha(PREP / 'rust/baseline/native-probes/counts' / name) for name in receipt['probe']} == receipt['probe'], 'Rust probe inputs changed')
-    require(sha(COUNTS / 'main.rs') == receipt['probe']['main.rs'], 'retained probe differs from public probe')
+    rust_heads = dict(baseline=manifest['rust_baseline_head'], candidate=manifest['rust_source_head'])
+    rust_sources, rust_binaries = {}, {}
+    for role, head in rust_heads.items():
+        rust = production_inventory(head)
+        receipt = json.loads((PREP / 'rust' / role / 'native-build-counts.receipt.json').read_text())
+        require(receipt['exit_code'] == 0 and receipt['head'] == head, 'wrong Rust build')
+        require(rust == receipt['sources'], 'Rust differs from retained original build')
+        require(sha(BINS[role]) == receipt['binary']['sha256'], 'Rust executable changed')
+        require({name: sha(PREP / 'rust' / role / 'native-probes/counts' / name) for name in receipt['probe']} == receipt['probe'], 'Rust probe inputs changed')
+        require(sha(COUNTS / 'main.rs') == receipt['probe']['main.rs'], 'retained probe differs from public probe')
+        rust_sources[role] = rust
+        rust_binaries[role] = sha(BINS[role])
     inputs = {name: sha(COUNTS / 'fixtures' / (name + '.stim')) for name in manifest['names']}
     require(inputs == manifest['inputs'], 'original circuit changed')
     harness_paths = [*sorted(HERE.glob('*.py')), HERE / 'manifest.json', PREP / 'manifest.json', PREP / 'expected-environment.json']
-    harness_paths += [ROOT / 'benchmarks/near_clifford/diagnostics/source_contract.py', COUNTS / 'common.py'] + [SOTA / name for name in ['run.py', 'worker.py', 'projection.py', 'evidence.py']]
-    return dict(protocol_revision=manifest['protocol_revision'], rust_build_head=receipt['head'],
-                rust_sources=rust, peer_sources=peer_sources, inputs=inputs,
-                rust_binary_sha256=sha(BIN), harness={str(path): sha(path) for path in harness_paths})
+    harness_paths += [ROOT / 'benchmarks/near_clifford/cdf_source_pair/prepare.py', ROOT / 'benchmarks/near_clifford/cdf_source_pair/evidence.py', ROOT / 'benchmarks/near_clifford/diagnostics/source_contract.py', COUNTS / 'common.py'] + [SOTA / name for name in ['run.py', 'worker.py', 'projection.py', 'evidence.py']]
+    return dict(protocol_revision=manifest['protocol_revision'], rust_build_heads=rust_heads,
+                rust_sources=rust_sources, peer_sources=peer_sources, inputs=inputs,
+                rust_binary_sha256=rust_binaries, harness={str(path): sha(path) for path in harness_paths})
 
 
 class Recorder:
@@ -179,6 +185,7 @@ def validate_peer_result(event, result, backend, input_hash, packages, identitie
     if successful:
         bind_peer(event, result, backend, input_hash, packages, identities)
         check_result(result, backend, shots, repetitions, validate=validate, batch=batch)
+        require(result.get('timing_contract') == TIMING_CONTRACT, 'matched timing contract differs')
         if backend == 'symft':
             require(result['cpu_backend'] == cpu, 'requested CPU backend changed')
             info = result['sampler_info']
@@ -196,14 +203,14 @@ def cancel(signum, frame):
 
 
 def main():
-    global PREP, OUT, SOURCE, PYTHON, CLIFFT_PYTHON, BIN
+    global PREP, OUT, SOURCE, PYTHON, CLIFFT_PYTHON, BINS
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--preparation',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
     args=parser.parse_args()
     PREP=args.preparation.resolve(); OUT=args.out.resolve()
     SOURCE=PREP/'source'; PYTHON=PREP/'symft/bin/python'; CLIFFT_PYTHON=PREP/'clifft/bin/python'
-    BIN=PREP/'rust/baseline/near-clifford-application-counts.bin'
+    BINS={role:PREP/'rust'/role/'near-clifford-application-counts.bin' for role in ['baseline','candidate']}
     for key in ['OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS','VECLIB_MAXIMUM_THREADS','NUMEXPR_NUM_THREADS']:os.environ[key]='1'
     signal.signal(signal.SIGTERM, cancel)
     signal.signal(signal.SIGINT, cancel)
@@ -224,7 +231,8 @@ def main():
     header = dict(schema=manifest['schema'], manifest=manifest, before=before, preparation_seal_sha256=preparation_seal,
                   packages=packages, identities=identities, host=host, controller_pid=os.getpid(), started=time.time(),
                   scope='Prespecified first12 Linux x86_64 counts cells. Pinned official SymFT main compiled CPU implementation. No general SOTA claim.',
-                  counts_rng_scope='Retained Rust executable self-attests carry; literal RNG words absent in counts output.')
+                  counts_rng_scope='Retained Rust executable self-attests carry; literal RNG words absent in counts output.',
+                  timing_contract=TIMING_CONTRACT)
     (OUT / 'header.json').write_text(json.dumps(header, indent=2) + '\n')
 
     def peer(backend, name, shots, selection, *, validate=False, pair=None, policy=None):
@@ -244,12 +252,14 @@ def main():
         return event, result
 
     def rust(name, shots, policy, *, validate=False, pair=None, role='rstim'):
-        cmd = [str(BIN), str(COUNTS / 'fixtures' / (name + '.stim')), str(shots),
-               str(1 if validate else manifest['repetitions']), policy, 'validate' if validate else 'bench', 'native']
+        source_role = 'candidate' if role == 'rstim' else 'baseline'
+        cmd = [str(BINS[source_role]), str(COUNTS / 'fixtures' / (name + '.stim')), str(shots),
+               str(1 if validate else manifest['repetitions']), policy, 'validate' if validate else 'bench', 'native', TIMING_CONTRACT]
         event, result = recorder.invoke(cmd, 'counts-validation' if validate else 'timing',
                                        backend=role, name=name, shots=shots, policy=policy, pair=pair)
         require(event['exit_code'] == 0 and not event['timed_out'] and result['input_sha256'] == manifest['inputs'][name], 'Rust child/input failed')
         check_result(result, 'rstim', shots, 1 if validate else manifest['repetitions'], validate=validate, policy=policy)
+        require(result.get('timing_contract') == TIMING_CONTRACT, 'matched timing contract differs')
         if validate:
             require(result['exact_native_counts_rng'], 'Rust counts/RNG executable self-check failed')
         return event, result
@@ -264,11 +274,12 @@ def main():
         for shots in manifest['shots']:
             selections[(name, shots)] = {}
             references = {}
-            for policy in manifest['policies']:
-                _, data = rust(name, shots, policy, validate=True)
-                raw_reference = raw_counts(data, masks)
-                require(raw_reference == counts(data), 'Rust raw detector/observable parity disagrees')
-                references[policy] = raw_reference
+            for role in ['baseline', 'rstim']:
+                for policy in manifest['policies']:
+                    _, data = rust(name, shots, policy, validate=True, role=role)
+                    raw_reference = raw_counts(data, masks)
+                    require(raw_reference == counts(data), 'Rust raw detector/observable parity disagrees')
+                    references[role+'/'+policy] = raw_reference
             for backend in ['clifft', 'clifft-scheduled', 'symft']:
                 options = [{'batch': batch} for batch in [1, 64, 256, 1024, 'auto']]
                 if backend == 'symft':
@@ -292,9 +303,9 @@ def main():
                                             backend=backend, name=name, shots=shots, selection=selected)
                 bind_peer(event, raw, backend, sha(native_input), packages, identities)
                 own_records = raw_counts(raw, masks)
-                # Conservative union budget: three comparisons, two Bernoulli
-                # quantities, and both sampled populations for each case/peer.
-                alpha = 0.001 / (len(cases) * 3 * 12)
+                # Conservative union budget: own raw records plus four Rust
+                # references, two Bernoulli quantities and both populations.
+                alpha = 0.001 / (len(cases) * 3 * 20)
                 checks = dict(own_records=compare(native_counts, own_records, alpha),
                               against_rust={policy: compare(native_counts, ref, alpha) for policy, ref in references.items()})
                 require(checks['own_records']['passed'] and all(check['passed'] for check in checks['against_rust'].values()), 'finite counts disagreement')
@@ -308,11 +319,9 @@ def main():
     print('selection and validation closed', flush=True)
     for pair in range(manifest['pairs']):
         ordered_cases = cases[pair % len(cases):] + cases[:pair % len(cases)]
-        if pair % 2:
-            ordered_cases.reverse()
         for name, shots, policy in ordered_cases:
             for role in role_order(manifest['roles'], pair):
-                if role in ['rstim', 'control']:
+                if role in RUST_ROLES:
                     rust(name, shots, policy, pair=pair, role=role)
                 else:
                     _, result = peer(role, name, shots, selections[(name, shots)][role], pair=pair, policy=policy)

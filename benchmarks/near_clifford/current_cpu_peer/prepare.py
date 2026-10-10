@@ -34,9 +34,9 @@ def invoke(out,label,command,cwd,env,*,timeout=600):
     require(child.returncode==0,'preparation failed; actual receipt retained: '+label)
     return (out/(label+'.stdout')).read_bytes()
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--rust-ref',required=True);args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--rust-ref',required=True);parser.add_argument('--baseline-ref',required=True);args=parser.parse_args()
     require(platform.system()=='Linux' and platform.machine()=='x86_64' and sys.version_info[:2]==(3,12),'Python3.12/Linux x86_64 required')
-    require(re.fullmatch('[0-9a-f]{40}',args.rust_ref) is not None,'exact40 lowercase Rust ref required')
+    require(all(re.fullmatch('[0-9a-f]{40}',ref) is not None for ref in [args.baseline_ref,args.rust_ref]),'exact40 lowercase Rust refs required')
     out=args.out.resolve();out.mkdir(parents=True,exist_ok=False)
     signal.signal(signal.SIGTERM,cancel);signal.signal(signal.SIGINT,cancel)
     env=os.environ.copy();env.update({key:'1' for key in THREADS});env.update(CC='gcc',CXX='g++',CFLAGS='-O3',CXXFLAGS='-O3',SYMFT_PY_NATIVE='1',SYMFT_PY_ENABLE_CUDA='0')
@@ -101,19 +101,19 @@ def main():
     # cleanup remains under the same signal owner rather than orphaning sessions.
     spec=importlib.util.spec_from_file_location('cdf_prepare',ROOT/'benchmarks/near_clifford/cdf_source_pair/prepare.py');cdf=importlib.util.module_from_spec(spec);spec.loader.exec_module(cdf)
     previous=sys.argv;previous_signals={s:signal.getsignal(s) for s in [signal.SIGTERM,signal.SIGINT]}
-    try:sys.argv=[str(ROOT/'benchmarks/near_clifford/cdf_source_pair/prepare.py'),'--out',str(out/'rust'),'--baseline-ref',args.rust_ref,'--candidate-ref',args.rust_ref];cdf.main()
+    try:sys.argv=[str(ROOT/'benchmarks/near_clifford/cdf_source_pair/prepare.py'),'--out',str(out/'rust'),'--baseline-ref',args.baseline_ref,'--candidate-ref',args.rust_ref];cdf.main()
     finally:
         sys.argv=previous
         for sig,handler in previous_signals.items():signal.signal(sig,handler)
     manifest=json.loads((HERE/'manifest.json').read_text())
-    manifest.update(schema='rstim.current-cpu-peer.v1',protocol_revision=protocol,rust_source_head=args.rust_ref,symft_revision=PEER)
+    manifest.update(schema='rstim.current-cpu-peer.v2',protocol_revision=protocol,rust_baseline_head=args.baseline_ref,rust_source_head=args.rust_ref,symft_revision=PEER)
     manifest.pop('current_merged_head',None);manifest.pop('source_relation',None)
     for name,digest in manifest['inputs'].items():require(sha(ROOT/'benchmarks/near_clifford/application_counts/fixtures'/(name+'.stim'))==digest,'manifest fixture mutation')
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    (out/'preparation.json').write_text(json.dumps(dict(protocol_revision=protocol,protocol_directory=str(HERE),repository_directory=str(ROOT),rust_source_head=args.rust_ref,symft_revision=PEER,compiler_native_flags=['-march=native','SYMFT_CPP_NATIVE_BUILD=1'],preparation_directory=str(out),controller_pid=os.getpid(),finished=time.time(),scope='Pinned source/native compiler/wheel/import preparation; exact counts work; no performance admission'),indent=2)+'\n')
+    (out/'preparation.json').write_text(json.dumps(dict(protocol_revision=protocol,protocol_directory=str(HERE),repository_directory=str(ROOT),rust_baseline_head=args.baseline_ref,rust_source_head=args.rust_ref,symft_revision=PEER,compiler_native_flags=['-march=native','SYMFT_CPP_NATIVE_BUILD=1'],preparation_directory=str(out),controller_pid=os.getpid(),finished=time.time(),scope='Pinned source/native compiler/wheel/import preparation; exact counts work; no performance admission'),indent=2)+'\n')
     protocol_paths=[*sorted(HERE.glob('*.py')),HERE/'manifest.json']
     protocol_paths += [ROOT/'benchmarks/near_clifford/application_counts/fixtures'/(name+'.stim') for name in manifest['names']]
-    protocol_paths += [ROOT/'benchmarks/near_clifford'/name for name in ['application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py','compiled_sota/manifest.json']]
+    protocol_paths += [ROOT/'benchmarks/near_clifford'/name for name in ['cdf_source_pair/prepare.py','cdf_source_pair/evidence.py','application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py','compiled_sota/manifest.json']]
     for path in protocol_paths:
         retained=out/'protocol'/path.relative_to(ROOT);retained.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,retained)
     require(subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()==protocol and not subprocess.check_output(['git','status','--porcelain'],cwd=ROOT),'protocol changed during preparation')
