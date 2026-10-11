@@ -21,5 +21,5 @@ grep -q 'test result: ok. 1 passed' drafts/x86-scout-highest-gather.log
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-gather-cdf.log
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-frozen-bits.log
 grep -q 'test result: ok. 1 passed' drafts/x86-scout-both-policy-bits.log
-grep -q 'test result: ok. 10 passed' drafts/x86-scout-public-counts.log
+grep -q 'test result: ok. 11 passed' drafts/x86-scout-public-counts.log
 grep -q 'test result: ok. 3 passed' drafts/x86-scout-compact-zero-spans.log

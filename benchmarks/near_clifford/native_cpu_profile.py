@@ -128,6 +128,19 @@ def verify_command(item, directory, stem, args):
         require(entry["path"] == name and scout.digest(directory / name) == entry["sha256"], "bounded original output: " + stem)
 
 
+
+def retain_native_preflight(out):
+    preflight = {}
+    for name in PREFLIGHT:
+        source = ROOT / ("drafts/x86-scout-" + name + ".log")
+        expected = 11 if name == "public-counts" else 1
+        require(f"test result: ok. {expected} passed;" in source.read_text(), "native preflight missing: " + name)
+        target = out / ("preflight-" + name + ".log")
+        shutil.copyfile(source, target)
+        preflight[name] = dict(path=target.name, sha256=scout.digest(target))
+    return preflight
+
+
 def profile(baseline_ref, out):
     require(platform.system() == "Linux" and platform.machine() == "x86_64", "native x86 Linux required")
     require({k: os.environ.get(k) for k in scout.ENV_KEYS} == ENV, "fixed native/thread environment required")
@@ -145,17 +158,10 @@ def profile(baseline_ref, out):
     shutil.copyfile(ROOT / "benchmarks/near_clifford/verify_x86_rotations.sh", out / "original-native-preflight.sh")
     shutil.copyfile(ROOT / "drafts/x86-scout-features.txt", out / "features.txt")
     require(all(re.search(r"\b" + feature + r"\b", (out / "features.txt").read_text()) for feature in ["avx2", "fma"]), "actual AVX2/FMA feature gate")
-    preflight = {}
-    for name in PREFLIGHT:
-        source = ROOT / ("drafts/x86-scout-" + name + ".log")
-        expected = 10 if name == "public-counts" else 1
-        require(f"test result: ok. {expected} passed;" in source.read_text(), "native preflight missing: " + name)
-        target = out / ("preflight-" + name + ".log")
-        shutil.copyfile(source, target)
-        preflight[name] = dict(path=target.name, sha256=scout.digest(target))
+    preflight = retain_native_preflight(out)
     before = {role: scout.identity(root) for role, root in roots.items()}
     require(all(i["dirty"] == "" for i in before.values()), "clean sources required")
-    header = dict(schema="diagnostic.native-cpu-sampling.v1", started=time.time(), performance_valid=False,
+    header = dict(schema="diagnostic.native-cpu-sampling.v2", started=time.time(), performance_valid=False,
                   scope="Whole-process software CPU samples, including setup/warmup/teardown; instrumented observation timings are invalid; no peer comparison",
                   identities=before, retained=retained, preflight=preflight,
                   profile_driver_sha256=scout.digest(Path(__file__)), available_affinity=available, affinity=[cpu],
@@ -216,7 +222,7 @@ def verify(out, *, git_sources=True, replay=True):
     out = Path(out)
     h, c = read(out / "header.json"), read(out / "closure.json")
     require(scout.digest(out / "header.json") == c["header_sha256"], "original header digest")
-    require(h["schema"] == "diagnostic.native-cpu-sampling.v1" and h["performance_valid"] is False
+    require(h["schema"] == "diagnostic.native-cpu-sampling.v2" and h["performance_valid"] is False
             and c["performance_valid"] is False, "instrumented timings must never be performance evidence")
     require(h["cases"] == [list(t) for t in CASES] and (h["event"], h["frequency"], h["call_graph"], h["observations"]) == ("cpu-clock:u", 499, "dwarf,8192", 101), "fixed profile protocol")
     require(h["host"].startswith("Linux-") and "release: 1.93.1\n" in h["rustc"]
@@ -257,7 +263,7 @@ def verify(out, *, git_sources=True, replay=True):
     require(set(h["preflight"]) == set(PREFLIGHT), "all native gate logs required")
     for name, entry in h["preflight"].items():
         require(entry["path"] == "preflight-" + name + ".log" and scout.digest(out / entry["path"]) == entry["sha256"], "native log bytes")
-        require(f"test result: ok. {10 if name == 'public-counts' else 1} passed;" in (out / entry["path"]).read_text(), "native gate result")
+        require(f"test result: ok. {11 if name == 'public-counts' else 1} passed;" in (out / entry["path"]).read_text(), "native gate result")
     buildids = {}
     require(set(h["binaries"]) == {"baseline", "candidate"}, "binary command inventory")
     for role in ["baseline", "candidate"]:
