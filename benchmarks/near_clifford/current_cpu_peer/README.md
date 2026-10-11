@@ -64,7 +64,7 @@ complete wheel code inventories to installed bytes and the wrappers/extensions
 actually imported in isolated Python. Rust probes use the reviewed source-pair
 preparation with `-C target-cpu=native`, retaining full source inventories,
 actual ELF binaries, compiler commands and four nonzero native check groups.
-The candidate must include the phase-CDF, wide-packet, all five real phase gauge packet tests and
+The candidate must include the phase-CDF, noisy wide-cache public test, all three lossless coefficient-cache tests and
 inline-cache-layout tests; exact mounted test names are checked. These candidate
 tests must execute in native Release before any timing. The matched clock, pinned
 peers, twelve cells, role balancing and full observation retention are unchanged.

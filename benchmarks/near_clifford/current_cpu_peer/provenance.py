@@ -134,7 +134,7 @@ def verify_prepared(prep, root, *, git_sources=False):
             original_manifest = (public/'Cargo.toml').read_text()
             needle = 'path = "../../../rstim"'
             require(original_manifest.count(needle) == 1 and (probe/'Cargo.toml').read_text() == original_manifest.replace(needle,'path = '+__import__('json').dumps(str(original/'rust/source'/role/'rstim'))), 'probe dependency path differs')
-    spec = importlib.util.spec_from_file_location('matched_real_packet_preflight', Path(__file__).resolve().parents[1]/'cdf_source_pair/prepare.py')
+    spec = importlib.util.spec_from_file_location('matched_axis_cache_preflight', Path(__file__).resolve().parents[1]/'cdf_source_pair/prepare.py')
     native_contract = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native_contract)
     for index in [0,1,2,3]:
@@ -144,8 +144,8 @@ def verify_prepared(prep, root, *, git_sources=False):
                 and receipt['timed_out'] is False and receipt['head'] == heads['candidate']
                 and receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and sha(rust/('native-check-'+str(index)+'.log')) == receipt['log_sha256'], 'native arithmetic/RNG check receipt differs')
         selection = (['--lib','phase_specialized_cdf_tests'] if index == 0 else
-                     ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'] if index == 1 else
-                     ['--lib','near_clifford::compiled::real_coherent_packet::tests::'] if index == 2 else
+                     ['--test','near_clifford_postselected_counts','wide_cached_amplitudes_preserve_noise_feedback_counts_records_and_rng','--','--exact'] if index == 1 else
+                     ['--lib','near_clifford::compiled::cached_coefficients::tests::'] if index == 2 else
                      ['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact'])
         require(receipt['command'] == ['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection], 'native check command/filter differs')
         require(sum(map(int,re.findall(r'test result: ok\. ([0-9]+) passed',log))) > 0, 'native check ran zero tests')

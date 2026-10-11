@@ -36,11 +36,9 @@ def probe_manifest(original, library):
 
 def require_candidate_tests(log, *, layout=False):
     expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
-        'near_clifford::compiled::real_coherent_packet::tests::real_projection_matches_complex_for_all_small_gauges_and_mixed_branches',
-        'near_clifford::compiled::real_coherent_packet::tests::real_rotations_match_complex_policies_expansion_and_wide_lanes',
-        'near_clifford::compiled::real_coherent_packet::tests::real_packet_limits_and_tiny_positive_branches_match_complex',
-        'near_clifford::compiled::real_coherent_packet::tests::eligible_counts_preserve_raw_records_rng_and_positive_logical_errors',
-        'near_clifford::compiled::real_coherent_packet::tests::msc_real_packets_preserve_both_counts_policies_and_rng',
+        'near_clifford::compiled::cached_coefficients::tests::axis_storage_preserves_every_component_bit_and_tail',
+        'near_clifford::compiled::cached_coefficients::tests::mixed_components_and_small_vectors_keep_dense_storage',
+        'near_clifford::compiled::cached_coefficients::tests::original_default_cultivation_uses_axis_storage_with_exact_rows_and_rng',
     }
     count = len(expected)
     records, summaries = [], []
@@ -52,7 +50,7 @@ def require_candidate_tests(log, *, layout=False):
         else:
             record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
             if record is None:
-                raise ValueError('malformed real-packet candidate test result record')
+                raise ValueError('malformed axis-cache candidate test result record')
             records.append(record.groups())
     valid_summary = len(summaries) == 1 and re.fullmatch(
         rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
@@ -60,7 +58,7 @@ def require_candidate_tests(log, *, layout=False):
     )
     if (len(records) != count or {name for name, _ in records} != expected
             or any(status != 'ok' for _, status in records) or not valid_summary):
-        raise ValueError('every named real-packet candidate test must execute successfully')
+        raise ValueError('every named axis-cache candidate test must execute successfully')
 
 class Cancelled(RuntimeError):pass
 def cancel(signum,frame):raise Cancelled('prepare cancelled by signal '+str(signum))
@@ -127,7 +125,7 @@ def main():
     roots['control']=roots['baseline']
     # Exercise the candidate's native arithmetic/public RNG before performance collection.
     candidate=Path(roots['candidate']);test_env=dict(env,CARGO_TARGET_DIR=str(out/'candidate/test-target'))
-    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'],['--lib','near_clifford::compiled::real_coherent_packet::tests::'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
+    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_postselected_counts','wide_cached_amplitudes_preserve_noise_feedback_counts_records_and_rng','--','--exact'],['--lib','near_clifford::compiled::cached_coefficients::tests::'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
     for index,selection in enumerate(tests):
         command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection]
         invoke(command,candidate,test_env,out/f'native-check-{index}.log',dict(head=heads['candidate'],environment={'RUSTFLAGS':env['RUSTFLAGS']}))
