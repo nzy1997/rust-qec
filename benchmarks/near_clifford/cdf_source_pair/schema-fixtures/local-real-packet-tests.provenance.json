@@ -1,0 +1,32 @@
+{
+  "scope": "Actual local debug/MSRV test stdout regression input only. Uncommitted candidate source is bound by exact hashes. No native Linux/Release/performance/fullCI/production admission.",
+  "source_base": "6e079197ce9ba62079744417f3f701d4562fa149",
+  "source_hashes": {
+    "rstim/src/near_clifford/compiled.rs": {
+      "bytes": 270990,
+      "sha256": "b82e1a7ed2df4107e9496b8d60f2c874af22951b0da418b66a76a5bdf095cbfc"
+    },
+    "rstim/src/near_clifford/real_coherent_packet.rs": {
+      "bytes": 28632,
+      "sha256": "61c976f846d0b5839ab0d081f4e8911cc6bbd43e33230a9b8e4941ebd7579a68"
+    },
+    "rstim/src/near_clifford/noise_schedule.rs": {
+      "bytes": 52855,
+      "sha256": "ee8703c12d3f8e90f0835c76f0de3514e378b693299b586517501a61e4adcc33"
+    },
+    "rstim/tests/near_clifford_postselected_counts.rs": {
+      "bytes": 24487,
+      "sha256": "7852e2ef70594b441ccbbded232040ae8cd702507bbcc67fe5c75b0637cc5c03"
+    }
+  },
+  "compiler": "rustc 1.88.0 (6b00bc388 2025-06-23)",
+  "target_arch": "aarch64-apple-darwin",
+  "build_profile": "debug",
+  "native_flags_used": false,
+  "test_filter": "real_coherent_packet::tests",
+  "test_exit_code": 0,
+  "original_bundle_seal_sha256": "87e0ddc3e7d7a5a9333e1c6f3f48e2ff9fff25f9c08a4bc2fe6a2c68a8c1fb3f",
+  "original_test_receipt_sha256": "f1a2bf5971eb5bfd0d0769bb2b5a4784e391d70efce61f8444ef75246a6edf40",
+  "stdout_bytes": 765,
+  "stdout_sha256": "23142fca15936fc265683ec911e28d6ed7919f12cf554c2968511195974da9df"
+}

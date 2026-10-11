@@ -92,8 +92,8 @@ class ContractTests(unittest.TestCase):
                     for relative,data in original.items():(moved/relative).write_bytes(data)
                     mutation();reseal();execute(1)
 
-    def test_actual_native_projection_stdout_binds_the_compiled_parent_module(self):
-        """Actual native output catches module-path mistakes hidden by synthetic names."""
+    def test_historical_projection_stdout_cannot_qualify_a_real_packet_candidate(self):
+        """Historical native output is retained, but cannot qualify a different candidate."""
         path = HERE/'schema-fixtures/native-projection-tests.stdout.json'
         provenance = json.loads((HERE/'schema-fixtures/native-projection-tests.provenance.json').read_text())
         raw = json.loads(path.read_text())['stdout'].encode()
@@ -101,15 +101,32 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(provenance['native_test_exit_code'], 0)
         self.assertEqual(provenance['workflow_conclusion'], 'failure')
         for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
-            validate(raw.decode())
+            with self.assertRaises(ValueError):
+                validate(raw.decode())
             # The original mistaken namespace must remain rejected, even with
             # the same successful test count and unchanged stdout scaffolding.
             wrong = raw.decode().replace('near_clifford::compiled::coherent_packet::', 'near_clifford::coherent_packet::')
             with self.assertRaises(ValueError):
                 validate(wrong)
 
+    def test_actual_local_real_packet_stdout_binds_every_mounted_candidate_test(self):
+        """Actual Rust output checks names; its local debug provenance is explicit."""
+        path = HERE/'schema-fixtures/local-real-packet-tests.stdout.json'
+        provenance = json.loads((HERE/'schema-fixtures/local-real-packet-tests.provenance.json').read_text())
+        raw = json.loads(path.read_text())['stdout'].encode()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), provenance['stdout_sha256'])
+        self.assertEqual(len(raw), provenance['stdout_bytes'])
+        self.assertEqual(provenance['test_exit_code'], 0)
+        self.assertEqual(provenance['build_profile'], 'debug')
+        self.assertFalse(provenance['native_flags_used'])
+        for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
+            validate(raw.decode())
+            wrong = raw.decode().replace('near_clifford::compiled::real_coherent_packet::', 'near_clifford::real_coherent_packet::')
+            with self.assertRaises(ValueError):
+                validate(wrong)
+
     def test_candidate_preflight_requires_every_named_test_and_successful_summary(self):
-        names = ['near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots', 'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::diagonal_projection_preserves_first_error_and_partial_scratch_bits']
+        names = ['near_clifford::compiled::real_coherent_packet::tests::real_projection_matches_complex_for_all_small_gauges_and_mixed_branches', 'near_clifford::compiled::real_coherent_packet::tests::real_rotations_match_complex_policies_expansion_and_wide_lanes', 'near_clifford::compiled::real_coherent_packet::tests::real_packet_limits_and_tiny_positive_branches_match_complex', 'near_clifford::compiled::real_coherent_packet::tests::eligible_counts_preserve_raw_records_rng_and_positive_logical_errors', 'near_clifford::compiled::real_coherent_packet::tests::msc_real_packets_preserve_both_counts_policies_and_rng']
         for layout in [False, True]:
             selected = ['near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'] if layout else names
             count = len(selected)
