@@ -338,9 +338,13 @@ impl CoefficientCache {
             .checked_add(bytes)
             .is_some_and(|sum| sum <= self.budget)
     }
-    fn store(&mut self, node: usize, coefficients: &[ComplexAmp]) -> Option<usize> {
+    fn admit_state(
+        &mut self,
+        node: usize,
+        coefficients: &[ComplexAmp],
+    ) -> Option<CachedStateAdmission> {
         if coefficients.len() == 1 {
-            return Some(0);
+            return Some(CachedStateAdmission::Existing(0));
         }
         let charge = Self::state_charge(coefficients)?;
         // Once admission closes, avoid hashing a coefficient vector on every
@@ -371,7 +375,7 @@ impl CoefficientCache {
             if let Some(intern) = &self.intern {
                 let (existing, slot) = intern.find_or_slot(node, coefficients, &self.states);
                 if let Some(id) = existing {
-                    return Some(id);
+                    return Some(CachedStateAdmission::Existing(id));
                 }
                 slot
             } else {
@@ -380,10 +384,42 @@ impl CoefficientCache {
         } else {
             None
         };
+        Some(CachedStateAdmission::New { charge, slot })
+    }
+    fn store(&mut self, node: usize, coefficients: &[ComplexAmp]) -> Option<usize> {
+        let (charge, slot) = match self.admit_state(node, coefficients)? {
+            CachedStateAdmission::Existing(id) => return Some(id),
+            CachedStateAdmission::New { charge, slot } => (charge, slot),
+        };
         let mut state = Vec::new();
         state.try_reserve_exact(coefficients.len()).ok()?;
         state.extend_from_slice(coefficients);
         self.states.try_reserve(1).ok()?;
+        Some(self.publish_state(node, state, charge, slot))
+    }
+    fn store_owned(&mut self, node: usize, coefficients: &mut Vec<ComplexAmp>) -> Option<usize> {
+        // The existing charge uses length. Copy retained-capacity buffers to
+        // avoid transferring uncharged spare storage into the bounded cache.
+        if coefficients.capacity() != coefficients.len() {
+            return self.store(node, coefficients);
+        }
+        let (charge, slot) = match self.admit_state(node, coefficients)? {
+            CachedStateAdmission::Existing(id) => return Some(id),
+            CachedStateAdmission::New { charge, slot } => (charge, slot),
+        };
+        // Aliases, declines and failed metadata reservation leave the caller's
+        // buffer intact. Only a fully admitted fresh state takes ownership.
+        self.states.try_reserve(1).ok()?;
+        let state = std::mem::take(coefficients);
+        Some(self.publish_state(node, state, charge, slot))
+    }
+    fn publish_state(
+        &mut self,
+        node: usize,
+        state: Vec<ComplexAmp>,
+        charge: usize,
+        slot: Option<(usize, u64)>,
+    ) -> usize {
         let id = self.states.len();
         self.states.push(CachedState {
             coefficients: Arc::new(state),
@@ -394,8 +430,16 @@ impl CoefficientCache {
         if let (Some(intern), Some((slot, fingerprint))) = (&mut self.intern, slot) {
             intern.insert(slot, fingerprint, node, id);
         }
-        Some(id)
+        id
     }
+}
+
+enum CachedStateAdmission {
+    Existing(usize),
+    New {
+        charge: usize,
+        slot: Option<(usize, u64)>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -2529,13 +2573,57 @@ impl CompiledNearCliffordSampler<'_> {
             }
         }
         let input = *state;
-        if let Some(id) = input {
-            self.load_state(id)?;
-        }
-        if let Some((c, s)) = coefficients {
-            self.rotate_signed_coefficients(p, expand, dagger, sign, c, s)?;
+        // A miss may compute directly from an immutable snapshot when its
+        // output can still enter the bounded cache. Optional construction
+        // failure uses the established materialize/in-place path.
+        let snapshot = input.and_then(|id| {
+            // Expansion retains the original vectorized in-place path.
+            // Only paired, fixed-dimension rotations compute an owned output.
+            if expand {
+                return None;
+            }
+            let cache = self.cache.as_ref()?;
+            if !matches!(
+                cache.entry(id, node),
+                Some(CachedOp::None | CachedOp::Rotate(_))
+            ) {
+                return None;
+            }
+            let before = &cache.states[id].coefficients;
+            let len = before.len();
+            let charge = len.checked_mul(size_of::<ComplexAmp>())?.checked_add(256)?;
+            cache.fits(charge).then(|| before.clone())
+        });
+        let direct = snapshot.and_then(|before| {
+            let (c, s) = coefficients.unwrap_or_else(|| {
+                (
+                    (std::f64::consts::PI / 8.).cos(),
+                    (std::f64::consts::PI / 8.).sin(),
+                )
+            });
+            cache_snapshot_rotation::direct(
+                &before,
+                p,
+                dagger,
+                sign,
+                self.plan.rotation_arithmetic,
+                c,
+                s,
+            )
+        });
+        let direct_output = direct.is_some();
+        if let Some(output) = direct {
+            self.materialized_coefficient_state = None;
+            self.coefficients = output;
         } else {
-            self.rotate_signed(p, expand, dagger, sign)?;
+            if let Some(id) = input {
+                self.load_state(id)?;
+            }
+            if let Some((c, s)) = coefficients {
+                self.rotate_signed_coefficients(p, expand, dagger, sign, c, s)?;
+            } else {
+                self.rotate_signed(p, expand, dagger, sign)?;
+            }
         }
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
@@ -2545,7 +2633,12 @@ impl CompiledNearCliffordSampler<'_> {
                     CachedOp::None => [None; 2],
                     _ => return Ok(()),
                 };
-                if let Some(next) = cache.store(node, &self.coefficients) {
+                let next = if direct_output {
+                    cache.store_owned(node, &mut self.coefficients)
+                } else {
+                    cache.store(node, &self.coefficients)
+                };
+                if let Some(next) = next {
                     children[usize::from(sign)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Rotate(children)) {
                         *state = Some(next);
@@ -2553,7 +2646,14 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
         }
-        self.materialized_coefficient_state = *state;
+        // Successful ownership transfer leaves no physical work coefficients.
+        // The logical snapshot remains authoritative. Probability reads it
+        // directly; operations load it only when they need a mutable buffer.
+        self.materialized_coefficient_state = if self.coefficients.is_empty() {
+            None
+        } else {
+            *state
+        };
         Ok(())
     }
     fn cached_probability_zero(
@@ -2567,10 +2667,15 @@ impl CompiledNearCliffordSampler<'_> {
                 return Ok(entry.probability_zero);
             }
         }
-        if let Some(id) = state {
-            self.load_state(id)?;
-        }
-        let probability = self.probability_zero(p);
+        let probability = if let Some(id) = state {
+            let cache = self
+                .cache
+                .as_ref()
+                .expect("admitted state belongs to a cache");
+            Self::probability_zero_for_coefficients(&cache.states[id].coefficients, p)
+        } else {
+            self.probability_zero(p)
+        };
         if let (Some(id), Some(cache)) = (state, self.cache.as_mut()) {
             cache.set_entry(
                 id,
@@ -2602,17 +2707,54 @@ impl CompiledNearCliffordSampler<'_> {
             }
         }
         let input = *state;
-        if let Some(id) = input {
-            self.load_state(id)?;
+        let snapshot = input.and_then(|id| {
+            let cache = self.cache.as_ref()?;
+            if !matches!(cache.entry(id, node), Some(CachedOp::Measure(_))) {
+                return None;
+            }
+            let before = &cache.states[id].coefficients;
+            let len = before.len() / 2;
+            let charge = if len == 1 {
+                0
+            } else {
+                len.checked_mul(size_of::<ComplexAmp>())?.checked_add(256)?
+            };
+            cache.fits(charge).then(|| before.clone())
+        });
+        let direct = snapshot.and_then(|before| {
+            let mut output = Vec::new();
+            // Optional construction failure falls back to the original work
+            // buffers and error path, before any cache/RNG/logical mutation.
+            Self::project_coefficients(&before, &mut output, p, index, y, fixed).ok()?;
+            Some(output)
+        });
+        let direct_output = direct.is_some();
+        if let Some(output) = direct {
+            self.materialized_coefficient_state = None;
+            self.coefficients = output;
+        } else {
+            if let Some(id) = input {
+                self.load_state(id)?;
+            }
+            self.project(p, index, y, fixed)?;
         }
-        self.project(p, index, y, fixed)?;
+        let mut fallback_materialization = None;
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(CachedOp::Measure(mut entry)) = cache.entry(id, node) {
-                if let Some(next) = cache.store(node, &self.coefficients) {
+                let next = if direct_output {
+                    cache.store_owned(node, &mut self.coefficients)
+                } else {
+                    cache.store(node, &self.coefficients)
+                };
+                if let Some(next) = next {
                     entry.next[usize::from(branch)] = Some(next);
                     if cache.set_entry(id, node, CachedOp::Measure(entry)) {
                         *state = Some(next);
+                    } else if self.coefficients.is_empty() {
+                        // Preserve a physical fallback even if a future cache
+                        // change refuses publication after ownership transfer.
+                        fallback_materialization = Some(next);
                     }
                 }
             } else if self.coefficients.len() == 1 {
@@ -2621,7 +2763,14 @@ impl CompiledNearCliffordSampler<'_> {
         } else if self.coefficients.len() == 1 && self.cache.is_some() {
             *state = Some(0);
         }
-        self.materialized_coefficient_state = *state;
+        if let Some(id) = fallback_materialization {
+            self.load_state(id)?;
+        }
+        self.materialized_coefficient_state = if self.coefficients.is_empty() {
+            None
+        } else {
+            *state
+        };
         Ok(())
     }
 
@@ -3018,25 +3167,31 @@ impl CompiledNearCliffordSampler<'_> {
         b[usize::from(!SWAP)] = ComplexAmp::new(out_b[2], out_b[3]);
     }
     fn probability_zero(&self, p: &CompactPauli) -> f64 {
+        Self::probability_zero_for_coefficients(&self.coefficients, p)
+    }
+    fn probability_zero_for_coefficients(coefficients: &[ComplexAmp], p: &CompactPauli) -> f64 {
         // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
         match p.physical.phase & 3 {
-            0 => self.probability_zero_phase::<0>(p),
-            1 => self.probability_zero_phase::<1>(p),
-            2 => self.probability_zero_phase::<2>(p),
-            _ => self.probability_zero_phase::<3>(p),
+            0 => Self::probability_zero_phase::<0>(coefficients, p),
+            1 => Self::probability_zero_phase::<1>(coefficients, p),
+            2 => Self::probability_zero_phase::<2>(coefficients, p),
+            _ => Self::probability_zero_phase::<3>(coefficients, p),
         }
     }
     #[inline]
-    fn probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
+    fn probability_zero_phase<const PHASE: u8>(
+        coefficients: &[ComplexAmp],
+        p: &CompactPauli,
+    ) -> f64 {
         let mut expectation = 0.;
         let mut norm = 0.;
-        for (i, &amp) in self.coefficients.iter().enumerate() {
+        for (i, &amp) in coefficients.iter().enumerate() {
             let sign = if (i & p.z).count_ones() % 2 != 0 {
                 -1.
             } else {
                 1.
             };
-            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
+            expectation += (coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
             norm += amp.norm_sqr();
         }
         ((1. + expectation / norm) * 0.5).clamp(0., 1.)
@@ -3049,23 +3204,41 @@ impl CompiledNearCliffordSampler<'_> {
         fixed: bool,
     ) -> Result<(), String> {
         self.materialized_coefficient_state = None;
+        Self::project_coefficients(
+            &self.coefficients,
+            &mut self.reduced_coefficients,
+            p,
+            index,
+            y,
+            fixed,
+        )?;
+        std::mem::swap(&mut self.coefficients, &mut self.reduced_coefficients);
+        Ok(())
+    }
+    fn project_coefficients(
+        coefficients: &[ComplexAmp],
+        reduced: &mut Vec<ComplexAmp>,
+        p: &CompactPauli,
+        index: usize,
+        y: bool,
+        fixed: bool,
+    ) -> Result<(), String> {
         let pivot = 1 << index;
         let low = pivot - 1;
         let other = p.z & !pivot;
-        self.reduced_coefficients.clear();
-        let reduced = &mut self.reduced_coefficients;
+        reduced.clear();
         reduced
-            .try_reserve_exact(self.coefficients.len() / 2)
+            .try_reserve_exact(coefficients.len() / 2)
             .map_err(|e| format!("compiled projection allocation failed: {e}"))?;
         let mut norm = 0.;
-        for i in 0..self.coefficients.len() / 2 {
+        for i in 0..coefficients.len() / 2 {
             let without = (i & low) | ((i & !low) << 1);
             let value = if p.x == 0 {
                 let bit = fixed ^ ((without & other).count_ones() % 2 != 0);
-                self.coefficients[without | ((bit as usize) << index)]
+                coefficients[without | ((bit as usize) << index)]
             } else {
-                let a = self.coefficients[without];
-                let mut b = self.coefficients[without ^ p.x];
+                let a = coefficients[without];
+                let mut b = coefficients[without ^ p.x];
                 if y {
                     b = ComplexAmp::new(b.im, -b.re);
                 }
@@ -3083,13 +3256,12 @@ impl CompiledNearCliffordSampler<'_> {
             return Err("compiled near-Clifford zero-probability measurement".into());
         }
         let scale = 1. / norm.sqrt();
-        for amp in reduced {
+        for amp in reduced.iter_mut() {
             *amp = *amp * scale;
         }
-        std::mem::swap(&mut self.coefficients, &mut self.reduced_coefficients);
         // A one-dimensional state has no observable relative phase.
-        if self.coefficients.len() == 1 {
-            self.coefficients[0] = ComplexAmp::new(1., 0.);
+        if reduced.len() == 1 {
+            reduced[0] = ComplexAmp::new(1., 0.);
         }
         Ok(())
     }
@@ -6816,6 +6988,825 @@ mod materialized_coefficient_cache_tests {
             assert_eq!(sampler.coefficients.len(), 1);
             sampler.load_state(start).unwrap();
             assert_eq!(coefficient_bits(&sampler.coefficients), original);
+        }
+    }
+}
+
+mod cache_snapshot_rotation {
+    use super::*;
+    #[inline(always)]
+    fn value<const FUSED: bool, const IMAGINARY: bool>(
+        own: ComplexAmp,
+        partner: ComplexAmp,
+        factor: f64,
+        c: f64,
+    ) -> ComplexAmp {
+        if FUSED {
+            if IMAGINARY {
+                ComplexAmp::new(
+                    (-partner.im).mul_add(factor, own.re * c),
+                    partner.re.mul_add(factor, own.im * c),
+                )
+            } else {
+                ComplexAmp::new(
+                    partner.re.mul_add(factor, own.re * c),
+                    partner.im.mul_add(factor, own.im * c),
+                )
+            }
+        } else {
+            let term = if IMAGINARY {
+                ComplexAmp::new(-partner.im * factor, partner.re * factor)
+            } else {
+                partner * factor
+            };
+            own * c + term
+        }
+    }
+    fn paired_direct<const FUSED: bool, const IMAGINARY: bool>(
+        before: &[ComplexAmp],
+        p: &CompactPauli,
+        dagger: bool,
+        flip: bool,
+        c: f64,
+        s: f64,
+    ) -> Option<Vec<ComplexAmp>> {
+        let len = before.len();
+        assert!(len.is_power_of_two() && p.x < len);
+        let mut factor = if matches!(p.physical.phase, 0 | 3) {
+            -s
+        } else {
+            s
+        };
+        if dagger ^ flip {
+            factor = -factor;
+        }
+        let mut result = Vec::<ComplexAmp>::new();
+        result.try_reserve_exact(len).ok()?;
+        let output = &mut result.spare_capacity_mut()[..len];
+        if p.z == 0 && p.x >= 2 && p.x & 7 != 0 {
+            #[cfg(target_arch = "x86_64")]
+            let avx = FUSED
+                && IMAGINARY
+                && std::arch::is_x86_feature_detected!("avx2")
+                && std::arch::is_x86_feature_detected!("fma");
+            let pivot = 1usize << (usize::BITS - 1 - p.x.leading_zeros());
+            let group_xor = (p.x ^ pivot) >> 1;
+            for (input, output) in before
+                .chunks_exact(pivot * 2)
+                .zip(output.chunks_exact_mut(pivot * 2))
+            {
+                let (left, right) = input.split_at(pivot);
+                let (out_left, out_right) = output.split_at_mut(pivot);
+                for (group, a) in left.chunks_exact(2).enumerate() {
+                    let other = (group ^ group_xor) * 2;
+                    let mut a = [a[0], a[1]];
+                    let mut b = [right[other], right[other + 1]];
+                    #[cfg(target_arch = "x86_64")]
+                    if avx {
+                        // SAFETY: avx2/fma were checked before the loop. The
+                        // existing helper reads/writes only initialized local arrays.
+                        unsafe {
+                            if p.x & 1 != 0 {
+                                CompiledNearCliffordSampler::rotate_adjacent_pair_avx2::<true>(
+                                    &mut a, &mut b, c, factor,
+                                );
+                            } else {
+                                CompiledNearCliffordSampler::rotate_adjacent_pair_avx2::<false>(
+                                    &mut a, &mut b, c, factor,
+                                );
+                            }
+                        }
+                        out_left[group * 2].write(a[0]);
+                        out_left[group * 2 + 1].write(a[1]);
+                        out_right[other].write(b[0]);
+                        out_right[other + 1].write(b[1]);
+                        continue;
+                    }
+                    if p.x & 1 != 0 {
+                        CompiledNearCliffordSampler::rotate_adjacent_pair::<FUSED, IMAGINARY, true>(
+                            &mut a, &mut b, c, factor,
+                        );
+                    } else {
+                        CompiledNearCliffordSampler::rotate_adjacent_pair::<FUSED, IMAGINARY, false>(
+                            &mut a, &mut b, c, factor,
+                        );
+                    }
+                    out_left[group * 2].write(a[0]);
+                    out_left[group * 2 + 1].write(a[1]);
+                    out_right[other].write(b[0]);
+                    out_right[other + 1].write(b[1]);
+                }
+            }
+        } else if p.x == 0 {
+            for (i, (old, out)) in before.iter().zip(output).enumerate() {
+                let f = if (i & p.z).count_ones() % 2 != 0 {
+                    -factor
+                } else {
+                    factor
+                };
+                out.write(value::<FUSED, IMAGINARY>(*old, *old, f, c));
+            }
+        } else {
+            let pivot = 1 << p.x.trailing_zeros();
+            let parity_swap = (p.x & p.z).count_ones() % 2 != 0;
+            let uniform = p.z & (pivot - 1) == 0;
+            for block in (0..len).step_by(pivot * 2) {
+                let other = block ^ p.x;
+                let a = &before[block..block + pivot];
+                let b = &before[other..other + pivot];
+                let (oa, ob) = if block < other {
+                    let (left, right) = output.split_at_mut(other);
+                    (&mut left[block..block + pivot], &mut right[..pivot])
+                } else {
+                    let (left, right) = output.split_at_mut(block);
+                    (&mut right[..pivot], &mut left[other..other + pivot])
+                };
+                if uniform {
+                    let pa = (block & p.z).count_ones() % 2 != 0;
+                    let fa = if pa ^ parity_swap { -factor } else { factor };
+                    let fb = if pa { -factor } else { factor };
+                    for (((a, b), oa), ob) in a.iter().zip(b).zip(oa).zip(ob) {
+                        oa.write(value::<FUSED, IMAGINARY>(*a, *b, fa, c));
+                        ob.write(value::<FUSED, IMAGINARY>(*b, *a, fb, c));
+                    }
+                } else {
+                    for (offset, (((a, b), oa), ob)) in a.iter().zip(b).zip(oa).zip(ob).enumerate()
+                    {
+                        let pa = ((block + offset) & p.z).count_ones() % 2 != 0;
+                        let fa = if pa ^ parity_swap { -factor } else { factor };
+                        let fb = if pa { -factor } else { factor };
+                        oa.write(value::<FUSED, IMAGINARY>(*a, *b, fa, c));
+                        ob.write(value::<FUSED, IMAGINARY>(*b, *a, fb, c));
+                    }
+                }
+            }
+        }
+        // SAFETY: Capacity was reserved for len ComplexAmp values. Diagonal traversal writes every
+        // slot; highest-pivot XOR permutes disjoint pairs; lowest-pivot traversal writes both
+        // sides of each disjoint pair exactly once. ComplexAmp has no destructor. No slot is read
+        // before its write, and the power-of-two input/mask precondition makes every permutation total.
+        unsafe {
+            result.set_len(len);
+        }
+        Some(result)
+    }
+    pub(super) fn direct(
+        before: &[ComplexAmp],
+        p: &CompactPauli,
+        dagger: bool,
+        flip: bool,
+        policy: CompiledRotationArithmetic,
+        c: f64,
+        s: f64,
+    ) -> Option<Vec<ComplexAmp>> {
+        let len = before.len();
+        if !before.len().is_power_of_two() || p.x >= len || p.z >= len || p.x == 0 && p.z == 0 {
+            return None;
+        }
+        match (
+            policy == CompiledRotationArithmetic::Fused,
+            p.physical.phase % 2 == 0,
+        ) {
+            (false, false) => paired_direct::<false, false>(before, p, dagger, flip, c, s),
+            (false, true) => paired_direct::<false, true>(before, p, dagger, flip, c, s),
+            (true, false) => paired_direct::<true, false>(before, p, dagger, flip, c, s),
+            (true, true) => paired_direct::<true, true>(before, p, dagger, flip, c, s),
+        }
+    }
+}
+
+#[cfg(test)]
+mod owned_snapshot_rotation_tests {
+    use super::*;
+    fn direct(
+        before: &[ComplexAmp],
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        flip: bool,
+        policy: CompiledRotationArithmetic,
+    ) -> Vec<ComplexAmp> {
+        if p.x == 0 && p.z == 0 {
+            return before.to_vec();
+        }
+        if expand {
+            return generic_direct(
+                before,
+                p,
+                true,
+                dagger,
+                flip,
+                policy,
+                (std::f64::consts::PI / 8.).cos(),
+                (std::f64::consts::PI / 8.).sin(),
+            )
+            .unwrap();
+        }
+        cache_snapshot_rotation::direct(
+            before,
+            p,
+            dagger,
+            flip,
+            policy,
+            (std::f64::consts::PI / 8.).cos(),
+            (std::f64::consts::PI / 8.).sin(),
+        )
+        .unwrap()
+    }
+    fn generic_direct(
+        before: &[ComplexAmp],
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        flip: bool,
+        policy: CompiledRotationArithmetic,
+        c: f64,
+        s: f64,
+    ) -> Option<Vec<ComplexAmp>> {
+        let len = before.len().checked_mul(if expand { 2 } else { 1 })?;
+        let imaginary = p.physical.phase % 2 == 0;
+        let mut factor = if matches!(p.physical.phase, 0 | 3) {
+            -s
+        } else {
+            s
+        };
+        if dagger ^ flip {
+            factor = -factor;
+        }
+        let mut result = Vec::new();
+        result.try_reserve_exact(len).ok()?;
+        for i in 0..len {
+            let own = before.get(i).copied().unwrap_or_default();
+            let partner = before.get(i ^ p.x).copied().unwrap_or_default();
+            let factor = if ((i ^ p.x) & p.z).count_ones() % 2 != 0 {
+                -factor
+            } else {
+                factor
+            };
+            let value = if policy == CompiledRotationArithmetic::Fused {
+                if imaginary {
+                    ComplexAmp::new(
+                        (-partner.im).mul_add(factor, own.re * c),
+                        partner.re.mul_add(factor, own.im * c),
+                    )
+                } else {
+                    ComplexAmp::new(
+                        partner.re.mul_add(factor, own.re * c),
+                        partner.im.mul_add(factor, own.im * c),
+                    )
+                }
+            } else {
+                let term = if imaginary {
+                    ComplexAmp::new(-partner.im * factor, partner.re * factor)
+                } else {
+                    partner * factor
+                };
+                own * c + term
+            };
+            result.push(value);
+        }
+        Some(result)
+    }
+
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        CompactPauli {
+            x,
+            z,
+            physical: PackedPauli {
+                x: vec![0],
+                z: vec![0],
+                phase,
+            },
+        }
+    }
+    fn bits(values: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        values
+            .iter()
+            .map(|v| (v.re.to_bits(), v.im.to_bits()))
+            .collect()
+    }
+    #[test]
+    fn direct_rotation_matches_in_place_bits() {
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+        ];
+        let mut cases = 0;
+        for (policy_name, policy) in [
+            ("strict", CompiledRotationArithmetic::Strict),
+            ("fused", CompiledRotationArithmetic::Fused),
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nH 0\nM 0\n",
+                policy,
+            )
+            .unwrap();
+            for len in [2, 4, 8, 16, 64] {
+                let before: Vec<_> = (0..len)
+                    .map(|i| {
+                        ComplexAmp::new(
+                            values[(i * 3) % values.len()],
+                            values[(i * 7 + 1) % values.len()],
+                        )
+                    })
+                    .collect();
+                for expand in [false, true] {
+                    let output_len = len * if expand { 2 } else { 1 };
+                    for x in 0..output_len {
+                        for z in [0, 1, output_len - 1] {
+                            for phase in [0, 1, 2, 3, 7] {
+                                for dagger in [false, true] {
+                                    for flip in [false, true] {
+                                        let p = pauli(x, z, phase);
+                                        let mut old =
+                                            plan.prepare_sampler_with_cache_budget(0).unwrap();
+                                        old.coefficients = before.clone();
+                                        old.rotate_signed(&p, expand, dagger, flip).unwrap();
+                                        let new = direct(&before, &p, expand, dagger, flip, policy);
+                                        assert_eq!(
+                                            bits(&new),
+                                            bits(&old.coefficients),
+                                            "{policy_name} len={len} x={x} z={z} phase={phase} expand={expand} dagger={dagger} flip={flip}"
+                                        );
+                                        cases += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(cases, 33840);
+    }
+
+    #[test]
+    fn ownership_transfer_keeps_logical_state_and_materializes_exact_bits_on_demand() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nH 0\nM 0\n",
+                policy,
+            )
+            .unwrap();
+            for (x, z, phase, expand) in [
+                (1, 0, 0, false),
+                (5, 0, 1, false),
+                (3, 5, 0, false),
+                (9, 3, 3, true),
+            ] {
+                let before: Vec<_> = (0..8)
+                    .map(|i| ComplexAmp::new(i as f64 / 16., -0.5))
+                    .collect();
+                let p = pauli(x, z, phase);
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                reference.coefficients = before.clone();
+                reference
+                    .rotate_signed_coefficients(&p, expand, false, true, 0.95, 0.2)
+                    .unwrap();
+                for budget in [0, 64 * 1024 * 1024] {
+                    let mut sampler = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                    sampler.coefficients = before.clone();
+                    let mut state = sampler
+                        .cache
+                        .as_mut()
+                        .and_then(|cache| cache.store(0, &before));
+                    sampler
+                        .cached_rotate_signed_coefficients(
+                            0,
+                            &p,
+                            expand,
+                            false,
+                            true,
+                            &mut state,
+                            Some((0.95, 0.2)),
+                        )
+                        .unwrap();
+                    if budget != 0 {
+                        let id = state.unwrap();
+                        if !expand {
+                            assert!(sampler.coefficients.is_empty());
+                            assert_eq!(sampler.materialized_coefficient_state, None);
+                        } else {
+                            assert_eq!(sampler.materialized_coefficient_state, Some(id));
+                        }
+                        assert_eq!(
+                            bits(&sampler.cache.as_ref().unwrap().states[id].coefficients),
+                            bits(&reference.coefficients)
+                        );
+                        sampler.load_state(id).unwrap();
+                        assert_eq!(sampler.materialized_coefficient_state, Some(id));
+                    }
+                    assert_eq!(bits(&sampler.coefficients), bits(&reference.coefficients));
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+impl CompiledNearCliffordSampler<'_> {
+    fn reference_probability_zero(&self, p: &CompactPauli) -> f64 {
+        // i_pow uses phase % 4; unsigned phase & 3 preserves every accepted u8 alias.
+        match p.physical.phase & 3 {
+            0 => self.reference_probability_zero_phase::<0>(p),
+            1 => self.reference_probability_zero_phase::<1>(p),
+            2 => self.reference_probability_zero_phase::<2>(p),
+            _ => self.reference_probability_zero_phase::<3>(p),
+        }
+    }
+    #[inline]
+    fn reference_probability_zero_phase<const PHASE: u8>(&self, p: &CompactPauli) -> f64 {
+        let mut expectation = 0.;
+        let mut norm = 0.;
+        for (i, &amp) in self.coefficients.iter().enumerate() {
+            let sign = if (i & p.z).count_ones() % 2 != 0 {
+                -1.
+            } else {
+                1.
+            };
+            expectation += (self.coefficients[i ^ p.x].conj() * i_pow(PHASE) * (amp * sign)).re;
+            norm += amp.norm_sqr();
+        }
+        ((1. + expectation / norm) * 0.5).clamp(0., 1.)
+    }
+    fn reference_project(
+        &mut self,
+        p: &CompactPauli,
+        index: usize,
+        y: bool,
+        fixed: bool,
+    ) -> Result<(), String> {
+        self.materialized_coefficient_state = None;
+        let pivot = 1 << index;
+        let low = pivot - 1;
+        let other = p.z & !pivot;
+        self.reduced_coefficients.clear();
+        let reduced = &mut self.reduced_coefficients;
+        reduced
+            .try_reserve_exact(self.coefficients.len() / 2)
+            .map_err(|e| format!("compiled projection allocation failed: {e}"))?;
+        let mut norm = 0.;
+        for i in 0..self.coefficients.len() / 2 {
+            let without = (i & low) | ((i & !low) << 1);
+            let value = if p.x == 0 {
+                let bit = fixed ^ ((without & other).count_ones() % 2 != 0);
+                self.coefficients[without | ((bit as usize) << index)]
+            } else {
+                let a = self.coefficients[without];
+                let mut b = self.coefficients[without ^ p.x];
+                if y {
+                    b = ComplexAmp::new(b.im, -b.re);
+                }
+                let sign = if fixed ^ ((without & other).count_ones() % 2 != 0) {
+                    -1.
+                } else {
+                    1.
+                };
+                (a + b * sign) * std::f64::consts::FRAC_1_SQRT_2
+            };
+            norm += value.norm_sqr();
+            reduced.push(value);
+        }
+        if !norm.is_finite() || norm <= 0. {
+            return Err("compiled near-Clifford zero-probability measurement".into());
+        }
+        let scale = 1. / norm.sqrt();
+        for amp in reduced {
+            *amp = *amp * scale;
+        }
+        std::mem::swap(&mut self.coefficients, &mut self.reduced_coefficients);
+        // A one-dimensional state has no observable relative phase.
+        if self.coefficients.len() == 1 {
+            self.coefficients[0] = ComplexAmp::new(1., 0.);
+        }
+        Ok(())
+    }
+}
+#[cfg(test)]
+mod owned_snapshot_projection_tests {
+    use super::*;
+    fn pauli(x: usize, z: usize, phase: u8) -> CompactPauli {
+        CompactPauli {
+            x,
+            z,
+            physical: PackedPauli {
+                x: vec![0],
+                z: vec![0],
+                phase,
+            },
+        }
+    }
+    fn bits(v: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        v.iter().map(|a| (a.re.to_bits(), a.im.to_bits())).collect()
+    }
+    fn index(p: &CompactPauli) -> usize {
+        if p.x != 0 {
+            p.x.trailing_zeros() as usize
+        } else if p.z != 0 {
+            p.z.trailing_zeros() as usize
+        } else {
+            0
+        }
+    }
+    #[test]
+    fn slices_match_frozen_original_probability_and_projection_bits() {
+        let values = [
+            0.,
+            -0.,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            0.75,
+            -0.25,
+            0.3826834323650898,
+            -0.9238795325112867,
+        ];
+        let mut probabilities = 0;
+        let mut projections = 0;
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nH 0\nM 0\n",
+                policy,
+            )
+            .unwrap();
+            for len in [2, 4, 8, 16, 64] {
+                let before: Vec<_> = (0..len)
+                    .map(|i| ComplexAmp::new(values[(i * 3) % 10], values[(i * 7 + 1) % 10]))
+                    .collect();
+                for x in 0..len {
+                    for z in [0, 1, len - 1] {
+                        for phase in [0, 1, 2, 3, 7, 255] {
+                            let p = pauli(x, z, phase);
+                            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                            reference.coefficients = before.clone();
+                            assert_eq!(
+                                reference.reference_probability_zero(&p).to_bits(),
+                                CompiledNearCliffordSampler::probability_zero_for_coefficients(
+                                    &before, &p
+                                )
+                                .to_bits()
+                            );
+                            probabilities += 1;
+                            for y in [false, true] {
+                                for fixed in [false, true] {
+                                    reference.coefficients = before.clone();
+                                    let expected =
+                                        reference.reference_project(&p, index(&p), y, fixed);
+                                    let mut actual = Vec::new();
+                                    let observed =
+                                        CompiledNearCliffordSampler::project_coefficients(
+                                            &before,
+                                            &mut actual,
+                                            &p,
+                                            index(&p),
+                                            y,
+                                            fixed,
+                                        );
+                                    assert_eq!(observed, expected);
+                                    if observed.is_ok() {
+                                        assert_eq!(bits(&actual), bits(&reference.coefficients));
+                                    }
+                                    projections += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(probabilities, 3384);
+        assert_eq!(projections, 13536);
+    }
+    #[test]
+    fn virtual_probability_projection_and_closed_quota_preserve_states() {
+        let mut cases = 0;
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nH 0\nM 0\n",
+                policy,
+            )
+            .unwrap();
+            for len in [2, 8, 64] {
+                for (x, z) in [(0, 1), (1, 0), (3, 5)] {
+                    if x >= len || z >= len {
+                        continue;
+                    }
+                    let before: Vec<_> = (0..len)
+                        .map(|i| ComplexAmp::new((i + 1) as f64 / 32., (i + 2) as f64 / 64.))
+                        .collect();
+                    let p = pauli(x, z, 0);
+                    let y = (x & z).count_ones() % 2 != 0;
+                    for budget in [0, 64 * 1024 * 1024] {
+                        for closed in [false, true] {
+                            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                            reference.coefficients = before.clone();
+                            let probability = reference.reference_probability_zero(&p);
+                            reference
+                                .reference_project(&p, index(&p), y, false)
+                                .unwrap();
+                            let mut sampler =
+                                plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                            let mut state =
+                                sampler.cache.as_mut().and_then(|c| c.store(0, &before));
+                            if state.is_some() {
+                                sampler.coefficients.clear();
+                            } else {
+                                sampler.coefficients = before.clone();
+                            }
+                            sampler.materialized_coefficient_state = None;
+                            if closed {
+                                if let Some(cache) = sampler.cache.as_mut() {
+                                    cache.budget = cache.reserved;
+                                }
+                            }
+                            assert_eq!(
+                                sampler
+                                    .cached_probability_zero(0, &p, state)
+                                    .unwrap()
+                                    .to_bits(),
+                                probability.to_bits()
+                            );
+                            if state.is_some() {
+                                assert!(sampler.coefficients.is_empty());
+                            }
+                            sampler
+                                .cached_project(0, &p, index(&p), y, false, false, &mut state)
+                                .unwrap();
+                            if let Some(id) = state {
+                                assert_eq!(
+                                    bits(&sampler.cache.as_ref().unwrap().states[id].coefficients),
+                                    bits(&reference.coefficients)
+                                );
+                                if sampler.coefficients.is_empty() {
+                                    assert_eq!(sampler.materialized_coefficient_state, None);
+                                }
+                                sampler.load_state(id).unwrap();
+                                assert_eq!(sampler.materialized_coefficient_state, Some(id));
+                            }
+                            assert_eq!(bits(&sampler.coefficients), bits(&reference.coefficients));
+                            if let Some(cache) = &sampler.cache {
+                                assert!(cache.reserved <= cache.budget);
+                            }
+                            cases += 1;
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(cases, 64);
+    }
+    #[test]
+    fn invalid_norm_falls_back_to_original_error_and_physical_state() {
+        let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nH 0\nM 0\n").unwrap();
+        for before in [
+            vec![ComplexAmp::default(); 8],
+            vec![ComplexAmp::new(f64::INFINITY, 0.); 8],
+        ] {
+            let p = pauli(1, 0, 0);
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            reference.coefficients = before.clone();
+            let expected = reference.reference_project(&p, 0, false, false);
+            assert!(expected.is_err());
+            let mut sampler = plan
+                .prepare_sampler_with_cache_budget(64 * 1024 * 1024)
+                .unwrap();
+            let mut state = sampler.cache.as_mut().unwrap().store(0, &before);
+            sampler.coefficients.clear();
+            sampler.materialized_coefficient_state = None;
+            sampler.cached_probability_zero(0, &p, state).unwrap();
+            assert_eq!(
+                sampler.cached_project(0, &p, 0, false, false, false, &mut state),
+                expected
+            );
+            assert_eq!(bits(&sampler.coefficients), bits(&before));
+            assert_eq!(sampler.materialized_coefficient_state, None);
+        }
+    }
+}
+
+#[cfg(test)]
+mod owned_coefficient_cache_tests {
+    use super::*;
+
+    fn bits(v: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        v.iter().map(|a| (a.re.to_bits(), a.im.to_bits())).collect()
+    }
+    fn cache() -> CoefficientCache {
+        let plan = CompiledNearCliffordExecutor::compile_text("H 0\nT 0\nH 0\nM 0\n").unwrap();
+        CoefficientCache::new(&plan, 64 * 1024 * 1024).unwrap()
+    }
+    fn values(len: usize) -> Vec<ComplexAmp> {
+        (0..len)
+            .map(|i| ComplexAmp::new(i as f64 / 16., -0.))
+            .collect()
+    }
+
+    #[test]
+    fn exact_capacity_transfers_allocation_and_charges_once() {
+        let mut cache = cache();
+        let mut input = values(8);
+        assert_eq!(input.capacity(), input.len());
+        let pointer = input.as_ptr();
+        let expected = bits(&input);
+        let reserved = cache.reserved;
+        let len = cache.states.len();
+        assert_eq!(cache.store_owned(0, &mut input), Some(len));
+        assert!(input.is_empty());
+        assert_eq!(input.capacity(), 0);
+        assert_eq!(cache.states[len].coefficients.as_ptr(), pointer);
+        assert_eq!(bits(&cache.states[len].coefficients), expected);
+        assert_eq!(cache.reserved, reserved + 8 * size_of::<ComplexAmp>() + 256);
+        assert!(cache.reserved <= cache.budget);
+    }
+
+    #[test]
+    fn retained_capacity_copies_without_consuming_input() {
+        let mut cache = cache();
+        let mut input = Vec::with_capacity(64);
+        input.extend(values(8));
+        let pointer = input.as_ptr();
+        let capacity = input.capacity();
+        let expected = bits(&input);
+        let reserved = cache.reserved;
+        let id = cache.store_owned(0, &mut input).unwrap();
+        assert_eq!(input.as_ptr(), pointer);
+        assert_eq!(input.capacity(), capacity);
+        assert_eq!(bits(&input), expected);
+        assert_ne!(cache.states[id].coefficients.as_ptr(), pointer);
+        assert_eq!(cache.states[id].coefficients.capacity(), input.len());
+        assert_eq!(bits(&cache.states[id].coefficients), expected);
+        assert_eq!(cache.reserved, reserved + 8 * size_of::<ComplexAmp>() + 256);
+    }
+
+    #[test]
+    fn intern_alias_retains_input_and_closed_admission_refuses_alias() {
+        let mut cache = cache();
+        while cache.states.len() < coefficient_intern::MIN_STATES {
+            cache.store(0, &values(2)).unwrap();
+        }
+        let mut input = values(coefficient_intern::MIN_COEFFICIENTS);
+        let id = cache.store(0, &input).unwrap();
+        assert!(cache.intern.is_some());
+        let pointer = input.as_ptr();
+        let capacity = input.capacity();
+        let expected = bits(&input);
+        let reserved = cache.reserved;
+        let states = cache.states.len();
+        assert_eq!(cache.store_owned(0, &mut input), Some(id));
+        assert_eq!(input.as_ptr(), pointer);
+        assert_eq!(input.capacity(), capacity);
+        assert_eq!(bits(&input), expected);
+        assert_eq!(cache.reserved, reserved);
+        assert_eq!(cache.states.len(), states);
+        cache.budget = reserved;
+        assert_eq!(cache.store_owned(0, &mut input), None);
+        assert_eq!(input.as_ptr(), pointer);
+        assert_eq!(bits(&input), expected);
+        assert_eq!(cache.reserved, reserved);
+        assert_eq!(cache.states.len(), states);
+    }
+
+    #[test]
+    fn scalar_and_quota_declines_keep_owned_buffers_intact() {
+        let mut cache = cache();
+        cache.budget = cache.reserved;
+        let reserved = cache.reserved;
+        let states = cache.states.len();
+        for len in [1, 8] {
+            for capacity in [len, len + 32] {
+                let mut input = Vec::with_capacity(capacity);
+                input.extend(values(len));
+                let pointer = input.as_ptr();
+                let actual_capacity = input.capacity();
+                let expected = bits(&input);
+                assert_eq!(
+                    cache.store_owned(0, &mut input),
+                    if len == 1 { Some(0) } else { None }
+                );
+                assert_eq!(input.as_ptr(), pointer);
+                assert_eq!(input.capacity(), actual_capacity);
+                assert_eq!(bits(&input), expected);
+                assert_eq!(cache.reserved, reserved);
+                assert_eq!(cache.states.len(), states);
+            }
         }
     }
 }
