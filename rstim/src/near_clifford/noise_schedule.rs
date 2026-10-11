@@ -196,7 +196,13 @@ fn advance(p: &mut Planner, o: &TapeOp, budget: &mut Budget) -> Option<()> {
         return None;
     }
     match o {
-        TapeOp::Rotate { pauli, dagger } => p.rotate_pauli(pauli, *dagger).ok()?,
+        TapeOp::Rotate {
+            pauli,
+            dagger,
+            coefficients,
+        } => p
+            .rotate_pauli_coefficients(pauli, *dagger, *coefficients)
+            .ok()?,
         TapeOp::Measure {
             pauli,
             record,
@@ -1013,7 +1019,11 @@ mod tests {
     fn tape_signature(tape: &[TapeOp]) -> Vec<String> {
         tape.iter()
             .map(|op| match op {
-                TapeOp::Rotate { pauli, dagger } => format!("rotate {:?}", (pauli, dagger)),
+                TapeOp::Rotate {
+                    pauli,
+                    dagger,
+                    coefficients,
+                } => format!("rotate {:?}", (pauli, dagger, coefficients)),
                 TapeOp::Measure {
                     pauli,
                     record,
@@ -1044,12 +1054,14 @@ mod tests {
                 TapeOp::Rotate {
                     pauli: p,
                     dagger: d,
+                    coefficients: c,
                 },
                 TapeOp::Rotate {
                     pauli: q,
                     dagger: e,
+                    coefficients: f,
                 },
-            ) => p.x == q.x && p.z == q.z && p.phase == q.phase && d == e,
+            ) => p.x == q.x && p.z == q.z && p.phase == q.phase && d == e && c == f,
             (
                 TapeOp::Measure {
                     pauli: p,
@@ -1233,6 +1245,7 @@ mod tests {
             TapeOp::Rotate {
                 pauli: pauli(1, 0, 0),
                 dagger: false,
+                coefficients: None,
             },
             TapeOp::Measure {
                 pauli: pauli(1, 1, 3),

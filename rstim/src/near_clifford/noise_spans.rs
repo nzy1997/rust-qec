@@ -80,6 +80,7 @@ mod tests {
         let boundaries = vec![
             PlanOp::Basis(Vec::new()),
             PlanOp::Rotate {
+                coefficients: None,
                 pauli: CompactPauli {
                     physical: PackedPauli {
                         x: vec![0],

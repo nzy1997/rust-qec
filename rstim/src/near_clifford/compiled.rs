@@ -559,6 +559,7 @@ enum PlanOp {
         pauli: CompactPauli,
         expand: bool,
         dagger: bool,
+        coefficients: Option<(f64, f64)>,
     },
     Measure(Measurement),
     Noise {
@@ -806,6 +807,7 @@ enum TapeOp {
     Rotate {
         pauli: PackedPauli,
         dagger: bool,
+        coefficients: Option<(f64, f64)>,
     },
     Measure {
         pauli: PackedPauli,
@@ -1131,17 +1133,54 @@ impl Planner {
     fn rotate(&mut self, q: usize, dagger: bool) -> Result<(), String> {
         let pauli = PackedPauli::new(&self.pauli(q, MeasurementBasis::Z)?);
         if self.tape.is_some() {
-            return self.emit(TapeOp::Rotate { pauli, dagger });
+            return self.emit(TapeOp::Rotate {
+                pauli,
+                dagger,
+                coefficients: None,
+            });
         }
         // Test-only direct planners retain the single physical coordinate API.
         let mut original = Pauli::identity(self.state.num_qubits);
         original.z[q] = true;
         self.rotate_pauli(&PackedPauli::new(&original), dagger)
     }
+    fn rotate_axis(
+        &mut self,
+        q: usize,
+        basis: MeasurementBasis,
+        half_turns: f64,
+    ) -> Result<(), String> {
+        if let Some(quarters) = rotation_clifford_quarters(half_turns) {
+            for _ in 0..quarters {
+                for gate in quarter_rotation_gates(q, basis).into_iter().flatten() {
+                    self.state.apply_clifford(gate)?;
+                }
+            }
+            return Ok(());
+        }
+        let coefficients = rotation_coefficients(half_turns);
+        if coefficients.1 == 0.0 {
+            return Ok(());
+        } // Only a common global phase.
+        let pauli = PackedPauli::new(&self.pauli(q, basis)?);
+        self.emit(TapeOp::Rotate {
+            pauli,
+            dagger: false,
+            coefficients: Some(coefficients),
+        })
+    }
     fn reexpress(&self, input: &PackedPauli) -> Result<Pauli, String> {
         self.state.reexpress(input)
     }
     fn rotate_pauli(&mut self, original: &PackedPauli, dagger: bool) -> Result<(), String> {
+        self.rotate_pauli_coefficients(original, dagger, None)
+    }
+    fn rotate_pauli_coefficients(
+        &mut self,
+        original: &PackedPauli,
+        dagger: bool,
+        coefficients: Option<(f64, f64)>,
+    ) -> Result<(), String> {
         let mut p = self.reexpress(original)?;
         let pivot = (0..self.state.num_qubits).find(|q| p.x[*q] && !self.axes.contains(q));
         let expand = pivot.is_some();
@@ -1176,6 +1215,7 @@ impl Planner {
             pauli: self.compact(&p),
             expand,
             dagger,
+            coefficients,
         });
         Ok(())
     }
@@ -1550,9 +1590,14 @@ impl CompiledNearCliffordExecutor {
                 pauli,
                 expand,
                 dagger,
+                coefficients,
             } = op
             {
-                sampler.rotate(pauli, *expand, *dagger)?;
+                if let Some((c, s)) = coefficients {
+                    sampler.rotate_signed_coefficients(pauli, *expand, *dagger, false, *c, *s)?;
+                } else {
+                    sampler.rotate(pauli, *expand, *dagger)?;
+                }
             }
             // The virtual frame is identity throughout this deterministic prefix.
         }
@@ -1846,7 +1891,14 @@ impl Planner {
                     if self.expanded > 1_000_000 {
                         return Err("compiled plan target limit exceeded".into());
                     }
-                    self.reserve_instruction(name, targets)?;
+                    // Exact quarter rotations only update the Clifford frame.
+                    // Generic rotations retain packed Paulis in the capture tape,
+                    // so reserve them before constructing those nodes.
+                    if !matches!(name.as_str(), "R_X" | "R_Y" | "R_Z")
+                        || rotation_clifford_quarters(args[0]).is_none()
+                    {
+                        self.reserve_instruction(name, targets)?;
+                    }
                     if matches!(
                         name.as_str(),
                         "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ" | "SWAP"
@@ -1962,6 +2014,31 @@ impl Planner {
                             "X" => self.state.apply_clifford(CliffordGate::X(q))?,
                             "Y" => self.state.apply_clifford(CliffordGate::Y(q))?,
                             "Z" => self.state.apply_clifford(CliffordGate::Z(q))?,
+                            "SQRT_X" | "SQRT_X_DAG" => {
+                                self.state.apply_clifford(CliffordGate::H(q))?;
+                                self.state.apply_clifford(if name == "SQRT_X" {
+                                    CliffordGate::S(q)
+                                } else {
+                                    CliffordGate::SDag(q)
+                                })?;
+                                self.state.apply_clifford(CliffordGate::H(q))?;
+                            }
+                            "SQRT_Y" => {
+                                self.state.apply_clifford(CliffordGate::Z(q))?;
+                                self.state.apply_clifford(CliffordGate::H(q))?;
+                            }
+                            "SQRT_Y_DAG" => {
+                                self.state.apply_clifford(CliffordGate::H(q))?;
+                                self.state.apply_clifford(CliffordGate::Z(q))?;
+                            }
+                            "R_X" | "R_Y" | "R_Z" => {
+                                let basis = match name.as_str() {
+                                    "R_X" => MeasurementBasis::X,
+                                    "R_Y" => MeasurementBasis::Y,
+                                    _ => MeasurementBasis::Z,
+                                };
+                                self.rotate_axis(q, basis, args[0])?;
+                            }
                             "T" | "T_DAG" => self.rotate(q, name == "T_DAG")?,
                             "X_ERROR" | "Y_ERROR" | "Z_ERROR" | "DEPOLARIZE1" => {
                                 let bases = match name.as_str() {
@@ -2033,9 +2110,13 @@ impl Planner {
     fn finish_op(&mut self, op: TapeOp) -> Result<(), String> {
         let target = [StimTarget::Qubit(0)];
         match op {
-            TapeOp::Rotate { pauli, dagger } => {
+            TapeOp::Rotate {
+                pauli,
+                dagger,
+                coefficients,
+            } => {
                 self.reserve_instruction("T", &target)?;
-                self.rotate_pauli(&pauli, dagger)?;
+                self.rotate_pauli_coefficients(&pauli, dagger, coefficients)?;
             }
             TapeOp::Measure {
                 pauli,
@@ -2136,7 +2217,7 @@ impl Planner {
         // Two emitted nodes, up to two typed events, and Vec growth headroom.
         let base = 4 * (size_of::<PlanOp>() + size_of::<RandomKind>());
         let per_target = match name {
-            "T" | "T_DAG" => base + packed + basis,
+            "T" | "T_DAG" | "R_X" | "R_Y" | "R_Z" => base + packed + basis,
             "MPP" | "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" | "R" | "RZ" | "RX"
             | "RY" => base + 2 * packed + basis,
             "DEPOLARIZE2" => base + 15 * noise_packed,
@@ -2359,18 +2440,7 @@ impl CompiledNearCliffordSampler<'_> {
         state.extend_to(&mut self.coefficients);
         Ok(())
     }
-    fn cached_rotate(
-        &mut self,
-        node: usize,
-        p: &CompactPauli,
-        expand: bool,
-        dagger: bool,
-        state: &mut Option<usize>,
-    ) -> Result<(), String> {
-        let sign = p.physical.anticommutes(&self.x, &self.z);
-        self.cached_rotate_signed(node, p, expand, dagger, sign, state)
-    }
-    fn cached_rotate_signed(
+    fn cached_rotate_signed_coefficients(
         &mut self,
         node: usize,
         p: &CompactPauli,
@@ -2378,6 +2448,7 @@ impl CompiledNearCliffordSampler<'_> {
         dagger: bool,
         sign: bool,
         state: &mut Option<usize>,
+        coefficients: Option<(f64, f64)>,
     ) -> Result<(), String> {
         // This operator is a common phase on the coherent base, even when F flips it.
         if p.x == 0 && p.z == 0 {
@@ -2395,7 +2466,11 @@ impl CompiledNearCliffordSampler<'_> {
         if let Some(id) = input {
             self.load_state(id)?;
         }
-        self.rotate_signed(p, expand, dagger, sign)?;
+        if let Some((c, s)) = coefficients {
+            self.rotate_signed_coefficients(p, expand, dagger, sign, c, s)?;
+        } else {
+            self.rotate_signed(p, expand, dagger, sign)?;
+        }
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
             if let Some(entry) = cache.entry(id, node) {
@@ -2493,6 +2568,24 @@ impl CompiledNearCliffordSampler<'_> {
         dagger: bool,
         flip: bool,
     ) -> Result<(), String> {
+        self.rotate_signed_coefficients(
+            p,
+            expand,
+            dagger,
+            flip,
+            (std::f64::consts::PI / 8.).cos(),
+            (std::f64::consts::PI / 8.).sin(),
+        )
+    }
+    fn rotate_signed_coefficients(
+        &mut self,
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        flip: bool,
+        c: f64,
+        s: f64,
+    ) -> Result<(), String> {
         if p.x == 0 && p.z == 0 {
             return Ok(());
         }
@@ -2508,10 +2601,8 @@ impl CompiledNearCliffordSampler<'_> {
             self.coefficients.resize(len, ComplexAmp::default());
         }
         if self.plan.rotation_arithmetic == CompiledRotationArithmetic::Fused {
-            return self.rotate_signed_fused(p, dagger, flip);
+            return self.rotate_signed_fused_coefficients(p, dagger, flip, c, s);
         }
-        let c = (std::f64::consts::PI / 8.).cos();
-        let s = (std::f64::consts::PI / 8.).sin();
         let imaginary = p.physical.phase % 2 == 0;
         let mut factor = if matches!(p.physical.phase, 0 | 3) {
             -s
@@ -2602,14 +2693,14 @@ impl CompiledNearCliffordSampler<'_> {
         }
         Ok(())
     }
-    fn rotate_signed_fused(
+    fn rotate_signed_fused_coefficients(
         &mut self,
         p: &CompactPauli,
         dagger: bool,
         flip: bool,
+        c: f64,
+        s: f64,
     ) -> Result<(), String> {
-        let c = (std::f64::consts::PI / 8.).cos();
-        let s = (std::f64::consts::PI / 8.).sin();
         let imaginary = p.physical.phase % 2 == 0;
         let mut factor = if matches!(p.physical.phase, 0 | 3) {
             -s
@@ -3149,14 +3240,22 @@ impl CompiledNearCliffordSampler<'_> {
                     pauli,
                     expand,
                     dagger,
+                    coefficients,
                 } => {
-                    if let Some(signs) = &plan.noise_signs {
-                        let sign = pauli.physical.anticommutes(&self.x, &self.z)
-                            ^ signs.scalar(node, random);
-                        self.cached_rotate_signed(node, pauli, *expand, *dagger, sign, &mut state)?;
-                    } else {
-                        self.cached_rotate(node, pauli, *expand, *dagger, &mut state)?;
-                    }
+                    let sign = pauli.physical.anticommutes(&self.x, &self.z)
+                        ^ plan
+                            .noise_signs
+                            .as_ref()
+                            .map_or(false, |signs| signs.scalar(node, random));
+                    self.cached_rotate_signed_coefficients(
+                        node,
+                        pauli,
+                        *expand,
+                        *dagger,
+                        sign,
+                        &mut state,
+                        *coefficients,
+                    )?;
                 }
                 PlanOp::Noise {
                     probability,
@@ -3419,6 +3518,7 @@ impl CompiledNearCliffordSampler<'_> {
                         pauli,
                         expand,
                         dagger,
+                        coefficients,
                     } => {
                         let anti = pauli.physical.packet_anti(&x, &z)
                             ^ plan.noise_signs.as_ref().map_or(0, |s| {
@@ -3431,12 +3531,13 @@ impl CompiledNearCliffordSampler<'_> {
                                 )
                             });
                         if coherent {
-                            self.coherent.rotate_with_arithmetic(
+                            self.coherent.rotate_with_coefficients(
                                 pauli,
                                 *expand,
                                 *dagger,
                                 anti,
                                 plan.rotation_arithmetic,
+                                *coefficients,
                             )?;
                         } else if let Some(id) = states.uniform(live) {
                             let masks = [live & !anti, live & anti];
@@ -3446,13 +3547,14 @@ impl CompiledNearCliffordSampler<'_> {
                                     continue;
                                 }
                                 let mut next = Some(id);
-                                self.cached_rotate_signed(
+                                self.cached_rotate_signed_coefficients(
                                     node,
                                     pauli,
                                     *expand,
                                     *dagger,
                                     sign != 0,
                                     &mut next,
+                                    *coefficients,
                                 )?;
                                 next_states[sign] = next;
                                 #[cfg(test)]
@@ -3467,13 +3569,14 @@ impl CompiledNearCliffordSampler<'_> {
                             while remaining != 0 {
                                 let lane = remaining.trailing_zeros() as usize;
                                 remaining &= remaining - 1;
-                                self.cached_rotate_signed(
+                                self.cached_rotate_signed_coefficients(
                                     node,
                                     pauli,
                                     *expand,
                                     *dagger,
                                     anti >> lane & 1 != 0,
                                     &mut states.lanes[lane],
+                                    *coefficients,
                                 )?;
                                 if states.lanes[lane].is_none() {
                                     live &= !(1 << lane);
@@ -4615,6 +4718,113 @@ mod tests {
             assert_eq!(packed.coefficient_cache_reserved_bytes(), initial + 288);
         }
         assert_eq!(a.next_u64(), b.next_u64());
+    }
+
+    #[test]
+    fn parametric_capture_checks_budget_before_emitting_and_keeps_quarters_frame_only() {
+        for name in ["R_X", "R_Y", "R_Z"] {
+            for (angle, rejected) in [(0.17, true), (0.0, false), (0.5, false), (2.0, false)] {
+                let mut planner = Planner {
+                    state: CompileFrame::identity(1).unwrap(),
+                    axes: Vec::new(),
+                    limit: 16,
+                    peak: 0,
+                    operations: Vec::new(),
+                    expanded: 0,
+                    reserved_bytes: PLAN_BYTE_BUDGET,
+                    tape: Some(Vec::new()),
+                    record_count: 0,
+                };
+                let instructions =
+                    crate::parser::parse_lines(&format!("{name}({angle}) 0\n")).unwrap();
+                let result = planner.block(&instructions);
+                if rejected {
+                    assert_eq!(
+                        result.unwrap_err(),
+                        "compiled plan reservation exceeds 64 MiB"
+                    );
+                } else {
+                    result.unwrap();
+                }
+                assert!(planner.tape.as_ref().unwrap().is_empty(), "{name}({angle})");
+                assert!(planner.operations.is_empty());
+                assert_eq!(planner.reserved_bytes, PLAN_BYTE_BUDGET);
+                assert_eq!(planner.peak, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn generic_rotations_force_coherent_cache_off_records_counts_and_rng() {
+        let text = conditional_fixture::circuit(16, 8, true)
+            .replace("T ", "R_Z(0.17) ")
+            .replace("MPP ", "MPP(0.09) ")
+            .replace("MR ", "R_X(-0.3040867239846964) 0\nR_Y(0.31) 1\nMR ");
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan =
+                CompiledNearCliffordExecutor::compile_text_with_arithmetic(&text, arithmetic)
+                    .unwrap();
+            assert!(plan.peak_active_rank >= 4);
+            assert!(
+                plan.operations
+                    .iter()
+                    .skip(plan.prefix_len)
+                    .any(|op| matches!(
+                        op,
+                        PlanOp::Rotate {
+                            coefficients: Some(_),
+                            ..
+                        }
+                    ))
+            );
+            for seed in [1739, 583] {
+                let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut flat = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                flat.observe_lazy_error_producer = true;
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                for shots in [32, 63, 64, 65, 129] {
+                    let records = scalar.sample(shots, &mut a).unwrap();
+                    let actual = flat.sample_measurements_u8(shots, &mut b).unwrap();
+                    let expected: Vec<u8> = records
+                        .iter()
+                        .flat_map(|row| row.measurements.iter().copied().map(u8::from))
+                        .collect();
+                    assert_eq!(
+                        actual.measurements, expected,
+                        "{arithmetic:?} seed={seed} shots={shots}"
+                    );
+                    assert!(flat.last_packet_error_producer.as_ref().unwrap().coherent);
+                    assert_eq!(flat.coefficient_cache_reserved_bytes(), 0);
+                    let records = scalar.sample(shots, &mut a).unwrap();
+                    let accepted: Vec<_> = records
+                        .iter()
+                        .filter(|row| row.detectors.iter().all(|b| !b))
+                        .collect();
+                    let errors = accepted
+                        .iter()
+                        .filter(|row| {
+                            row.observables
+                                .iter()
+                                .filter(|(i, _)| *i == 0)
+                                .fold(false, |parity, (_, b)| parity ^ b)
+                        })
+                        .count();
+                    let actual = flat.sample_postselected_counts(shots, 0, &mut b).unwrap();
+                    assert_eq!(
+                        (actual.attempted, actual.accepted, actual.logical_errors),
+                        (shots, accepted.len(), errors)
+                    );
+                    assert!(flat.last_packet_error_producer.as_ref().unwrap().coherent);
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                }
+            }
+        }
     }
 
     #[test]
