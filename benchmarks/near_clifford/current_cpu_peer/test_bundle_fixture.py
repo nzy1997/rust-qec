@@ -178,12 +178,12 @@ def build_bundle(root):
         events.append(dict(item,index=index,command=command,controller_pid=32179,child_pid=34000+index,child_waited=True,exit_code=0,timed_out=False,cancellation=None,result_compaction_error=None,start=index*2,end=index*2+1,process_status='closed',stdout_sha256=sha(output/f'{index:05d}.stdout'),stderr_sha256=sha(output/f'{index:05d}.stderr'),result=compact))
         payloads[index]=payload
     (output/'events.jsonl').write_text(''.join(json.dumps(e,separators=(',',':'))+'\n' for e in events))
-    rows=[];alpha=.001/(12*3*20)
+    rows=[];alpha=.001/(len(manifest['names'])*len(manifest['shots'])*len(manifest['policies'])*3*20)
     for (name,shots),backends in selected.items():
         own=dict(attempted=8192,accepted=8192,discarded=0,logical_errors=0)
         for backend in backends:rows.append(dict(name=name,shots=shots,backend=backend,selection=backends[backend],counts=own,own_records=own,rust={r+'/'+p:own for r in ['baseline','rstim'] for p in manifest['policies']},alpha_per_population=alpha,checks=dict(own_records=compare(own,own,alpha),against_rust={r+'/'+p:compare(own,own,alpha) for r in ['baseline','rstim'] for p in manifest['policies']})))
     (output/'validation-checks.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in rows))
-    write(output/'closure.json',dict(before=before,after=before,preparation_seal_after=sha(prep/'seal.json'),controller_pid=32179,all_children_waited=True,events=1035,events_sha256=sha(output/'events.jsonl'),timing_children=864,packages_after=expected['packages'],identities_after=expected['identities']))
+    write(output/'closure.json',dict(before=before,after=before,preparation_seal_after=sha(prep/'seal.json'),controller_pid=32179,all_children_waited=True,events=4383,events_sha256=sha(output/'events.jsonl'),timing_children=3888,packages_after=expected['packages'],identities_after=expected['identities']))
     (control/'producer.log').write_text('synthetic fixture\n')
     write(control/'closure.json',dict(command=[sys.executable,'-I',str(HERE/'run.py'),'--preparation',str(prep),'--out',str(output)],controller_pid=32169,child_pid=32179,child_waited=True,exit_code=0,timed_out=False,cancellation=None,post_run_seal_error=None,preparation_seal_before=sha(prep/'seal.json'),preparation_seal_after=sha(prep/'seal.json'),producer_log_sha256=sha(control/'producer.log'),thread_environment={k:'1' for k in THREADS}))
     pids=sorted(set(preparation_pids(prep)));write(control/'preparation-process-absence.json',dict(pids=pids,command=['ps','-p',','.join(map(str,pids)),'-o','pid=,comm='],exit_code=1,stdout='',stderr=''))

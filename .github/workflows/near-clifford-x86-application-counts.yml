@@ -343,7 +343,7 @@ jobs:
   current-cpu-peer:
     if: ${{ inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       RUSTFLAGS: '-C target-cpu=native'
       OMP_NUM_THREADS: '1'
@@ -398,8 +398,8 @@ jobs:
           python -I benchmarks/near_clifford/current_cpu_peer/prepare.py \
             --rust-ref "$RUST_REF" --baseline-ref "$BASELINE_REF" --out drafts/x86-current-peer/preparation \
             > drafts/x86-current-peer/prepare.log 2>&1
-      - name: Tune, freeze, validate and compare all twelve original counts cells
-        timeout-minutes: 65
+      - name: Tune, freeze, validate and compare all 36 original counts cells
+        timeout-minutes: 105
         run: |
           taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/current_cpu_peer/run_retained.py \
             --preparation drafts/x86-current-peer/preparation \

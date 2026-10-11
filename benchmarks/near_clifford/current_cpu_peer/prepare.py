@@ -106,7 +106,7 @@ def main():
         sys.argv=previous
         for sig,handler in previous_signals.items():signal.signal(sig,handler)
     manifest=json.loads((HERE/'manifest.json').read_text())
-    manifest.update(schema='rstim.current-cpu-peer.v2',protocol_revision=protocol,rust_baseline_head=args.baseline_ref,rust_source_head=args.rust_ref,symft_revision=PEER)
+    manifest.update(schema='rstim.current-cpu-peer.v3',protocol_revision=protocol,rust_baseline_head=args.baseline_ref,rust_source_head=args.rust_ref,symft_revision=PEER)
     manifest.pop('current_merged_head',None);manifest.pop('source_relation',None)
     for name,digest in manifest['inputs'].items():require(sha(ROOT/'benchmarks/near_clifford/application_counts/fixtures'/(name+'.stim'))==digest,'manifest fixture mutation')
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')

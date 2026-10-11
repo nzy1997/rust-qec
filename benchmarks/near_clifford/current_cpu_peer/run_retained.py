@@ -72,7 +72,7 @@ def main():
             previous=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM,signal.SIGINT})
             try:child=subprocess.Popen(command,cwd=ROOT,env=env,stdout=file,stderr=subprocess.STDOUT,start_new_session=True,preexec_fn=lambda:signal.pthread_sigmask(signal.SIG_SETMASK,previous))
             finally:signal.pthread_sigmask(signal.SIG_SETMASK,previous)
-            child.wait(timeout=3600)
+            child.wait(timeout=6000)
         except subprocess.TimeoutExpired:
             timeout=True;cleanup=stop_producer(child,ACTIVE)
         except BaseException as error:

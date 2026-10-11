@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from peer_evidence import verify_preparation
 from commands import HOST_SCRIPT, package_script
 from timing import TIMING_CONTRACT, RUST_ROLES
+from role_schedule import role_order
 sys.path.insert(0, str(COUNTS))
 from common import annotations, check_result, compare, counts, raw_counts, require
 sys.path.insert(0, str(SOTA))
@@ -34,12 +35,6 @@ from source_contract import production_inventory
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def role_order(roles, pair):
-    offset = pair % len(roles)
-    ordered = roles[offset:] + roles[:offset]
-    return ordered[::-1] if (pair // len(roles)) % 2 else ordered
 
 
 def git(*args, root=ROOT):
@@ -230,7 +225,7 @@ def main():
     require(packages['numpy']['version'] == packages['clifft_environment']['numpy']['version'] == manifest['versions']['numpy'], 'NumPy mismatch')
     header = dict(schema=manifest['schema'], manifest=manifest, before=before, preparation_seal_sha256=preparation_seal,
                   packages=packages, identities=identities, host=host, controller_pid=os.getpid(), started=time.time(),
-                  scope='Prespecified first12 Linux x86_64 counts cells. Pinned official SymFT main compiled CPU implementation. No general SOTA claim.',
+                  scope='Prespecified six-workload 36-cell Linux x86_64 counts comparison with 18 rounds. Pinned official SymFT main compiled CPU implementation. No general SOTA claim.',
                   counts_rng_scope='Retained Rust executable self-attests carry; literal RNG words absent in counts output.',
                   timing_contract=TIMING_CONTRACT)
     (OUT / 'header.json').write_text(json.dumps(header, indent=2) + '\n')
@@ -320,7 +315,7 @@ def main():
     for pair in range(manifest['pairs']):
         ordered_cases = cases[pair % len(cases):] + cases[:pair % len(cases)]
         for name, shots, policy in ordered_cases:
-            for role in role_order(manifest['roles'], pair):
+            for role in role_order(manifest, name, shots, policy, pair):
                 if role in RUST_ROLES:
                     rust(name, shots, policy, pair=pair, role=role)
                 else:
