@@ -25,7 +25,7 @@ struct CacheSnapshot {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct SamplerSnapshot {
+pub(super) struct SamplerSnapshot {
     cache: Option<CacheSnapshot>,
     coefficients: (AmpBits, usize),
     reduced: (AmpBits, usize),
@@ -55,7 +55,7 @@ fn entry_snapshot(entry: CachedOp) -> EntrySnapshot {
     }
 }
 
-fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
+pub(super) fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
     SamplerSnapshot {
         cache: sampler.cache.as_ref().map(|cache| CacheSnapshot {
             start: cache.start,
@@ -430,7 +430,7 @@ fn rank_one_projection_norm(p: &CompactPauli, y: bool, fixed: bool, values: &[Co
     }
 }
 
-fn error_plan(
+pub(super) fn error_plan(
     policy: CompiledRotationArithmetic,
     compact: bool,
     fail_second: bool,

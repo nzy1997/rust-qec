@@ -38,6 +38,9 @@ mod conditional_fixture;
 mod scalar_basis;
 use scalar_basis::{ScalarBasisProgram, build_scalar_basis};
 #[cfg(test)]
+#[path = "cdf_materialized_projection_tests.rs"]
+mod cdf_materialized_projection_tests;
+#[cfg(test)]
 #[path = "lazy_uniform_reference_tests.rs"]
 mod lazy_uniform_reference_tests;
 
@@ -226,6 +229,12 @@ struct CachedState {
     coefficients: Arc<Vec<ComplexAmp>>,
     next_node: Option<usize>,
     transition: CachedOp,
+}
+// A local witness for the buffer loaded by a probability cache miss.
+// It lives only until the immediately following projection(s).
+struct CachedProbability {
+    zero: f64,
+    materialized: Option<usize>,
 }
 struct CoefficientCache {
     // Scalar state 0 is shared across positions. Optional interning only shares
@@ -2340,6 +2349,8 @@ impl CompiledNearCliffordSampler<'_> {
         self.cache.as_ref().map_or(0, |cache| cache.reserved)
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
+        #[cfg(test)]
+        cdf_materialized_projection_tests::record_load();
         let state = self
             .cache
             .as_ref()
@@ -2414,10 +2425,13 @@ impl CompiledNearCliffordSampler<'_> {
         node: usize,
         p: &CompactPauli,
         state: Option<usize>,
-    ) -> Result<f64, String> {
+    ) -> Result<CachedProbability, String> {
         if let (Some(id), Some(cache)) = (state, self.cache.as_ref()) {
             if let Some(CachedOp::Measure(entry)) = cache.entry(id, node) {
-                return Ok(entry.probability_zero);
+                return Ok(CachedProbability {
+                    zero: entry.probability_zero,
+                    materialized: None,
+                });
             }
         }
         if let Some(id) = state {
@@ -2434,7 +2448,10 @@ impl CompiledNearCliffordSampler<'_> {
                 }),
             );
         }
-        Ok(probability)
+        Ok(CachedProbability {
+            zero: probability,
+            materialized: state,
+        })
     }
     fn cached_project(
         &mut self,
@@ -2445,6 +2462,7 @@ impl CompiledNearCliffordSampler<'_> {
         fixed: bool,
         branch: bool,
         state: &mut Option<usize>,
+        materialized: &mut Option<usize>,
     ) -> Result<(), String> {
         if let (Some(id), Some(cache)) = (*state, self.cache.as_ref()) {
             if let Some(CachedOp::Measure(entry)) = cache.entry(id, node) {
@@ -2456,8 +2474,19 @@ impl CompiledNearCliffordSampler<'_> {
         }
         let input = *state;
         if let Some(id) = input {
-            self.load_state(id)?;
+            let reuse = *materialized == Some(id);
+            #[cfg(test)]
+            let reuse = reuse && !cdf_materialized_projection_tests::force_reload();
+            if reuse {
+                #[cfg(test)]
+                cdf_materialized_projection_tests::record_reuse();
+            } else {
+                self.load_state(id)?;
+            }
         }
+        // A real projection mutates the buffer even if it later returns Err.
+        // A cached child above leaves the buffer and this witness untouched.
+        *materialized = None;
         self.project(p, index, y, fixed)?;
         *state = None;
         if let (Some(id), Some(cache)) = (input, self.cache.as_mut()) {
@@ -3207,6 +3236,7 @@ impl CompiledNearCliffordSampler<'_> {
                             .noise_signs
                             .as_ref()
                             .is_some_and(|s| s.scalar(node, random));
+                    let mut materialized = None;
                     let branch = match m.projection {
                         Projection::Constant(bit) => bit,
                         Projection::Independent { .. } => {
@@ -3215,8 +3245,11 @@ impl CompiledNearCliffordSampler<'_> {
                         }
                         Projection::Active { .. } => {
                             event += 1;
-                            f64::from_bits(random.draw(RandomKind::Active))
-                                >= self.cached_probability_zero(node, &m.pauli, state)?
+                            let draw = f64::from_bits(random.draw(RandomKind::Active));
+                            let probability =
+                                self.cached_probability_zero(node, &m.pauli, state)?;
+                            materialized = probability.materialized;
+                            draw >= probability.zero
                         }
                     };
                     let physical = branch ^ anti;
@@ -3232,6 +3265,7 @@ impl CompiledNearCliffordSampler<'_> {
                             branch ^ offset,
                             branch,
                             &mut state,
+                            &mut materialized,
                         )?;
                     }
                     if !m.basis.is_empty() {
@@ -3606,14 +3640,14 @@ impl CompiledNearCliffordSampler<'_> {
                                         if offset { branch ^ all } else { branch },
                                     )?;
                                 } else if let Some(id) = states.uniform(live) {
-                                    let probability =
+                                    let mut probability =
                                         self.cached_probability_zero(node, &m.pauli, Some(id))?;
                                     let mut remaining = live;
                                     while remaining != 0 {
                                         let lane = remaining.trailing_zeros() as usize;
                                         remaining &= remaining - 1;
                                         if f64::from_bits(tape[lane * random_count + event])
-                                            >= probability
+                                            >= probability.zero
                                         {
                                             branch |= 1 << lane;
                                         }
@@ -3633,6 +3667,7 @@ impl CompiledNearCliffordSampler<'_> {
                                             (bit != 0) ^ offset,
                                             bit != 0,
                                             &mut next,
+                                            &mut probability.materialized,
                                         )?;
                                         next_states[bit] = next;
                                         #[cfg(test)]
@@ -3647,12 +3682,14 @@ impl CompiledNearCliffordSampler<'_> {
                                     while remaining != 0 {
                                         let lane = remaining.trailing_zeros() as usize;
                                         remaining &= remaining - 1;
-                                        let bit = f64::from_bits(tape[lane * random_count + event])
-                                            >= self.cached_probability_zero(
-                                                node,
-                                                &m.pauli,
-                                                states.lanes[lane],
-                                            )?;
+                                        let draw =
+                                            f64::from_bits(tape[lane * random_count + event]);
+                                        let mut probability = self.cached_probability_zero(
+                                            node,
+                                            &m.pauli,
+                                            states.lanes[lane],
+                                        )?;
+                                        let bit = draw >= probability.zero;
                                         if bit {
                                             branch |= 1 << lane;
                                         }
@@ -3664,6 +3701,7 @@ impl CompiledNearCliffordSampler<'_> {
                                             bit ^ offset,
                                             bit,
                                             &mut states.lanes[lane],
+                                            &mut probability.materialized,
                                         )?;
                                         if states.lanes[lane].is_none() {
                                             live &= !(1 << lane);
