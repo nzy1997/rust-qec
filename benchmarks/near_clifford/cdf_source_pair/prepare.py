@@ -70,14 +70,14 @@ def invoke(command,cwd,env,path,context):
             previous=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM,signal.SIGINT})
             try:child=subprocess.Popen(command,cwd=cwd,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True,preexec_fn=lambda:signal.pthread_sigmask(signal.SIG_SETMASK,previous))
             finally:signal.pthread_sigmask(signal.SIG_SETMASK,previous)
-            child.wait(timeout=600)
+            child.wait(timeout=1800)
         except BaseException as error:
             cancellation=error;timed_out=isinstance(error,subprocess.TimeoutExpired)
             if child is not None:
                 try:os.killpg(child.pid,signal.SIGKILL)
                 except ProcessLookupError:pass
                 child.wait(timeout=10)
-    receipt=dict(command=command,controller_pid=os.getpid(),child_pid=child.pid if child else None,child_waited=child is not None and child.returncode is not None,exit_code=child.returncode if child else None,started=start,finished=time.time(),timed_out=timed_out,cancellation=type(cancellation).__name__ if cancellation else None,log_sha256=sha(path),**context)
+    receipt=dict(command=command,controller_pid=os.getpid(),child_pid=child.pid if child else None,child_waited=child is not None and child.returncode is not None,exit_code=child.returncode if child else None,started=start,finished=time.time(),timeout_seconds=1800,timed_out=timed_out,cancellation=type(cancellation).__name__ if cancellation else None,log_sha256=sha(path),**context)
     path.with_suffix('.receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
     if cancellation is not None:raise cancellation
     if child.returncode:raise ValueError('build/check failed; receipt retained')
