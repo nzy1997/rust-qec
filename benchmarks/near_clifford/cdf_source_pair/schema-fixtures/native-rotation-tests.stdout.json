@@ -1,0 +1,3 @@
+{
+  "stdout": "\nrunning 1 test\ntest near_clifford::compiled::highest_rotation_gather_tests::both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 347 filtered out; finished in 0.62s\n\n"
+}

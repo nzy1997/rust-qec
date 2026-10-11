@@ -1,0 +1,30 @@
+{
+  "schema": "rstim.native-rotation-tests.fixture.v1",
+  "scope": "Actual local Mac ARM debug test stdout used only to bind names and parser semantics. No Linux AVX/Release, timing, full CI or performance evidence.",
+  "source_check_seal": "16a195f82b1aa0a29496d301f123662f009e625692c62f6c8891996f6468f718",
+  "native_test_exit_code": 0,
+  "stdout_sha256": "8a9e10695c3d3b5836842a7bfa6021b9119aeaac50e4f1db7475c564e92d0064",
+  "toolchain_selector": "1.93.1",
+  "host_system": "Darwin",
+  "host_machine": "arm64",
+  "source_base": "6e079197ce9ba62079744417f3f701d4562fa149",
+  "source_file": "rstim/src/near_clifford/compiled.rs",
+  "source_identity": {
+    "bytes": 269193,
+    "sha256": "36e07c0babcea6c8f871a59156b022d10ed6cc1cd20591d328cc20299089663d"
+  },
+  "command": [
+    "env",
+    "CARGO_TARGET_DIR=/Users/nzy/.codex/worktrees/near-clifford-cache-rotation-output/rstim/drafts/rotation-array-groups-target-193",
+    "rustup",
+    "run",
+    "1.93.1",
+    "cargo",
+    "test",
+    "-p",
+    "rstim",
+    "--lib",
+    "--locked",
+    "highest_rotation_gather_tests"
+  ]
+}
