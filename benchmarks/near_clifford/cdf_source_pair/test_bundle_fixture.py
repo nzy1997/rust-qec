@@ -45,9 +45,12 @@ def build_bundle(root):
             probes[kind]=dict(hashes,binary=e.sha(retained))
         identities[role]=dict(head=heads[role],sources=source,probes=probes)
     identities['control']=copy.deepcopy(identities['baseline'])
-    for index in [0,1]:
+    for index in [0,1,2,3]:
         log=prep/('native-check-'+str(index)+'.log');log.write_text('test result: ok. 1 passed; 0 failed\n')
-        selection=['--lib','phase_specialized_cdf_tests'] if index==0 else ['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact']
+        selection=['--lib','phase_specialized_cdf_tests'] if index==0 else ['--test','near_clifford_postselected_counts','cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng','--','--exact'] if index==1 else ['--lib','near_clifford::compiled::cdf_materialized_projection_tests::'] if index==2 else ['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']
+        if index >= 2:
+            names = ['near_clifford::compiled::cdf_materialized_projection_tests::probability_miss_reuses_only_the_unmodified_input_for_both_projection_branches', 'near_clifford::compiled::cdf_materialized_projection_tests::cached_first_branch_keeps_buffer_untouched_and_missing_second_branch_loads_input', 'near_clifford::compiled::cdf_materialized_projection_tests::projection_error_invalidates_loaded_input_and_preserves_the_old_error_state', 'near_clifford::compiled::cdf_materialized_projection_tests::default_mixed_calls_match_old_reload_state_records_counts_and_rng'] if index == 2 else ['near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage']
+            log.write_text(''.join('test '+name+' ... ok\n' for name in names)+f'test result: ok. {len(names)} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n')
         write(log.with_suffix('.receipt.json'),dict(receipt_base,head=heads['candidate'],log_sha256=e.sha(log),command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection],environment={'RUSTFLAGS':'-C target-cpu=native'}))
     manifest=v.read(HERE/'manifest.json');cases,schedule=v.schedule(manifest);events=[];values={(k,c):{role:[] for role in identities} for k,c in cases}
     for index,(route,kind,case,action,pair,call) in enumerate(schedule):

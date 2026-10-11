@@ -10,17 +10,23 @@ the reviewed manifest pin. A matching integration-branch ref cannot substitute
 for main. This source build is separate from the PyPI release; revisit pins
 before claiming that a result covers currently available peers.
 
-The twelve fixed cells use original MSC distance 3 and 5 circuits, 1/64/1024
+The 36 fixed cells use six original official workloads: MSC distance 3 and 5,
+85-qubit distillation, coherent surface distance 3/rounds 3 and distance 5/rounds 5,
+and a pure-Clifford surface distance 7/rounds 7 control. They use 1/64/1024
 attempted shots per call, and separate Strict/Fused Rust arithmetic. All backends
 return all-zero **raw** detector postselection and XOR-folded raw observable 0
 counts, with reference normalization disabled. SymFT explicitly requests either
 legacy or compiled CPU execution; declined compiled requests are retained and
-never substituted with legacy timings.
+never substituted with legacy timings. Distillation exposes five observables;
+this comparison counts only raw observable 0, following the official workload
+contract. It does not fold the five output blocks together. The pure-Clifford
+row is a control against the same selected peers; this campaign does not add
+Stim as another backend.
 
-Each of six circuit/call-size combinations tunes five Clifft batches, five
+Each of eighteen circuit/call-size combinations tunes five Clifft batches, five
 scheduled Clifft batches and seven SymFT executor/batch choices. It freezes the
 lowest median of seven valid observations before comparisons. Selected peers
-and both Rust policies validate at least 8192 attempts. Rust literal records are
+and both Rust policies in both separately built Rust source roles (the same revision) validate at least 8192 attempts. Rust literal records are
 folded independently through the original annotations; peer counts are checked
 against Rust and each peer's own raw-record executor using unconditional
 Hoeffding bounds with total family alpha 0.001. These finite checks do not certify
@@ -28,37 +34,61 @@ rare conditional errors or the full joint distribution. Counts probes retain
 an executable RNG carry self-check but do not emit literal continuation words;
 no cross-source or cross-backend RNG identity follows from these receipts.
 
-Ten rotated/reversed rounds measure five roles: Rust, direct Clifft, scheduled
-Clifft, selected SymFT and an identical Rust-binary control. Each role occupies
-each position twice in every cell. The complete ledger retains 759 events:
-102 tuning children, 30 selected finite counts children, 18 raw-record children,
-600 timing children and nine environment/host inspection children. Each timing
-child produces seven adaptive observations of at least 50 ms: 4200 total.
+Eighteen rounds measure six roles: baseline Rust, candidate Rust, direct Clifft,
+scheduled Clifft, selected SymFT and an identical baseline-binary control.
+Before collecting native data, the reviewed v3 manifest freezes a public random
+256-bit seed. A SHA256 ordering of canonical JSON
+`[seed, name, shots, policy, pair, role]` independently permutes the six roles for
+each cell and round; no order is chosen from measured timings. The offline
+verifier reconstructs every permutation. Case order still rotates each round.
+Position frequencies need not be exactly balanced. The DATA report must tabulate each role's frequency in each of the six positions for every cell, derived from the accepted timing ledger before interpreting paired ratios. The automated verifier retains and checks every exact order but does not print this diagnostic table.
+Randomized order helps diagnose order bias; it does not establish exchangeability
+or independent observations. Eighteen rounds improve the resolution of a future
+prespecified paired analysis, but no statistical significance follows from the
+round count alone. A single VM screen still requires independent replication.
+
+The complete ledger retains 4383 events: 306 tuning children, 126 selected finite
+counts children, 54 raw-record children, 3888 timing children and nine
+environment/host inspection children. Each timing child produces seven adaptive
+observations of at least 50 ms: 27216 total. Baseline/control ratios remain separate from candidate ratios.
 Failed tuning trials and every timing outlier stay in the artifact.
 
 Compilation, preparation, first calls and process high-water RSS are retained
 separately. Linux RSS includes interpreter/launcher allocations and does not
-establish simulator-only memory costs. The primary comparison is warm counts
-work, including the adapters' count conversion. Peer RNGs differ; finite
-statistical validation accommodates this while preserving the output contract.
+establish simulator-only memory costs. The primary comparison uses the explicit
+`seeded-counts-invocation-v1` contract: choose the scalar seed before the clock,
+then initialize the backend RNG, call public counts, materialize attempted,
+accepted, discarded and logical-error integers, and release this invocation's
+temporary result wrapper before the end timestamp. The four integer references
+remain available for aggregation outside the clock. Rust's native result is a
+Copy struct without heap fields; Python includes its adapter conversion and
+temporary dictionary release. These are seeded public invocations, not isolated
+kernels, and no claim that every internal backend allocation is released follows.
+The same helper times Python first calls. Rust finite witness simulation and RNG
+carry checks remain outside the native clock. Legacy probe users retain the
+default `historical-probe-v1` boundary. Receipts with different timing contracts
+are rejected. Peer RNGs differ; finite statistical validation accommodates this
+while preserving the output contract.
 
 ## Collect and verify
 
 Use a clean committed checkout, Python 3.12, gcc/g++, Rust 1.93.1 and an exact
-locally available Rust source SHA. Preparation builds native SymFT CPU wheels
+locally available baseline and candidate Rust source SHAs. Preparation builds native SymFT CPU wheels
 with CUDA disabled and verifies the actual verbose compiler flags. It binds
 complete wheel code inventories to installed bytes and the wrappers/extensions
 actually imported in isolated Python. Rust probes use the reviewed source-pair
 preparation with `-C target-cpu=native`, retaining full source inventories,
-actual ELF binaries, compiler commands and nonzero arithmetic/RNG test results.
-The Rust source must include the required phase-CDF and wide-packet tests.
+actual ELF binaries, compiler commands and four nonzero native check groups.
+The identical packed Rust source roles execute eight named phase-CDF, packed inverse-frame, scheduler-effect and public structural-limit tests, with exact successful summaries. Native guards are independent of the subsequent full peer validation. These candidate
+tests must execute in native Release before any timing. The matched clock, pinned
+peers, 36 cells, frozen randomized role order and full observation retention are unchanged.
 
 ```sh
 python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
 python3 -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
 mkdir -p drafts/current-peer
 python3 -I benchmarks/near_clifford/current_cpu_peer/prepare.py \
-  --rust-ref "$RUST_SHA" --out drafts/current-peer/preparation
+  --baseline-ref "$BASELINE_SHA" --rust-ref "$CANDIDATE_SHA" --out drafts/current-peer/preparation
 # Choose one permitted logical CPU on a quiet host; preparation must have exited.
 taskset -c "$BENCH_CPU" python3 -I benchmarks/near_clifford/current_cpu_peer/run_retained.py \
   --preparation drafts/current-peer/preparation \
@@ -70,7 +100,7 @@ python3 -I -O benchmarks/near_clifford/current_cpu_peer/verify.py drafts/current
 ```
 
 Alternatively dispatch **Near-Clifford x86 application counts** at the committed
-protocol branch with `current_cpu_peer=true` and `rust_ref`. Leave
+protocol branch with `current_cpu_peer=true`, `baseline_ref` and candidate `rust_ref`. Leave
 `profile_only=false` and `cdf_source_pair=false`. Its independent Ubuntu VM builds, pins one CPU,
 collects, seals before interpretation, verifies normally and under `-O`, and
 uploads native originals and partial failures. Existing source-pair and historical
@@ -86,7 +116,15 @@ fixture tests relocation and resealed corruption rejection, and real transport
 tests cover failed, timed-out and cancelled subprocesses. Synthetic inputs supply
 no production timing or admission evidence.
 
+v3 changes the matrix and schedule. Preserve v2 validators and receipts at their
+original Git revisions; do not reinterpret earlier two-workload data as v3.
+
 A successful screen establishes these fixed workload comparisons on its recorded
 host. Confirm gains in an independent complete campaign before making a
 performance claim. Runtime-source admission still needs its separate full
 resource campaign, fresh review and terminal-green final-head CI.
+
+
+This protocol binds baseline, rstim and control to the identical reviewed packed-scheduler source `97fc7e5a79f34741785df9d85a4f70575a8844d6`, using peer-only `packed-structural-97fc-peer-null-controls-v1` native guards. Baseline/control measure repeatability and drift; these roles cannot establish a Rust optimization speedup. All six original workloads and all 36 seeded counts cells remain. Four commands must execute eight named tests: three independent frozen-bit CDF/phase tests, two packed inverse-frame/phase/padding tests, one packed versus Boolean scheduler-effect/zero-work test, and two public structural-limit tests. The public tests cover the original coherent d5 workload at the default budget, rank-13 success/rank-12 rejection, Strict/Fused, default/cache-off sampling, records/counts/measurements and following RNG words; the rank-five case also crosses packed-shot boundaries. Profile, source roles, exact commands, successful named records and summaries are independently replayed. Standalone CDF defaults and rejection of peer-only profiles are unchanged.
+
+The local readiness screen takes about 2–2.6 seconds per d5 1024-shot invocation. To retain all 18 paired rounds, seven observations and finite validations without deleting expensive cells, this manual diagnostic job allows 360 minutes total, 300 minutes for collection, and 290 minutes for the retained controller (leaving cleanup/upload margin). Child timeouts and every failure/outlier remain recorded. Actual native timing must establish whether this budget is sufficient. A timeout is incomplete evidence, never a speedup or SOTA result.

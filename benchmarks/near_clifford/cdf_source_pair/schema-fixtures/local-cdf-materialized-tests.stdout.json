@@ -1,0 +1,3 @@
+{
+  "stdout": "\nrunning 4 tests\ntest near_clifford::compiled::cdf_materialized_projection_tests::cached_first_branch_keeps_buffer_untouched_and_missing_second_branch_loads_input ... ok\ntest near_clifford::compiled::cdf_materialized_projection_tests::projection_error_invalidates_loaded_input_and_preserves_the_old_error_state ... ok\ntest near_clifford::compiled::cdf_materialized_projection_tests::probability_miss_reuses_only_the_unmodified_input_for_both_projection_branches ... ok\ntest near_clifford::compiled::cdf_materialized_projection_tests::default_mixed_calls_match_old_reload_state_records_counts_and_rng ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 348 filtered out; finished in 0.41s\n\n"
+}
