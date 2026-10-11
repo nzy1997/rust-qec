@@ -1828,6 +1828,7 @@ impl CompiledNearCliffordExecutor {
             z: vec![0; self.num_qubits.div_ceil(64)],
             coefficients,
             reduced_coefficients: Vec::new(),
+            materialized_coefficient_state: None,
             cache: CoefficientCache::new(self, cache_bytes),
             pack_enabled: true,
             #[cfg(test)]
@@ -1870,6 +1871,9 @@ pub struct CompiledNearCliffordSampler<'a> {
     z: Vec<u64>,
     coefficients: Vec<ComplexAmp>,
     reduced_coefficients: Vec<ComplexAmp>,
+    // Cache identity of the exact coefficient bits already in the work buffer.
+    // Arithmetic invalidates this identity before changing those bits.
+    materialized_coefficient_state: Option<usize>,
     cache: Option<CoefficientCache>,
     pack_enabled: bool,
     #[cfg(test)]
@@ -2474,6 +2478,18 @@ impl CompiledNearCliffordSampler<'_> {
         self.cache.as_ref().map_or(0, |cache| cache.reserved)
     }
     fn load_state(&mut self, id: usize) -> Result<(), String> {
+        if self.materialized_coefficient_state == Some(id) {
+            #[cfg(test)]
+            {
+                let expected = &self.cache.as_ref().unwrap().states[id].coefficients;
+                assert_eq!(self.coefficients.len(), expected.len());
+                for (actual, expected) in self.coefficients.iter().zip(expected.iter()) {
+                    assert_eq!(actual.re.to_bits(), expected.re.to_bits());
+                    assert_eq!(actual.im.to_bits(), expected.im.to_bits());
+                }
+            }
+            return Ok(());
+        }
         let state = self
             .cache
             .as_ref()
@@ -2481,11 +2497,13 @@ impl CompiledNearCliffordSampler<'_> {
             .states[id]
             .coefficients
             .clone();
+        self.materialized_coefficient_state = None;
         self.coefficients.clear();
         self.coefficients
             .try_reserve_exact(state.len())
             .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
         self.coefficients.extend_from_slice(&state);
+        self.materialized_coefficient_state = Some(id);
         Ok(())
     }
     fn cached_rotate_signed_coefficients(
@@ -2535,6 +2553,7 @@ impl CompiledNearCliffordSampler<'_> {
                 }
             }
         }
+        self.materialized_coefficient_state = *state;
         Ok(())
     }
     fn cached_probability_zero(
@@ -2602,6 +2621,7 @@ impl CompiledNearCliffordSampler<'_> {
         } else if self.coefficients.len() == 1 && self.cache.is_some() {
             *state = Some(0);
         }
+        self.materialized_coefficient_state = *state;
         Ok(())
     }
 
@@ -2637,6 +2657,7 @@ impl CompiledNearCliffordSampler<'_> {
         if p.x == 0 && p.z == 0 {
             return Ok(());
         }
+        self.materialized_coefficient_state = None;
         if expand {
             let len = self
                 .coefficients
@@ -3027,6 +3048,7 @@ impl CompiledNearCliffordSampler<'_> {
         y: bool,
         fixed: bool,
     ) -> Result<(), String> {
+        self.materialized_coefficient_state = None;
         let pivot = 1 << index;
         let low = pivot - 1;
         let other = p.z & !pivot;
@@ -3237,6 +3259,7 @@ impl CompiledNearCliffordSampler<'_> {
         self.z.fill(0);
         let mut state = self.cache.as_ref().map(|cache| cache.start);
         if state.is_none() {
+            self.materialized_coefficient_state = None;
             self.coefficients.clear();
             self.coefficients
                 .try_reserve_exact(self.plan.initial_coefficients.len())
@@ -6740,6 +6763,59 @@ mod avx2_rotation_bits_tests {
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod materialized_coefficient_cache_tests {
+    use super::*;
+
+    fn coefficient_bits(coefficients: &[ComplexAmp]) -> Vec<(u64, u64)> {
+        coefficients
+            .iter()
+            .map(|a| (a.re.to_bits(), a.im.to_bits()))
+            .collect()
+    }
+
+    #[test]
+    fn cached_state_reload_restores_exact_bits_after_rotation_and_projection() {
+        for policy in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(
+                "H 0\nT 0\nH 0\nM 0\n",
+                policy,
+            )
+            .unwrap();
+            let mut sampler = plan.prepare_sampler().unwrap();
+            let start = sampler.cache.as_ref().unwrap().start;
+            assert_ne!(start, 0);
+            let original =
+                coefficient_bits(&sampler.cache.as_ref().unwrap().states[start].coefficients);
+            assert_eq!(original.len(), 2);
+            sampler.load_state(start).unwrap();
+            assert_eq!(coefficient_bits(&sampler.coefficients), original);
+            sampler.load_state(start).unwrap();
+            assert_eq!(coefficient_bits(&sampler.coefficients), original);
+            let z = CompactPauli {
+                x: 0,
+                z: 1,
+                physical: PackedPauli {
+                    x: vec![0],
+                    z: vec![1],
+                    phase: 0,
+                },
+            };
+            sampler.rotate_signed(&z, false, false, false).unwrap();
+            assert_ne!(coefficient_bits(&sampler.coefficients), original);
+            sampler.load_state(start).unwrap();
+            assert_eq!(coefficient_bits(&sampler.coefficients), original);
+            sampler.project(&z, 0, false, false).unwrap();
+            assert_eq!(sampler.coefficients.len(), 1);
+            sampler.load_state(start).unwrap();
+            assert_eq!(coefficient_bits(&sampler.coefficients), original);
         }
     }
 }
