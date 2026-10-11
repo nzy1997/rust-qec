@@ -109,8 +109,8 @@ class ContractTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validate(wrong)
 
-    def test_actual_local_real_packet_stdout_binds_every_mounted_candidate_test(self):
-        """Actual Rust output checks names; its local debug provenance is explicit."""
+    def test_historical_real_packet_stdout_cannot_qualify_axis_cache_candidate(self):
+        """Historical real-packet native names cannot qualify this cache candidate."""
         path = HERE/'schema-fixtures/local-real-packet-tests.stdout.json'
         provenance = json.loads((HERE/'schema-fixtures/local-real-packet-tests.provenance.json').read_text())
         raw = json.loads(path.read_text())['stdout'].encode()
@@ -120,13 +120,30 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(provenance['build_profile'], 'debug')
         self.assertFalse(provenance['native_flags_used'])
         for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
-            validate(raw.decode())
+            with self.assertRaises(ValueError):
+                validate(raw.decode())
             wrong = raw.decode().replace('near_clifford::compiled::real_coherent_packet::', 'near_clifford::real_coherent_packet::')
             with self.assertRaises(ValueError):
                 validate(wrong)
 
+    def test_actual_local_axis_cache_stdout_binds_every_mounted_candidate_test(self):
+        """Actual Rust output checks names; its local debug provenance is explicit."""
+        path = HERE/'schema-fixtures/local-axis-cache-tests.stdout.json'
+        provenance = json.loads((HERE/'schema-fixtures/local-axis-cache-tests.provenance.json').read_text())
+        raw = json.loads(path.read_text())['stdout'].encode()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), provenance['stdout_sha256'])
+        self.assertEqual(len(raw), provenance['stdout_bytes'])
+        self.assertEqual(provenance['test_exit_code'], 0)
+        self.assertEqual(provenance['build_profile'], 'debug')
+        self.assertFalse(provenance['native_flags_used'])
+        for validate in [prepare.require_candidate_tests, verifier.require_candidate_tests]:
+            validate(raw.decode())
+            wrong = raw.decode().replace('near_clifford::compiled::cached_coefficients::', 'near_clifford::cached_coefficients::')
+            with self.assertRaises(ValueError):
+                validate(wrong)
+
     def test_candidate_preflight_requires_every_named_test_and_successful_summary(self):
-        names = ['near_clifford::compiled::real_coherent_packet::tests::real_projection_matches_complex_for_all_small_gauges_and_mixed_branches', 'near_clifford::compiled::real_coherent_packet::tests::real_rotations_match_complex_policies_expansion_and_wide_lanes', 'near_clifford::compiled::real_coherent_packet::tests::real_packet_limits_and_tiny_positive_branches_match_complex', 'near_clifford::compiled::real_coherent_packet::tests::eligible_counts_preserve_raw_records_rng_and_positive_logical_errors', 'near_clifford::compiled::real_coherent_packet::tests::msc_real_packets_preserve_both_counts_policies_and_rng']
+        names = ['near_clifford::compiled::cached_coefficients::tests::axis_storage_preserves_every_component_bit_and_tail', 'near_clifford::compiled::cached_coefficients::tests::mixed_components_and_small_vectors_keep_dense_storage', 'near_clifford::compiled::cached_coefficients::tests::original_default_cultivation_uses_axis_storage_with_exact_rows_and_rng']
         for layout in [False, True]:
             selected = ['near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'] if layout else names
             count = len(selected)

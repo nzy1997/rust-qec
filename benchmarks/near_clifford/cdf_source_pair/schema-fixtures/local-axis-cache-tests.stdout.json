@@ -1,0 +1,3 @@
+{
+  "stdout": "\nrunning 3 tests\ntest near_clifford::compiled::cached_coefficients::tests::mixed_components_and_small_vectors_keep_dense_storage ... ok\ntest near_clifford::compiled::cached_coefficients::tests::axis_storage_preserves_every_component_bit_and_tail ... ok\ntest near_clifford::compiled::cached_coefficients::tests::original_default_cultivation_uses_axis_storage_with_exact_rows_and_rng ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 348 filtered out; finished in 12.82s\n\n"
+}
