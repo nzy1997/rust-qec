@@ -151,6 +151,25 @@ fn coordinate_work(p: &Planner, pauli: &PackedPauli) -> Option<usize> {
         .checked_mul(32)?
         .checked_add(p.state.num_qubits.checked_mul(p.axes.len() + 2)?)
 }
+fn packed_coordinate_work(p: &Planner, pauli: &PackedPauli) -> Option<usize> {
+    let words = p.state.num_qubits.div_ceil(64);
+    if words > MAX_NEAR_CLIFFORD_QUBITS.div_ceil(64) {
+        return None;
+    }
+    let support = pauli
+        .x
+        .iter()
+        .chain(&pauli.z)
+        .try_fold(0usize, |n, w| n.checked_add(w.count_ones() as usize))?;
+    // Packed row multiplication, validation/scans, axis writes and the fixed
+    // stack mask. Charge before reconstructing the coordinate Pauli.
+    support
+        .checked_mul(words.max(1))?
+        .checked_mul(32)?
+        .checked_add(words.checked_mul(16)?)?
+        .checked_add(p.axes.len().checked_mul(4)?)?
+        .checked_add(MAX_NEAR_CLIFFORD_QUBITS.div_ceil(64))
+}
 fn effect(p: &Planner, o: &TapeOp, budget: &mut Budget) -> Option<i32> {
     let physical = match o {
         TapeOp::Rotate { pauli, .. } | TapeOp::Measure { pauli, .. } => pauli,
@@ -159,17 +178,24 @@ fn effect(p: &Planner, o: &TapeOp, budget: &mut Budget) -> Option<i32> {
             return Some(0);
         }
     };
-    budget.tick(coordinate_work(p, physical)?)?;
-    let v = p.reexpress(physical).ok()?;
-    let expands = (0..p.state.num_qubits).any(|q| v.x[q] && !p.axes.contains(&q));
+    budget.tick(packed_coordinate_work(p, physical)?)?;
+    let v = p.state.reexpress_packed(physical).ok()?;
+    let active = p.active_axis_mask();
+    let expands = v.x.iter().zip(&active).any(|(&x, &mask)| x & !mask != 0);
     Some(match o {
         TapeOp::Rotate { .. } => i32::from(expands),
         _ => {
-            if expands {
+            if expands
+                || !v
+                    .x
+                    .iter()
+                    .zip(&v.z)
+                    .zip(&active)
+                    .any(|((&x, &z), &mask)| (x | z) & mask != 0)
+            {
                 0
             } else {
-                let c = p.compact(&v);
-                if c.x == 0 && c.z == 0 { 0 } else { -1 }
+                -1
             }
         }
     })
@@ -182,7 +208,11 @@ fn advance(p: &mut Planner, o: &TapeOp, budget: &mut Budget) -> Option<()> {
             return Some(());
         }
     };
-    let coordinates = coordinate_work(p, physical)?.checked_mul(4)?;
+    let coordinates = if matches!(o, TapeOp::Rotate { .. }) {
+        packed_coordinate_work(p, physical)?.checked_add(p.state.num_qubits.checked_mul(2)?)?
+    } else {
+        coordinate_work(p, physical)?.checked_mul(4)?
+    };
     // Preflight the worst basis update before touching a potentially very wide
     // frame, then charge the emitted gates. Rejection is still before any tape
     // mutation or caller RNG event.
@@ -648,20 +678,36 @@ fn build_bounded(
         p.axes.clear();
         p.peak = 0;
         let mut done = budget.zeros::<bool>(n)?;
+        let mut effects = budget.zeros::<i32>(n)?;
+        budget.tick(n)?;
+        effects.fill(i32::MAX);
         let mut order = budget.zeros::<usize>(n)?;
         for step in 0..n {
             let mut best = None;
             for id in 0..n {
                 budget.tick(1)?;
                 if !done[id] && preds[id] == 0 {
-                    let score = (effect(&p, &tape[id], &mut budget)?, id);
+                    if effects[id] == i32::MAX {
+                        effects[id] = effect(&p, &tape[id], &mut budget)?;
+                    }
+                    let score = (effects[id], id);
                     if best.is_none_or(|b| score < b) {
                         best = Some(score);
                     }
                 }
             }
             let id = best?.1;
+            // Only measurements and axis-expanding rotations change the
+            // structural frame. Other steps preserve every ready effect.
+            let quantum = matches!(tape[id], TapeOp::Measure { .. })
+                || (matches!(tape[id], TapeOp::Rotate { .. }) && effects[id] > 0);
+            if quantum {
+                budget.tick(effects.len())?;
+            }
             advance(&mut p, &tape[id], &mut budget)?;
+            if quantum {
+                effects.fill(i32::MAX);
+            }
             done[id] = true;
             order[step] = id;
             for (w, &bits) in successors[id * words..(id + 1) * words].iter().enumerate() {
@@ -988,6 +1034,64 @@ mod tests {
         let mut tape = p.tape.take().unwrap();
         remove_unobservable_rotations(&mut tape).unwrap();
         (p, tape)
+    }
+    #[test]
+    fn packed_effect_matches_boolean_coordinates_across_words_and_basis_changes() {
+        for width in [1, 63, 64, 65, 129, MAX_NEAR_CLIFFORD_QUBITS] {
+            let (mut p, _) = captured(&format!("R 0 {}\n", width - 1));
+            let mut budget = Budget {
+                bytes: 0,
+                limit: PLAN_BYTE_BUDGET,
+                work: usize::MAX,
+            };
+            for q in [0, width / 2, width - 1] {
+                p.state.apply_clifford(CliffordGate::H(q)).unwrap();
+                let mut pauli = Pauli::identity(width);
+                pauli.z[q] = true;
+                p.preview_rotation(&PackedPauli::new(&pauli)).unwrap();
+            }
+            for q in [0, width / 2, width - 1] {
+                for basis in [
+                    MeasurementBasis::X,
+                    MeasurementBasis::Y,
+                    MeasurementBasis::Z,
+                ] {
+                    let mut pauli = Pauli::identity(width);
+                    pauli.x[q] = !matches!(basis, MeasurementBasis::Z);
+                    pauli.z[q] = !matches!(basis, MeasurementBasis::X);
+                    pauli.phase = 2 + u8::from(matches!(basis, MeasurementBasis::Y));
+                    let packed = PackedPauli::new(&pauli);
+                    let v = p.reexpress(&packed).unwrap();
+                    let expands = (0..width).any(|bit| v.x[bit] && !p.axes.contains(&bit));
+                    let compact = p.compact(&v);
+                    let measurement = if expands || compact.x | compact.z == 0 {
+                        0
+                    } else {
+                        -1
+                    };
+                    let rotate = TapeOp::Rotate {
+                        pauli: packed.clone(),
+                        dagger: false,
+                        coefficients: None,
+                    };
+                    let measure = TapeOp::Measure {
+                        pauli: packed,
+                        record: None,
+                        inverted: false,
+                        readout: 0.,
+                        reset: None,
+                    };
+                    assert_eq!(effect(&p, &rotate, &mut budget), Some(i32::from(expands)));
+                    assert_eq!(effect(&p, &measure, &mut budget), Some(measurement));
+                    let mut exhausted = Budget {
+                        bytes: 0,
+                        limit: PLAN_BYTE_BUDGET,
+                        work: 0,
+                    };
+                    assert_eq!(effect(&p, &rotate, &mut exhausted), None);
+                }
+            }
+        }
     }
     #[test]
     fn preview_canonical_structural_rank_is_five() {

@@ -1138,6 +1138,32 @@ impl Planner {
         self.state.right(gate);
         gates.push(gate);
     }
+    fn active_axis_mask(&self) -> [u64; MAX_NEAR_CLIFFORD_QUBITS.div_ceil(64)] {
+        let mut active = [0; MAX_NEAR_CLIFFORD_QUBITS.div_ceil(64)];
+        for &q in &self.axes {
+            active[q / 64] |= 1u64 << (q % 64);
+        }
+        active
+    }
+    fn rotation_pivot(&self, p: &PackedPauli) -> Option<usize> {
+        let active = self.active_axis_mask();
+        p.x.iter().enumerate().find_map(|(i, &word)| {
+            let dormant = word & !active[i];
+            (dormant != 0).then(|| i * 64 + dormant.trailing_zeros() as usize)
+        })
+    }
+    fn compact_packed(&self, physical: PackedPauli) -> CompactPauli {
+        let mask = |bits: &[u64]| {
+            self.axes.iter().enumerate().fold(0, |m, (i, &q)| {
+                m | ((((bits[q / 64] >> (q % 64)) & 1) as usize) << i)
+            })
+        };
+        CompactPauli {
+            x: mask(&physical.x),
+            z: mask(&physical.z),
+            physical,
+        }
+    }
     fn rotate(&mut self, q: usize, dagger: bool) -> Result<(), String> {
         let pauli = PackedPauli::new(&self.pauli(q, MeasurementBasis::Z)?);
         if self.tape.is_some() {
@@ -1189,8 +1215,8 @@ impl Planner {
         dagger: bool,
         coefficients: Option<(f64, f64)>,
     ) -> Result<(), String> {
-        let p = self.reexpress(original)?;
-        let pivot = (0..self.state.num_qubits).find(|q| p.x[*q] && !self.axes.contains(q));
+        let mut p = self.state.reexpress_packed(original)?;
+        let pivot = self.rotation_pivot(&p);
         let expand = pivot.is_some();
         if expand {
             if self.axes.len() >= self.limit {
@@ -1201,7 +1227,11 @@ impl Planner {
                 return Err("compiled coefficient reservation exceeds 64 MiB".into());
             }
         }
-        let pauli = self.rotation_basis(original, p, pivot)?;
+        if let Some(pivot) = pivot {
+            self.expand_rotation_basis(pivot, &p);
+            p = self.state.reexpress_packed(original)?;
+        }
+        let pauli = self.compact_packed(p);
         self.operations.push(PlanOp::Rotate {
             pauli,
             expand,
@@ -1213,35 +1243,29 @@ impl Planner {
     // Rank-only scheduling stores no dense coefficients. Explore orders above
     // the execution limit, but reject before compact masks can overflow.
     fn preview_rotation(&mut self, original: &PackedPauli) -> Result<(), String> {
-        let p = self.reexpress(original)?;
-        let pivot = (0..self.state.num_qubits).find(|q| p.x[*q] && !self.axes.contains(q));
-        if pivot.is_some() && self.axes.len() >= usize::BITS as usize - 1 {
-            return Err("compiled near-Clifford preview rank exceeds platform capacity".into());
+        let p = self.state.reexpress_packed(original)?;
+        if let Some(pivot) = self.rotation_pivot(&p) {
+            if self.axes.len() >= usize::BITS as usize - 1 {
+                return Err("compiled near-Clifford preview rank exceeds platform capacity".into());
+            }
+            self.expand_rotation_basis(pivot, &p);
         }
-        self.rotation_basis(original, p, pivot)?;
         Ok(())
     }
-    fn rotation_basis(
-        &mut self,
-        original: &PackedPauli,
-        mut p: Pauli,
-        pivot: Option<usize>,
-    ) -> Result<CompactPauli, String> {
-        if let Some(pivot) = pivot {
-            let mut gates = Vec::new();
-            for bit in 0..self.state.num_qubits {
-                if bit != pivot && p.x[bit] {
-                    self.right(BasisGate::CX(pivot, bit), &mut gates);
-                }
+    // Runtime and rank-only previews must choose the same pivot and CX order.
+    // Previews need only the resulting frame, not a second Pauli reconstruction.
+    fn expand_rotation_basis(&mut self, pivot: usize, p: &PackedPauli) {
+        let mut gates = Vec::new();
+        for_support(&p.x, |bit| {
+            if bit != pivot {
+                self.right(BasisGate::CX(pivot, bit), &mut gates);
             }
-            self.axes.push(pivot);
-            self.peak = self.peak.max(self.axes.len());
-            if !gates.is_empty() {
-                self.operations.push(PlanOp::Basis(gates));
-            }
-            p = self.reexpress(original)?;
+        });
+        self.axes.push(pivot);
+        self.peak = self.peak.max(self.axes.len());
+        if !gates.is_empty() {
+            self.operations.push(PlanOp::Basis(gates));
         }
-        Ok(self.compact(&p))
     }
     #[cfg(test)]
     fn measure(
