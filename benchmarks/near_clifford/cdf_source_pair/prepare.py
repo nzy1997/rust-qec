@@ -36,8 +36,7 @@ def probe_manifest(original, library):
 
 def require_candidate_tests(log, *, layout=False):
     expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
-        'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::large_diagonal_projection_preserves_frozen_plane_bits_for_masks_and_pivots',
-        'near_clifford::compiled::coherent_packet::diagonal_projection_offset_tests::diagonal_projection_preserves_first_error_and_partial_scratch_bits'
+        'near_clifford::compiled::highest_rotation_gather_tests::both_policies_highest_pairs_match_snapshot_gather_at_all_mask_boundaries'
     }
     count = len(expected)
     records, summaries = [], []
@@ -49,7 +48,7 @@ def require_candidate_tests(log, *, layout=False):
         else:
             record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
             if record is None:
-                raise ValueError('malformed diagonal-projection candidate test result record')
+                raise ValueError('malformed rotation-array-group candidate test result record')
             records.append(record.groups())
     valid_summary = len(summaries) == 1 and re.fullmatch(
         rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
@@ -57,7 +56,7 @@ def require_candidate_tests(log, *, layout=False):
     )
     if (len(records) != count or {name for name, _ in records} != expected
             or any(status != 'ok' for _, status in records) or not valid_summary):
-        raise ValueError('every named diagonal-projection candidate test must execute successfully')
+        raise ValueError('every named rotation-array-group candidate test must execute successfully')
 
 class Cancelled(RuntimeError):pass
 def cancel(signum,frame):raise Cancelled('prepare cancelled by signal '+str(signum))
@@ -124,7 +123,7 @@ def main():
     roots['control']=roots['baseline']
     # Exercise the candidate's native arithmetic/public RNG before performance collection.
     candidate=Path(roots['candidate']);test_env=dict(env,CARGO_TARGET_DIR=str(out/'candidate/test-target'))
-    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'],['--lib','diagonal_projection_offset_tests'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
+    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact'],['--lib','highest_rotation_gather_tests'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
     for index,selection in enumerate(tests):
         command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection]
         invoke(command,candidate,test_env,out/f'native-check-{index}.log',dict(head=heads['candidate'],environment={'RUSTFLAGS':env['RUSTFLAGS']}))
