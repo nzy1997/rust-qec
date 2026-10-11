@@ -107,15 +107,15 @@ impl CachedCoefficients {
             Self::Dense(values) => output.extend_from_slice(values),
             Self::Axis(axis) => {
                 for (values, &tags) in axis.values.chunks(32).zip(&axis.tags) {
-                    for (i, &value) in values.iter().enumerate() {
+                    output.extend(values.iter().enumerate().map(|(i, &value)| {
                         let tag = (tags >> (2 * i)) & 3;
                         let zero = f64::from_bits((tag & 2) << 62);
-                        output.push(if tag & 1 != 0 {
+                        if tag & 1 != 0 {
                             ComplexAmp::new(zero, value)
                         } else {
                             ComplexAmp::new(value, zero)
-                        });
-                    }
+                        }
+                    }));
                 }
             }
         }
