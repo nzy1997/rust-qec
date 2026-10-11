@@ -1298,6 +1298,7 @@ mod tests {
             prefix_len: 0,
             rotation_arithmetic: CompiledRotationArithmetic::Strict,
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+            real_prefix_gauge: None,
             random_kinds: vec![
                 RandomKind::Noise {
                     probability: 0.37,
