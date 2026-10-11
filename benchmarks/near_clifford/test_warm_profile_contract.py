@@ -1,5 +1,9 @@
 """Offline negative tests for clock binding and exact sample-window accounting."""
 import copy
+import hashlib
+import json
+import tempfile
+from types import SimpleNamespace
 from pathlib import Path
 import struct
 import sys
@@ -7,6 +11,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import warm_profile_contract as contract
+import cdf_warm_profile as profile
 
 
 def raw_attr():
@@ -180,6 +185,54 @@ class WarmContractTests(unittest.TestCase):
         self.assertEqual(contract.finite_payload(original, 'counts'), contract.finite_payload(other, 'counts'))
         other['measurements'][0] = 1
         self.assertNotEqual(contract.finite_payload(original, 'counts'), contract.finite_payload(other, 'counts'))
+
+
+    def test_native_preflight_rejects_missing_layout_wrong_source_and_old_kernel_routes(self):
+        # Synthetic receipt/log records test rejection; they are not native execution evidence.
+        with tempfile.TemporaryDirectory() as temporary:
+            prep = Path(temporary)
+            originals = {}
+            for index, (selection, expected) in enumerate(profile.NATIVE_CHECKS):
+                log = ''.join('test ' + name + ' ... ok\n' for name in sorted(expected))
+                log += f'test result: ok. {len(expected)} passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.01s\n'
+                receipt = dict(exit_code=0, child_waited=True, head=profile.CANDIDATE,
+                               environment={'RUSTFLAGS': '-C target-cpu=native'},
+                               log_sha256=hashlib.sha256(log.encode()).hexdigest(),
+                               command=['rustup', 'run', '1.93.1', 'cargo', 'test', '--release', '--locked', '-p', 'rstim',
+                                        '--no-default-features', *selection])
+                originals[index] = (receipt, log)
+                (prep / f'native-check-{index}.log').write_text(log)
+                (prep / f'native-check-{index}.receipt.json').write_text(json.dumps(receipt))
+            evidence = SimpleNamespace(require_executed_tests=lambda log: None)
+            profile.validate_native_preflight(prep, evidence)
+            layout = prep / 'native-check-3.receipt.json'
+            layout.unlink()
+            with self.assertRaises(OSError):
+                profile.validate_native_preflight(prep, evidence)
+            layout.write_text(json.dumps(originals[3][0]))
+            for index in range(4):
+                receipt, log = originals[index]
+                path = prep / f'native-check-{index}.receipt.json'
+                for key, value in [('head', '0' * 40), ('exit_code', 101), ('child_waited', False),
+                                   ('environment', {'RUSTFLAGS': ''}), ('log_sha256', '0' * 64),
+                                   ('command', receipt['command'] + ['--ignored'])]:
+                    bad = copy.deepcopy(receipt); bad[key] = value; path.write_text(json.dumps(bad))
+                    with self.subTest(index=index, key=key), self.assertRaises(ValueError):
+                        profile.validate_native_preflight(prep, evidence)
+                path.write_text(json.dumps(receipt))
+            receipt, log = originals[2]
+            path = prep / 'native-check-2.receipt.json'
+            bad = copy.deepcopy(receipt); bad['command'][-1] = 'near_clifford::compiled::probability_replay_tests'
+            path.write_text(json.dumps(bad))
+            with self.assertRaises(ValueError):
+                profile.validate_native_preflight(prep, evidence)
+            for wrong in [log.replace(' ... ok', ' ... ignored', 1), log.replace('5 passed', '0 passed'),
+                          log.replace(sorted(profile.REAL_TESTS)[0], 'historical::projection_kernel'),
+                          '\n'.join(log.splitlines()[1:]) + '\n']:
+                bad = copy.deepcopy(receipt); bad['log_sha256'] = hashlib.sha256(wrong.encode()).hexdigest()
+                path.write_text(json.dumps(bad)); (prep / 'native-check-2.log').write_text(wrong)
+                with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                    profile.validate_native_preflight(prep, evidence)
 
 
 if __name__ == '__main__':
