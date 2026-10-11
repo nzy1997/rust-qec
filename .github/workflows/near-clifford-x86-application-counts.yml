@@ -289,8 +289,8 @@ jobs:
           PROFILE_ONLY: ${{ inputs.profile_only }}
         run: |
           test "$PROFILE_ONLY" != true
-          test "$BASELINE_REF" = 6e079197ce9ba62079744417f3f701d4562fa149
-          test "$CANDIDATE_REF" = 63a4fe7c30e2f894f2c15ec28da569d903638207
+          test "$BASELINE_REF" = c095bcac7aa78dc3a17b516c4c2781df36b530f2
+          test "$CANDIDATE_REF" = c49a71de7cf1e59b9ec0d4bb0efd1d499c286852
           mkdir -p drafts
           python -I -B benchmarks/near_clifford/fixed_call_lifecycle/test_contract.py > drafts/fixed-contract.log 2>&1
           python -I -B -O benchmarks/near_clifford/fixed_call_lifecycle/test_contract.py > drafts/fixed-contract-optimized.log 2>&1
