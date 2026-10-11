@@ -196,13 +196,7 @@ fn advance(p: &mut Planner, o: &TapeOp, budget: &mut Budget) -> Option<()> {
         return None;
     }
     match o {
-        TapeOp::Rotate {
-            pauli,
-            dagger,
-            coefficients,
-        } => p
-            .rotate_pauli_coefficients(pauli, *dagger, *coefficients)
-            .ok()?,
+        TapeOp::Rotate { pauli, .. } => p.preview_rotation(pauli).ok()?,
         TapeOp::Measure {
             pauli,
             record,
@@ -647,7 +641,7 @@ fn build_bounded(
             advance(&mut p, &tape[id], &mut budget)?;
         }
         let old_peak = p.peak;
-        if old_peak < 4 {
+        if old_peak < 4 && executable_rank(old_peak, limit) {
             return None;
         }
         p.state.reset_identity();
@@ -679,14 +673,24 @@ fn build_bounded(
                 }
             }
         }
-        if p.peak >= old_peak {
+        if p.peak >= old_peak && executable_rank(old_peak, limit) {
             return None;
         }
         let greedy_peak = p.peak;
-        let fallback = refs_for_order(tape, order, &successors, words, &mut budget)?;
-        if greedy_peak >= 4 {
+        let fallback = if greedy_peak < old_peak && executable_rank(greedy_peak, limit) {
+            Some(refs_for_order(
+                tape,
+                order,
+                &successors,
+                words,
+                &mut budget,
+            )?)
+        } else {
+            None
+        };
+        if greedy_peak >= 4 || !executable_rank(greedy_peak, limit) {
             if let Some(order) = preview_order(tape, &mut p, &successors, words, &mut budget) {
-                if p.peak < greedy_peak {
+                if p.peak < greedy_peak && p.peak < old_peak && executable_rank(p.peak, limit) {
                     if let Some(selected) =
                         refs_for_order(tape, order, &successors, words, &mut budget)
                     {
@@ -695,10 +699,14 @@ fn build_bounded(
                 }
             }
         }
-        Some(fallback)
+        fallback
     })();
     *state = p.state;
     result
+}
+fn executable_rank(rank: usize, limit: usize) -> bool {
+    rank <= limit
+        && coefficient_reservation_bytes(rank).is_ok_and(|bytes| bytes <= COEFFICIENT_BYTE_BUDGET)
 }
 fn refs_for_order(
     tape: &[TapeOp],
@@ -1015,6 +1023,70 @@ mod tests {
             }
             assert_eq!(p.peak, 9, "work={work} bytes={bytes}");
         }
+    }
+    #[test]
+    fn incomplete_preview_never_admits_a_greedy_order_above_the_execution_limit() {
+        let text = conditional_fixture::circuit(16, 8, false);
+        for (work, bytes) in [
+            (8_000_000, PLAN_BYTE_BUDGET),
+            (WORK_LIMIT, RANK_SCRATCH_BYTES + 72 * 1024),
+        ] {
+            for limit in [5, 8, 9] {
+                let (mut p, mut tape) = captured(&text);
+                let before = tape_signature(&tape);
+                let selected = build_bounded(&tape, &mut p.state, limit, bytes, work);
+                assert_eq!(tape_signature(&tape), before);
+                if limit < 9 {
+                    assert!(
+                        selected.is_none(),
+                        "limit={limit} work={work} bytes={bytes}"
+                    );
+                } else {
+                    let selected = selected.expect("complete executable greedy fallback");
+                    selected.apply(&mut tape).unwrap();
+                    p.state.reset_identity();
+                    p.limit = limit;
+                    for op in tape {
+                        p.finish_op(op).unwrap();
+                    }
+                    assert_eq!(p.peak, 9);
+                }
+            }
+        }
+    }
+    #[test]
+    fn structural_preview_stops_before_compact_mask_capacity_without_dense_reservations() {
+        let width = usize::BITS as usize + 1;
+        let mut p = Planner {
+            state: CompileFrame::identity(width).unwrap(),
+            axes: Vec::new(),
+            limit: 0,
+            peak: 0,
+            operations: Vec::new(),
+            expanded: 0,
+            reserved_bytes: 0,
+            tape: None,
+            record_count: 0,
+        };
+        for q in 0..usize::BITS as usize - 1 {
+            let mut pauli = Pauli::identity(width);
+            pauli.x[q] = true;
+            p.preview_rotation(&PackedPauli::new(&pauli)).unwrap();
+        }
+        assert_eq!(p.peak, usize::BITS as usize - 1);
+        assert!(p.operations.is_empty());
+        assert!(!executable_rank(p.peak, p.peak));
+        let before = p.axes.clone();
+        let mut pauli = Pauli::identity(width);
+        pauli.x[usize::BITS as usize - 1] = true;
+        assert!(
+            p.preview_rotation(&PackedPauli::new(&pauli))
+                .unwrap_err()
+                .contains("platform capacity")
+        );
+        assert_eq!(p.axes, before);
+        assert_eq!(p.peak, before.len());
+        assert!(p.operations.is_empty());
     }
     fn tape_signature(tape: &[TapeOp]) -> Vec<String> {
         tape.iter()
