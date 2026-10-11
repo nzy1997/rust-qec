@@ -19,6 +19,18 @@ unsupported rotation should use a distinct name such as `ROT_Z(0.448798950512827
 (an approximation to pi/7) and assert the unsupported-gate error, not a parser
 error on the text `pi/7`.
 
+The experimental runners also accept `R_X(alpha)`, `R_Y(alpha)`, and
+`R_Z(alpha)`. They implement `exp(-i alpha*pi*P/2)` for the corresponding
+Pauli operator, matching the [Tsim half-turn convention](https://www.bloqade.quera.com/vendored/tsim/overview/).
+For example, `R_X(0.5) 0` rotates by pi/2, while `RX 0` resets in the X basis.
+Each rotation requires exactly one finite angle and one or more plain qubit
+targets. Negative angles reverse the rotation. `SQRT_X`, `SQRT_X_DAG`, `SQRT_Y`,
+and `SQRT_Y_DAG` are also supported. Exact quarter-turn rotations use Clifford
+evolution and require no active coordinates. Other angles use coherent
+amplitudes in both the interpreter and compiled Strict/Fused samplers.
+Gate support does not remove resource limits: a compiled circuit can still
+exceed the structural active-rank or memory budget.
+
 The delivery sequence is: Clifford and T/T_DAG evolution; terminal X/Y/Z
 measurement and sampling; the experimental circuit API; mid-circuit measurement
 and reset; then Pauli noise, classical feedback, and detector/observable records.
@@ -45,7 +57,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 The circuit API accepts the basic single-qubit Clifford generators,
-`CX`/`CNOT`/`ZCX`, `CY`/`ZCY`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, `REPEAT`,
+`CX`/`CNOT`/`ZCX`, `CY`/`ZCY`, `CZ`/`ZCZ`, `SWAP`, `T`, `T_DAG`, the rotations
+and square-root Cliffords above, `REPEAT`,
 mid-circuit `M`/`MZ`/`MX`/`MY`, and `R`/`RZ`/`RX`/`RY` and
 `MR`/`MRZ`/`MRX`/`MRY` resets. It also accepts `X_ERROR`, `Y_ERROR`,
 `Z_ERROR`, `DEPOLARIZE1`, and `DEPOLARIZE2`, each with an explicit probability
