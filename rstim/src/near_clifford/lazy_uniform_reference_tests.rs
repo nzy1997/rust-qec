@@ -66,8 +66,10 @@ fn snapshot(sampler: &CompiledNearCliffordSampler<'_>) -> SamplerSnapshot {
                 .states
                 .iter()
                 .map(|state| {
+                    let mut coefficients = Vec::with_capacity(state.coefficients.len());
+                    state.coefficients.extend_to(&mut coefficients);
                     (
-                        amp_bits(&state.coefficients),
+                        amp_bits(&coefficients),
                         state.next_node,
                         entry_snapshot(state.transition),
                     )
