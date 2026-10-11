@@ -1,0 +1,17 @@
+[package]
+name = "near-clifford-application-counts"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[[bin]]
+name = "near-clifford-application-counts"
+path = "main.rs"
+
+[dependencies]
+rand = { version = "=0.8.7", features = ["small_rng"] }
+rstim = { path = "../../../rstim", default-features = false }
+serde_json = "1"
+sha2 = "=0.10.9"
+libc = "0.2"
