@@ -48,6 +48,19 @@ const PACKET_BYTE_BUDGET: usize = 16 * 1024 * 1024;
 // Conservative admission floor: noisy application scouts cover 128 or more events.
 const MIN_SCALAR_PREPARED_NOISE_EVENTS: usize = 128;
 
+// Immutable prefix and both retained work buffers can coexist.
+fn coefficient_reservation_bytes(rank: usize) -> Result<usize, String> {
+    let count = 1usize
+        .checked_shl(
+            rank.try_into()
+                .map_err(|_| "compiled coefficient size overflow")?,
+        )
+        .ok_or("compiled coefficient size overflow")?;
+    count
+        .checked_mul(3 * size_of::<ComplexAmp>())
+        .ok_or_else(|| "compiled coefficient byte overflow".into())
+}
+
 #[derive(Clone, Copy, Debug)]
 enum RandomKind {
     Independent,
@@ -1176,23 +1189,45 @@ impl Planner {
         dagger: bool,
         coefficients: Option<(f64, f64)>,
     ) -> Result<(), String> {
-        let mut p = self.reexpress(original)?;
+        let p = self.reexpress(original)?;
         let pivot = (0..self.state.num_qubits).find(|q| p.x[*q] && !self.axes.contains(q));
         let expand = pivot.is_some();
-        if let Some(pivot) = pivot {
+        if expand {
             if self.axes.len() >= self.limit {
                 return Err("compiled near-Clifford structural active-rank limit exceeded".into());
             }
-            let count = 1usize
-                .checked_shl((self.axes.len() + 1) as u32)
-                .ok_or("compiled coefficient size overflow")?;
-            // Immutable prefix and both retained work buffers can coexist.
-            let bytes = count
-                .checked_mul(3 * size_of::<ComplexAmp>())
-                .ok_or("compiled coefficient byte overflow")?;
+            let bytes = coefficient_reservation_bytes(self.axes.len() + 1)?;
             if bytes > COEFFICIENT_BYTE_BUDGET {
                 return Err("compiled coefficient reservation exceeds 64 MiB".into());
             }
+        }
+        let pauli = self.rotation_basis(original, p, pivot)?;
+        self.operations.push(PlanOp::Rotate {
+            pauli,
+            expand,
+            dagger,
+            coefficients,
+        });
+        Ok(())
+    }
+    // Rank-only scheduling stores no dense coefficients. Explore orders above
+    // the execution limit, but reject before compact masks can overflow.
+    fn preview_rotation(&mut self, original: &PackedPauli) -> Result<(), String> {
+        let p = self.reexpress(original)?;
+        let pivot = (0..self.state.num_qubits).find(|q| p.x[*q] && !self.axes.contains(q));
+        if pivot.is_some() && self.axes.len() >= usize::BITS as usize - 1 {
+            return Err("compiled near-Clifford preview rank exceeds platform capacity".into());
+        }
+        self.rotation_basis(original, p, pivot)?;
+        Ok(())
+    }
+    fn rotation_basis(
+        &mut self,
+        original: &PackedPauli,
+        mut p: Pauli,
+        pivot: Option<usize>,
+    ) -> Result<CompactPauli, String> {
+        if let Some(pivot) = pivot {
             let mut gates = Vec::new();
             for bit in 0..self.state.num_qubits {
                 if bit != pivot && p.x[bit] {
@@ -1206,13 +1241,7 @@ impl Planner {
             }
             p = self.reexpress(original)?;
         }
-        self.operations.push(PlanOp::Rotate {
-            pauli: self.compact(&p),
-            expand,
-            dagger,
-            coefficients,
-        });
-        Ok(())
+        Ok(self.compact(&p))
     }
     #[cfg(test)]
     fn measure(
