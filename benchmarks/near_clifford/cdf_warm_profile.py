@@ -19,8 +19,8 @@ from profile_processes import Recorder
 from warm_profile_contract import finite_payload, perf_clock, record_perf_path, select_samples
 
 BASE = '6e079197ce9ba62079744417f3f701d4562fa149'
-CANDIDATE = 'f2b1a474093728d0ec31c32faf5a533c65a370ac'
-PROTOCOL = '02ad5e9993a032b73f64f4950ae96e5a4bd0b8de'
+CANDIDATE = 'cc13770aded27b434cdedd8a07c2a7adae3f5ec4'
+PROTOCOL = '73107400ee67376cfa549f1d1b9c4e20e7c0f7d5'
 EXPORTS = {'perf-script.txt': ['script', '--header', '--ns', '-F', 'comm,pid,tid,cpu,time,event,ip,sym,dso'],
            'perf-report.txt': ['report', '--stdio', '--no-children', '--percent-limit', '0'],
            'perf-buildids.txt': ['buildid-list'], 'perf-header.txt': ['report', '--header-only'],
@@ -32,6 +32,19 @@ PHASE_TESTS = {
         'scalar_cdf_preserves_all_unsigned_modulo_phase_aliases',
         'phase_specialized_scalar_and_packet_cdfs_match_independent_frozen_bits']}
 WIDE_TESTS = {'compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails'}
+REAL_TESTS = {'near_clifford::compiled::real_coherent_packet::tests::' + name for name in [
+    'real_projection_matches_complex_for_all_small_gauges_and_mixed_branches',
+    'real_rotations_match_complex_policies_expansion_and_wide_lanes',
+    'real_packet_limits_and_tiny_positive_branches_match_complex',
+    'eligible_counts_preserve_raw_records_rng_and_positive_logical_errors',
+    'msc_real_packets_preserve_both_counts_policies_and_rng']}
+LAYOUT_TESTS = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'}
+NATIVE_CHECKS = [(['--lib', 'phase_specialized_cdf_tests'], PHASE_TESTS),
+                (['--test', 'near_clifford_compiled',
+                  'compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails', '--', '--exact'], WIDE_TESTS),
+                (['--lib', 'near_clifford::compiled::real_coherent_packet::tests::'], REAL_TESTS),
+                (['--lib', 'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage', '--', '--exact'], LAYOUT_TESTS)]
+
 
 
 def require(value, reason):
@@ -103,6 +116,19 @@ def require_exact_tests(log, expected):
     require(len(summaries) == 1 and re.fullmatch(
         r'test result: ok\. ' + str(len(expected)) + r' passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?', summaries[0]),
         'exact preflight summary differs')
+
+
+def validate_native_preflight(prep, evidence):
+    for index, (selection, expected) in enumerate(NATIVE_CHECKS):
+        receipt = read(prep / ('native-check-' + str(index) + '.receipt.json'))
+        log = prep / ('native-check-' + str(index) + '.log')
+        require(receipt['exit_code'] == 0 and receipt['child_waited'] and receipt['head'] == CANDIDATE and
+                receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and
+                receipt['log_sha256'] == meta(log)['sha256'], 'native preflight differs')
+        require(receipt['command'] == ['rustup', 'run', '1.93.1', 'cargo', 'test', '--release', '--locked', '-p', 'rstim',
+                                      '--no-default-features', *selection], 'native preflight selection differs')
+        evidence.require_executed_tests(log.read_text())
+        require_exact_tests(log.read_text(), expected)
 
 
 def profile(args):
@@ -256,22 +282,7 @@ def profile(args):
                         'fifo_gate_retains_a_completed_monotonic_warm_span']})
         # Frozen preparation verifier checks inventory; exact preflight tests are
         # independently audited in their retained source-qualified logs/receipts.
-        selections = [['--lib', 'phase_specialized_cdf_tests'], ['--test', 'near_clifford_compiled',
-                       'compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails', '--', '--exact'],
-                      ['--lib', 'near_clifford::compiled::probability_replay_tests']]
-        for index, selection in enumerate(selections):
-            receipt = read(prep / ('native-check-' + str(index) + '.receipt.json'))
-            log = prep / ('native-check-' + str(index) + '.log')
-            require(receipt['exit_code'] == 0 and receipt['child_waited'] and receipt['head'] == CANDIDATE and
-                    receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and
-                    receipt['log_sha256'] == meta(log)['sha256'], 'native preflight differs')
-            require(receipt['command'] == ['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim',
-                                           '--no-default-features', *selection], 'native preflight selection differs')
-            evidence.require_executed_tests(log.read_text())
-            if index < 2:
-                require_exact_tests(log.read_text(), PHASE_TESTS if index == 0 else WIDE_TESTS)
-        prepare_module = load_module('profile_cdf_prepare', here / 'prepare.py')
-        prepare_module.require_replay_tests((prep / 'native-check-2.log').read_text())
+        validate_native_preflight(prep, evidence)
         command(rec, 'cpu', ['lscpu', '--json'])
         command(rec, 'compiler', ['rustup', 'run', '1.93.1', 'rustc', '-Vv'])
         require((out / 'compiler.stdout').read_text() == prepared['compiler'], 'compiler differs from native build')

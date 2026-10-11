@@ -25,7 +25,7 @@ jobs:
       - name: Check out the frozen full36 protocol
         uses: actions/checkout@v4
         with:
-          ref: 02ad5e9993a032b73f64f4950ae96e5a4bd0b8de
+          ref: 73107400ee67376cfa549f1d1b9c4e20e7c0f7d5
           path: drafts/cdf-profile-protocol
           fetch-depth: 0
           persist-credentials: false
@@ -46,7 +46,7 @@ jobs:
           python3 -B benchmarks/near_clifford/cdf_source_pair/prepare.py \
             --out drafts/profile-preparation \
             --baseline-ref 6e079197ce9ba62079744417f3f701d4562fa149 \
-            --candidate-ref f2b1a474093728d0ec31c32faf5a533c65a370ac \
+            --candidate-ref cc13770aded27b434cdedd8a07c2a7adae3f5ec4 \
             > drafts/profile-prepare.log 2>&1
       - name: Build warm probes, compare finite outputs and sample fourteen cells
         timeout-minutes: 22
