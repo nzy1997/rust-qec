@@ -459,3 +459,39 @@ fn wide_coherent_rows_preserve_counts_records_and_following_rng() {
         }
     }
 }
+
+#[test]
+fn cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng() {
+    let text = "H 0 1 2 3 4 5 6 7\nT 0 1 2 3 4 5 6 7\nCX 0 1 1 2 2 3 3 4 4 5 5 6 6 7\nDEPOLARIZE2(0.11) 0 7\nMPP(0.07) X0*Y1*X2*Y3*X4*Y5*X6*Y7\nCX rec[-1] 7\nT_DAG 7\nMY 0 1 2 3 4 5 6 7\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        for seed in [583, 1739] {
+            let mut cached = plan.prepare_sampler().unwrap();
+            let mut uncached = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(seed);
+            let mut b = a.clone();
+            for shots in [1, 31, 32, 63, 64, 65, 1024, 64] {
+                assert_eq!(
+                    cached.sample(shots, &mut a).unwrap(),
+                    uncached.sample(shots, &mut b).unwrap()
+                );
+                let expected = uncached.sample(shots, &mut b).unwrap();
+                assert_eq!(
+                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                    count_records(&expected, 7)
+                );
+                assert_eq!(
+                    cached.sample_measurements_u8(shots, &mut a).unwrap(),
+                    uncached.sample_measurements_u8(shots, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
