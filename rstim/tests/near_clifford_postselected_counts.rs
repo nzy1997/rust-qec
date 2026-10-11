@@ -25,6 +25,63 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn coherent_joint_measurement_preserves_counts_records_feedback_and_following_rng() {
+    // The joint measurement retains all four coherent rotations. The independent
+    // noise produces accepted logical errors as well as rejected detector rows.
+    let text = "H 0 1 2 3\nT 0 1 2 3\nDEPOLARIZE2(0.03) 0 1\nMPP X0*X1*X2*X3\nCX rec[-1] 4\nCX sweep[1] 4\nX_ERROR(0.5) 4\nM 4\nOBSERVABLE_INCLUDE(7) rec[-1]\nX_ERROR(0.23) 5\nM 5\nDETECTOR rec[-1]\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        assert!(plan.peak_active_rank() >= 4);
+        for budget in [0, 64 * 1024 * 1024] {
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut batch = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+            let mut a = StdRng::seed_from_u64(20261011);
+            let mut b = a.clone();
+            for (position, shots) in [0, 1, 31, 32, 63, 64, 65, 129, 1024, 17]
+                .into_iter()
+                .enumerate()
+            {
+                let sweep = [false, position % 2 == 0];
+                // Structured sampling executes the scalar coefficient path.
+                let rows = reference.sample_with_sweep(shots, &sweep, &mut a).unwrap();
+                let expected = count_records(&rows, 7);
+                let actual = batch
+                    .sample_postselected_counts_with_sweep(shots, 7, &sweep, &mut b)
+                    .unwrap();
+                assert_eq!(
+                    actual, expected,
+                    "{arithmetic:?} budget={budget} shots={shots}"
+                );
+                if shots == 1024 {
+                    assert!(actual.accepted > 0 && actual.accepted < shots);
+                    assert!(actual.logical_errors > 0);
+                }
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                let rows = reference.sample_with_sweep(shots, &sweep, &mut a).unwrap();
+                let flat = batch
+                    .sample_measurements_u8_with_sweep(shots, &sweep, &mut b)
+                    .unwrap();
+                assert_eq!(
+                    flat.measurements,
+                    rows.iter()
+                        .flat_map(|row| row.measurements.iter().copied().map(u8::from))
+                        .collect::<Vec<_>>()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [

@@ -9,6 +9,9 @@ use coefficient_intern::CoefficientIntern;
 #[path = "coherent_packet.rs"]
 mod coherent_packet;
 use coherent_packet::CoherentPacket;
+#[path = "real_coherent_packet.rs"]
+mod real_coherent_packet;
+use real_coherent_packet::RealCoherentPacket;
 #[path = "random_event_runs.rs"]
 mod random_event_runs;
 use random_event_runs::RandomRunPlan;
@@ -1068,6 +1071,7 @@ pub struct CompiledNearCliffordExecutor {
     prefix_len: usize,
     rotation_arithmetic: CompiledRotationArithmetic,
     initial_coefficients: Arc<Vec<ComplexAmp>>,
+    real_prefix_gauge: Option<usize>,
     random_kinds: Vec<RandomKind>,
     random_runs: Option<RandomRunPlan>,
     noise_spans: Option<NoiseSpans>,
@@ -1442,6 +1446,7 @@ impl CompiledNearCliffordExecutor {
             prefix_len: 0,
             rotation_arithmetic: arithmetic,
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+            real_prefix_gauge: None,
             random_kinds: Vec::new(),
             random_runs: None,
             noise_spans: None,
@@ -1555,6 +1560,11 @@ impl CompiledNearCliffordExecutor {
         drop(sampler);
         plan.prefix_len = prefix;
         plan.initial_coefficients = Arc::new(coefficients);
+        plan.real_prefix_gauge = real_coherent_packet::prefix_gauge(
+            &plan.operations,
+            plan.prefix_len,
+            &plan.initial_coefficients,
+        );
         for op in &plan.operations[plan.prefix_len..] {
             let kind = match op {
                 PlanOp::Noise {
@@ -1751,6 +1761,7 @@ impl CompiledNearCliffordExecutor {
             packet_noise_masks: Vec::new(),
             packet_independent: None,
             coherent: CoherentPacket::default(),
+            real_coherent: RealCoherentPacket::default(),
             counts_outputs: Vec::new(),
         })
     }
@@ -1794,6 +1805,7 @@ pub struct CompiledNearCliffordSampler<'a> {
     packet_noise_masks: Vec<u64>,
     packet_independent: Option<IndependentPacket>,
     coherent: CoherentPacket,
+    real_coherent: RealCoherentPacket,
     counts_outputs: Vec<u64>,
 }
 
@@ -3294,9 +3306,22 @@ impl CompiledNearCliffordSampler<'_> {
         let result = (|| {
             let plan = self.plan;
             let random_count = plan.random_kinds.len();
+            let real = coherent && plan.real_prefix_gauge.is_some();
             if coherent {
-                self.coherent
-                    .reset(&plan.initial_coefficients, lanes, plan.peak_active_rank)?;
+                if let Some(gauge) = plan.real_prefix_gauge {
+                    self.real_coherent.reset(
+                        &plan.initial_coefficients,
+                        lanes,
+                        plan.peak_active_rank,
+                        gauge,
+                    )?;
+                } else {
+                    self.coherent.reset(
+                        &plan.initial_coefficients,
+                        lanes,
+                        plan.peak_active_rank,
+                    )?;
+                }
             }
             noise_masks.fill(0);
             if let Some(packet) = &mut noise_packet {
@@ -3426,13 +3451,23 @@ impl CompiledNearCliffordSampler<'_> {
                                 )
                             });
                         if coherent {
-                            self.coherent.rotate_with_arithmetic(
-                                pauli,
-                                *expand,
-                                *dagger,
-                                anti,
-                                plan.rotation_arithmetic,
-                            )?;
+                            if real {
+                                self.real_coherent.rotate(
+                                    pauli,
+                                    *expand,
+                                    *dagger,
+                                    anti,
+                                    plan.rotation_arithmetic,
+                                )?;
+                            } else {
+                                self.coherent.rotate_with_arithmetic(
+                                    pauli,
+                                    *expand,
+                                    *dagger,
+                                    anti,
+                                    plan.rotation_arithmetic,
+                                )?;
+                            }
                         } else if let Some(id) = states.uniform(live) {
                             let masks = [live & !anti, live & anti];
                             let mut next_states = [None; 2];
@@ -3591,7 +3626,11 @@ impl CompiledNearCliffordSampler<'_> {
                                 index, y, offset, ..
                             } => {
                                 if coherent {
-                                    let probabilities = self.coherent.probability_zero(&m.pauli);
+                                    let probabilities = if real {
+                                        self.real_coherent.probability_zero(&m.pauli)
+                                    } else {
+                                        self.coherent.probability_zero(&m.pauli)
+                                    };
                                     for lane in 0..lanes {
                                         if f64::from_bits(tape[lane * random_count + event])
                                             >= probabilities[lane]
@@ -3599,12 +3638,12 @@ impl CompiledNearCliffordSampler<'_> {
                                             branch |= 1 << lane;
                                         }
                                     }
-                                    self.coherent.project(
-                                        &m.pauli,
-                                        index,
-                                        y,
-                                        if offset { branch ^ all } else { branch },
-                                    )?;
+                                    let fixed = if offset { branch ^ all } else { branch };
+                                    if real {
+                                        self.real_coherent.project(&m.pauli, index, y, fixed)?;
+                                    } else {
+                                        self.coherent.project(&m.pauli, index, y, fixed)?;
+                                    }
                                 } else if let Some(id) = states.uniform(live) {
                                     let probability =
                                         self.cached_probability_zero(node, &m.pauli, Some(id))?;
@@ -4397,6 +4436,7 @@ mod tests {
                                     peak_active_rank: axes.len(),
                                     prefix_len: 0,
                                     initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+                                    real_prefix_gauge: None,
                                     random_kinds: Vec::new(),
                                     random_runs: None,
                                     noise_spans: None,
@@ -5103,6 +5143,7 @@ mod tests {
             prefix_len: 0,
             rotation_arithmetic: CompiledRotationArithmetic::Strict,
             initial_coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+            real_prefix_gauge: None,
             random_kinds: Vec::new(),
             random_runs: None,
             noise_spans: None,
