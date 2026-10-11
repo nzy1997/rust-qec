@@ -24,8 +24,8 @@ def archive_files(archive):
                 with stream.extractfile(member) as source:data=source.read()
                 files[member.name]={"bytes":len(data),"sha256":hashlib.sha256(data).hexdigest()}
     return files
-BASELINE="c095bcac7aa78dc3a17b516c4c2781df36b530f2"
-CANDIDATE="1f6daa4b502ec0a7b0d701e9061e46220007511c"
+BASELINE="1f6daa4b502ec0a7b0d701e9061e46220007511c"
+CANDIDATE="95124643d595fdc564b0733cf7a0524f77df138e"
 COMPILER="1.93.1"
 PUBLIC="wide_cached_amplitudes_preserve_noise_feedback_counts_records_and_rng"
 BASELINE_PUBLIC="postselected_counts_preserve_noise_projection_feedback_and_rng_across_routes"
