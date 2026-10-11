@@ -22,7 +22,7 @@ on:
         default: false
         type: boolean
       cdf_source_pair:
-        description: 'Run the fixed 36-cell depth/rank/boundary/counts source-pair protocol with an identical-binary control'
+        description: 'Run the fixed-call 24-cell lifecycle protocol, 1..256 prefixes, and identical-binary controls'
         required: false
         default: false
         type: boolean
@@ -282,78 +282,64 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check contracts and install pinned compiler before any timings
-        env:
-          PROFILE_ONLY: ${{ inputs.profile_only }}
-        run: |
-          test "$PROFILE_ONLY" != true
-          mkdir -p drafts
-          python -I benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/test_contract.py > drafts/x86-cdf-contract-optimized.log 2>&1
-          rustup toolchain install 1.93.1 --profile minimal > drafts/x86-cdf-toolchain.log 2>&1
-      - name: Record virtual host and select one logical CPU
-        run: |
-          python - <<'PY'
-          import json, os, platform, subprocess
-          from pathlib import Path
-          root = Path('drafts/x86-cdf')
-          root.mkdir()
-          affinity = sorted(os.sched_getaffinity(0))
-          receipt = dict(platform=platform.platform(), selected_cpu=affinity[0],
-                         available_affinity=affinity, virtual_machine=True,
-                         lscpu=json.loads(subprocess.check_output(['lscpu', '--json'])),
-                         meminfo=Path('/proc/meminfo').read_text(),
-                         cpuinfo=Path('/proc/cpuinfo').read_text())
-          (root/'host.json').write_text(json.dumps(receipt, indent=2)+'\n')
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              f.write(f'BENCH_CPU={affinity[0]}\n')
-          PY
-      - name: Build and retain both exact sources and run native arithmetic and RNG tests
-        timeout-minutes: 25
+      - name: Check full matrix contracts and install pinned compiler
         env:
           BASELINE_REF: ${{ inputs.baseline_ref }}
           CANDIDATE_REF: ${{ inputs.candidate_ref }}
+          PROFILE_ONLY: ${{ inputs.profile_only }}
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/prepare.py \
-            --baseline-ref "$BASELINE_REF" --candidate-ref "$CANDIDATE_REF" \
-            --out drafts/x86-cdf/preparation > drafts/x86-cdf/prepare.log 2>&1
-      - name: Collect all 36 cells with balanced source and identical-binary controls
-        timeout-minutes: 40
+          test "$PROFILE_ONLY" != true
+          test "$BASELINE_REF" = 6e079197ce9ba62079744417f3f701d4562fa149
+          test "$CANDIDATE_REF" = 63a4fe7c30e2f894f2c15ec28da569d903638207
+          mkdir -p drafts
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/test_contract.py > drafts/fixed-contract.log 2>&1
+          python -I -B -O benchmarks/near_clifford/fixed_call_lifecycle/test_contract.py > drafts/fixed-contract-optimized.log 2>&1
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/test_native_contract.py > drafts/fixed-native-contract.log 2>&1
+          python -I -B -O benchmarks/near_clifford/fixed_call_lifecycle/test_native_contract.py > drafts/fixed-native-contract-optimized.log 2>&1
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/test_native_bundle.py > drafts/fixed-bundle-contract.log 2>&1
+          python -I -B -O benchmarks/near_clifford/fixed_call_lifecycle/test_native_bundle.py > drafts/fixed-bundle-contract-optimized.log 2>&1
+          rustup toolchain install 1.93.1 --profile minimal > drafts/fixed-toolchain.log 2>&1
+      - name: Build exact native sources and require positive joint guards
+        timeout-minutes: 30
         run: |
-          taskset -c "$BENCH_CPU" python -I benchmarks/near_clifford/cdf_source_pair/run_retained.py \
-            --preparation drafts/x86-cdf/preparation --out drafts/x86-cdf/output \
-            --control drafts/x86-cdf/control > drafts/x86-cdf/outer.log 2>&1
-      - name: Seal originals before external summary interpretation
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/prepare.py \
+            --repo . --out drafts/x86-fixed-call/preparation \
+            --scratch drafts/fixed-call-build-scratch > drafts/fixed-prepare.log 2>&1
+      - name: Collect every fixed call prefix including first use
+        timeout-minutes: 35
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py --seal drafts/x86-cdf > drafts/x86-cdf-seal.log 2>&1
-      - name: Independently replay source bytes, finite witnesses, schedule and statistics
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/run.py \
+            --preparation drafts/x86-fixed-call/preparation \
+            --out drafts/x86-fixed-call/output > drafts/fixed-run.log 2>&1
+      - name: Seal original bytes before interpretation
         run: |
-          python -I benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify.log 2>&1
-          python -I -O benchmarks/near_clifford/cdf_source_pair/verify.py drafts/x86-cdf --git-sources > drafts/x86-cdf-verify-optimized.log 2>&1
-      - name: Retain original streams, actual binaries, source snapshots and partial failures
+          python -I -B - <<'PYSEAL'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('benchmarks/near_clifford/fixed_call_lifecycle').resolve()))
+          from common import seal
+          seal(Path('drafts/x86-fixed-call'))
+          PYSEAL
+      - name: Replay exact source archives native closures and all prefixes
+        run: |
+          python -I -B benchmarks/near_clifford/fixed_call_lifecycle/verify_native.py \
+            drafts/x86-fixed-call/preparation drafts/x86-fixed-call/output \
+            --git-repo . --expected-protocol "$GITHUB_SHA" --audit-out drafts/fixed-git-replay > drafts/fixed-summary.json 2> drafts/fixed-verify.log
+          python -I -B -O benchmarks/near_clifford/fixed_call_lifecycle/verify_native.py \
+            drafts/x86-fixed-call/preparation drafts/x86-fixed-call/output \
+            --git-repo . --expected-protocol "$GITHUB_SHA" --audit-out drafts/fixed-git-replay-optimized > drafts/fixed-summary-optimized.json 2> drafts/fixed-verify-optimized.log
+      - name: Retain all originals binaries archives and partial failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: near-clifford-x86-cdf-source-pair-${{ github.sha }}
+          name: near-clifford-x86-fixed-call-${{ github.sha }}
           retention-days: 30
           path: |
-            drafts/x86-cdf-*.log
-            drafts/x86-cdf/*.json
-            drafts/x86-cdf/*.log
-            drafts/x86-cdf/output/
-            drafts/x86-cdf/control/
-            drafts/x86-cdf/preparation/*.json
-            drafts/x86-cdf/preparation/*.log
-            drafts/x86-cdf/preparation/production-sources/
-            drafts/x86-cdf/preparation/protocol/
-            drafts/x86-cdf/preparation/baseline/native-probes/
-            drafts/x86-cdf/preparation/baseline/*.bin
-            drafts/x86-cdf/preparation/baseline/*.json
-            drafts/x86-cdf/preparation/baseline/*.log
-            drafts/x86-cdf/preparation/candidate/native-probes/
-            drafts/x86-cdf/preparation/candidate/*.bin
-            drafts/x86-cdf/preparation/candidate/*.json
-            drafts/x86-cdf/preparation/candidate/*.log
+            drafts/x86-fixed-call/
+            drafts/fixed-*.log
+            drafts/fixed-summary*.json
+            drafts/fixed-git-replay/
+            drafts/fixed-git-replay-optimized/
   current-cpu-peer:
     if: ${{ inputs.current_cpu_peer }}
     runs-on: ubuntu-24.04
