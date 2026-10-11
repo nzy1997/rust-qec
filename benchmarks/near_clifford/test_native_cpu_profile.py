@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import native_cpu_profile as profile
 
@@ -54,9 +55,9 @@ def fixture(out):
     preflight = {}
     for name in profile.PREFLIGHT:
         path = out / ("preflight-" + name + ".log")
-        path.write_text(f"test result: ok. {10 if name == 'public-counts' else 1} passed; fixture only\n")
+        path.write_text(f"test result: ok. {11 if name == 'public-counts' else 1} passed; fixture only\n")
         preflight[name] = dict(path=path.name, sha256=profile.scout.digest(path))
-    h = dict(schema="diagnostic.native-cpu-sampling.v1", started=1, performance_valid=False,
+    h = dict(schema="diagnostic.native-cpu-sampling.v2", started=1, performance_valid=False,
              scope="fixture-only metadata, no real samples", identities=identities, retained=retained, preflight=preflight,
              profile_driver_sha256=profile.scout.digest(out / "original-profile-driver.py"),
              native_preflight_sha256=profile.scout.digest(out / "original-native-preflight.sh"), features_sha256=profile.scout.digest(out / "features.txt"),
@@ -167,6 +168,61 @@ class ProfileContract(unittest.TestCase):
                 seal(out, h, c, events)
                 with self.assertRaises(ValueError):
                     profile.verify(out, git_sources=False, replay=False)
+
+    def test_producer_retains_current_preflight_logs_with_exact_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "drafts").mkdir()
+            out = root / "retained"
+            out.mkdir()
+            originals = {}
+            for name in profile.PREFLIGHT:
+                body = f"test result: ok. {11 if name == 'public-counts' else 1} passed; fixture only\n".encode()
+                (root / ("drafts/x86-scout-" + name + ".log")).write_bytes(body)
+                originals[name] = body
+            with patch.object(profile, "ROOT", root):
+                retained = profile.retain_native_preflight(out)
+            self.assertEqual(set(retained), set(profile.PREFLIGHT))
+            for name, body in originals.items():
+                target = "preflight-" + name + ".log"
+                self.assertEqual((out / target).read_bytes(), body)
+                self.assertEqual(retained[name], dict(path=target, sha256=hashlib.sha256(body).hexdigest()))
+
+    def test_producer_rejects_old_or_unexpected_counts_before_retention(self):
+        for count in (0, 10, 12):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / "drafts").mkdir()
+                out = root / "retained"
+                out.mkdir()
+                for name in profile.PREFLIGHT:
+                    passed = count if name == "public-counts" else 1
+                    (root / ("drafts/x86-scout-" + name + ".log")).write_text(f"test result: ok. {passed} passed; fixture only\n")
+                with patch.object(profile, "ROOT", root):
+                    with self.assertRaisesRegex(ValueError, "native preflight missing: public-counts"):
+                        profile.retain_native_preflight(out)
+                self.assertFalse((out / "preflight-public-counts.log").exists())
+
+    def test_current_profile_rejects_resealed_old_public_counts_totals(self):
+        for count in (0, 10, 12):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as temporary:
+                out = Path(temporary)
+                h, c, events = fixture(out)
+                path = out / "preflight-public-counts.log"
+                path.write_text(f"test result: ok. {count} passed; fixture only\n")
+                h["preflight"]["public-counts"]["sha256"] = profile.scout.digest(path)
+                seal(out, h, c, events)
+                with self.assertRaisesRegex(ValueError, "native gate result"):
+                    profile.verify(out, git_sources=False, replay=False)
+
+    def test_current_profile_does_not_relabel_historical_v1_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            out = Path(temporary)
+            h, c, events = fixture(out)
+            h["schema"] = "diagnostic.native-cpu-sampling.v1"
+            seal(out, h, c, events)
+            with self.assertRaisesRegex(ValueError, "instrumented timings"):
+                profile.verify(out, git_sources=False, replay=False)
 
     def test_timeout_stops_descendant_and_preserves_failed_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
