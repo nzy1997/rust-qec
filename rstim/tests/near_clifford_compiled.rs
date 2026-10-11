@@ -301,6 +301,12 @@ fn check_distribution_with_arithmetic(
     qubits: usize,
     arithmetic: CompiledRotationArithmetic,
 ) {
+    let plan =
+        CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+    assert_eq!(plan.rotation_arithmetic(), arithmetic);
+    check_plan_distribution(text, qubits, &plan);
+}
+fn check_plan_distribution(text: &str, qubits: usize, plan: &CompiledNearCliffordExecutor) {
     let branches = evolve(
         &rstim::parser::parse_lines(text).unwrap(),
         vec![Branch {
@@ -314,9 +320,6 @@ fn check_distribution_with_arithmetic(
         *expected.entry(key(&branch.records)).or_default() += branch.weight;
     }
     assert!((expected.values().sum::<f64>() - 1.).abs() < 2e-12);
-    let plan =
-        CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
-    assert_eq!(plan.rotation_arithmetic(), arithmetic);
     let shots = 16384;
     let mut observed = BTreeMap::<u64, usize>::new();
     let mut rng = StdRng::seed_from_u64(20261007);
@@ -466,14 +469,46 @@ fn compiled_wide_frame_word_boundaries_preserve_bell_correlations() {
 
 #[test]
 fn compiled_limits_fail_before_sampling_and_do_not_truncate_coherence() {
-    let too_many = "H 0 1\nT 0 1\nCX 0 1\nMY 0\nMX 1\n";
-    assert!(
-        CompiledNearCliffordExecutor::compile_with_limit(
-            rstim::parser::parse_lines(too_many).unwrap(),
-            1
+    // This former rejection can now retire one coherent axis before expanding
+    // the other. Check the admitted plan against independent physical matrices.
+    let reorderable = "H 0 1\nT 0 1\nCX 0 1\nMY 0\nMX 1\n";
+    for policy in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan = CompiledNearCliffordExecutor::compile_with_limit_and_arithmetic(
+            rstim::parser::parse_lines(reorderable).unwrap(),
+            1,
+            policy,
         )
-        .is_err()
-    );
+        .unwrap();
+        assert_eq!(plan.peak_active_rank(), 1);
+        check_plan_distribution(reorderable, 2, &plan);
+        let mut cached = plan.prepare_sampler().unwrap();
+        let mut uncached = plan.prepare_sampler_with_cache_budget(0).unwrap();
+        let mut a = StdRng::seed_from_u64(739);
+        let mut b = a.clone();
+        for shots in [0, 1, 31, 32, 65, 1] {
+            assert_eq!(
+                cached.sample(shots, &mut a).unwrap(),
+                uncached.sample(shots, &mut b).unwrap()
+            );
+            let mut x = a.clone();
+            let mut y = b.clone();
+            for _ in 0..16 {
+                assert_eq!(x.next_u64(), y.next_u64());
+            }
+        }
+    }
+    // A joint X measurement depends on both rotations. Neither axis can be
+    // retired before both have expanded, so the caller's rank-one cap rejects.
+    let too_many = "H 0 1\nT 0 1\nMPP X0*X1\n";
+    let error = CompiledNearCliffordExecutor::compile_with_limit(
+        rstim::parser::parse_lines(too_many).unwrap(),
+        1,
+    )
+    .unwrap_err();
+    assert!(error.contains("active-rank"), "{error}");
     assert!(CompiledNearCliffordExecutor::compile_text("REPEAT 1000001 {\nH 0\n}\n").is_err());
     assert!(CompiledNearCliffordExecutor::compile_text("H 4096\n").is_err());
     let mut wide_magic = String::new();
