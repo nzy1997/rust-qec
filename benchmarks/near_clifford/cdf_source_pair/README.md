@@ -40,11 +40,14 @@ production or performance evidence.
 Use a clean committed protocol checkout, Python 3.10 or later, Rust toolchain
 1.93.1, and two locally available exact 40-character source SHAs. The candidate
 must contain the `phase_specialized_cdf_tests`, wide-packet raw-record/RNG
-test, both `diagonal_projection_offset_tests` tests, and the exact
+test, all five `near_clifford::compiled::real_coherent_packet::tests::` tests, and the exact
 `near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage`
-test. This preflight revision is for the diagonal projection offset candidate; it rejects
+test. This preflight revision is for the exact real phase gauge packet candidate; it rejects
 missing, ignored, duplicated or failed named candidate tests. All four checks
-use native Release. The zero-noise sign protocol remains frozen at
+use native Release. The actual local Rust stdout fixture only checks mounted test
+names; it is explicitly a debug/MSRV witness, not a Linux native build receipt.
+The previous diagonal projection protocol remains frozen at
+`4e69bddd8921e3caa257eb2f334ef9efc4cbf8c9`. The zero-noise sign protocol remains frozen at
 `3ee3f528ad2e260834e5b7300068649b69c76cac`, and the earlier replay-cache protocol
 at `02ad5e9993a032b73f64f4950ae96e5a4bd0b8de`; their artifacts use their own verifiers.
 Preparation still rejects an old filter that executes zero tests. Both sources build
