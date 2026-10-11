@@ -1,0 +1,32 @@
+{
+  "scope": "Actual local debug/MSRV test stdout regression input only. Uncommitted candidate source bound by exact hashes. No native Linux/Release/performance/fullCI/production admission.",
+  "source_base": "6e079197ce9ba62079744417f3f701d4562fa149",
+  "source_hashes": {
+    "rstim/src/near_clifford/compiled.rs": {
+      "bytes": 270874,
+      "sha256": "505d7032a520f5e417ee6c915188e997778f9d9489a4eedac9602b66d5ab81cc"
+    },
+    "rstim/src/near_clifford/cdf_materialized_projection_tests.rs": {
+      "bytes": 11988,
+      "sha256": "fd0c92a2b2b0422749cff41e0cbcb6bc792b683663347579a1b79084639218f1"
+    },
+    "rstim/src/near_clifford/lazy_uniform_reference_tests.rs": {
+      "bytes": 25926,
+      "sha256": "1e152303675318e305a4e8d5239b531edd1036d5b3e880ed6da171b108d31426"
+    },
+    "rstim/tests/near_clifford_postselected_counts.rs": {
+      "bytes": 23440,
+      "sha256": "82cf0d9bbefbde8e82d5d2d12652193427808608ffaf6cdce45a5c496a140955"
+    }
+  },
+  "compiler": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: aarch64-apple-darwin\nrelease: 1.88.0\nLLVM version: 20.1.5",
+  "target_arch": "aarch64-apple-darwin",
+  "build_profile": "debug",
+  "native_flags_used": false,
+  "test_filter": "cdf_materialized_projection_tests",
+  "test_exit_code": 0,
+  "original_bundle_seal_sha256": "a302b9f311754f01a92287e8e44ecb46e2a81d65b99311067a6c5ad08c67c82d",
+  "original_test_receipt_sha256": "6a976abf9fe6d04ce2c49dbcf2552fe4444962db13e6d682dc6032997b24a8c9",
+  "stdout_bytes": 705,
+  "stdout_sha256": "f8aecabcebd91faab859b0867177014477787bfba034255b3209f1bb58e8beb9"
+}
