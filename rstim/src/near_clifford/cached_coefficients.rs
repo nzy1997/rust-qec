@@ -147,16 +147,20 @@ impl StoragePlan<'_> {
                 return None;
             }
             tags.resize(self.coefficients.len().div_ceil(32), 0);
-            for (i, coefficient) in self.coefficients.iter().enumerate() {
-                let imaginary = coefficient.re == 0. && coefficient.im != 0.;
-                let (active, unused) = if imaginary {
-                    (coefficient.im, coefficient.re)
-                } else {
-                    (coefficient.re, coefficient.im)
-                };
-                values.push(active);
-                let tag = u64::from(imaginary) | (u64::from(unused.is_sign_negative()) << 1);
-                tags[i / 32] |= tag << (2 * (i % 32));
+            for (coefficients, tag_word) in self.coefficients.chunks(32).zip(&mut tags) {
+                let mut packed_tags = 0;
+                values.extend(coefficients.iter().enumerate().map(|(i, coefficient)| {
+                    let imaginary = coefficient.re == 0. && coefficient.im != 0.;
+                    let (active, unused) = if imaginary {
+                        (coefficient.im, coefficient.re)
+                    } else {
+                        (coefficient.re, coefficient.im)
+                    };
+                    let tag = u64::from(imaginary) | (u64::from(unused.is_sign_negative()) << 1);
+                    packed_tags |= tag << (2 * i);
+                    active
+                }));
+                *tag_word = packed_tags;
             }
             CachedCoefficients::Axis(Arc::new(AxisCoefficients { values, tags }))
         } else {
