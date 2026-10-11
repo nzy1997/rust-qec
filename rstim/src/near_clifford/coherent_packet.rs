@@ -107,6 +107,7 @@ impl CoherentPacket {
         self.rotate_with_arithmetic(p, expand, dagger, anti, CompiledRotationArithmetic::Strict)
     }
 
+    #[cfg(test)]
     pub(super) fn rotate_with_arithmetic(
         &mut self,
         p: &CompactPauli,
@@ -115,6 +116,23 @@ impl CoherentPacket {
         anti: u64,
         arithmetic: CompiledRotationArithmetic,
     ) -> Result<(), String> {
+        self.rotate_with_coefficients(p, expand, dagger, anti, arithmetic, None)
+    }
+    pub(super) fn rotate_with_coefficients(
+        &mut self,
+        p: &CompactPauli,
+        expand: bool,
+        dagger: bool,
+        anti: u64,
+        arithmetic: CompiledRotationArithmetic,
+        coefficients: Option<(f64, f64)>,
+    ) -> Result<(), String> {
+        let (c, s) = coefficients.unwrap_or_else(|| {
+            (
+                (std::f64::consts::PI / 8.).cos(),
+                (std::f64::consts::PI / 8.).sin(),
+            )
+        });
         if self.lanes == 0 {
             return Err("coherent packet has not been initialized".into());
         }
@@ -153,10 +171,8 @@ impl CoherentPacket {
         self.im.resize(count, 0.);
         self.len = len;
         if arithmetic == CompiledRotationArithmetic::Fused {
-            return self.rotate_fused(p, dagger, anti);
+            return self.rotate_fused(p, dagger, anti, c, s);
         }
-        let c = (std::f64::consts::PI / 8.).cos();
-        let s = (std::f64::consts::PI / 8.).sin();
         let imaginary = p.physical.phase % 2 == 0;
         let base = if matches!(p.physical.phase, 0 | 3) {
             -s
@@ -241,9 +257,14 @@ impl CoherentPacket {
         Ok(())
     }
 
-    fn rotate_fused(&mut self, p: &CompactPauli, dagger: bool, anti: u64) -> Result<(), String> {
-        let c = (std::f64::consts::PI / 8.).cos();
-        let s = (std::f64::consts::PI / 8.).sin();
+    fn rotate_fused(
+        &mut self,
+        p: &CompactPauli,
+        dagger: bool,
+        anti: u64,
+        c: f64,
+        s: f64,
+    ) -> Result<(), String> {
         let imaginary = p.physical.phase % 2 == 0;
         let base = if matches!(p.physical.phase, 0 | 3) {
             -s
@@ -1865,6 +1886,7 @@ mod rotation_arithmetic_policy_bits_tests {
                     pauli,
                     expand,
                     dagger,
+                    ..
                 } = op
                 {
                     reference_rotate(&mut expected, pauli, *expand, *dagger, false, policy);
