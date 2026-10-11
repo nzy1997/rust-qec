@@ -25,6 +25,50 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn wide_cached_amplitudes_preserve_noise_feedback_counts_records_and_rng() {
+    let text = "H 0 1 2 3 4 5 6 7\nT 0 1 2 3 4 5 6 7\nCX 0 1 2 3 4 5 6 7\nDEPOLARIZE1(0.1) 0 1 2 3 4 5 6 7\nMPP(0.05) X0*X1*X2*X3*X4*X5*X6*X7\nCX rec[-1] 0\nT_DAG 0 1\nM(0.2) 0 1 2 3 4 5 6 7\nDETECTOR rec[-8] rec[-7]\nOBSERVABLE_INCLUDE(7) rec[-1] rec[-2]\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        let initial = plan
+            .prepare_sampler()
+            .unwrap()
+            .coefficient_cache_reserved_bytes();
+        for budget in [initial + 4096, 64 * 1024 * 1024] {
+            let mut cached = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+            let mut scalar = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(928371);
+            let mut b = a.clone();
+            let mut errors = 0;
+            for shots in [1, 31, 32, 63, 64, 65, 129, 1024, 64] {
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                assert_eq!(cached.sample(shots, &mut a).unwrap(), expected);
+                let expected = scalar.sample(shots, &mut b).unwrap();
+                let counts = count_records(&expected, 7);
+                errors += counts.logical_errors;
+                assert_eq!(
+                    cached.sample_postselected_counts(shots, 7, &mut a).unwrap(),
+                    counts
+                );
+                assert_eq!(
+                    cached.sample_measurements_u8(17, &mut a).unwrap(),
+                    scalar.sample_measurements_u8(17, &mut b).unwrap()
+                );
+                for _ in 0..16 {
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+                assert!(cached.coefficient_cache_reserved_bytes() <= budget);
+            }
+            assert!(errors > 0, "finite comparisons must witness logical errors");
+            assert!(cached.coefficient_cache_reserved_bytes() > initial);
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [

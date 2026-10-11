@@ -6,6 +6,9 @@ use compile_frame::CompileFrame;
 #[path = "coefficient_intern.rs"]
 mod coefficient_intern;
 use coefficient_intern::CoefficientIntern;
+#[path = "cached_coefficients.rs"]
+mod cached_coefficients;
+use cached_coefficients::CachedCoefficients;
 #[path = "coherent_packet.rs"]
 mod coherent_packet;
 use coherent_packet::CoherentPacket;
@@ -223,7 +226,7 @@ enum CachedOp {
     Measure(CachedMeasurement),
 }
 struct CachedState {
-    coefficients: Arc<Vec<ComplexAmp>>,
+    coefficients: CachedCoefficients,
     next_node: Option<usize>,
     transition: CachedOp,
 }
@@ -259,7 +262,7 @@ impl CoefficientCache {
         let mut states = Vec::new();
         states.try_reserve_exact(2).ok()?;
         states.push(CachedState {
-            coefficients: Arc::new(vec![ComplexAmp::new(1., 0.)]),
+            coefficients: CachedCoefficients::Dense(Arc::new(vec![ComplexAmp::new(1., 0.)])),
             next_node: None,
             transition: CachedOp::None,
         });
@@ -267,7 +270,7 @@ impl CoefficientCache {
             0
         } else {
             states.push(CachedState {
-                coefficients: plan.initial_coefficients.clone(),
+                coefficients: CachedCoefficients::Dense(plan.initial_coefficients.clone()),
                 next_node: None,
                 transition: CachedOp::None,
             });
@@ -310,14 +313,12 @@ impl CoefficientCache {
             true
         }
     }
+    #[cfg(test)]
     fn state_charge(coefficients: &[ComplexAmp]) -> Option<usize> {
         if coefficients.len() == 1 {
             Some(0)
         } else {
-            coefficients
-                .len()
-                .checked_mul(size_of::<ComplexAmp>())?
-                .checked_add(256)
+            Some(CachedCoefficients::plan(coefficients)?.requested_charge())
         }
     }
     fn fits(&self, bytes: usize) -> bool {
@@ -329,10 +330,15 @@ impl CoefficientCache {
         if coefficients.len() == 1 {
             return Some(0);
         }
-        let charge = Self::state_charge(coefficients)?;
         // Once admission closes, avoid hashing a coefficient vector on every
         // scalar replay. Interning is optional construction work, not a lookup
         // route after the bounded cache has filled.
+        // Check the cheapest possible representation before scanning for zeros.
+        if !self.fits(CachedCoefficients::minimum_charge(coefficients.len())?) {
+            return None;
+        }
+        let storage = CachedCoefficients::plan(coefficients)?;
+        let charge = storage.requested_charge();
         if !self.fits(charge) {
             return None;
         }
@@ -367,13 +373,12 @@ impl CoefficientCache {
         } else {
             None
         };
-        let mut state = Vec::new();
-        state.try_reserve_exact(coefficients.len()).ok()?;
-        state.extend_from_slice(coefficients);
+        let state = storage.allocate(self.budget - self.reserved)?;
+        let charge = state.charge()?;
         self.states.try_reserve(1).ok()?;
         let id = self.states.len();
         self.states.push(CachedState {
-            coefficients: Arc::new(state),
+            coefficients: state,
             next_node: None,
             transition: CachedOp::None,
         });
@@ -2351,7 +2356,7 @@ impl CompiledNearCliffordSampler<'_> {
         self.coefficients
             .try_reserve_exact(state.len())
             .map_err(|e| format!("compiled coefficient allocation failed: {e}"))?;
-        self.coefficients.extend_from_slice(&state);
+        state.extend_to(&mut self.coefficients);
         Ok(())
     }
     fn cached_rotate(
