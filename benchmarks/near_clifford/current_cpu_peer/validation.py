@@ -9,26 +9,58 @@ def counts(payload):
     return {key:sum(o[key] for o in payload["observations"]) for key in ["attempted","accepted","discarded","logical_errors"]}
 
 def masks(text):
-    # Independent linear-corpus parser; no use of author's helper imports.
-    width=0;detectors=[];observable=set();projection=[];found=False
-    for line in text.splitlines():
-        content=line.split('#',1)[0].strip()
-        match=re.fullmatch(r'([A-Za-z0-9_]+)(?:\(([^)]*)\))?(?:\s+(.*))?',content) if content else None
-        words=([match[1]+('('+match[2]+')' if match[2] is not None else '')]+(match[3] or '').split()) if match else []
-        if not words: projection.append(line);continue
-        gate=words[0].split('(')[0]
-        require(gate!='REPEAT','independent parser requires linear corpus')
-        if gate in {'M','MZ','MX','MY','MR','MRZ','MRX','MRY','MPP'}: width+=len(words)-1
-        if gate not in {'DETECTOR','OBSERVABLE_INCLUDE'}: projection.append(line);continue
+    # Independent iterative interpreter for bounded repeat blocks. Native
+    # execution receives the original text, not this annotation-analysis walk.
+    lines=text.splitlines()
+    content=[line.split('#',1)[0].strip() for line in lines]
+    matching={};opening=[];repeat_counts={}
+    for index,line in enumerate(content):
+        repeat=re.fullmatch(r'REPEAT\s+([0-9]+)\s*\{',line)
+        if repeat:
+            count=int(repeat[1]);require(1<=count<=1024,'repeat count outside bounded corpus')
+            opening.append(index);require(len(opening)<=32,'repeat nesting too deep');repeat_counts[index]=count
+        elif line=='}':
+            require(bool(opening),'unexpected repeat terminator')
+            start=opening.pop();matching[start]=index
+        else:
+            require('{' not in line and '}' not in line,'unsupported inline repeat syntax')
+    require(not opening,'unclosed repeat')
+    width=0;detectors=[];observable=set();found=False;cursor=0;frames=[];steps=0
+    while cursor<len(content):
+        position=cursor;line=content[cursor];cursor+=1;steps+=1
+        require(steps<=100000,'expanded corpus too large')
+        if position in repeat_counts:
+            frames.append([cursor,matching[position],repeat_counts[position]])
+            continue
+        if line=='}':
+            require(frames and frames[-1][1]==position,'repeat structure differs')
+            frames[-1][2]-=1
+            if frames[-1][2]:cursor=frames[-1][0]
+            else:frames.pop()
+            continue
+        if not line:continue
+        match=re.fullmatch(r'([A-Za-z0-9_]+)(?:\(([^)]*)\))?(?:\s+(.*))?',line)
+        require(match is not None,'unsupported annotation-analysis syntax')
+        gate,argument,targets=match.groups();words=(targets or '').split()
+        if gate in {'M','MZ','MX','MY','MR','MRZ','MRX','MRY','MPP'}:width+=len(words)
+        if gate not in {'DETECTOR','OBSERVABLE_INCLUDE'}:continue
         parity=set()
-        for token in words[1:]:
-            match=re.fullmatch(r'rec\[(-[0-9]+)\]',token);require(match is not None,'annotation token')
-            index=width+int(match[1]);require(0<=index<width,'annotation bounds')
+        for token in words:
+            record=re.fullmatch(r'rec\[(-[0-9]+)\]',token);require(record is not None,'annotation token')
+            index=width+int(record[1]);require(0<=index<width,'annotation bounds')
             if index in parity:parity.remove(index)
             else:parity.add(index)
         if gate=='DETECTOR':detectors.append(sorted(parity))
-        elif words[0]=='OBSERVABLE_INCLUDE(0)': observable.symmetric_difference_update(parity);found=True
-    require(found,'missing observable zero')
+        else:
+            require(argument is not None and argument.isdigit(),'observable index required')
+            if int(argument)==0:observable.symmetric_difference_update(parity);found=True
+    require(found and width>0,'missing observable zero or measurement records')
+    # Keep repeat structure and original physical instructions in the raw
+    # projection. Only output annotations are removed, including inside blocks.
+    projection=[]
+    for line,code in zip(lines,content):
+        words=code.split()
+        if not words or words[0].split('(',1)[0] not in {'DETECTOR','OBSERVABLE_INCLUDE'}:projection.append(line)
     return dict(width=width,detectors=detectors,observable=sorted(observable)), '\n'.join(projection)+'\n'
 def replay(p,m):
     width=p['width'];n=p['shots'];bits=p['measurements']

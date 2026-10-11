@@ -73,8 +73,8 @@ class ProtocolContracts(unittest.TestCase):
             moved = Path(directory)/'moved'
             shutil.copytree(original,moved);shutil.rmtree(original)
             def execute(expected, optimized=False, message=None):
-                command = [sys.executable,'-I']+(['-O'] if optimized else [])+[str(Path(__file__).parent/'verify.py'),str(moved)]
-                result = subprocess.run(command,capture_output=True,timeout=45)
+                command = [sys.executable,'-I','-B']+(['-O'] if optimized else [])+[str(Path(__file__).parent/'verify.py'),str(moved)]
+                result = subprocess.run(command,capture_output=True,timeout=120)
                 self.assertEqual(result.returncode,expected,result.stderr.decode())
                 if message is not None:self.assertIn(message,result.stderr.decode())
             execute(0);execute(0,True)
@@ -113,6 +113,14 @@ class ProtocolContracts(unittest.TestCase):
                 lambda:rewrite('preparation/rust/candidate/native-build-counts.receipt.json',lambda r:r.update(head='a'*40)),
                 lambda:rewrite('preparation/rust/native-check-2.receipt.json',lambda r:r.update(head='a'*40)),
             ]
+            def change_manifest(change):
+                rewrite('preparation/manifest.json',change)
+                rewrite('output/header.json',lambda h: change(h['manifest']))
+            mutations += [
+                lambda:change_manifest(lambda m:m.update(schema='rstim.current-cpu-peer.v2')),
+                lambda:change_manifest(lambda m:m.update(names=m['names'][:2])),
+                lambda:worker_change(lambda events:next(e for e in events if e['kind']=='timing').update(backend='not-a-frozen-role')),
+            ]
             for number,mutation in enumerate(mutations):
                 with self.subTest(mutation=number):
                     for relative,data in snapshots.items():(moved/relative).write_bytes(data)
@@ -147,27 +155,48 @@ class ProtocolContracts(unittest.TestCase):
             execute(1,message='reviewed official main revision differs')
             execute(1,True,message='reviewed official main revision differs')
 
-    def test_full_schedule_keeps_all_roles_and_counterbalances_each_case(self):
+    def test_full_schedule_keeps_all_roles_in_each_case_and_round(self):
+        from role_schedule import role_order
         manifest = json.loads((Path(__file__).parent/'manifest.json').read_text())
+        original = copy.deepcopy(manifest)
         selected = {(n,s):{b:{'batch':'auto',**({'cpu_backend':'compiled'} if b=='symft' else {})}
                             for b in ['clifft','clifft-scheduled','symft']}
                     for n in manifest['names'] for s in manifest['shots']}
         cases, events = schedule(manifest,selected)
-        self.assertEqual(len(cases),12)
-        self.assertEqual(len(events),1035)
+        self.assertEqual(len(cases),36)
+        self.assertEqual(len(events),4383)
         self.assertEqual(collections.Counter(e['kind'] for e in events),
                          {'package-inspection':4,'import-inspection':4,'host-inspection':1,
-                          'tuning':102,'counts-validation':42,'raw-validation':18,'timing':864})
+                          'tuning':306,'counts-validation':126,'raw-validation':54,'timing':3888})
         for name,shots,policy in cases:
             matching = [e for e in events if e['kind']=='timing' and (e['name'],e['shots'],e['policy'])==(name,shots,policy)]
-            self.assertEqual(len(matching),72)
-            positions = collections.defaultdict(collections.Counter)
-            for pair in range(12):
-                round = [e for e in matching if e['pair']==pair]
-                self.assertEqual({e['backend'] for e in round},set(manifest['roles']))
-                for position,event in enumerate(round):
-                    positions[event['backend']][position] += 1
-            self.assertTrue(all(dict(v)=={p:2 for p in range(6)} for v in positions.values()))
+            self.assertEqual(len(matching),108)
+            orders = []
+            for pair in range(18):
+                ordered = [e['backend'] for e in matching if e['pair']==pair]
+                self.assertEqual(len(ordered),6)
+                self.assertEqual(set(ordered),set(manifest['roles']))
+                self.assertEqual(ordered,role_order(manifest,name,shots,policy,pair))
+                orders.append(tuple(ordered))
+            self.assertGreater(len(set(orders)),1)
+        self.assertEqual(manifest,original)
+        validation_end = max(i for i,e in enumerate(events) if e['kind'] in {'tuning','counts-validation','raw-validation'})
+        self.assertLess(validation_end,min(i for i,e in enumerate(events) if e['kind']=='timing'))
+
+    def test_role_schedule_has_a_fixed_cross_interpreter_witness_and_rejects_invalid_inputs(self):
+        from role_schedule import role_order
+        manifest = json.loads((Path(__file__).parent/'manifest.json').read_text())
+        manifest['role_order_seed'] = '0'*64
+        self.assertEqual(role_order(manifest,'distillation',64,'strict',0),
+                         ['rstim', 'clifft-scheduled', 'baseline', 'control', 'symft', 'clifft'])
+        for change in [{'pair':True},{'pair':-1},{'pair':18},{'shots':True},{'name':'omitted'},{'policy':'other'}]:
+            arguments = dict(name='distillation',shots=64,policy='strict',pair=0); arguments.update(change)
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                role_order(manifest,**arguments)
+        for field,value in [('role_order_seed','0'*63),('role_order_contract','old-balanced-v2')]:
+            altered=dict(manifest,**{field:value})
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                role_order(altered,'distillation',64,'strict',0)
 
     def test_seeded_clock_releases_each_temporary_result_in_its_own_span(self):
         import timing
@@ -198,7 +227,7 @@ class ProtocolContracts(unittest.TestCase):
                                  ('clock',100),('rng-seed',8),*inside,('clock',145)])
 
     def test_literal_raw_parities_include_xor_cancellation_and_all_detector_rejection(self):
-        text = 'M 0 1 2\nDETECTOR rec[-1] rec[-1]\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-3]\nOBSERVABLE_INCLUDE(0) rec[-1]\n'
+        text = 'M 0 1 2\nDETECTOR rec[-1] rec[-1]\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-3]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-3] rec[-2] rec[-1]\n'
         parsed, projection = masks(text)
         self.assertEqual(parsed,dict(width=3,detectors=[[],[1]],observable=[0,2]))
         self.assertEqual(projection,'M 0 1 2\n')
@@ -209,6 +238,38 @@ class ProtocolContracts(unittest.TestCase):
         invalid['measurements'][37] = True
         with self.assertRaisesRegex(ValueError,'raw bit'):
             replay(invalid,parsed)
+
+    def test_nested_repeats_resolve_record_history_and_keep_native_projection(self):
+        text = 'M 0\nREPEAT 2 {\n M 1\n DETECTOR rec[-1] rec[-2]\n REPEAT 2 {\n  M 2\n  DETECTOR rec[-1] rec[-1]\n }\n}\nM 3\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-8]\n'
+        parsed,projection = masks(text)
+        self.assertEqual(parsed,dict(width=8,detectors=[[0,1],[],[],[3,4],[],[]],observable=[7]))
+        self.assertEqual(projection,'M 0\nREPEAT 2 {\n M 1\n REPEAT 2 {\n  M 2\n }\n}\nM 3\n')
+        rows = [[0,0,0,0,0,0,0,1],[1,0,0,0,0,0,0,0],
+                [1,1,0,0,0,0,0,0],[1,1,0,1,0,0,0,1]]*2048
+        self.assertEqual(replay(dict(width=8,shots=8192,measurements=[v for row in rows for v in row]),parsed),
+                         dict(attempted=8192,accepted=4096,discarded=4096,logical_errors=2048))
+        invalid = ['}\n','REPEAT 2 {\nM 0\n','REPEAT 0 {\n}\n',
+                   'REPEAT 1025 {\n}\n','REPEAT 2 { M 0 }\n',
+                   'M 0\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n',
+                   'REPEAT 1024 {\nREPEAT 1024 {\nM 0\n}\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n']
+        for text in invalid:
+            with self.subTest(text=text),self.assertRaises(ValueError):masks(text)
+
+    def test_all_six_official_inputs_have_their_declared_expanded_dimensions(self):
+        # Literal official metadata, independent of either parser's algorithm.
+        dimensions = {'msc_d3_inject_cultivate_p1e-3':(21,20),
+                      'msc_d5_inject_cultivate_p1e-3':(112,107),
+                      'distillation':(85,40),'coherent_d3_r3':(33,24),
+                      'coherent_d5_r5':(145,120),'pure_surface_d7_r7_p1e-3':(385,336)}
+        manifest=json.loads((Path(__file__).parent/'manifest.json').read_text())
+        self.assertEqual(set(manifest['names']),set(dimensions))
+        for name,(width,detectors) in dimensions.items():
+            path=Path(__file__).parent.parent/'application_counts/fixtures'/(name+'.stim')
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),manifest['inputs'][name])
+            parsed,_=masks(path.read_text())
+            with self.subTest(name=name):
+                self.assertEqual(parsed['width'],width)
+                self.assertEqual(len(parsed['detectors']),detectors)
 
     def test_compacted_raw_payload_requires_exact_bits_padding_and_metadata(self):
         raw = dict(shots=3,width=3,measurements=[1,0,1,1,0,0,0,1,1],backend='peer')

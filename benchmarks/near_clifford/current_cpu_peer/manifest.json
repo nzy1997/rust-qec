@@ -1,5 +1,5 @@
 {
-  "schema": "rstim.current-cpu-peer.v2",
+  "schema": "rstim.current-cpu-peer.v3",
   "symft_revision": "3f718e9e0c58b277a8fb506b4170863db5c3dbe6",
   "versions": {
     "symft": "2026.10.8",
@@ -8,7 +8,11 @@
   },
   "names": [
     "msc_d3_inject_cultivate_p1e-3",
-    "msc_d5_inject_cultivate_p1e-3"
+    "msc_d5_inject_cultivate_p1e-3",
+    "distillation",
+    "coherent_d3_r3",
+    "coherent_d5_r5",
+    "pure_surface_d7_r7_p1e-3"
   ],
   "shots": [
     1,
@@ -19,7 +23,7 @@
     "strict",
     "fused"
   ],
-  "pairs": 12,
+  "pairs": 18,
   "repetitions": 7,
   "roles": [
     "baseline",
@@ -33,10 +37,16 @@
   "warm_ns_min": 50000000,
   "peer_timeout_s": 180,
   "raw_timeout_s": 600,
-  "scope": "Fixed12 matched seeded public counts invocations with two exact Rust sources and identical baseline control; language adapter work included, no isolated-kernel or general SOTA claim.",
+  "scope": "Six official workloads, 36 seeded public counts cells and 18 paired rounds; prespecified per-case randomized role order, exact Rust source pair and identical baseline control. Language adapter work included; no isolated-kernel or general SOTA admission.",
   "inputs": {
     "msc_d3_inject_cultivate_p1e-3": "90a7d841e003e5ee38137cd9a3eb6529bb552e49c424bc6b0932a27d97cdb41f",
-    "msc_d5_inject_cultivate_p1e-3": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d"
+    "msc_d5_inject_cultivate_p1e-3": "c2b4566917bd9bf27a5705284dac02700ef0dcc7c03c91066670db376d633a6d",
+    "distillation": "188bd53c48dbc21f840fb297df6f41c61f5bad6a856bba621f00ff42078921c1",
+    "coherent_d3_r3": "87d1308c83894e87c60aeb2dc31b74be89b3460a951929951f2c3ac92606827d",
+    "coherent_d5_r5": "54088bbd5f06b441596e414f9fa99d8eeaff8a4a1a862b911e0ad40092c5e549",
+    "pure_surface_d7_r7_p1e-3": "30d1940101d70e05a63f0d2f877756ffaeaba7e8e17e94cd2ea40fce04b99583"
   },
-  "timing_contract": "seeded-counts-invocation-v1"
+  "timing_contract": "seeded-counts-invocation-v1",
+  "role_order_contract": "sha256-per-case-round-v1",
+  "role_order_seed": "8dfb07d4956e34ac413d7cb04310d64d4e3779de43de13f7eefeab9479e259d3"
 }

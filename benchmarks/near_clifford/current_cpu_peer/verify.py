@@ -16,6 +16,7 @@ from peer_evidence import inventory, preparation_pids, read, receipt_pids, requi
 from provenance import verify_prepared
 from commands import HOST_SCRIPT, THREADS, package_script
 from timing import TIMING_CONTRACT, RUST_ROLES
+from role_schedule import role_order
 from validation import compact_equal, compare, counts, masks, replay, validate_observations
 
 
@@ -43,11 +44,8 @@ def schedule(manifest, selected):
                            dict(kind='raw-validation',backend=backend,name=name,shots=shots,selection=selection)])
     for pair in range(manifest['pairs']):
         ordered = cases[pair%len(cases):]+cases[:pair%len(cases)]
-        roles = manifest['roles'][pair%len(manifest['roles']):]+manifest['roles'][:pair%len(manifest['roles'])]
-        if (pair//len(manifest['roles']))%2:
-            roles.reverse()
         for name,shots,policy in ordered:
-            for role in roles:
+            for role in role_order(manifest, name, shots, policy, pair):
                 item = dict(kind='timing',backend=role,name=name,shots=shots,policy=policy,pair=pair)
                 if role not in RUST_ROLES:
                     item['selection'] = selected[name,shots][role]
@@ -119,14 +117,14 @@ def verify_bundle(root, *, git_sources=False):
             and len(host['affinity']) == 1 and type(host['affinity'][0]) is int
             and all(host['thread_environment'][k] == '1' for k in threads), 'native host/affinity/threads differ')
     events = [json.loads(line) for line in (output/'events.jsonl').read_text().splitlines()]
-    require(len(events) == 1035 == closure['events'] and sha(output/'events.jsonl') == closure['events_sha256']
-            and [e['index'] for e in events] == list(range(1035)) and len({e['child_pid'] for e in events}) == 1035, 'complete event ledger differs')
+    require(len(events) == 4383 == closure['events'] and sha(output/'events.jsonl') == closure['events_sha256']
+            and [e['index'] for e in events] == list(range(4383)) and len({e['child_pid'] for e in events}) == 4383, 'complete event ledger differs')
     frozen = read(output/'frozen-selections.json')
     keys = list(itertools.product(manifest['names'],manifest['shots']))
     require([(f['name'],f['shots']) for f in frozen] == keys, 'complete frozen selection inventory differs')
     selected = {(f['name'],f['shots']):f['backends'] for f in frozen}
     cases, expected = schedule(manifest,selected)
-    require(len(expected) == 1035 and all(all(e.get(k) == v for k,v in s.items()) for e,s in zip(events,expected)), 'exact finite/tuning/comparison schedule differs')
+    require(len(expected) == 4383 and all(all(e.get(k) == v for k,v in s.items()) for e,s in zip(events,expected)), 'exact finite/tuning/comparison schedule differs')
     fixtures = prep/'protocol/benchmarks/near_clifford/application_counts/fixtures'
     parsed = {}
     for name in manifest['names']:
@@ -206,7 +204,7 @@ def verify_bundle(root, *, git_sources=False):
         elif kind == 'import-inspection':
             require(e['command'] == [str(original/backend/'bin/python'),'-I',str(repository/'benchmarks/near_clifford/compiled_sota/worker.py'),backend,str(repository/'benchmarks/near_clifford/compiled_sota/manifest.json'),'1','--mode','identity'], 'actual import inspection executable differs')
             require(payload['isolated'] is True and payload['loaded_files'] == header['identities'][backend], 'actual import worker differs')
-    require(observations['timing'] == 6048 and observations['counts-validation'] == 42 and closure['timing_children'] == 864, 'complete required observation counts differ')
+    require(observations['timing'] == 27216 and observations['counts-validation'] == 126 and closure['timing_children'] == 3888, 'complete required observation counts differ')
     for name,shots in keys:
         for backend in ['clifft','clifft-scheduled','symft']:
             trials = [e for e in events if e['kind'] == 'tuning' and (e['name'],e['shots'],e['backend']) == (name,shots,backend)]
@@ -216,7 +214,7 @@ def verify_bundle(root, *, git_sources=False):
             require(best['selection'] == selected[name,shots][backend], 'selection differs from prespecified tuning minimum')
     checks = [json.loads(line) for line in (output/'validation-checks.jsonl').read_text().splitlines()]
     require([(r['name'],r['shots'],r['backend']) for r in checks] == [(n,s,b) for n,s in keys for b in ['clifft','clifft-scheduled','symft']], 'full finite comparison inventory differs')
-    alpha = .001/(12*3*20)
+    alpha = .001/(len(cases)*3*20)
     for row in checks:
         name, shots, backend = row['name'],row['shots'],row['backend']
         match = lambda e,b,k: e['kind'] == k and (e['name'],e['shots'],e['backend']) == (name,shots,b)
@@ -233,7 +231,7 @@ def verify_bundle(root, *, git_sources=False):
     summary = []
     for name,shots,policy in cases:
         timing = [e for e in events if e['kind'] == 'timing' and (e['name'],e['shots'],e['policy']) == (name,shots,policy)]
-        values = {role:[statistics.median(o['ns_per_call'] for o in payloads[next(e['index'] for e in timing if e['backend'] == role and e['pair'] == pair)]['observations']) for pair in range(12)] for role in manifest['roles']}
+        values = {role:[statistics.median(o['ns_per_call'] for o in payloads[next(e['index'] for e in timing if e['backend'] == role and e['pair'] == pair)]['observations']) for pair in range(manifest['pairs'])] for role in manifest['roles']}
         ratios = {role:[p/r for p,r in zip(values[role],values['rstim'])] for role in ['baseline','clifft','clifft-scheduled','symft','control']}
         aa = [b/a for b,a in zip(values['baseline'],values['control'])]
         summary.append(dict(name=name,shots=shots,policy=policy,per_round_ns=values,per_round_over_rust=ratios,
@@ -243,10 +241,10 @@ def verify_bundle(root, *, git_sources=False):
     verify_absence(read(root/'control/preparation-process-absence.json'),preparation_pids(prep))
     verify_absence(read(root/'process-absence.json'),known)
     verify_files(root,seal['files'])
-    return dict(cases=summary,events=1035,finite_comparisons=18,timing_workers=864,timing_observations=6048,
+    return dict(cases=summary,events=4383,finite_comparisons=54,timing_workers=3888,timing_observations=27216,
                 successful_tuning_observations=observations['tuning'],original_seal_sha256=sha(root/'original-seal.json'),
                 timing_contract=TIMING_CONTRACT,
-                scope='Fixed12 seeded public counts invocations with exact Rust source pair and baseline control; language adapter work included; finite unconditional bounds only; no isolated-kernel/general SOTA admission')
+                scope='Six-workload 36-cell, 18-round seeded public counts invocations with exact Rust source pair and baseline control; language adapter work included; finite unconditional bounds only; no isolated-kernel/general SOTA admission')
 
 
 def main():
@@ -267,7 +265,7 @@ def main():
             require(args.analysis.resolve().is_relative_to(root/'analysis'), 'analysis output must be inside excluded bundle analysis directory')
             args.analysis.parent.mkdir(parents=True,exist_ok=True)
             args.analysis.write_text(json.dumps(result,indent=2)+'\n')
-        print('verified 1035 events, 18 finite comparisons, 864 timing workers, 6048 timing observations')
+        print('verified 4383 events, 54 finite comparisons, 3888 timing workers, 27216 timing observations')
 
 
 if __name__ == '__main__':
