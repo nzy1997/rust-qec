@@ -34,6 +34,33 @@ def probe_manifest(original, library):
         raise ValueError('probe library path missing or ambiguous')
     return original.replace(needle, 'path = ' + json.dumps(str(library)))
 
+def require_candidate_tests(log, *, layout=False):
+    expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
+        'near_clifford::compiled::cdf_materialized_projection_tests::probability_miss_reuses_only_the_unmodified_input_for_both_projection_branches',
+        'near_clifford::compiled::cdf_materialized_projection_tests::cached_first_branch_keeps_buffer_untouched_and_missing_second_branch_loads_input',
+        'near_clifford::compiled::cdf_materialized_projection_tests::projection_error_invalidates_loaded_input_and_preserves_the_old_error_state',
+        'near_clifford::compiled::cdf_materialized_projection_tests::default_mixed_calls_match_old_reload_state_records_counts_and_rng',
+    }
+    count = len(expected)
+    records, summaries = [], []
+    for line in log.splitlines():
+        if not line.startswith('test '):
+            continue
+        if line.startswith('test result:'):
+            summaries.append(line)
+        else:
+            record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
+            if record is None:
+                raise ValueError('malformed CDF materialization candidate test result record')
+            records.append(record.groups())
+    valid_summary = len(summaries) == 1 and re.fullmatch(
+        rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
+        summaries[0],
+    )
+    if (len(records) != count or {name for name, _ in records} != expected
+            or any(status != 'ok' for _, status in records) or not valid_summary):
+        raise ValueError('every named CDF materialization candidate test must execute successfully')
+
 class Cancelled(RuntimeError):pass
 def cancel(signum,frame):raise Cancelled('prepare cancelled by signal '+str(signum))
 def invoke(command,cwd,env,path,context):
@@ -56,12 +83,14 @@ def invoke(command,cwd,env,path,context):
     if child.returncode:raise ValueError('build/check failed; receipt retained')
     return receipt
 
-def main():
+def main(*, native_preflight=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out',type=Path,required=True)
     p.add_argument('--baseline-ref',required=True)
     p.add_argument('--candidate-ref',required=True)
     args=p.parse_args()
+    if native_preflight is not None:
+        native_preflight.require_heads(dict(baseline=args.baseline_ref,candidate=args.candidate_ref,control=args.baseline_ref))
     for ref in [args.baseline_ref,args.candidate_ref]:
         if not re.fullmatch('[0-9a-f]{40}',ref):p.error('exact40character lowercase source SHAs required')
     if git(ROOT,'status','--porcelain'):raise ValueError('protocol checkout must be clean')
@@ -99,12 +128,21 @@ def main():
     roots['control']=roots['baseline']
     # Exercise the candidate's native arithmetic/public RNG before performance collection.
     candidate=Path(roots['candidate']);test_env=dict(env,CARGO_TARGET_DIR=str(out/'candidate/test-target'))
-    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_compiled','compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails','--','--exact']]
+    tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_postselected_counts','cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng','--','--exact'],['--lib','near_clifford::compiled::cdf_materialized_projection_tests::'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
+    if native_preflight is not None:
+        tests = native_preflight.SELECTIONS
     for index,selection in enumerate(tests):
         command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection]
         invoke(command,candidate,test_env,out/f'native-check-{index}.log',dict(head=heads['candidate'],environment={'RUSTFLAGS':env['RUSTFLAGS']}))
-        evidence.require_executed_tests((out/f'native-check-{index}.log').read_text())
+        log=(out/f'native-check-{index}.log').read_text()
+        if native_preflight is None:
+            evidence.require_executed_tests(log)
+            if index >= 2:require_candidate_tests(log, layout=index == 3)
+        else:
+            native_preflight.check(index,log)
     metadata=dict(protocol_revision=protocol,protocol_directory=str(HERE),preparation_directory=str(out),roots=roots,heads=heads,created=time.time(),compiler=subprocess.check_output(['rustup','run','1.93.1','rustc','-Vv'],text=True))
+    if native_preflight is not None:
+        metadata['native_preflight_profile'] = native_preflight.PROFILE
     (out/'preparation.json').write_text(json.dumps(metadata,indent=2)+'\n')
     protocol_paths = [path for path in HERE.rglob('*') if path.is_file() and '__pycache__' not in path.parts]
     protocol_paths += [ROOT/'benchmarks/near_clifford'/name for name in ['application_counts/common.py','application_counts/manifest.json','diagnostics/corpus.py']]

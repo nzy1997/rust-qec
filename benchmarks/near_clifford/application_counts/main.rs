@@ -34,14 +34,19 @@ fn structured_counts(records: &[NearCliffordShot]) -> Result<(usize, usize), Str
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 6 && args.len() != 7 {
-        return Err("usage: PROBE CIRCUIT SHOTS REPETITIONS strict|fused bench|validate [structured|native]".into());
+    if !(6..=8).contains(&args.len()) {
+        return Err("usage: PROBE CIRCUIT SHOTS REPETITIONS strict|fused bench|validate [structured|native] [historical-probe-v1|seeded-counts-invocation-v1]".into());
     }
     let route = args.get(6).map_or("structured", String::as_str);
     if route != "structured" && route != "native" {
         return Err("Rust route must be structured or native".into());
     }
     let native = route == "native";
+    let timing_contract = args.get(7).map_or("historical-probe-v1", String::as_str);
+    let seeded = timing_contract == "seeded-counts-invocation-v1";
+    if (timing_contract != "historical-probe-v1" && !seeded) || (seeded && !native) {
+        return Err("seeded counts timing requires native route; unknown timing contract".into());
+    }
     let text = std::fs::read_to_string(&args[1])?;
     let shots: usize = args[2].parse()?;
     let repetitions: usize = args[3].parse()?;
@@ -71,19 +76,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut witness_bits = Vec::new();
     let mut witness_width = 0;
     let mut sample = |seed: u64| -> Result<_, String> {
+        // Only finite witnesses prepare a reference RNG in the new contract.
+        // Legacy calls retain their existing pre-clock clone and clock boundary.
+        let mut reference_rng = if seeded && validation {
+            Some(SmallRng::seed_from_u64(seed))
+        } else {
+            None
+        };
+        let seeded_start = seeded.then(Instant::now);
         let mut rng = SmallRng::seed_from_u64(seed);
-        let mut reference_rng = rng.clone();
-        let start = Instant::now();
+        if !seeded {
+            reference_rng = Some(rng.clone());
+        }
+        let start = seeded_start.unwrap_or_else(Instant::now);
         let (ns, records, accepted, logical_errors) = if native {
             let counts = sampler.sample_postselected_counts(shots, 0, &mut rng)?;
-            let ns = start.elapsed().as_nanos();
+            let legacy_ns = (!seeded).then(|| start.elapsed().as_nanos());
+            let (attempted, accepted, logical_errors) =
+                (counts.attempted, counts.accepted, counts.logical_errors);
+            let discarded = attempted.saturating_sub(accepted);
+            // Materialize the four public count scalars inside the seeded clock.
+            // The native result is a Copy struct with no heap-owned fields.
+            black_box((attempted, accepted, discarded, logical_errors));
+            black_box(counts);
+            let ns = legacy_ns.unwrap_or_else(|| start.elapsed().as_nanos());
+            if attempted != shots || accepted > attempted || logical_errors > accepted {
+                return Err("invalid native counts semantics".into());
+            }
             let records = if validation {
                 let records = reference_sampler
                     .as_mut()
                     .unwrap()
-                    .sample(shots, &mut reference_rng)?;
-                if structured_counts(&records)? != (counts.accepted, counts.logical_errors)
-                    || (0..16).any(|_| rng.next_u64() != reference_rng.next_u64())
+                    .sample(shots, reference_rng.as_mut().unwrap())?;
+                if structured_counts(&records)? != (accepted, logical_errors)
+                    || (0..16).any(|_| rng.next_u64() != reference_rng.as_mut().unwrap().next_u64())
                 {
                     return Err(
                         "native counts or RNG continuation differs from structured witness".into(),
@@ -93,7 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 Vec::new()
             };
-            (ns, records, counts.accepted, counts.logical_errors)
+            (ns, records, accepted, logical_errors)
         } else {
             let records = sampler.sample(shots, &mut rng)?;
             let (accepted, logical_errors) = structured_counts(&records)?;
@@ -154,6 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut output = json!({"backend":"rstim","status":"ok","arithmetic":args[4],
         "input_sha256":format!("{:x}",Sha256::digest(text.as_bytes())),
+        "timing_contract":timing_contract,
         "output_contract":"all-zero raw detector postselection; raw observable 0 counts; no reference normalization",
         "execution":if native { "native raw postselected counts; optional affine model and scalar/packed early rejection" } else { "full structured records then filter; no early rejection" },
         "compile_ns":compile_ns,"prepare_ns":prepare_ns,"first_ns":first.0,

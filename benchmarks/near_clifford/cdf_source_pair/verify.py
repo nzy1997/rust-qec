@@ -40,6 +40,33 @@ def require(value, message):
         raise ValueError(message)
 
 
+def require_candidate_tests(log, *, layout=False):
+    expected = {'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage'} if layout else {
+        'near_clifford::compiled::cdf_materialized_projection_tests::probability_miss_reuses_only_the_unmodified_input_for_both_projection_branches',
+        'near_clifford::compiled::cdf_materialized_projection_tests::cached_first_branch_keeps_buffer_untouched_and_missing_second_branch_loads_input',
+        'near_clifford::compiled::cdf_materialized_projection_tests::projection_error_invalidates_loaded_input_and_preserves_the_old_error_state',
+        'near_clifford::compiled::cdf_materialized_projection_tests::default_mixed_calls_match_old_reload_state_records_counts_and_rng',
+    }
+    count = len(expected)
+    records, summaries = [], []
+    for line in log.splitlines():
+        if not line.startswith('test '):
+            continue
+        if line.startswith('test result:'):
+            summaries.append(line)
+        else:
+            record = re.fullmatch(r'test (\S+) \.\.\. (.+)', line)
+            if record is None:
+                raise ValueError('malformed CDF materialization candidate test result record')
+            records.append(record.groups())
+    valid_summary = len(summaries) == 1 and re.fullmatch(
+        rf'test result: ok\. {count} passed; 0 failed; 0 ignored; 0 measured; [0-9]+ filtered out(?:; finished in [0-9]+(?:\.[0-9]+)?s)?',
+        summaries[0],
+    )
+    if (len(records) != count or {name for name, _ in records} != expected
+            or any(status != 'ok' for _, status in records) or not valid_summary):
+        raise ValueError('every named CDF materialization candidate test must execute successfully')
+
 def receipt_pids(receipt):
     pids = [receipt['controller_pid'], receipt['child_pid']]
     require(all(type(pid) is int and pid > 0 for pid in pids), 'invalid actual process PID')
@@ -154,6 +181,7 @@ def verify_bundle(root, git_sources=False):
     prep, output = root / 'preparation', root / 'output'
     prep_digest = evidence.verify_preparation(prep)
     metadata = read(prep / 'preparation.json')
+    require('native_preflight_profile' not in metadata, 'standalone CDF verifier rejects peer-only native profiles')
     original_prep = Path(metadata['preparation_directory'])
     original_protocol = Path(metadata['protocol_directory'])
     require(original_prep.is_absolute() and original_protocol.is_absolute(), 'original execution directories missing')
@@ -245,12 +273,14 @@ def verify_bundle(root, git_sources=False):
                     receipt['binary']['mode'] == '0o755', 'native target/flags/executable binding differs')
             require(evidence.sha(prep / role / ('native-build-' + kind + '.log')) ==
                     receipt['log_sha256'], 'build log differs')
-    for index in [0, 1]:
+    for index in [0, 1, 2, 3]:
         receipt = read(prep / ('native-check-' + str(index) + '.receipt.json'))
         preparation_pids.extend(receipt_pids(receipt))
         selection = (['--lib', 'phase_specialized_cdf_tests'] if index == 0 else
-                     ['--test', 'near_clifford_compiled',
-                      'compiled_wide_coherent_packets_keep_raw_records_and_rng_across_tiles_and_tails', '--', '--exact'])
+                     ['--test', 'near_clifford_postselected_counts',
+                      'cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng', '--', '--exact'] if index == 1 else
+                     ['--lib', 'near_clifford::compiled::cdf_materialized_projection_tests::'] if index == 2 else
+                     ['--lib', 'near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage', '--', '--exact'])
         require(receipt['command'] == ['rustup', 'run', '1.93.1', 'cargo', 'test', '--release', '--locked',
                                         '-p', 'rstim', '--no-default-features', *selection] and
                 receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and
@@ -261,6 +291,7 @@ def verify_bundle(root, git_sources=False):
                 receipt['exit_code'] == 0 and evidence.sha(log) == receipt['log_sha256'],
                 'native arithmetic/public RNG check differs')
         evidence.require_executed_tests(log.read_text())
+        if index >= 2:require_candidate_tests(log.read_text(), layout=index == 3)
     verify_absence(read(root / 'control/preparation-process-absence.json'), preparation_pids, waited=False)
     require(evidence.sha(output / 'events.jsonl') == closure['events_sha256'], 'ledger hash differs')
     events = [json.loads(line) for line in (output / 'events.jsonl').read_text().splitlines()]

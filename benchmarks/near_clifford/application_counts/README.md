@@ -34,7 +34,7 @@ All source/input bytes, binaries, peer distributions and actual isolated imports
 are inventoried before and after. Five independent rotated/reversed process
 rounds, each seven observations accumulating at least 50 ms, are formal defaults.
 Compilation, preparation, first calls, RSS and count rates are separate metrics.
-Rust RNG setup and caller output destruction are outside timing; filtering is
+The probe defaults to `historical-probe-v1`: Rust RNG setup and caller output destruction are outside timing; filtering is
 inside. Python count-dictionary conversion is inside timing. OS process high-water
 RSS includes interpreter/probe allocations and is not a cache-only measurement.
 Use taskset on Linux and report actual affinity; macOS is a shared unpinned host.
@@ -80,6 +80,13 @@ The published Linux high-water marks are retained as process observations but
 cannot establish simulator-only memory usage or relative engine memory costs.
 Future Linux memory comparisons need a separately attributed measurement.
 See the [Linux getrusage contract](https://man7.org/linux/man-pages/man2/getrusage.2.html).
+
+The optional final probe argument `seeded-counts-invocation-v1` requires the
+native route. It includes RNG initialization and four count-scalar materialization
+inside each call's clock, and emits an explicit `timing_contract`. Native witness
+records and RNG carry validation remain outside that clock. Existing callers keep
+the historical default; source-pair peer v2 uses the opt-in contract on both Rust
+revisions and rejects mixed receipts.
 
 ## Native Rust counts follow-up
 
