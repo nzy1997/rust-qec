@@ -17,6 +17,7 @@ import zipfile
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0,str(HERE))
+import axis_preflight
 from commands import HOST_SCRIPT, THREADS, package_script, setup_commands
 from peer_evidence import inventory, preparation_pids, read, seal_preparation, sha
 from wheel_bindings import bind_wheel
@@ -52,8 +53,9 @@ def build_preparation(prep):
             path.write_text(path.read_text().replace(original_rust,str(rust)))
     shutil.rmtree(template)
     meta = read(rust/'preparation.json')
-    heads = dict(baseline='a'*40,candidate='b'*40,control='a'*40)
+    heads = dict(baseline=axis_preflight.BASELINE,candidate=axis_preflight.CANDIDATE,control=axis_preflight.BASELINE)
     meta['heads'] = heads
+    meta['native_preflight_profile'] = axis_preflight.PROFILE
     write(rust/'preparation.json',meta)
     for role in ['baseline','candidate']:
         (rust/'production-sources'/role/'toy.rs').write_text('// synthetic Rust source '+role+'\n')
@@ -65,16 +67,22 @@ def build_preparation(prep):
                            probe={n:sha(rust/role/'native-probes'/kind/n) for n in ['Cargo.toml','Cargo.lock','main.rs']})
             receipt['binary'].update(bytes=retained.stat().st_size,sha256=sha(retained))
             write(path,receipt)
+    for index,(selection,names) in enumerate(zip(axis_preflight.SELECTIONS,axis_preflight.NAMES)):
+        log=rust/('native-check-'+str(index)+'.log')
+        log.write_text(''.join('test '+name+' ... ok\n' for name in names)+f'test result: ok. {len(names)} passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n')
+        path=log.with_suffix('.receipt.json');receipt=read(path)
+        receipt.update(head=heads['candidate'],log_sha256=sha(log),command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection])
+        write(path,receipt)
     (rust/'seal.json').unlink();seal_preparation(rust,'c'*40)
     for path in [*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['cdf_source_pair/prepare.py','cdf_source_pair/evidence.py','application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py','compiled_sota/manifest.json']]]:
         target=prep/'protocol'/path.relative_to(ROOT);target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
     manifest=read(HERE/'manifest.json')
-    manifest.update(protocol_revision='c'*40,rust_baseline_head='a'*40,rust_source_head='b'*40)
+    manifest.update(protocol_revision='c'*40,rust_baseline_head=axis_preflight.BASELINE,rust_source_head=axis_preflight.CANDIDATE)
     for name in manifest['names']:
         target=prep/'protocol/benchmarks/near_clifford/application_counts/fixtures'/(name+'.stim')
         target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(HERE.parent/'application_counts/fixtures'/(name+'.stim'),target)
     write(prep/'manifest.json',manifest)
-    write(prep/'preparation.json',dict(protocol_revision='c'*40,rust_baseline_head='a'*40,rust_source_head='b'*40,symft_revision=manifest['symft_revision'],preparation_directory=str(prep),repository_directory=str(ROOT),protocol_directory=str(HERE)))
+    write(prep/'preparation.json',dict(native_preflight_profile=axis_preflight.PROFILE,protocol_revision='c'*40,rust_baseline_head=axis_preflight.BASELINE,rust_source_head=axis_preflight.CANDIDATE,symft_revision=manifest['symft_revision'],preparation_directory=str(prep),repository_directory=str(ROOT),protocol_directory=str(HERE)))
     peer_data=b'# synthetic peer source\n'
     (prep/'peer-sources').mkdir();(prep/'peer-sources/toy.py').write_bytes(peer_data)
     buffer=io.BytesIO()
@@ -143,7 +151,7 @@ def build_bundle(root):
         parsed[n],projection=masks((HERE.parent/'application_counts/fixtures'/(n+'.stim')).read_text());(output/(n+'.records.stim')).write_text(projection)
     sources={role:read(prep/'rust'/role/'native-build-counts.receipt.json') for role in ['baseline','candidate']}
     harness=[*HERE.glob('*.py'),HERE/'manifest.json',*[ROOT/'benchmarks/near_clifford'/n for n in ['cdf_source_pair/prepare.py','cdf_source_pair/evidence.py','application_counts/common.py','diagnostics/source_contract.py','compiled_sota/run.py','compiled_sota/worker.py','compiled_sota/projection.py','compiled_sota/evidence.py']]]
-    before=dict(protocol_revision='c'*40,rust_build_heads=dict(baseline='a'*40,candidate='b'*40),rust_sources={r:s['sources'] for r,s in sources.items()},peer_sources={n:v['sha256'] for n,v in inventory(prep/'peer-sources').items()},rust_binary_sha256={r:s['binary']['sha256'] for r,s in sources.items()},inputs=manifest['inputs'],harness={str(p):sha(p) for p in harness}|{str(prep/n):sha(prep/n) for n in ['manifest.json','expected-environment.json']})
+    before=dict(protocol_revision='c'*40,rust_build_heads=dict(baseline=axis_preflight.BASELINE,candidate=axis_preflight.CANDIDATE),rust_sources={r:s['sources'] for r,s in sources.items()},peer_sources={n:v['sha256'] for n,v in inventory(prep/'peer-sources').items()},rust_binary_sha256={r:s['binary']['sha256'] for r,s in sources.items()},inputs=manifest['inputs'],harness={str(p):sha(p) for p in harness}|{str(prep/n):sha(prep/n) for n in ['manifest.json','expected-environment.json']})
     host=dict(uname=['Linux','test','0','0','x86_64',''],python='3.12.0',affinity=[0],thread_environment={k:'1' for k in THREADS})
     write(output/'header.json',dict(schema=manifest['schema'],manifest=manifest,before=before,preparation_seal_sha256=sha(prep/'seal.json'),controller_pid=32179,packages=expected['packages'],identities=expected['identities'],host=host,timing_contract=TIMING_CONTRACT))
     _,schedule_events=schedule(manifest,selected);events=[];payloads={}

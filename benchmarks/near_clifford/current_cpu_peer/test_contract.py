@@ -31,6 +31,7 @@ class ProtocolContracts(unittest.TestCase):
 
     def test_preparation_requires_reviewed_main_before_cloning(self):
         import prepare
+        import axis_preflight
         pin = json.loads((Path(__file__).parent/'manifest.json').read_text())['symft_revision']
         self.assertEqual(prepare.PEER,pin)
         cases = [
@@ -52,7 +53,7 @@ class ProtocolContracts(unittest.TestCase):
                 def git_output(command,**kwargs):
                     return b'' if command[1]=='status' else 'c'*40+'\n'
                 with self.subTest(remote=remote), \
-                     mock.patch.object(sys,'argv',['prepare.py','--out',str(Path(directory)/str(number)),'--rust-ref','b'*40,'--baseline-ref','a'*40]), \
+                     mock.patch.object(sys,'argv',['prepare.py','--out',str(Path(directory)/str(number)),'--rust-ref',axis_preflight.CANDIDATE,'--baseline-ref',axis_preflight.BASELINE]), \
                      mock.patch.object(sys,'version_info',(3,12)), \
                      mock.patch.object(prepare.platform,'system',return_value='Linux'), \
                      mock.patch.object(prepare.platform,'machine',return_value='x86_64'), \
@@ -121,6 +122,28 @@ class ProtocolContracts(unittest.TestCase):
                 lambda:change_manifest(lambda m:m.update(names=m['names'][:2])),
                 lambda:worker_change(lambda events:next(e for e in events if e['kind']=='timing').update(backend='not-a-frozen-role')),
             ]
+            def native_log(index,change):
+                path=moved/'preparation/rust'/('native-check-'+str(index)+'.log')
+                path.write_text(change(path.read_text()))
+                rewrite('preparation/rust/native-check-'+str(index)+'.receipt.json',lambda r:r.update(log_sha256=hashlib.sha256(path.read_bytes()).hexdigest()))
+            profile_mutations = [
+                lambda:rewrite('preparation/preparation.json',lambda r:r.pop('native_preflight_profile')),
+                lambda:rewrite('preparation/manifest.json',lambda r:r.update(native_preflight_profile='unknown')),
+                lambda:rewrite('preparation/rust/preparation.json',lambda r:r.pop('native_preflight_profile')),
+                lambda:rewrite('preparation/rust/preparation.json',lambda r:r.update(native_preflight_profile='materialized-default')),
+                lambda:rewrite('preparation/rust/preparation.json',lambda r:r['heads'].update(control=r['heads']['candidate'])),
+                lambda:native_log(2,lambda log:log.replace('compiled::cached_coefficients::','cached_coefficients::')),
+                lambda:native_log(2,lambda log:'\n'.join(log.splitlines()[1:])+'\n'),
+                lambda:native_log(2,lambda log:log.splitlines()[0]+'\n'+log),
+                lambda:native_log(2,lambda log:log.replace(' ... ok',' ... ignored',1)),
+                lambda:native_log(2,lambda log:log.replace(' ... ok',' ... FAILED',1)),
+                lambda:native_log(2,lambda log:log.replace('3 passed','4 passed')),
+                lambda:native_log(1,lambda log:'running 0 tests\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out\n'),
+            ]
+            for number,mutation in enumerate(profile_mutations):
+                with self.subTest(axis_profile_mutation=number):
+                    for relative,data in snapshots.items():(moved/relative).write_bytes(data)
+                    mutation();fixture.reseal(moved);execute(1);execute(1,True)
             for number,mutation in enumerate(mutations):
                 with self.subTest(mutation=number):
                     for relative,data in snapshots.items():(moved/relative).write_bytes(data)

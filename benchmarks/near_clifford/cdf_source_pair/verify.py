@@ -181,6 +181,7 @@ def verify_bundle(root, git_sources=False):
     prep, output = root / 'preparation', root / 'output'
     prep_digest = evidence.verify_preparation(prep)
     metadata = read(prep / 'preparation.json')
+    require('native_preflight_profile' not in metadata, 'standalone CDF verifier rejects peer-only native profiles')
     original_prep = Path(metadata['preparation_directory'])
     original_protocol = Path(metadata['protocol_directory'])
     require(original_prep.is_absolute() and original_protocol.is_absolute(), 'original execution directories missing')

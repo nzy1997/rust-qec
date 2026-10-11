@@ -83,12 +83,14 @@ def invoke(command,cwd,env,path,context):
     if child.returncode:raise ValueError('build/check failed; receipt retained')
     return receipt
 
-def main():
+def main(*, native_preflight=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out',type=Path,required=True)
     p.add_argument('--baseline-ref',required=True)
     p.add_argument('--candidate-ref',required=True)
     args=p.parse_args()
+    if native_preflight is not None:
+        native_preflight.require_heads(dict(baseline=args.baseline_ref,candidate=args.candidate_ref,control=args.baseline_ref))
     for ref in [args.baseline_ref,args.candidate_ref]:
         if not re.fullmatch('[0-9a-f]{40}',ref):p.error('exact40character lowercase source SHAs required')
     if git(ROOT,'status','--porcelain'):raise ValueError('protocol checkout must be clean')
@@ -127,13 +129,20 @@ def main():
     # Exercise the candidate's native arithmetic/public RNG before performance collection.
     candidate=Path(roots['candidate']);test_env=dict(env,CARGO_TARGET_DIR=str(out/'candidate/test-target'))
     tests=[['--lib','phase_specialized_cdf_tests'],['--test','near_clifford_postselected_counts','cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng','--','--exact'],['--lib','near_clifford::compiled::cdf_materialized_projection_tests::'],['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact']]
+    if native_preflight is not None:
+        tests = native_preflight.SELECTIONS
     for index,selection in enumerate(tests):
         command=['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection]
         invoke(command,candidate,test_env,out/f'native-check-{index}.log',dict(head=heads['candidate'],environment={'RUSTFLAGS':env['RUSTFLAGS']}))
         log=(out/f'native-check-{index}.log').read_text()
-        evidence.require_executed_tests(log)
-        if index >= 2:require_candidate_tests(log, layout=index == 3)
+        if native_preflight is None:
+            evidence.require_executed_tests(log)
+            if index >= 2:require_candidate_tests(log, layout=index == 3)
+        else:
+            native_preflight.check(index,log)
     metadata=dict(protocol_revision=protocol,protocol_directory=str(HERE),preparation_directory=str(out),roots=roots,heads=heads,created=time.time(),compiler=subprocess.check_output(['rustup','run','1.93.1','rustc','-Vv'],text=True))
+    if native_preflight is not None:
+        metadata['native_preflight_profile'] = native_preflight.PROFILE
     (out/'preparation.json').write_text(json.dumps(metadata,indent=2)+'\n')
     protocol_paths = [path for path in HERE.rglob('*') if path.is_file() and '__pycache__' not in path.parts]
     protocol_paths += [ROOT/'benchmarks/near_clifford'/name for name in ['application_counts/common.py','application_counts/manifest.json','diagnostics/corpus.py']]

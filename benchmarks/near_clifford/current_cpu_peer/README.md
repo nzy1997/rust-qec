@@ -79,8 +79,9 @@ complete wheel code inventories to installed bytes and the wrappers/extensions
 actually imported in isolated Python. Rust probes use the reviewed source-pair
 preparation with `-C target-cpu=native`, retaining full source inventories,
 actual ELF binaries, compiler commands and four nonzero native check groups.
-The candidate must include the phase-CDF tests, the noisy joint-projection public test, all four materialized-input projection tests and
-the inline-cache-layout test; exact mounted test names are checked. These candidate
+The exact c095/c49 source pair uses three phase-CDF tests, the public wide-cache
+counts/RNG test, three axis-storage tests and the inline-cache-layout test; all
+eight mounted test names and successful summaries are checked. These candidate
 tests must execute in native Release before any timing. The matched clock, pinned
 peers, 36 cells, frozen randomized role order and full observation retention are unchanged.
 
@@ -126,3 +127,5 @@ performance claim. Runtime-source admission still needs its separate full
 resource campaign, fresh review and terminal-green final-head CI.
 
 The expanded v3 job has a 180-minute ceiling, unchanged 35-minute preparation ceiling, a 105-minute measurement step and a 6000-second (100-minute) retained producer wait. This leaves five minutes in the measurement step for cancellation/closure and 40 minutes outside preparation/measurement for contract checks, installation, verification and upload. These are finite execution budgets, not measured completion estimates. The 27216 retained observations alone require at least 1360.8 seconds at the 0.05-second minimum per observation, before imports, tuning and finite validation. Timeout/cancellation remains a retained failure; no automatic restart or incomplete performance admission follows.
+
+This protocol explicitly binds Rust baseline c095bcac7aa78dc3a17b516c4c2781df36b530f2 and candidate c49a71de7cf1e59b9ec0d4bb0efd1d499c286852 to the peer-only `axis-cache-c095-c49-v1` native preflight. Four guarded commands must execute eight named tests: three phase-CDF, one public wide-cache counts/RNG with logical-error witness, three axis-storage bit/tail/dense/budget/real-route tests, and one scalar-layout test. Profile, exact source roles, filters, successful named records and summaries are bound in metadata and independently replayed. Standalone CDF preparation keeps its current default materialized-projection guards; its verifier rejects peer-only profiles. This change repairs an absent exact public selector in the failed v3 preparation; it changes no fixture, backend, role order, seed, tuning, finite validation or timing clock. A failed preparation contains no performance evidence.

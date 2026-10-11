@@ -48,5 +48,6 @@
   },
   "timing_contract": "seeded-counts-invocation-v1",
   "role_order_contract": "sha256-per-case-round-v1",
-  "role_order_seed": "8dfb07d4956e34ac413d7cb04310d64d4e3779de43de13f7eefeab9479e259d3"
+  "role_order_seed": "8dfb07d4956e34ac413d7cb04310d64d4e3779de43de13f7eefeab9479e259d3",
+  "native_preflight_profile": "axis-cache-c095-c49-v1"
 }

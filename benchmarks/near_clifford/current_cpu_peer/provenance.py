@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 
 from peer_evidence import inventory, read, require, sha, verify_preparation
+import axis_preflight
 from wheel_bindings import bind_wheel
 from commands import setup_commands, require_peer_main
 
@@ -24,6 +25,8 @@ def verify_prepared(prep, root, *, git_sources=False):
     prep_sha = verify_preparation(prep)
     meta = read(prep/'preparation.json')
     manifest = read(prep/'manifest.json')
+    require(meta.get('native_preflight_profile') == manifest.get('native_preflight_profile') == axis_preflight.PROFILE, 'peer native preflight profile differs')
+    axis_preflight.require_heads(dict(baseline=meta['rust_baseline_head'],candidate=meta['rust_source_head'],control=meta['rust_baseline_head']))
     original = Path(meta['preparation_directory'])
     repository = Path(meta['repository_directory'])
     protocol = Path(meta['protocol_directory'])
@@ -101,6 +104,7 @@ def verify_prepared(prep, root, *, git_sources=False):
     verify_preparation(rust)
     rust_meta = read(rust/'preparation.json')
     require(rust_meta['protocol_revision'] == meta['protocol_revision'] and rust_meta['compiler'].startswith('rustc 1.93.1 ('), 'native Rust compiler/protocol differs')
+    require(rust_meta.get('native_preflight_profile') == axis_preflight.PROFILE, 'nested Rust native preflight profile differs')
     heads = dict(baseline=meta['rust_baseline_head'], candidate=meta['rust_source_head'], control=meta['rust_baseline_head'])
     require(rust_meta['heads'] == heads, 'Rust source roles differ')
     require(rust_meta['preparation_directory'] == str(original/'rust') and rust_meta['protocol_directory'] == str(repository/'benchmarks/near_clifford/cdf_source_pair')
@@ -134,23 +138,14 @@ def verify_prepared(prep, root, *, git_sources=False):
             original_manifest = (public/'Cargo.toml').read_text()
             needle = 'path = "../../../rstim"'
             require(original_manifest.count(needle) == 1 and (probe/'Cargo.toml').read_text() == original_manifest.replace(needle,'path = '+__import__('json').dumps(str(original/'rust/source'/role/'rstim'))), 'probe dependency path differs')
-    spec = importlib.util.spec_from_file_location('matched_cdf_materialized_preflight', Path(__file__).resolve().parents[1]/'cdf_source_pair/prepare.py')
-    native_contract = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(native_contract)
-    for index in [0,1,2,3]:
+    for index,selection in enumerate(axis_preflight.SELECTIONS):
         receipt = read(rust/('native-check-'+str(index)+'.receipt.json'))
         log = (rust/('native-check-'+str(index)+'.log')).read_text()
         require(receipt['child_waited'] is True and receipt['exit_code'] == 0 and receipt['cancellation'] is None
                 and receipt['timed_out'] is False and receipt['head'] == heads['candidate']
                 and receipt['environment']['RUSTFLAGS'] == '-C target-cpu=native' and sha(rust/('native-check-'+str(index)+'.log')) == receipt['log_sha256'], 'native arithmetic/RNG check receipt differs')
-        selection = (['--lib','phase_specialized_cdf_tests'] if index == 0 else
-                     ['--test','near_clifford_postselected_counts','cached_joint_projection_preserves_noisy_feedback_records_counts_and_rng','--','--exact'] if index == 1 else
-                     ['--lib','near_clifford::compiled::cdf_materialized_projection_tests::'] if index == 2 else
-                     ['--lib','near_clifford::compiled::row_random_log_cache_tests::scalar_cache_adds_at_most_one_inline_word_and_no_dynamic_storage','--','--exact'])
         require(receipt['command'] == ['rustup','run','1.93.1','cargo','test','--release','--locked','-p','rstim','--no-default-features',*selection], 'native check command/filter differs')
-        require(sum(map(int,re.findall(r'test result: ok\. ([0-9]+) passed',log))) > 0, 'native check ran zero tests')
-        if index >= 2:
-            native_contract.require_candidate_tests(log, layout=index == 3)
+        axis_preflight.check(index,log)
     if git_sources:
         for subtree in [prep,rust]:
             for name,entry in read(subtree/'seal.json')['files'].items():
