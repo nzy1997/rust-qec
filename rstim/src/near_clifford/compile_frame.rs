@@ -265,6 +265,10 @@ impl CompileFrame {
     }
 
     pub(super) fn reexpress(&self, original: &PackedPauli) -> Result<Pauli, String> {
+        self.unpack(&self.reexpress_packed(original)?)
+    }
+
+    pub(super) fn reexpress_packed(&self, original: &PackedPauli) -> Result<PackedPauli, String> {
         let words = self.num_qubits.div_ceil(64);
         if original.x.len() != words || original.z.len() != words {
             return Err("packed input Pauli width differs from compile frame".into());
@@ -285,7 +289,7 @@ impl CompileFrame {
         for_support(&original.z, |q| {
             Self::multiply(&mut output, &self.inverse[self.num_qubits + q])
         });
-        self.unpack(&output)
+        Ok(output)
     }
 
     pub(super) fn pauli(&self, q: usize, basis: MeasurementBasis) -> Result<Pauli, String> {
@@ -330,6 +334,11 @@ mod packed_compile_frame_tests {
         assert_eq!(actual.x, expected.x);
         assert_eq!(actual.z, expected.z);
         assert_eq!(actual.phase, expected.phase);
+        let packed = frame.reexpress_packed(input).unwrap();
+        let expected = PackedPauli::new(&expected);
+        assert_eq!(packed.x, expected.x);
+        assert_eq!(packed.z, expected.z);
+        assert_eq!(packed.phase, expected.phase);
     }
 
     #[test]
