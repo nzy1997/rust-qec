@@ -2730,12 +2730,14 @@ impl CompiledNearCliffordSampler<'_> {
         debug_assert_eq!(coefficients.len() % (pivot * 2), 0);
         for block in coefficients.chunks_exact_mut(pivot * 2) {
             let (left, right) = block.split_at_mut(pivot);
-            for (group, a) in left.chunks_exact_mut(2).enumerate() {
+            // The power-of-two pivot divides both halves into complete pairs.
+            // Array indexing checks one group instead of a range of coefficients.
+            let (left, _) = left.as_chunks_mut::<2>();
+            let (right, _) = right.as_chunks_mut::<2>();
+            for (group, a) in left.iter_mut().enumerate() {
                 // XOR is a permutation of the pivot/2 adjacent groups.
                 // The separate halves and distinct groups never overlap.
-                let other = (group ^ group_xor) * 2;
-                let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                let b = &mut right[group ^ group_xor];
                 Self::rotate_adjacent_pair::<FUSED, IMAGINARY, SWAP>(a, b, c, factor);
             }
         }
@@ -2800,12 +2802,14 @@ impl CompiledNearCliffordSampler<'_> {
         debug_assert_eq!(coefficients.len() % (pivot * 2), 0);
         for block in coefficients.chunks_exact_mut(pivot * 2) {
             let (left, right) = block.split_at_mut(pivot);
-            for (group, a) in left.chunks_exact_mut(2).enumerate() {
+            // The power-of-two pivot divides both halves into complete pairs.
+            // Array indexing checks one group instead of a range of coefficients.
+            let (left, _) = left.as_chunks_mut::<2>();
+            let (right, _) = right.as_chunks_mut::<2>();
+            for (group, a) in left.iter_mut().enumerate() {
                 // XOR is a permutation of the pivot/2 adjacent groups.
                 // The separate halves and distinct groups never overlap.
-                let other = (group ^ group_xor) * 2;
-                let a: &mut [ComplexAmp; 2] = a.try_into().unwrap();
-                let b: &mut [ComplexAmp; 2] = (&mut right[other..other + 2]).try_into().unwrap();
+                let b = &mut right[group ^ group_xor];
                 // SAFETY: This function has the same CPU feature precondition.
                 unsafe {
                     Self::rotate_adjacent_pair_avx2::<SWAP>(a, b, c, factor);
@@ -6323,12 +6327,7 @@ mod highest_rotation_gather_tests {
                     )
                 })
                 .collect();
-            let masks: Vec<_> = if len == 1024 {
-                vec![2, 3, 255, 256, 257, 511, 512, 513, 1022, 1023]
-            } else {
-                (2..len).collect()
-            };
-            for x in masks {
+            for x in 2..len {
                 for factor in [0.3826834323650898, -0.3826834323650898] {
                     let c = 0.9238795325112867;
                     // Snapshot gather visits every coefficient independently,
