@@ -72,6 +72,40 @@ impl CoherentPacket {
         Ok(())
     }
 
+    /// Retain selected coefficient lanes in their original order, without allocation.
+    /// Frame bits and random-event rows stay in the caller's original lane coordinates.
+    pub(super) fn retain_lanes(&mut self, kept: u64) -> Result<(), String> {
+        if self.lanes == 0 || kept == 0 || (self.lanes < 64 && kept >> self.lanes != 0) {
+            return Err("coherent packet retained mask outside initialized lanes".into());
+        }
+        let lanes = kept.count_ones() as usize;
+        if lanes == self.lanes {
+            return Ok(());
+        }
+        let mut indices = [0usize; 64];
+        let mut remaining = kept;
+        for index in &mut indices[..lanes] {
+            *index = remaining.trailing_zeros() as usize;
+            remaining &= remaining - 1;
+        }
+        // Each destination precedes or equals its source. Increasing amplitude
+        // and lane order therefore cannot overwrite a coefficient still to read.
+        for amplitude in 0..self.len {
+            let old = amplitude * self.lanes;
+            let new = amplitude * lanes;
+            for (lane, &original) in indices[..lanes].iter().enumerate() {
+                self.re[new + lane] = self.re[old + original];
+                self.im[new + lane] = self.im[old + original];
+            }
+        }
+        self.re.truncate(self.len * lanes);
+        self.im.truncate(self.len * lanes);
+        self.reduced_re.clear();
+        self.reduced_im.clear();
+        self.lanes = lanes;
+        Ok(())
+    }
+
     fn check_pauli(&self, p: &CompactPauli, len: usize) -> Result<(), String> {
         if self.lanes == 0 || len == 0 || !len.is_power_of_two() {
             return Err("coherent packet has not been initialized".into());
@@ -658,6 +692,123 @@ impl CoherentPacket {
 mod coherent_packet_kernel_tests {
     use super::*;
     use rand::{Rng, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn retained_lanes_keep_coefficient_bits_and_future_measurement_probabilities() {
+        let prefix = vec![ComplexAmp::new(0.25, 0.25); 8];
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            for lanes in [1, 7, 32, 64] {
+                let all = u64::MAX >> (64 - lanes);
+                for kept in [1, 1 << (lanes - 1), all & 0xaaaa_aaaa_aaaa_aaaa, all] {
+                    if kept == 0 {
+                        continue;
+                    }
+                    let mut full = CoherentPacket::default();
+                    let mut packed = CoherentPacket::default();
+                    for packet in [&mut full, &mut packed] {
+                        packet.reset(&prefix, lanes, 4).unwrap();
+                        packet
+                            .rotate_with_arithmetic(
+                                &compact(3, 5, 1),
+                                false,
+                                false,
+                                0x953c_817a_4962_ef01,
+                                arithmetic,
+                            )
+                            .unwrap();
+                    }
+                    let capacities = [
+                        packed.re.capacity(),
+                        packed.im.capacity(),
+                        packed.reduced_re.capacity(),
+                        packed.reduced_im.capacity(),
+                    ];
+                    let selected: Vec<usize> =
+                        (0..lanes).filter(|&lane| kept & (1 << lane) != 0).collect();
+                    packed.retain_lanes(kept).unwrap();
+                    assert_eq!(packed.lanes, selected.len());
+                    assert_eq!(packed.re.len(), packed.len * selected.len());
+                    assert_eq!(
+                        [
+                            packed.re.capacity(),
+                            packed.im.capacity(),
+                            packed.reduced_re.capacity(),
+                            packed.reduced_im.capacity()
+                        ],
+                        capacities
+                    );
+                    for amplitude in 0..full.len {
+                        for (lane, &original) in selected.iter().enumerate() {
+                            assert_eq!(
+                                packed.re[amplitude * packed.lanes + lane].to_bits(),
+                                full.re[amplitude * lanes + original].to_bits()
+                            );
+                            assert_eq!(
+                                packed.im[amplitude * packed.lanes + lane].to_bits(),
+                                full.im[amplitude * lanes + original].to_bits()
+                            );
+                        }
+                    }
+                    let anti = 0x62d1_439a_f018_ac57;
+                    let packed_anti = selected
+                        .iter()
+                        .enumerate()
+                        .fold(0, |mask, (lane, &original)| {
+                            mask | ((anti >> original & 1) << lane)
+                        });
+                    full.rotate_with_arithmetic(&compact(8, 3, 0), true, true, anti, arithmetic)
+                        .unwrap();
+                    packed
+                        .rotate_with_arithmetic(
+                            &compact(8, 3, 0),
+                            true,
+                            true,
+                            packed_anti,
+                            arithmetic,
+                        )
+                        .unwrap();
+                    let measurement = compact(1, 3, 1);
+                    let expected = full.probability_zero(&measurement);
+                    let actual = packed.probability_zero(&measurement);
+                    for (lane, &original) in selected.iter().enumerate() {
+                        assert_eq!(actual[lane].to_bits(), expected[original].to_bits());
+                    }
+                    let fixed = 0x851c_734b_19a2_ef60;
+                    let packed_fixed = selected
+                        .iter()
+                        .enumerate()
+                        .fold(0, |mask, (lane, &original)| {
+                            mask | ((fixed >> original & 1) << lane)
+                        });
+                    full.project(&measurement, 0, true, fixed).unwrap();
+                    packed.project(&measurement, 0, true, packed_fixed).unwrap();
+                    let expected = full.probability_zero(&compact(2, 1, 0));
+                    let actual = packed.probability_zero(&compact(2, 1, 0));
+                    for (lane, &original) in selected.iter().enumerate() {
+                        assert_eq!(actual[lane].to_bits(), expected[original].to_bits());
+                    }
+                    packed.retain_lanes(1 << (packed.lanes - 1)).unwrap();
+                    assert_eq!(packed.lanes, 1);
+                    for amplitude in 0..full.len {
+                        let original = *selected.last().unwrap();
+                        assert_eq!(
+                            packed.re[amplitude].to_bits(),
+                            full.re[amplitude * lanes + original].to_bits()
+                        );
+                        assert_eq!(
+                            packed.im[amplitude].to_bits(),
+                            full.im[amplitude * lanes + original].to_bits()
+                        );
+                    }
+                    assert!(packed.retain_lanes(0).is_err());
+                    assert!(packed.retain_lanes(2).is_err());
+                }
+            }
+        }
+    }
 
     fn compact(x: usize, z: usize, phase: u8) -> CompactPauli {
         CompactPauli {

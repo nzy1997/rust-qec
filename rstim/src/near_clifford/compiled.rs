@@ -2502,6 +2502,23 @@ fn packet_choice_masks(
     result
 }
 
+// Map original packet bits to ascending coefficient-lane positions. The
+// unfiltered and contiguous-tail cases keep their original bit positions.
+fn compact_coherent_mask(mask: u64, live: u64) -> u64 {
+    if live & live.wrapping_add(1) == 0 {
+        return mask & live;
+    }
+    let mut remaining = live;
+    let mut compact = 0;
+    let mut lane = 0;
+    while remaining != 0 {
+        compact |= ((mask >> remaining.trailing_zeros()) & 1) << lane;
+        remaining &= remaining - 1;
+        lane += 1;
+    }
+    compact
+}
+
 fn resize_packet(buffer: &mut Vec<u64>, len: usize) -> Result<(), String> {
     if buffer.capacity() < len {
         buffer
@@ -3735,6 +3752,7 @@ impl CompiledNearCliffordSampler<'_> {
                 (1u64 << lanes) - 1
             };
             let mut live = all;
+            let mut coherent_live = all;
             let mut event = 0;
             let mut noise_event = 0;
             let mut independent_event = 0;
@@ -3778,7 +3796,7 @@ impl CompiledNearCliffordSampler<'_> {
                                 pauli,
                                 *expand,
                                 *dagger,
-                                anti,
+                                compact_coherent_mask(anti, coherent_live),
                                 plan.rotation_arithmetic,
                                 *coefficients,
                             )?;
@@ -3897,6 +3915,13 @@ impl CompiledNearCliffordSampler<'_> {
                                         // Admission failures still replay their own rows.
                                         break;
                                     }
+                                    if coherent && newly_rejected != 0 {
+                                        self.coherent.retain_lanes(compact_coherent_mask(
+                                            live,
+                                            coherent_live,
+                                        ))?;
+                                        coherent_live = live;
+                                    }
                                 }
                                 Some(index) if *index == selected => {
                                     logical ^= offsets
@@ -3943,18 +3968,34 @@ impl CompiledNearCliffordSampler<'_> {
                             } => {
                                 if coherent {
                                     let probabilities = self.coherent.probability_zero(&m.pauli);
-                                    for lane in 0..lanes {
-                                        if f64::from_bits(tape[lane * random_count + event])
-                                            >= probabilities[lane]
-                                        {
-                                            branch |= 1 << lane;
+                                    if coherent_live == all {
+                                        for lane in 0..lanes {
+                                            if f64::from_bits(tape[lane * random_count + event])
+                                                >= probabilities[lane]
+                                            {
+                                                branch |= 1 << lane;
+                                            }
+                                        }
+                                    } else {
+                                        let mut remaining = coherent_live;
+                                        for probability in &probabilities[..self.coherent.lanes] {
+                                            let lane = remaining.trailing_zeros() as usize;
+                                            remaining &= remaining - 1;
+                                            if f64::from_bits(tape[lane * random_count + event])
+                                                >= *probability
+                                            {
+                                                branch |= 1 << lane;
+                                            }
                                         }
                                     }
                                     self.coherent.project(
                                         &m.pauli,
                                         index,
                                         y,
-                                        if offset { branch ^ all } else { branch },
+                                        compact_coherent_mask(
+                                            if offset { branch ^ all } else { branch },
+                                            coherent_live,
+                                        ),
                                     )?;
                                 } else if let Some(id) = states.uniform(live) {
                                     let probability =
@@ -4181,7 +4222,8 @@ impl CompiledNearCliffordSampler<'_> {
     /// No reference normalization is performed. Scalar and admission-fallback rows
     /// skip remaining physics after a nonzero detector, while consuming all remaining
     /// typed random events. Packed counts also reject lanes when a raw detector
-    /// is nonzero, and stop suffix physics once no live lanes remain. Sampling
+    /// is nonzero, compact surviving coherent coefficient lanes, and stop suffix
+    /// physics once no live lanes remain. Sampling
     /// preserves the random stream of [`Self::sample`] without batch output records.
     /// Rejected scalar suffixes do not perform physics or its fallible allocations.
     pub fn sample_postselected_counts(
@@ -6554,6 +6596,44 @@ mod scalar_prepared_tape_tests {
 mod postselected_packet_tests {
     use super::*;
     use rand::{RngCore, SeedableRng, rngs::StdRng};
+
+    #[test]
+    fn coherent_counts_drop_rejected_coefficient_lanes_in_original_bit_order() {
+        assert_eq!(compact_coherent_mask(0x84, 0xa5), 0b1010);
+        assert_eq!(compact_coherent_mask(u64::MAX, 0xa5), 0b1111);
+        assert_eq!(compact_coherent_mask(1 << 63, (1 << 63) | 1), 0b10);
+        assert_eq!(compact_coherent_mask(0x35, 0x3f), 0x35);
+        assert_eq!(compact_coherent_mask(0x35, u64::MAX), 0x35);
+        let text = "H 0 1 2 3\nT 0 1 2 3\nH 4\nM 4\nDETECTOR rec[-1]\nMPP X0*Y1*X2*Y3\nOBSERVABLE_INCLUDE(7) rec[-1]\n";
+        for arithmetic in [
+            CompiledRotationArithmetic::Strict,
+            CompiledRotationArithmetic::Fused,
+        ] {
+            let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)
+                .unwrap();
+            let mut native = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+            let mut a = StdRng::seed_from_u64(719);
+            let mut b = a.clone();
+            let rows = reference.sample(64, &mut a).unwrap();
+            let expected: Vec<_> = rows
+                .iter()
+                .filter(|row| row.detectors.iter().all(|bit| !*bit))
+                .collect();
+            let counts = native.sample_postselected_counts(64, 7, &mut b).unwrap();
+            assert!(counts.accepted > 0 && counts.accepted < 64);
+            assert_eq!(counts.accepted, expected.len());
+            assert_eq!(
+                counts.logical_errors,
+                expected.iter().filter(|row| row.observables[0].1).count()
+            );
+            assert_eq!(native.coherent.lanes, counts.accepted);
+            assert_eq!(native.last_packet_live, counts.accepted);
+            for _ in 0..16 {
+                assert_eq!(a.next_u64(), b.next_u64());
+            }
+        }
+    }
 
     #[test]
     fn all_rejected_packets_skip_suffix_physics_without_disabling_admitted_cache() {

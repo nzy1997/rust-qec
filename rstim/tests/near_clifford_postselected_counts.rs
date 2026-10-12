@@ -25,6 +25,54 @@ fn count_records(shots: &[NearCliffordShot], observable: u32) -> NearCliffordPos
 }
 
 #[test]
+fn sparse_coherent_survivors_preserve_counts_feedback_and_mixed_call_rng() {
+    let text = "H 0 1 2 3 4 5 6 7\nT 0 1 2 3 4 5 6 7\nDEPOLARIZE2(0.07) 0 7\nH 8\nM(0.11) 8\nDETECTOR rec[-1]\nR 8\nMPP X0*Y1*X2*Y3\nCX rec[-1] 7\nCX sweep[1] 6\nT_DAG 7\nH 9\nM 9\nDETECTOR rec[-1]\nMY 0\nMRX(0.13) !1\nT 3\nM 0 1 2 3 4 5 6 7\nOBSERVABLE_INCLUDE(7) rec[-1]\nOBSERVABLE_INCLUDE(7) rec[-2]\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan =
+            CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic).unwrap();
+        assert!(plan.peak_active_rank() >= 4);
+        for budget in [0, 64 * 1024 * 1024] {
+            for seed in [739, 1739] {
+                let mut reference = plan.prepare_sampler_with_cache_budget(0).unwrap();
+                let mut counts = plan.prepare_sampler_with_cache_budget(budget).unwrap();
+                let mut a = StdRng::seed_from_u64(seed);
+                let mut b = a.clone();
+                for shots in [0, 1, 31, 32, 33, 63, 64, 65, 129, 64] {
+                    let records = reference
+                        .sample_with_sweep(shots, &[false, true], &mut a)
+                        .unwrap();
+                    let expected = count_records(&records, 7);
+                    if shots >= 32 {
+                        assert!(expected.accepted > 0 && expected.accepted < shots);
+                    }
+                    let actual = counts
+                        .sample_postselected_counts_with_sweep(shots, 7, &[false, true], &mut b)
+                        .unwrap();
+                    assert_eq!(
+                        actual, expected,
+                        "shots={shots} budget={budget} seed={seed} arithmetic={arithmetic:?}"
+                    );
+                    for _ in 0..16 {
+                        assert_eq!(a.next_u64(), b.next_u64());
+                    }
+                    let expected = reference
+                        .sample_measurements_u8_with_sweep(17, &[false, true], &mut a)
+                        .unwrap();
+                    let actual = counts
+                        .sample_measurements_u8_with_sweep(17, &[false, true], &mut b)
+                        .unwrap();
+                    assert_eq!(actual, expected);
+                    assert_eq!(a.next_u64(), b.next_u64());
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn reconverging_coherent_rows_preserve_mixed_call_counts_records_and_rng() {
     let text = "REPEAT 5 {\nR 0 1 2\nH 0 1 2\nT 0 1 2\nCX 0 1\nDEPOLARIZE2(0.01) 1 2\nMY 0\nCX rec[-1] 2\nT_DAG 2\nMX 1\nMY 2\nDETECTOR rec[-1] rec[-2]\nOBSERVABLE_INCLUDE(7) rec[-3]\n}\n";
     for arithmetic in [
