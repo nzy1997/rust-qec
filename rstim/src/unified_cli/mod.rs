@@ -69,6 +69,24 @@ enum Command {
 
 #[derive(Debug, Subcommand)]
 enum DatasetCommand {
+    /// Score observable predictions against the private answer bundle
+    Score {
+        /// Public dataset directory used for decoding
+        #[arg(long)]
+        dataset: PathBuf,
+        /// Matching private answer bundle (read only during scoring)
+        #[arg(long)]
+        private: PathBuf,
+        /// Bit-packed observable predictions in lsb_first b8 format
+        #[arg(long)]
+        predictions: PathBuf,
+        /// Optional decode statistics to verify successful completion
+        #[arg(long = "decode-stats")]
+        decode_stats: Option<PathBuf>,
+        /// Select human-readable or versioned JSON output
+        #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Human)]
+        format: pipeline::PipelineFormat,
+    },
     /// Export a public decoder dataset and private answer bundle
     Export {
         /// Circuit file to sample (loss-visible circuits supported)
@@ -77,8 +95,8 @@ enum DatasetCommand {
         /// Number of shots to sample into the dataset
         #[arg(long)]
         shots: u64,
-        /// Dataset mode: detectors or measurements_blinded
-        #[arg(long)]
+        /// Dataset mode; auto uses circuit logical-input metadata or explicit support
+        #[arg(long, default_value = "auto")]
         mode: String,
         /// Destination directory for the public dataset bundle
         #[arg(long = "public-out")]
@@ -89,10 +107,10 @@ enum DatasetCommand {
         /// Sampling seed for reproducible datasets
         #[arg(long)]
         seed: Option<u64>,
-        /// Apply a logical-X flip on the given data qubits before export
+        /// Override the circuit's logical-input operator with X on these qubits
         #[arg(long = "logical-x-qubits")]
         logical_x_qubits: Option<String>,
-        /// Apply a logical-Z flip on the given data qubits before export
+        /// Override the circuit's logical-input operator with Z on these qubits
         #[arg(long = "logical-z-qubits")]
         logical_z_qubits: Option<String>,
         /// Also write a per-shot rstim.error-trace.v1 trace.jsonl into the private bundle
@@ -711,6 +729,46 @@ where
                     )
                 })
                 .map_err(RunError::Command)
+        }
+        Command::Dataset {
+            command:
+                DatasetCommand::Score {
+                    dataset,
+                    private,
+                    predictions,
+                    decode_stats,
+                    format,
+                },
+        } => {
+            let json = format.is_json(error_format);
+            let error = |code, message| CommandError {
+                command: decode::score::COMMAND,
+                code,
+                message,
+                json,
+                exit_code: 2,
+            };
+            decode::score::run(&decode::score::ScoreOptions {
+                dataset,
+                private,
+                predictions,
+                decode_stats,
+            })
+            .map_err(|failure| error(failure.code, failure.message))
+            .and_then(|result| match format {
+                pipeline::PipelineFormat::Human => stdout
+                    .write_all(result.human().as_bytes())
+                    .map_err(|failure| error("output_error", failure.to_string())),
+                pipeline::PipelineFormat::Json => write_pipeline_success(
+                    decode::score::COMMAND,
+                    &result,
+                    Vec::new(),
+                    format,
+                    error_format,
+                    stdout,
+                ),
+            })
+            .map_err(RunError::Command)
         }
         Command::Capabilities { format } => {
             write_capabilities(format, error_format, stdout).map_err(RunError::Command)
@@ -1455,9 +1513,9 @@ fn write_capabilities(
                         ArgumentCapability {
                             name: "mode",
                             flag: "--mode",
-                            required: true,
-                            values: vec!["detectors", "measurements_blinded"],
-                            default: None,
+                            required: false,
+                            values: vec!["auto", "detectors", "measurements_blinded"],
+                            default: Some("auto"),
                         },
                         ArgumentCapability {
                             name: "public_out",
@@ -1640,6 +1698,74 @@ fn write_capabilities(
                         flag: "--out",
                         format: "directory",
                     }],
+                },
+                Capability {
+                    name: decode::score::COMMAND,
+                    argv: vec!["dataset", "score"],
+                    input_sources: vec![
+                        "public_decoder_dataset_directory",
+                        "private_answer_bundle",
+                        "b8_predictions",
+                    ],
+                    formats: vec!["human", "json"],
+                    output_schema: SCHEMA_VERSION,
+                    arguments: vec![
+                        ArgumentCapability {
+                            name: "dataset",
+                            flag: "--dataset",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "private",
+                            flag: "--private",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "predictions",
+                            flag: "--predictions",
+                            required: true,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "decode_stats",
+                            flag: "--decode-stats",
+                            required: false,
+                            values: vec!["path"],
+                            default: None,
+                        },
+                        ArgumentCapability {
+                            name: "format",
+                            flag: "--format",
+                            required: false,
+                            values: vec!["human", "json"],
+                            default: Some("human"),
+                        },
+                    ],
+                    success_exit_code: 0,
+                    errors: [
+                        "invalid_arguments",
+                        "input_error",
+                        "missing_dataset_file",
+                        "invalid_dataset",
+                        "unsupported_dataset_mode",
+                        "invalid_predictions",
+                        "invalid_decode_stats",
+                        "output_error",
+                    ]
+                    .into_iter()
+                    .map(|code| ErrorCapability {
+                        code,
+                        exit_code: 2,
+                        channel: "stderr",
+                    })
+                    .collect(),
+                    decoders: Vec::new(),
+                    artifacts: Vec::new(),
                 },
                 Capability {
                     name: decode::COMMAND,
@@ -1845,6 +1971,9 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let is_dataset_export = command_words
         .windows(2)
         .any(|pair| pair[0] == "dataset" && pair[1] == "export");
+    let is_dataset_score = command_words
+        .windows(2)
+        .any(|pair| pair[0] == "dataset" && pair[1] == "score");
     let is_capabilities = command_words.contains(&"capabilities");
     let is_decode = command_words.contains(&"decode");
     let command = if is_stats {
@@ -1853,6 +1982,8 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         pipeline_command
     } else if is_dataset_export {
         pipeline::DATASET_EXPORT_COMMAND
+    } else if is_dataset_score {
+        decode::score::COMMAND
     } else if is_capabilities {
         "capabilities"
     } else if is_decode {
@@ -1867,6 +1998,7 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         Some(Some("human")) => false,
         Some(_) => true,
         None if is_capabilities || is_decode => true,
+        None if is_dataset_score => matches!(explicit_output_format, Some(Some("json"))),
         None if pipeline_command.is_some() || is_dataset_export => {
             !matches!(explicit_output_format, Some(Some("human")))
         }

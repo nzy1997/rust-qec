@@ -312,7 +312,11 @@ pub fn run_export_decoder_dataset_with_logical_flip_in_batches(
 ) -> Result<(), String> {
     let circuit_text = std::fs::read_to_string(circuit)
         .map_err(|error| format!("failed to read circuit {circuit}: {error}"))?;
-    let mode = crate::decoder_dataset::DecoderDatasetMode::parse(mode)?;
+    let mode = crate::decoder_dataset::resolve_decoder_dataset_mode(
+        mode,
+        &circuit_text,
+        logical_flip.as_ref(),
+    )?;
     let shots =
         usize::try_from(shots).map_err(|_| "--shots is too large for this platform".to_string())?;
     crate::decoder_dataset::export_decoder_dataset_with_logical_flip_in_batches(

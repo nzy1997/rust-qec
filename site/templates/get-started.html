@@ -11,7 +11,6 @@
 <p class="start-requirements">Requires Rust and Cargo. <a href="https://www.rust-lang.org/tools/install">Install Rust</a> first.</p>
 <p>Install this development version from a repository checkout once. After installation, the commands below work from any directory:</p>
 <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
-<p>This install includes all <code>rstim</code> commands used below.</p>
 <details class="loss-disclosure"><summary>Additional tool for the CSS-code tutorial</summary>
 <p>The CSS-code tutorial uses the separate <code>qec-code</code> executable. Install it once from the same repository checkout:</p>
 <pre data-language="Shell"><code>cargo install --locked --path qec-code --features cli</code></pre>
@@ -35,7 +34,7 @@ cargo install --locked --path qec-code --features cli,distance-ilp-highs --force
 <figure class="result-plot">
 <a href="../examples/getting-started-circuit.svg" data-figure-viewer><img src="../examples/getting-started-circuit.svg" alt="Two-qubit circuit definition with two possible X errors before the CNOT, two measurements, two detectors, and one logical observable"></a>
 </figure>
-<p>This drawing shows the circuit definition, including both possible error locations; it does not show a sampled result. <code>R</code> resets <code>q0</code> and <code>q1</code>. Each <code>XE</code> marks an X error with probability <code>0.1</code> before the CNOT. <code>M</code> labels the measurements <code>m1</code> and <code>m2</code>; <code>rec[-2]</code> and <code>rec[-1]</code> refer to those results. <code>DETECTOR</code> defines <code>D0</code> from <code>m1</code> and <code>D1</code> from <code>m2</code>; <code>OBSERVABLE_INCLUDE(0)</code> defines the logical observable <code>L0 = m1 ⊕ m2</code>.</p>
+<p><code>R</code> resets <code>q0</code> and <code>q1</code>. Each <code>XE</code> marks an X error with probability <code>0.1</code> before the CNOT. <code>M</code> labels the measurements <code>m1</code> and <code>m2</code>; <code>rec[-2]</code> and <code>rec[-1]</code> refer to those results. <code>DETECTOR</code> defines <code>D0</code> from <code>m1</code> and <code>D1</code> from <code>m2</code>; <code>OBSERVABLE_INCLUDE(0)</code> defines the logical observable <code>L0 = m1 ⊕ m2</code>.</p>
 </section>
 <section class="task-section" aria-labelledby="detector-output"><h2 id="detector-output">3. Analyze and sample errors</h2>
 <p>Extract the detector error model (DEM), which lists the effect of each possible error:</p>

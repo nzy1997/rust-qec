@@ -1,26 +1,26 @@
 /* Atom-loss content components use the shared documentation layout. */
 .loss-hero .eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .loss-badge { color: #76531d; background: #f6ebd7; border: 1px solid #e7d3af; padding: 2px 9px; border-radius: 5px; font-size: .72rem; letter-spacing: .03em; text-transform: none; }
-body[data-page="loss"] .loss-step { border-top: 1px solid var(--border); padding-top: 36px; }
 .loss-step .eyebrow { margin: 0 0 10px; color: var(--accent-dark); }
+.loss-circuit-crops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin: 24px 0 16px; }
+.loss-circuit-crop { display: grid; grid-template-rows: 144px auto; gap: 12px; min-width: 0; margin: 0; }
+.loss-circuit-crop img { display: block; align-self: center; justify-self: center; width: auto; max-width: 100%; height: auto; max-height: 144px; background: #fff; border-radius: 8px; }
+.loss-circuit-crop figcaption { margin: 0; color: var(--muted); }
+.loss-circuit-crop figcaption strong { color: var(--text); }
 .loss-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; padding: 0; margin: 24px 0; background: #f4eee7; border: 1px solid var(--border); border-radius: 8px; }
 .loss-flow li { min-width: 0; padding: 18px 14px; position: relative; }
 .loss-flow li + li { border-left: 1px solid #e2d6c9; }
 .loss-flow span { display: block; color: var(--accent-dark); font-size: .75rem; margin-bottom: 12px; font-weight: 650; }
 .loss-flow strong { display: block; font-size: 1rem; }
 .loss-flow small { display: block; font-size: .75rem; color: var(--muted); margin-top: 6px; }
-.loss-inline-note { border-left: 2px solid #c6b4a1; padding: 4px 0 4px 14px; font-size: .875rem; color: var(--muted); }
-.loss-inline-note strong { color: var(--text); margin-right: 5px; }
 .loss-disclosure { border-block: 1px solid var(--border); padding: 14px 0; margin: 16px 0; }
 .loss-disclosure + .loss-disclosure { border-top: 0; margin-top: -16px; }
 .loss-disclosure > summary { cursor: pointer; font-weight: 550; font-size: .9375rem; padding-right: 8px; }
 .loss-disclosure[open] > summary { margin-bottom: 14px; color: var(--accent-dark); }
 .loss-disclosure p, .loss-disclosure li { font-size: .9375rem; }
-.loss-bundle-grid, .loss-next-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 22px 0; }
-.loss-bundle-grid > div { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 7px; background: #fff; }
-.loss-label, .loss-next-grid > a > span { font-size: .6875rem; font-weight: 650; letter-spacing: .075em; color: var(--muted); }
-.loss-bundle-grid h3 { font-size: 1rem; margin: 10px 0 8px; overflow-wrap: anywhere; }
-.loss-bundle-grid p, .loss-next-grid p { margin: 0; font-size: .875rem; color: var(--muted); }
+.loss-next-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 22px 0; }
+.loss-next-grid > a > span { font-size: .6875rem; font-weight: 650; letter-spacing: .075em; color: var(--muted); }
+.loss-next-grid p { margin: 0; font-size: .875rem; color: var(--muted); }
 .loss-output { padding: 12px 0; font-size: .875rem; }
 .loss-output strong { color: #386558; margin-right: 9px; }
 .loss-next-grid > a { display: block; padding: 22px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; background: #fff; }
@@ -38,8 +38,9 @@ body[data-page="loss"] figure figcaption { font-size: .875rem; line-height: 1.7;
 body[data-page="loss"] figure .loss-figure-actions a { display: inline; background: none; border: 0; border-radius: 0; }
 body[data-page="loss"] .loss-sampling-context { font-size: .875rem; }
 @media (max-width: 599px) {
+  .loss-circuit-crops { grid-template-columns: 1fr; }
   .loss-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .loss-flow li:nth-child(3) { border-left: 0; }
   .loss-flow li:nth-child(n+3) { border-top: 1px solid #e2d6c9; }
-  .loss-bundle-grid, .loss-next-grid { grid-template-columns: 1fr; }
+  .loss-next-grid { grid-template-columns: 1fr; }
 }

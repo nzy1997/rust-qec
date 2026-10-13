@@ -154,11 +154,11 @@ test("long protocol page supplies rendered content and usable table-of-contents 
   await expect(page.locator("main")).not.toContainText("{{ load_data");
   await expect(page.locator(".page-toc")).toBeVisible();
   await page.locator(".toc-disclosure > summary").click();
-  const anchor = page.locator('.page-toc a[href="#schema-identity"]');
-  await expect(anchor).toHaveText("Schema identity");
+  const anchor = page.locator('.page-toc a[href="#scope-and-applicability"]');
+  await expect(anchor).toHaveText("Scope And Applicability");
   await anchor.click();
-  await expect(page).toHaveURL(/#schema-identity$/);
-  await expect(page.locator("#schema-identity")).toBeInViewport();
+  await expect(page).toHaveURL(/#scope-and-applicability$/);
+  await expect(page.locator("#scope-and-applicability")).toBeInViewport();
 });
 
 test("decoder evidence keeps provenance layered and never stringifies objects", async ({ page }) => {

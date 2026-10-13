@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="328" height="176" viewBox="7192 194 164 88" role="img" aria-labelledby="title">
+  <title id="title">Measurement loss: LOSS(0.003) before final ML on q2</title>
+  <desc>Cropped from rstim render_svg of the exact circuit generation command on the atom-loss tutorial. The q2 label is repeated at the crop edge. This is the circuit definition, without sampled events.</desc>
+  <rect x="7192" y="194" width="164" height="88" fill="#fff" />
+  <g class="qp101-svg" fill="none" font-family="monospace" font-size="14">
+    <line class="wire" x1="56" y1="232" x2="7832" y2="232" stroke="#667085" stroke-width="1" />
+    <rect class="noise-box" x="7237" y="218" width="38" height="28" rx="4" ry="4" stroke="#9a3412" fill="#fff7ed" />
+    <text x="7256" y="232" fill="#111827" text-anchor="middle" dominant-baseline="middle">LOSS</text>
+    <text class="param-note" x="7256" y="260" fill="#475467" text-anchor="middle" font-size="11">0.003</text>
+    <rect class="gate-box" x="7309" y="218" width="38" height="28" rx="4" ry="4" stroke="#111827" fill="#ffffff" />
+    <text x="7328" y="232" fill="#111827" text-anchor="middle" dominant-baseline="middle">ML</text>
+    <text class="measurement-anchor" x="7328" y="260" fill="#2563eb" text-anchor="middle" font-size="11">m33-m34</text>
+    <rect x="7192" y="218" width="32" height="28" fill="#fff" />
+    <text x="7200" y="232" fill="#20252d" dominant-baseline="middle">q2</text>
+  </g>
+</svg>

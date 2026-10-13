@@ -38,7 +38,9 @@
                   ${renderBadge("tier", item.tier)}
                 </div>
               </div>
-              <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || "No claims limit recorded.")}</p>
+              ${item.claims_limit && item.claims_limit !== family.claims_limit
+                ? `<p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit)}</p>`
+                : ""}
             </article>
           `)
           .join("");
@@ -389,7 +391,6 @@
               </div>
             </div>
             ${plotHtml ? `<p class="result-takeaway">${escapeHtml(takeaways[item.id] || item.title)}</p>${plotHtml}` : ""}
-            <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
             <details class="evidence-details evidence-reproduction">
               <summary>Reproduce this result</summary>
               <h4>Artifacts</h4>
@@ -400,6 +401,7 @@
             <details class="evidence-details evidence-provenance">
               <summary>Full provenance and sources</summary>
               ${renderEvidenceStatusSummary(family, item)}
+              <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
               ${renderTextList(item.caveats)}
               <h4>Provenance</h4>
               ${renderProvenance(item.provenance)}

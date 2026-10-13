@@ -32,6 +32,7 @@ drafts/
 .DS_Store
 
 /site/generated/
+/site/static/support/
 
 # Generated documentation artifacts are published in rust-qec-docs and fetched
 # by tools/fetch_docs_artifacts.py when a site or evidence check needs them.

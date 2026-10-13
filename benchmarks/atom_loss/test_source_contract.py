@@ -280,6 +280,25 @@ class SourceContractTests(unittest.TestCase):
                     verify_bundle_source(out,self.repo)
 
 
+class GeneratedCircuitReplayTests(unittest.TestCase):
+    def test_replay_allows_only_the_exact_metadata_addition(self):
+        from .replay import verify_generated_circuit
+        archived = (b'QUBIT_COORDS(1, 1) 1\nQUBIT_COORDS(1, 3) 8\n'
+                    b'QUBIT_COORDS(1, 5) 15\nR 1 8 15\n'
+                    b'TICK[rstim:logical_flip_point]\nX_ERROR(0.001) 1 8 15\n')
+        generated = archived.replace(b'TICK[rstim:logical_flip_point]',
+            b'TICK[rstim:logical_flip_point] # rstim:logical_input=X:1,8,15')
+        verify_generated_circuit(archived, archived, 3, 'same-source')
+        verify_generated_circuit(generated, archived, 3, 'metadata-only')
+        for changed in (generated.replace(b'X:1,8,15', b'X:1,8,16'),
+                        generated.replace(b'X:1,8,15', b'Z:1,8,15'),
+                        generated.replace(b'0.001', b'0.002'),
+                        generated + b'X 1\n',
+                        generated.replace(b' # rstim:', b' # other:')):
+            with self.subTest(changed=changed), self.assertRaisesRegex(ValueError, 'Regenerated circuit mismatch'):
+                verify_generated_circuit(changed, archived, 3, 'mutation')
+
+
 class DecoderReplayTests(unittest.TestCase):
     def test_actual_wrong_decoder_with_unchanged_archive_is_rejected(self):
         from .decoder_replay import replay_case

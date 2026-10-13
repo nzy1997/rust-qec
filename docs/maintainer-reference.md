@@ -45,6 +45,11 @@ cargo test --locked -p rstim --test external_fixtures \
 
 ## Decoder release-readiness gate
 
+Promotion requires every scoped case, the release gate at the candidate revision,
+and post-publication asset verification to pass. Later Supported releases repeat
+the same gate. The offline suite's `in-domain` and `outside-supported-domain`
+labels classify support scope.
+
 Promotion is decided per decoder. The gate consumes the support matrix,
 independent correctness report, measured resource envelope, and installed
 artifact reports for `x86_64-unknown-linux-gnu` and
@@ -115,3 +120,64 @@ claims:
 4. Run the release-readiness gate at the candidate revision.
 5. Publish and checksum the evidence bundle with the release.
 6. Verify the published bundle and update the user-facing support contract.
+
+## RSMP compression evidence
+
+Committed compression evidence lives under
+`benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/`. The checked gate names
+are `benchmark_raw_lt_20pct`, `benchmark_zstd_lt_75pct`, and
+`high_entropy_raw_le_102pct`; their arithmetic is integer cross-multiplication
+over recorded byte counts.
+
+The evidence checker is:
+
+```console
+python3 tools/check_rsmp_v1_compression_evidence.py \
+  --results-dir benchmarks/rstim_vs_stim_simulator/results/rsmp-v1
+```
+
+The reproduction command for regenerating the evidence remains separate from
+readiness:
+
+```console
+python3 -m benchmarks.rstim_vs_stim_simulator.run_rsmp_compression \
+  --rstim target/release/rstim \
+  --catalog rstim/tests/fixtures/rsmp/catalog.json \
+  --case stim_surface_d11_r100 \
+  --shots 1024 \
+  --seed 7 \
+  --zstd-level 3 \
+  --out-dir /tmp/rstim-rsmp-v1-evidence
+```
+
+The benchmark row also carries Stim-format baselines for exactly `b8`, `r8`,
+and `ptb64`. All three serialize the same canonical 1024-shot, seed-7
+measurement batch; `r8` is produced with the pinned `stim convert` command and
+`ptb64` with the pinned stim Python API (the Stim CLI streams single records
+and cannot write `ptb64`). Each baseline records its raw byte count, its
+direct level-3 Zstandard byte count under the same recorded contract, the
+conversion argv, the artifact SHA-256, and a round-trip `b8` SHA-256 that must
+equal the canonical measurement SHA-256. The summary and report state byte
+counts and ratios relative to the RSMP archive only; no universal
+cross-format compression superiority is claimed. The pinned Stim binary
+identity, version, and every conversion command are recorded in
+`environment.json`.
+
+The runner writes the bundle to a temporary output directory so the evidence
+check above stays separate from regeneration. To publish a regenerated bundle
+over the committed location, copy the five generated files:
+
+```console
+cp /tmp/rstim-rsmp-v1-evidence/{raw.jsonl,summary.json,report.md,environment.json,artifact-sha256.json} \
+  benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/
+```
+
+Regeneration must run from a clean Git tree so the recorded environment has
+`git.dirty=false`.
+
+The recorded environment includes producer identity, Git state, Rust target,
+Cargo.lock hash, zstd crate versions, native zstd version, full command argv,
+and artifact SHA-256 values. These gates prove only the pinned `rsmp v1`
+evidence cases under that recorded producer and zstd contract. No fixed
+wall-clock performance gate, cross-version byte-for-byte writer determinism,
+or broader compression claim is made.
