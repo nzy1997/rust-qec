@@ -8,6 +8,11 @@ impl Recorder {
         self.bits.push(bit);
     }
 
+    pub(crate) fn flip_last(&mut self) {
+        let bit = self.bits.last_mut().expect("measurement was recorded");
+        *bit = !*bit;
+    }
+
     pub fn len(&self) -> usize {
         self.bits.len()
     }
