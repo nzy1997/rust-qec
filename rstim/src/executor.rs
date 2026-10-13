@@ -787,6 +787,8 @@ fn execute_op(
                 rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_z(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -803,6 +805,8 @@ fn execute_op(
                 rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_x(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -819,6 +823,8 @@ fn execute_op(
                 rng.prepare_intrinsic(context, &[target_slot], 0);
                 let outcome =
                     record_measure_y(&mut exec.state, &exec.lost, q, inv, rng, &mut exec.recorder);
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -841,6 +847,8 @@ fn execute_op(
                     rng,
                     &mut exec.recorder,
                 );
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -863,6 +871,8 @@ fn execute_op(
                     rng,
                     &mut exec.recorder,
                 );
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -885,6 +895,8 @@ fn execute_op(
                     rng,
                     &mut exec.recorder,
                 );
+                let outcome =
+                    apply_readout_noise(exec, outcome, name, args, context, target_slot, q, rng);
                 exec.record_measurement_event(
                     context,
                     name,
@@ -2649,6 +2661,34 @@ fn apply_pauli(state: &mut StabilizerState, q: usize, p: u8) {
         3 => state.z_gate(q),
         _ => {}
     }
+}
+
+fn apply_readout_noise(
+    exec: &mut ExecutionState,
+    mut outcome: MeasurementOutcome,
+    name: &str,
+    args: &[f64],
+    context: &ExecutionTraversalContext,
+    target_slot: usize,
+    qubit: usize,
+    rng: &mut ExecutionRandom<'_>,
+) -> MeasurementOutcome {
+    let probability = args.first().copied().unwrap_or(0.0);
+    if probability > 0.0
+        && rng.bernoulli(
+            context,
+            &[target_slot],
+            ChoiceKind::MeasurementFlip,
+            0,
+            probability,
+            true,
+        )
+    {
+        outcome.bit = !outcome.bit;
+        exec.recorder.flip_last();
+        exec.record_noise_event(context, name, vec![target_slot], vec![qubit as u32], "flip");
+    }
+    outcome
 }
 
 fn record_measure_z(

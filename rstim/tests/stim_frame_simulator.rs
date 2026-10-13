@@ -4,7 +4,6 @@
 // The following test categories are skipped because the rstim frame simulator
 // does not support them:
 // - Classical controls (CX rec[-1] 1) -- parser/sim rejects rec targets for gates
-// - Noisy measurements (MX(0.05)) -- noise arg on measurements is ignored
 // - OBSERVABLE_INCLUDE with Pauli targets (X0, Y0, Z0) -- only rec targets supported
 // - MXX/MYY/MZZ inversions (MXX 0 !1) -- inversions are ignored by frame sim
 // - Non-deterministic detectors via MPP (single non-eigenstate) -- frame sim
