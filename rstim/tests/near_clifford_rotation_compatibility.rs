@@ -54,7 +54,6 @@ fn repeated_targets_apply_complete_axis_rotations_in_sequence() {
 fn neighboring_clifford_angles_still_need_non_clifford_coordinates() {
     for angle in [
         -0.5000000000000001,
-        0.49999999999999994,
         -0.49999999999999994,
         0.5000000000000001,
         0.49999999999999994,
