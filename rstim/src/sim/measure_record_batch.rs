@@ -45,6 +45,13 @@ impl MeasureRecordBatch {
         self.row_count += 1;
     }
 
+    pub(crate) fn xor_last_row(&mut self, mask: &[u64]) {
+        let range = self.row_range(self.row_count - 1);
+        for (word, noise) in self.records[range].iter_mut().zip(mask) {
+            *word ^= noise;
+        }
+    }
+
     /// lookback(k, shot): get bit for rec[-k] for the given shot (k >= 1)
     pub fn lookback(&self, k: usize, shot: usize) -> bool {
         let row = self.lookback_row(k);

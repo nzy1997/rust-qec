@@ -55,10 +55,12 @@ pub enum CompiledOp {
     Measure {
         basis: CompiledBasis,
         qubits: Vec<usize>,
+        readout_probability: f64,
     },
     MeasureReset {
         basis: CompiledBasis,
         qubits: Vec<usize>,
+        readout_probability: f64,
     },
     Detector {
         rec_offsets: Vec<usize>,
@@ -229,36 +231,42 @@ fn compile_sampler_op(name: &str, args: &[f64], targets: &[StimTarget]) -> Compi
             .map(|qubits| CompiledOp::Measure {
                 basis: CompiledBasis::Z,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "MX" => qubits_ignoring_inv(targets)
             .map(|qubits| CompiledOp::Measure {
                 basis: CompiledBasis::X,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "MY" => qubits_ignoring_inv(targets)
             .map(|qubits| CompiledOp::Measure {
                 basis: CompiledBasis::Y,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "MR" | "MRZ" => qubits_ignoring_inv(targets)
             .map(|qubits| CompiledOp::MeasureReset {
                 basis: CompiledBasis::Z,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "MRX" => qubits_ignoring_inv(targets)
             .map(|qubits| CompiledOp::MeasureReset {
                 basis: CompiledBasis::X,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "MRY" => qubits_ignoring_inv(targets)
             .map(|qubits| CompiledOp::MeasureReset {
                 basis: CompiledBasis::Y,
                 qubits,
+                readout_probability: first_arg(args),
             })
             .unwrap_or_else(|| unsupported(name)),
         "DETECTOR" => rec_offsets(targets)
