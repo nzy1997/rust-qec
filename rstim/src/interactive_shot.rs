@@ -1555,7 +1555,7 @@ fn measurement_flip_sites_for_op(
         .filter_map(|(slot, target)| target.qubit_index().map(|qubit| (slot, qubit)))
         .collect::<Vec<_>>();
     match name {
-        "MPAD" => target_entries
+        "MPAD" | "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" => target_entries
             .into_iter()
             .map(|(slot, qubit)| SiteDescriptor {
                 kind,
