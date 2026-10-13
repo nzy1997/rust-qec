@@ -1,6 +1,7 @@
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rstim::executor::{Executor, reference_sample};
+use rstim::interactive_shot::{EditableShot, ExpansionLimits, NoiseSiteKind};
 use rstim::parser::parse_lines;
 use rstim::sampler::{SampleOptions, SamplingBackend, sample_batch_with_options};
 
@@ -127,8 +128,12 @@ fn y_basis_readout_flips_all_targets_in_both_batch_backends() {
 fn classical_feedback_and_trace_use_the_flipped_readout() {
     let circuit = parse_lines("R 0 1 2\nM(1) 0\nCX rec[-1] 1\nM 1 2\n").unwrap();
     let mut executor = Executor::from_instrs(circuit).unwrap();
-    let output = executor.run(&mut StdRng::seed_from_u64(42)).unwrap();
+    let (output, trace) = executor
+        .run_with_trace(&mut StdRng::seed_from_u64(42))
+        .unwrap();
     assert_eq!(output.measurements, vec![true, true, false]);
+    assert_eq!(trace.noise_events.len(), 1);
+    assert_eq!(trace.noise_events[0].branch_label.as_deref(), Some("flip"));
 }
 
 #[test]
@@ -182,5 +187,59 @@ fn zero_readout_probability_preserves_seeded_measurements() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn interactive_sampling_catalogs_readout_flips_including_aliases_and_repeats() {
+    for (reset, measurement, later) in [
+        ("R", "M", "M"),
+        ("R", "MZ", "MZ"),
+        ("RX", "MX", "MX"),
+        ("RY", "MY", "MY"),
+        ("R", "MR", "M"),
+        ("R", "MRZ", "MZ"),
+        ("RX", "MRX", "MX"),
+        ("RY", "MRY", "MY"),
+    ] {
+        let program = format!("{reset} 0 1\nREPEAT 2 {{\n{measurement}(1) 0 1\n}}\n{later} 0 1\n");
+        let mut shot = EditableShot::open(&program, ExpansionLimits::default(), 23).unwrap();
+        let catalog = shot.session().catalog();
+        assert_eq!(catalog.events().len(), 4, "{measurement}");
+        assert!(
+            catalog
+                .sites()
+                .iter()
+                .all(|site| site.kind == NoiseSiteKind::MeasurementFlip && !site.editable)
+        );
+        assert!(
+            shot.summary()
+                .result
+                .measurements
+                .iter()
+                .all(|row| !row.bit)
+        );
+        shot.sample(23).unwrap();
+        let result = shot.summary().result;
+        assert_eq!(
+            result
+                .measurements
+                .iter()
+                .map(|row| row.bit)
+                .collect::<Vec<_>>(),
+            vec![true, true, true, true, false, false],
+            "{measurement}"
+        );
+        assert_eq!(result.noise_events.len(), 4);
+        // Snapshot construction also consumes the trace and must resolve all sites.
+        shot.view_snapshot().unwrap();
+        shot.clear(23).unwrap();
+        assert!(
+            shot.summary()
+                .result
+                .measurements
+                .iter()
+                .all(|row| !row.bit)
+        );
     }
 }
