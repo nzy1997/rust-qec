@@ -29,10 +29,16 @@ jobs:
           args=(--head "$HEAD_SHA")
           if [ "$EVENT_NAME" = pull_request ]; then
             args+=(--base "$PR_BASE_SHA")
-          elif [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
+            args+=(--base "$HEAD_SHA^")
+          elif [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$PUSH_BEFORE_SHA^{commit}" 2>/dev/null; then
             args+=(--base "$PUSH_BEFORE_SHA")
+          else
+            args+=(--base "$HEAD_SHA^")
           fi
           python3 tools/check_tracked_file_sizes.py "${args[@]}"
+      - name: Fetch pinned near-Clifford benchmark evidence
+        run: python3 tools/fetch_benchmark_artifacts.py
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
@@ -57,7 +63,7 @@ jobs:
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Test repository governance gates
-        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes
+        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes tools.test_fetch_benchmark_artifacts
       - name: Check entangled near-Clifford benchmark evidence
         run: |
           python3 benchmarks/near_clifford/entangled/verify.py benchmarks/near_clifford/results/apple-m4-entangled-2026-09-30.json --git-sources

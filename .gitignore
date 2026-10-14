@@ -39,4 +39,8 @@ drafts/
 /site/static/data/atom-loss/
 /site/static/rsmp-v1-showcase/og.png
 
+# Generated benchmark evidence is published in rust-qec-benchmarks and fetched
+# by tools/fetch_benchmark_artifacts.py when a benchmark check needs it.
+/benchmarks/near_clifford/results/
+
 /site/static/examples/rust-experiment/target/

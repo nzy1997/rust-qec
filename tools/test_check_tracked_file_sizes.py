@@ -58,6 +58,59 @@ class TrackedFileSizeCheckerTest(unittest.TestCase):
 
         self.assertEqual(checker.oversized_files(repo, base, head, 1024), [])
 
+    def test_aggregate_limit_rejects_multiple_small_files(self) -> None:
+        temporary, repo, base, _ = self.make_repo()
+        self.addCleanup(temporary.cleanup)
+        for index in range(3):
+            (repo / f"part-{index}.bin").write_bytes(b"x" * 512)
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-qm", "parts"], check=True)
+        head = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
+        ).strip()
+
+        files = checker.changed_file_sizes(repo, base, head)
+        self.assertEqual(sum(size for _, size in files), 1536)
+        self.assertTrue(all(size <= 1024 for _, size in files))
+
+    def test_forbidden_generated_result_is_rejected_even_when_small(self) -> None:
+        temporary, repo, base, _ = self.make_repo()
+        self.addCleanup(temporary.cleanup)
+        result = repo / "benchmarks/near_clifford/results/tiny.json"
+        result.parent.mkdir(parents=True)
+        result.write_text("{}\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-qm", "result"], check=True)
+        head = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
+        ).strip()
+
+        paths = checker.changed_paths(repo, base, head)
+        self.assertEqual(
+            checker.forbidden_files(paths),
+            ["benchmarks/near_clifford/results/tiny.json"],
+        )
+
+    def test_deleting_forbidden_generated_result_is_allowed(self) -> None:
+        temporary, repo, _, _ = self.make_repo()
+        self.addCleanup(temporary.cleanup)
+        result = repo / "benchmarks/near_clifford/results/old.json"
+        result.parent.mkdir(parents=True)
+        result.write_text("{}\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-qm", "result"], check=True)
+        base = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
+        ).strip()
+        result.unlink()
+        subprocess.run(["git", "-C", str(repo), "add", "-u"], check=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-qm", "remove result"], check=True)
+        head = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True
+        ).strip()
+
+        self.assertEqual(checker.changed_paths(repo, base, head), [])
+
 
 if __name__ == "__main__":
     unittest.main()
