@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check changed tracked file sizes
+      - name: Check tracked file policy
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -37,7 +37,7 @@ jobs:
             args+=(--base "$HEAD_SHA^")
           fi
           python3 tools/check_tracked_file_sizes.py "${args[@]}"
-      - name: Fetch pinned near-Clifford benchmark evidence
+      - name: Fetch pinned benchmark artifacts
         run: python3 tools/fetch_benchmark_artifacts.py
       - name: Install system deps
         run: |

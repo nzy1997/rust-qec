@@ -1347,6 +1347,7 @@
             }
           ],
           "commands": [
+            "python3 tools/fetch_benchmark_artifacts.py --path benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem",
             "python3 -m benchmarks.rstim_vs_stim_simulator.run_dem_speed_case --profile release --case stim-style-surface-dem-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir benchmarks/rstim_vs_stim_simulator/results/release-dem-sample",
             "python3 tools/check_rstim_vs_stim_release_dem_speed_case.py --results-dir benchmarks/rstim_vs_stim_simulator/results/release-dem-sample --case stim-style-surface-dem-sample-d11-r100-b1024 --required-variants stim-sample-dem,rstim-sample-dem"
           ],
