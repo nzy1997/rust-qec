@@ -21,8 +21,30 @@ ARTIFACT_REPOSITORY = "nzy1997/rust-qec-benchmarks"
 REVISION_PATH = Path(__file__).with_name("benchmark_artifacts_revision.txt")
 HISTORY_MAP_PATH = Path(__file__).with_name("history_commit_map.txt")
 HISTORY_PACK_PATH = "history/history-compat.pack"
-MANAGED_PREFIX = "benchmarks/near_clifford/results/"
+MANAGED_PREFIXES = (
+    "benchmarks/near_clifford/results/",
+    "benchmarks/rstim_vs_stim_simulator/fixtures/",
+)
 ZERO_SHA = "0" * 40
+FROZEN_PROBE_ROOT = (
+    "benchmarks/near_clifford/results/"
+    "apple-m4-strict-coefficient-pairs-rust-ablation-2026-10-08/probe/"
+)
+DECLARED_TREE_DEPENDENCIES = (
+    (
+        "benchmarks/near_clifford/results/"
+        "apple-m4-compact-zero-spans-rust-ablation-2026-10-08/",
+        (
+            f"{FROZEN_PROBE_ROOT}warm-candidate/",
+            f"{FROZEN_PROBE_ROOT}cold-candidate/",
+        ),
+    ),
+    (
+        "benchmarks/near_clifford/results/"
+        "linux-vm-x86-compact-zero-spans-rust-ablation-2026-10-08/",
+        (f"{FROZEN_PROBE_ROOT}warm-candidate/",),
+    ),
+)
 
 
 def _sha256(path: Path) -> str:
@@ -33,8 +55,8 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _history_replacements(data: str) -> list[tuple[str, str]]:
-    replacements: list[tuple[str, str]] = []
+def _history_entries(data: str) -> list[tuple[str, str]]:
+    entries: list[tuple[str, str]] = []
     seen: set[str] = set()
     for line_number, line in enumerate(data.splitlines(), start=1):
         line = line.strip()
@@ -53,9 +75,20 @@ def _history_replacements(data: str) -> list[tuple[str, str]]:
         if old in seen:
             raise RuntimeError(f"duplicate old commit ID in history map: {old}")
         seen.add(old)
-        if old != new and new != ZERO_SHA:
-            replacements.append((old, new))
-    return replacements
+        entries.append((old, new))
+    return entries
+
+
+def _history_replacements(data: str) -> list[tuple[str, str]]:
+    return [
+        (old, new)
+        for old, new in _history_entries(data)
+        if old != new and new != ZERO_SHA
+    ]
+
+
+def _history_object_commits(data: str) -> list[str]:
+    return [old for old, new in _history_entries(data) if old != new]
 
 
 def _install_history_replacements(
@@ -107,7 +140,7 @@ def _history_pack_digest(data: str) -> str:
 
 
 def _install_history_objects(revision: str, repo: Path = REPO_ROOT) -> int:
-    old_commits = [old for old, _ in _history_replacements(HISTORY_MAP_PATH.read_text(encoding="utf-8"))]
+    old_commits = _history_object_commits(HISTORY_MAP_PATH.read_text(encoding="utf-8"))
     missing = [
         commit
         for commit in old_commits
@@ -157,6 +190,10 @@ def _safe_path(path: str) -> bool:
     return not pure.is_absolute() and ".." not in pure.parts and path == pure.as_posix()
 
 
+def _managed_path(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in MANAGED_PREFIXES)
+
+
 def _manifest(data: str) -> dict[str, str]:
     entries: dict[str, str] = {}
     for line_number, line in enumerate(data.splitlines(), start=1):
@@ -167,7 +204,7 @@ def _manifest(data: str) -> dict[str, str]:
         if len(parts) != 2:
             raise RuntimeError(f"malformed manifest line {line_number}")
         digest, path = parts
-        if not path.startswith(MANAGED_PREFIX):
+        if not _managed_path(path):
             continue
         if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
             raise RuntimeError(f"invalid SHA-256 on manifest line {line_number}")
@@ -183,8 +220,9 @@ def _manifest(data: str) -> dict[str, str]:
 
 def _normalize_selector(selector: str) -> str:
     normalized = selector.rstrip("/")
-    if not normalized.startswith(MANAGED_PREFIX) or not _safe_path(normalized):
-        raise RuntimeError(f"artifact selection is outside {MANAGED_PREFIX}: {selector}")
+    if not _managed_path(f"{normalized}/") or not _safe_path(normalized):
+        roots = ", ".join(prefix.rstrip("/") for prefix in MANAGED_PREFIXES)
+        raise RuntimeError(f"artifact selection is outside managed roots ({roots}): {selector}")
     return normalized
 
 
@@ -209,6 +247,21 @@ def _source_inventory_dependencies(
     root: Path, selected: dict[str, str], entries: dict[str, str]
 ) -> dict[str, str]:
     dependencies: dict[str, str] = {}
+    for trigger_prefix, dependency_prefixes in DECLARED_TREE_DEPENDENCIES:
+        if not any(path.startswith(trigger_prefix) for path in selected):
+            continue
+        for dependency_prefix in dependency_prefixes:
+            matches = {
+                path: digest
+                for path, digest in entries.items()
+                if path.startswith(dependency_prefix)
+            }
+            if not matches:
+                raise RuntimeError(
+                    "declared artifact dependency tree is absent from the manifest: "
+                    f"{dependency_prefix}"
+                )
+            dependencies.update(matches)
     for relative in selected:
         if Path(relative).name != "header.json":
             continue
@@ -220,7 +273,7 @@ def _source_inventory_dependencies(
         if not isinstance(contract, dict) or not isinstance(contract.get("sources"), dict):
             continue
         for source_path in contract["sources"]:
-            if not source_path.startswith(MANAGED_PREFIX):
+            if not _managed_path(source_path):
                 continue
             digest = entries.get(source_path)
             if digest is None:

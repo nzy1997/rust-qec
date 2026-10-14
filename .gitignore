@@ -42,5 +42,6 @@ drafts/
 # Generated benchmark evidence is published in rust-qec-benchmarks and fetched
 # by tools/fetch_benchmark_artifacts.py when a benchmark check needs it.
 /benchmarks/near_clifford/results/
+/benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem
 
 /site/static/examples/rust-experiment/target/

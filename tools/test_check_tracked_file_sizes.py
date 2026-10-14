@@ -31,9 +31,9 @@ class TrackedFileSizeCheckerTest(unittest.TestCase):
         subprocess.run(["git", "-C", str(repo), "commit", "-qm", "large"], check=True)
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
 
-        self.assertEqual(checker.oversized_files(repo, base, head, 1024), [("large.bin", 1025)])
+        self.assertEqual(checker.oversized_files(repo, head, 1024), [("large.bin", 1025)])
 
-    def test_existing_oversized_file_is_not_rechecked_without_a_change(self) -> None:
+    def test_existing_oversized_file_is_rejected_without_a_change(self) -> None:
         temporary, repo, base, _ = self.make_repo()
         self.addCleanup(temporary.cleanup)
         (repo / "large.bin").write_bytes(b"x" * 1025)
@@ -46,7 +46,7 @@ class TrackedFileSizeCheckerTest(unittest.TestCase):
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
 
         self.assertEqual(checker.changed_paths(repo, large, head), ["small.txt"])
-        self.assertEqual(checker.oversized_files(repo, large, head, 1024), [])
+        self.assertEqual(checker.oversized_files(repo, head, 1024), [("large.bin", 1025)])
 
     def test_exact_limit_is_allowed(self) -> None:
         temporary, repo, base, _ = self.make_repo()
@@ -56,7 +56,7 @@ class TrackedFileSizeCheckerTest(unittest.TestCase):
         subprocess.run(["git", "-C", str(repo), "commit", "-qm", "exact"], check=True)
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
 
-        self.assertEqual(checker.oversized_files(repo, base, head, 1024), [])
+        self.assertEqual(checker.oversized_files(repo, head, 1024), [])
 
     def test_aggregate_limit_rejects_multiple_small_files(self) -> None:
         temporary, repo, base, _ = self.make_repo()
@@ -90,6 +90,14 @@ class TrackedFileSizeCheckerTest(unittest.TestCase):
             checker.forbidden_files(paths),
             ["benchmarks/near_clifford/results/tiny.json"],
         )
+
+    def test_externalized_dem_fixture_is_forbidden(self) -> None:
+        path = (
+            "benchmarks/rstim_vs_stim_simulator/fixtures/"
+            "stim_surface_code_rotated_memory_z_d11_r100.dem"
+        )
+
+        self.assertEqual(checker.forbidden_files([path]), [path])
 
     def test_deleting_forbidden_generated_result_is_allowed(self) -> None:
         temporary, repo, _, _ = self.make_repo()

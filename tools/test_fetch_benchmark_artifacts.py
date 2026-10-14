@@ -33,15 +33,21 @@ class FetchBenchmarkArtifactsTest(unittest.TestCase):
         new = "2" * 40
         unchanged = "3" * 40
         removed = "4" * 40
+        data = (
+            "old                                      new\n"
+            f"{old} {new}\n"
+            f"{unchanged} {unchanged}\n"
+            f"{removed} {fetcher.ZERO_SHA}\n"
+        )
         self.assertEqual(
-            fetcher._history_replacements(
-                "old                                      new\n"
-                f"{old} {new}\n"
-                f"{unchanged} {unchanged}\n"
-                f"{removed} {fetcher.ZERO_SHA}\n"
-            ),
+            fetcher._history_entries(data),
+            [(old, new), (unchanged, unchanged), (removed, fetcher.ZERO_SHA)],
+        )
+        self.assertEqual(
+            fetcher._history_replacements(data),
             [(old, new)],
         )
+        self.assertEqual(fetcher._history_object_commits(data), [old, removed])
 
     def test_history_replacement_resolves_a_missing_old_commit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -73,11 +79,15 @@ class FetchBenchmarkArtifactsTest(unittest.TestCase):
         digest = "a" * 64
         entries = fetcher._manifest(
             f"{digest}  benchmarks/near_clifford/results/run/results.json\n"
+            f"{digest}  benchmarks/rstim_vs_stim_simulator/fixtures/case.dem\n"
             f"{digest}  README.md\n"
         )
         self.assertEqual(
             entries,
-            {"benchmarks/near_clifford/results/run/results.json": digest},
+            {
+                "benchmarks/near_clifford/results/run/results.json": digest,
+                "benchmarks/rstim_vs_stim_simulator/fixtures/case.dem": digest,
+            },
         )
 
     def test_manifest_rejects_path_traversal(self) -> None:
@@ -106,6 +116,9 @@ class FetchBenchmarkArtifactsTest(unittest.TestCase):
             {"benchmarks/near_clifford/results/b.json": "3"},
         )
 
+        fixture = "benchmarks/rstim_vs_stim_simulator/fixtures/case.dem"
+        self.assertEqual(fetcher._normalize_selector(fixture), fixture)
+
     def test_selector_cannot_escape_managed_prefix(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "outside"):
             fetcher._selected_entries({}, ["README.md"])
@@ -128,6 +141,41 @@ class FetchBenchmarkArtifactsTest(unittest.TestCase):
             self.assertEqual(
                 fetcher._source_inventory_dependencies(root, selected, entries),
                 {source: "source-digest"},
+            )
+
+    def test_compact_zero_spans_selection_adds_frozen_probe_trees(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            apple = (
+                "benchmarks/near_clifford/results/"
+                "apple-m4-compact-zero-spans-rust-ablation-2026-10-08/header.json"
+            )
+            linux = (
+                "benchmarks/near_clifford/results/"
+                "linux-vm-x86-compact-zero-spans-rust-ablation-2026-10-08/header.json"
+            )
+            warm = f"{fetcher.FROZEN_PROBE_ROOT}warm-candidate/main.rs"
+            cold = f"{fetcher.FROZEN_PROBE_ROOT}cold-candidate/main.rs"
+            unrelated = "benchmarks/near_clifford/results/unrelated/data.json"
+            entries = {
+                apple: "apple-digest",
+                linux: "linux-digest",
+                warm: "warm-digest",
+                cold: "cold-digest",
+                unrelated: "unrelated-digest",
+            }
+
+            self.assertEqual(
+                fetcher._source_inventory_dependencies(
+                    root, {apple: entries[apple]}, entries
+                ),
+                {warm: "warm-digest", cold: "cold-digest"},
+            )
+            self.assertEqual(
+                fetcher._source_inventory_dependencies(
+                    root, {linux: entries[linux]}, entries
+                ),
+                {warm: "warm-digest"},
             )
 
     def test_externalized_source_inventory_must_be_manifested(self) -> None:
