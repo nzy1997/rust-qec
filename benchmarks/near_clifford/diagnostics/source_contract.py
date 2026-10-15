@@ -48,7 +48,14 @@ def validate_contract(header, closure):
             'current-production revision differs from measured source')
     require(contract == closure.get('production_contract_after'),
             'current-production closure differs')
-    require(contract['sources'] == production_inventory(contract['revision']),
+    inventory = production_inventory(contract['revision'])
+    for name in set(contract['sources']) - set(inventory):
+        require(name.startswith('benchmarks/near_clifford/results/'),
+                'current-production Git inventory differs')
+        externalized = ROOT / name
+        require(externalized.is_file(), 'externalized production source is unavailable: ' + name)
+        inventory[name] = hashlib.sha256(externalized.read_bytes()).hexdigest()
+    require(contract['sources'] == inventory,
             'current-production Git inventory differs')
     try:
         producer = subprocess.check_output(

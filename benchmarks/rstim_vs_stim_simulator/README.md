@@ -218,6 +218,14 @@ the same output boundary as the other four rows.
 
 ## Selected DEM Speed Evidence
 
+Fetch the generated 13 MB DEM fixture from the pinned benchmark-artifact
+revision before running or checking this case:
+
+```sh
+python3 tools/fetch_benchmark_artifacts.py \
+  --path benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem
+```
+
 Run the checked release-profile DEM sampling evidence case:
 
 ```sh

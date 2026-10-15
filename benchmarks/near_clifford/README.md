@@ -1,5 +1,20 @@
 # Near-Clifford P0/P1 benchmark
 
+Generated benchmark evidence is stored in
+[`nzy1997/rust-qec-benchmarks`](https://github.com/nzy1997/rust-qec-benchmarks),
+not in this source repository. Fetch the exact revision pinned by this checkout
+before replaying retained evidence:
+
+```sh
+python3 tools/fetch_benchmark_artifacts.py
+```
+
+Use repeated `--path benchmarks/near_clifford/results/<name>` arguments to fetch
+only selected publications. The command also installs local Git replacement refs
+from `tools/history_commit_map.txt`, so source revisions recorded before the
+2026-10 history cleanup resolve to their rewritten commits. The fetched
+`results/` tree and compatibility refs are ignored by Git.
+
 Run from the repository root:
 
 ```sh
