@@ -133,9 +133,8 @@ test('tutorial summarizes support once while the support page keeps decoder-spec
   await page.goto('/support/');
   for (const name of ['envelope-matching', 'envelope-mle']) {
     const copies = page.locator(`[data-decoder-support-copy="${name}"]`);
-    await expect(copies).toHaveCount(2);
-    await expect(copies.first()).toHaveText(`Supported since ${published.release}`);
-    await expect(copies.last()).toHaveText(`Supported since ${published.release}`);
+    await expect(copies).toHaveCount(1);
+    await expect(copies).toHaveText(`Supported since ${published.release}`);
   }
 });
 

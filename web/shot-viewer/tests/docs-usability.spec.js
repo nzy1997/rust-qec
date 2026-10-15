@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const CIRCUIT_HEREDOC = `cat > circuit.stim <<'STIM'
 R 0 1
@@ -61,12 +63,25 @@ test('home routes first-time users to the workflow and docs links to the API ref
 });
 
 test('CLI reference is generated from the executable capabilities contract', async ({ page }) => {
+  const binary = fileURLToPath(new URL('../../../target/debug/rstim', import.meta.url));
+  const capabilities = JSON.parse(execFileSync(binary, ['capabilities', '--format', 'json'], { encoding: 'utf8' }));
   await page.goto('/reference/');
-  await expect(page.locator('.reference-command')).toHaveCount(9);
+  expect(await page.locator('.reference-command > h3 code').allTextContents()).toEqual(
+    capabilities.commands.map(command => `rstim ${command.argv.join(' ')}`),
+  );
   await expect(page.locator('#command-circuit-gen')).toContainText('rstim circuit gen');
   await expect(page.locator('#command-circuit-gen').locator('xpath=..')).toContainText('--before-round-data-loss-probability');
   await expect(page.locator('#command-decode').locator('xpath=..')).toContainText('decode_timeout');
   await expect(page.locator('main')).toContainText('rstim capabilities --format json');
+  const score = page.locator('.reference-command[aria-labelledby="command-dataset-score"]');
+  await expect(score).toContainText('public_decoder_dataset_directory');
+  for (const flag of ['--dataset', '--private', '--predictions']) {
+    await expect(score.getByRole('row').filter({ has: page.getByText(flag, { exact: true }) })).toContainText('Yes');
+  }
+  await expect(score.getByRole('row').filter({ has: page.getByText('--decode-stats', { exact: true }) })).toContainText('No');
+  for (const code of ['invalid_predictions', 'invalid_decode_stats']) {
+    await expect(score.getByRole('row').filter({ has: page.getByText(code, { exact: true }) }).locator('td')).toHaveText([code, '2', 'stderr']);
+  }
 });
 
 test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
@@ -76,7 +91,7 @@ test('home atom-loss link reaches the dedicated workflow', async ({ page }) => {
   await expect(page).toHaveURL(/\/atom-loss\/$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Decode with\s*atom loss/);
   await expect(page.locator('pre[data-atom-loss-step]')).toHaveCount(4);
-  await expect(page.locator('[data-output]').filter({ hasText: 'Decoded shots' })).toContainText('Logical errors: 0 / 64');
+  await expect(page.locator('[data-output]').filter({ hasText: 'Scored shots: 64' })).toContainText('Logical errors: 0 / 64');
   await expect(page.locator('.docs-sidebar a[aria-current="page"]')).toHaveText('Decode with atom loss');
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
