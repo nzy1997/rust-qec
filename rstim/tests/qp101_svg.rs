@@ -1008,11 +1008,7 @@ fn svg_renderer_assigns_first_observable_include_then_accumulates() {
     .expect("observable accumulation fixture should export");
     let svg = render_svg(&doc).expect("observable accumulation fixture should render");
 
-    for marker in [
-        ">L0 = m1</text>",
-        ">L0 *= m2</text>",
-        ">L1 = m2</text>",
-    ] {
+    for marker in [">L0 = m1</text>", ">L0 *= m2</text>", ">L1 = m2</text>"] {
         assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
     }
 }
@@ -1020,10 +1016,8 @@ fn svg_renderer_assigns_first_observable_include_then_accumulates() {
 #[test]
 fn svg_renderer_uses_bit_parity_for_measurement_only_sources() {
     let doc = export_qp101(
-        &parse_lines(
-            "M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
-        )
-        .expect("measurement parity fixture should parse"),
+        &parse_lines("M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n")
+            .expect("measurement parity fixture should parse"),
     )
     .expect("measurement parity fixture should export");
     let svg = render_svg(&doc).expect("measurement parity fixture should render");
