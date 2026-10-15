@@ -780,8 +780,9 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
             "circuit sample",
             "dataset export",
             "mkdir -p data",
-            "--mode measurements_blinded",
-            "--logical-x-qubits 1,8,15",
+            "measurements_blinded",
+            "rstim:logical_input=X:1,8,15",
+            "The exporter reads this metadata and selects blinded measurements automatically.",
             "--error-trace",
             "shots.b8",
             "answers.b8",
@@ -793,10 +794,12 @@ fn sampling_data_page_preserves_training_and_loss_contracts() {
             "TICK[rstim:logical_flip_point]",
             "before every positive-probability noise instruction",
             "load_blinded_training_data.py",
-            "this command requires a dataset exported with",
+            "required by the loader below",
         ],
         "sampling and training-data page",
     );
+    assert!(!page.contains("--mode measurements_blinded"));
+    assert!(!page.contains("--logical-x-qubits"));
     assert_contains_all(
         &base,
         &[
@@ -1428,7 +1431,7 @@ fn qec_code_and_future_benchmarks_are_classified() {
             "rstim-vs-stim-release",
             "rstim-vs-stim-release-surface-detect",
             "rstim-vs-stim-release-dem-sample",
-            "named fixtures",
+            "recorded environments",
         ],
         "rstim-versus-Stim simulator evidence section",
     );
