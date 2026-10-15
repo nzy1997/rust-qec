@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "esbuild app.js --bundle --format=esm --target=es2022 --minify --outfile=../../site/static/interactive/app.js",
+    "build": "esbuild app.js --bundle --format=esm --target=es2022 --minify --external:html2canvas --outfile=../../site/static/interactive/app.js",
     "test:e2e": "playwright test"
   },
   "dependencies": {

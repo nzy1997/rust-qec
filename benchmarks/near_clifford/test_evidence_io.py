@@ -22,7 +22,7 @@ def rejects(call):
 def main():
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
-        wire = '{"index":0,"value":"记录"}\n'.encode()
+        wire = '{"index":0,"value":"record €"}\n'.encode()
         plain = root / 'plain'
         plain.mkdir()
         (plain / 'events.jsonl').write_bytes(wire)
@@ -40,7 +40,7 @@ def main():
         split = root / 'split'
         split.mkdir()
         # Split a multibyte UTF-8 character, not a JSON line boundary.
-        cut = wire.index('记'.encode()) + 1
+        cut = wire.index('€'.encode()) + 1
         (split / 'events.part-00000.jsonl.gz').write_bytes(gzip.compress(wire[:cut], mtime=0))
         (split / 'events.part-00001.jsonl.gz').write_bytes(gzip.compress(wire[cut:], mtime=0))
         require(read_event_bytes(split) == wire, 'split UTF-8 roundtrip failed')
