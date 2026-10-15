@@ -60,6 +60,11 @@ Once you understand the circuit shape, a typical CLI workflow is:
 
 The full command reference is in [`cli.md`](cli.md).
 
+For circuits containing `T`, `T_DAG` or coherent axis rotations, use the opt-in
+Rust backend described in the [near-Clifford usage guide](near-clifford.md).
+It covers compiled execution, Strict/Fused arithmetic and raw postselected
+counts. The ordinary stabilizer CLI does not automatically select that backend.
+
 ## Create a circuit and sample
 
 Parse a simple Bell pair circuit and sample measurement outcomes:
