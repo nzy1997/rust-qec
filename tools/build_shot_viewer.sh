@@ -42,6 +42,7 @@ RUSTC="$rustc_path" CC_wasm32_unknown_unknown="$wasm_cc" \
   --out-name rstim_shot_web
 
 npm --prefix web/shot-viewer ci
+# Vector PDF export uses svg2pdf; leave jsPDF's unused HTML rasterizer external.
 npm --prefix web/shot-viewer run build
 perl -pi -e 's/[ \t]+$//' site/static/interactive/app.js
 
