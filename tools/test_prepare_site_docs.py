@@ -35,11 +35,11 @@ class PrepareSiteDocsTests(unittest.TestCase):
             for source, _ in pairs:
                 path = root / source
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('# Original\nUnicode: 量子\n## Mid-SWAP configuration migration\nMigration body\n')
+                path.write_text('# Original\nUnicode: €\n## Mid-SWAP configuration migration\nMigration body\n')
             for filename in SUPPORT_ARTIFACTS:
                 (root / 'docs' / filename).write_text('original support metadata\n')
             prepare(root)
-            self.assertEqual((root / 'site/generated/support-core.md').read_text(), '# Original\nUnicode: 量子\n')
+            self.assertEqual((root / 'site/generated/support-core.md').read_text(), '# Original\nUnicode: €\n')
             self.assertEqual((root / 'site/generated/version-migration.md').read_text(), '## Mid-SWAP configuration migration\nMigration body\n')
             version = json.loads((root / 'site/generated/docs-version.json').read_text())
             self.assertEqual(version['id'], 'master')

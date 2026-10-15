@@ -36,7 +36,11 @@ def verify_sources(directory, header, *, cold=False):
         paths += ['Cargo.toml', 'Cargo.lock', 'rstim/Cargo.toml']
         paths += ['benchmarks/near_clifford/application_counts/fixtures/' + n + '.stim' for n in NAMES]
         expected = {p: digest(git_bytes(ref, p)) for p in paths}
-        expected.update({prefix + p: digest(git_bytes(CANDIDATE, FROZEN + probe_name + '/' + p)) for p in PROBE_INPUTS})
+        # These probe snapshots are declared fetch dependencies of this archive.
+        # Read the fetched, checksum-verified files directly: history replacement
+        # refs point at cleaned commits where artifact paths intentionally do not
+        # exist.
+        expected.update({prefix + p: digest((ROOT / FROZEN / probe_name / p).read_bytes()) for p in PROBE_INPUTS})
         require(identity['sources'] == expected, 'complete original source/probe inventory')
         require(len(identity['binary']) == 64 and all(x in '0123456789abcdef' for x in identity['binary']), 'measured binary digest')
         mapping[role] = {'source_equivalent_commit':ref,

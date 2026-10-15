@@ -62,6 +62,19 @@ class ProductionContractTests(unittest.TestCase):
         self.assertIn('renvelope/src/lib.rs', header['production_contract']['sources'])
         self.assertIn('Cargo.lock', header['production_contract']['sources'])
 
+    def test_externalized_result_source_is_still_hash_bound(self):
+        header, closure = self.receipt()
+        name = 'benchmarks/near_clifford/results/frozen/probe.rs'
+        self.put(name, 'fn main() {}\n')
+        digest = hashlib.sha256((self.root / name).read_bytes()).hexdigest()
+        header['production_contract']['sources'][name] = digest
+        closure['production_contract_after'] = copy.deepcopy(header['production_contract'])
+        contract.validate_contract(header, closure)
+
+        self.put(name, 'fn main() { panic!() }\n')
+        with self.assertRaisesRegex(ValueError, 'Git inventory differs'):
+            contract.validate_contract(header, closure)
+
     def test_dirty_rust_and_manifest_rejected_before_measurement(self):
         for name in ['renvelope/src/lib.rs', 'rstim/Cargo.toml', 'Cargo.lock']:
             with self.subTest(name=name):

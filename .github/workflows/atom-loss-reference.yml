@@ -37,6 +37,8 @@ jobs:
           fetch-depth: 0
       - name: Fetch generated documentation artifacts
         run: python3 tools/fetch_docs_artifacts.py
+      - name: Install rewritten-history compatibility refs
+        run: python3 tools/fetch_benchmark_artifacts.py --history-only
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-python@v5
