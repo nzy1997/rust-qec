@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -125,6 +126,45 @@ fn generated_support_tracks_distance_and_auto_matches_explicit_export() {
 }
 
 #[test]
+fn generated_mle_witnesses_match_the_release_scope_identities() {
+    let plan_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("docs/envelope-mle-scope.json");
+    let plan: Value = serde_json::from_slice(&fs::read(plan_path).unwrap()).unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("witness.stim");
+    let mut generated_cases = 0;
+    for case in plan["required_cases"].as_array().unwrap() {
+        let Some(source) = case["evidence_identity"]["source"].as_str() else {
+            continue;
+        };
+        if !source.starts_with("rstim circuit gen ") {
+            continue;
+        }
+        let args: Vec<_> = source.split_whitespace().skip(1).collect();
+        let output = Command::new(env!("CARGO_BIN_EXE_rstim"))
+            .args(args)
+            .arg("--out")
+            .arg(&path)
+            .output()
+            .unwrap();
+        success(output);
+        let circuit = fs::read(&path).unwrap();
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&circuit)),
+            case["evidence_identity"]["circuit_sha256"]
+                .as_str()
+                .unwrap(),
+            "release scope identity is stale for {}",
+            case["id"]
+        );
+        generated_cases += 1;
+    }
+    assert_eq!(generated_cases, 3);
+}
+
+#[test]
 fn auto_falls_back_to_detectors_and_explicit_mode_can_ignore_defaults() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
@@ -201,6 +241,10 @@ fn explicit_support_overrides_a_circuit_default_after_validation() {
 #[test]
 fn auto_rejects_invalid_declarations_and_unsafe_insertion_points_before_writing() {
     for (prefix, marker) in [
+        (
+            "R 0\n",
+            "TICK[rstim:logical_flip_point] # rstim:logical_input=X",
+        ),
         (
             "R 0\n",
             "TICK[rstim:logical_flip_point] # rstim:logical_input=X:",

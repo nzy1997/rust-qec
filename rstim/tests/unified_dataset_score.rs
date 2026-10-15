@@ -115,7 +115,7 @@ fn result(output: Output) -> Value {
     value["result"].clone()
 }
 
-fn assert_rejected(mut cmd: Command, code: &str) {
+fn assert_rejected(mut cmd: Command, code: &str) -> Value {
     let output = cmd.args(["--error-format", "json"]).output().unwrap();
     assert_eq!(output.status.code(), Some(2));
     assert!(
@@ -125,6 +125,7 @@ fn assert_rejected(mut cmd: Command, code: &str) {
     let value: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(value["command"], "dataset.score");
     assert_eq!(value["error"]["code"], code, "{value}");
+    value
 }
 
 #[test]
@@ -224,6 +225,113 @@ fn scoring_rejects_mixed_bundles_and_tampered_answers() {
     manifest["answers_file"]["sha256"] = json!(format!("{:x}", Sha256::digest(bad_answers)));
     write_json(&manifest_path, &manifest);
     assert_rejected(fixture.score(), "invalid_dataset");
+}
+
+#[test]
+fn scoring_reports_missing_and_malformed_inputs_without_a_partial_score() {
+    let fixture = Fixture::new(1, 3);
+    let manifest_path = fixture.private.join("manifest.json");
+    let manifest = fs::read(&manifest_path).unwrap();
+    fs::remove_file(&manifest_path).unwrap();
+    let error = assert_rejected(fixture.score(), "input_error");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("manifest.json")
+    );
+    fs::write(&manifest_path, b"{invalid").unwrap();
+    assert_rejected(fixture.score(), "invalid_dataset");
+    fs::write(&manifest_path, manifest).unwrap();
+
+    let stats_path = fixture.dir.path().join("missing-stats.json");
+    let mut cmd = fixture.score();
+    cmd.arg("--decode-stats").arg(&stats_path);
+    assert_rejected(cmd, "input_error");
+    fs::write(&stats_path, b"[]").unwrap();
+    let mut cmd = fixture.score();
+    cmd.arg("--decode-stats").arg(&stats_path);
+    assert_rejected(cmd, "invalid_decode_stats");
+
+    fs::remove_file(&fixture.predictions).unwrap();
+    let error = assert_rejected(fixture.score(), "input_error");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("predictions.b8")
+    );
+}
+
+#[test]
+fn scoring_requires_consistent_nonzero_observables_and_private_row_layout() {
+    let fixture = Fixture::new(1, 3);
+    let public_path = fixture.public.join("manifest.json");
+    let public = read_json(&public_path);
+    for observables in [0, 2] {
+        let mut inconsistent = public.clone();
+        inconsistent["circuit"]["observables"] = json!(observables);
+        write_json(&public_path, &inconsistent);
+        let error = assert_rejected(fixture.score(), "invalid_dataset");
+        assert!(
+            error["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("observable count")
+        );
+    }
+    write_json(&public_path, &public);
+
+    let private_path = fixture.private.join("manifest.json");
+    let original = read_json(&private_path);
+    for (key, value) in [
+        ("file", json!("other.b8")),
+        ("bits", json!(2)),
+        ("bytes_per_shot", json!(2)),
+    ] {
+        let mut changed = original.clone();
+        changed["answers_file"][key] = value;
+        write_json(&private_path, &changed);
+        let error = assert_rejected(fixture.score(), "invalid_dataset");
+        assert!(
+            error["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("observable row width")
+        );
+    }
+    let answers = [0, 0];
+    fs::write(fixture.private.join("answers.b8"), answers).unwrap();
+    let mut truncated = original;
+    truncated["answers_file"]["sha256"] = json!(format!("{:x}", Sha256::digest(answers)));
+    write_json(&private_path, &truncated);
+    let error = assert_rejected(fixture.score(), "invalid_dataset");
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("Incomplete rows")
+    );
+}
+
+#[test]
+fn scoring_rejects_unsupported_modes_and_inconsistent_row_kinds() {
+    let fixture = Fixture::new(1, 3);
+    let path = fixture.public.join("manifest.json");
+    let original = read_json(&path);
+    for (mode, kind) in [("auto", "detectors"), ("detectors", "measurements")] {
+        let mut changed = original.clone();
+        changed["mode"] = json!(mode);
+        changed["row"]["kind"] = json!(kind);
+        write_json(&path, &changed);
+        let error = assert_rejected(fixture.score(), "unsupported_dataset_mode");
+        assert!(
+            error["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("score requires")
+        );
+    }
 }
 
 #[test]
