@@ -2032,12 +2032,35 @@ fn target_pairs(
 }
 
 fn is_independent_single_qubit_gate(gate: &str) -> bool {
+    // Include every one-qubit Clifford accepted by validation, including aliases.
+    // A batch applies independently to each target; it is not a spanning gate.
     matches!(
         gate,
-        "H" | "X"
+        "I" | "H"
+            | "H_XY"
+            | "H_YZ"
+            | "H_NXY"
+            | "H_NXZ"
+            | "H_NYZ"
+            | "X"
             | "Y"
             | "Z"
             | "S"
+            | "S_DAG"
+            | "SQRT_X"
+            | "SQRT_X_DAG"
+            | "SQRT_Y"
+            | "SQRT_Y_DAG"
+            | "SQRT_Z"
+            | "SQRT_Z_DAG"
+            | "C_XYZ"
+            | "C_ZYX"
+            | "C_NXYZ"
+            | "C_NZYX"
+            | "C_XNYZ"
+            | "C_XYNZ"
+            | "C_ZNYX"
+            | "C_ZYNX"
             | "T"
             | "R"
             | "RX"
