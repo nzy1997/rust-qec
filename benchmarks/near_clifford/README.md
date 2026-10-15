@@ -15,6 +15,22 @@ from `tools/history_commit_map.txt`, so source revisions recorded before the
 2026-10 history cleanup resolve to their rewritten commits. The fetched
 `results/` tree and compatibility refs are ignored by Git.
 
+The [October two-workload closeout](results/omen-two-workload-wrapup-2026-10-15/README.md)
+preserves the frozen distillation/MSC-d5 peer comparison, its independent repeat,
+both recent candidate screens and the native cost/CPU diagnostics. Neither
+measured candidate established a broad or 1024-shot improvement; the transition
+memo candidate remains correctness-reviewed but unbenchmarked. These historical
+results do not establish current-master or current-peer superiority. Fetch only
+this compact summary archive with:
+
+```sh
+python3 tools/fetch_benchmark_artifacts.py \
+  --path benchmarks/near_clifford/results/omen-two-workload-wrapup-2026-10-15
+```
+
+The archive contains all comparison summaries and paired round ratios, not the
+full raw-run replay bundle; its report states the remaining verification limits.
+
 Run from the repository root:
 
 ```sh
