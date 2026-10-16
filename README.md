@@ -1,278 +1,199 @@
-# RustQEC
+# rstim Workspace
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/static/brand/rustqec-logo-dark.svg">
-    <img src="site/static/brand/rustqec-logo.svg" width="200" alt="RustQEC: a copper surface-code patch with four boundary checks">
-  </picture>
-</p>
+[![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
 
-[![CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rust-qec/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rust-qec)
+This repository is a Rust quantum error correction workspace centered on
+Stim-like circuit simulation, detector error models, decoding, and benchmarking.
 
-RustQEC is a Rust workspace for quantum error correction. It brings together
-the `rstim` Stim-like circuit simulator and CLI, code-construction tools,
-decoder experiments, and reproducible benchmark evidence.
+The main entrypoints are:
 
-## Benchmarked Documentation Site
-
-The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
-is the broad repository reference: workspace walkthroughs, benchmark evidence,
-checked results, methodology and claims limits, plus the QP101 schema browser
-and gallery that used to be the whole Pages surface.
-
-Build and check the same Pages tree locally:
-
-```sh
-make build-site
-python3 tools/check_site_build.py _site
-```
-
-Generated evidence bundles, documentation test reports and other large site
-artifacts live in the companion [`rust-qec-docs`](https://github.com/nzy1997/rust-qec-docs)
-repository. `make build-site` and the evidence workflow fetch the pinned
-artifact revision automatically; use `make fetch-doc-artifacts` when running
-those checks directly.
-
-The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
-pins the native CLI examples to v0.3.3. `make build-site` stages the canonical
-QP101 and support contracts into ignored `site/generated/` before Zola renders
-them. Edit `rstim/doc/QP101-ZY.md` or `docs/support-compatibility.md` to update
-those pages; do not edit the generated copies.
-
-## What You Can Do
-
-With RustQEC you can:
-
-- [Trace a circuit through stats, detector events, detector-error-model
-  extraction, and DEM sampling](docs/showcases/rstim-cli-dem-pipeline.md).
-- [Render circuit diagrams as SVG, including seeded atom-loss sample-shot
-  overlays](docs/showcases/rstim-render-svg-atom-loss.md).
-- [Construct CSS code matrices and run small exact-distance
-  checks](docs/showcases/qec-code-css-construction.md).
-- [Inspect benchmark and reproduction evidence, including the checked-in
-  surface-code decoder comparison plot](docs/showcases/benchmark-evidence.md).
-- [Browse the full showcase index](docs/showcases/README.md) for runnable
-  workflow categories and verification commands.
+- `rstim`: stabilizer circuit simulation, circuit generation, DEM extraction,
+  and QP101 export
+- `rsinter`: benchmark and sampling harness for decoder experiments
+- `rmatching`: Rust MWPM decoder for DEM-based workflows
 
 ## Workspace Map
 
 | Path | Role |
 | --- | --- |
-| `rstim/` | Simulator crate and unified `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, dataset tools, decoding, and QP101 export |
-| `rstim/doc/` | Simulator getting-started guide, CLI reference, QP101 notes, and parity documentation |
-| `docs/showcases/` | Stable index for runnable workspace showcases |
-| `rsinter/` | Parallel collection and benchmark harness for decoder experiments |
-| `rmatching/` | Rust MWPM decoder for detector-error-model workflows |
-| `renvelope/` | Reference decoders for explicit atom-loss Pauli envelopes (exact MLE and matching) |
-| `rbposd/`, `rilpqec/` | Additional decoder components used by benchmark and comparison flows |
-| `qec-code/`, `qec-ilp-core/` | Code construction helpers and ILP-backed checks |
-| `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness and benchmark artifacts |
-| `qp101-viz/` | Optional legacy/prototype Typst renderer and committed QP101 fixtures |
+| `rstim/` | Stim-like simulator crate and `rstim` CLI |
+| `rsinter/` | Parallel collection and benchmark harness, plus `rsinter` CLI |
+| `rmatching/` | Sparse Blossom MWPM decoder |
+| `rbposd/` | BP+OSD decoder components |
+| `rilpqec/` | ILP-based decoding path |
+| `qec-code/` | CSS/code construction helpers and `qec-code` CLI |
+| `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness |
+| `qp101-viz/` | Typst renderer for QP101 circuit JSON |
 
 ## Quick Start
 
-The development checkout provides one CLI package and one executable. With Rust
-and Cargo installed, run from the repository root:
+Build the workspace:
 
 ```sh
-cargo install --locked --path rstim --force
-rstim --version
+cargo build --workspace
 ```
 
-Create a circuit and inspect its detector output:
+Run a minimal `rstim` CLI check:
 
 ```sh
-cat > pipeline.stim <<'STIM'
-R 0
-X_ERROR(1) 0
-M 0
-DETECTOR rec[-1]
-OBSERVABLE_INCLUDE(0) rec[-1]
-STIM
-rstim circuit stats --format json --in pipeline.stim
-rstim circuit detect --in pipeline.stim --shots 1 --out-format dets --append-observables --out events.dets
-rstim circuit dem --in pipeline.stim --out pipeline.dem
-cat events.dets pipeline.dem
-```
-
-The last two outputs are `shot D0 L0` and `error(1) D0 L0`. The same `rstim`
-executable also supports the simulator commands, including `render_svg`, and
-`rstim capabilities --format json` lists the structured command contract.
-
-The published v0.3.3 native installer still contains the previous two-command
-layout. A single-binary native archive will be available after the unified CLI
-release; until then, install this development build from source.
-
-### Rust library users
-
-For direct library integration, see the [independent consumer example](examples/rust-consumer/README.md).
-The [crate guide](docs/crates-io.md) explains package boundaries, features, and
-registry publication checks.
-
-## Build From Source
-
-RustQEC supports native source builds on these tested environments:
-
-| Operating system | Native target | Rust toolchains |
-| --- | --- | --- |
-| Ubuntu 24.04 x86_64 | `x86_64-unknown-linux-gnu` | 1.88.0 (MSRV), stable |
-| macOS 15 on Apple silicon | `aarch64-apple-darwin` | 1.88.0 (MSRV), stable |
-
-Install the full-workspace native build prerequisites on Ubuntu 24.04:
-
-```sh
-sudo apt-get update
-sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv
-```
-
-On macOS 15, install the Xcode Command Line Tools and the Homebrew packages:
-
-```sh
-xcode-select --install
-brew install cmake fontconfig pkg-config python
-```
-
-Install Rust 1.88.0 with [rustup](https://rustup.rs/) for the minimum-version
-configuration, or select the current stable toolchain:
-
-```sh
-rustup toolchain install 1.88.0 --profile minimal
-rustup default 1.88.0
-```
-
-These prerequisites cover the full workspace feature selection, including the HiGHS-backed
-ILP crates and `rsinter` plotting. A smaller `rsinter` build avoids both HiGHS
-and plotting (as well as the other optional decoder runners):
-
-```sh
-cargo build --locked -p rsinter --no-default-features --features rbposd-runner
-```
-
-The complete test suite also invokes Stim through Python. Install it in an
-isolated environment before running `make test`:
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install stim
-```
-
-The support promise is limited to the two native targets above. Windows and
-other operating-system, architecture, and toolchain combinations are not part
-of the validated matrix.
-
-```sh
-git clone https://github.com/nzy1997/rust-qec.git
-cd rust-qec
-cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,rstim/ilp,rsinter/full,rstim/benchmark-tools
-```
-
-Inspect a small circuit through the unified CLI:
-
-```sh
-printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | \
-  cargo run -p rstim --bin rstim -- circuit stats --format json
-```
-
-Discover the currently implemented automation contract:
-
-```sh
-cargo run -p rstim --bin rstim -- capabilities --format json
-```
-
-Automation clients can request structured errors independently of successful
-output formatting by adding `--error-format json`. Capability discovery lists
-the concrete argv path, supported arguments, error codes, and exit codes.
-
-The existing crate-specific CLIs remain available. For example, the same
-circuit can be inspected with `rstim stats`:
-
-```sh
-printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --features cli --bin rstim -- stats
+printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
 ```
 
 Run the Rust test suite:
 
 ```sh
-make test
+cargo test --workspace
 ```
 
-After a native-support workflow completes, validate its four jobs, compiler
-identities, uploaded CLI evidence, and the checked-out package metadata with:
+If you only want the simulator, start with
+[`rstim/doc/getting_started.md`](rstim/doc/getting_started.md) and
+[`rstim/doc/cli.md`](rstim/doc/cli.md).
+
+## Common Workflows
+
+### Inspect And Sample A Circuit
+
+Use `rstim stats` before heavier workflows:
 
 ```sh
-python3 tools/check_native_support_matrix.py --repo-root . --run-id RUN_ID
+printf 'H 0\nREPEAT 2 {\n  M 0\n  DETECTOR rec[-1]\n  TICK\n}\n' | \
+  cargo run -p rstim --bin rstim -- stats
 ```
 
-## Support And Compatibility
+Then move on to:
 
-The [support and compatibility contract](docs/support-compatibility.md) states
-the current supported boundaries, pre-1.0 compatibility policy, and known
-exclusions for this release line.
+- `sample` for measurements
+- `detect` for detection events and observable flips
+- `analyze_errors` for DEM extraction
+- `export_json` for QP101 export
 
-## Primary Next Steps
+The full command reference is in
+[`rstim/doc/cli.md`](rstim/doc/cli.md).
 
-- [Showcase index](docs/showcases/README.md): runnable workflow categories and
-  the template used for future examples, including
-  [rstim CLI DEM Pipeline](docs/showcases/rstim-cli-dem-pipeline.md),
-  [rstim Render SVG Atom-Loss](docs/showcases/rstim-render-svg-atom-loss.md),
-  [QEC-Code CSS Construction](docs/showcases/qec-code-css-construction.md), and
-  [Benchmark Evidence](docs/showcases/benchmark-evidence.md).
-- [Getting started with `rstim`](rstim/doc/getting_started.md): simulator and
-  Rust API orientation.
-- [`rstim` CLI reference](rstim/doc/cli.md): `stats`, `sample`, `detect`,
-  `analyze_errors`, `render_svg`, `export_json`, and related commands.
-- [Local neural-decoder training data](rstim/doc/training-data.md): aligned
-  detector/observable `b8` streams plus versioned per-shot simulator traces.
-- [`rmatching` decoder docs](rmatching/README.md): MWPM decoder entry point for
-  detector-error-model workflows.
-- [`rsinter replay`](docs/rsinter-replay.md): decode frozen `.dem` plus b8
-  detector rows into b8 predictions and a reproducibility report.
-- [Surface decoder benchmark docs](benchmarks/surface_decoder_compare/README.md):
-  benchmark setup, smoke commands, and generated artifacts.
+### Generate Standard QEC Circuits
 
-## CLI And Visualization Notes
-
-The CLI reads from `--in <path>` or stdin and writes to `--out <path>` or
-stdout for most commands. For static circuit diagrams, prefer:
+`rstim gen` can generate common benchmark circuits:
 
 ```sh
-rstim render_svg --in circuit.stim --out circuit.svg
+cargo run -p rstim --bin rstim -- gen \
+  --code repetition_code \
+  --task memory \
+  --distance 5 \
+  --rounds 5
 ```
 
-For an interactive single-shot view that can resample the fixed circuit, change
-the realized outcome of existing noise instructions, and export SVG/PDF, run:
+For code-construction-oriented workflows, see `qec-code`:
 
 ```sh
-rstim shot_viewer
+cargo run -p qec-code -- --help
 ```
 
-The hosted [Shot Lab](https://nzy1997.github.io/rust-qec/interactive/) shows one
-repository-configured circuit. Its
-[local-file entry](https://nzy1997.github.io/rust-qec/interactive/local/) starts
-blank and processes a selected `.stim` file entirely in WebAssembly.
+### Run Decoder Benchmarks
 
-Use `export_json` when you need QP101 structured data for downstream tools,
-fixtures, or the optional `qp101-viz` workflow:
+The workspace includes two benchmark layers:
+
+- `rsinter` benchmark flow under `benchmarks/surface_decoder/`
+- comparison harness under `benchmarks/surface_decoder_compare/`
+
+Smoke benchmark through `rsinter`:
 
 ```sh
-rstim export_json --in circuit.stim --out circuit.json
+make bench-surface-smoke
 ```
 
-Benchmark smoke runs are documented in
-[`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md);
-the README intentionally leaves algorithm details and benchmark implementation
-notes to those dedicated docs.
+Cross-decoder comparison harness:
 
-## License
+```sh
+make surface-decoder-compare-smoke
+```
 
-All tracked content in this repository, including the Rust workspace crates and
-`qp101-viz`, is licensed under Apache-2.0. See [LICENSE](LICENSE) for the full
-license text. Ignored or untracked drafts are outside this repository license
-declaration.
+Benchmark setup details are in
+[`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md).
 
-Portions of `rstim` compatibility tests are adapted from
-[Stim](https://github.com/quantumlib/Stim), and `rmatching` is ported from
-[PyMatching](https://github.com/oscarhiggott/PyMatching). Both upstream projects
-are Apache-2.0, and existing source-level provenance comments are preserved.
+## Atom Loss And QP101 Export
+
+Atom loss is a first-class workflow in `rstim`. The simulator can model
+explicit `LOSS` events, propagate loss through later operations, and annotate
+loss-caused measurement outcomes in exported sample traces.
+
+Example circuit:
+
+```stim
+DEPOLARIZE1(1) 0
+LOSS(1) 1
+LOSS(1) 2
+M 1
+MRL 2
+DETECTOR rec[-3]
+```
+
+Export one seeded sample shot as QP101 JSON:
+
+```sh
+cargo run -p rstim --bin rstim -- export_json --sample_shot --seed 7 \
+  < qp101-viz/examples/atom-loss-sample.stim
+```
+
+Regenerate the larger mixed-noise showcase:
+
+```sh
+cargo run -p rstim --example mixed_noise_showcase
+```
+
+Related files:
+
+- [`qp101-viz/examples/atom-loss-sample.typ`](qp101-viz/examples/atom-loss-sample.typ)
+- [`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json)
+- [`qp101-viz/README.md`](qp101-viz/README.md)
+
+## Stim Parity And Performance Evidence
+
+This repository keeps parity and benchmark evidence for generated circuits and
+detector error models against Stim-oriented workflows.
+
+To rerun the current parity showcase:
+
+```sh
+cargo build -p rstim --bin rstim
+cargo run -p rstim --example stim_parity_showcase
+```
+
+Supporting notes live in:
+
+- [`rstim/doc/performance_parity.md`](rstim/doc/performance_parity.md)
+- [`docs/plans/2026-05-25-performance-parity-foundation-design.md`](docs/plans/2026-05-25-performance-parity-foundation-design.md)
+
+## Further Reading
+
+- [`rstim/doc/getting_started.md`](rstim/doc/getting_started.md)
+- [`rstim/doc/cli.md`](rstim/doc/cli.md)
+- [`rmatching/README.md`](rmatching/README.md)
+- [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
+- [`qp101-viz/README.md`](qp101-viz/README.md)
+
+## Maintainer Release Flow
+
+Cut a new tagged release with:
+
+```sh
+make release V=0.1.1
+```
+
+That target:
+
+- bumps selected workspace crate versions
+- runs `cargo check --workspace`
+- creates a release commit
+- creates an annotated tag `vX.Y.Z`
+- pushes the default branch and tags to `origin`
+
+Pushing a tag that matches `v*.*.*` triggers
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which creates
+a GitHub Release with generated notes.
+
+The default branch is currently `master`. If that changes later, override it:
+
+```sh
+make release V=0.1.1 DEFAULT_BRANCH=main
+```

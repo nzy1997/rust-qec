@@ -1,18 +1,6 @@
 # qp101-viz
 
-`qp101-viz` is a local Typst package prototype for rendering QP101-ZY circuit
-JSON as a timeline view. For normal static SVG output, prefer the built-in
-`rstim render_svg` CLI:
-
-```sh
-rstim render_svg --in circuit.stim --out circuit.svg
-```
-
-For a committed atom-loss SVG workflow reference, see
-[`rstim Render SVG Atom-Loss showcase`](docs/showcases/rstim-render-svg-atom-loss.md).
-
-This package remains useful as optional legacy/prototype infrastructure for
-Typst-specific workflows and direct QP101 JSON experiments.
+`qp101-viz` is a local Typst package prototype for rendering QP101-ZY circuit JSON as a timeline view.
 
 ## Scope
 
@@ -24,7 +12,7 @@ This first prototype focuses on:
 - assigning renderer-only global measurement anchors such as `m1`, `m2`, `m3`, ... in expanded visual order
 - resolving `detector` and `observable_include` `rec[-k]` sources into those measurement anchors when possible
 
-It renders a timeline view rather than a geometry-based layout.
+It does not yet implement a geometry-based layout renderer. The schema and renderer shape are designed so that a future coordinate/layout view can consume the same JSON.
 
 ## Public API
 
@@ -52,9 +40,9 @@ typst compile --root qp101-viz qp101-viz/examples/atom-loss-sample.typ /tmp/atom
 ```
 
 The source circuit is
-[`qp101-viz/examples/atom-loss-sample.stim`](qp101-viz/examples/atom-loss-sample.stim),
-and the exported sample result is
-[`qp101-viz/examples/atom-loss-sample.qp101.json`](qp101-viz/examples/atom-loss-sample.qp101.json).
+[`examples/atom-loss-sample.stim`](examples/atom-loss-sample.stim), and the
+exported sample result is
+[`examples/atom-loss-sample.qp101.json`](examples/atom-loss-sample.qp101.json).
 
 For a denser end-to-end example, compile:
 
@@ -92,7 +80,6 @@ cargo run -p rstim --example mixed_noise_showcase
 - `X_ERROR`, `Z_ERROR`, and `DEPOLARIZE1` render as compact single-qubit noise boxes with short labels such as `XE`, `ZE`, and `D1`, even when one op targets many qubits.
 - `DEPOLARIZE2` renders as connected two-box noise gates, and each rendered pair carries its own parameter note above it.
 - single-qubit measurement families such as `M`, `MX`, `MY`, `MR`, `ML`, and `MRL` are rendered as compact measurement boxes with plain-text anchors such as `m1` above the gate.
-- pair/product/padding/herald measurement families (`MXX`, `MYY`, `MZZ`, `MPP`, `MPAD`, `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1`) advance the same global measurement history used by Rust, so later `rec[-k]` sources resolve to the correct anchors.
 - sample-trace annotations render inline on supported single-qubit measurements, including loss markers such as `1[L]` and `L=1 | M=1[L]`.
 - measurement and detector/observable operators reserve extra horizontal space for their labels so dense timelines do not collide as easily.
 - circuit-top measurement and Stim-style operator labels now share a single theme clearance value so they stay above the wire instead of drifting into gate bodies.

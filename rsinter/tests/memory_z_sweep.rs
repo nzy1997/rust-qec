@@ -1,17 +1,17 @@
 #![allow(unexpected_cfgs)]
 
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 use rsinter::bench::registry::build_default_rust_runner_registry;
 use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 use rsinter::bench::run::run_rust_benchmark;
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::stats::fit_binomial;
 use serde::Deserialize;
@@ -19,7 +19,6 @@ use serde::Deserialize;
 const FIT_FACTOR: f64 = 10_000.0;
 const EXPECTED_DISTANCES: [usize; 3] = [3, 5, 7];
 const EXPECTED_PS: [f64; 5] = [0.008, 0.009, 0.010, 0.011, 0.012];
-#[cfg(not(any(tarpaulin, coverage)))]
 const ISSUE65_RUNNERS: [&str; 3] = [
     "rmatching-memory-z-d3",
     "rmatching-memory-z-d5",
@@ -50,9 +49,7 @@ struct StimRow {
     logical_error_rate: f64,
     ci_low: f64,
     ci_high: f64,
-    #[cfg(not(any(tarpaulin, coverage)))]
     num_detectors: usize,
-    #[cfg(not(any(tarpaulin, coverage)))]
     num_observables: usize,
 }
 
@@ -171,7 +168,7 @@ fn write_runner_result(root: &Path, runner: &str, row: RunnerRow) {
     .unwrap();
 }
 
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 #[test]
 #[ignore = "heavy statistical regression: runs the full 15-point issue #65 memory-z sweep"]
 fn issue65_memory_z_rstim_ler_agrees_with_stim_reference_intervals() {
@@ -238,7 +235,7 @@ fn load_stim_fixture() -> StimFixture {
     serde_json::from_str(&text).unwrap()
 }
 
-#[cfg(not(any(tarpaulin, coverage)))]
+#[cfg(not(tarpaulin))]
 fn run_rust_issue65_sweep() -> Vec<BenchmarkResultRow> {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/bench/issue65_memory_z_sweep.toml");

@@ -1,8 +1,3 @@
-use std::collections::HashSet;
-
-use super::apm::{AffinePermutation, ApmCssManifestEntry, build_apm_css_checks};
-use super::color_666::{Color666FamilySpec, Color666Layout, color_666_sparse_checks};
-use super::toric_3d::{Toric3dSpec, toric_3d_css_checks};
 use crate::error::{QecError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,27 +30,12 @@ pub enum BuiltInCssFamily {
     RepetitionX,
     RepetitionZ,
     SurfaceRotated,
-    Color666,
     Toric,
-    Toric3d,
-    BivariateBicycle,
-    ApmKasai,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum BuiltInCssParams {
-    Distance { distance: usize },
-    Toric3d(Toric3dSpec),
-    BivariateBicycle(BivariateBicycleParams),
-    ApmKasai { p: usize },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BivariateBicycleParams {
-    pub lx: usize,
-    pub ly: usize,
-    pub a_terms: Vec<(usize, usize)>,
-    pub b_terms: Vec<(usize, usize)>,
+pub struct BuiltInCssParams {
+    pub distance: usize,
 }
 
 const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
@@ -66,18 +46,6 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
     BuiltInCssCatalogEntry {
         spec: "bb72",
         description: "fixed [[72,12,6]] bivariate-bicycle CSS code",
-    },
-    BuiltInCssCatalogEntry {
-        spec: "apm_kasai:p=96",
-        description: "fixed Table A1 P=96 APM-CSS code",
-    },
-    BuiltInCssCatalogEntry {
-        spec: "apm_kasai:p=192",
-        description: "fixed Table A1 P=192 APM-CSS code",
-    },
-    BuiltInCssCatalogEntry {
-        spec: "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
-        description: "bivariate-bicycle CSS family over periodic lattice",
     },
     BuiltInCssCatalogEntry {
         spec: "repetition_x:d=<distance>",
@@ -92,16 +60,8 @@ const BUILT_IN_CSS_CATALOG: &[BuiltInCssCatalogEntry] = &[
         description: "rotated surface CSS code, distance >= 2",
     },
     BuiltInCssCatalogEntry {
-        spec: "color_666:d=<distance>",
-        description: "triangular 6.6.6 color CSS code, odd distance >= 3",
-    },
-    BuiltInCssCatalogEntry {
         spec: "toric:d=<distance>",
         description: "periodic square-lattice toric CSS code, distance >= 2",
-    },
-    BuiltInCssCatalogEntry {
-        spec: "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>",
-        description: "periodic cubic 3D toric CSS code, periods >= 3",
     },
 ];
 
@@ -117,24 +77,12 @@ pub fn parse_built_in_css_code_spec(input: &str) -> Result<BuiltInCssCodeSpec> {
     match input {
         "steane" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "steane" }),
         "bb72" => Ok(BuiltInCssCodeSpec::Fixed { code_id: "bb72" }),
-        "apm_kasai" => Err(QecError::MissingBuiltInCssParameter {
-            family: input.to_owned(),
-            parameter: "p".to_owned(),
-        }),
-        "repetition_x" | "repetition_z" | "surface_rotated" | "color_666" | "toric" => {
+        "repetition_x" | "repetition_z" | "surface_rotated" | "toric" => {
             Err(QecError::MissingBuiltInCssParameter {
                 family: input.to_owned(),
                 parameter: "d".to_owned(),
             })
         }
-        "toric_3d" => Err(QecError::MissingBuiltInCssParameter {
-            family: input.to_owned(),
-            parameter: "lx".to_owned(),
-        }),
-        "bb" => Err(QecError::MissingBuiltInCssParameter {
-            family: input.to_owned(),
-            parameter: "lx".to_owned(),
-        }),
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: input.to_owned(),
         }),
@@ -145,57 +93,23 @@ fn parse_built_in_css_family_spec(
     family_name: &str,
     params_text: &str,
 ) -> Result<BuiltInCssCodeSpec> {
-    match family_name {
-        "repetition_x" => {
-            parse_distance_family_spec(family_name, BuiltInCssFamily::RepetitionX, params_text)
+    let family = match family_name {
+        "repetition_x" => BuiltInCssFamily::RepetitionX,
+        "repetition_z" => BuiltInCssFamily::RepetitionZ,
+        "surface_rotated" => BuiltInCssFamily::SurfaceRotated,
+        "toric" => BuiltInCssFamily::Toric,
+        _ => {
+            return Err(QecError::UnknownBuiltInCssFamily {
+                family: family_name.to_owned(),
+            });
         }
-        "repetition_z" => {
-            parse_distance_family_spec(family_name, BuiltInCssFamily::RepetitionZ, params_text)
-        }
-        "surface_rotated" => {
-            parse_distance_family_spec(family_name, BuiltInCssFamily::SurfaceRotated, params_text)
-        }
-        "color_666" => {
-            parse_distance_family_spec(family_name, BuiltInCssFamily::Color666, params_text)
-        }
-        "toric" => parse_distance_family_spec(family_name, BuiltInCssFamily::Toric, params_text),
-        "toric_3d" => {
-            let spec = parse_toric_3d_params(family_name, params_text)?;
-            Ok(BuiltInCssCodeSpec::Family {
-                family: BuiltInCssFamily::Toric3d,
-                params: BuiltInCssParams::Toric3d(spec),
-            })
-        }
-        "apm_kasai" => {
-            let p = parse_apm_kasai_params(family_name, params_text)?;
-            Ok(BuiltInCssCodeSpec::Family {
-                family: BuiltInCssFamily::ApmKasai,
-                params: BuiltInCssParams::ApmKasai { p },
-            })
-        }
-        "bb" => {
-            let params = parse_bivariate_bicycle_params(family_name, params_text)?;
-            Ok(BuiltInCssCodeSpec::Family {
-                family: BuiltInCssFamily::BivariateBicycle,
-                params: BuiltInCssParams::BivariateBicycle(params),
-            })
-        }
-        _ => Err(QecError::UnknownBuiltInCssFamily {
-            family: family_name.to_owned(),
-        }),
-    }
-}
+    };
 
-fn parse_distance_family_spec(
-    family_name: &str,
-    family: BuiltInCssFamily,
-    params_text: &str,
-) -> Result<BuiltInCssCodeSpec> {
     let distance = parse_repetition_distance(family_name, params_text)?;
 
     Ok(BuiltInCssCodeSpec::Family {
         family,
-        params: BuiltInCssParams::Distance { distance },
+        params: BuiltInCssParams { distance },
     })
 }
 
@@ -259,320 +173,6 @@ fn parse_repetition_distance(family_name: &str, params_text: &str) -> Result<usi
     })
 }
 
-fn parse_toric_3d_params(family_name: &str, params_text: &str) -> Result<Toric3dSpec> {
-    if params_text.is_empty() {
-        return Err(QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "lx".to_owned(),
-        });
-    }
-
-    let mut lx = None;
-    let mut ly = None;
-    let mut lz = None;
-    for pair in params_text.split(',') {
-        let Some((key, value)) = pair.split_once('=') else {
-            return Err(QecError::UnexpectedBuiltInCssParameter {
-                family: family_name.to_owned(),
-                parameter: pair.to_owned(),
-            });
-        };
-
-        match key {
-            "lx" => parse_unique_positive_usize_param(family_name, "lx", value, &mut lx)?,
-            "ly" => parse_unique_positive_usize_param(family_name, "ly", value, &mut ly)?,
-            "lz" => parse_unique_positive_usize_param(family_name, "lz", value, &mut lz)?,
-            _ => {
-                return Err(QecError::UnexpectedBuiltInCssParameter {
-                    family: family_name.to_owned(),
-                    parameter: key.to_owned(),
-                });
-            }
-        }
-    }
-
-    let spec = Toric3dSpec {
-        lx: lx.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "lx".to_owned(),
-        })?,
-        ly: ly.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "ly".to_owned(),
-        })?,
-        lz: lz.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "lz".to_owned(),
-        })?,
-    };
-    toric_3d_css_checks(spec)?;
-    Ok(spec)
-}
-
-fn parse_bivariate_bicycle_params(
-    family_name: &str,
-    params_text: &str,
-) -> Result<BivariateBicycleParams> {
-    if params_text.is_empty() {
-        return Err(QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "lx".to_owned(),
-        });
-    }
-
-    let mut lx = None;
-    let mut ly = None;
-    let mut a_terms = None;
-    let mut b_terms = None;
-
-    for pair in params_text.split(',') {
-        let Some((key, value)) = pair.split_once('=') else {
-            return Err(QecError::UnexpectedBuiltInCssParameter {
-                family: family_name.to_owned(),
-                parameter: pair.to_owned(),
-            });
-        };
-
-        match key {
-            "lx" => parse_unique_positive_usize_param(family_name, "lx", value, &mut lx)?,
-            "ly" => parse_unique_positive_usize_param(family_name, "ly", value, &mut ly)?,
-            "a" => parse_unique_bivariate_bicycle_terms(family_name, "a", value, &mut a_terms)?,
-            "b" => parse_unique_bivariate_bicycle_terms(family_name, "b", value, &mut b_terms)?,
-            _ => {
-                return Err(QecError::UnexpectedBuiltInCssParameter {
-                    family: family_name.to_owned(),
-                    parameter: key.to_owned(),
-                });
-            }
-        }
-    }
-
-    let params = BivariateBicycleParams {
-        lx: lx.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "lx".to_owned(),
-        })?,
-        ly: ly.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "ly".to_owned(),
-        })?,
-        a_terms: a_terms.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "a".to_owned(),
-        })?,
-        b_terms: b_terms.ok_or_else(|| QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "b".to_owned(),
-        })?,
-    };
-
-    validate_bivariate_bicycle_params(&params)?;
-    Ok(params)
-}
-
-const APM_KASAI_SUPPORTED_P_VALUES: &str = "96, 192";
-const APM_KASAI_P96_CODE_ID: &str = "apm_kasai:p=96";
-const APM_KASAI_P192_CODE_ID: &str = "apm_kasai:p=192";
-const APM_KASAI_P96_P: u64 = 96;
-const APM_KASAI_P192_P: u64 = 192;
-const APM_KASAI_J: u64 = 3;
-const APM_KASAI_L: u64 = 12;
-const APM_KASAI_P96_F: &[(u64, u64)] = &[(5, 41), (85, 77), (73, 66), (1, 0), (1, 72), (37, 9)];
-const APM_KASAI_P96_G: &[(u64, u64)] = &[(61, 15), (1, 24), (89, 62), (25, 22), (85, 93), (25, 78)];
-const APM_KASAI_P192_F: &[(u64, u64)] = &[
-    (71, 127),
-    (97, 80),
-    (67, 117),
-    (163, 165),
-    (25, 60),
-    (187, 33),
-];
-const APM_KASAI_P192_G: &[(u64, u64)] = &[
-    (163, 165),
-    (55, 183),
-    (167, 79),
-    (139, 41),
-    (109, 78),
-    (31, 27),
-];
-
-fn parse_apm_kasai_params(family_name: &str, params_text: &str) -> Result<usize> {
-    if params_text.is_empty() {
-        return Err(QecError::MissingBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: "p".to_owned(),
-        });
-    }
-
-    let mut p = None;
-    for pair in params_text.split(',') {
-        let Some((key, value)) = pair.split_once('=') else {
-            return Err(QecError::UnexpectedBuiltInCssParameter {
-                family: family_name.to_owned(),
-                parameter: pair.to_owned(),
-            });
-        };
-
-        match key {
-            "p" => {
-                if p.is_some() {
-                    return Err(QecError::DuplicateBuiltInCssParameter {
-                        family: family_name.to_owned(),
-                        parameter: "p".to_owned(),
-                    });
-                }
-                p = Some(value.parse::<usize>().map_err(|_| {
-                    QecError::InvalidBuiltInCssIntegerParameter {
-                        family: family_name.to_owned(),
-                        parameter: "p".to_owned(),
-                        value: value.to_owned(),
-                    }
-                })?);
-            }
-            _ => {
-                return Err(QecError::UnexpectedBuiltInCssParameter {
-                    family: family_name.to_owned(),
-                    parameter: key.to_owned(),
-                });
-            }
-        }
-    }
-
-    Ok(p.expect("apm_kasai parameter parser should require p before success"))
-}
-
-fn apm_kasai_css_checks(p: usize) -> Result<BuiltInCssChecks> {
-    let entry = match p {
-        96 => apm_kasai_manifest_entry(
-            APM_KASAI_P96_CODE_ID,
-            APM_KASAI_P96_P,
-            APM_KASAI_P96_F,
-            APM_KASAI_P96_G,
-        ),
-        192 => apm_kasai_manifest_entry(
-            APM_KASAI_P192_CODE_ID,
-            APM_KASAI_P192_P,
-            APM_KASAI_P192_F,
-            APM_KASAI_P192_G,
-        ),
-        _ => {
-            return Err(QecError::UnsupportedBuiltInCssIntegerParameter {
-                family: "apm_kasai".to_owned(),
-                parameter: "p".to_owned(),
-                value: p,
-                supported: APM_KASAI_SUPPORTED_P_VALUES.to_owned(),
-                note: "available Table A1 APM-CSS instances".to_owned(),
-            });
-        }
-    };
-
-    Ok(build_apm_css_checks(&entry).expect("pinned APM Kasai manifest must build"))
-}
-
-fn apm_kasai_manifest_entry(
-    code_id: &'static str,
-    p: u64,
-    f_params: &[(u64, u64)],
-    g_params: &[(u64, u64)],
-) -> ApmCssManifestEntry {
-    let affine = |slope, offset| {
-        AffinePermutation::new(p, slope, offset)
-            .expect("pinned APM Kasai affine maps must be permutations")
-    };
-    let f = f_params
-        .iter()
-        .map(|&(slope, offset)| affine(slope, offset))
-        .collect();
-    let g = g_params
-        .iter()
-        .map(|&(slope, offset)| affine(slope, offset))
-        .collect();
-
-    ApmCssManifestEntry::new(code_id, p, APM_KASAI_J, APM_KASAI_L, f, g)
-        .expect("pinned APM Kasai manifest must satisfy invariants")
-}
-
-fn parse_unique_positive_usize_param(
-    family_name: &str,
-    parameter: &'static str,
-    value: &str,
-    slot: &mut Option<usize>,
-) -> Result<()> {
-    if slot.is_some() {
-        return Err(QecError::DuplicateBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: parameter.to_owned(),
-        });
-    }
-
-    let parsed =
-        value
-            .parse::<usize>()
-            .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
-                family: family_name.to_owned(),
-                parameter: parameter.to_owned(),
-                value: value.to_owned(),
-            })?;
-
-    if parsed == 0 {
-        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
-            family: family_name.to_owned(),
-            parameter: parameter.to_owned(),
-            value: parsed,
-        });
-    }
-
-    *slot = Some(parsed);
-    Ok(())
-}
-
-fn parse_unique_bivariate_bicycle_terms(
-    family_name: &str,
-    parameter: &'static str,
-    value: &str,
-    slot: &mut Option<Vec<(usize, usize)>>,
-) -> Result<()> {
-    if slot.is_some() {
-        return Err(QecError::DuplicateBuiltInCssParameter {
-            family: family_name.to_owned(),
-            parameter: parameter.to_owned(),
-        });
-    }
-
-    let mut terms = Vec::new();
-    for term in value.split('|') {
-        let Some((dx_text, dy_text)) = term.split_once(':') else {
-            return Err(QecError::InvalidBuiltInCssIntegerParameter {
-                family: family_name.to_owned(),
-                parameter: parameter.to_owned(),
-                value: term.to_owned(),
-            });
-        };
-
-        let dx =
-            dx_text
-                .parse::<usize>()
-                .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
-                    family: family_name.to_owned(),
-                    parameter: parameter.to_owned(),
-                    value: dx_text.to_owned(),
-                })?;
-        let dy =
-            dy_text
-                .parse::<usize>()
-                .map_err(|_| QecError::InvalidBuiltInCssIntegerParameter {
-                    family: family_name.to_owned(),
-                    parameter: parameter.to_owned(),
-                    value: dy_text.to_owned(),
-                })?;
-
-        terms.push((dx, dy));
-    }
-
-    *slot = Some(terms);
-    Ok(())
-}
-
 const STEANE_ROW_SUPPORTS: &[&[usize]] = &[&[0, 3, 5, 6], &[1, 3, 4, 6], &[2, 4, 5, 6]];
 
 const BB72_LX: usize = 6;
@@ -580,13 +180,8 @@ const BB72_LY: usize = 6;
 const BB72_A_TERMS: &[(usize, usize)] = &[(3, 0), (0, 1), (0, 2)];
 const BB72_B_TERMS: &[(usize, usize)] = &[(0, 3), (1, 0), (2, 0)];
 
-fn bb72_bivariate_bicycle_params() -> BivariateBicycleParams {
-    BivariateBicycleParams {
-        lx: BB72_LX,
-        ly: BB72_LY,
-        a_terms: BB72_A_TERMS.to_vec(),
-        b_terms: BB72_B_TERMS.to_vec(),
-    }
+fn bb72_checks() -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
+    bivariate_bicycle_checks(BB72_LX, BB72_LY, BB72_A_TERMS, BB72_B_TERMS)
 }
 
 fn bivariate_bicycle_checks(
@@ -597,15 +192,6 @@ fn bivariate_bicycle_checks(
 ) -> (Vec<Vec<usize>>, Vec<Vec<usize>>) {
     let block = lx * ly;
     let index = |x: usize, y: usize| -> usize { (x % lx) * ly + (y % ly) };
-    let periodic_add = |coord: usize, shift: usize, period: usize| -> usize {
-        if shift == 0 {
-            coord
-        } else if coord >= period - shift {
-            coord - (period - shift)
-        } else {
-            coord + shift
-        }
-    };
     let mut hx = Vec::with_capacity(block);
     let mut hz = Vec::with_capacity(block);
 
@@ -613,14 +199,10 @@ fn bivariate_bicycle_checks(
         for y in 0..ly {
             let mut x_row = Vec::new();
             for &(dx, dy) in a_terms {
-                let dx = dx % lx;
-                let dy = dy % ly;
-                x_row.push(index(periodic_add(x, dx, lx), periodic_add(y, dy, ly)));
+                x_row.push(index(x + dx, y + dy));
             }
             for &(dx, dy) in b_terms {
-                let dx = dx % lx;
-                let dy = dy % ly;
-                x_row.push(block + index(periodic_add(x, dx, lx), periodic_add(y, dy, ly)));
+                x_row.push(block + index(x + dx, y + dy));
             }
             x_row.sort_unstable();
             hx.push(x_row);
@@ -640,77 +222,10 @@ fn bivariate_bicycle_checks(
     (hx, hz)
 }
 
-pub fn bivariate_bicycle_css_checks(params: BivariateBicycleParams) -> Result<BuiltInCssChecks> {
-    validate_bivariate_bicycle_params(&params)?;
-
-    let (hx, hz) = bivariate_bicycle_checks(params.lx, params.ly, &params.a_terms, &params.b_terms);
-
-    Ok(BuiltInCssChecks {
-        code_id: "bb",
-        num_cols: 2 * params.lx * params.ly,
-        hx,
-        hz,
-    })
-}
-
-fn validate_bivariate_bicycle_params(params: &BivariateBicycleParams) -> Result<()> {
-    if params.lx == 0 {
-        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
-            family: "bb".to_owned(),
-            parameter: "lx".to_owned(),
-            value: 0,
-        });
-    }
-
-    if params.ly == 0 {
-        return Err(QecError::OutOfRangeBuiltInCssIntegerParameter {
-            family: "bb".to_owned(),
-            parameter: "ly".to_owned(),
-            value: 0,
-        });
-    }
-
-    validate_bivariate_bicycle_terms("bb", "a_terms", params.lx, params.ly, &params.a_terms)?;
-    validate_bivariate_bicycle_terms("bb", "b_terms", params.lx, params.ly, &params.b_terms)?;
-    Ok(())
-}
-
-fn validate_bivariate_bicycle_terms(
-    family: &'static str,
-    parameter: &'static str,
-    lx: usize,
-    ly: usize,
-    terms: &[(usize, usize)],
-) -> Result<()> {
-    if terms.is_empty() {
-        return Err(QecError::MissingBuiltInCssParameter {
-            family: family.to_owned(),
-            parameter: parameter.to_owned(),
-        });
-    }
-
-    let mut seen = HashSet::new();
-    for &(dx, dy) in terms {
-        let normalized = (dx % lx, dy % ly);
-        if !seen.insert(normalized) {
-            return Err(QecError::DuplicateBuiltInCssParameter {
-                family: family.to_owned(),
-                parameter: parameter.to_owned(),
-            });
-        }
-    }
-
-    Ok(())
-}
-
 pub fn built_in_css_checks(code_id: &str) -> Result<BuiltInCssChecks> {
     match parse_built_in_css_code_spec(code_id)? {
         BuiltInCssCodeSpec::Fixed { code_id } => fixed_built_in_css_checks(code_id),
-        BuiltInCssCodeSpec::Family {
-            family: BuiltInCssFamily::BivariateBicycle,
-            params: BuiltInCssParams::BivariateBicycle(params),
-        } => bivariate_bicycle_css_checks(params),
-        BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params),
+        BuiltInCssCodeSpec::Family { family, params } => family_css_checks(family, params.distance),
     }
 }
 
@@ -730,9 +245,14 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
             })
         }
         "bb72" => {
-            let mut checks = bivariate_bicycle_css_checks(bb72_bivariate_bicycle_params())?;
-            checks.code_id = "bb72";
-            Ok(checks)
+            let (hx, hz) = bb72_checks();
+
+            Ok(BuiltInCssChecks {
+                code_id: "bb72",
+                num_cols: 2 * BB72_LX * BB72_LY,
+                hx,
+                hz,
+            })
         }
         _ => Err(QecError::UnknownBuiltInCssCode {
             code_id: code_id.to_owned(),
@@ -740,15 +260,9 @@ fn fixed_built_in_css_checks(code_id: &'static str) -> Result<BuiltInCssChecks> 
     }
 }
 
-fn family_css_checks(
-    family: BuiltInCssFamily,
-    params: BuiltInCssParams,
-) -> Result<BuiltInCssChecks> {
+fn family_css_checks(family: BuiltInCssFamily, distance: usize) -> Result<BuiltInCssChecks> {
     match family {
         BuiltInCssFamily::RepetitionX => {
-            let BuiltInCssParams::Distance { distance } = params else {
-                unreachable!("repetition_x only uses distance params");
-            };
             let hx = chain_supports("repetition_x", distance)?;
             Ok(BuiltInCssChecks {
                 code_id: "repetition_x",
@@ -758,9 +272,6 @@ fn family_css_checks(
             })
         }
         BuiltInCssFamily::RepetitionZ => {
-            let BuiltInCssParams::Distance { distance } = params else {
-                unreachable!("repetition_z only uses distance params");
-            };
             let hz = chain_supports("repetition_z", distance)?;
             Ok(BuiltInCssChecks {
                 code_id: "repetition_z",
@@ -769,52 +280,8 @@ fn family_css_checks(
                 hz,
             })
         }
-        BuiltInCssFamily::SurfaceRotated => {
-            let BuiltInCssParams::Distance { distance } = params else {
-                unreachable!("surface_rotated only uses distance params");
-            };
-            surface_rotated_css_checks(distance)
-        }
-        BuiltInCssFamily::Color666 => {
-            let BuiltInCssParams::Distance { distance } = params else {
-                unreachable!("color_666 only uses distance params");
-            };
-            let checks = color_666_sparse_checks(&Color666FamilySpec {
-                distance,
-                layout: Color666Layout::Triangular,
-            })?;
-            Ok(BuiltInCssChecks {
-                code_id: "color_666",
-                num_cols: checks.num_cols,
-                hx: checks.rows.clone(),
-                hz: checks.rows,
-            })
-        }
-        BuiltInCssFamily::Toric => {
-            let BuiltInCssParams::Distance { distance } = params else {
-                unreachable!("toric only uses distance params");
-            };
-            toric_css_checks(distance)
-        }
-        BuiltInCssFamily::Toric3d => {
-            let BuiltInCssParams::Toric3d(spec) = params else {
-                unreachable!("toric_3d only uses toric_3d params");
-            };
-            let checks = toric_3d_css_checks(spec)?;
-            Ok(BuiltInCssChecks {
-                code_id: "toric_3d",
-                num_cols: checks.num_cols,
-                hx: checks.hx,
-                hz: checks.hz,
-            })
-        }
-        BuiltInCssFamily::ApmKasai => {
-            let BuiltInCssParams::ApmKasai { p } = params else {
-                unreachable!("apm_kasai only uses p params");
-            };
-            apm_kasai_css_checks(p)
-        }
-        BuiltInCssFamily::BivariateBicycle => unreachable!("bb specs are parser-only here"),
+        BuiltInCssFamily::SurfaceRotated => surface_rotated_css_checks(distance),
+        BuiltInCssFamily::Toric => toric_css_checks(distance),
     }
 }
 
@@ -983,27 +450,4 @@ fn wrap_prev(value: usize, distance: usize) -> usize {
 
 fn wrap_next(value: usize, distance: usize) -> usize {
     (value + 1) % distance
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[should_panic(expected = "color_666 only uses distance params")]
-    fn color_666_family_checks_reject_mismatched_internal_params() {
-        let _ = family_css_checks(
-            BuiltInCssFamily::Color666,
-            BuiltInCssParams::ApmKasai { p: 96 },
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "toric_3d only uses toric_3d params")]
-    fn toric_3d_family_checks_reject_mismatched_internal_params() {
-        let _ = family_css_checks(
-            BuiltInCssFamily::Toric3d,
-            BuiltInCssParams::ApmKasai { p: 96 },
-        );
-    }
 }

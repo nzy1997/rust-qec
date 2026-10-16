@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rbposd::{Correction, DecodeError, DecodeResult, DecodeStats};
+use rbposd::{Correction, DecodeError, DecodeResult};
 
 #[path = "../dev/parity_runner.rs"]
 mod parity_runner;
@@ -87,7 +87,6 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
         bp_iterations: 7,
         used_osd: true,
         residual_syndrome_weight: 1,
-        stats: DecodeStats::default(),
     });
 
     assert_eq!(
@@ -168,12 +167,6 @@ fn parity_outcomes_use_stable_error_codes_and_partial_diagnostics_matching() {
         (DecodeError::NoOsdSolution, "NoOsdSolution"),
         (DecodeError::NoLsdSolution, "NoLsdSolution"),
         (
-            DecodeError::UnsupportedOsdMethod {
-                method: "typo".to_string(),
-            },
-            "UnsupportedOsdMethod",
-        ),
-        (
             DecodeError::UnsupportedLsdOrder { order: 1 },
             "UnsupportedLsdOrder",
         ),
@@ -225,37 +218,6 @@ fn parity_case_defaults_to_bposd_decoder_for_existing_json_shape() {
 }
 
 #[test]
-fn parity_case_accepts_explicit_osd_variant_strings() {
-    for osd_variant in ["osd0", "legacy_combination_sweep", "ldpc_combination_sweep"] {
-        let json = format!(
-            r#"{{
-      "name": "variant_case",
-      "matrix": {{
-        "num_checks": 1,
-        "num_bits": 1,
-        "rows": [[0]]
-      }},
-      "channel": {{
-        "kind": "bsc",
-        "error_rate": 0.2
-      }},
-      "syndrome": [true],
-      "config": {{
-        "max_bp_iterations": 0,
-        "early_stop": true,
-        "bp_variant": "minimum_sum",
-        "schedule": "parallel",
-        "osd_variant": "{osd_variant}"
-      }}
-    }}"#
-        );
-
-        let case: parity_schema::ParityCase = serde_json::from_str(&json).unwrap();
-        case.build_decoder().unwrap();
-    }
-}
-
-#[test]
 fn parity_runner_decodes_bplsd_cases_when_decoder_field_is_set() {
     let case = parity_schema::ParityCase {
         name: "lsd_parity_case".to_string(),
@@ -286,10 +248,7 @@ fn parity_runner_decodes_bplsd_cases_when_decoder_field_is_set() {
             let pcm = rbposd::ParityCheckMatrix::from_sparse_rows(2, 3, vec![vec![1, 2], vec![0]])
                 .unwrap();
             let syndrome = rbposd::Syndrome::from(vec![true, false]);
-            assert_eq!(
-                pcm.multiply(&rbposd::Correction::from(correction)),
-                syndrome
-            );
+            assert_eq!(pcm.multiply(&rbposd::Correction::from(correction)), syndrome);
             assert_eq!(diagnostics.used_osd, Some(false));
             assert_eq!(diagnostics.residual_syndrome_weight, Some(0));
         }

@@ -1,5 +1,3 @@
-#![cfg(feature = "plotting")]
-
 use std::collections::HashMap;
 
 use rsinter::failure::FailureKind;

@@ -1,5 +1,3 @@
-#![cfg(feature = "cli")]
-
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,12 +14,6 @@ fn qec_code_bin() -> &'static str {
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..")
-}
-
-fn quantum_tanner_fixture_path(name: &str) -> PathBuf {
-    workspace_root()
-        .join("qec-code/tests/fixtures/quantum_tanner")
-        .join(name)
 }
 
 fn read_fixture(rel_path: &str) -> String {
@@ -44,112 +36,6 @@ fn run_qec_code_in_process_os(args: Vec<OsString>) -> Result<String, QecError> {
     argv.extend(args);
     run(Cli::parse_from(argv))
 }
-
-const CSS_DISTANCE_DOC: &str = include_str!("../doc/css_distance.md");
-const CSS_DISTANCE_DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code --features cli -- ";
-
-#[derive(Debug)]
-struct CssDistanceDocCommand {
-    args: Vec<String>,
-}
-
-fn css_distance_doc_command_block(marker: &str) -> &str {
-    let marker_text = format!("<!-- {marker} -->");
-    let after_marker = CSS_DISTANCE_DOC
-        .split_once(&marker_text)
-        .map(|(_, after)| after)
-        .unwrap_or_else(|| panic!("missing doc marker {marker_text}"));
-    let fence_start = after_marker
-        .find("```bash")
-        .unwrap_or_else(|| panic!("missing bash fence after {marker_text}"));
-    let command_start = fence_start + "```bash".len();
-    let command_tail = &after_marker[command_start..];
-    let fence_end = command_tail
-        .find("```")
-        .unwrap_or_else(|| panic!("missing closing bash fence after {marker_text}"));
-    &command_tail[..fence_end]
-}
-
-fn css_distance_doc_command(marker: &str) -> CssDistanceDocCommand {
-    let commands: Vec<&str> = css_distance_doc_command_block(marker)
-        .lines()
-        .map(str::trim)
-        .filter(|line| line.starts_with(CSS_DISTANCE_DOC_COMMAND_PREFIX))
-        .collect();
-    assert_eq!(
-        commands.len(),
-        1,
-        "marker {marker} should contain one qec-code command"
-    );
-
-    let args = commands[0]
-        .strip_prefix(CSS_DISTANCE_DOC_COMMAND_PREFIX)
-        .unwrap()
-        .split_whitespace()
-        .map(str::to_owned)
-        .collect();
-    CssDistanceDocCommand { args }
-}
-
-fn materialize_css_distance_doc_args(command: &CssDistanceDocCommand) -> Vec<OsString> {
-    command
-        .args
-        .iter()
-        .map(|arg| {
-            if arg.starts_with("qec-code/tests/fixtures/")
-                || arg.starts_with("rsinter/tests/fixtures/")
-            {
-                workspace_root().join(arg).into_os_string()
-            } else {
-                OsString::from(arg)
-            }
-        })
-        .collect()
-}
-
-fn css_distance_doc_args_contain_sequence(command: &CssDistanceDocCommand, expected: &[&str]) {
-    assert!(
-        command.args.windows(expected.len()).any(|window| window
-            .iter()
-            .map(String::as_str)
-            .eq(expected.iter().copied())),
-        "documented command args {:?} should contain sequence {:?}",
-        command.args,
-        expected
-    );
-}
-
-fn run_css_distance_doc_command(command: &CssDistanceDocCommand) -> Output {
-    Command::new(qec_code_bin())
-        .args(materialize_css_distance_doc_args(&command))
-        .output()
-        .expect("documented qec-code command should run")
-}
-
-fn assert_random_window_doc_json(command: &CssDistanceDocCommand) -> serde_json::Value {
-    let output = run_css_distance_doc_command(command);
-    assert!(
-        output.status.success(),
-        "documented command {:?} failed with stderr: {}",
-        command.args,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(output.stderr, b"");
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let json: serde_json::Value = serde_json::from_str(&stdout).expect("stdout should be JSON");
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["method"], "random-window-upper-bound");
-    assert_eq!(json["bound_type"], "upper");
-    json
-}
-
-const BB72_PARAMETERIZED_SPEC: &str = "bb:lx=6,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
-const BB144_PARAMETERIZED_SPEC: &str = "bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0";
-const BB_FAMILY_CATALOG_SPEC: &str =
-    "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...";
-const BB_INVALID_LX_ERROR: &str = "out-of-range built-in CSS integer parameter lx for family bb: 0";
-const TORIC_3D_PARAMETERIZED_SPEC: &str = "toric_3d:lx=3,ly=3,lz=3";
-const TORIC_3D_FAMILY_CATALOG_SPEC: &str = "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>";
 
 fn write_matrix_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
@@ -196,16 +82,6 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         fixture: "bb72_hz.json",
     },
     BuiltInCssFixtureCase {
-        code_id: BB72_PARAMETERIZED_SPEC,
-        matrix: "hx",
-        fixture: "bb72_hx.json",
-    },
-    BuiltInCssFixtureCase {
-        code_id: BB72_PARAMETERIZED_SPEC,
-        matrix: "hz",
-        fixture: "bb72_hz.json",
-    },
-    BuiltInCssFixtureCase {
         code_id: "surface_rotated:d=3",
         matrix: "hx",
         fixture: "surface_rotated_d3_hx.json",
@@ -224,16 +100,6 @@ const BUILT_IN_CSS_FIXTURE_CASES: &[BuiltInCssFixtureCase] = &[
         code_id: "toric:d=3",
         matrix: "hz",
         fixture: "toric_d3_hz.json",
-    },
-    BuiltInCssFixtureCase {
-        code_id: TORIC_3D_PARAMETERIZED_SPEC,
-        matrix: "hx",
-        fixture: "toric_3d_3x3x3_hx.json",
-    },
-    BuiltInCssFixtureCase {
-        code_id: TORIC_3D_PARAMETERIZED_SPEC,
-        matrix: "hz",
-        fixture: "toric_3d_3x3x3_hz.json",
     },
 ];
 
@@ -382,83 +248,6 @@ fn code_css_bb72_hx_prints_sparse_rows_json() {
 }
 
 #[test]
-fn code_css_bb_parameterized_hx_matches_bb72_fixture() {
-    let output = run_qec_code(&["code", "css", BB72_PARAMETERIZED_SPEC, "hx"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let expected = read_fixture("qec-code/tests/fixtures/css/bb72_hx.json");
-
-    assert_eq!(stdout, expected);
-}
-
-#[test]
-fn code_css_bb_parameterized_hz_matches_bb72_fixture() {
-    let output = run_qec_code(&["code", "css", BB72_PARAMETERIZED_SPEC, "hz"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let expected = read_fixture("qec-code/tests/fixtures/css/bb72_hz.json");
-
-    assert_eq!(stdout, expected);
-}
-
-#[test]
-fn code_css_bb144_parameterized_hx_prints_sparse_rows_shape() {
-    // This is qec-code construction/export coverage only; circuit-level
-    // BB144 work and benchmark reproduction remain downstream in #110/#124.
-    let output = run_qec_code(&["code", "css", BB144_PARAMETERIZED_SPEC, "hx"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let json: serde_json::Value =
-        serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
-    let rows = json["rows"]
-        .as_array()
-        .expect("sparse-row JSON should contain rows");
-
-    assert_eq!(json["format"], "sparse_rows");
-    assert_eq!(json["num_cols"], 144);
-    assert_eq!(rows.len(), 72);
-    assert!(
-        rows.iter()
-            .all(|row| row.as_array().is_some_and(|cols| cols.len() == 6)),
-        "all BB144 hx rows should have weight 6: {rows:?}"
-    );
-}
-
-#[test]
-fn code_css_bb_parameterized_invalid_lattice_dimension_fails_without_json() {
-    let output = run_qec_code(&["code", "css", "bb:lx=0,ly=6,a=3:0,b=0:3", "hx"]);
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-
-    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
-    assert!(stderr.contains(BB_INVALID_LX_ERROR), "stderr was: {stderr}");
-}
-
-#[test]
-fn code_css_bb_parameterized_malformed_shift_term_fails_without_json() {
-    let output = run_qec_code(&["code", "css", "bb:lx=12,ly=6,a=3:0|,b=0:3", "hx"]);
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-
-    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
-    assert!(
-        stderr.contains("invalid built-in CSS integer parameter a for family bb"),
-        "stderr was: {stderr}"
-    );
-}
-
-#[test]
 fn code_css_surface_rotated_d3_hx_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "surface_rotated:d=3", "hx"]);
 
@@ -485,58 +274,6 @@ fn code_css_surface_rotated_d3_hz_prints_workspace_fixture() {
 }
 
 #[test]
-fn code_css_color_666_d5_inline_matrices_print_workspace_fixtures() {
-    for (matrix, fixture) in [
-        ("hx", "color_666_d5_hx.json"),
-        ("hz", "color_666_d5_hz.json"),
-    ] {
-        let output = run_qec_code(&["code", "css", "color_666:d=5", matrix]);
-
-        assert!(output.status.success(), "{matrix} export failed");
-        assert_eq!(output.stderr, b"", "{matrix} export printed stderr");
-
-        let expected = read_fixture(&format!("qec-code/tests/fixtures/css/{fixture}"));
-        assert_eq!(
-            output.stdout,
-            expected.as_bytes(),
-            "{matrix} output differed"
-        );
-    }
-}
-
-#[test]
-fn code_css_color_666_d5_structured_matrices_print_workspace_fixtures() {
-    let dir = tempdir().unwrap();
-    let spec = write_matrix_file(
-        dir.path(),
-        "color-666.json",
-        r#"{"schema_version":1,"construction":"color_666","distance":5}"#,
-    );
-
-    for (matrix, fixture) in [
-        ("hx", "color_666_d5_hx.json"),
-        ("hz", "color_666_d5_hz.json"),
-    ] {
-        let output = Command::new(qec_code_bin())
-            .args(["code", "css", "construct", "--spec"])
-            .arg(&spec)
-            .arg(matrix)
-            .output()
-            .expect("qec-code binary should run");
-
-        assert!(output.status.success(), "{matrix} export failed");
-        assert_eq!(output.stderr, b"", "{matrix} export printed stderr");
-
-        let expected = read_fixture(&format!("qec-code/tests/fixtures/css/{fixture}"));
-        assert_eq!(
-            output.stdout,
-            expected.as_bytes(),
-            "{matrix} output differed"
-        );
-    }
-}
-
-#[test]
 fn code_css_toric_d3_hx_prints_workspace_fixture() {
     let output = run_qec_code(&["code", "css", "toric:d=3", "hx"]);
 
@@ -560,46 +297,6 @@ fn code_css_toric_d3_hz_prints_workspace_fixture() {
     let expected = read_fixture("qec-code/tests/fixtures/css/toric_d3_hz.json");
 
     assert_eq!(stdout, expected);
-}
-
-#[test]
-fn code_css_toric_3d_3x3x3_hx_prints_workspace_fixture() {
-    let output = run_qec_code(&["code", "css", TORIC_3D_PARAMETERIZED_SPEC, "hx"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let expected = read_fixture("qec-code/tests/fixtures/css/toric_3d_3x3x3_hx.json");
-
-    assert_eq!(stdout, expected);
-}
-
-#[test]
-fn code_css_toric_3d_3x3x3_hz_prints_workspace_fixture() {
-    let output = run_qec_code(&["code", "css", TORIC_3D_PARAMETERIZED_SPEC, "hz"]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-    let expected = read_fixture("qec-code/tests/fixtures/css/toric_3d_3x3x3_hz.json");
-
-    assert_eq!(stdout, expected);
-}
-
-#[test]
-fn code_css_toric_3d_rejects_degenerate_periods() {
-    let output = run_qec_code(&["code", "css", "toric_3d:lx=2,ly=3,lz=3", "hx"]);
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-
-    let stderr = String::from_utf8(output.stderr).expect("stderr should be valid utf-8");
-    assert!(
-        stderr.contains("out-of-range built-in CSS integer parameter lx for family toric_3d: 2"),
-        "stderr was: {stderr}"
-    );
 }
 
 #[test]
@@ -706,10 +403,6 @@ fn code_css_list_includes_supported_built_ins() {
     assert!(stdout.contains("steane"), "stdout was: {stdout}");
     assert!(stdout.contains("bb72"), "stdout was: {stdout}");
     assert!(
-        stdout.contains(BB_FAMILY_CATALOG_SPEC),
-        "stdout was: {stdout}"
-    );
-    assert!(
         stdout.contains("repetition_x:d=<distance>"),
         "stdout was: {stdout}"
     );
@@ -722,67 +415,10 @@ fn code_css_list_includes_supported_built_ins() {
         "stdout was: {stdout}"
     );
     assert!(
-        stdout.contains("color_666:d=<distance>"),
-        "stdout was: {stdout}"
-    );
-    assert!(
         stdout.contains("toric:d=<distance>"),
         "stdout was: {stdout}"
     );
-    assert!(
-        stdout.contains(TORIC_3D_FAMILY_CATALOG_SPEC),
-        "stdout was: {stdout}"
-    );
     assert!(stdout.contains("distance >= 2"), "stdout was: {stdout}");
-}
-
-#[test]
-fn apm_kasai_css_export() {
-    let list = run_qec_code(&["code", "css", "list"]);
-    assert!(list.status.success());
-    assert_eq!(list.stderr, b"");
-
-    let list_stdout = String::from_utf8(list.stdout).expect("stdout should be valid utf-8");
-    assert!(
-        list_stdout.contains("apm_kasai:p=96"),
-        "stdout was: {list_stdout}"
-    );
-    assert!(
-        list_stdout.contains("apm_kasai:p=192"),
-        "stdout was: {list_stdout}"
-    );
-
-    for (code_id, expected_num_cols) in [("apm_kasai:p=96", 1152), ("apm_kasai:p=192", 2304)] {
-        for matrix in ["hx", "hz"] {
-            let output = run_qec_code(&["code", "css", code_id, matrix]);
-            assert!(output.status.success());
-            assert_eq!(output.stderr, b"");
-
-            let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
-            let json: serde_json::Value =
-                serde_json::from_str(&stdout).expect("stdout should be sparse-row JSON");
-            assert_eq!(json["format"], "sparse_rows");
-            assert_eq!(json["num_cols"], expected_num_cols);
-            assert!(
-                json["rows"].as_array().is_some_and(|rows| !rows.is_empty()),
-                "rows should be non-empty: {json}"
-            );
-        }
-    }
-
-    let p128 = run_qec_code(&["code", "css", "apm_kasai:p=128", "hx"]);
-    assert!(!p128.status.success());
-    assert_eq!(p128.stdout, b"");
-    let p128_stderr = String::from_utf8(p128.stderr).expect("stderr should be valid utf-8");
-    assert!(
-        p128_stderr
-            .contains("unsupported built-in CSS integer parameter p for family apm_kasai: 128"),
-        "stderr was: {p128_stderr}"
-    );
-    assert!(
-        p128_stderr.contains("supported: 96, 192"),
-        "stderr was: {p128_stderr}"
-    );
 }
 
 #[test]
@@ -871,77 +507,6 @@ fn run_code_css_surface_rotated_d3_matrices_return_fixture_json_without_newline(
 }
 
 #[test]
-fn run_code_css_construct_json_surface_rotated_d3_matches_inline_fixture() {
-    let dir = tempdir().unwrap();
-    let spec = write_matrix_file(
-        dir.path(),
-        "surface.json",
-        r#"{"schema_version":1,"construction":"surface","distance":3}"#,
-    );
-
-    let hx = run_qec_code_in_process_os(vec![
-        OsString::from("code"),
-        OsString::from("css"),
-        OsString::from("construct"),
-        OsString::from("--spec"),
-        spec.into_os_string(),
-        OsString::from("hx"),
-    ])
-    .unwrap();
-
-    let expected_hx = read_fixture("qec-code/tests/fixtures/css/surface_rotated_d3_hx.json");
-    assert_eq!(hx, expected_hx.trim_end_matches('\n'));
-}
-
-#[test]
-fn run_code_css_construct_json_directional_square_hx_matches_fixture() {
-    let dir = tempdir().unwrap();
-    let fixture: serde_json::Value =
-        serde_json::from_str(include_str!("fixtures/directional/square_ne2n_8x6.json")).unwrap();
-    let request = serde_json::to_string(&fixture["request"]).unwrap();
-    let spec = write_matrix_file(dir.path(), "directional-square.json", &request);
-
-    let hx = run_qec_code_in_process_os(vec![
-        OsString::from("code"),
-        OsString::from("css"),
-        OsString::from("construct"),
-        OsString::from("--spec"),
-        spec.into_os_string(),
-        OsString::from("hx"),
-    ])
-    .unwrap();
-
-    let expected = serde_json::json!({
-        "format": "sparse_rows",
-        "num_cols": 24,
-        "rows": fixture["checks"]["h_x"],
-    });
-    assert_eq!(hx, serde_json::to_string(&expected).unwrap());
-}
-
-#[test]
-fn run_code_css_construct_json_rejects_unknown_schema() {
-    let dir = tempdir().unwrap();
-    let spec = write_matrix_file(
-        dir.path(),
-        "surface-v2.json",
-        r#"{"schema_version":2,"construction":"surface","distance":3}"#,
-    );
-
-    assert_eq!(
-        run_qec_code_in_process_os(vec![
-            OsString::from("code"),
-            OsString::from("css"),
-            OsString::from("construct"),
-            OsString::from("--spec"),
-            spec.into_os_string(),
-            OsString::from("hx"),
-        ]),
-        Err(QecError::UnsupportedCssConstructionSchemaVersion { version: 2 })
-    );
-}
-
-#[test]
 fn run_code_css_list_returns_catalog_without_newline() {
     let output = run(Cli {
         command: Commands::Code {
@@ -950,22 +515,7 @@ fn run_code_css_list_returns_catalog_without_newline() {
     })
     .unwrap();
 
-    let width = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...".len();
-    let expected = format!(
-        "Built-in CSS codes:\n  {steane:width$}  fixed [[7,1,3]] CSS code\n  {bb72:width$}  fixed [[72,12,6]] bivariate-bicycle CSS code\n  {apm96:width$}  fixed Table A1 P=96 APM-CSS code\n  {apm192:width$}  fixed Table A1 P=192 APM-CSS code\n  {bb:width$}  bivariate-bicycle CSS family over periodic lattice\n  {rep_x:width$}  X-check chain, distance >= 2\n  {rep_z:width$}  Z-check chain, distance >= 2\n  {surf:width$}  rotated surface CSS code, distance >= 2\n  {color_666:width$}  triangular 6.6.6 color CSS code, odd distance >= 3\n  {toric:width$}  periodic square-lattice toric CSS code, distance >= 2\n  {toric_3d:width$}  periodic cubic 3D toric CSS code, periods >= 3",
-        steane = "steane",
-        bb72 = "bb72",
-        apm96 = "apm_kasai:p=96",
-        apm192 = "apm_kasai:p=192",
-        bb = "bb:lx=<period-x>,ly=<period-y>,a=<dx>:<dy>|...,b=<dx>:<dy>|...",
-        rep_x = "repetition_x:d=<distance>",
-        rep_z = "repetition_z:d=<distance>",
-        surf = "surface_rotated:d=<distance>",
-        color_666 = "color_666:d=<distance>",
-        toric = "toric:d=<distance>",
-        toric_3d = TORIC_3D_FAMILY_CATALOG_SPEC,
-        width = width,
-    );
+    let expected = "Built-in CSS codes:\n  steane                        fixed [[7,1,3]] CSS code\n  bb72                          fixed [[72,12,6]] bivariate-bicycle CSS code\n  repetition_x:d=<distance>     X-check chain, distance >= 2\n  repetition_z:d=<distance>     Z-check chain, distance >= 2\n  surface_rotated:d=<distance>  rotated surface CSS code, distance >= 2\n  toric:d=<distance>            periodic square-lattice toric CSS code, distance >= 2";
     assert_eq!(output, expected);
 }
 
@@ -1109,9 +659,7 @@ fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
     assert!(matches!(
         conflicting_inputs,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains(
-                "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz",
-            )
+            if message.contains("use either --code-id or --hx/--hz")
     ));
 
     let missing_pair = run_qec_code_in_process_os(vec![
@@ -1145,8 +693,7 @@ fn run_code_css_distance_randomized_upper_bound_rejects_input_errors() {
     assert!(matches!(
         missing_source,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message
-                .contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz")
+            if message.contains("provide --code-id or both --hx and --hz")
     ));
 }
 
@@ -1254,31 +801,6 @@ fn code_css_distance_exact_code_id_returns_exact_json() {
 }
 
 #[test]
-fn code_css_distance_exact_color_666_d3_code_id_returns_exact_json() {
-    let output = run_qec_code(&[
-        "code",
-        "css-distance",
-        "exact",
-        "--code-id",
-        "color_666:d=3",
-        "--json",
-    ]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["distance"], 3);
-    assert_eq!(json["method"], "rstim-ilp-exact");
-    assert_eq!(json["bound_type"], "exact");
-    assert_eq!(json["witness"]["weight"], 3);
-    assert_eq!(json["options"]["input"], "code_id");
-    assert_eq!(json["options"]["code_id"], "color_666:d=3");
-    assert_eq!(json["provenance"]["tool"], "qec-code");
-}
-
-#[test]
 fn run_code_css_distance_exact_code_id_returns_exact_json() {
     let output = run_qec_code_in_process(&[
         "code",
@@ -1328,59 +850,6 @@ fn code_css_distance_exact_hx_hz_files_return_exact_json() {
     assert_eq!(json["options"]["input"], "files");
     assert_eq!(json["options"]["hx"], hx.display().to_string());
     assert_eq!(json["options"]["hz"], hz.display().to_string());
-}
-
-#[test]
-fn code_css_distance_exact_quantum_tanner_spec_returns_exact_json() {
-    let spec = quantum_tanner_fixture_path("toric_d4.json");
-    let output = Command::new(qec_code_bin())
-        .args(["code", "css-distance", "exact", "--quantum-tanner-spec"])
-        .arg(&spec)
-        .arg("--json")
-        .output()
-        .expect("qec-code binary should run");
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Fixture follows qLDPC's toric Tanner test: Z_d x Z_d has distance d.
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["distance"], 4);
-    assert_eq!(json["method"], "rstim-ilp-exact");
-    assert_eq!(json["bound_type"], "exact");
-    assert_eq!(json["witness"]["weight"], 4);
-    assert_eq!(json["options"]["input"], "quantum_tanner_spec");
-    assert_eq!(
-        json["options"]["quantum_tanner_spec"],
-        spec.display().to_string()
-    );
-}
-
-#[test]
-fn code_css_distance_exact_quantum_tanner_invalid_spec_fails_before_distance_result() {
-    let spec = quantum_tanner_fixture_path("invalid_non_symmetric_a.json");
-    let output = Command::new(qec_code_bin())
-        .args(["code", "css-distance", "exact", "--quantum-tanner-spec"])
-        .arg(spec)
-        .arg("--json")
-        .output()
-        .expect("qec-code binary should run");
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        stderr.contains("invalid quantum Tanner generator set A"),
-        "stderr was: {stderr}"
-    );
-    assert!(
-        serde_json::from_str::<serde_json::Value>(&stderr).is_err(),
-        "stderr should not be a distance result: {stderr}"
-    );
 }
 
 #[test]
@@ -1438,8 +907,7 @@ fn run_code_css_distance_exact_rejects_input_errors() {
     assert!(matches!(
         missing_source,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message
-                .contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz")
+            if message.contains("provide --code-id or both --hx and --hz")
     ));
 
     let dir = tempdir().unwrap();
@@ -1469,9 +937,7 @@ fn run_code_css_distance_exact_rejects_input_errors() {
     assert!(matches!(
         mixed_input,
         Err(QecError::InvalidCssDistanceInput(message))
-            if message.contains(
-                "use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz",
-            )
+            if message.contains("use either --code-id or --hx/--hz, not both")
     ));
 
     let missing_pair = run_qec_code_in_process_os(vec![
@@ -1514,8 +980,7 @@ fn code_css_distance_exact_rejects_code_id_and_file_input_together() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr
-            .contains("use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz"),
+        stderr.contains("use either --code-id or --hx/--hz, not both"),
         "stderr was: {stderr}"
     );
 }
@@ -1549,7 +1014,7 @@ fn code_css_distance_exact_rejects_missing_input_source() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz"),
+        stderr.contains("provide --code-id or both --hx and --hz"),
         "stderr was: {stderr}"
     );
 }
@@ -1714,7 +1179,6 @@ fn css_distance_randomized_upper_bound_code_id_outputs_json() {
     assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["upper_bound"], 3);
     assert_eq!(json["options"]["seed"], 7);
-    assert!(json.get("search_stats").is_none());
 }
 
 #[test]
@@ -1749,43 +1213,6 @@ fn css_distance_randomized_upper_bound_hx_hz_files_output_json() {
     assert_eq!(json["method"], "randomized-upper-bound");
     assert_eq!(json["bound_type"], "upper");
     assert_eq!(json["upper_bound"], 3);
-}
-
-#[test]
-fn css_distance_randomized_upper_bound_quantum_tanner_spec_outputs_json() {
-    let spec = quantum_tanner_fixture_path("toric_d4.json");
-    let output = Command::new(qec_code_bin())
-        .args([
-            "code",
-            "css-distance",
-            "randomized-upper-bound",
-            "--quantum-tanner-spec",
-        ])
-        .arg(spec)
-        .args([
-            "--iterations",
-            "1000",
-            "--restarts",
-            "8",
-            "--seed",
-            "7",
-            "--target-weight",
-            "4",
-            "--json",
-        ])
-        .output()
-        .expect("qec-code binary should run");
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["method"], "randomized-upper-bound");
-    assert_eq!(json["bound_type"], "upper");
-    assert!(json["upper_bound"].as_u64().unwrap() <= 4);
 }
 
 #[test]
@@ -1837,8 +1264,7 @@ fn css_distance_randomized_upper_bound_rejects_code_id_and_file_input_together()
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr
-            .contains("use only one input source: --code-id, --quantum-tanner-spec, or --hx/--hz"),
+        stderr.contains("use either --code-id or --hx/--hz, not both"),
         "stderr was: {stderr}"
     );
 }
@@ -1881,7 +1307,7 @@ fn css_distance_randomized_upper_bound_rejects_missing_input_source() {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(
-        stderr.contains("provide --code-id, --quantum-tanner-spec, or both --hx and --hz"),
+        stderr.contains("provide --code-id or both --hx and --hz"),
         "stderr was: {stderr}"
     );
 }
@@ -1970,320 +1396,4 @@ fn css_distance_randomized_upper_bound_rejects_zero_iterations_without_stdout() 
         stderr.contains("invalid distance bound option iterations"),
         "stderr was: {stderr}"
     );
-}
-
-#[test]
-fn css_distance_random_window_upper_bound_cli_contract() {
-    let built_in = run_qec_code(&[
-        "code",
-        "css-distance",
-        "random-window-upper-bound",
-        "--code-id",
-        "surface_rotated:d=5",
-        "--iterations",
-        "5000",
-        "--restarts",
-        "8",
-        "--seed",
-        "7",
-        "--target-weight",
-        "5",
-        "--json",
-    ]);
-
-    assert!(built_in.status.success());
-    assert_eq!(built_in.stderr, b"");
-    let stdout = String::from_utf8(built_in.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["method"], "random-window-upper-bound");
-    assert_eq!(json["bound_type"], "upper");
-    assert_eq!(json["upper_bound"], 5);
-    assert_eq!(json["witness"]["weight"], 5);
-    assert!(json["search_stats"].is_object());
-
-    let hx = workspace_root().join("rsinter/tests/fixtures/css/steane_hx.json");
-    let hz = workspace_root().join("rsinter/tests/fixtures/css/steane_hz.json");
-    let files = Command::new(qec_code_bin())
-        .args(["code", "css-distance", "random-window-upper-bound", "--hx"])
-        .arg(&hx)
-        .arg("--hz")
-        .arg(&hz)
-        .args([
-            "--iterations",
-            "500",
-            "--restarts",
-            "4",
-            "--seed",
-            "7",
-            "--target-weight",
-            "3",
-            "--json",
-        ])
-        .output()
-        .expect("qec-code binary should run");
-
-    assert!(files.status.success());
-    assert_eq!(files.stderr, b"");
-    let stdout = String::from_utf8(files.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["method"], "random-window-upper-bound");
-    assert_eq!(json["bound_type"], "upper");
-    assert_eq!(json["upper_bound"], 3);
-    assert_eq!(json["witness"]["weight"], 3);
-
-    let spec = quantum_tanner_fixture_path("toric_d4.json");
-    let quantum_tanner = Command::new(qec_code_bin())
-        .args([
-            "code",
-            "css-distance",
-            "random-window-upper-bound",
-            "--quantum-tanner-spec",
-        ])
-        .arg(&spec)
-        .args([
-            "--iterations",
-            "1000",
-            "--restarts",
-            "8",
-            "--seed",
-            "7",
-            "--target-weight",
-            "4",
-            "--json",
-        ])
-        .output()
-        .expect("qec-code binary should run");
-
-    assert!(quantum_tanner.status.success());
-    assert_eq!(quantum_tanner.stderr, b"");
-    let stdout = String::from_utf8(quantum_tanner.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(json["status"], "completed");
-    assert_eq!(json["method"], "random-window-upper-bound");
-    assert_eq!(json["bound_type"], "upper");
-    assert!(json["upper_bound"].as_u64().unwrap() <= 4);
-    assert!(json["witness"]["weight"].as_u64().unwrap() <= 4);
-
-    let missing_json = run_qec_code(&[
-        "code",
-        "css-distance",
-        "random-window-upper-bound",
-        "--code-id",
-        "steane",
-        "--iterations",
-        "10",
-        "--seed",
-        "7",
-    ]);
-
-    assert!(!missing_json.status.success());
-    assert_eq!(missing_json.stdout, b"");
-    let stderr = String::from_utf8(missing_json.stderr).unwrap();
-    assert!(
-        stderr.contains("JSON output is required for code css-distance random-window-upper-bound"),
-        "stderr was: {stderr}"
-    );
-}
-
-#[test]
-fn random_window_upper_bound_doc_contract() {
-    assert!(CSS_DISTANCE_DOC.contains("random-window-upper-bound"));
-    assert!(CSS_DISTANCE_DOC.contains("randomized-upper-bound"));
-    assert!(CSS_DISTANCE_DOC.contains("bound_type"));
-    assert!(CSS_DISTANCE_DOC.contains("upper"));
-    assert!(CSS_DISTANCE_DOC.contains(
-        "When `bound_type: \"upper\"` appears in this JSON, the value is an upper bound from a randomized search, not a certified exact distance."
-    ), "docs no longer warn users not to treat the randomized result as an exact distance");
-    assert!(CSS_DISTANCE_DOC.contains(
-        "cargo test -p qec-code issue_225_random_window_upper_bound_smoke_ladder -- --nocapture"
-    ));
-    assert!(CSS_DISTANCE_DOC.contains(
-        "cargo test -p qec-code issue_225_random_window_upper_bound_full_ladder -- --ignored --nocapture"
-    ));
-
-    let built_in_command = css_distance_doc_command("css_distance:random_window_builtin");
-    css_distance_doc_args_contain_sequence(&built_in_command, &["--code-id", "steane"]);
-    let built_in = assert_random_window_doc_json(&built_in_command);
-    assert_eq!(built_in["upper_bound"], 3);
-    assert_eq!(built_in["witness"]["weight"], 3);
-
-    let file_command = css_distance_doc_command("css_distance:random_window_files");
-    css_distance_doc_args_contain_sequence(
-        &file_command,
-        &["--hx", "qec-code/tests/fixtures/css/steane_hx.json"],
-    );
-    css_distance_doc_args_contain_sequence(
-        &file_command,
-        &["--hz", "qec-code/tests/fixtures/css/steane_hz.json"],
-    );
-    let file_block = css_distance_doc_command_block("css_distance:random_window_files");
-    assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hx.json"));
-    assert!(file_block.contains("qec-code/tests/fixtures/css/steane_hz.json"));
-    assert!(
-        workspace_root()
-            .join("qec-code/tests/fixtures/css/steane_hx.json")
-            .exists()
-    );
-    assert!(
-        workspace_root()
-            .join("qec-code/tests/fixtures/css/steane_hz.json")
-            .exists()
-    );
-
-    let files = assert_random_window_doc_json(&file_command);
-    assert_eq!(files["upper_bound"], 3);
-    assert_eq!(files["witness"]["weight"], 3);
-}
-
-#[cfg(feature = "distance-ilp-highs")]
-#[test]
-fn code_css_distance_exact_accepts_highs_backend_and_solver_limits() {
-    let output = run_qec_code(&[
-        "code",
-        "css-distance",
-        "exact",
-        "--code-id",
-        "steane",
-        "--backend",
-        "highs",
-        "--time-limit-seconds",
-        "300",
-        "--mip-gap",
-        "0.001",
-        "--threads",
-        "1",
-        "--verbose-solver",
-        "--json",
-    ]);
-
-    assert!(output.status.success());
-    assert_eq!(output.stderr, b"");
-
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    assert_eq!(json["status"], "incomplete");
-    assert_eq!(json["bound_type"], "upper");
-    assert_eq!(json["requested_backend"], "highs");
-    assert_eq!(json["backend"], "highs");
-    assert_eq!(json["solver_status"], "optimal");
-    assert_eq!(json["time_limit_seconds"], 300.0);
-    assert_eq!(json["mip_gap"], 0.001);
-    assert_eq!(json["threads"], 1);
-    assert_eq!(json["verbose_solver"], true);
-    assert_eq!(json["options"]["backend"], "highs");
-}
-
-#[cfg(feature = "distance-ilp-highs")]
-#[test]
-fn code_css_distance_exact_reports_timeout_without_incumbent_instead_of_panicking() {
-    let output = run_qec_code(&[
-        "code",
-        "css-distance",
-        "exact",
-        "--code-id",
-        "steane",
-        "--backend",
-        "highs",
-        "--time-limit-seconds",
-        "0.000000000001",
-        "--json",
-    ]);
-
-    assert!(!output.status.success());
-    assert_eq!(output.stdout, b"");
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        stderr.contains("time limit without a feasible incumbent"),
-        "unexpected stderr: {stderr}"
-    );
-    assert!(!stderr.contains("panicked"), "unexpected panic: {stderr}");
-}
-
-#[test]
-fn code_css_distance_exact_rejects_gurobi_backend_without_feature() {
-    let output = run_qec_code(&[
-        "code",
-        "css-distance",
-        "exact",
-        "--code-id",
-        "steane",
-        "--backend",
-        "gurobi",
-        "--json",
-    ]);
-
-    if cfg!(feature = "distance-ilp-gurobi") {
-        assert!(output.status.success());
-    } else {
-        assert!(!output.status.success());
-        assert_eq!(output.stdout, b"");
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(
-            stderr.contains("ILP backend is unavailable"),
-            "stderr was: {stderr}"
-        );
-        assert!(stderr.contains("Gurobi"), "stderr was: {stderr}");
-    }
-}
-
-#[cfg(not(feature = "distance-ilp-highs"))]
-#[test]
-fn run_code_css_distance_exact_rejects_valid_ilp_options_without_ilp_build() {
-    let result = run_qec_code_in_process(&[
-        "code",
-        "css-distance",
-        "exact",
-        "--code-id",
-        "steane",
-        "--backend",
-        "highs",
-        "--time-limit-seconds",
-        "300",
-        "--mip-gap",
-        "0",
-        "--threads",
-        "1",
-        "--json",
-    ]);
-
-    assert!(
-        matches!(
-            result,
-            Err(QecError::DistanceComputationUnsupported { n: 7, ref reason })
-                if reason == "solver options require an ILP-enabled build"
-        ),
-        "expected unsupported ILP options error, got {result:?}",
-    );
-}
-
-#[test]
-fn run_code_css_distance_exact_rejects_invalid_solver_options() {
-    for (flag, value, expected) in [
-        ("--time-limit-seconds", "0", "time_limit_seconds"),
-        ("--time-limit-seconds", "NaN", "time_limit_seconds"),
-        ("--mip-gap", "-0.1", "mip_gap"),
-        ("--mip-gap", "NaN", "mip_gap"),
-        ("--threads", "0", "threads"),
-    ] {
-        let result = run_qec_code_in_process(&[
-            "code",
-            "css-distance",
-            "exact",
-            "--code-id",
-            "steane",
-            flag,
-            value,
-            "--json",
-        ]);
-        assert!(
-            matches!(
-                result,
-                Err(QecError::InvalidCssDistanceInput(ref message)) if message.contains(expected)
-            ),
-            "expected invalid {expected} error for {flag} {value}, got {result:?}",
-        );
-    }
 }
