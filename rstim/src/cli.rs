@@ -47,7 +47,7 @@ pub use crate::operations::{
 #[cfg_attr(
     feature = "unified-cli",
     command(
-        after_help = "Additional command groups:\n  circuit       Structured circuit operations\n  dataset       Import and export decoder datasets\n  decode        Decode a detector dataset\n  capabilities  Print the machine-readable CLI contract"
+        after_help = "Additional command groups:\n  circuit       Structured circuit operations\n  dataset       Import, export and score decoder datasets\n  decode        Decode a detector dataset\n  capabilities  Print the machine-readable CLI contract"
     )
 )]
 pub struct Cli {
@@ -298,7 +298,8 @@ pub enum Commands {
             default_value_t = crate::decoder_dataset::DEFAULT_DECODER_DATASET_BATCH_SHOTS
         )]
         batch_shots: usize,
-        #[arg(long = "mode")]
+        /// Auto selects blinded measurements when logical-input metadata is available
+        #[arg(long = "mode", default_value = "auto")]
         mode: String,
         #[arg(long = "logical_x_qubits")]
         logical_x_qubits: Option<String>,

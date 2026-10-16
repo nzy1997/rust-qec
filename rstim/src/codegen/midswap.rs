@@ -3,7 +3,7 @@ use std::fmt;
 
 #[cfg(test)]
 use crate::decoder_dataset::LOGICAL_FLIP_MARKER;
-use crate::ir::{circuit_to_string, StimInstr, StimTarget};
+use crate::ir::{StimInstr, StimTarget, circuit_to_string};
 
 const CNOT_SCHEDULE: &str = "paper_alternating_ab";
 
@@ -115,6 +115,7 @@ struct Site {
 enum CircuitItem {
     Instruction(StimInstr),
     Comment(String),
+    LogicalFlipMarker(crate::decoder_dataset::LogicalFlip),
 }
 
 pub fn rotated_memory_z_midswap(config: MidSwapConfig) -> Result<String, MidSwapError> {
@@ -257,8 +258,17 @@ impl MidSwapBuilder {
         let data = self.mapped_sites(&self.data.clone());
         let checks = self.mapped_sites(&self.checks.clone());
         self.emit("R", vec![], qubit_targets(&data));
-        self.items.push(CircuitItem::Instruction(
-            crate::decoder_dataset::logical_flip_marker_instruction(),
+        let logical_x = self
+            .data
+            .iter()
+            .filter(|site| site.x == 1)
+            .map(|site| self.mapped(*site))
+            .collect();
+        self.items.push(CircuitItem::LogicalFlipMarker(
+            crate::decoder_dataset::LogicalFlip {
+                pauli: crate::decoder_dataset::LogicalPauli::X,
+                qubits: logical_x,
+            },
         ));
         self.emit_noise("X_ERROR", self.config.after_reset_flip_probability, &data);
         self.emit_noise("LOSS", self.config.operation_loss_probability, &data);
@@ -579,6 +589,11 @@ fn render_items(items: &[CircuitItem]) -> String {
     let mut output = String::new();
     for item in items {
         match item {
+            CircuitItem::LogicalFlipMarker(logical_flip) => {
+                output.push_str(&crate::decoder_dataset::logical_flip_marker_source(
+                    logical_flip,
+                ));
+            }
             CircuitItem::Instruction(instruction) => {
                 output.push_str(&circuit_to_string(std::slice::from_ref(instruction)));
             }
@@ -666,7 +681,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(text.matches(LOGICAL_FLIP_MARKER).count(), 1);
-        assert_eq!(lines[data_reset + 1], LOGICAL_FLIP_MARKER);
+        assert_eq!(
+            lines[data_reset + 1].split('#').next().unwrap().trim(),
+            LOGICAL_FLIP_MARKER
+        );
         assert!(lines[data_reset + 2].starts_with("X_ERROR(0.01) "));
         assert!(lines[data_reset + 3].starts_with("LOSS(0.02) "));
     }

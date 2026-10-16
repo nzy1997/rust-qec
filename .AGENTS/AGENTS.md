@@ -21,6 +21,10 @@ The package-to-directory map below is checked against `cargo metadata --no-deps 
 ## Agent Rules
 Use the [visualization update flow](rules/visualization-update-flow.md) for the end-to-end sync process when QP101 export changes affect docs, fixtures, and Typst rendering. Use the [QP101-ZY maintenance rule](rules/QP101-ZY.md) for the narrower rule that treats `rstim/doc/QP101-ZY.md` as the format contract and lists the exact files that must be kept in sync with it.
 
+## Language Policy
+
+Use English for repository content and GitHub communication: issue and PR titles and descriptions, comments, reviews, release notes, milestone and label descriptions, and commit messages. Do not introduce Chinese text or Han characters in file names, source code, comments, documentation, examples, test fixtures, or generated and bundled assets, including through Unicode escapes. When testing Unicode or UTF-8 behavior, use non-Han multibyte characters and preserve the intended coverage. Before committing or publishing changes, check the affected files and GitHub text for literal and escaped Han characters, and translate or replace any matches.
+
 ## Build, Test, and Development Commands
 - `cargo build --workspace`: build workspace packages with their default features.
 - `make test`: run the standard workspace Rust test suite with CLI, CSS, viewer, and HiGHS features enabled.

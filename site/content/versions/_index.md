@@ -15,4 +15,4 @@ A RustQEC tag identifies a coordinated source release. Individual crates can rec
 
 For an installed CLI, record capabilities before upgrading, retain original input files, then rerun a small known case. For Rust, update the intended dependency versions and commit Cargo.lock in your application. A native decoder feature is a build choice, not a new dataset schema or an expanded support promise.
 
-The migration notes below come from the same canonical support contract, so code examples and compatibility rules have one maintained source. Historical release details are in [GitHub releases](https://github.com/nzy1997/rust-qec/releases).
+Historical release details are in [GitHub releases](https://github.com/nzy1997/rust-qec/releases).

@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 pub const LOGICAL_FLIP_MARKER_TAG: &str = "rstim:logical_flip_point";
 pub const LOGICAL_FLIP_MARKER: &str = "TICK[rstim:logical_flip_point]";
+pub const LOGICAL_INPUT_METADATA_PREFIX: &str = "rstim:logical_input=";
 pub const DEFAULT_DECODER_DATASET_BATCH_SHOTS: usize = 10_000;
 const PUBLIC_SCHEMA_VERSION: u32 = 1;
 const DATASET_FORMAT: &str = "rstim_decoder_dataset";
@@ -77,6 +78,73 @@ impl LogicalFlip {
             qubits: parse_logical_qubits(pauli.option_name(), value)?,
         })
     }
+}
+
+/// Reads the default logical-input Pauli and physical support attached to the
+/// canonical insertion marker, e.g. `# rstim:logical_input=X:1,8,15`.
+/// This comment declares a default operator, never a sampled input bit.
+pub fn logical_flip_from_circuit_metadata(
+    circuit_text: &str,
+) -> Result<Option<LogicalFlip>, String> {
+    let mut declared = None;
+    for line in circuit_text.lines() {
+        let Some((instruction, comment)) = line.split_once('#') else {
+            continue;
+        };
+        let Some(metadata) = comment.trim().strip_prefix(LOGICAL_INPUT_METADATA_PREFIX) else {
+            continue;
+        };
+        if instruction.trim() != LOGICAL_FLIP_MARKER {
+            return Err(
+                "logical-input metadata must annotate the canonical logical flip marker"
+                    .to_string(),
+            );
+        }
+        if declared.is_some() {
+            return Err("logical-input metadata must appear exactly once".to_string());
+        }
+        let (pauli, qubits) = metadata.split_once(':').ok_or_else(|| {
+            "logical-input metadata must have the form X:qubits or Z:qubits".to_string()
+        })?;
+        let pauli = match pauli {
+            "X" => LogicalPauli::X,
+            "Z" => LogicalPauli::Z,
+            _ => return Err("logical-input metadata Pauli must be X or Z".to_string()),
+        };
+        declared = Some(LogicalFlip::parse(pauli, qubits)?);
+    }
+    Ok(declared)
+}
+
+/// Resolves CLI `auto` without changing the two on-disk dataset modes.
+pub fn resolve_decoder_dataset_mode(
+    mode: &str,
+    circuit_text: &str,
+    explicit_logical_flip: Option<&LogicalFlip>,
+) -> Result<DecoderDatasetMode, String> {
+    if mode != "auto" {
+        return DecoderDatasetMode::parse(mode);
+    }
+    if explicit_logical_flip.is_some()
+        || logical_flip_from_circuit_metadata(circuit_text)?.is_some()
+    {
+        Ok(DecoderDatasetMode::MeasurementsBlinded)
+    } else {
+        Ok(DecoderDatasetMode::Detectors)
+    }
+}
+
+pub(crate) fn logical_flip_marker_source(logical_flip: &LogicalFlip) -> String {
+    let qubits = logical_flip
+        .qubits
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{LOGICAL_FLIP_MARKER} # {LOGICAL_INPUT_METADATA_PREFIX}{}:{qubits}\n",
+        logical_flip.pauli.as_str()
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -474,7 +542,14 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
     if stats.num_sweep_bits != 0 {
         return Err("export_decoder_dataset does not support sweep-bit circuits".to_string());
     }
-    match (config.mode, config.logical_flip.as_ref()) {
+    let logical_flip = match config.mode {
+        DecoderDatasetMode::MeasurementsBlinded => config
+            .logical_flip
+            .clone()
+            .or(logical_flip_from_circuit_metadata(&config.circuit_text)?),
+        DecoderDatasetMode::Detectors => config.logical_flip.clone(),
+    };
+    match (config.mode, logical_flip.as_ref()) {
         (DecoderDatasetMode::Detectors, Some(logical_flip)) => {
             return Err(format!(
                 "detectors mode rejects {}",
@@ -483,7 +558,7 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
         }
         (DecoderDatasetMode::MeasurementsBlinded, None) => {
             return Err(
-                "measurements_blinded mode requires exactly one of --logical_x_qubits or --logical_z_qubits"
+                "measurements_blinded mode requires exactly one of --logical_x_qubits or --logical_z_qubits, or circuit logical-input metadata"
                     .to_string(),
             );
         }
@@ -493,8 +568,7 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
     let private_one_instrs = match config.mode {
         DecoderDatasetMode::Detectors => None,
         DecoderDatasetMode::MeasurementsBlinded => {
-            let logical_flip = config
-                .logical_flip
+            let logical_flip = logical_flip
                 .as_ref()
                 .expect("measurements_blinded logical flip checked above");
             if logical_flip.qubits.is_empty() {
@@ -531,7 +605,7 @@ pub fn validate_decoder_dataset_logical_flip_inputs(
         public_circuit_text: config.circuit_text.clone(),
         public_instrs,
         private_one_instrs,
-        logical_flip: config.logical_flip.clone(),
+        logical_flip,
         measurements: stats.num_measurements,
         detectors: stats.num_detectors,
         observables: stats.num_observables,
@@ -928,7 +1002,8 @@ pub fn generate_decoder_dataset_artifacts_with_logical_flip(
         config.shots,
         0,
         config.error_trace,
-        &mut rngs)?;
+        &mut rngs,
+    )?;
     Ok(DecoderDatasetArtifacts {
         public_circuit_text: validated.public_circuit_text,
         public_instrs: validated.public_instrs,
@@ -1353,7 +1428,8 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
             current_shots,
             shot_offset,
             config.error_trace,
-            &mut rngs)?;
+            &mut rngs,
+        )?;
         crate::output::write_shots_b8(&chunk.public_shots, &mut shots_writer)
             .map_err(|error| format!("failed to write public shots: {error}"))?;
         crate::output::write_shots_b8(&chunk.answers, &mut answers_writer)
@@ -1455,10 +1531,12 @@ fn export_decoder_dataset_with_logical_flip_and_publisher_in_batches(
 
     write_manifest(
         &private_stage.temp_path.join("manifest.json"),
-        &private_manifest)?;
+        &private_manifest,
+    )?;
     write_manifest(
         &public_stage.temp_path.join("manifest.json"),
-        &public_manifest)?;
+        &public_manifest,
+    )?;
     write_file(
         &public_stage.temp_path.join("circuit.stim"),
         validated.public_circuit_text.as_bytes(),
@@ -1602,8 +1680,7 @@ mod tests {
                 .contains("exactly once")
         );
 
-        let nested =
-            "R 0\nREPEAT 2 {\nTICK[rstim:logical_flip_point]\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let nested = "R 0\nREPEAT 2 {\nTICK[rstim:logical_flip_point]\nM 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         assert!(
             circuit_with_injected_logical_x(nested, &[0])
                 .unwrap_err()
@@ -1637,7 +1714,8 @@ mod tests {
         );
         assert!(validate_decoder_dataset_logical_flip_inputs(&config).is_ok());
 
-        let no_flip = "R 0\nTICK[rstim:logical_flip_point]\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let no_flip =
+            "R 0\nTICK[rstim:logical_flip_point]\nR 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let config = test_config(
             no_flip,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1757,8 +1835,7 @@ mod tests {
         let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
         assert!(error.contains("LOSS"), "{error}");
 
-        let zero_probability_loss =
-            "R 0 1\nLOSS(0) 0\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
+        let zero_probability_loss = "R 0 1\nLOSS(0) 0\nTICK[rstim:logical_flip_point]\nM 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\n";
         let config = test_config(
             zero_probability_loss,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1791,7 +1868,10 @@ mod tests {
                 logical_x(vec![0]),
             );
             let error = validate_decoder_dataset_logical_flip_inputs(&config).unwrap_err();
-            assert!(error.contains("positive-probability noise"), "{name}: {error}");
+            assert!(
+                error.contains("positive-probability noise"),
+                "{name}: {error}"
+            );
         }
 
         let zero_probability_error = "R 0\nX_ERROR(0) 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
@@ -1926,8 +2006,7 @@ mod tests {
 
     #[test]
     fn blinded_measurement_answers_are_public_observable_xor_mask() {
-        let circuit =
-            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1959,8 +2038,7 @@ mod tests {
 
     #[test]
     fn fixed_seed_reproduces_artifacts_byte_for_byte() {
-        let circuit =
-            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -1990,8 +2068,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
-        let circuit =
-            "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
+        let circuit = "R 0\nTICK[rstim:logical_flip_point]\nX_ERROR(0.5) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n";
         let mut config = test_config(
             circuit,
             DecoderDatasetMode::MeasurementsBlinded,
@@ -2109,8 +2186,9 @@ mod tests {
         let public_out = root.path().join("public");
         let private_out = root.path().join("private");
         let config = ExportDecoderDatasetConfig {
-            circuit_text: "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
-                .to_string(),
+            circuit_text:
+                "R 0\nTICK[rstim:logical_flip_point]\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"
+                    .to_string(),
             shots: 1,
             mode: DecoderDatasetMode::MeasurementsBlinded,
             logical_x_qubits: vec![0],

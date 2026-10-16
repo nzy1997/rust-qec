@@ -35,4 +35,4 @@ A public bundle contains `manifest.json`, `circuit.stim` and `shots.b8`. A priva
 
 Simulator traces (`rstim.sample_trace.v1`) and per-shot dataset error traces (`rstim.error-trace.v1`) are different schemas. A trace can reveal realized physical errors and private logical input metadata; keep it private for blind evaluation. Loss-log ordinals identify loss-visible readouts, not arbitrary measurement-bit indices. Loaders must validate shot and readout alignment rather than zip unrelated files.
 
-The normative [error-trace v1](https://github.com/nzy1997/rust-qec/blob/master/docs/specs/error-trace-v1.md) and [loss-log v1](https://github.com/nzy1997/rust-qec/blob/master/docs/specs/loss-log-v1.md) specify their fields and validation. The <a href="#dataset-export-contract">dataset export contract</a> below is staged from its canonical source.
+See [error-trace v1](https://github.com/nzy1997/rust-qec/blob/master/docs/specs/error-trace-v1.md) and [loss-log v1](https://github.com/nzy1997/rust-qec/blob/master/docs/specs/loss-log-v1.md) for fields and validation rules.

@@ -64,7 +64,8 @@ test('atom-loss evidence exposes sampling costs, figures and downloadable measur
   const stages = page.locator('.loss-stage-figure img');
   await stages.scrollIntoViewIfNeeded();
   await expect.poll(() => stages.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
-  await expect(page.locator('.loss-stage-figure figcaption')).toContainText('not establish a matching-kernel');
+  await expect(page.locator('.loss-stage-figure figcaption')).toContainText('5,000 shots');
+  await expect(page.locator('.loss-stage-figure figcaption')).not.toContainText('matching-kernel');
   const chain = await (await page.request.get('/data/atom-loss/chain-correctness.json')).json();
   expect(chain.status).toBe('PASS');
   for (const backend of ['pymatching-envelope', 'envelope-matching-offline']) {
@@ -76,7 +77,8 @@ test('atom-loss evidence exposes sampling costs, figures and downloadable measur
     }
   }
   expect(chain.compiler_output_mutations_rejected).toEqual({ pauli_weight: true, loss_candidate: true });
-  await page.locator('.loss-evidence-downloads summary').click();
+  await page.locator('.loss-evidence-downloads > summary').click();
+  await expect(page.locator('.loss-evidence-downloads')).toContainText('not isolated kernel benchmarks');
   const sourceLink = page.getByRole('link', { name: 'Source and build manifest' });
   const sourceResponse = await page.request.get(new URL(await sourceLink.getAttribute('href'), page.url()).href);
   expect(sourceResponse.ok()).toBe(true);
