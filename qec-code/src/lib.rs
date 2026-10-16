@@ -25,6 +25,7 @@ pub mod pauli;
 pub mod pauli_coset;
 pub mod phased_pauli;
 pub mod regular_classical;
+pub mod signed_encoder;
 pub mod sparse_gf2;
 mod symplectic;
 
