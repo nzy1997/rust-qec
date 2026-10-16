@@ -13,7 +13,12 @@ fn run_with_stdin(args: &[&str], stdin_data: &str) -> std::process::Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(stdin_data.as_bytes()).unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin_data.as_bytes())
+        .unwrap();
     child.wait_with_output().unwrap()
 }
 
@@ -66,10 +71,7 @@ fn pipeline_analyze_then_sample_dem() {
 
 #[test]
 fn invalid_subcommand_fails() {
-    let output = rstim_cmd()
-        .args(["nonexistent"])
-        .output()
-        .unwrap();
+    let output = rstim_cmd().args(["nonexistent"]).output().unwrap();
     assert!(!output.status.success());
 }
 

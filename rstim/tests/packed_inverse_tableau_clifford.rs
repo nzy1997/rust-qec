@@ -1,8 +1,8 @@
 use rstim::sim::packed_inverse_tableau::{CanonicalTableauSnapshot, PackedInverseTableau};
 use rstim::sim::tableau::StabilizerState;
 
-const AUDITED_TABLEAU_LEN: usize = 12_248;
-const AUDITED_TABLEAU_FNV1A64: u64 = 0x855e_a7dc_4a84_99c6;
+const AUDITED_TABLEAU_LEN: usize = 11_842;
+const AUDITED_TABLEAU_FNV1A64: u64 = 0x5b0d_b6c8_9bbf_a95c;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Gate {
@@ -113,13 +113,15 @@ fn deterministic_sequence(seed: u64, num_qubits: usize, len: usize) -> Vec<Gate>
     gates
 }
 
-fn strip_marked_extension(source: &str, begin: &str, end: &str) -> String {
+fn strip_snapshot_accessor(source: &str) -> String {
+    let begin = "    // BEGIN issue-456 read-only snapshot accessor\n";
+    let end = "    // END issue-456 read-only snapshot accessor\n";
     let Some(start) = source.find(begin) else {
         return source.to_string();
     };
     let relative_end = source[start..]
         .find(end)
-        .expect("marked extension end marker missing");
+        .expect("snapshot accessor end marker missing");
     let end_index = start + relative_end + end.len();
     let mut stripped = String::with_capacity(source.len() - (end_index - start));
     stripped.push_str(&source[..start]);
@@ -136,30 +138,16 @@ fn fnv1a64(bytes: &[u8]) -> u64 {
     hash
 }
 
-fn assert_legacy_oracle_only_has_marked_extensions() {
+fn assert_legacy_oracle_only_has_snapshot_accessor() {
     let current = include_str!("../src/sim/tableau.rs");
-    let stripped = strip_marked_extension(
-        current,
-        "    // BEGIN issue-456 read-only snapshot accessor\n",
-        "    // END issue-456 read-only snapshot accessor\n",
-    );
-    let stripped = strip_marked_extension(
-        &stripped,
-        "    // BEGIN near-clifford tableau extensions\n",
-        "    // END near-clifford tableau extensions\n",
-    );
-    let stripped = strip_marked_extension(
-        &stripped,
-        "// BEGIN near-clifford tableau tests\n",
-        "// END near-clifford tableau tests\n",
-    );
+    let stripped = strip_snapshot_accessor(current);
     assert_eq!(stripped.len(), AUDITED_TABLEAU_LEN);
     assert_eq!(fnv1a64(stripped.as_bytes()), AUDITED_TABLEAU_FNV1A64);
 }
 
 #[test]
 fn each_supported_gate_matches_pinned_legacy() {
-    assert_legacy_oracle_only_has_marked_extensions();
+    assert_legacy_oracle_only_has_snapshot_accessor();
 
     let cases = [
         vec![Gate::H(0)],

@@ -16,9 +16,9 @@ fn e2e_rep_code_d3() {
     let w = ((1.0 - p) / p).ln();
 
     let mut m = Matching::new();
-    m.add_edge(0, 1, w, &[0], p);          // D0-D1, observable L0
-    m.add_boundary_edge(0, w, &[0], p);     // D0-boundary, observable L0
-    m.add_boundary_edge(1, w, &[], p);      // D1-boundary, no observable
+    m.add_edge(0, 1, w, &[0], p); // D0-D1, observable L0
+    m.add_boundary_edge(0, w, &[0], p); // D0-boundary, observable L0
+    m.add_boundary_edge(1, w, &[], p); // D1-boundary, no observable
 
     // syndrome [1,1]: both detectors fire => match D0-D1 => obs L0 toggled
     let pred = m.decode(&[1, 1]);
@@ -26,11 +26,19 @@ fn e2e_rep_code_d3() {
 
     // syndrome [1,0]: only D0 fires => boundary match via L0 edge
     let pred = m.decode(&[1, 0]);
-    assert_eq!(pred, vec![1], "syndrome [1,0]: D0-boundary match should flip L0");
+    assert_eq!(
+        pred,
+        vec![1],
+        "syndrome [1,0]: D0-boundary match should flip L0"
+    );
 
     // syndrome [0,1]: only D1 fires => boundary match via no-observable edge
     let pred = m.decode(&[0, 1]);
-    assert_eq!(pred, vec![0], "syndrome [0,1]: D1-boundary match should not flip L0");
+    assert_eq!(
+        pred,
+        vec![0],
+        "syndrome [0,1]: D1-boundary match should not flip L0"
+    );
 
     // syndrome [0,0]: no errors
     let pred = m.decode(&[0, 0]);
@@ -90,7 +98,11 @@ error(0.1) D1
     let pred = m.decode(&[0, 0]);
     // neg_obs_mask has L0 set. Matching D0-D1 gives obs_mask with L0.
     // Final = obs_mask ^ neg_obs_mask = 1 ^ 1 = 0
-    assert_eq!(pred, vec![0], "no syndrome with neg weight: should predict 0");
+    assert_eq!(
+        pred,
+        vec![0],
+        "no syndrome with neg weight: should predict 0"
+    );
 
     // syndrome [1,1]: effective events = sym_diff({D0,D1}, {D0,D1}) = {}
     //   => no matching needed => obs_mask = 0, final = 0 ^ neg_obs_mask = 1

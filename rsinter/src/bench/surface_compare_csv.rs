@@ -4,7 +4,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, ParamMap};
-use crate::failure::{classify_completed, classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_completed, classify_error};
 
 #[derive(Debug, Deserialize)]
 struct SurfaceCompareCsvRow {

@@ -1,7 +1,7 @@
-use rstim::executor::Executor;
-use rstim::parser::parse_lines;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::executor::Executor;
+use rstim::parser::parse_lines;
 
 fn run(prog: &str) -> Vec<bool> {
     let instrs = parse_lines(prog).unwrap();
@@ -11,12 +11,14 @@ fn run(prog: &str) -> Vec<bool> {
 }
 
 fn run_many(prog: &str, n: usize) -> Vec<Vec<bool>> {
-    (0..n).map(|seed| {
-        let instrs = parse_lines(prog).unwrap();
-        let mut exec = Executor::from_instrs(instrs).unwrap();
-        let mut rng = StdRng::seed_from_u64(seed as u64);
-        exec.run(&mut rng).unwrap().measurements
-    }).collect()
+    (0..n)
+        .map(|seed| {
+            let instrs = parse_lines(prog).unwrap();
+            let mut exec = Executor::from_instrs(instrs).unwrap();
+            let mut rng = StdRng::seed_from_u64(seed as u64);
+            exec.run(&mut rng).unwrap().measurements
+        })
+        .collect()
 }
 
 #[test]

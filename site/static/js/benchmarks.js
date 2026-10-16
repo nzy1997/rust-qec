@@ -10,7 +10,17 @@
   }
 
   const benchmarkManifest = document.getElementById("benchmark-manifest");
-  const evidenceContainers = Array.from(document.querySelectorAll("[data-evidence-items]"));
+  const checkedBenchmarkResults = document.getElementById("checked-benchmark-result-cards");
+  const checkedBenchmarkItems = [
+    "surface-decoder-full",
+    "bb-circuit-full",
+    "rstim-vs-stim-correctness",
+    "rstim-vs-stim-full",
+    "rstim-vs-stim-release",
+    "rstim-vs-stim-release-repetition-sample",
+    "rstim-vs-stim-release-surface-detect",
+    "rstim-vs-stim-release-dem-sample",
+  ];
 
   function renderBadge(label, value) {
     return `<span class="badge">${escapeHtml(label)}: ${escapeHtml(value || "unspecified")}</span>`;
@@ -38,9 +48,7 @@
                   ${renderBadge("tier", item.tier)}
                 </div>
               </div>
-              ${item.claims_limit && item.claims_limit !== family.claims_limit
-                ? `<p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit)}</p>`
-                : ""}
+              <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || "No claims limit recorded.")}</p>
             </article>
           `)
           .join("");
@@ -97,16 +105,6 @@
     return `<ul class="result-link-list">${links}</ul>`;
   }
 
-  const figureGuides = {
-    "surface-decoder-full": "Surface-code comparison: physical error rate on the horizontal axes; logical error rate on the left and decode time per shot on the right. Read each distance and decoder separately; shaded bands show the recorded uncertainty.",
-    "bb-circuit-full": "BB72/BB144 paired decoder comparison. Read the code size and decoder labels before comparing logical error rates and timings. The reference-gap report explains why these error-budget-stopped runs are not a fixed-shot reproduction of the reference curve.",
-  };
-
-  const takeaways = {
-    "surface-decoder-full": "Recorded d=3, p=0.002 case: rmatching predicts 14 logical failures in 10,000 shots and takes 0.218 µs per shot to decode.",
-    "bb-circuit-full": "Recorded BB72, p=0.003 case: rbposd and ldpc_bposd report 216 and 217 logical failures respectively on 8,000 paired shots.",
-  };
-
   function renderImageArtifacts(item) {
     const artifacts = Array.isArray(item.artifacts) ? item.artifacts : [];
     const images = artifacts.filter(
@@ -122,11 +120,6 @@
           <a href="${ROOT}/${escapeHtml(image.path)}">
             <img src="${ROOT}/${escapeHtml(image.path)}" alt="${escapeHtml(item.title || "Checked benchmark plot")}">
           </a>
-          <figcaption class="result-plot-caption">
-            ${escapeHtml(figureGuides[item.id] || item.claims_limit || item.title)}
-            <a class="result-plot-enlarge" data-figure-viewer href="${ROOT}/${escapeHtml(image.path)}">Enlarge figure on this page</a>
-          <a href="${ROOT}/${escapeHtml(image.path)}" download>Download original figure</a>
-          </figcaption>
         </figure>
       `,
       )
@@ -137,8 +130,8 @@
     if (!Array.isArray(commands) || !commands.length) {
       return "<p>No reproduction command is listed.</p>";
     }
-    const commandText = commands.join("\n");
-    return `<pre class="result-commands" data-language="Shell · source checkout"><code>${escapeHtml(commandText)}</code></pre>`;
+    const commandText = commands.map((command) => `$ ${command}`).join("\n");
+    return `<pre class="result-commands"><code>${escapeHtml(commandText)}</code></pre>`;
   }
 
   function renderTextList(values) {
@@ -152,7 +145,7 @@
     if (typeof path !== "string" || /^(?:https?:)?\/\//.test(path) || path.startsWith("#")) {
       return path;
     }
-    return `https://github.com/nzy1997/rust-qec/blob/master/${path}`;
+    return `https://github.com/nzy1997/rstim/blob/master/${path}`;
   }
 
   function renderSourceLinks(paths) {
@@ -167,13 +160,13 @@
 
   function renderCompactValue(value) {
     if (value === null || value === undefined) {
-      return '<span class="provenance-muted">not recorded</span>';
+      return "";
     }
     if (Array.isArray(value)) {
       if (!value.length) {
         return '<span class="provenance-muted">empty</span>';
       }
-      return `<ul class="provenance-value-list">${value.map((item) => `<li>${renderCompactValue(item)}</li>`).join("")}</ul>`;
+      return `<ul class="provenance-value-list">${value.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
     }
     if (typeof value === "object") {
       const entries = Object.entries(value);
@@ -181,87 +174,10 @@
         return '<span class="provenance-muted">empty</span>';
       }
       return `<ul class="provenance-value-list">${entries
-        .map(
-          ([key, entryValue]) => `
-            <li>
-              <code>${escapeHtml(key)}</code>
-              ${renderCompactValue(entryValue)}
-            </li>
-          `,
-        )
+        .map(([key, entryValue]) => `<li><code>${escapeHtml(key)}</code>: ${escapeHtml(JSON.stringify(entryValue))}</li>`)
         .join("")}</ul>`;
     }
     return `<span>${escapeHtml(value)}</span>`;
-  }
-
-  function githubRepositoryHref(repository) {
-    if (typeof repository !== "string" || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
-      return "";
-    }
-    return `https://github.com/${repository
-      .split("/")
-      .map((part) => encodeURIComponent(part))
-      .join("/")}`;
-  }
-
-  function renderExternalRepositoryCommits(entry) {
-    if (entry && entry.status === "not_recorded") {
-      return `<p class="provenance-muted">${escapeHtml(entry.reason || "External repository commits were not recorded.")}</p>`;
-    }
-    const recordedValue = entry && entry.value;
-    if (recordedValue === null || recordedValue === undefined) {
-      return '<p class="provenance-muted">No external repository commit value is recorded.</p>';
-    }
-    const commits = Array.isArray(recordedValue) ? recordedValue : [recordedValue];
-    if (!commits.length) {
-      return '<p class="provenance-muted">No external repository commits are listed.</p>';
-    }
-    return `<ul class="provenance-value-list external-repository-list">${commits
-      .map((commitEntry) => {
-        if (!commitEntry || typeof commitEntry !== "object" || Array.isArray(commitEntry)) {
-          return `<li class="external-repository-entry">${renderCompactValue(commitEntry)}</li>`;
-        }
-        const repository = commitEntry.repository;
-        const commit = commitEntry.commit;
-        const repositoryHref = githubRepositoryHref(repository);
-        const commitHref =
-          repositoryHref && typeof commit === "string" && /^[0-9a-fA-F]{7,64}$/.test(commit)
-            ? `${repositoryHref}/commit/${encodeURIComponent(commit)}`
-            : "";
-        const extraEntries = Object.entries(commitEntry).filter(
-          ([key]) => key !== "repository" && key !== "commit",
-        );
-        return `
-          <li class="external-repository-entry">
-            <div>
-              <strong>Repository:</strong>
-              ${
-                repositoryHref
-                  ? `<a href="${escapeHtml(repositoryHref)}">${escapeHtml(repository)}</a>`
-                  : renderCompactValue(repository || null)
-              }
-            </div>
-            <div>
-              <strong>Commit:</strong>
-              ${
-                commitHref
-                  ? `<a href="${escapeHtml(commitHref)}"><code>${escapeHtml(commit)}</code></a>`
-                  : renderCompactValue(commit || null)
-              }
-            </div>
-            ${
-              extraEntries.length
-                ? `<ul class="provenance-value-list">${extraEntries
-                    .map(
-                      ([key, value]) => `<li><code>${escapeHtml(key)}</code> ${renderCompactValue(value)}</li>`,
-                    )
-                    .join("")}</ul>`
-                : ""
-            }
-          </li>
-        `;
-      })
-      .join("")}</ul>`;
   }
 
   function renderArtifactHashes(entry) {
@@ -309,8 +225,6 @@
         const body =
           field === "artifact_hashes"
             ? renderArtifactHashes(entry)
-            : field === "external_repository_commits"
-              ? renderExternalRepositoryCommits(entry)
             : status === "not_recorded"
               ? `<p class="provenance-muted">${escapeHtml(entry.reason || "reason not recorded")}</p>`
               : renderCompactValue(entry && entry.value);
@@ -328,96 +242,53 @@
     return `<ul class="provenance-card-list">${rows}</ul>`;
   }
 
-  function evidenceTierDescription(tier) {
-    const descriptions = {
-      full: "full benchmark run",
-      smoke: "quick smoke run",
-      readiness: "readiness check",
-      release: "release-profile run",
-      "local-pipeline": "local pipeline",
-      "compatibility-gate": "compatibility gate",
-      "regression-gate": "regression gate",
-    };
-    return descriptions[tier] || `run tier “${tier || "unspecified"}”`;
-  }
-
-  function renderEvidenceStatusSummary(family, item) {
-    const tier = evidenceTierDescription(item.tier);
-    let resultSummary;
-    if (item.status === "existing") {
-      resultSummary = `Checked artifacts are available for this ${tier}.`;
-    } else if (item.status === "partial") {
-      resultSummary = `Checked artifacts cover part of this ${tier}; the claims limit below defines its boundary.`;
-    } else if (item.status === "local-only") {
-      resultSummary = `This ${tier} is a local workflow; it does not provide checked site artifacts.`;
-    } else {
-      resultSummary = `This ${tier} has evidence status “${item.status || "unspecified"}”.`;
+  function renderCheckedBenchmarkResults(manifest) {
+    if (!checkedBenchmarkResults) {
+      return;
     }
-
-    let familySummary = "";
-    if (family.status === "partial") {
-      familySummary = " The broader benchmark family has partial checked coverage.";
-    } else if (family.status === "local-only") {
-      familySummary = " The broader benchmark family is documented for local runs only.";
-    }
-    return `<p class="evidence-status-summary"><strong>Evidence status:</strong> ${escapeHtml(resultSummary + familySummary)}</p>`;
-  }
-
-  function renderEvidenceContainers(manifest) {
-    evidenceContainers.forEach((container) => {
-      const itemIds = String(container.dataset.evidenceItems || "")
-        .split(/\s+/)
-        .filter(Boolean);
-      container.innerHTML = itemIds
-        .map((itemId) => {
+    checkedBenchmarkResults.innerHTML = checkedBenchmarkItems
+      .map((itemId) => {
         const found = findEvidenceItem(manifest, itemId);
         if (!found) {
-          return `<article class="result-card error"><h3>${escapeHtml(itemId)}</h3><p>Missing benchmark manifest item.</p></article>`;
+          return `<article class="result-card error"><h3>${escapeHtml(itemId)}</h3><p>Missing checked benchmark manifest item.</p></article>`;
         }
         const { family, item } = found;
-        const plotHtml = renderImageArtifacts(item);
         return `
-        <article
-          class="result-card${plotHtml ? " has-plot" : ""}"
-          data-family-status="${escapeHtml(family.status || "unspecified")}"
-          data-item-status="${escapeHtml(item.status || "unspecified")}"
-          data-evidence-tier="${escapeHtml(item.tier || "unspecified")}"
-        >
+        <article class="result-card">
           <div class="result-card-copy">
             <div class="manifest-heading">
               <div>
                 <p class="eyebrow">${escapeHtml(family.title || family.id || "Benchmark family")}</p>
-                <h3>${escapeHtml(item.title || item.id || "Benchmark evidence")}</h3>
+                <h3>${escapeHtml(item.title || item.id || "Checked benchmark result")}</h3>
+              </div>
+              <div class="schema-meta">
+                ${renderBadge("family", family.status)}
+                ${renderBadge("status", item.status)}
+                ${renderBadge("tier", item.tier)}
               </div>
             </div>
-            ${plotHtml ? `<p class="result-takeaway">${escapeHtml(takeaways[item.id] || item.title)}</p>${plotHtml}` : ""}
-            <details class="evidence-details evidence-reproduction">
-              <summary>Reproduce this result</summary>
-              <h4>Artifacts</h4>
-              ${renderArtifactLinks(item)}
-              <h4>Reproduction</h4>
-              ${renderCommandList(item.commands)}
-            </details>
-            <details class="evidence-details evidence-provenance">
-              <summary>Full provenance and sources</summary>
-              ${renderEvidenceStatusSummary(family, item)}
-              <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
-              ${renderTextList(item.caveats)}
-              <h4>Provenance</h4>
-              ${renderProvenance(item.provenance)}
-              <h4>Sources</h4>
-              ${renderSourceLinks(item.provenance_sources || family.source_docs)}
-            </details>
+            <p><strong>Claims limit:</strong> ${escapeHtml(item.claims_limit || family.claims_limit || "No claims limit recorded.")}</p>
+            <h4>Artifacts</h4>
+            ${renderArtifactLinks(item)}
+            <h4>Reproduction</h4>
+            ${renderCommandList(item.commands)}
+            <h4>Provenance</h4>
+            ${renderProvenance(item.provenance)}
+            <h4>Caveats</h4>
+            ${renderTextList(item.caveats)}
+            <h4>Provenance Sources</h4>
+            ${renderSourceLinks(item.provenance_sources || family.source_docs)}
           </div>
-
+          <div class="result-card-plot">
+            ${renderImageArtifacts(item)}
+          </div>
         </article>
       `;
-        })
-        .join("");
-    });
+      })
+      .join("");
   }
 
-  if (benchmarkManifest || evidenceContainers.length) {
+  if (benchmarkManifest || checkedBenchmarkResults) {
     fetch(ROOT + "/data/benchmark-site.json")
       .then((response) => {
         if (!response.ok) {
@@ -427,7 +298,7 @@
       })
       .then((manifest) => {
         renderBenchmarkManifest(manifest);
-        renderEvidenceContainers(manifest);
+        renderCheckedBenchmarkResults(manifest);
       })
       .catch((error) => {
         if (benchmarkManifest) {
@@ -437,13 +308,13 @@
             <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
           `;
         }
-        evidenceContainers.forEach((container) => {
-          container.classList.add("error");
-          container.innerHTML = `
-              <p>Benchmark evidence could not be loaded: ${escapeHtml(error.message)}</p>
-              <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
-            `;
-        });
+        if (checkedBenchmarkResults) {
+          checkedBenchmarkResults.classList.add("error");
+          checkedBenchmarkResults.innerHTML = `
+            <p>Checked benchmark results could not be loaded: ${escapeHtml(error.message)}</p>
+            <p><a href="${ROOT}/data/benchmark-site.json">Open benchmark-site.json</a></p>
+          `;
+        }
       });
   }
 })();

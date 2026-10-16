@@ -57,9 +57,7 @@ impl DetectorNode {
 
         match self.region_that_arrived_top {
             None => VaryingCT::frozen(0),
-            Some(top_idx) => {
-                regions[top_idx.0 as usize].radius + self.wrapped_radius_cached as i64
-            }
+            Some(top_idx) => regions[top_idx.0 as usize].radius + self.wrapped_radius_cached as i64,
         }
     }
 

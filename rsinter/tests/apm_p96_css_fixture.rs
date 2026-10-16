@@ -64,10 +64,7 @@ fn parse_sparse_rows(input: &str) -> SparseRowsMatrix {
 fn sparse_rows_are_orthogonal(hx: &SparseRowsMatrix, hz: &SparseRowsMatrix) -> bool {
     for x_row in hx.rows() {
         for z_row in hz.rows() {
-            let overlap = x_row
-                .iter()
-                .filter(|x_col| z_row.contains(x_col))
-                .count();
+            let overlap = x_row.iter().filter(|x_col| z_row.contains(x_col)).count();
             if overlap % 2 != 0 {
                 return false;
             }

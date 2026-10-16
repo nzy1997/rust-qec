@@ -455,7 +455,11 @@ fn verify_precedence_controls() {
     let free = free_stream_range(&multi_frame_and_wrong_content_size);
     let original = multi_frame_and_wrong_content_size[free.clone()].to_vec();
     multi_frame_and_wrong_content_size.splice(free.end..free.end, original.iter().copied());
-    put_u64(&mut multi_frame_and_wrong_content_size, GLOBAL_HEADER_LEN + 60, 2);
+    put_u64(
+        &mut multi_frame_and_wrong_content_size,
+        GLOBAL_HEADER_LEN + 60,
+        2,
+    );
     put_u64(
         &mut multi_frame_and_wrong_content_size,
         GLOBAL_HEADER_LEN + 68,
@@ -500,7 +504,11 @@ fn verify_precedence_controls() {
     );
 
     let mut window_and_wrong_content_size = archive.clone();
-    put_u64(&mut window_and_wrong_content_size, GLOBAL_HEADER_LEN + 60, 2);
+    put_u64(
+        &mut window_and_wrong_content_size,
+        GLOBAL_HEADER_LEN + 60,
+        2,
+    );
     let mut tiny_window = limits();
     tiny_window.max_zstd_window_bytes = 0;
     let mut reader = SampleArchiveReader::open(
@@ -518,7 +526,11 @@ fn verify_precedence_controls() {
     );
 
     let mut memory_and_wrong_content_size = archive.clone();
-    put_u64(&mut memory_and_wrong_content_size, GLOBAL_HEADER_LEN + 60, 2);
+    put_u64(
+        &mut memory_and_wrong_content_size,
+        GLOBAL_HEADER_LEN + 60,
+        2,
+    );
     let mut tiny_memory = limits();
     tiny_memory.max_zstd_decoder_memory_bytes = 1;
     let mut reader = SampleArchiveReader::open(

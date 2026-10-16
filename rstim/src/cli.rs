@@ -4,9 +4,10 @@ use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 use clap::{Parser, Subcommand};
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 use crate::codegen::NoiseParams;
-#[cfg(feature = "codegen-css")]
 use crate::codegen::css::{
     CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
     parse_css_matrix_json, parse_css_observable_json,
@@ -18,38 +19,21 @@ use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 #[cfg(test)]
 use crate::measurement_transform::DecodedSampleBlock;
 use crate::measurement_transform::{MeasurementTransform, MeasurementTransformError};
-#[cfg(test)]
-use crate::output::write_shots_b8;
-use crate::output::{OutputFormat, write_shots_dets};
+use crate::output::{
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
+    write_shots_ptb64, write_shots_r8,
+};
 use crate::parser::parse_lines;
 use crate::result_stream::{ResultBlockReader, ResultBlockWriter, ResultOutputKind};
 use crate::sample_archive::{
     ArchiveLimits, SampleArchiveOptions, SampleArchiveReader, SampleArchiveWriter,
     format::SampleArchiveErrorCode,
 };
+use crate::sampler::{SampleOptions, SampleOutputMode, sample_batch, sample_batch_with_options};
 use crate::sim::bit_table::BitTable;
 
-#[cfg(test)]
-pub(crate) use crate::operations::generate_common_circuit_text;
-pub use crate::operations::{
-    make_rng, run_analyze_errors_with_flags, run_detect, run_detect_with_obs,
-    run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip,
-    run_export_decoder_dataset_with_logical_flip_in_batches, run_gen, run_gen_with_params,
-    run_sample, sample_cli_options, try_merge_detections_observables, write_format,
-};
-
 #[derive(Parser)]
-#[command(
-    name = "rstim",
-    version,
-    about = "Circuit simulation and quantum error correction tools"
-)]
-#[cfg_attr(
-    feature = "unified-cli",
-    command(
-        after_help = "Additional command groups:\n  circuit       Structured circuit operations\n  dataset       Import, export and score decoder datasets\n  decode        Decode a detector dataset\n  capabilities  Print the machine-readable CLI contract"
-    )
-)]
+#[command(name = "rstim", version, about = "Rust stabilizer circuit simulator")]
 pub struct Cli {
     #[arg(long = "benchmark-telemetry-json", global = true)]
     pub benchmark_telemetry_json: Option<String>,
@@ -101,9 +85,6 @@ pub enum Commands {
         obs_out: Option<String>,
         #[arg(long = "obs_out_format", default_value = "01")]
         obs_out_format: String,
-        /// Write a versioned manifest and one detailed JSON record per shot
-        #[arg(long = "trace_out")]
-        trace_out: Option<String>,
     },
     /// Convert a circuit into a detector error model
     #[command(name = "analyze_errors")]
@@ -132,30 +113,8 @@ pub enum Commands {
         rounds: usize,
         #[arg(long = "after_clifford_depolarization", default_value = "0")]
         noise: f64,
-        /// Depolarization applied to data qubits at the start of each round.
-        #[arg(long = "before_round_data_depolarization", default_value = "0")]
-        before_round_data_depolarization: f64,
-        /// Atom loss applied to data qubits at the start of each Mid-SWAP round.
-        #[arg(
-            long = "before_round_data_loss_probability",
-            visible_alias = "before_round_data_loss",
-            default_value = "0"
-        )]
-        before_round_data_loss_probability: f64,
-        /// Bit-flip probability applied immediately before each measurement.
-        #[arg(long = "before_measure_flip_probability", default_value = "0")]
-        before_measure_flip_probability: f64,
-        /// Bit-flip probability applied immediately after each reset.
-        #[arg(long = "after_reset_flip_probability", default_value = "0")]
-        after_reset_flip_probability: f64,
         #[arg(long = "after_clifford_loss_probability", default_value = "0")]
         after_clifford_loss_probability: f64,
-        /// Operation-loss probability for gates and resets in Mid-SWAP circuits.
-        #[arg(long = "operation_loss_probability", default_value = "0")]
-        operation_loss_probability: f64,
-        /// Atom-loss probability immediately before a Mid-SWAP measurement.
-        #[arg(long = "measurement_loss_probability", default_value = "0")]
-        measurement_loss_probability: f64,
         #[arg(long)]
         hx: Option<String>,
         #[arg(long)]
@@ -275,46 +234,6 @@ pub enum Commands {
         #[arg(long)]
         seed: Option<u64>,
     },
-    /// Open the interactive local-file shot viewer on loopback
-    #[cfg(feature = "shot-viewer")]
-    #[command(name = "shot_viewer")]
-    ShotViewer {
-        #[arg(long, default_value_t = 0)]
-        port: u16,
-        #[arg(long = "no_open")]
-        no_open: bool,
-        #[arg(long, hide = true)]
-        serve_once: bool,
-    },
-    /// Export a public decoder dataset and private answer bundle
-    #[command(name = "export_decoder_dataset")]
-    ExportDecoderDataset {
-        #[arg(long = "circuit")]
-        circuit: String,
-        #[arg(long = "shots")]
-        shots: u64,
-        #[arg(
-            long = "batch_shots",
-            default_value_t = crate::decoder_dataset::DEFAULT_DECODER_DATASET_BATCH_SHOTS
-        )]
-        batch_shots: usize,
-        /// Auto selects blinded measurements when logical-input metadata is available
-        #[arg(long = "mode", default_value = "auto")]
-        mode: String,
-        #[arg(long = "logical_x_qubits")]
-        logical_x_qubits: Option<String>,
-        #[arg(long = "logical_z_qubits")]
-        logical_z_qubits: Option<String>,
-        #[arg(long = "public_out")]
-        public_out: String,
-        #[arg(long = "private_out")]
-        private_out: String,
-        #[arg(long = "seed")]
-        seed: Option<u64>,
-        /// Also write a per-shot rstim.error-trace.v1 trace.jsonl into the private bundle
-        #[arg(long = "error_trace")]
-        error_trace: bool,
-    },
     /// Pack measurement samples into an RSMP archive
     #[command(name = "pack_samples")]
     PackSamples {
@@ -348,8 +267,6 @@ pub enum Commands {
         obs_out: Option<String>,
         #[arg(long = "obs_out_format", default_value = "b8")]
         obs_out_format: String,
-        #[arg(long = "verify_only")]
-        verify_only: bool,
     },
     /// Write one checked Zstandard frame for rsmp evidence diagnostics
     #[command(name = "rsmp_zstd_frame", hide = true)]
@@ -366,25 +283,6 @@ pub enum Commands {
     RsmpZstdInfo {
         #[arg(long = "out")]
         out: Option<String>,
-    },
-    /// Sample, decode, and plot a surface-code logical error rate curve
-    #[cfg(feature = "plotting")]
-    SurfaceCodeLer {
-        /// Increasing code distances, comma-separated
-        #[arg(long, value_delimiter = ',', required = true)]
-        distances: Vec<u64>,
-        /// Measurement rounds paired with distances, comma-separated
-        #[arg(long, value_delimiter = ',', required = true)]
-        rounds: Vec<u64>,
-        /// Increasing physical error probabilities, comma-separated
-        #[arg(long, value_delimiter = ',', required = true)]
-        physical_error_rates: Vec<f64>,
-        #[arg(long, default_value_t = 2000)]
-        shots: u64,
-        #[arg(long, default_value_t = 86)]
-        seed: u64,
-        #[arg(long, default_value = ".")]
-        out_dir: PathBuf,
     },
     /// Run performance evidence workflows
     Perf {
@@ -492,22 +390,6 @@ pub fn run(cli: Cli) -> Result<(), String> {
 
 fn run_command(command: Option<Commands>) -> Result<(), String> {
     match command {
-        #[cfg(feature = "plotting")]
-        Some(Commands::SurfaceCodeLer {
-            distances,
-            rounds,
-            physical_error_rates,
-            shots,
-            seed,
-            out_dir,
-        }) => crate::surface_code_ler::run(&crate::surface_code_ler::SurfaceCodeLerOptions {
-            distances,
-            rounds,
-            physical_error_rates,
-            shots,
-            seed,
-            out_dir,
-        }),
         Some(Commands::Stats { r#in, out, json }) => {
             let text = read_input(r#in.as_deref())?;
             let mut w = open_output(out.as_deref())?;
@@ -541,23 +423,8 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             append_observables,
             obs_out,
             obs_out_format,
-            trace_out,
         }) => {
             let text = read_input(r#in.as_deref())?;
-            if let Some(trace_path) = trace_out.as_deref() {
-                return run_detect_with_trace_files(
-                    &text,
-                    shots.unwrap_or(1) as usize,
-                    &out_format,
-                    seed,
-                    append_observables,
-                    out.as_deref(),
-                    obs_out.as_deref(),
-                    &obs_out_format,
-                    trace_path,
-                    r#in.as_deref(),
-                );
-            }
             let mut w = open_output(out.as_deref())?;
             if let Some(obs_path) = obs_out.as_deref() {
                 let mut obs_w = open_output(Some(obs_path))?;
@@ -605,13 +472,7 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             distance,
             rounds,
             noise,
-            before_round_data_depolarization,
-            before_round_data_loss_probability,
-            before_measure_flip_probability,
-            after_reset_flip_probability,
             after_clifford_loss_probability,
-            operation_loss_probability,
-            measurement_loss_probability,
             hx,
             hz,
             basis,
@@ -619,133 +480,28 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             observables,
             out,
         }) => {
-            #[cfg(not(feature = "codegen-css"))]
-            let _ = (&hx, &hz, &basis, &schedule, &observables);
-            for (name, value) in [
-                ("after_clifford_depolarization", noise),
-                (
-                    "before_round_data_depolarization",
-                    before_round_data_depolarization,
-                ),
-                (
-                    "before_round_data_loss_probability",
-                    before_round_data_loss_probability,
-                ),
-                (
-                    "before_measure_flip_probability",
-                    before_measure_flip_probability,
-                ),
-                ("after_reset_flip_probability", after_reset_flip_probability),
-                (
-                    "after_clifford_loss_probability",
-                    after_clifford_loss_probability,
-                ),
-                ("operation_loss_probability", operation_loss_probability),
-                ("measurement_loss_probability", measurement_loss_probability),
-            ] {
-                if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                    return Err(format!("{name} must be finite and in [0, 1], got {value}"));
-                }
-            }
-            let params = NoiseParams {
-                before_round_data_depolarization,
-                after_clifford_depolarization: noise,
-                before_measure_flip_probability,
-                after_reset_flip_probability,
-                after_clifford_loss_probability,
-            };
-            let is_midswap = code == "surface_code" && task == "rotated_memory_z_midswap";
-            if !is_midswap && before_round_data_loss_probability != 0.0 {
-                return Err(
-                    "before_round_data_loss_probability is only valid for surface_code/rotated_memory_z_midswap"
-                        .to_string(),
-                );
-            }
-            if is_midswap {
-                if after_clifford_loss_probability != 0.0 {
-                    return Err(
-                        "after_clifford_loss_probability is not used by the Mid-SWAP task; use operation_loss_probability"
-                            .to_string(),
-                    );
-                }
-                let distance = distance
-                    .ok_or_else(|| "distance is required for common generators".to_string())?;
-                let circuit =
-                    crate::codegen::rotated_memory_z_midswap(crate::codegen::MidSwapConfig {
-                        distance,
-                        rounds,
-                        before_round_data_depolarization,
-                        before_round_data_loss_probability,
-                        after_clifford_depolarization: noise,
-                        before_measure_flip_probability,
-                        after_reset_flip_probability,
-                        operation_loss_probability,
-                        measurement_loss_probability,
-                    })
-                    .map_err(|error| error.to_string())?;
-                let mut writer = open_output(out.as_deref())?;
-                return writer
-                    .write_all(circuit.as_bytes())
-                    .map_err(|error| format!("write error: {error}"));
-            }
-            let is_conventional_z = code == "surface_code" && task == "rotated_memory_z";
-            if is_conventional_z
-                && (operation_loss_probability != 0.0 || measurement_loss_probability != 0.0)
-            {
-                let distance = distance
-                    .ok_or_else(|| "distance is required for common generators".to_string())?;
-                let circuit = crate::codegen::surface_code::rotated_memory_z_loss_visible(
-                    distance,
-                    rounds,
-                    crate::codegen::surface_code::RotatedMemoryZLossConfig {
-                        before_round_data_depolarization,
-                        after_clifford_depolarization: noise,
-                        before_measure_flip_probability,
-                        after_reset_flip_probability,
-                        operation_loss_probability,
-                        measurement_loss_probability,
-                        after_clifford_loss_probability,
-                    },
-                )?;
-                let mut writer = open_output(out.as_deref())?;
-                return writer
-                    .write_all(circuit.as_bytes())
-                    .map_err(|error| format!("write error: {error}"));
-            }
-            if operation_loss_probability != 0.0 || measurement_loss_probability != 0.0 {
-                return Err(
-                    "operation_loss_probability and measurement_loss_probability are only valid for surface_code/rotated_memory_z and surface_code/rotated_memory_z_midswap"
-                        .to_string(),
-                );
-            }
             if code == "css" {
-                #[cfg(not(feature = "codegen-css"))]
-                return Err(
-                    "CSS generation requires rebuilding rstim with the codegen-css feature"
-                        .to_string(),
-                );
-                #[cfg(feature = "codegen-css")]
-                {
-                    let mut buffer = Vec::new();
-                    run_css_gen(
-                        &task,
-                        hx.as_deref(),
-                        hz.as_deref(),
-                        basis.as_deref(),
-                        rounds,
-                        params,
-                        &schedule,
-                        observables.as_deref(),
-                        &mut buffer,
-                    )?;
-                    let mut w = open_output(out.as_deref())?;
-                    w.write_all(&buffer)
-                        .map_err(|error| format!("write error: {error}"))
-                }
+                let mut buffer = Vec::new();
+                run_css_gen(
+                    &task,
+                    hx.as_deref(),
+                    hz.as_deref(),
+                    basis.as_deref(),
+                    rounds,
+                    noise,
+                    &schedule,
+                    observables.as_deref(),
+                    &mut buffer,
+                )?;
+                let mut w = open_output(out.as_deref())?;
+                w.write_all(&buffer)
+                    .map_err(|error| format!("write error: {error}"))
             } else {
                 let distance = distance
                     .ok_or_else(|| "distance is required for common generators".to_string())?;
                 let mut w = open_output(out.as_deref())?;
+                let mut params = NoiseParams::uniform(noise);
+                params.after_clifford_loss_probability = after_clifford_loss_probability;
                 run_gen_with_params(&code, &task, distance, rounds, params, &mut w)
             }
         }
@@ -909,32 +665,6 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             w.write_all(svg.as_bytes())
                 .map_err(|e| format!("write error: {e}"))
         }
-        Some(Commands::ExportDecoderDataset {
-            circuit,
-            shots,
-            batch_shots,
-            mode,
-            logical_x_qubits,
-            logical_z_qubits,
-            public_out,
-            private_out,
-            seed,
-            error_trace,
-        }) => {
-            let logical_flip =
-                parse_cli_logical_flip(logical_x_qubits.as_deref(), logical_z_qubits.as_deref())?;
-            run_export_decoder_dataset_with_logical_flip_in_batches(
-                &circuit,
-                shots,
-                batch_shots,
-                &mode,
-                logical_flip,
-                &public_out,
-                &private_out,
-                seed,
-                error_trace,
-            )
-        }
         Some(Commands::PackSamples {
             circuit,
             shots,
@@ -951,7 +681,6 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             detectors_out_format,
             obs_out,
             obs_out_format,
-            verify_only,
         }) => run_unpack_samples(
             &circuit,
             &r#in,
@@ -961,22 +690,11 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             &detectors_out_format,
             obs_out.as_deref(),
             &obs_out_format,
-            verify_only,
         ),
         Some(Commands::RsmpZstdFrame { level, r#in, out }) => {
             run_rsmp_zstd_frame(&r#in, &out, level)
         }
         Some(Commands::RsmpZstdInfo { out }) => run_rsmp_zstd_info(out.as_deref()),
-        #[cfg(feature = "shot-viewer")]
-        Some(Commands::ShotViewer {
-            port,
-            no_open,
-            serve_once,
-        }) => crate::shot_viewer::serve(crate::shot_viewer::ShotViewerOptions {
-            port,
-            open_browser: !no_open,
-            serve_once,
-        }),
         Some(Commands::Perf { command }) => {
             match command {
                 PerfCommands::Run {
@@ -1065,150 +783,6 @@ fn run_command(command: Option<Commands>) -> Result<(), String> {
             Ok(())
         }
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn run_detect_with_trace_files(
-    circuit_text: &str,
-    shots: usize,
-    out_format: &str,
-    seed: Option<u64>,
-    append_observables: bool,
-    out_path: Option<&str>,
-    obs_out_path: Option<&str>,
-    obs_out_format: &str,
-    trace_path: &str,
-    input_path: Option<&str>,
-) -> Result<(), String> {
-    let out_path = out_path.filter(|path| *path != "-").ok_or_else(|| {
-        "detect --trace_out requires --out to name a file so all outputs can be staged".to_string()
-    })?;
-    if trace_path == "-" {
-        return Err("detect --trace_out must name a file".to_string());
-    }
-    if obs_out_path == Some("-") {
-        return Err(
-            "detect --trace_out requires --obs_out to name a file so all outputs can be staged"
-                .to_string(),
-        );
-    }
-
-    let output_format = traced_detect_format(out_format, "--out_format", true)?;
-    let obs_format = obs_out_path
-        .map(|_| traced_detect_format(obs_out_format, "--obs_out_format", false))
-        .transpose()?;
-    let instrs = parse_lines(circuit_text)?;
-    crate::validation::validate_circuit(&instrs)?;
-    let stats = crate::stats::summarize(&instrs);
-
-    let cwd = std::env::current_dir()
-        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
-    let mut reserved_paths = BTreeSet::new();
-    for path in [Some(out_path), obs_out_path, Some(trace_path)]
-        .into_iter()
-        .flatten()
-    {
-        let normalized = canonical_parent_path_identity_with_cwd(Path::new(path), &cwd)?;
-        if !reserved_paths.insert(normalized) {
-            return Err("detect output paths must be distinct".to_string());
-        }
-    }
-    if let Some(input_path) = input_path.filter(|path| *path != "-") {
-        let normalized_input =
-            canonical_parent_path_identity_with_cwd(Path::new(input_path), &cwd)?;
-        if reserved_paths.contains(&normalized_input) {
-            return Err("detect output paths must differ from --in".to_string());
-        }
-    }
-
-    let mut out = PendingOutput::create(out_path, &reserved_paths)?;
-    let mut obs_out = obs_out_path
-        .map(|path| PendingOutput::create(path, &reserved_paths))
-        .transpose()?;
-    let mut trace_out = PendingOutput::create(trace_path, &reserved_paths)?;
-    let mut executor = Executor::from_instrs(instrs)?;
-    let mut rng = make_rng(seed);
-
-    crate::detect_trace::write_manifest(
-        trace_out.writer(),
-        circuit_text,
-        seed,
-        shots,
-        stats.num_measurements,
-        stats.num_detectors,
-        stats.num_observables,
-    )?;
-
-    for shot_index in 0..shots {
-        let (output, trace) = executor.run_with_trace(&mut rng)?;
-        let observables =
-            crate::detect_trace::aggregate_observables(&output, stats.num_observables)?;
-        let detections = one_shot_bit_table(&output.detectors)?;
-        let observable_flips = one_shot_bit_table(&observables)?;
-        write_detection_outputs(
-            &detections,
-            &observable_flips,
-            output_format,
-            append_observables,
-            out.writer(),
-            obs_out
-                .as_mut()
-                .zip(obs_format)
-                .map(|(writer, format)| (writer.writer(), format)),
-        )?;
-        crate::detect_trace::write_shot(
-            trace_out.writer(),
-            shot_index,
-            &output,
-            &trace,
-            stats.num_observables,
-        )?;
-    }
-
-    out.finish_staging()?;
-    if let Some(obs_out) = obs_out.as_mut() {
-        obs_out.finish_staging()?;
-    }
-    trace_out.finish_staging()?;
-
-    let mut outputs = vec![&mut out];
-    if let Some(obs_out) = obs_out.as_mut() {
-        outputs.push(obs_out);
-    }
-    outputs.push(&mut trace_out);
-    let mut publisher = FsPublisher::from_env();
-    publish_pending_outputs_atomically(&mut outputs, &mut publisher)?;
-    Ok(())
-}
-
-fn traced_detect_format(
-    value: &str,
-    option: &str,
-    allow_detector_labels: bool,
-) -> Result<OutputFormat, String> {
-    let format = OutputFormat::from_str(value)?;
-    if format == OutputFormat::Ptb64 || (!allow_detector_labels && format == OutputFormat::Dets) {
-        return Err(format!(
-            "detect --trace_out does not support {option}={value}; use 01, b8, r8, or hits{}",
-            if allow_detector_labels {
-                ", or dets"
-            } else {
-                ""
-            }
-        ));
-    }
-    Ok(format)
-}
-
-fn one_shot_bit_table(bits: &[bool]) -> Result<BitTable, String> {
-    let mut table = BitTable::try_new(bits.len(), 1)
-        .map_err(|error| format!("BitTable allocation failed: {error:?}"))?;
-    for (index, &bit) in bits.iter().enumerate() {
-        if bit {
-            table.set(index, 0, true);
-        }
-    }
-    Ok(table)
 }
 
 fn finish_benchmark_telemetry(
@@ -1428,54 +1002,8 @@ pub fn open_output(path: Option<&str>) -> Result<Box<dyn Write>, String> {
 struct PendingOutput {
     final_path: PathBuf,
     temp_path: PathBuf,
-    file: Option<BufWriter<File>>,
+    file: BufWriter<File>,
     published: bool,
-}
-
-trait FilePublisher {
-    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
-}
-
-struct FsPublisher {
-    rename_count: usize,
-    fail_at: Option<usize>,
-}
-
-impl FsPublisher {
-    fn from_env() -> Self {
-        let fail_at = if cfg!(debug_assertions) {
-            std::env::var("RSTIM_TEST_RSMP_FAIL_RENAME_AT")
-                .ok()
-                .and_then(|value| value.parse::<usize>().ok())
-        } else {
-            None
-        };
-        Self {
-            rename_count: 0,
-            fail_at,
-        }
-    }
-
-    #[cfg(test)]
-    fn without_injection() -> Self {
-        Self {
-            rename_count: 0,
-            fail_at: None,
-        }
-    }
-}
-
-impl FilePublisher for FsPublisher {
-    fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()> {
-        self.rename_count += 1;
-        if self.fail_at == Some(self.rename_count) {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "injected rsmp rename failure",
-            ));
-        }
-        std::fs::rename(from, to)
-    }
 }
 
 impl PendingOutput {
@@ -1490,13 +1018,7 @@ impl PendingOutput {
 
         for retry in 0..1024 {
             let temp_path = parent.join(format!(".{name}.rstim-{process_id}-{retry}.tmp"));
-            let lexical_temp_path = lexical_absolute_path_from_path(&temp_path)?;
-            let canonical_temp_path = canonical_parent_path_identity_from_path(&temp_path).ok();
-            if reserved_final_paths.contains(&lexical_temp_path)
-                || canonical_temp_path
-                    .as_ref()
-                    .is_some_and(|path| reserved_final_paths.contains(path))
-            {
+            if reserved_final_paths.contains(&lexical_absolute_path_from_path(&temp_path)?) {
                 continue;
             }
             match OpenOptions::new()
@@ -1508,7 +1030,7 @@ impl PendingOutput {
                     return Ok(Self {
                         final_path,
                         temp_path,
-                        file: Some(BufWriter::new(file)),
+                        file: BufWriter::new(file),
                         published: false,
                     });
                 }
@@ -1528,185 +1050,19 @@ impl PendingOutput {
         ))
     }
 
-    fn writer(&mut self) -> &mut dyn Write {
-        self.file
-            .as_mut()
-            .expect("staged output writer is still open")
-    }
-
-    fn finish_staging(&mut self) -> Result<(), String> {
-        let Some(mut file) = self.file.take() else {
-            return Ok(());
-        };
-        file.flush()
-            .map_err(|error| format!("failed to flush {}: {error}", self.temp_path.display()))?;
-        file.into_inner()
-            .map_err(|error| {
-                format!(
-                    "failed to close staged output {}: {}",
-                    self.temp_path.display(),
-                    error.error()
-                )
-            })
-            .map(drop)
-    }
-
-    #[cfg(test)]
     fn publish(&mut self) -> Result<(), String> {
-        let mut publisher = FsPublisher::without_injection();
-        self.publish_with(&mut publisher).map(drop)
-    }
-
-    fn publish_with(&mut self, publisher: &mut impl FilePublisher) -> Result<PathBuf, String> {
-        self.finish_staging()?;
-        publisher
-            .rename(&self.temp_path, &self.final_path)
-            .map_err(|error| {
-                format!(
-                    "failed to publish {} to {}: {error}",
-                    self.temp_path.display(),
-                    self.final_path.display()
-                )
-            })?;
+        self.file
+            .flush()
+            .map_err(|error| format!("failed to flush {}: {error}", self.temp_path.display()))?;
+        std::fs::rename(&self.temp_path, &self.final_path).map_err(|error| {
+            format!(
+                "failed to publish {} to {}: {error}",
+                self.temp_path.display(),
+                self.final_path.display()
+            )
+        })?;
         self.published = true;
-        Ok(self.final_path.clone())
-    }
-
-    fn final_path(&self) -> &Path {
-        &self.final_path
-    }
-}
-
-fn publish_pending_outputs_atomically(
-    outputs: &mut [&mut PendingOutput],
-    publisher: &mut impl FilePublisher,
-) -> Result<(), String> {
-    for output in outputs.iter_mut() {
-        output.finish_staging()?;
-    }
-
-    let mut reserved_paths = BTreeSet::new();
-    for output in outputs.iter() {
-        reserved_paths.insert(canonical_parent_path_identity_from_path(
-            output.final_path(),
-        )?);
-        reserved_paths.insert(canonical_parent_path_identity_from_path(&output.temp_path)?);
-        if std::fs::symlink_metadata(output.final_path())
-            .map(|metadata| metadata.file_type().is_dir())
-            .unwrap_or(false)
-        {
-            return Err(format!(
-                "cannot publish output over directory {}",
-                output.final_path().display()
-            ));
-        }
-    }
-
-    let mut backups = vec![None; outputs.len()];
-    for index in 0..outputs.len() {
-        if std::fs::symlink_metadata(outputs[index].final_path()).is_err() {
-            continue;
-        }
-        let backup_path =
-            allocate_output_backup_path(outputs[index].final_path(), &reserved_paths)?;
-        reserved_paths.insert(canonical_parent_path_identity_from_path(&backup_path)?);
-        if let Err(error) = publisher.rename(outputs[index].final_path(), &backup_path) {
-            let rollback = restore_output_backups(outputs, &backups, publisher);
-            return Err(format_transaction_error(
-                format!(
-                    "failed to stage existing output {}: {error}",
-                    outputs[index].final_path().display()
-                ),
-                rollback,
-            ));
-        }
-        backups[index] = Some(backup_path);
-    }
-
-    let mut published_count = 0;
-    for index in 0..outputs.len() {
-        if let Err(error) = publisher.rename(&outputs[index].temp_path, outputs[index].final_path())
-        {
-            let mut rollback_errors = Vec::new();
-            for published_index in (0..published_count).rev() {
-                if let Err(remove_error) =
-                    std::fs::remove_file(outputs[published_index].final_path())
-                {
-                    rollback_errors.push(format!(
-                        "failed to remove partially published {}: {remove_error}",
-                        outputs[published_index].final_path().display()
-                    ));
-                }
-                outputs[published_index].published = false;
-            }
-            rollback_errors.extend(restore_output_backups(outputs, &backups, publisher));
-            return Err(format_transaction_error(
-                format!(
-                    "failed to publish {}: {error}",
-                    outputs[index].final_path().display()
-                ),
-                rollback_errors,
-            ));
-        }
-        outputs[index].published = true;
-        published_count += 1;
-    }
-
-    for backup in backups.into_iter().flatten() {
-        let _ = std::fs::remove_file(backup);
-    }
-    Ok(())
-}
-
-fn allocate_output_backup_path(
-    final_path: &Path,
-    reserved_paths: &BTreeSet<PathBuf>,
-) -> Result<PathBuf, String> {
-    let parent = final_path.parent().unwrap_or_else(|| Path::new("."));
-    let name = final_path
-        .file_name()
-        .ok_or_else(|| "output path must name a file".to_string())?
-        .to_string_lossy();
-    let process_id = std::process::id();
-    for retry in 0..1024 {
-        let candidate = parent.join(format!(".{name}.rstim-{process_id}-{retry}.bak"));
-        let identity = canonical_parent_path_identity_from_path(&candidate)?;
-        if !reserved_paths.contains(&identity) && std::fs::symlink_metadata(&candidate).is_err() {
-            return Ok(candidate);
-        }
-    }
-    Err(format!(
-        "failed to allocate a backup beside {}",
-        final_path.display()
-    ))
-}
-
-fn restore_output_backups(
-    outputs: &mut [&mut PendingOutput],
-    backups: &[Option<PathBuf>],
-    publisher: &mut impl FilePublisher,
-) -> Vec<String> {
-    let mut errors = Vec::new();
-    for index in (0..outputs.len()).rev() {
-        let Some(backup) = backups[index].as_ref() else {
-            continue;
-        };
-        if let Err(error) = publisher.rename(backup, outputs[index].final_path()) {
-            errors.push(format!(
-                "failed to restore {} from {}: {error}",
-                outputs[index].final_path().display(),
-                backup.display()
-            ));
-        }
-    }
-    errors
-}
-
-fn format_transaction_error(primary: String, rollback_errors: Vec<String>) -> String {
-    if rollback_errors.is_empty() {
-        primary
-    } else {
-        format!("{primary}; rollback errors: {}", rollback_errors.join("; "))
+        Ok(())
     }
 }
 
@@ -1727,33 +1083,16 @@ impl OutputTarget {
     fn writer(&mut self) -> &mut dyn Write {
         match self {
             Self::Stdout(output) => output,
-            Self::File(output) => output.writer(),
+            Self::File(output) => &mut output.file,
         }
     }
 
-    fn finish_staging(&mut self) -> Result<(), String> {
+    fn publish(&mut self) -> Result<(), String> {
         match self {
             Self::Stdout(output) => output
                 .flush()
                 .map_err(|error| format!("failed to flush stdout: {error}")),
-            Self::File(output) => output.finish_staging(),
-        }
-    }
-
-    fn publish_file(
-        &mut self,
-        publisher: &mut impl FilePublisher,
-    ) -> Result<Option<PathBuf>, String> {
-        match self {
-            Self::Stdout(_) => Ok(None),
-            Self::File(output) => output.publish_with(publisher).map(Some),
-        }
-    }
-
-    fn final_path(&self) -> Option<&Path> {
-        match self {
-            Self::Stdout(_) => None,
-            Self::File(output) => Some(output.final_path()),
+            Self::File(output) => output.publish(),
         }
     }
 }
@@ -1761,59 +1100,9 @@ impl OutputTarget {
 impl Drop for PendingOutput {
     fn drop(&mut self) {
         if !self.published {
-            self.file.take();
             let _ = std::fs::remove_file(&self.temp_path);
         }
     }
-}
-
-fn rsmp_io_error(detail: impl AsRef<str>) -> String {
-    format_rsmp_cli_error(SampleArchiveErrorCode::Io, detail.as_ref())
-}
-
-fn rsmp_publish_error(final_path: &Path, published: &[PathBuf], cause: Option<&str>) -> String {
-    let mut detail = format!("failed to publish {}", final_path.display());
-    if let Some(cause) = cause {
-        detail.push_str(": ");
-        detail.push_str(cause);
-    }
-    if !published.is_empty() {
-        let already = published
-            .iter()
-            .map(|path| path.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        detail.push_str("; already published: ");
-        detail.push_str(&already);
-    }
-    rsmp_io_error(detail)
-}
-
-fn fail_pack_finish_is_injected() -> bool {
-    cfg!(debug_assertions) && std::env::var_os("RSTIM_TEST_RSMP_FAIL_PACK_FINISH").is_some()
-}
-
-fn parse_cli_logical_flip(
-    logical_x_qubits: Option<&str>,
-    logical_z_qubits: Option<&str>,
-) -> Result<Option<crate::decoder_dataset::LogicalFlip>, String> {
-    let logical_flip = match (logical_x_qubits, logical_z_qubits) {
-        (Some(_), Some(_)) => {
-            return Err(
-                "--logical_x_qubits and --logical_z_qubits are mutually exclusive".to_string(),
-            );
-        }
-        (Some(value), None) => Some(crate::decoder_dataset::LogicalFlip::parse(
-            crate::decoder_dataset::LogicalPauli::X,
-            value,
-        )?),
-        (None, Some(value)) => Some(crate::decoder_dataset::LogicalFlip::parse(
-            crate::decoder_dataset::LogicalPauli::Z,
-            value,
-        )?),
-        (None, None) => None,
-    };
-    Ok(logical_flip)
 }
 
 fn run_pack_samples(
@@ -1859,10 +1148,9 @@ fn run_pack_samples(
             .finish()
             .map_err(format_sample_archive_error_for_rsmp_cli)?;
     } else {
-        let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)
-            .map_err(rsmp_io_error)?;
+        let mut output = PendingOutput::create(output_path, &preflight.reserved_output_paths)?;
         let mut writer = SampleArchiveWriter::new(
-            output.writer(),
+            &mut output.file,
             transform,
             shots,
             SampleArchiveOptions::default(),
@@ -1877,18 +1165,10 @@ fn run_pack_samples(
             max_chunk_shots,
             &mut writer,
         )?;
-        if fail_pack_finish_is_injected() {
-            return Err(rsmp_io_error("archive finalization failed"));
-        }
         writer
             .finish()
             .map_err(format_sample_archive_error_for_rsmp_cli)?;
-        output.finish_staging().map_err(rsmp_io_error)?;
-        let mut publisher = FsPublisher::from_env();
-        let final_path = output.final_path().to_path_buf();
-        output
-            .publish_with(&mut publisher)
-            .map_err(|error| rsmp_publish_error(&final_path, &[], Some(&error)))?;
+        output.publish()?;
     }
 
     Ok(())
@@ -1904,7 +1184,6 @@ fn run_unpack_samples(
     detectors_out_format: &str,
     obs_out: Option<&str>,
     obs_out_format: &str,
-    verify_only: bool,
 ) -> Result<(), String> {
     let preflight = preflight_unpack_samples(
         circuit_path,
@@ -1915,7 +1194,6 @@ fn run_unpack_samples(
         detectors_out_format,
         obs_out,
         obs_out_format,
-        verify_only,
     )?;
 
     let circuit_text = read_rsmp_text(circuit_path)?;
@@ -1925,11 +1203,7 @@ fn run_unpack_samples(
     let reader = SampleArchiveReader::open(input, &circuit, ArchiveLimits::default())
         .map_err(format_sample_archive_error_for_rsmp_cli)?;
 
-    if preflight.verify_only {
-        verify_unpack_archive(reader)
-    } else {
-        stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
-    }
+    stream_unpack_outputs(reader, measurements_out, detectors_out, obs_out, preflight)
 }
 
 fn run_rsmp_zstd_frame(input_path: &str, output_path: &str, level: i32) -> Result<(), String> {
@@ -1987,8 +1261,6 @@ fn preflight_pack_samples(
     output_path: &str,
 ) -> Result<PackSamplesPreflight, String> {
     let input_format = parse_pack_input_format(input_format)?;
-    let cwd = std::env::current_dir()
-        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
     if [circuit_path, input_path]
         .iter()
         .filter(|path| **path == "-")
@@ -2003,14 +1275,9 @@ fn preflight_pack_samples(
     if output_path.is_empty() {
         return Err("pack_samples requires --out".to_string());
     }
-    let input_paths = normalized_input_paths(&[circuit_path, input_path], &cwd)?;
     let mut final_paths = BTreeSet::new();
     if output_path != "-" {
-        let output_path = lexical_absolute_path_with_cwd(Path::new(output_path), &cwd)?;
-        if input_paths.contains(&output_path) {
-            return Err("pack_samples output path must differ from input paths".to_string());
-        }
-        final_paths.insert(output_path);
+        final_paths.insert(lexical_absolute_path(output_path)?);
     }
     Ok(PackSamplesPreflight {
         reserved_output_paths: final_paths,
@@ -2024,7 +1291,6 @@ struct UnpackSamplesPreflight {
     measurements_format: Option<OutputFormat>,
     detectors_format: Option<OutputFormat>,
     obs_format: Option<OutputFormat>,
-    verify_only: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2037,21 +1303,13 @@ fn preflight_unpack_samples(
     detectors_out_format: &str,
     obs_out: Option<&str>,
     obs_out_format: &str,
-    verify_only: bool,
 ) -> Result<UnpackSamplesPreflight, String> {
     let outputs = [
         (measurements_out, "--measurements_out"),
         (detectors_out, "--detectors_out"),
         (obs_out, "--obs_out"),
     ];
-    let cwd = std::env::current_dir()
-        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
-    if verify_only && outputs.iter().any(|(path, _)| path.is_some()) {
-        return Err(
-            "unpack_samples --verify_only cannot be combined with result outputs".to_string(),
-        );
-    }
-    if !verify_only && outputs.iter().all(|(path, _)| path.is_none()) {
+    if outputs.iter().all(|(path, _)| path.is_none()) {
         return Err("unpack_samples requires at least one output".to_string());
     }
     if [circuit_path, input_path]
@@ -2098,15 +1356,10 @@ fn preflight_unpack_samples(
         })
         .transpose()?;
     let mut final_paths = BTreeSet::new();
-    let input_paths = normalized_input_paths(&[circuit_path, input_path], &cwd)?;
     for (path, _) in outputs {
         if let Some(path) = path.filter(|path| *path != "-") {
-            let normalized = lexical_absolute_path_with_cwd(Path::new(path), &cwd)?;
-            if !final_paths.insert(normalized.clone()) {
+            if !final_paths.insert(lexical_absolute_path(path)?) {
                 return Err("unpack_samples output paths must be distinct".to_string());
-            }
-            if input_paths.contains(&normalized) {
-                return Err("unpack_samples output path must differ from input paths".to_string());
             }
         }
     }
@@ -2115,7 +1368,6 @@ fn preflight_unpack_samples(
         measurements_format,
         detectors_format,
         obs_format,
-        verify_only,
     })
 }
 
@@ -2150,67 +1402,21 @@ fn parse_result_output_format(
     }
 }
 
-#[cfg(test)]
 fn lexical_absolute_path(path: &str) -> Result<PathBuf, String> {
     lexical_absolute_path_from_path(Path::new(path))
 }
 
 #[rustfmt::skip]
 fn lexical_absolute_path_from_path(path: &Path) -> Result<PathBuf, String> {
-    let cwd = std::env::current_dir().map_err(|error| format!("failed to resolve current directory: {error}"))?;
-    lexical_absolute_path_with_cwd(path, &cwd)
-}
-
-fn canonical_parent_path_identity_from_path(path: &Path) -> Result<PathBuf, String> {
-    let cwd = std::env::current_dir()
-        .map_err(|error| format!("failed to resolve current directory: {error}"))?;
-    canonical_parent_path_identity_with_cwd(path, &cwd)
-}
-
-fn canonical_parent_path_identity_with_cwd(path: &Path, cwd: &Path) -> Result<PathBuf, String> {
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        cwd.join(path)
-    };
-    let file_name = absolute
-        .file_name()
-        .ok_or_else(|| format!("path must name a file: {}", path.display()))?;
-    let parent = absolute.parent().unwrap_or_else(|| Path::new("."));
-    let canonical_parent = std::fs::canonicalize(parent).map_err(|error| {
-        format!(
-            "failed to resolve parent directory {}: {error}",
-            parent.display()
-        )
-    })?;
-    Ok(canonical_parent.join(file_name))
-}
-
-fn lexical_absolute_path_with_cwd(path: &Path, cwd: &Path) -> Result<PathBuf, String> {
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        cwd.join(path)
-    };
+    let absolute = if path.is_absolute() { path.to_path_buf() } else { std::env::current_dir().map_err(|error| format!("failed to resolve output path: {error}"))?.join(path) };
     let mut normalized = PathBuf::new();
     for component in absolute.components() {
         match component {
-            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
-            Component::RootDir => normalized.push(component.as_os_str()),
-            Component::CurDir => {}
             Component::ParentDir => {
                 normalized.pop();
             }
-            Component::Normal(name) => normalized.push(name),
+            other => normalized.push(other.as_os_str()),
         }
-    }
-    Ok(normalized)
-}
-
-fn normalized_input_paths(paths: &[&str], cwd: &Path) -> Result<BTreeSet<PathBuf>, String> {
-    let mut normalized = BTreeSet::new();
-    for path in paths.iter().copied().filter(|path| *path != "-") {
-        normalized.insert(lexical_absolute_path_with_cwd(Path::new(path), cwd)?);
     }
     Ok(normalized)
 }
@@ -2342,33 +1548,6 @@ fn read_sample_archive<R: Read>(
     }
 }
 
-fn verify_unpack_archive<R: Read>(reader: SampleArchiveReader<R>) -> Result<(), String> {
-    let summary = reader
-        .finish()
-        .map_err(format_sample_archive_error_for_rsmp_cli)?;
-    println!(
-        "PASS rsmp version={}.{} shots={} blocks={} M={} D={} L={} circuit={}",
-        summary.format_major,
-        summary.format_minor,
-        summary.total_shots,
-        summary.block_count,
-        summary.measurement_count,
-        summary.detector_count,
-        summary.observable_count,
-        hex_prefix(&summary.circuit_sha256, 12)
-    );
-    Ok(())
-}
-
-fn hex_prefix(bytes: &[u8], hex_chars: usize) -> String {
-    let mut output = String::new();
-    for byte in bytes.iter().take(hex_chars.div_ceil(2)) {
-        output.push_str(&format!("{byte:02x}"));
-    }
-    output.truncate(hex_chars);
-    output
-}
-
 fn stream_unpack_outputs<R: Read>(
     mut reader: SampleArchiveReader<R>,
     measurements_out: Option<&str>,
@@ -2379,19 +1558,13 @@ fn stream_unpack_outputs<R: Read>(
     let limits = ArchiveLimits::default();
     let total_shots = reader.total_shots();
     let mut measurements_target = measurements_out
-        .map(|path| {
-            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
-        })
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
         .transpose()?;
     let mut detectors_target = detectors_out
-        .map(|path| {
-            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
-        })
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
         .transpose()?;
     let mut obs_target = obs_out
-        .map(|path| {
-            OutputTarget::create(path, &preflight.reserved_output_paths).map_err(rsmp_io_error)
-        })
+        .map(|path| OutputTarget::create(path, &preflight.reserved_output_paths))
         .transpose()?;
 
     let mut measurements_writer = measurements_target
@@ -2477,45 +1650,16 @@ fn stream_unpack_outputs<R: Read>(
     drop(detectors_writer);
     drop(obs_writer);
 
-    finish_configured_target(&mut measurements_target)?;
-    finish_configured_target(&mut detectors_target)?;
-    finish_configured_target(&mut obs_target)?;
-
-    let mut publisher = FsPublisher::from_env();
-    let mut published = Vec::new();
-    publish_configured_target(&mut measurements_target, &mut publisher, &mut published)?;
-    publish_configured_target(&mut detectors_target, &mut publisher, &mut published)?;
-    publish_configured_target(&mut obs_target, &mut publisher, &mut published)?;
-    Ok(())
-}
-
-fn finish_configured_target(target: &mut Option<OutputTarget>) -> Result<(), String> {
-    if let Some(target) = target.as_mut() {
-        target.finish_staging().map_err(rsmp_io_error)?;
+    if let Some(target) = measurements_target.as_mut() {
+        target.publish()?;
+    }
+    if let Some(target) = detectors_target.as_mut() {
+        target.publish()?;
+    }
+    if let Some(target) = obs_target.as_mut() {
+        target.publish()?;
     }
     Ok(())
-}
-
-fn publish_configured_target(
-    target: &mut Option<OutputTarget>,
-    publisher: &mut impl FilePublisher,
-    published: &mut Vec<PathBuf>,
-) -> Result<(), String> {
-    let Some(target) = target.as_mut() else {
-        return Ok(());
-    };
-    let final_path = target.final_path().map(Path::to_path_buf);
-    match target.publish_file(publisher) {
-        Ok(Some(path)) => {
-            published.push(path);
-            Ok(())
-        }
-        Ok(None) => Ok(()),
-        Err(error) => match final_path {
-            Some(path) => Err(rsmp_publish_error(&path, published, Some(&error))),
-            None => Err(rsmp_io_error("failed to publish stdout")),
-        },
-    }
 }
 
 #[cfg(test)]
@@ -2523,13 +1667,73 @@ fn empty_bit_table(rows: usize) -> Result<BitTable, String> {
     BitTable::try_new(rows, 0).map_err(|error| format!("BitTable allocation failed: {error:?}"))
 }
 
+pub fn make_rng(seed: Option<u64>) -> StdRng {
+    match seed {
+        Some(s) => StdRng::seed_from_u64(s),
+        None => StdRng::from_entropy(),
+    }
+}
+
+pub fn write_format(
+    fmt: OutputFormat,
+    table: &BitTable,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    match fmt {
+        OutputFormat::Format01 => write_shots_01(table, out),
+        OutputFormat::B8 => write_shots_b8(table, out),
+        OutputFormat::R8 => write_shots_r8(table, out),
+        OutputFormat::Hits => write_shots_hits(table, out),
+        OutputFormat::Dets => return Err("use write_shots_dets for dets format".to_string()),
+        OutputFormat::Ptb64 => write_shots_ptb64(table, out),
+    }
+    .map_err(|e| format!("write error: {e}"))
+}
+
 pub fn merge_detections_observables(dets: &BitTable, obs: &BitTable) -> BitTable {
     try_merge_detections_observables(dets, obs)
         .expect("trusted detector/observable dimensions allocate")
 }
 
+pub fn try_merge_detections_observables(
+    dets: &BitTable,
+    obs: &BitTable,
+) -> Result<BitTable, String> {
+    let n_dets = dets.num_major();
+    let n_obs = obs.num_major();
+    let n_shots = dets.num_minor();
+    if obs.num_minor() != n_shots {
+        return Err(format!(
+            "observable shot count {} does not match detection shot count {}",
+            obs.num_minor(),
+            n_shots
+        ));
+    }
+    let merged_rows = n_dets
+        .checked_add(n_obs)
+        .ok_or_else(|| "detector and observable row count overflows".to_string())?;
+    let mut merged = BitTable::try_new(merged_rows, n_shots)
+        .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+    for row in 0..n_dets {
+        for shot in 0..n_shots {
+            if dets.get(row, shot) {
+                merged.set(row, shot, true);
+            }
+        }
+    }
+    for row in 0..n_obs {
+        for shot in 0..n_shots {
+            if obs.get(row, shot) {
+                merged.set(n_dets + row, shot, true);
+            }
+        }
+    }
+    Ok(merged)
+}
+
 pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), String> {
-    let summary = crate::stats::summarize_text(text)?;
+    let instrs = parse_lines(text)?;
+    let summary = crate::stats::summarize(&instrs);
     if json {
         serde_json::to_writer_pretty(&mut *out, &summary)
             .map_err(|e| format!("write error: {e}"))?;
@@ -2538,7 +1742,16 @@ pub fn run_stats(text: &str, json: bool, out: &mut dyn Write) -> Result<(), Stri
         return Ok(());
     }
 
-    crate::stats::write_human(&summary, out)
+    writeln!(out, "instruction_count: {}", summary.instruction_count).map_err(|e| e.to_string())?;
+    writeln!(out, "repeat_blocks: {}", summary.repeat_blocks).map_err(|e| e.to_string())?;
+    writeln!(out, "max_repeat_depth: {}", summary.max_repeat_depth).map_err(|e| e.to_string())?;
+    writeln!(out, "num_qubits: {}", summary.num_qubits).map_err(|e| e.to_string())?;
+    writeln!(out, "num_measurements: {}", summary.num_measurements).map_err(|e| e.to_string())?;
+    writeln!(out, "num_detectors: {}", summary.num_detectors).map_err(|e| e.to_string())?;
+    writeln!(out, "num_observables: {}", summary.num_observables).map_err(|e| e.to_string())?;
+    writeln!(out, "num_ticks: {}", summary.num_ticks).map_err(|e| e.to_string())?;
+    writeln!(out, "num_sweep_bits: {}", summary.num_sweep_bits).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn write_detection_outputs(
@@ -2569,14 +1782,40 @@ fn write_detection_outputs(
     Ok(())
 }
 
-#[cfg(feature = "codegen-css")]
+pub fn run_gen(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let circuit_text = generate_common_circuit_text(code, task, distance, rounds, noise)?;
+    out.write_all(circuit_text.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
+}
+
+pub fn run_gen_with_params(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let circuit_text =
+        generate_common_circuit_text_with_params(code, task, distance, rounds, params)?;
+    out.write_all(circuit_text.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
+}
+
 pub fn run_css_gen(
     task: &str,
     hx_path: Option<&str>,
     hz_path: Option<&str>,
     basis: Option<&str>,
     rounds: usize,
-    noise: NoiseParams,
+    noise: f64,
     schedule: &str,
     observables_path: Option<&str>,
     out: &mut dyn Write,
@@ -2622,7 +1861,7 @@ pub fn run_css_gen(
             num_data_qubits: hx.num_cols,
         },
         rounds,
-        noise,
+        noise: NoiseParams::uniform(noise),
         basis,
         schedule,
         observables,
@@ -2632,7 +1871,6 @@ pub fn run_css_gen(
         .map_err(|error| format!("write error: {error}"))
 }
 
-#[cfg(feature = "codegen-css")]
 fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
     match value {
         "x" | "X" => Ok(MemoryBasis::X),
@@ -2641,13 +1879,139 @@ fn parse_memory_basis(value: &str) -> Result<MemoryBasis, String> {
     }
 }
 
-#[cfg(feature = "codegen-css")]
 fn parse_css_schedule(value: &str) -> Result<CssSchedule, String> {
     match value {
         "sequential" => Ok(CssSchedule::Sequential),
         "greedy" => Ok(CssSchedule::Greedy),
         other => Err(format!("unknown CSS schedule: {other}")),
     }
+}
+
+pub(crate) fn generate_common_circuit_text(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    noise: f64,
+) -> Result<String, String> {
+    generate_common_circuit_text_with_params(
+        code,
+        task,
+        distance,
+        rounds,
+        NoiseParams::uniform(noise),
+    )
+}
+
+pub(crate) fn generate_common_circuit_text_with_params(
+    code: &str,
+    task: &str,
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+) -> Result<String, String> {
+    let instrs = match (code, task) {
+        ("repetition_code", "memory") => {
+            crate::codegen::repetition_code_memory_with_params(distance, rounds, params)
+        }
+        ("surface_code", "rotated_memory_x") => {
+            crate::codegen::surface_code::rotated_memory_x_with_params(distance, rounds, params)
+        }
+        ("surface_code", "rotated_memory_z") => {
+            crate::codegen::surface_code::rotated_memory_z_with_params(distance, rounds, params)
+        }
+        ("surface_code", "unrotated_memory_x") => {
+            crate::codegen::surface_code::unrotated_memory_x_with_params(distance, rounds, params)
+        }
+        ("surface_code", "unrotated_memory_z") => {
+            crate::codegen::surface_code::unrotated_memory_z_with_params(distance, rounds, params)
+        }
+        ("color_code", "memory_xyz") => {
+            crate::codegen::color_code::memory_xyz_with_params(distance, rounds, params)
+        }
+        _ => return Err(format!("unknown code/task: {code}/{task}")),
+    };
+    Ok(crate::ir::circuit_to_string(&instrs))
+}
+
+pub fn run_sample(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    skip_reference_sample: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let fmt = OutputFormat::from_str(out_format)?;
+    let instrs = parse_lines(circuit_text)?;
+    let mut rng = make_rng(seed);
+    let options = sample_cli_options(skip_reference_sample);
+    let result = sample_batch_with_options(&instrs, shots, &mut rng, options)?;
+    match fmt {
+        OutputFormat::Dets => {
+            Err("dets format not applicable to sample command; use detect".to_string())
+        }
+        _ => write_format(fmt, &result.measurements, out),
+    }
+}
+
+pub fn sample_cli_options(skip_reference_sample: bool) -> SampleOptions {
+    SampleOptions {
+        reference_sample_mode: if skip_reference_sample {
+            crate::data_path::ReferenceSampleMode::AssumeAllZero
+        } else {
+            crate::data_path::ReferenceSampleMode::SimulateNoiseless
+        },
+        output_mode: SampleOutputMode::MeasurementsOnly,
+        ..SampleOptions::default()
+    }
+}
+
+pub fn run_detect(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    append_observables: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let fmt = OutputFormat::from_str(out_format)?;
+    let instrs = parse_lines(circuit_text)?;
+    let mut rng = make_rng(seed);
+    let result = sample_batch(&instrs, shots, &mut rng)?;
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        None,
+    )
+}
+
+pub fn run_detect_with_obs(
+    circuit_text: &str,
+    shots: usize,
+    out_format: &str,
+    seed: Option<u64>,
+    append_observables: bool,
+    out: &mut dyn Write,
+    obs_out: &mut dyn Write,
+    obs_out_format: &str,
+) -> Result<(), String> {
+    let fmt = OutputFormat::from_str(out_format)?;
+    let obs_fmt = OutputFormat::from_str(obs_out_format)?;
+    let instrs = parse_lines(circuit_text)?;
+    let mut rng = make_rng(seed);
+    let result = sample_batch(&instrs, shots, &mut rng)?;
+    write_detection_outputs(
+        &result.detections,
+        &result.observable_flips,
+        fmt,
+        append_observables,
+        out,
+        Some((obs_out, obs_fmt)),
+    )
 }
 
 pub fn run_analyze_errors(circuit_text: &str, out: &mut dyn Write) -> Result<(), String> {
@@ -2667,6 +2031,29 @@ pub fn run_analyze_errors_with_options(
         false,
         out,
     )
+}
+
+pub fn run_analyze_errors_with_flags(
+    circuit_text: &str,
+    approximate_disjoint_errors: bool,
+    allow_gauge_detectors: bool,
+    decompose_errors: bool,
+    out: &mut dyn Write,
+) -> Result<(), String> {
+    let instrs = parse_lines(circuit_text)?;
+    let options = crate::error_analyzer::AnalyzeOptions {
+        backend: crate::error_analyzer::AnalyzeBackend::Auto,
+        approximate_disjoint_errors,
+        allow_gauge_detectors,
+    };
+    let dem = if decompose_errors {
+        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(&instrs, options)?
+    } else {
+        ErrorAnalyzer::circuit_to_dem_with_options(&instrs, options)?
+    };
+    let dem_str = dem.to_string();
+    out.write_all(dem_str.as_bytes())
+        .map_err(|e| format!("write error: {e}"))
 }
 
 fn run_export_json(
@@ -3279,27 +2666,6 @@ mod tests {
             .err()
             .unwrap();
         assert!(exhausted_err.contains("failed to allocate a staged output"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn output_backup_allocation_skips_dangling_symlinks() {
-        use std::os::unix::fs::symlink;
-
-        let dir = tempfile::tempdir().unwrap();
-        let final_path = dir.path().join("detections.b8");
-        let first_candidate = dir
-            .path()
-            .join(format!(".detections.b8.rstim-{}-0.bak", std::process::id()));
-        symlink(dir.path().join("missing-target"), &first_candidate).unwrap();
-
-        let allocated = allocate_output_backup_path(&final_path, &BTreeSet::new()).unwrap();
-        assert_eq!(
-            allocated,
-            dir.path()
-                .join(format!(".detections.b8.rstim-{}-1.bak", std::process::id()))
-        );
-        assert!(std::fs::symlink_metadata(first_candidate).is_ok());
     }
 
     #[test]
@@ -4011,13 +3377,7 @@ mod tests {
                 distance: None,
                 rounds: 2,
                 noise: 0.0,
-                before_round_data_depolarization: 0.0,
-                before_round_data_loss_probability: 0.0,
-                before_measure_flip_probability: 0.0,
-                after_reset_flip_probability: 0.0,
                 after_clifford_loss_probability: 0.0,
-                operation_loss_probability: 0.0,
-                measurement_loss_probability: 0.0,
                 hx: Some(hx),
                 hz: Some(hz),
                 basis: Some("Z".to_string()),
@@ -4049,7 +3409,7 @@ mod tests {
             Some(&hz),
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut out,
@@ -4097,7 +3457,7 @@ mod tests {
             None,
             None,
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4111,7 +3471,7 @@ mod tests {
             Some(&hz),
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4125,7 +3485,7 @@ mod tests {
             None,
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4139,7 +3499,7 @@ mod tests {
             Some(&hz_wide),
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4153,7 +3513,7 @@ mod tests {
             Some(&hz),
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             Some(&obs_wide),
             &mut Vec::new(),
@@ -4167,7 +3527,7 @@ mod tests {
             Some(&hz),
             None,
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4181,7 +3541,7 @@ mod tests {
             Some(&hz),
             Some("y"),
             1,
-            NoiseParams::none(),
+            0.0,
             "greedy",
             None,
             &mut Vec::new(),
@@ -4195,7 +3555,7 @@ mod tests {
             Some(&hz),
             Some("x"),
             1,
-            NoiseParams::none(),
+            0.0,
             "layered",
             None,
             &mut Vec::new(),
@@ -4218,13 +3578,7 @@ mod tests {
                 distance: None,
                 rounds: 1,
                 noise: 0.0,
-                before_round_data_depolarization: 0.0,
-                before_round_data_loss_probability: 0.0,
-                before_measure_flip_probability: 0.0,
-                after_reset_flip_probability: 0.0,
                 after_clifford_loss_probability: 0.0,
-                operation_loss_probability: 0.0,
-                measurement_loss_probability: 0.0,
                 hx: None,
                 hz: None,
                 basis: None,

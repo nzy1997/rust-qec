@@ -5,7 +5,7 @@ use rsinter::bench::plot::{
 };
 use rsinter::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use rsinter::bench::spec::{
-    BenchmarkSpec, LogicalRateUnit, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit,
 };
 use rsinter::failure::FailureKind;
 use rsinter::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
@@ -1096,8 +1096,10 @@ fn logical_rate_unit_transforms_best_and_interval_bounds() {
     )
     .unwrap_err();
     assert!(nonnumeric_observable_err.contains("logical_rate_unit = \"per_observable\""));
-    assert!(nonnumeric_observable_err
-        .contains("positive numeric case_summary.logical_observable_count"));
+    assert!(
+        nonnumeric_observable_err
+            .contains("positive numeric case_summary.logical_observable_count")
+    );
     assert!(nonnumeric_observable_err.contains("case_summary.num_obs"));
 }
 
@@ -1140,9 +1142,11 @@ label = "Decode Time Per Shot"
         &single_out,
     )
     .unwrap();
-    assert!(std::fs::read_to_string(single_out)
-        .unwrap()
-        .contains("<svg"));
+    assert!(
+        std::fs::read_to_string(single_out)
+            .unwrap()
+            .contains("<svg")
+    );
 
     let dashed_rows = vec![
         ok_row("rmatching", 3, 0.002, 0.001, 2.0, 2000.0, 12.0),
@@ -1152,9 +1156,11 @@ label = "Decode Time Per Shot"
     ];
     let dashed_out = dir.path().join("dashed.svg");
     render_benchmark_plot(&dashed_series_spec, &dashed_rows, &dashed_out).unwrap();
-    assert!(std::fs::read_to_string(dashed_out)
-        .unwrap()
-        .contains("rmatching d=5"));
+    assert!(
+        std::fs::read_to_string(dashed_out)
+            .unwrap()
+            .contains("rmatching d=5")
+    );
 }
 
 #[test]
@@ -1504,12 +1510,14 @@ label = "Decode Time Per Shot"
 fn log_log_fit_rejects_invalid_degenerate_and_overflowing_inputs() {
     assert!(log_log_fit_for_plot(&[(0.1, Some(f64::NAN)), (0.2, Some(0.04))]).is_none());
     assert!(log_log_fit_for_plot(&[(0.1, Some(0.01)), (0.1, Some(0.02))]).is_none());
-    assert!(log_log_fit_for_plot(&[
-        (1.49e-304, Some(2.09e304)),
-        (3.96e-44, Some(6.7e-322)),
-        (3.11e43, Some(1.06e-217)),
-    ])
-    .is_none());
+    assert!(
+        log_log_fit_for_plot(&[
+            (1.49e-304, Some(2.09e304)),
+            (3.96e-44, Some(6.7e-322)),
+            (3.11e43, Some(1.06e-217)),
+        ])
+        .is_none()
+    );
 }
 
 #[test]
@@ -1894,7 +1902,9 @@ fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
 
 fn surface_compare_fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/bench/surface_compare_plot_semantics.csv")
+        .parent()
+        .unwrap()
+        .join("benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv")
 }
 
 fn surface_compare_fixture_rows() -> Vec<BenchmarkResultRow> {

@@ -1,21 +1,17 @@
 use rand::Rng;
 
 use crate::compiled::{
-    choose_sampler_path, compile_circuit, sample_compiled_batch_with_reference, CompiledCircuit,
-    SamplerPathDecision, SamplingFallbackReason,
+    CompiledCircuit, SamplerPathDecision, SamplingFallbackReason, choose_sampler_path,
+    compile_circuit, sample_compiled_batch_with_reference,
 };
 use crate::data_path::{
-    build_reference_sample, build_reference_sample_with_decision,
-    build_reference_sample_with_sweep_bits_and_decision, ReferenceSampleDecision,
-    ReferenceSampleMode,
+    ReferenceSampleDecision, ReferenceSampleMode, build_reference_sample,
+    build_reference_sample_with_decision, build_reference_sample_with_sweep_bits_and_decision,
 };
-use crate::executor::max_qubit;
 use crate::executor::Executor;
+use crate::executor::max_qubit;
 use crate::ir::StimInstr;
-use crate::loss_sampler::LossSamplerPlan;
-use crate::m2d::{
-    measurements_to_detections_with_options, measurements_to_detections_with_reference, M2dOptions,
-};
+use crate::m2d::{M2dOptions, measurements_to_detections_with_options};
 use crate::sim::bit_table::BitTable;
 use crate::sim::frame::FrameSimulator;
 
@@ -115,19 +111,6 @@ pub struct CompiledMeasurementSampler {
     diagnostics: CompiledMeasurementSamplerDiagnostics,
 }
 
-/// A reusable sampler for circuits whose `LOSS` instructions can conditionally suppress gates.
-///
-/// Compiling once keeps the loss operation plan and noiseless reference sample out of the timed
-/// steady-state sampling path. When loss can affect a later entangling gate, sampling uses a
-/// self-contained bit-parallel CSS frame so each shot can follow its own Clifford path.
-#[derive(Debug)]
-pub struct CompiledLossMeasurementSampler {
-    instrs: Vec<StimInstr>,
-    plan: LossSamplerPlan,
-    reference_sample: Vec<bool>,
-    diagnostics: CompiledMeasurementSamplerDiagnostics,
-}
-
 impl CompiledMeasurementSampler {
     pub fn compile(
         instrs: &[StimInstr],
@@ -187,65 +170,6 @@ impl CompiledMeasurementSampler {
                 ..SampleOptions::default()
             },
         )
-    }
-
-    #[doc(hidden)]
-    pub fn diagnostics(&self) -> CompiledMeasurementSamplerDiagnostics {
-        self.diagnostics
-    }
-}
-
-impl CompiledLossMeasurementSampler {
-    pub fn compile(
-        instrs: &[StimInstr],
-        reference_mode: ReferenceSampleMode,
-    ) -> Result<Self, String> {
-        let plan = LossSamplerPlan::try_compile(instrs)
-            .ok_or_else(|| "circuit does not support the compiled loss sampler".to_string())?;
-        let reference_sample = match reference_mode {
-            ReferenceSampleMode::SimulateNoiseless => {
-                build_reference_sample(instrs, reference_mode)?
-            }
-            ReferenceSampleMode::AssumeAllZero => vec![false; plan.num_measurements()],
-        };
-        Ok(Self {
-            instrs: instrs.to_vec(),
-            plan,
-            reference_sample,
-            diagnostics: CompiledMeasurementSamplerDiagnostics {
-                compiled_ir_builds: 1,
-                reference_builds: 1,
-                sample_calls: 0,
-            },
-        })
-    }
-
-    pub fn sample(
-        &mut self,
-        shots: usize,
-        rng: &mut impl Rng,
-        output_mode: SampleOutputMode,
-    ) -> Result<BatchOutput, String> {
-        self.diagnostics.sample_calls += 1;
-        let measurements = self.plan.run_batch(shots, &self.reference_sample, rng)?;
-        if output_mode == SampleOutputMode::MeasurementsOnly {
-            return BatchOutput::measurements_only(measurements, shots);
-        }
-
-        let m2d = measurements_to_detections_with_reference(
-            &self.instrs,
-            &measurements,
-            &self.reference_sample,
-        )?;
-        let (detector_materializations, observable_materializations) =
-            count_output_materialization_ops(&self.instrs);
-        Ok(BatchOutput::full(
-            measurements,
-            m2d.detections,
-            m2d.observable_flips,
-            detector_materializations,
-            observable_materializations,
-        ))
     }
 
     #[doc(hidden)]
@@ -403,40 +327,22 @@ fn sample_batch_with_executor(
         ReferenceSampleMode::AssumeAllZero => vec![false; crate::stats::num_measurements(instrs)],
     };
     let n_meas = ref_sample.len();
-    let loss_plan = if sweep_bits.is_none() {
-        LossSamplerPlan::try_compile(instrs)
-    } else {
-        None
-    };
-    let mut executor = if loss_plan.is_none() {
-        Some(Executor::from_instrs(instrs.to_vec())?)
-    } else {
-        None
-    };
+    let mut measurements = alloc_bit_table(n_meas, n_shots)?;
 
-    let measurements = if let Some(plan) = &loss_plan {
-        plan.run_batch(n_shots, &ref_sample, rng)?
-    } else {
-        let mut measurements = alloc_bit_table(n_meas, n_shots)?;
-        for shot in 0..n_shots {
-            let shot_measurements = executor
-                .as_mut()
-                .expect("legacy executor is available when the loss plan is absent")
-                .run_with_sweep_bits(rng, sweep_bits)?
-                .measurements;
-            if shot_measurements.len() != n_meas {
-                return Err(format!(
-                    "executor produced {} measurements but reference sample expects {}",
-                    shot_measurements.len(),
-                    n_meas
-                ));
-            }
-            for (m, &bit) in shot_measurements.iter().enumerate() {
-                measurements.set(m, shot, bit);
-            }
+    for shot in 0..n_shots {
+        let mut ex = Executor::from_instrs(instrs.to_vec())?;
+        let out = ex.run_with_sweep_bits(rng, sweep_bits)?;
+        if out.measurements.len() != n_meas {
+            return Err(format!(
+                "executor produced {} measurements but reference sample expects {}",
+                out.measurements.len(),
+                n_meas
+            ));
         }
-        measurements
-    };
+        for (m, &bit) in out.measurements.iter().enumerate() {
+            measurements.set(m, shot, bit);
+        }
+    }
 
     if options.output_mode == SampleOutputMode::MeasurementsOnly {
         return BatchOutput::measurements_only(measurements, n_shots);
@@ -560,8 +466,8 @@ fn is_sweep_dependent_operation(name: &str, targets: &[crate::ir::StimTarget]) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     use crate::data_path::ReferenceSampleMode;
     use crate::ir::StimTarget;

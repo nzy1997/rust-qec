@@ -9,7 +9,7 @@ mod enabled {
     use crate::bench::result::{BenchmarkResultRow, PairMapExt, ParamMap};
     use crate::bench::runners::params::{optional_bool, optional_string, optional_usize};
     use crate::bench::runners::{
-        plan_decoder_point_identity_with_dem_mode, run_decoder_point_with_dem_mode, DemBuildMode,
+        DemBuildMode, plan_decoder_point_identity_with_dem_mode, run_decoder_point_with_dem_mode,
     };
     use crate::decode::{RbposdDemDecoder, RbposdLsdDemDecoder};
 

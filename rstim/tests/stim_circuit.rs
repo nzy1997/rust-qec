@@ -3,8 +3,7 @@
 /// Source: Stim/src/stim/circuit/circuit.test.cc
 ///
 /// Covers: parsing, validation, round-trips, repeat blocks, stats.
-
-use rstim::ir::{circuit_to_string, PauliBasis, StimInstr, StimTarget};
+use rstim::ir::{PauliBasis, StimInstr, StimTarget, circuit_to_string};
 use rstim::parser::parse_lines;
 use rstim::stats;
 use rstim::transforms;
@@ -173,12 +172,28 @@ fn parse_mpp_valid() {
     assert_eq!(
         t,
         &[
-            StimTarget::Pauli { qubit: 1, basis: PauliBasis::X, inverted: false },
+            StimTarget::Pauli {
+                qubit: 1,
+                basis: PauliBasis::X,
+                inverted: false
+            },
             StimTarget::Combiner,
-            StimTarget::Pauli { qubit: 2, basis: PauliBasis::Y, inverted: false },
-            StimTarget::Pauli { qubit: 3, basis: PauliBasis::Z, inverted: false },
+            StimTarget::Pauli {
+                qubit: 2,
+                basis: PauliBasis::Y,
+                inverted: false
+            },
+            StimTarget::Pauli {
+                qubit: 3,
+                basis: PauliBasis::Z,
+                inverted: false
+            },
             StimTarget::Combiner,
-            StimTarget::Pauli { qubit: 4, basis: PauliBasis::Z, inverted: false },
+            StimTarget::Pauli {
+                qubit: 4,
+                basis: PauliBasis::Z,
+                inverted: false
+            },
         ]
     );
 }
@@ -200,11 +215,19 @@ fn parse_spp_valid() {
     assert_eq!(t.len(), 2);
     assert_eq!(
         t[0],
-        StimTarget::Pauli { qubit: 1, basis: PauliBasis::X, inverted: false }
+        StimTarget::Pauli {
+            qubit: 1,
+            basis: PauliBasis::X,
+            inverted: false
+        }
     );
     assert_eq!(
         t[1],
-        StimTarget::Pauli { qubit: 2, basis: PauliBasis::Z, inverted: false }
+        StimTarget::Pauli {
+            qubit: 2,
+            basis: PauliBasis::Z,
+            inverted: false
+        }
     );
 }
 
@@ -329,10 +352,9 @@ fn count_qubits_empty() {
 
 #[test]
 fn count_qubits_with_repeat() {
-    let instrs = parse_lines(
-        "H 0\nM 0 1\nREPEAT 2 {\n  X 1\n  REPEAT 3 {\n    Y 2\n    M 2\n  }\n}",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("H 0\nM 0 1\nREPEAT 2 {\n  X 1\n  REPEAT 3 {\n    Y 2\n    M 2\n  }\n}")
+            .unwrap();
     assert_eq!(stats::num_qubits(&instrs), 3);
 }
 
@@ -354,10 +376,9 @@ fn count_measurements_empty() {
 
 #[test]
 fn count_measurements_with_repeat() {
-    let instrs = parse_lines(
-        "H 0\nM 0 1\nREPEAT 2 {\n  X 1\n  REPEAT 3 {\n    Y 2\n    M 2\n  }\n}",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("H 0\nM 0 1\nREPEAT 2 {\n  X 1\n  REPEAT 3 {\n    Y 2\n    M 2\n  }\n}")
+            .unwrap();
     assert_eq!(stats::num_measurements(&instrs), 8);
 }
 
@@ -472,7 +493,8 @@ fn zero_repetitions_not_allowed() {
 
 #[test]
 fn negative_float_coordinates() {
-    let instrs = parse_lines("SHIFT_COORDS(-1,-2,-3)\nQUBIT_COORDS(1,-2) 1\nQUBIT_COORDS(-3.5) 1").unwrap();
+    let instrs =
+        parse_lines("SHIFT_COORDS(-1,-2,-3)\nQUBIT_COORDS(1,-2) 1\nQUBIT_COORDS(-3.5) 1").unwrap();
     assert_eq!(instrs[0].args().unwrap()[2], -3.0);
     assert_eq!(instrs[2].args().unwrap()[0], -3.5);
 }

@@ -1,13 +1,13 @@
 use std::cmp::Ordering;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 
 use serde_json::{Number, Value};
 
 use crate::bench::result::{
-    case_summary_additive_keys, stable_case_summary, BenchmarkResultRow, MetricMap,
+    BenchmarkResultRow, MetricMap, case_summary_additive_keys, stable_case_summary,
 };
-use crate::failure::{combine_failure_kind, FailureKind};
+use crate::failure::{FailureKind, combine_failure_kind};
 
 const ADDITIVE_METRICS: [&str; 5] = [
     "shots_used",

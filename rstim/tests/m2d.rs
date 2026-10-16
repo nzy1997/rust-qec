@@ -1,13 +1,15 @@
-use rstim::data_path::ReferenceSampleMode;
-use rstim::parser::parse_lines;
-use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
-use rstim::sim::bit_table::BitTable;
 use rstim::cli::{run_m2d, run_m2d_with_options};
+use rstim::data_path::ReferenceSampleMode;
+use rstim::m2d::{M2dOptions, measurements_to_detections, measurements_to_detections_with_options};
+use rstim::parser::parse_lines;
+use rstim::sim::bit_table::BitTable;
 
 fn single_shot_table(bits: usize, vals: &[bool]) -> BitTable {
     let mut t = BitTable::new(bits, 1);
     for (i, &v) in vals.iter().enumerate() {
-        if v { t.set(i, 0, true); }
+        if v {
+            t.set(i, 0, true);
+        }
     }
     t
 }
@@ -54,7 +56,11 @@ fn m2d_meas_count_mismatch() {
     let instrs = parse_lines(circuit).unwrap();
     let meas = BitTable::new(5, 1); // 5 bits but circuit has 1 measurement
     let result = measurements_to_detections(&instrs, &meas);
-    assert!(result.as_ref().is_err_and(|e| e.contains("5 bits but circuit has 1")));
+    assert!(
+        result
+            .as_ref()
+            .is_err_and(|e| e.contains("5 bits but circuit has 1"))
+    );
 }
 
 #[test]
@@ -97,7 +103,10 @@ fn m2d_skip_reference_sample_matches_default_on_zero_reference() {
         },
     )
     .unwrap();
-    assert_eq!(default_out.detections.get(0, 0), skipped_out.detections.get(0, 0));
+    assert_eq!(
+        default_out.detections.get(0, 0),
+        skipped_out.detections.get(0, 0)
+    );
 }
 
 #[test]
@@ -110,7 +119,13 @@ fn m2d_sweep_controlled_reference_is_evaluated_per_shot() {
     let mut sweep = BitTable::new(1, 2);
     sweep.set(0, 1, true);
 
-    let out = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default()).unwrap();
+    let out = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        Some(&sweep),
+        M2dOptions::default(),
+    )
+    .unwrap();
     assert!(!out.detections.get(0, 0));
     assert!(!out.detections.get(0, 1));
 }
@@ -120,18 +135,21 @@ fn m2d_sweep_shot_count_mismatch_errors() {
     let instrs = parse_lines("R 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
     let meas = single_shot_table(1, &[false]);
     let sweep = BitTable::new(1, 2);
-    let err = measurements_to_detections_with_options(&instrs, &meas, Some(&sweep), M2dOptions::default())
-        .err()
-        .unwrap();
+    let err = measurements_to_detections_with_options(
+        &instrs,
+        &meas,
+        Some(&sweep),
+        M2dOptions::default(),
+    )
+    .err()
+    .unwrap();
     assert!(err.contains("sweep shots"));
 }
 
 #[test]
 fn m2d_ran_without_feedback_compensates_simple_classical_x_feedback() {
-    let instrs = parse_lines(
-        "R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
     let meas = single_shot_table(2, &[true, false]);
     let out = measurements_to_detections_with_options(
         &instrs,

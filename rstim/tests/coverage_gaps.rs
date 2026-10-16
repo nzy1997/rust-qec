@@ -1,6 +1,6 @@
 //! Targeted tests for remaining coverage gaps.
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::executor::Executor;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
@@ -35,13 +35,9 @@ fn executor_qubit_coords_bad_target() {
     assert!(
         result.is_err() || {
             let instrs = result.unwrap();
-            match Executor::from_instrs(instrs) {
-                Err(_) => true,
-                Ok(mut exec) => {
-                    let mut rng = StdRng::seed_from_u64(0);
-                    exec.run(&mut rng).is_err()
-                }
-            }
+            let mut exec = Executor::from_instrs(instrs).unwrap();
+            let mut rng = StdRng::seed_from_u64(0);
+            exec.run(&mut rng).is_err()
         }
     );
 }
@@ -51,7 +47,9 @@ fn executor_qubit_coords_bad_target() {
 fn executor_sweep_in_single_qubit_gate_errors() {
     // H with sweep target — executor rejects sweep in non-CX context
     let instrs = parse_lines("H sweep[0]\nM 0").unwrap();
-    assert!(Executor::from_instrs(instrs).is_err());
+    let mut exec = Executor::from_instrs(instrs).unwrap();
+    let mut rng = StdRng::seed_from_u64(0);
+    assert!(exec.run(&mut rng).is_err());
 }
 
 // --- executor.rs: QubitInv in qubits_with_inversion (line 793-794) ---
@@ -200,7 +198,6 @@ fn explain_errors_empty_dem() {
 
 // --- cli.rs: run_explain_errors with dem_text (line 501) ---
 #[test]
-#[cfg(feature = "cli")]
 fn explain_errors_cli_with_dem_text() {
     use rstim::cli::run_explain_errors;
     let dem_text = "error(0.1) D0\n";
@@ -213,7 +210,6 @@ fn explain_errors_cli_with_dem_text() {
 
 // --- cli.rs: run_convert with circuit instead of bits (lines 421-422) ---
 #[test]
-#[cfg(feature = "cli")]
 fn convert_with_circuit_for_bits() {
     use rstim::cli::run_convert;
     let circuit = "M 0 1";
@@ -225,7 +221,6 @@ fn convert_with_circuit_for_bits() {
 
 // --- cli.rs: run_m2d with ptb64 input (lines 468-469) ---
 #[test]
-#[cfg(feature = "cli")]
 fn m2d_ptb64_input() {
     use rstim::cli::run_m2d;
     use rstim::output::write_shots_ptb64;

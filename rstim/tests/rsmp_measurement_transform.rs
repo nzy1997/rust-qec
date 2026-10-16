@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rstim::ir::{circuit_to_string, StimInstr};
+use rstim::ir::{StimInstr, circuit_to_string};
 use rstim::m2d::measurements_to_detections;
 use rstim::measurement_transform::{
     CheckedMeasurementLayout, EncodedMeasurementBlock, MeasurementTransform,
@@ -220,9 +220,10 @@ fn verify_public_error_and_accessor_contracts() {
         err,
         MeasurementTransformError::ShapeMismatch { .. }
     ));
-    assert!(err
-        .to_string()
-        .contains("measurement rows 0 do not match transform measurements 1"));
+    assert!(
+        err.to_string()
+            .contains("measurement rows 0 do not match transform measurements 1")
+    );
 
     let zero_shot_measurements = BitTable::try_new(1, 0).unwrap();
     let zero_shot_encoded = transform.encode_block(&zero_shot_measurements).unwrap();

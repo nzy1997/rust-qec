@@ -1,5 +1,5 @@
-use rstim::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
 use rstim::compiled::{analyze_compiled_circuit, compile_circuit};
+use rstim::error_analyzer::{AnalyzeBackend, AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 use rstim::showcase::dem_semantic_summary;
 
@@ -55,8 +55,7 @@ fn auto_backend_falls_back_to_flattened_for_mixed_top_level_structure() {
 
 #[test]
 fn compiled_backend_preserves_decomposed_entry_point_for_supported_repeat() {
-    let circuit =
-        "REPEAT 8 {\n    DEPOLARIZE2(0.01) 0 1\n    MR 0 1\n    DETECTOR rec[-1]\n    DETECTOR rec[-2]\n}\n";
+    let circuit = "REPEAT 8 {\n    DEPOLARIZE2(0.01) 0 1\n    MR 0 1\n    DETECTOR rec[-1]\n    DETECTOR rec[-2]\n}\n";
 
     assert_eq!(
         analyze_error_probabilities_decomposed(circuit, AnalyzeBackend::Flattened),
@@ -71,8 +70,8 @@ fn circuit_to_dem_default_entry_point_uses_default_backend_routing() {
             .unwrap();
 
     let default_dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
-    let auto_dem = ErrorAnalyzer::circuit_to_dem_with_options(&instrs, AnalyzeOptions::default())
-        .unwrap();
+    let auto_dem =
+        ErrorAnalyzer::circuit_to_dem_with_options(&instrs, AnalyzeOptions::default()).unwrap();
 
     assert_eq!(default_dem.to_string(), auto_dem.to_string());
 }

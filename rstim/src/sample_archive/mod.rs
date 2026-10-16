@@ -1,4 +1,3 @@
-pub mod corruption_corpus;
 pub mod format;
 #[doc(hidden)]
 pub mod syndrome;

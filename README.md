@@ -1,22 +1,16 @@
-# RustQEC
+# rstim
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="site/static/brand/rustqec-logo-dark.svg">
-    <img src="site/static/brand/rustqec-logo.svg" width="200" alt="RustQEC: a copper surface-code patch with four boundary checks">
-  </picture>
-</p>
+[![CI](https://github.com/nzy1997/rstim/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rstim/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nzy1997/rstim/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rstim)
 
-[![CI](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml/badge.svg)](https://github.com/nzy1997/rust-qec/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/nzy1997/rust-qec/branch/master/graph/badge.svg)](https://codecov.io/gh/nzy1997/rust-qec)
-
-RustQEC is a Rust workspace for quantum error correction. It brings together
-the `rstim` Stim-like circuit simulator and CLI, code-construction tools,
-decoder experiments, and reproducible benchmark evidence.
+`rstim` is a Rust quantum error correction workspace for Stim-like circuit
+simulation, command-line circuit workflows, decoder experiments, and benchmark
+evidence. Use this README as the map; the detailed workflows live in the linked
+docs.
 
 ## Benchmarked Documentation Site
 
-The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
+The [benchmarked documentation site](https://nzy1997.github.io/rstim/)
 is the broad repository reference: workspace walkthroughs, benchmark evidence,
 checked results, methodology and claims limits, plus the QP101 schema browser
 and gallery that used to be the whole Pages surface.
@@ -28,21 +22,9 @@ make build-site
 python3 tools/check_site_build.py _site
 ```
 
-Generated evidence bundles, documentation test reports and other large site
-artifacts live in the companion [`rust-qec-docs`](https://github.com/nzy1997/rust-qec-docs)
-repository. `make build-site` and the evidence workflow fetch the pinned
-artifact revision automatically; use `make fetch-doc-artifacts` when running
-those checks directly.
-
-The site follows `master`; [Get started](https://nzy1997.github.io/rust-qec/get-started/)
-pins the native CLI examples to v0.3.3. `make build-site` stages the canonical
-QP101 and support contracts into ignored `site/generated/` before Zola renders
-them. Edit `rstim/doc/QP101-ZY.md` or `docs/support-compatibility.md` to update
-those pages; do not edit the generated copies.
-
 ## What You Can Do
 
-With RustQEC you can:
+With `rstim` you can:
 
 - [Trace a circuit through stats, detector events, detector-error-model
   extraction, and DEM sampling](docs/showcases/rstim-cli-dem-pipeline.md).
@@ -59,12 +41,11 @@ With RustQEC you can:
 
 | Path | Role |
 | --- | --- |
-| `rstim/` | Simulator crate and unified `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, dataset tools, decoding, and QP101 export |
+| `rstim/` | Simulator crate and `rstim` CLI for circuit parsing, sampling, DEM extraction, SVG rendering, and QP101 export |
 | `rstim/doc/` | Simulator getting-started guide, CLI reference, QP101 notes, and parity documentation |
 | `docs/showcases/` | Stable index for runnable workspace showcases |
 | `rsinter/` | Parallel collection and benchmark harness for decoder experiments |
 | `rmatching/` | Rust MWPM decoder for detector-error-model workflows |
-| `renvelope/` | Reference decoders for explicit atom-loss Pauli envelopes (exact MLE and matching) |
 | `rbposd/`, `rilpqec/` | Additional decoder components used by benchmark and comparison flows |
 | `qec-code/`, `qec-ilp-core/` | Code construction helpers and ILP-backed checks |
 | `benchmarks/surface_decoder_compare/` | Cross-decoder comparison harness and benchmark artifacts |
@@ -72,144 +53,23 @@ With RustQEC you can:
 
 ## Quick Start
 
-The development checkout provides one CLI package and one executable. With Rust
-and Cargo installed, run from the repository root:
+Build the workspace:
 
 ```sh
-cargo install --locked --path rstim --force
-rstim --version
+cargo build --workspace
 ```
 
-Create a circuit and inspect its detector output:
+Inspect a small circuit with `rstim stats`:
 
 ```sh
-cat > pipeline.stim <<'STIM'
-R 0
-X_ERROR(1) 0
-M 0
-DETECTOR rec[-1]
-OBSERVABLE_INCLUDE(0) rec[-1]
-STIM
-rstim circuit stats --format json --in pipeline.stim
-rstim circuit detect --in pipeline.stim --shots 1 --out-format dets --append-observables --out events.dets
-rstim circuit dem --in pipeline.stim --out pipeline.dem
-cat events.dets pipeline.dem
-```
-
-The last two outputs are `shot D0 L0` and `error(1) D0 L0`. The same `rstim`
-executable also supports the simulator commands, including `render_svg`, and
-`rstim capabilities --format json` lists the structured command contract.
-
-The published v0.3.3 native installer still contains the previous two-command
-layout. A single-binary native archive will be available after the unified CLI
-release; until then, install this development build from source.
-
-### Rust library users
-
-For direct library integration, see the [independent consumer example](examples/rust-consumer/README.md).
-The [crate guide](docs/crates-io.md) explains package boundaries, features, and
-registry publication checks.
-
-## Build From Source
-
-RustQEC supports native source builds on these tested environments:
-
-| Operating system | Native target | Rust toolchains |
-| --- | --- | --- |
-| Ubuntu 24.04 x86_64 | `x86_64-unknown-linux-gnu` | 1.88.0 (MSRV), stable |
-| macOS 15 on Apple silicon | `aarch64-apple-darwin` | 1.88.0 (MSRV), stable |
-
-Install the full-workspace native build prerequisites on Ubuntu 24.04:
-
-```sh
-sudo apt-get update
-sudo apt-get install -y build-essential clang cmake libclang-dev pkg-config libfontconfig1-dev python3-venv
-```
-
-On macOS 15, install the Xcode Command Line Tools and the Homebrew packages:
-
-```sh
-xcode-select --install
-brew install cmake fontconfig pkg-config python
-```
-
-Install Rust 1.88.0 with [rustup](https://rustup.rs/) for the minimum-version
-configuration, or select the current stable toolchain:
-
-```sh
-rustup toolchain install 1.88.0 --profile minimal
-rustup default 1.88.0
-```
-
-These prerequisites cover the full workspace feature selection, including the HiGHS-backed
-ILP crates and `rsinter` plotting. A smaller `rsinter` build avoids both HiGHS
-and plotting (as well as the other optional decoder runners):
-
-```sh
-cargo build --locked -p rsinter --no-default-features --features rbposd-runner
-```
-
-The complete test suite also invokes Stim through Python. Install it in an
-isolated environment before running `make test`:
-
-```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install stim
-```
-
-The support promise is limited to the two native targets above. Windows and
-other operating-system, architecture, and toolchain combinations are not part
-of the validated matrix.
-
-```sh
-git clone https://github.com/nzy1997/rust-qec.git
-cd rust-qec
-cargo build --locked --workspace --features rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,rstim/ilp,rsinter/full,rstim/benchmark-tools
-```
-
-Inspect a small circuit through the unified CLI:
-
-```sh
-printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | \
-  cargo run -p rstim --bin rstim -- circuit stats --format json
-```
-
-Discover the currently implemented automation contract:
-
-```sh
-cargo run -p rstim --bin rstim -- capabilities --format json
-```
-
-Automation clients can request structured errors independently of successful
-output formatting by adding `--error-format json`. Capability discovery lists
-the concrete argv path, supported arguments, error codes, and exit codes.
-
-The existing crate-specific CLIs remain available. For example, the same
-circuit can be inspected with `rstim stats`:
-
-```sh
-printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --features cli --bin rstim -- stats
+printf 'H 0\nM 0\nDETECTOR rec[-1]\n' | cargo run -p rstim --bin rstim -- stats
 ```
 
 Run the Rust test suite:
 
 ```sh
-make test
+cargo test --workspace
 ```
-
-After a native-support workflow completes, validate its four jobs, compiler
-identities, uploaded CLI evidence, and the checked-out package metadata with:
-
-```sh
-python3 tools/check_native_support_matrix.py --repo-root . --run-id RUN_ID
-```
-
-## Support And Compatibility
-
-The [support and compatibility contract](docs/support-compatibility.md) states
-the current supported boundaries, pre-1.0 compatibility policy, and known
-exclusions for this release line.
 
 ## Primary Next Steps
 
@@ -223,12 +83,8 @@ exclusions for this release line.
   Rust API orientation.
 - [`rstim` CLI reference](rstim/doc/cli.md): `stats`, `sample`, `detect`,
   `analyze_errors`, `render_svg`, `export_json`, and related commands.
-- [Local neural-decoder training data](rstim/doc/training-data.md): aligned
-  detector/observable `b8` streams plus versioned per-shot simulator traces.
 - [`rmatching` decoder docs](rmatching/README.md): MWPM decoder entry point for
   detector-error-model workflows.
-- [`rsinter replay`](docs/rsinter-replay.md): decode frozen `.dem` plus b8
-  detector rows into b8 predictions and a reproducibility report.
 - [Surface decoder benchmark docs](benchmarks/surface_decoder_compare/README.md):
   benchmark setup, smoke commands, and generated artifacts.
 
@@ -240,18 +96,6 @@ stdout for most commands. For static circuit diagrams, prefer:
 ```sh
 rstim render_svg --in circuit.stim --out circuit.svg
 ```
-
-For an interactive single-shot view that can resample the fixed circuit, change
-the realized outcome of existing noise instructions, and export SVG/PDF, run:
-
-```sh
-rstim shot_viewer
-```
-
-The hosted [Shot Lab](https://nzy1997.github.io/rust-qec/interactive/) shows one
-repository-configured circuit. Its
-[local-file entry](https://nzy1997.github.io/rust-qec/interactive/local/) starts
-blank and processes a selected `.stim` file entirely in WebAssembly.
 
 Use `export_json` when you need QP101 structured data for downstream tools,
 fixtures, or the optional `qp101-viz` workflow:

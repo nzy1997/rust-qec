@@ -1,10 +1,10 @@
+use rmatching::Matching;
 use rmatching::flooder::graph::MatchingGraph;
 use rmatching::flooder::graph_flooder::GraphFlooder;
 use rmatching::interop::{CompressedEdge, MwpmEvent};
-use rmatching::matcher::alt_tree::{unstable_erase_by_node, AltTreeEdge, AltTreeNode};
+use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode, unstable_erase_by_node};
 use rmatching::matcher::mwpm::Mwpm;
 use rmatching::types::*;
-use rmatching::Matching;
 
 // =========================================================================
 // 1. Graph self-loop skip (graph.rs line 57)
@@ -176,8 +176,8 @@ fn tree_hitting_match_chain_4() {
 #[test]
 fn tree_hitting_match_asymmetric_chain() {
     let mut g = MatchingGraph::new(3, 1);
-    g.add_edge(0, 1, 2, &[0]);  // D0-D1, weight 2
-    g.add_edge(1, 2, 8, &[]);   // D1-D2, weight 8
+    g.add_edge(0, 1, 2, &[0]); // D0-D1, weight 2
+    g.add_edge(1, 2, 8, &[]); // D1-D2, weight 8
     g.add_boundary_edge(0, 20, &[]);
     g.add_boundary_edge(2, 20, &[]);
 
@@ -203,7 +203,12 @@ fn tree_hitting_match_asymmetric_chain() {
     }
 
     // Should process: D0-D1 match, then D2 hits matched D1, then boundary
-    assert!(event_count >= 2, "Expected at least 2 events, got {}: {:?}", event_count, event_types);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}: {:?}",
+        event_count,
+        event_types
+    );
 }
 
 // =========================================================================
@@ -271,7 +276,11 @@ fn blossom_formation_triangle_plus_one() {
         }
     }
 
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -309,7 +318,11 @@ fn blossom_formation_triangle_four_events() {
         }
     }
 
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -353,7 +366,11 @@ fn handle_blossom_shattering_direct() {
     }
 
     // Should have processed multiple events including blossom formation
-    assert!(event_count >= 3, "Expected at least 3 events, got {}", event_count);
+    assert!(
+        event_count >= 3,
+        "Expected at least 3 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -406,7 +423,7 @@ detector (0, 0, 0)
 
 #[test]
 fn user_graph_boundary_node_routing() {
-    use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+    use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
     let mut g = UserGraph::new();
     // Create edges
@@ -430,7 +447,7 @@ fn user_graph_boundary_node_routing() {
 
 #[test]
 fn user_graph_boundary_search_graph() {
-    use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+    use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
     let mut g = UserGraph::new();
     g.add_edge(0, 1, vec![0], 1.0, 0.1);
@@ -509,6 +526,7 @@ fn user_graph_get_num_detectors_with_boundary() {
 
 // =========================================================================
 // 20. UserGraph handle_dem_instruction with 0 or 3+ detectors
+//     (user_graph.rs line 277 — the _ => {} branch)
 // =========================================================================
 
 #[test]
@@ -517,16 +535,11 @@ fn user_graph_dem_instruction_zero_detectors() {
 
     let mut g = UserGraph::new();
     // 0 detectors => no edge added
-    g.handle_dem_instruction(0.1, &[], vec![0]).unwrap();
+    g.handle_dem_instruction(0.1, &[], vec![0]);
     assert_eq!(g.get_num_edges(), 0);
 
-    // 3 detectors => reject an unsupported hyperedge instead of silently
-    // changing the model.
-    let error = g
-        .handle_dem_instruction(0.1, &[0, 1, 2], vec![0])
-        .unwrap_err();
-    assert!(error.contains("requires a graphlike DEM"));
-    assert!(error.contains("3 detectors"));
+    // 3 detectors => no edge added (hyperedge, ignored)
+    g.handle_dem_instruction(0.1, &[0, 1, 2], vec![0]);
     assert_eq!(g.get_num_edges(), 0);
 }
 
@@ -588,12 +601,7 @@ fn prune_upward_path_back_false() {
     arena[child.0].parent = Some(AltTreeEdge::new(root, e.reversed()));
 
     // Prune from child to root with back=false
-    let result = AltTreeNode::prune_upward_path_stopping_before(
-        child,
-        &mut arena,
-        root,
-        false,
-    );
+    let result = AltTreeNode::prune_upward_path_stopping_before(child, &mut arena, root, false);
 
     // Should have 2 region edges (outer->inner, inner->parent)
     assert_eq!(result.pruned_path_region_edges.len(), 2);
@@ -703,7 +711,7 @@ error(0.1) D1
 
 #[test]
 fn user_graph_node1_is_boundary() {
-    use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+    use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
     let mut g = UserGraph::new();
     g.add_edge(0, 1, vec![0], 1.0, 0.1);
@@ -771,7 +779,11 @@ fn blossom_pentagon_five_events() {
         }
     }
 
-    assert!(event_count >= 3, "Expected at least 3 events, got {}", event_count);
+    assert!(
+        event_count >= 3,
+        "Expected at least 3 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -816,7 +828,12 @@ fn direct_blossom_shatter_event() {
     }
 
     // Should have processed events (blossom formation at minimum)
-    assert!(count >= 2, "Expected at least 2 events, got {}: {:?}", count, events);
+    assert!(
+        count >= 2,
+        "Expected at least 2 events, got {}: {:?}",
+        count,
+        events
+    );
 }
 
 // =========================================================================
@@ -851,12 +868,7 @@ error(0.05) D2
 ";
     let mut m = Matching::from_dem(dem).unwrap();
 
-    let syndromes = vec![
-        vec![1u8, 1, 0],
-        vec![0, 0, 0],
-        vec![1, 0, 0],
-        vec![0, 1, 1],
-    ];
+    let syndromes = vec![vec![1u8, 1, 0], vec![0, 0, 0], vec![1, 0, 0], vec![0, 1, 1]];
 
     let batch = m.decode_batch(&syndromes);
     assert_eq!(batch.len(), 4);
@@ -879,9 +891,9 @@ fn mwpm_make_child_exercises_add_child() {
     // D0 and D1 match first, then D2 grows into D1 (tree-hitting-match)
     // which calls make_child internally
     let mut g = MatchingGraph::new(4, 1);
-    g.add_edge(0, 1, 4, &[0]);   // cheap
-    g.add_edge(1, 2, 12, &[]);   // medium
-    g.add_edge(2, 3, 4, &[]);    // cheap
+    g.add_edge(0, 1, 4, &[0]); // cheap
+    g.add_edge(1, 2, 12, &[]); // medium
+    g.add_edge(2, 3, 4, &[]); // cheap
     g.add_boundary_edge(0, 40, &[]);
     g.add_boundary_edge(3, 40, &[]);
 
@@ -990,7 +1002,7 @@ fn alt_tree_mrca_different_trees() {
 
 #[test]
 fn user_graph_search_graph_node1_boundary() {
-    use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+    use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
     let mut g = UserGraph::new();
     g.add_edge(0, 1, vec![0], 1.0, 0.1);
@@ -1032,9 +1044,9 @@ repeat 2 {
 fn mwpm_tree_hitting_boundary_match_direct() {
     // D0 has cheap boundary, D1 connects to D0 with heavier edge
     let mut g = MatchingGraph::new(2, 1);
-    g.add_boundary_edge(0, 2, &[0]);  // D0 boundary, weight 2
-    g.add_edge(0, 1, 8, &[]);         // D0-D1, weight 8
-    g.add_boundary_edge(1, 20, &[]);   // D1 boundary, weight 20
+    g.add_boundary_edge(0, 2, &[0]); // D0 boundary, weight 2
+    g.add_edge(0, 1, 8, &[]); // D0-D1, weight 8
+    g.add_boundary_edge(1, 20, &[]); // D1 boundary, weight 20
 
     let mut mwpm = Mwpm::new(GraphFlooder::new(g));
 
@@ -1057,7 +1069,12 @@ fn mwpm_tree_hitting_boundary_match_direct() {
     }
 
     // D0 hits boundary first, then D1 grows into boundary-matched D0
-    assert!(event_count >= 2, "Expected at least 2 events, got {}: {:?}", event_count, event_types);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}: {:?}",
+        event_count,
+        event_types
+    );
 }
 
 // =========================================================================
@@ -1066,7 +1083,7 @@ fn mwpm_tree_hitting_boundary_match_direct() {
 
 #[test]
 fn user_graph_both_nodes_boundary() {
-    use rmatching::driver::user_graph::{UserGraph, NUM_DISTINCT_WEIGHTS};
+    use rmatching::driver::user_graph::{NUM_DISTINCT_WEIGHTS, UserGraph};
 
     let mut g = UserGraph::new();
     g.add_edge(0, 1, vec![0], 1.0, 0.1);
@@ -1121,7 +1138,10 @@ fn blossom_formation_full_decode_pipeline() {
         }
         if matches!(&event, MwpmEvent::RegionHitRegion { .. }) {
             // Check if it's a same-tree collision (blossom formation)
-            if let MwpmEvent::RegionHitRegion { region1, region2, .. } = &event {
+            if let MwpmEvent::RegionHitRegion {
+                region1, region2, ..
+            } = &event
+            {
                 let an1 = mwpm.flooder.region_arena[region1.0].alt_tree_node;
                 let an2 = mwpm.flooder.region_arena[region2.0].alt_tree_node;
                 if an1.is_some() && an2.is_some() {
@@ -1136,7 +1156,11 @@ fn blossom_formation_full_decode_pipeline() {
         }
     }
 
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -1173,7 +1197,11 @@ fn blossom_five_node_mwpm() {
         }
     }
 
-    assert!(event_count >= 3, "Expected at least 3 events, got {}", event_count);
+    assert!(
+        event_count >= 3,
+        "Expected at least 3 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -1193,12 +1221,12 @@ fn tree_absorb_then_blossom_orphan_reparenting() {
     // Sequence: D0-D1 match, D2 absorbs them, D3 absorbs D2's match partner,
     // then D0 and D3 collide in same tree => blossom with orphans
     let mut g = MatchingGraph::new(6, 1);
-    g.add_edge(0, 1, 4, &[0]);    // D0-D1, cheap
-    g.add_edge(1, 2, 12, &[]);    // D1-D2, medium
-    g.add_edge(2, 3, 12, &[]);    // D2-D3, medium
-    g.add_edge(0, 3, 24, &[]);    // D0-D3, creates odd cycle
-    g.add_edge(2, 4, 40, &[]);    // D2-D4, expensive
-    g.add_edge(4, 5, 4, &[]);     // D4-D5, cheap
+    g.add_edge(0, 1, 4, &[0]); // D0-D1, cheap
+    g.add_edge(1, 2, 12, &[]); // D1-D2, medium
+    g.add_edge(2, 3, 12, &[]); // D2-D3, medium
+    g.add_edge(0, 3, 24, &[]); // D0-D3, creates odd cycle
+    g.add_edge(2, 4, 40, &[]); // D2-D4, expensive
+    g.add_edge(4, 5, 4, &[]); // D4-D5, cheap
     g.add_boundary_edge(0, 60, &[]);
     g.add_boundary_edge(5, 60, &[]);
 
@@ -1221,7 +1249,11 @@ fn tree_absorb_then_blossom_orphan_reparenting() {
         }
     }
 
-    assert!(event_count >= 3, "Expected at least 3 events, got {}", event_count);
+    assert!(
+        event_count >= 3,
+        "Expected at least 3 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================
@@ -1407,7 +1439,11 @@ fn blossom_triangle_boundary_mwpm() {
         }
     }
 
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 
     // Reset and run again to test reset after blossom
     mwpm.reset();
@@ -1466,7 +1502,11 @@ fn complex_graph_multiple_triangles_mwpm() {
         }
     }
 
-    assert!(event_count >= 3, "Expected at least 3 events, got {}", event_count);
+    assert!(
+        event_count >= 3,
+        "Expected at least 3 events, got {}",
+        event_count
+    );
 }
 
 // =========================================================================

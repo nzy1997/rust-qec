@@ -36,7 +36,7 @@ ITEM_REQUIRED_FIELDS = {
 }
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
-    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample|compiled-steady-release)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
+    r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 PROVENANCE_SCHEMA_VERSION = 1
@@ -80,13 +80,6 @@ RSTIM_VS_STIM_REQUIRED_ARTIFACTS = {
     "benchmarks/rstim_vs_stim_simulator/cases.full.toml": "fixture-manifest",
     "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim": "stim-fixture",
     "docs/showcases/rstim-vs-stim-simulator.md": "showcase",
-}
-RSTIM_VS_STIM_OPTIONAL_ARTIFACTS = {
-    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/raw.jsonl": "speed-raw",
-    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json": "speed-summary",
-    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md": "speed-report",
-    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/environment.json": "environment",
-    "benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/artifact-sha256.json": "artifact-hashes",
 }
 RSTIM_VS_STIM_REQUIRED_PROVENANCE_REQUIREMENTS = (
     "OS",
@@ -291,7 +284,6 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
         add_error(errors, scope, f"partial {RSTIM_VS_STIM_FAMILY_ID} family must list checked artifacts")
         return
 
-    accepted_artifacts = {**RSTIM_VS_STIM_REQUIRED_ARTIFACTS, **RSTIM_VS_STIM_OPTIONAL_ARTIFACTS}
     found_required_artifacts: dict[str, tuple[str, str, bool]] = {}
     for item in checked_items:
         item_id = item.get("id", "<missing>")
@@ -305,14 +297,14 @@ def validate_family_status_policy(scope: str, family: dict[str, Any], errors: li
             artifact_path = artifact.get("path")
             if not isinstance(artifact_path, str):
                 continue
-            if artifact.get("checked") is True and artifact_path not in accepted_artifacts:
+            if artifact.get("checked") is True and artifact_path not in RSTIM_VS_STIM_REQUIRED_ARTIFACTS:
                 add_error(
                     errors,
                     item_scope,
                     f"checked artifact {artifact_path} is not accepted by rstim-vs-Stim site policy",
                 )
                 continue
-            expected_kind = accepted_artifacts.get(artifact_path)
+            expected_kind = RSTIM_VS_STIM_REQUIRED_ARTIFACTS.get(artifact_path)
             if expected_kind is None:
                 continue
             artifact_checked = artifact.get("checked") is True
@@ -707,18 +699,12 @@ def validate_manifest(repo_root: Path, manifest_path: Path, site_root: Path | No
 def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     errors: list[str] = []
     scope = "site root"
-    evidence_page_names = (
-        "benchmarks/simulation/index.html",
-        "benchmarks/decoders/index.html",
-        "css-codes/index.html",
-        "validation/index.html",
-    )
-    evidence_paths = [site_root / relative for relative in evidence_page_names]
+    benchmarks_path = site_root / "benchmarks/index.html"
     benchmarks_js_path = site_root / "js/benchmarks.js"
     expected_manifest = site_root / "data/benchmark-site.json"
 
     for path, label in [
-        *zip(evidence_paths, evidence_page_names),
+        (benchmarks_path, "benchmarks/index.html"),
         (benchmarks_js_path, "js/benchmarks.js"),
         (expected_manifest, "data/benchmark-site.json"),
     ]:
@@ -728,12 +714,23 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     if manifest_path.resolve() != expected_manifest.resolve():
         add_error(errors, scope, "manifest path must be _site/data/benchmark-site.json when --site-root is used")
 
+    benchmarks = benchmarks_path.read_text(encoding="utf-8") if benchmarks_path.is_file() else ""
     benchmarks_js = benchmarks_js_path.read_text(encoding="utf-8") if benchmarks_js_path.is_file() else ""
+
+    for marker in [
+        'id="benchmarks"',
+        'id="benchmark-manifest"',
+        'id="checked-benchmark-results"',
+        'id="checked-benchmark-result-cards"',
+        "Benchmark Methodology",
+        "Claims Policy",
+    ]:
+        if marker not in benchmarks:
+            add_error(errors, scope, f"benchmarks/index.html missing benchmark marker {marker}")
 
     required_app_markers = [
         'fetch(ROOT + "/data/benchmark-site.json")',
-        "evidenceContainers",
-        "renderEvidenceContainers",
+        "renderBenchmarkManifest",
         "family.status",
         "family.claims_limit",
         "item.status",
@@ -748,7 +745,8 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
         )
 
     checked_result_markers = [
-        "container.dataset.evidenceItems",
+        "checkedBenchmarkItems",
+        "renderCheckedBenchmarkResults",
         "item.artifacts",
         "item.commands",
         "item.caveats",
@@ -773,38 +771,6 @@ def validate_site_root(site_root: Path, manifest_path: Path) -> list[str]:
     except (FileNotFoundError, json.JSONDecodeError):
         manifest = None
     if isinstance(manifest, dict):
-        expected_item_ids = {
-            item["id"]
-            for family in manifest.get("families", [])
-            if isinstance(family, dict)
-            for item in family.get("evidence_items", [])
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
-        }
-        assignments: dict[str, list[str]] = {}
-        for relative, path in zip(evidence_page_names, evidence_paths):
-            if not path.is_file():
-                continue
-            page_text = path.read_text(encoding="utf-8")
-            matches = re.findall(r'data-evidence-items="([^"]*)"', page_text)
-            for value in matches:
-                for item_id in value.split():
-                    assignments.setdefault(item_id, []).append(relative)
-        assigned_item_ids = set(assignments)
-        missing_assignments = sorted(expected_item_ids - assigned_item_ids)
-        unexpected_assignments = sorted(assigned_item_ids - expected_item_ids)
-        duplicate_assignments = {
-            item_id: pages for item_id, pages in assignments.items() if len(pages) > 1
-        }
-        if missing_assignments:
-            add_error(errors, scope, f"benchmark evidence items are not assigned to a content page: {missing_assignments}")
-        if unexpected_assignments:
-            add_error(errors, scope, f"content pages reference unknown benchmark evidence items: {unexpected_assignments}")
-        if duplicate_assignments:
-            detail = ", ".join(
-                f"{item_id} ({', '.join(pages)})"
-                for item_id, pages in sorted(duplicate_assignments.items())
-            )
-            add_error(errors, scope, f"benchmark evidence items are assigned more than once: {detail}")
         validate_site_artifact_references(site_root, manifest, errors)
 
     return errors
@@ -814,18 +780,10 @@ def validate_site_artifact_references(site_root: Path, manifest: dict[str, Any],
     checked_paths = {artifact_path for _, artifact_path in iter_checked_artifact_paths(manifest)}
     for relative in (
         "index.html",
-        "get-started/index.html",
-        "support/index.html",
-        "benchmarks/simulation/index.html",
-        "benchmarks/decoders/index.html",
-        "css-codes/index.html",
+        "guide/index.html",
+        "benchmarks/index.html",
         "qp101/index.html",
-        "qp101/protocol/index.html",
-        "validation/index.html",
-        "interactive/index.html",
-        "interactive/local/index.html",
         "js/benchmarks.js",
-        "js/docs.js",
         "js/qp101-browser.js",
     ):
         path = site_root / relative
@@ -1060,7 +1018,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "commands": [
                             "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                             "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
-                            "cargo run -p rstim --features cli --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
                             "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
                             "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                             "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
@@ -1069,7 +1027,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                             [
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
-                                "cargo run -p rstim --features cli --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                                "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
                                 "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
                                 "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                                 "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
@@ -1118,7 +1076,7 @@ def make_fixture_repo() -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
                         "status": "partial",
                         "tier": "regression-gate",
                         "artifacts": [],
-                        "commands": ["cargo run -p rstim --features cli --bin rstim -- perf ci --out-dir perf-artifacts"],
+                        "commands": ["cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts"],
                         "provenance_requirements": ["command line", "date"],
                         "provenance_sources": [".github/workflows/ci.yml"],
                         "claims_limit": "Regression gate evidence only.",

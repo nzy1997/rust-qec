@@ -1,5 +1,5 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 use rstim::sim::frame::FrameSimulator;

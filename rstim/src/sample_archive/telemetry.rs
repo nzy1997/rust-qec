@@ -1,7 +1,7 @@
 use crate::sample_archive::format::{SampleArchiveError, SampleArchiveErrorCode};
-use crate::sim::bit_table::{checked_bit_table_storage_size, BitTableAllocError};
-use std::sync::atomic::{AtomicU64, Ordering};
+use crate::sim::bit_table::{BitTableAllocError, checked_bit_table_storage_size};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::{self, ThreadId};
 
 static TELEMETRY_OWNER: Mutex<Option<ThreadId>> = Mutex::new(None);

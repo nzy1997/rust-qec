@@ -111,7 +111,11 @@ fn ilp_dem_decoder_reports_unavailable_gurobi_backend() {
             verbose: false,
         },
     });
-    let err = decoder.compile_for_dem(&dem).err().unwrap();
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
+
+    let err = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 1, 1)
+        .unwrap_err();
 
     assert!(
         err.contains("no ILP backend is available"),

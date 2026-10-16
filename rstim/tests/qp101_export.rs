@@ -1,8 +1,8 @@
 use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::parser::parse_lines;
 use rstim::qp101::{
-    export_qp101, export_qp101_with_sample_trace, Qp101Annotation, Qp101AnnotationStyle,
-    Qp101Display, Qp101Document, Qp101Operation, Qp101PauliBasis, Qp101TargetRef,
+    Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document, Qp101Operation,
+    Qp101PauliBasis, Qp101TargetRef, export_qp101, export_qp101_with_sample_trace,
 };
 use rstim::sample_trace::{
     DetectorEvent, MeasurementComponent, MeasurementEvent, NoiseEvent, SampleTrace,
@@ -429,8 +429,8 @@ fn export_classifies_loss_as_noise() {
 
 #[test]
 fn export_qp101_with_sample_trace_adds_noise_measurement_and_detector_annotations() {
-    let circuit = parse_lines("REPEAT 2 {\n  LOSS(1) 0\n  M 0\n  DETECTOR rec[-1]\n}\nMRL 0\n")
-        .unwrap();
+    let circuit =
+        parse_lines("REPEAT 2 {\n  LOSS(1) 0\n  M 0\n  DETECTOR rec[-1]\n}\nMRL 0\n").unwrap();
     let trace = SampleTrace {
         noise_events: vec![
             NoiseEvent {
@@ -514,10 +514,7 @@ fn export_qp101_with_sample_trace_adds_noise_measurement_and_detector_annotation
     assert_eq!(loss_annotations[0]["target_slots"], json!([0]));
     assert_eq!(loss_annotations[0]["style"]["preset"], "danger");
     assert_eq!(loss_annotations[0]["text"], "repeat[1]");
-    assert_eq!(
-        loss_annotations[0]["context"]["target_qubits"],
-        json!([0])
-    );
+    assert_eq!(loss_annotations[0]["context"]["target_qubits"], json!([0]));
 
     let repeat_measure_annotations = value["operations"][0]["body"][1]["annotations"]
         .as_array()
@@ -545,13 +542,19 @@ fn export_qp101_with_sample_trace_adds_noise_measurement_and_detector_annotation
         json!(["dem-symptom", "query-result"])
     );
     assert_eq!(detector_annotations[0]["text"], "repeat[1]");
-    assert_eq!(detector_annotations[0]["context"]["detector_index"], json!(1));
+    assert_eq!(
+        detector_annotations[0]["context"]["detector_index"],
+        json!(1)
+    );
 
     let loss_visible_annotations = value["operations"][1]["annotations"].as_array().unwrap();
     assert_eq!(loss_visible_annotations.len(), 1);
     assert_eq!(loss_visible_annotations[0]["label"], "L=1 | M=1[L]");
     assert_eq!(loss_visible_annotations[0]["target_slots"], json!([0]));
-    assert_eq!(loss_visible_annotations[0]["context"]["loss_visible"], json!(true));
+    assert_eq!(
+        loss_visible_annotations[0]["context"]["loss_visible"],
+        json!(true)
+    );
     assert_eq!(
         loss_visible_annotations[0]["context"]["components"],
         json!({
@@ -728,7 +731,7 @@ fn export_qp101_with_sample_trace_rejects_missing_loss_visible_components() {
 }
 
 #[test]
-fn export_qp101_with_sample_trace_accepts_supported_measurement_instruction_families() {
+fn export_qp101_with_sample_trace_rejects_unsupported_measurement_instruction_families() {
     let trace = SampleTrace {
         noise_events: vec![],
         measurement_events: vec![],
@@ -748,12 +751,12 @@ fn export_qp101_with_sample_trace_accepts_supported_measurement_instruction_fami
         ),
     ] {
         let circuit = parse_lines(circuit_text).unwrap();
-        let document = export_qp101_with_sample_trace(&circuit, &trace)
-            .unwrap_or_else(|error| panic!("sample export failed for {gate}: {error}"));
-        assert_eq!(
-            document.operations.len(),
-            2,
-            "unexpected document for {gate}"
+        let err = export_qp101_with_sample_trace(&circuit, &trace).unwrap_err();
+        assert!(
+            err.contains(&format!(
+                "sample trace visualization does not yet support instruction {gate}"
+            )),
+            "unexpected error for {gate}: {err}"
         );
     }
 }
@@ -783,9 +786,7 @@ fn export_preserves_observable_noise_tags_and_special_targets() {
     let doc = export_qp101(&instrs).unwrap();
 
     match &doc.operations[0] {
-        Qp101Operation::ObservableInclude {
-            index, sources, ..
-        } => {
+        Qp101Operation::ObservableInclude { index, sources, .. } => {
             assert_eq!(*index, 2);
             assert_eq!(sources, &vec![Qp101TargetRef::Rec { offset: -1 }]);
         }

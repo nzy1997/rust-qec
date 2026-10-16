@@ -1,6 +1,6 @@
 use rmatching::flooder::detector_node::DetectorNode;
 use rmatching::flooder::fill_region::GraphFillRegion;
-use rmatching::flooder::graph::{MatchingGraph, BOUNDARY_NODE};
+use rmatching::flooder::graph::{BOUNDARY_NODE, MatchingGraph};
 use rmatching::types::*;
 
 #[test]

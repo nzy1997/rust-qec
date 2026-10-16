@@ -1,7 +1,7 @@
-use std::num::Wrapping;
-use rmatching::types::*;
 use rmatching::interop::*;
+use rmatching::types::*;
 use rmatching::util::radix_heap::{HasTime, RadixHeapQueue};
+use std::num::Wrapping;
 
 #[test]
 fn compressed_edge_reversed() {
@@ -110,8 +110,9 @@ fn queued_event_tracker_basic() {
 
     // Dequeue and check decision
     let dequeued = queue.dequeue();
-    let result = tracker.dequeue_decision(&dequeued, &mut queue, |t| {
-        FloodCheckEvent::LookAtNode { node: NodeIdx(0), time: t }
+    let result = tracker.dequeue_decision(&dequeued, &mut queue, |t| FloodCheckEvent::LookAtNode {
+        node: NodeIdx(0),
+        time: t,
     });
     assert!(result);
 }
@@ -138,16 +139,18 @@ fn queued_event_tracker_stale_event() {
     // Dequeue the earlier event (time=5) first
     let dequeued = queue.dequeue();
     assert_eq!(dequeued.time(), Wrapping(5));
-    let result = tracker.dequeue_decision(&dequeued, &mut queue, |t| {
-        FloodCheckEvent::LookAtNode { node: NodeIdx(0), time: t }
+    let result = tracker.dequeue_decision(&dequeued, &mut queue, |t| FloodCheckEvent::LookAtNode {
+        node: NodeIdx(0),
+        time: t,
     });
     assert!(result);
 
     // The stale event (time=10) should be rejected
     let stale = queue.dequeue();
     assert_eq!(stale.time(), Wrapping(10));
-    let result2 = tracker.dequeue_decision(&stale, &mut queue, |t| {
-        FloodCheckEvent::LookAtNode { node: NodeIdx(0), time: t }
+    let result2 = tracker.dequeue_decision(&stale, &mut queue, |t| FloodCheckEvent::LookAtNode {
+        node: NodeIdx(0),
+        time: t,
     });
     assert!(!result2);
 }

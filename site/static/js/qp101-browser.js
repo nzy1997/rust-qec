@@ -226,37 +226,24 @@
       allButtons[0].click();
     }
   }
-  async function loadSchema() {
-    status.textContent = "Loading";
-    status.setAttribute?.("aria-label", "Loading QP101 schema");
-    detail.classList.remove("error");
-    detail.innerHTML = "<h3>Loading schema</h3><p>Fetching the versioned QP101 definition…</p>";
-    navList.innerHTML = "";
-    try {
-      // Relative-root contract marker: fetch(ROOT + "/qp101.schema.json")
-      const response = await fetch(ROOT + "/qp101.schema.json", { cache: "no-cache" });
-      if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
-      const schema = await response.json();
+  fetch(ROOT + "/qp101.schema.json")
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((schema) => {
       status.textContent = "Loaded";
-      status.setAttribute?.("aria-label", "QP101 schema loaded");
       renderNav(schema, collectNodes(schema));
-    } catch (error) {
-      status.textContent = "Unavailable";
-      status.setAttribute?.("aria-label", "QP101 schema unavailable");
+    })
+    .catch((error) => {
+      status.textContent = "Error";
       detail.classList.add("error");
       detail.innerHTML = `
-        <h3>Schema browser is unavailable</h3>
+        <h3>Schema could not be loaded</h3>
         <p>${escapeHtml(error.message)}</p>
-        <p>The format specification and raw schema remain available without the interactive browser.</p>
-        <div class="content-links">
-          <button type="button" class="button" data-schema-retry>Try again</button>
-          <a href="${ROOT}/qp101.schema.json">Open raw schema</a>
-          <a href="${ROOT}/qp101/protocol/">Read the format specification</a>
-        </div>
+        <p><a href="${ROOT}/qp101.schema.json" download>Download qp101.schema.json</a></p>
       `;
-      detail.querySelector("[data-schema-retry]").addEventListener("click", loadSchema);
-    }
-  }
-
-  loadSchema();
+    });
 })();

@@ -27,7 +27,6 @@ HIGH_ENTROPY_ROW_INDEX = 7
 
 PINNED_BENCHMARK_RAW_BYTES = 1_552_384
 PINNED_BENCHMARK_SHA256 = "a80d7503ee2d06d6b4e04a1c582b32ab89c6dd9c70f9d4e4e1d671f4386f278b"
-REQUIRED_STIM_BASELINE_FORMATS = ("b8", "r8", "ptb64")
 PINNED_BENCHMARK_SAMPLE_ARGV = [
     "target/release/rstim",
     "sample",
@@ -148,12 +147,12 @@ def load_catalog_cases_from_path(catalog_path: Path) -> dict[str, dict[str, Any]
     return by_id
 
 
-def load_catalog_cases(repo_root: Path = REPO_ROOT) -> dict[str, dict[str, Any]]:
-    return load_catalog_cases_from_path(repo_root / "rstim/tests/fixtures/rsmp/catalog.json")
+def load_catalog_cases() -> dict[str, dict[str, Any]]:
+    return load_catalog_cases_from_path(REPO_ROOT / "rstim/tests/fixtures/rsmp/catalog.json")
 
 
-def load_locked_package_versions(repo_root: Path = REPO_ROOT) -> dict[str, str]:
-    with (repo_root / "Cargo.lock").open("rb") as handle:
+def load_locked_package_versions() -> dict[str, str]:
+    with (REPO_ROOT / "Cargo.lock").open("rb") as handle:
         lock = tomllib.load(handle)
     packages = lock.get("package")
     if not isinstance(packages, list):
@@ -245,51 +244,10 @@ def repo_relative_path(raw: Any, field: str) -> Path:
     return REPO_ROOT / posix
 
 
-def require_string_list(value: Any, field: str) -> list[Any]:
-    argv = require_list(value, field)
-    if any(not isinstance(part, str) for part in argv):
-        raise ValueError(f"{field} entries must be strings")
-    return argv
-
-
-def validate_stim_baselines(row: dict[str, Any], label: str) -> None:
-    measurement = require_object(row.get("measurement_input"), f"{label} measurement_input")
-    measurement_sha256 = require_sha256(measurement.get("sha256"), f"{label} measurement_sha256")
-    raw_b8_bytes = require_int(measurement.get("raw_b8_bytes"), f"{label} raw_b8_bytes", minimum=0)
-    baselines = require_object(row.get("stim_baselines"), f"{label} stim_baselines")
-    unexpected = sorted(set(baselines) - set(REQUIRED_STIM_BASELINE_FORMATS))
-    if unexpected:
-        raise ValueError(f"{label} unexpected Stim baseline format: {unexpected[0]}")
-    for fmt in REQUIRED_STIM_BASELINE_FORMATS:
-        if fmt not in baselines:
-            raise ValueError(f"missing required Stim baseline format: {fmt}")
-        baseline_label = f"{label} stim baseline {fmt}"
-        baseline = require_object(baselines[fmt], baseline_label)
-        artifact = require_object(baseline.get("artifact"), f"{baseline_label} artifact")
-        artifact_bytes = require_int(artifact.get("bytes"), f"{baseline_label} artifact bytes", minimum=1)
-        artifact_sha256 = require_sha256(artifact.get("sha256"), f"{baseline_label} artifact sha256")
-        require_string_list(artifact.get("argv"), f"{baseline_label} artifact argv")
-        direct = require_object(baseline.get("direct_zstd"), f"{baseline_label} direct_zstd")
-        if direct.get("input_sha256") != artifact_sha256:
-            raise ValueError(f"{baseline_label} direct_zstd input_sha256 must match artifact sha256")
-        require_int(direct.get("bytes"), f"{baseline_label} direct_zstd bytes", minimum=1)
-        require_sha256(direct.get("sha256"), f"{baseline_label} direct_zstd sha256")
-        direct_argv = require_list(direct.get("argv"), f"{baseline_label} direct_zstd argv")
-        validate_direct_zstd_argv(direct_argv, baseline_label)
-        roundtrip = require_object(baseline.get("roundtrip_b8"), f"{baseline_label} roundtrip_b8")
-        require_string_list(roundtrip.get("argv"), f"{baseline_label} roundtrip_b8 argv")
-        roundtrip_sha256 = require_sha256(roundtrip.get("sha256"), f"{baseline_label} roundtrip_b8 sha256")
-        if roundtrip_sha256 != measurement_sha256:
-            raise ValueError(f"{fmt} round-trip measurement SHA-256 mismatch")
-        if fmt == "b8":
-            if artifact_bytes != raw_b8_bytes:
-                raise ValueError(f"{baseline_label} artifact bytes must equal canonical raw b8 bytes")
-            if artifact_sha256 != measurement_sha256:
-                raise ValueError(f"{baseline_label} artifact must be the canonical measurement bytes")
-
-
 def expected_b8_bytes(bits_per_shot: int, shots: int) -> int:
     return ((bits_per_shot + 7) // 8) * shots
+
+
 def expected_blocks(shots: int) -> int:
     return (shots + 4095) // 4096
 
@@ -335,12 +293,12 @@ def peak_working_set(row: dict[str, Any]) -> int:
     return peak
 
 
-def validate_records(records: list[dict[str, Any]], repo_root: Path = REPO_ROOT) -> None:
+def validate_records(records: list[dict[str, Any]]) -> None:
     if len(records) != len(REQUIRED_ROWS):
         raise ValueError(f"raw.jsonl must contain exactly {len(REQUIRED_ROWS)} rows")
     if sha256_bytes(HIGH_ENTROPY_CIRCUIT_TEXT.encode("utf-8")) != HIGH_ENTROPY_CIRCUIT_SHA256:
         raise ValueError("internal high-entropy circuit SHA-256 constant is wrong")
-    catalog_cases = load_catalog_cases(repo_root)
+    catalog_cases = load_catalog_cases()
     for index, (row, requirement) in enumerate(zip(records, REQUIRED_ROWS, strict=True)):
         label = f"raw row {index} ({requirement.case_id})"
         if row.get("schema_version") != RAW_SCHEMA_VERSION:
@@ -510,9 +468,6 @@ def validate_records(records: list[dict[str, Any]], repo_root: Path = REPO_ROOT)
                 raise ValueError(f"{label} threshold_arithmetic must be integer_cross_multiplication")
             raise ValueError(f"{label} zstd_contract mismatch")
 
-        if requirement.case_id == BENCHMARK_CASE_ID:
-            validate_stim_baselines(row, label)
-
 
 def ratio(numerator: int, denominator: int) -> dict[str, int]:
     return {
@@ -557,24 +512,6 @@ def row_summary(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def stim_baseline_summaries(benchmark: dict[str, Any]) -> dict[str, Any]:
-    archive_bytes = int(benchmark["rsmp_archive"]["bytes"])
-    summaries: dict[str, Any] = {}
-    for fmt in REQUIRED_STIM_BASELINE_FORMATS:
-        baseline = benchmark["stim_baselines"][fmt]
-        raw_bytes = int(baseline["artifact"]["bytes"])
-        direct_bytes = int(baseline["direct_zstd"]["bytes"])
-        summaries[fmt] = {
-            "raw_bytes": raw_bytes,
-            "direct_zstd_bytes": direct_bytes,
-            "artifact_sha256": baseline["artifact"]["sha256"],
-            "roundtrip_b8_sha256": baseline["roundtrip_b8"]["sha256"],
-            "archive_to_raw": ratio(archive_bytes, raw_bytes),
-            "archive_to_direct_zstd": ratio(archive_bytes, direct_bytes),
-        }
-    return summaries
-
-
 def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     benchmark = records[BENCHMARK_ROW_INDEX]
     high_entropy = records[HIGH_ENTROPY_ROW_INDEX]
@@ -616,7 +553,6 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         "required_semantic_roles": [row.semantic_role for row in REQUIRED_ROWS[:-1]],
         "cases": [row_summary(row) for row in records],
         "benchmark": row_summary(benchmark),
-        "stim_baselines": stim_baseline_summaries(benchmark),
         "high_entropy_control": {
             **row_summary(high_entropy),
             "direct_zstd_is_diagnostic_only": True,
@@ -686,28 +622,6 @@ def render_report(summary: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Stim Format Baselines",
-            "Each row serializes the same canonical 1024-shot, seed-7 measurement batch in one Stim result format. Every format round-trips to the canonical b8 SHA-256; ratios are relative to the RSMP archive byte count.",
-            "| format | raw bytes | direct zstd | archive/raw | archive/zstd | round-trip b8 SHA-256 |",
-            "| --- | ---: | ---: | ---: | ---: | --- |",
-        ]
-    )
-    archive_bytes = benchmark["archive_bytes"]
-    for fmt in REQUIRED_STIM_BASELINE_FORMATS:
-        baseline = summary["stim_baselines"][fmt]
-        lines.append(
-            "| {fmt} | {raw} | {direct} | {archive_raw} | {archive_zstd} | {roundtrip} |".format(
-                fmt=fmt,
-                raw=baseline["raw_bytes"],
-                direct=baseline["direct_zstd_bytes"],
-                archive_raw=format_percent(archive_bytes, baseline["raw_bytes"]),
-                archive_zstd=format_percent(archive_bytes, baseline["direct_zstd_bytes"]),
-                roundtrip=baseline["roundtrip_b8_sha256"],
-            )
-        )
-    lines.extend(
-        [
-            "",
             "## Environment",
             "The exact producer, Git state, Rust target, Cargo.lock hash, zstd package versions, and complete command argv values are recorded in environment.json. This report is rendered from raw.jsonl-derived counts and gate arithmetic.",
             "",
@@ -724,7 +638,6 @@ def render_report(summary: dict[str, Any]) -> str:
             "## Claim Limitations",
             "- These gates prove the pinned `rsmp v1` evidence cases under the recorded producer and zstd settings.",
             "- Direct Zstandard for the high-entropy control is reported only as a diagnostic; the acceptance denominator is raw b8 bytes.",
-            "- The Stim `b8`/`r8`/`ptb64` baselines report byte counts and ratios only; no universal cross-format compression superiority is claimed.",
             "- No fixed wall-clock performance gate or cross-version byte-for-byte writer determinism is claimed.",
             "",
         ]
@@ -771,7 +684,7 @@ def first_json_difference(expected: Any, actual: Any, path: str = "$") -> str | 
     return None
 
 
-def validate_environment(environment: dict[str, Any], repo_root: Path = REPO_ROOT) -> None:
+def validate_environment(environment: dict[str, Any]) -> None:
     if environment.get("schema_version") != ENVIRONMENT_SCHEMA_VERSION:
         raise ValueError(f"environment.json schema_version must be {ENVIRONMENT_SCHEMA_VERSION}")
     if environment.get("evidence_format") != EVIDENCE_FORMAT:
@@ -779,8 +692,9 @@ def validate_environment(environment: dict[str, Any], repo_root: Path = REPO_ROO
     if require_object(environment.get("zstd_contract"), "environment zstd_contract") != ZSTD_CONTRACT:
         raise ValueError("environment zstd_contract mismatch")
     cargo = require_object(environment.get("cargo"), "environment cargo")
-    require_sha256(cargo.get("lock_sha256"), "environment cargo lock_sha256")
-    locked_versions = load_locked_package_versions(repo_root)
+    if cargo.get("lock_sha256") != sha256_file(REPO_ROOT / "Cargo.lock"):
+        raise ValueError("environment Cargo.lock sha256 mismatch")
+    locked_versions = load_locked_package_versions()
     for package in ("zstd", "zstd-safe", "zstd-sys"):
         if cargo.get(package) != locked_versions.get(package):
             raise ValueError(f"environment cargo {package} version mismatch")
@@ -811,30 +725,12 @@ def validate_environment(environment: dict[str, Any], repo_root: Path = REPO_ROO
     if isinstance(binary_path_raw, str) and binary_path_raw:
         binary_path = Path(binary_path_raw)
         if not binary_path.is_absolute():
-            binary_path = repo_root / binary_path
+            binary_path = REPO_ROOT / binary_path
         if binary_path.exists() and sha256_file(binary_path) != binary["sha256"]:
             raise ValueError("environment rstim_binary sha256 mismatch")
     commands = require_object(environment.get("commands"), "environment commands")
     if commands.get("benchmark_sample") != PINNED_BENCHMARK_SAMPLE_ARGV:
         raise ValueError("environment benchmark sample argv mismatch")
-    stim = require_object(environment.get("stim"), "environment stim")
-    require_string(stim.get("version"), "environment stim version")
-    require_string(stim.get("version_source"), "environment stim version_source")
-    stim_binary = require_object(stim.get("binary"), "environment stim binary")
-    stim_binary_path_raw = require_string(stim_binary.get("path"), "environment stim binary path")
-    stim_binary_sha256 = require_sha256(stim_binary.get("sha256"), "environment stim binary sha256")
-    stim_binary_path = Path(stim_binary_path_raw)
-    if not stim_binary_path.is_absolute():
-        stim_binary_path = repo_root / stim_binary_path
-    if stim_binary_path.exists() and sha256_file(stim_binary_path) != stim_binary_sha256:
-        raise ValueError("environment stim binary sha256 mismatch")
-    stim_commands = require_object(commands.get("stim_baselines"), "environment commands stim_baselines")
-    if sorted(stim_commands) != sorted(REQUIRED_STIM_BASELINE_FORMATS):
-        raise ValueError("environment commands stim_baselines must cover exactly b8, r8, ptb64")
-    for fmt in REQUIRED_STIM_BASELINE_FORMATS:
-        entry = require_object(stim_commands[fmt], f"environment commands stim_baselines {fmt}")
-        for key in ("serialize", "direct_zstd", "roundtrip"):
-            require_string_list(entry.get(key), f"environment commands stim_baselines {fmt} {key}")
     require_object(environment.get("git"), "environment git")
     require_object(environment.get("platform"), "environment platform")
     require_object(environment.get("generator"), "environment generator")
@@ -857,10 +753,10 @@ def validate_gates(summary: dict[str, Any]) -> None:
         raise ValueError("gate failure: " + ", ".join(failed))
 
 
-def check_bundle(results_dir: Path, repo_root: Path = REPO_ROOT) -> str:
+def check_bundle(results_dir: Path) -> str:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
-    validate_records(records, repo_root)
+    validate_records(records)
     derived_summary = derive_summary(records)
     summary = load_json_object(results_dir / "summary.json", "summary.json")
     diff = first_json_difference(derived_summary, summary)
@@ -871,7 +767,7 @@ def check_bundle(results_dir: Path, repo_root: Path = REPO_ROOT) -> str:
     if actual_report != expected_report:
         raise ValueError("report.md is stale or not checker-derived")
     environment = load_json_object(results_dir / "environment.json", "environment.json")
-    validate_environment(environment, repo_root)
+    validate_environment(environment)
     validate_artifact_hashes(results_dir)
     validate_gates(derived_summary)
     return derived_summary["pass_line"]
@@ -880,10 +776,9 @@ def check_bundle(results_dir: Path, repo_root: Path = REPO_ROOT) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check rsmp v1 compression evidence bundle")
     parser.add_argument("--results-dir", required=True, type=Path)
-    parser.add_argument("--repo-root", default=REPO_ROOT, type=Path)
     args = parser.parse_args(argv)
     try:
-        line = check_bundle(args.results_dir, args.repo_root.resolve())
+        line = check_bundle(args.results_dir)
     except ValueError as error:
         print(f"FAIL rsmp v1 compression {error}", file=sys.stderr)
         return 1

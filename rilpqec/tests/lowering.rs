@@ -1,4 +1,4 @@
-use rilpqec::{lower_dem_to_problem, IlpDecodeError};
+use rilpqec::{IlpDecodeError, lower_dem_to_problem};
 use rstim::dem::DetectorErrorModel;
 
 #[test]
@@ -93,10 +93,9 @@ fn lowering_rejects_invalid_probability() {
 
 #[test]
 fn detector_and_logical_observable_annotations_do_not_create_columns() {
-    let dem = DetectorErrorModel::parse(
-        "error(0.25) D0 L0\ndetector(1, 2) D0\nlogical_observable L3\n",
-    )
-    .unwrap();
+    let dem =
+        DetectorErrorModel::parse("error(0.25) D0 L0\ndetector(1, 2) D0\nlogical_observable L3\n")
+            .unwrap();
 
     let problem = lower_dem_to_problem(&dem).unwrap();
 

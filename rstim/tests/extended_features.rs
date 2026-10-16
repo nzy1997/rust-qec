@@ -1,11 +1,11 @@
-use rstim::ir::{circuit_to_string, PauliBasis, StimInstr, StimTarget};
-use rstim::parser::parse_lines;
-use rstim::stats;
-use rstim::transforms;
-use rstim::sampler::sample_batch;
-use rstim::error_analyzer::ErrorAnalyzer;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::ir::{PauliBasis, StimInstr, StimTarget, circuit_to_string};
+use rstim::parser::parse_lines;
+use rstim::sampler::sample_batch;
+use rstim::stats;
+use rstim::transforms;
 
 // ========== circuit_to_string coverage (src/ir.rs) ==========
 
@@ -70,10 +70,22 @@ fn circuit_to_string_pauli_targets() {
         tag: None,
         args: vec![],
         targets: vec![
-            StimTarget::Pauli { qubit: 0, basis: PauliBasis::X, inverted: false },
+            StimTarget::Pauli {
+                qubit: 0,
+                basis: PauliBasis::X,
+                inverted: false,
+            },
             StimTarget::Combiner,
-            StimTarget::Pauli { qubit: 1, basis: PauliBasis::Y, inverted: false },
-            StimTarget::Pauli { qubit: 2, basis: PauliBasis::Z, inverted: true },
+            StimTarget::Pauli {
+                qubit: 1,
+                basis: PauliBasis::Y,
+                inverted: false,
+            },
+            StimTarget::Pauli {
+                qubit: 2,
+                basis: PauliBasis::Z,
+                inverted: true,
+            },
         ],
     }];
     let s = circuit_to_string(&instrs);
@@ -183,14 +195,18 @@ fn frame_h_nyz_with_noise() {
 
 #[test]
 fn frame_exotic_c_gates_noiseless_deterministic() {
-    for gate in &["C_XYZ", "C_ZYX", "C_NXYZ", "C_NZYX", "C_XNYZ", "C_XYNZ", "C_ZNYX", "C_ZYNX"] {
+    for gate in &[
+        "C_XYZ", "C_ZYX", "C_NXYZ", "C_NZYX", "C_XNYZ", "C_XYNZ", "C_ZNYX", "C_ZYNX",
+    ] {
         let circuit = format!("R 0\n{gate} 0\n{gate} 0\n{gate} 0\nM 0");
         let instrs = parse_lines(&circuit).unwrap();
         let mut rng = StdRng::seed_from_u64(42);
         let result = sample_batch(&instrs, 10, &mut rng).unwrap();
         for shot in 0..10 {
-            assert!(!result.measurements.get(0, shot),
-                "gate {gate} cubed should give 0 on |0>");
+            assert!(
+                !result.measurements.get(0, shot),
+                "gate {gate} cubed should give 0 on |0>"
+            );
         }
     }
 }
@@ -203,8 +219,10 @@ fn frame_exotic_h_gates_noiseless_deterministic() {
         let mut rng = StdRng::seed_from_u64(42);
         let result = sample_batch(&instrs, 10, &mut rng).unwrap();
         for shot in 0..10 {
-            assert!(!result.measurements.get(0, shot),
-                "gate {gate} squared should give 0 on |0>");
+            assert!(
+                !result.measurements.get(0, shot),
+                "gate {gate} squared should give 0 on |0>"
+            );
         }
     }
 }
@@ -214,7 +232,8 @@ fn frame_exotic_h_gates_noiseless_deterministic() {
 #[test]
 fn error_analyzer_c_xyz_family() {
     for gate in &["C_XYZ", "C_NXYZ", "C_XNYZ", "C_XYNZ"] {
-        let circuit = format!("R 0\n{gate} 0\nX_ERROR(0.1) 0\n{gate} 0\n{gate} 0\nM 0\nDETECTOR rec[-1]");
+        let circuit =
+            format!("R 0\n{gate} 0\nX_ERROR(0.1) 0\n{gate} 0\n{gate} 0\nM 0\nDETECTOR rec[-1]");
         let instrs = parse_lines(&circuit).unwrap();
         let _dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
     }
@@ -223,10 +242,15 @@ fn error_analyzer_c_xyz_family() {
 #[test]
 fn error_analyzer_c_zyx_family() {
     for gate in &["C_ZYX", "C_NZYX", "C_ZNYX", "C_ZYNX"] {
-        let circuit = format!("R 0 1\n{gate} 0\nCX 0 1\nX_ERROR(0.1) 0\n{gate} 0\n{gate} 0\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]");
+        let circuit = format!(
+            "R 0 1\n{gate} 0\nCX 0 1\nX_ERROR(0.1) 0\n{gate} 0\n{gate} 0\nM 0 1\nDETECTOR rec[-1]\nDETECTOR rec[-2]"
+        );
         let instrs = parse_lines(&circuit).unwrap();
         let result = ErrorAnalyzer::circuit_to_dem(&instrs);
-        assert!(result.is_err(), "expected default gauge rejection for {gate}");
+        assert!(
+            result.is_err(),
+            "expected default gauge rejection for {gate}"
+        );
     }
 }
 
@@ -338,7 +362,7 @@ fn stats_num_qubits_pauli_targets() {
 #[test]
 fn cli_run_gen_direct() {
     let mut buf = Vec::new();
-    rstim::operations::run_gen("repetition_code", "memory", 3, 2, 0.001, &mut buf).unwrap();
+    rstim::cli::run_gen("repetition_code", "memory", 3, 2, 0.001, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.contains("R "));
     assert!(s.contains("CX "));
@@ -350,7 +374,7 @@ fn cli_run_gen_direct() {
 #[test]
 fn cli_run_gen_noiseless() {
     let mut buf = Vec::new();
-    rstim::operations::run_gen("repetition_code", "memory", 3, 1, 0.0, &mut buf).unwrap();
+    rstim::cli::run_gen("repetition_code", "memory", 3, 1, 0.0, &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(!s.contains("DEPOLARIZE"));
 }
@@ -358,21 +382,25 @@ fn cli_run_gen_noiseless() {
 #[test]
 fn cli_run_gen_unknown_code() {
     let mut buf = Vec::new();
-    let result = rstim::operations::run_gen("surface_code", "memory", 3, 1, 0.0, &mut buf);
+    let result = rstim::cli::run_gen("surface_code", "memory", 3, 1, 0.0, &mut buf);
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("unknown code/task"));
 }
 
 #[test]
-#[cfg(feature = "cli")]
 fn cli_run_gen_via_dispatch() {
     use clap::Parser;
     let cli = rstim::cli::Cli::parse_from([
-        "rstim", "gen",
-        "--code", "repetition_code",
-        "--task", "memory",
-        "--distance", "3",
-        "--rounds", "1",
+        "rstim",
+        "gen",
+        "--code",
+        "repetition_code",
+        "--task",
+        "memory",
+        "--distance",
+        "3",
+        "--rounds",
+        "1",
     ]);
     let result = rstim::cli::run(cli);
     assert!(result.is_ok());
@@ -445,13 +473,20 @@ fn inverse_sqrt_z() {
 #[test]
 fn inverse_c_negated_variants() {
     for (gate, expected) in [
-        ("C_NXYZ", "C_XYNZ"), ("C_XYNZ", "C_NXYZ"),
-        ("C_XNYZ", "C_ZNYX"), ("C_ZNYX", "C_XNYZ"),
-        ("C_NZYX", "C_ZYNX"), ("C_ZYNX", "C_NZYX"),
+        ("C_NXYZ", "C_XYNZ"),
+        ("C_XYNZ", "C_NXYZ"),
+        ("C_XNYZ", "C_ZNYX"),
+        ("C_ZNYX", "C_XNYZ"),
+        ("C_NZYX", "C_ZYNX"),
+        ("C_ZYNX", "C_NZYX"),
     ] {
         let instrs = parse_lines(&format!("{gate} 0")).unwrap();
         let inv = transforms::inverse(&instrs).unwrap();
-        assert_eq!(inv[0].name().unwrap(), expected, "inverse of {gate} should be {expected}");
+        assert_eq!(
+            inv[0].name().unwrap(),
+            expected,
+            "inverse of {gate} should be {expected}"
+        );
     }
 }
 
@@ -501,6 +536,10 @@ fn qubit_index_qubit_inv() {
 
 #[test]
 fn qubit_index_pauli() {
-    let t = StimTarget::Pauli { qubit: 7, basis: PauliBasis::X, inverted: false };
+    let t = StimTarget::Pauli {
+        qubit: 7,
+        basis: PauliBasis::X,
+        inverted: false,
+    };
     assert_eq!(t.qubit_index(), Some(7));
 }

@@ -701,12 +701,12 @@ mod tests {
     use crate::vector::{Correction, Syndrome};
 
     use super::{
+        BpSchedule, BpWorkspace, CheckUpdateRule, CompiledGraph,
         finish_all_variable_to_check_messages_from_suffix, recompute_residual_from_hard_decision,
         refresh_all_bit_posteriors, refresh_all_bit_posteriors_and_prefix_variable_messages,
         refresh_all_variable_to_check_messages, run_bp_compiled_in_place, run_bp_selected_in_place,
         run_minimum_sum_compiled, run_minimum_sum_compiled_in_place,
-        update_check_to_variable_messages, update_check_to_variable_messages_with_rule, BpSchedule,
-        BpWorkspace, CheckUpdateRule, CompiledGraph,
+        update_check_to_variable_messages, update_check_to_variable_messages_with_rule,
     };
 
     #[test]
@@ -1052,10 +1052,12 @@ mod tests {
         );
 
         assert_ne!(minimum_workspace.c_to_v, product_workspace.c_to_v);
-        assert!(product_workspace
-            .c_to_v
-            .iter()
-            .all(|value| value.is_finite()));
+        assert!(
+            product_workspace
+                .c_to_v
+                .iter()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]

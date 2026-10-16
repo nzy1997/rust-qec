@@ -43,31 +43,6 @@ fn sample_trace_holds_noise_measurement_and_detector_events() {
 }
 
 #[test]
-fn traced_execution_records_only_present_to_lost_transitions() {
-    let instrs = parse_lines("LOSS(1) 0\nLOSS(1) 0\nM 0\nR 0\nLOSS(1) 0\nM 0\n").unwrap();
-    let mut ex = Executor::from_instrs(instrs).unwrap();
-    let mut rng = StdRng::seed_from_u64(1);
-
-    let (_out, trace) = ex.run_with_trace(&mut rng).unwrap();
-
-    let loss_events: Vec<_> = trace
-        .noise_events
-        .iter()
-        .filter(|event| event.instr_name == "LOSS")
-        .collect();
-    // Only the true onsets are recorded: the first LOSS, and the one after
-    // the reset. The LOSS sampled on an already-lost qubit is a no-op.
-    assert_eq!(loss_events.len(), 2);
-    assert_eq!(loss_events[0].op_path, vec![0]);
-    assert_eq!(loss_events[1].op_path, vec![4]);
-    assert!(
-        loss_events
-            .iter()
-            .all(|event| event.branch_label.as_deref() == Some("L"))
-    );
-}
-
-#[test]
 fn traced_execution_records_loss_as_branch_l() {
     let instrs = parse_lines("LOSS(1) 0\nM 0\n").unwrap();
     let mut ex = Executor::from_instrs(instrs).unwrap();
@@ -154,11 +129,11 @@ fn traced_execution_tracks_repeat_iterations_in_process() {
 
     let (_out, trace) = ex.run_with_trace(&mut rng).unwrap();
 
-    // Only the first iteration's LOSS is a present→lost onset; in the second
-    // iteration the qubit is already lost, so the sampled loss is a no-op.
-    assert_eq!(trace.noise_events.len(), 1);
+    assert_eq!(trace.noise_events.len(), 2);
     assert_eq!(trace.noise_events[0].op_path, vec![0, 0]);
     assert_eq!(trace.noise_events[0].repeat_iterations, vec![0]);
+    assert_eq!(trace.noise_events[1].op_path, vec![0, 0]);
+    assert_eq!(trace.noise_events[1].repeat_iterations, vec![1]);
 
     assert_eq!(trace.measurement_events.len(), 2);
     assert_eq!(trace.measurement_events[0].measurement_index, 1);

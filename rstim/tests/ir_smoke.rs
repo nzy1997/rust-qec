@@ -1,4 +1,4 @@
-use rstim::ir::{StimInstr, StimTarget, Annotation};
+use rstim::ir::{Annotation, StimInstr, StimTarget};
 
 #[test]
 fn build_simple_instr() {

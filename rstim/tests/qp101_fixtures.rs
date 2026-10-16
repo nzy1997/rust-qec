@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rstim::operations as cli;
+use rstim::cli;
 use rstim::codegen::{repetition_code_memory, surface_code};
 use rstim::executor::Executor;
-use rstim::ir::{circuit_to_string, StimInstr};
-use rstim::qp101::{export_qp101, export_qp101_with_sample_trace, Qp101Document};
+use rstim::ir::{StimInstr, circuit_to_string};
+use rstim::qp101::{Qp101Document, export_qp101, export_qp101_with_sample_trace};
 
 const MIXED_NOISE_BASE_FIXTURE: &str = "surface_code_rotated_memory_x_d3_r3_mixed_noise.json";
 const MIXED_NOISE_SAMPLE_FIXTURE: &str =

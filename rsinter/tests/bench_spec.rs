@@ -1,6 +1,6 @@
 use rsinter::bench::spec::{
-    AxisSpec, BenchmarkMode, BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotFitKind, PlotSpec,
-    SeriesSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    LogicalRateUnit, PanelSpec, PlotFitKind, PlotSpec, SeriesSpec,
 };
 use std::path::Path;
 
@@ -303,7 +303,7 @@ fn steane_minimal_feature_gate_fixtures_are_valid() {
 #[test]
 fn bb_compare_plot_spec_uses_paper_style_logical_rate_per_syndrome_cycle() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/bench/bb_compare_plot.toml");
+        .join("../benchmarks/bb_circuit_bposd_compare/plot.toml");
     let text = std::fs::read_to_string(path).unwrap();
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
 

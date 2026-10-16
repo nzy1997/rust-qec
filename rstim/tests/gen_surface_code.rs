@@ -86,8 +86,8 @@ fn cli_gen_surface_code_rotated_memory_x() {
 
 #[test]
 fn surface_code_after_clifford_atom_loss() {
-    use rstim::codegen::surface_code::rotated_memory_x_with_params;
     use rstim::codegen::NoiseParams;
+    use rstim::codegen::surface_code::rotated_memory_x_with_params;
 
     let instrs = rotated_memory_x_with_params(
         3,
@@ -103,8 +103,8 @@ fn surface_code_after_clifford_atom_loss() {
 
 #[test]
 fn unrotated_surface_code_after_clifford_atom_loss() {
-    use rstim::codegen::surface_code::unrotated_memory_x_with_params;
     use rstim::codegen::NoiseParams;
+    use rstim::codegen::surface_code::unrotated_memory_x_with_params;
 
     let instrs = unrotated_memory_x_with_params(
         3,

@@ -97,7 +97,10 @@ pub struct TrackedDemResult {
 }
 
 impl TrackedDemResult {
-    pub fn from_terms_and_sources(sources: Vec<TrackedSource>, terms: Vec<TrackedErrorTerm>) -> Self {
+    pub fn from_terms_and_sources(
+        sources: Vec<TrackedSource>,
+        terms: Vec<TrackedErrorTerm>,
+    ) -> Self {
         let mut dem = DetectorErrorModel::new();
         let mut dem_error_to_sources = Vec::with_capacity(terms.len());
         for term in terms {

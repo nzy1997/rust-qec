@@ -1,3 +1,4 @@
+use rstim::codegen::color_code::memory_xyz;
 /// Tests ported from Stim's error_analyzer.test.cc to rstim.
 ///
 /// Covers: DEM extraction, noise analysis, basis-sensitive error propagation,
@@ -5,7 +6,6 @@
 /// composite DEPOLARIZE2 analysis, reversed operation order, MPP ordering,
 /// duplicate records, exact pauli_channel_1, and gauge detection.
 use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
-use rstim::codegen::color_code::memory_xyz;
 use rstim::error_analyzer::{AnalyzeOptions, ErrorAnalyzer};
 use rstim::parser::parse_lines;
 
@@ -63,7 +63,12 @@ fn assert_has_error(dem: &DetectorErrorModel, prob: f64, expected_targets: &[Dem
     );
 }
 
-fn assert_has_error_approx(dem: &DetectorErrorModel, prob: f64, tol: f64, expected_targets: &[DemTarget]) {
+fn assert_has_error_approx(
+    dem: &DetectorErrorModel,
+    prob: f64,
+    tol: f64,
+    expected_targets: &[DemTarget],
+) {
     let found = dem.instructions().iter().any(|instr| {
         if let DemInstruction::Error {
             probability,
@@ -100,9 +105,8 @@ fn stim_noisy_measurement_merges_with_data_error() {
 
 #[test]
 fn stim_x_error_with_observable() {
-    let dem = circuit_to_dem(
-        "X_ERROR(0.25) 3\nM 3\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
-    );
+    let dem =
+        circuit_to_dem("X_ERROR(0.25) 3\nM 3\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(
         &dem,
@@ -148,9 +152,7 @@ fn stim_independent_x_errors_separate_det_obs() {
 fn stim_depolarize2_three_error_classes() {
     // DEPOLARIZE2(0.25) on two qubits with Z-basis detectors produces errors
     // for every non-trivial 2-qubit Pauli that has X or Y on at least one qubit
-    let dem = circuit_to_dem(
-        "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]",
-    );
+    let dem = circuit_to_dem("DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]");
     // Should see errors on D0 only, D1 only, and D0 D1
     let mut has_d0 = false;
     let mut has_d1 = false;
@@ -175,10 +177,8 @@ fn stim_depolarize2_three_error_classes() {
 
 #[test]
 fn stim_depolarize2_decomposed_merges_into_three_graphlike_classes() {
-    let instrs = parse_lines(
-        "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]").unwrap();
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&instrs).unwrap();
 
     assert_eq!(error_count(&dem), 3);
@@ -187,7 +187,11 @@ fn stim_depolarize2_decomposed_merges_into_three_graphlike_classes() {
         &dem,
         0.07182558071116237,
         1e-12,
-        &[DemTarget::Detector(0), DemTarget::Separator, DemTarget::Detector(1)],
+        &[
+            DemTarget::Detector(0),
+            DemTarget::Separator,
+            DemTarget::Detector(1),
+        ],
     );
     assert_has_error_approx(&dem, 0.07182558071116237, 1e-12, &[DemTarget::Detector(1)]);
 }
@@ -421,23 +425,15 @@ fn stim_detect_gauge_detector_mx_no_reset() {
 
 #[test]
 fn stim_detect_gauge_detector_allowed_with_option() {
-    let dem = circuit_to_dem_with_options(
-        "R 0\nH 0\nM 0\nDETECTOR rec[-1]",
-        false,
-        true,
-    )
-    .unwrap();
+    let dem = circuit_to_dem_with_options("R 0\nH 0\nM 0\nDETECTOR rec[-1]", false, true).unwrap();
     assert_eq!(error_count(&dem), 0);
 }
 
 #[test]
 fn stim_detect_gauge_observable_allowed_with_option() {
-    let dem = circuit_to_dem_with_options(
-        "R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
-        false,
-        true,
-    )
-    .unwrap();
+    let dem =
+        circuit_to_dem_with_options("R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]", false, true)
+            .unwrap();
     assert_eq!(error_count(&dem), 0);
 }
 
@@ -481,9 +477,7 @@ fn stim_composite_depolarize1_surface_code() {
 #[test]
 fn stim_composite_depolarize2_no_decompose() {
     // DEPOLARIZE2(0.25) on qubits 3 and 5 produces 15 error channels
-    let dem = circuit_to_dem(
-        "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]",
-    );
+    let dem = circuit_to_dem("DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]");
     // All 15 non-identity two-qubit Paulis; those with X or Y on either qubit
     // contribute errors. p = 0.25/15 ≈ 0.01667 per channel.
     // Stim expects 3 distinct error patterns with prob ~0.0718 each (after combining):
@@ -539,9 +533,7 @@ fn stim_mpp_xz_product() {
 fn stim_mpp_ordering_same_qubit_consecutive() {
     // MPP X0*X1 X0, then MPP X0 → DETECTOR rec[-1] rec[-2]
     // X0 in second MPP should match X0 in second product of first MPP
-    let dem = circuit_to_dem(
-        "MPP X0*X1 X0\nTICK\nMPP X0\nDETECTOR rec[-1] rec[-2]",
-    );
+    let dem = circuit_to_dem("MPP X0*X1 X0\nTICK\nMPP X0\nDETECTOR rec[-1] rec[-2]");
     assert_eq!(error_count(&dem), 0);
 }
 
@@ -555,9 +547,7 @@ fn stim_mpp_ordering_three_products_in_one() {
 #[test]
 fn stim_mpp_ordering_different_qubit_set() {
     // MPP X2*X1 X0, then MPP X0 → deterministic
-    let dem = circuit_to_dem(
-        "MPP X2*X1 X0\nTICK\nMPP X0\nDETECTOR rec[-1] rec[-2]",
-    );
+    let dem = circuit_to_dem("MPP X2*X1 X0\nTICK\nMPP X0\nDETECTOR rec[-1] rec[-2]");
     assert_eq!(error_count(&dem), 0);
 }
 
@@ -651,7 +641,8 @@ fn stim_depolarize2_after_h_cnot() {
 #[test]
 fn stim_depolarize2_cnot_basis_change_same_errors() {
     let circuit1 = "DEPOLARIZE2(0.25) 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]";
-    let circuit2 = "CNOT 3 5\nDEPOLARIZE2(0.25) 3 5\nCNOT 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]";
+    let circuit2 =
+        "CNOT 3 5\nDEPOLARIZE2(0.25) 3 5\nCNOT 3 5\nM 3\nM 5\nDETECTOR rec[-1]\nDETECTOR rec[-2]";
     let dem1 = circuit_to_dem(circuit1);
     let dem2 = circuit_to_dem(circuit2);
     // Both should produce the same number of errors
@@ -792,9 +783,7 @@ fn stim_else_correlated_error_without_leader_is_rejected() {
 
 #[test]
 fn stim_correlated_error_two_branch_block_is_mutually_exclusive() {
-    let dem = circuit_to_dem(
-        "E(0.25) X0\nELSE_CORRELATED_ERROR(0.5) X0\nM 0\nDETECTOR rec[-1]",
-    );
+    let dem = circuit_to_dem("E(0.25) X0\nELSE_CORRELATED_ERROR(0.5) X0\nM 0\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.625, &[DemTarget::Detector(0)]);
 }
@@ -829,15 +818,15 @@ fn stim_heralded_erase_x_basis_merges_y_and_z_components() {
 
 #[test]
 fn circuit_to_dem_with_options_allows_non_deterministic_mx_when_enabled() {
-    let dem = circuit_to_dem_with_options("MX 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
-        .unwrap();
+    let dem =
+        circuit_to_dem_with_options("MX 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true).unwrap();
     assert_eq!(dem.num_detectors(), 1);
 }
 
 #[test]
 fn circuit_to_dem_with_options_allows_non_deterministic_my_when_enabled() {
-    let dem = circuit_to_dem_with_options("MY 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true)
-        .unwrap();
+    let dem =
+        circuit_to_dem_with_options("MY 0\nH 0\nMX 0\nDETECTOR rec[-1]", false, true).unwrap();
     assert_eq!(dem.num_detectors(), 1);
 }
 

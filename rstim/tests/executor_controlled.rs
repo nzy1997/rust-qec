@@ -1,5 +1,5 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::{executor::Executor, parser::parse_lines};
 
 #[test]
@@ -24,7 +24,9 @@ fn xcx_entangles_from_00() {
         let mut ex = Executor::from_instrs(instrs.clone()).unwrap();
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
-        if !out.measurements[0] { zeros += 1; }
+        if !out.measurements[0] {
+            zeros += 1;
+        }
     }
     assert!(zeros > 60 && zeros < 140, "XCX: {zeros}/200 zeros");
 }
@@ -39,7 +41,9 @@ fn xcy_entangles_from_00() {
         let mut ex = Executor::from_instrs(instrs.clone()).unwrap();
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
-        if !out.measurements[0] { zeros += 1; }
+        if !out.measurements[0] {
+            zeros += 1;
+        }
     }
     assert!(zeros > 60 && zeros < 140, "XCY: {zeros}/200 zeros on q1");
 }
@@ -54,7 +58,9 @@ fn ycx_entangles_from_00() {
         let mut ex = Executor::from_instrs(instrs.clone()).unwrap();
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
-        if !out.measurements[0] { zeros += 1; }
+        if !out.measurements[0] {
+            zeros += 1;
+        }
     }
     assert!(zeros > 60 && zeros < 140, "YCX: {zeros}/200 zeros on q0");
 }

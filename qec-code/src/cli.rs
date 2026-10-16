@@ -20,10 +20,6 @@ use crate::distance_exact::{
     ExactCssDistanceResult, ExactCssDistanceSolverOptions,
 };
 use crate::error::CssMatrixReadSource;
-use crate::family_contract::{
-    CssConstructionSpec, CssFamilySpec, construct_css, parse_css_construction_json,
-};
-use crate::family_verifier::{FamilyVerificationReport, verify_checked_in_family_manifest};
 
 #[derive(Debug, Parser)]
 #[command(name = "qec-code")]
@@ -95,15 +91,9 @@ impl CssArgs {
 #[derive(Debug, Subcommand)]
 pub enum CssCommands {
     List,
-    VerifyFamilies,
     Export {
         code_id: String,
         matrix: CssMatrixKind,
-    },
-    Construct {
-        #[arg(long)]
-        spec: PathBuf,
-        output: CssConstructionOutput,
     },
     QuantumTanner {
         #[arg(long)]
@@ -116,13 +106,6 @@ pub enum CssCommands {
 pub enum CssMatrixKind {
     Hx,
     Hz,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum CssConstructionOutput {
-    Hx,
-    Hz,
-    Metadata,
 }
 
 #[derive(Debug, Subcommand)]
@@ -225,9 +208,7 @@ fn run_code(command: CodeCommands) -> Result<String, QecError> {
 fn run_css_args(args: CssArgs) -> Result<String, QecError> {
     match args.command {
         Some(CssCommands::List) => Ok(run_css_list()),
-        Some(CssCommands::VerifyFamilies) => run_css_verify_families(),
         Some(CssCommands::Export { code_id, matrix }) => run_css(&code_id, matrix),
-        Some(CssCommands::Construct { spec, output }) => run_css_construction_spec(&spec, output),
         Some(CssCommands::QuantumTanner { spec, matrix }) => run_css_quantum_tanner(&spec, matrix),
         None => {
             let code_id = args
@@ -239,38 +220,6 @@ fn run_css_args(args: CssArgs) -> Result<String, QecError> {
 
             run_css(&code_id, matrix)
         }
-    }
-}
-
-fn run_css_verify_families() -> Result<String, QecError> {
-    family_report_to_cli_result(verify_checked_in_family_manifest()?)
-}
-
-fn family_report_to_cli_result(report: FamilyVerificationReport) -> Result<String, QecError> {
-    if report.failed == 0 {
-        Ok(report.output)
-    } else {
-        Err(QecError::FamilyVerificationFailed {
-            report: report.output,
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn family_report_to_cli_result_returns_error_for_failed_report() {
-        let output = "FAIL generalized_bicycle expected rank_x=5 actual rank_x=4\nSUMMARY FAIL supported=12 deferred=2 failed=1".to_owned();
-        let report = FamilyVerificationReport {
-            output: output.clone(),
-            failed: 1,
-        };
-
-        let error = family_report_to_cli_result(report).unwrap_err();
-
-        assert_eq!(error, QecError::FamilyVerificationFailed { report: output });
     }
 }
 
@@ -297,79 +246,36 @@ fn run_css_list() -> String {
 }
 
 fn run_css(code_id: &str, matrix: CssMatrixKind) -> Result<String, QecError> {
-    let spec = CssConstructionSpec::from_inline(code_id)?;
-    let construction = construct_css(spec)?;
+    let checks = built_in_css_checks(code_id)?;
+    let num_cols = checks.num_cols;
     let rows = match matrix {
-        CssMatrixKind::Hx => construction.checks.h_x,
-        CssMatrixKind::Hz => construction.checks.h_z,
+        CssMatrixKind::Hx => checks.hx,
+        CssMatrixKind::Hz => checks.hz,
     };
 
-    let matrix = SparseRowsMatrix::new(construction.stats.n, rows)?;
+    let matrix = SparseRowsMatrix::new(num_cols, rows)?;
     Ok(matrix.to_json_string())
-}
-
-fn run_css_construction_spec(
-    path: &PathBuf,
-    output: CssConstructionOutput,
-) -> Result<String, QecError> {
-    let input = read_css_spec_file(path)?;
-    let spec = parse_css_construction_json(&input)?;
-    export_css_construction_output(spec, output)
 }
 
 fn run_css_quantum_tanner(spec: &PathBuf, matrix: CssMatrixKind) -> Result<String, QecError> {
     let spec = read_quantum_tanner_spec(spec)?;
-    export_css_construction(CssFamilySpec::QuantumTanner(spec).into(), matrix)
-}
-
-fn export_css_construction(
-    spec: CssConstructionSpec,
-    matrix: CssMatrixKind,
-) -> Result<String, QecError> {
-    export_css_construction_matrix(construct_css(spec)?, matrix)
-}
-
-fn export_css_construction_output(
-    spec: CssConstructionSpec,
-    output: CssConstructionOutput,
-) -> Result<String, QecError> {
-    let construction = construct_css(spec)?;
-    match output {
-        CssConstructionOutput::Hx => {
-            export_css_construction_matrix(construction, CssMatrixKind::Hx)
-        }
-        CssConstructionOutput::Hz => {
-            export_css_construction_matrix(construction, CssMatrixKind::Hz)
-        }
-        CssConstructionOutput::Metadata => Ok(serde_json::to_string(&construction)
-            .expect("validated CSS construction result should always serialize")),
-    }
-}
-
-fn export_css_construction_matrix(
-    construction: crate::family_contract::CssConstructionResult,
-    matrix: CssMatrixKind,
-) -> Result<String, QecError> {
+    let checks = quantum_tanner_css_checks(&spec)?;
     let rows = match matrix {
-        CssMatrixKind::Hx => construction.checks.h_x,
-        CssMatrixKind::Hz => construction.checks.h_z,
+        CssMatrixKind::Hx => checks.hx,
+        CssMatrixKind::Hz => checks.hz,
     };
 
-    let matrix = SparseRowsMatrix::new(construction.stats.n, rows)?;
+    let matrix = SparseRowsMatrix::new(checks.num_cols, rows)?;
     Ok(matrix.to_json_string())
 }
 
 fn read_quantum_tanner_spec(path: &PathBuf) -> Result<QuantumTannerSpec, QecError> {
-    let input = read_css_spec_file(path)?;
-
-    quantum_tanner_spec_from_json_str(&input)
-}
-
-fn read_css_spec_file(path: &PathBuf) -> Result<String, QecError> {
-    fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
+    let input = fs::read_to_string(path).map_err(|err| QecError::CssMatrixReadFailed {
         path: path.display().to_string(),
         source: CssMatrixReadSource(err.to_string()),
-    })
+    })?;
+
+    quantum_tanner_spec_from_json_str(&input)
 }
 
 fn run_css_distance(command: CssDistanceCommands) -> Result<String, QecError> {

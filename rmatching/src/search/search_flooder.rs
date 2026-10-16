@@ -12,7 +12,10 @@ use crate::util::radix_heap::{HasTime, RadixHeapQueue};
 #[derive(Debug, Clone, Copy)]
 pub enum SearchEvent {
     NoEvent,
-    LookAtNode { node: SearchNodeIdx, time: Wrapping<u32> },
+    LookAtNode {
+        node: SearchNodeIdx,
+        time: Wrapping<u32>,
+    },
 }
 
 impl HasTime for SearchEvent {
@@ -80,10 +83,7 @@ impl SearchFlooder {
     // -- internal helpers ---------------------------------------------------
 
     /// Find the best next event (neighbor index, collision time) for a node.
-    fn find_next_event(
-        &self,
-        node_idx: SearchNodeIdx,
-    ) -> (Option<usize>, CumulativeTime) {
+    fn find_next_event(&self, node_idx: SearchNodeIdx) -> (Option<usize>, CumulativeTime) {
         let node = &self.graph.nodes[node_idx.0 as usize];
         let mut best_time: CumulativeTime = CumulativeTime::MAX;
         let mut best_neighbor: Option<usize> = None;
@@ -122,8 +122,7 @@ impl SearchFlooder {
                 // Reached from different source -- two fronts meeting.
                 let covered_this = self.queue.cur_time - node.distance_from_source;
                 let covered_nb = self.queue.cur_time - nb.distance_from_source;
-                collision_time =
-                    self.queue.cur_time + (weight - covered_this - covered_nb) / 2;
+                collision_time = self.queue.cur_time + (weight - covered_this - covered_nb) / 2;
             }
 
             if collision_time < best_time {
@@ -138,8 +137,7 @@ impl SearchFlooder {
     /// Schedule the next event for a node.
     fn reschedule_events(&mut self, node_idx: SearchNodeIdx) {
         let (best_nb, best_time) = self.find_next_event(node_idx);
-        let tracker =
-            &mut self.graph.nodes[node_idx.0 as usize].node_event_tracker;
+        let tracker = &mut self.graph.nodes[node_idx.0 as usize].node_event_tracker;
         match best_nb {
             None => tracker.set_no_desired_event(),
             Some(_) => {
@@ -165,20 +163,13 @@ impl SearchFlooder {
     }
 
     /// Explore an unreached neighbor.
-    fn explore_empty_node(
-        &mut self,
-        empty_idx: SearchNodeIdx,
-        empty_to_from_index: usize,
-    ) {
+    fn explore_empty_node(&mut self, empty_idx: SearchNodeIdx, empty_to_from_index: usize) {
         let from_idx =
-            self.graph.nodes[empty_idx.0 as usize].neighbors[empty_to_from_index]
-                .unwrap();
-        let from_source =
-            self.graph.nodes[from_idx.0 as usize].reached_from_source;
-        let from_dist =
-            self.graph.nodes[from_idx.0 as usize].distance_from_source;
-        let weight = self.graph.nodes[empty_idx.0 as usize].neighbor_weights
-            [empty_to_from_index] as CumulativeTime;
+            self.graph.nodes[empty_idx.0 as usize].neighbors[empty_to_from_index].unwrap();
+        let from_source = self.graph.nodes[from_idx.0 as usize].reached_from_source;
+        let from_dist = self.graph.nodes[from_idx.0 as usize].distance_from_source;
+        let weight = self.graph.nodes[empty_idx.0 as usize].neighbor_weights[empty_to_from_index]
+            as CumulativeTime;
 
         {
             let empty = &mut self.graph.nodes[empty_idx.0 as usize];
@@ -191,16 +182,12 @@ impl SearchFlooder {
     }
 
     /// Process a "look at node" event. Returns a collision edge if found.
-    fn do_look_at_node_event(
-        &mut self,
-        node_idx: SearchNodeIdx,
-    ) -> SearchGraphEdge {
+    fn do_look_at_node_event(&mut self, node_idx: SearchNodeIdx) -> SearchGraphEdge {
         let (next_nb, next_time) = self.find_next_event(node_idx);
 
         if let Some(nb_i) = next_nb {
             if next_time == self.queue.cur_time {
-                let dst_opt =
-                    self.graph.nodes[node_idx.0 as usize].neighbors[nb_i];
+                let dst_opt = self.graph.nodes[node_idx.0 as usize].neighbors[nb_i];
                 match dst_opt {
                     None => {
                         // Boundary collision.
@@ -210,26 +197,20 @@ impl SearchFlooder {
                         };
                     }
                     Some(dst_idx) => {
-                        let dst_reached = self.graph.nodes[dst_idx.0 as usize]
-                            .reached_from_source;
+                        let dst_reached = self.graph.nodes[dst_idx.0 as usize].reached_from_source;
                         if dst_reached.is_none() {
                             // Explore the empty neighbor.
-                            let reverse_idx = self.graph.nodes
-                                [dst_idx.0 as usize]
+                            let reverse_idx = self.graph.nodes[dst_idx.0 as usize]
                                 .index_of_neighbor(Some(node_idx));
                             self.explore_empty_node(dst_idx, reverse_idx);
                             // Revisit this node immediately.
-                            let tracker = &mut self.graph.nodes
-                                [node_idx.0 as usize]
-                                .node_event_tracker;
+                            let tracker =
+                                &mut self.graph.nodes[node_idx.0 as usize].node_event_tracker;
                             let event = SearchEvent::LookAtNode {
                                 node: node_idx,
                                 time: Wrapping(self.queue.cur_time as u32),
                             };
-                            tracker.set_desired_event(
-                                event,
-                                &mut self.queue,
-                            );
+                            tracker.set_desired_event(event, &mut self.queue);
                             return SearchGraphEdge {
                                 node: None,
                                 neighbor_index: NO_NEIGHBOR,
@@ -245,9 +226,7 @@ impl SearchFlooder {
                 }
             } else {
                 // Revisit later.
-                let tracker =
-                    &mut self.graph.nodes[node_idx.0 as usize]
-                        .node_event_tracker;
+                let tracker = &mut self.graph.nodes[node_idx.0 as usize].node_event_tracker;
                 let event = SearchEvent::LookAtNode {
                     node: node_idx,
                     time: Wrapping(next_time as u32),
@@ -287,11 +266,12 @@ impl SearchFlooder {
             let ev = self.queue.dequeue();
             if let SearchEvent::LookAtNode { node, .. } = ev {
                 let n = &mut self.graph.nodes[node.0 as usize];
-                let should_process = n.node_event_tracker.dequeue_decision(
-                    &ev,
-                    &mut self.queue,
-                    |t| SearchEvent::LookAtNode { node, time: t },
-                );
+                let should_process =
+                    n.node_event_tracker
+                        .dequeue_decision(&ev, &mut self.queue, |t| SearchEvent::LookAtNode {
+                            node,
+                            time: t,
+                        });
                 if should_process {
                     let edge = self.do_look_at_node_event(node);
                     if edge.node.is_some() {
@@ -308,10 +288,7 @@ impl SearchFlooder {
     }
 
     /// Trace back from a node to its source, collecting edges.
-    fn trace_back_from_node(
-        &self,
-        start: SearchNodeIdx,
-    ) -> Vec<SearchGraphEdge> {
+    fn trace_back_from_node(&self, start: SearchNodeIdx) -> Vec<SearchGraphEdge> {
         let mut edges = Vec::new();
         let mut cur = start;
         loop {
@@ -323,8 +300,7 @@ impl SearchFlooder {
                         node: Some(cur),
                         neighbor_index: pred_idx,
                     });
-                    cur = self.graph.nodes[cur.0 as usize].neighbors[pred_idx]
-                        .unwrap();
+                    cur = self.graph.nodes[cur.0 as usize].neighbors[pred_idx].unwrap();
                 }
             }
         }
@@ -355,8 +331,8 @@ impl SearchFlooder {
         let path1 = self.trace_back_from_node(collision_node);
 
         // The collision edge itself.
-        let other_opt = self.graph.nodes[collision_node.0 as usize].neighbors
-            [collision_edge.neighbor_index];
+        let other_opt =
+            self.graph.nodes[collision_node.0 as usize].neighbors[collision_edge.neighbor_index];
 
         // Path 2: trace back from the other side of the collision edge.
         let mut path2 = vec![collision_edge];
@@ -368,8 +344,7 @@ impl SearchFlooder {
         // Determine which path leads back to src.
         let last_of_path2 = {
             let last_edge = path2.last().unwrap();
-            self.graph.nodes[last_edge.node.unwrap().0 as usize].neighbors
-                [last_edge.neighbor_index]
+            self.graph.nodes[last_edge.node.unwrap().0 as usize].neighbors[last_edge.neighbor_index]
         };
 
         let leads_to_src = last_of_path2 == Some(src_idx);
@@ -399,8 +374,7 @@ impl SearchFlooder {
             let from = e.node;
             let node_i = e.node.unwrap().0 as usize;
             let to = self.graph.nodes[node_i].neighbors[e.neighbor_index];
-            let obs = self.graph.nodes[node_i].neighbor_observables
-                [e.neighbor_index];
+            let obs = self.graph.nodes[node_i].neighbor_observables[e.neighbor_index];
             callback(from, to, obs);
         }
     }
@@ -419,25 +393,18 @@ impl SearchFlooder {
             let to = e.node;
             // Find the reverse edge's observable.
             let obs = if let Some(nb_idx) = nb_opt {
-                let reverse_i = self.graph.nodes[nb_idx.0 as usize]
-                    .index_of_neighbor(e.node);
-                self.graph.nodes[nb_idx.0 as usize].neighbor_observables
-                    [reverse_i]
+                let reverse_i = self.graph.nodes[nb_idx.0 as usize].index_of_neighbor(e.node);
+                self.graph.nodes[nb_idx.0 as usize].neighbor_observables[reverse_i]
             } else {
                 // Boundary edge -- use the same observable.
-                self.graph.nodes[node_i].neighbor_observables
-                    [e.neighbor_index]
+                self.graph.nodes[node_i].neighbor_observables[e.neighbor_index]
             };
             callback(from, to, obs);
         }
     }
 
     /// Build a `CompressedEdge` for the shortest path between two nodes.
-    pub fn find_shortest_path(
-        &mut self,
-        src: usize,
-        dst: Option<usize>,
-    ) -> CompressedEdge {
+    pub fn find_shortest_path(&mut self, src: usize, dst: Option<usize>) -> CompressedEdge {
         let mut obs_mask: ObsMask = 0;
         self.iter_edges_on_shortest_path(src, dst, |_, _, obs| {
             obs_mask ^= obs;

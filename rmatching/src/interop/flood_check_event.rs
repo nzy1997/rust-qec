@@ -1,13 +1,22 @@
-use std::num::Wrapping;
 use crate::types::*;
 use crate::util::radix_heap::HasTime;
+use std::num::Wrapping;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FloodCheckEvent {
     NoEvent,
-    LookAtNode { node: NodeIdx, time: Wrapping<u32> },
-    LookAtShrinkingRegion { region: RegionIdx, time: Wrapping<u32> },
-    LookAtSearchNode { node: SearchNodeIdx, time: Wrapping<u32> },
+    LookAtNode {
+        node: NodeIdx,
+        time: Wrapping<u32>,
+    },
+    LookAtShrinkingRegion {
+        region: RegionIdx,
+        time: Wrapping<u32>,
+    },
+    LookAtSearchNode {
+        node: SearchNodeIdx,
+        time: Wrapping<u32>,
+    },
 }
 
 impl HasTime for FloodCheckEvent {

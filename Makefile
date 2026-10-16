@@ -1,4 +1,4 @@
-.PHONY: help test check build-shot-viewer fetch-doc-artifacts build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test check build-site release bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -23,10 +23,6 @@ help:
 	@echo "  test                 - Run workspace tests"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  build-site           - Build the benchmarked documentation site into _site"
-	@echo "  fetch-doc-artifacts  - Fetch the pinned generated docs and evidence artifacts"
-	@echo "  build-shot-viewer    - Rebuild the version-matched interactive-shot web bundle"
-	@echo "  rsmp-v1-readiness    - Run the deterministic rsmp v1 readiness gate"
-	@echo "  publication-evidence-check - Validate the publication benchmark evidence bundle (issue #601)"
 	@echo "  bench-surface-smoke  - Run the smoke surface decoder benchmark framework flow"
 	@echo "  bench-surface-full   - Run the full surface decoder benchmark framework flow"
 	@echo "  surface-decoder-compare-smoke - Run the smoke surface decoder comparison benchmark"
@@ -43,92 +39,60 @@ help:
 	@echo "  release V=x.y.z      - Bump crate versions, commit, tag, and push a release"
 
 test:
-	cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
+	cargo test --locked --workspace
 
 check:
 	cargo check --locked --workspace
 
-rsmp-v1-readiness:
-	@python3 tools/check_rsmp_v1_readiness.py --repo-root . --out-dir benchmarks/out/rsmp-v1
-
-publication-evidence-check:
-	@python3 tools/check_publication_benchmark_evidence.py --self-test
-	@python3 tools/check_publication_benchmark_evidence.py \
-		--manifest benchmarks/publication_evidence/manifest.toml \
-		--results-dir benchmarks/publication_evidence/results \
-		--report-out /tmp/rstim-publication-evidence-report.md \
-		--readiness-out /tmp/rstim-publication-evidence-readiness.json
-	@cmp /tmp/rstim-publication-evidence-report.md benchmarks/publication_evidence/report.md
-	@cmp /tmp/rstim-publication-evidence-readiness.json benchmarks/publication_evidence/readiness.json
-
-build-shot-viewer:
-	tools/build_shot_viewer.sh
-
-fetch-doc-artifacts:
-	python3 tools/fetch_docs_artifacts.py
-
-build-site: build-shot-viewer fetch-doc-artifacts
-	python3 tools/prepare_site_docs.py
-	python3 tools/build_cli_reference.py
-	python3 tools/build_atom_loss_circuit_crops.py
+build-site:
 	rm -rf _site
-	zola --root site build --output-dir $(CURDIR)/_site $(if $(DOCS_SITE_BASE_URL),--base-url "$(DOCS_SITE_BASE_URL)")
+	zola --root site build --output-dir $(CURDIR)/_site
 	mkdir -p _site/examples _site/data
 	cp rstim/doc/qp101.schema.json _site/qp101.schema.json
 	cp rstim/doc/QP101-ZY.md _site/QP101-ZY.md
-	mkdir -p _site/support _site/benchmarks/atom_loss/readiness/resources
-	cp docs/envelope-support.json _site/support/envelope-support.json
-	cp docs/envelope-compatibility-policy.md _site/support/envelope-compatibility-policy.md
-	cp docs/envelope-mle-scope.json _site/support/envelope-mle-scope.json
-	cp benchmarks/atom_loss/readiness/resources/report.md _site/benchmarks/atom_loss/readiness/resources/report.md
 	cp qp101-viz/examples/basic.qp101.json _site/examples/basic.qp101.json
 	cp qp101-viz/examples/repeat-detector.qp101.json _site/examples/repeat-detector.qp101.json
 	cp qp101-viz/examples/atom-loss-sample.qp101.json _site/examples/atom-loss-sample.qp101.json
-	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --in site/static/examples/getting-started.stim --out _site/examples/getting-started-circuit.svg
-	cargo run --locked -q -p rstim --features cli --bin rstim -- render_svg --sample_shot --seed 86 --in site/static/examples/getting-started.stim --out _site/examples/getting-started.svg
-	target/debug/rstim surface-code-ler --distances 3,5,7 --rounds 9,15,21 --physical-error-rates 0.008,0.009,0.01,0.011,0.012 --shots 10000 --seed 86 --out-dir _site/examples
 	python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery
 	python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json
-	python3 tools/build_docs_search.py --site-root _site
-	python3 tools/site_versions.py index --site-root _site
 
 bench-surface-smoke:
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust
+	cargo run --locked -p rsinter --bin rsinter -- bench run --spec benchmarks/surface_decoder/spec.toml --language rust --out benchmarks/out/surface_decoder/smoke-rust
 	.venv-surface-decoder/bin/python -m benchmarks.python_runners.surface_decoder.run --spec benchmarks/surface_decoder/spec.toml --language python --out benchmarks/out/surface_decoder/smoke-python
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench merge --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/smoke-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/smoke.jsonl
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/merged/smoke.jsonl --out benchmarks/out/surface_decoder/plots/smoke.svg
+	cargo run --locked -p rsinter --bin rsinter -- bench merge --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/smoke-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/smoke-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/smoke.jsonl
+	cargo run --locked -p rsinter --bin rsinter -- bench plot --spec benchmarks/surface_decoder/spec.toml --input benchmarks/out/surface_decoder/merged/smoke.jsonl --out benchmarks/out/surface_decoder/plots/smoke.svg
 
 bench-surface-full:
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench run --spec benchmarks/surface_decoder/full.toml --language rust --out benchmarks/out/surface_decoder/full-rust
+	cargo run --locked -p rsinter --bin rsinter -- bench run --spec benchmarks/surface_decoder/full.toml --language rust --out benchmarks/out/surface_decoder/full-rust
 	.venv-surface-decoder/bin/python -m benchmarks.python_runners.surface_decoder.run --spec benchmarks/surface_decoder/full.toml --language python --out benchmarks/out/surface_decoder/full-python
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench merge --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/full-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/full.jsonl
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/merged/full.jsonl --out benchmarks/out/surface_decoder/plots/full.svg
+	cargo run --locked -p rsinter --bin rsinter -- bench merge --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/full-rust/rmatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rbposd/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-rust/rilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/pymatching/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ilpqec/test-run/results.jsonl --input benchmarks/out/surface_decoder/full-python/ldpc/test-run/results.jsonl --out benchmarks/out/surface_decoder/merged/full.jsonl
+	cargo run --locked -p rsinter --bin rsinter -- bench plot --spec benchmarks/surface_decoder/full.toml --input benchmarks/out/surface_decoder/merged/full.jsonl --out benchmarks/out/surface_decoder/plots/full.svg
 
 surface-decoder-compare-smoke:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier smoke
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/spec.toml --input benchmarks/surface_decoder_compare/results/smoke/results.csv --out benchmarks/surface_decoder_compare/results/smoke/surface_decoder_compare.png
+	cargo run --locked -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/spec.toml --input benchmarks/surface_decoder_compare/results/smoke/results.csv --out benchmarks/surface_decoder_compare/results/smoke/surface_decoder_compare.png
 
 surface-decoder-compare-full:
 	.venv-surface-decoder/bin/python -m benchmarks.surface_decoder_compare.run_compare --tier full
-	cargo run --locked -p rsinter --features full --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/full.toml --input benchmarks/surface_decoder_compare/results/full/results.csv --out benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png
+	cargo run --locked -p rsinter --bin rsinter -- bench plot-surface-compare-csv --spec benchmarks/surface_decoder/full.toml --input benchmarks/surface_decoder_compare/results/full/results.csv --out benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png
 
 bb-circuit-bposd-compare-smoke:
 	python3 -m benchmarks.bb_circuit_bposd_compare.run_compare --tier smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/smoke
 	python3 -m benchmarks.bb_circuit_bposd_compare.verify_smoke benchmarks/bb_circuit_bposd_compare/results/smoke/results.csv
 
 bb-circuit-bposd-compare-plot-smoke:
-	cargo build --locked --release -p rsinter --features full
+	cargo build --locked --release -p rsinter
 	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier bb72-bb144-plot-smoke --output-dir benchmarks/bb_circuit_bposd_compare/results/plot-smoke --rust-binary target/release/rsinter --batch-size 10
 
 bb-circuit-bposd-compare-full:
-	cargo build --locked --release -p rsinter --features full
+	cargo build --locked --release -p rsinter
 	.venv-surface-decoder/bin/python -m benchmarks.bb_circuit_bposd_compare.run_compare --tier full --output-dir benchmarks/bb_circuit_bposd_compare/results/full --rust-binary target/release/rsinter --batch-size 500
 
 qec-code-random-window-bench-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES)
-	cargo build --locked -p qec-code --features cli
+	cargo build --locked -p qec-code
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/summary
 	printf '%s\n' '$(QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER)' > $(QEC_CODE_RANDOM_WINDOW_SMOKE_DIR)/paper-baselines.empty.csv
@@ -138,7 +102,7 @@ qec-code-random-window-bench-full:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES)
-	cargo build --locked -p qec-code --features cli
+	cargo build --locked -p qec-code
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --out $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --qec-code-bin target/debug/qec-code
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_FULL_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_FULL_DIR)/summary
 	# CODEDISTANCE_PAPER_RESULTS_DIR controls paper baseline import source
@@ -149,7 +113,7 @@ qec-code-random-window-bench-no-target-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)
-	cargo build --locked --release -p qec-code --features cli
+	cargo build --locked --release -p qec-code
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_DIR)/summary
 
@@ -157,14 +121,14 @@ qec-code-random-window-bench-no-target-multiseed-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES)
-	cargo build --locked --release -p qec-code --features cli
+	cargo build --locked --release -p qec-code
 	set -e; run_status=0; python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release --seeds 7 11 17 || run_status=$$?; if [ -f $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl ]; then python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_MULTISEED_SMOKE_DIR)/summary --expected-seeds 7 11 17; fi; exit $$run_status
 
 qec-code-random-window-bench-no-target-ladder-smoke:
 	rm -rf $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)
 	mkdir -p $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)
 	python3 -m benchmarks.qec_code_random_window.validate_cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --no-target-ladder-smoke
-	cargo build --locked --release -p qec-code --features cli
+	cargo build --locked --release -p qec-code
 	python3 -m benchmarks.qec_code_random_window.run_local --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --out $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --qec-code-bin target/release/qec-code --build-profile release
 	python3 -m benchmarks.qec_code_random_window.summarize --cases $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_CASES) --runs $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/local-runs.jsonl --out-dir $(QEC_CODE_RANDOM_WINDOW_NO_TARGET_LADDER_SMOKE_DIR)/summary
 
@@ -184,9 +148,8 @@ endif
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rsinter/Cargo.toml
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rbposd/Cargo.toml
 	$(SED_I) 's/^version = ".*"/version = "$(V)"/' rmatching/Cargo.toml
-	cargo check --offline --workspace
 	cargo check --locked --workspace
-	git add rstim/Cargo.toml rsinter/Cargo.toml rbposd/Cargo.toml rmatching/Cargo.toml Cargo.lock
+	git add rstim/Cargo.toml rsinter/Cargo.toml rbposd/Cargo.toml rmatching/Cargo.toml
 	git commit -m "release: v$(V)"
 	git tag -a "v$(V)" -m "Release v$(V)"
 	git push origin $(DEFAULT_BRANCH) --tags

@@ -1,7 +1,7 @@
 #[cfg(feature = "plotting")]
 pub use enabled::{
-    log_log_fit_for_plot, logical_rate_fit_for_plot, render_benchmark_plot, LogLogFitForPlot,
-    LogicalRateFitForPlot,
+    LogLogFitForPlot, LogicalRateFitForPlot, log_log_fit_for_plot, logical_rate_fit_for_plot,
+    render_benchmark_plot,
 };
 
 #[cfg(not(feature = "plotting"))]
@@ -69,8 +69,8 @@ mod enabled {
 
     use crate::bench::result::BenchmarkResultRow;
     use crate::bench::spec::{
-        BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotFitKind,
-        DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+        BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR, LogicalRateUnit, PanelSpec,
+        PlotFitKind,
     };
     use crate::stats::{fit_binomial, shot_error_rate_to_piece_error_rate};
 

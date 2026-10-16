@@ -192,8 +192,8 @@ fn multiply_pauli(x1: bool, z1: bool, x2: bool, z2: bool) -> (bool, bool, u8) {
         ((true, false), (true, false)) => (false, false, 0),
         ((false, true), (false, true)) => (false, false, 0),
         ((true, true), (true, true)) => (false, false, 0),
-        ((true, false), (false, true)) => (true, true, 3),
-        ((false, true), (true, false)) => (true, true, 1),
+        ((true, false), (false, true)) => (true, true, 1),
+        ((false, true), (true, false)) => (true, true, 3),
         ((true, false), (true, true)) => (false, true, 1),
         ((true, true), (true, false)) => (false, true, 3),
         ((false, true), (true, true)) => (true, false, 3),
@@ -536,7 +536,9 @@ fn is_measurement_reset_operation(name: &str) -> bool {
 fn is_loss_operation(name: &str) -> bool {
     matches!(
         name,
-        "ML" | "MXL"
+        "LOSS"
+            | "ML"
+            | "MXL"
             | "MYL"
             | "MZL"
             | "MRL"
@@ -566,7 +568,6 @@ fn is_noiselessly_skipped_or_metadata_operation(name: &str) -> bool {
     matches!(
         name,
         "I" | "I_ERROR"
-            | "LOSS"
             | "II_ERROR"
             | "X_ERROR"
             | "Y_ERROR"
@@ -606,8 +607,8 @@ mod tests {
             ((true, false), (true, false), (false, false, 0)),
             ((false, true), (false, true), (false, false, 0)),
             ((true, true), (true, true), (false, false, 0)),
-            ((true, false), (false, true), (true, true, 3)),
-            ((false, true), (true, false), (true, true, 1)),
+            ((true, false), (false, true), (true, true, 1)),
+            ((false, true), (true, false), (true, true, 3)),
             ((true, false), (true, true), (false, true, 1)),
             ((true, true), (true, false), (false, true, 3)),
             ((false, true), (true, true), (true, false, 3)),

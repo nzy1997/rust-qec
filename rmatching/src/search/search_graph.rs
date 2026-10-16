@@ -72,13 +72,7 @@ impl SearchGraph {
     }
 
     /// Add an edge between two detector nodes.
-    pub fn add_edge(
-        &mut self,
-        u: usize,
-        v: usize,
-        weight: Weight,
-        obs_mask: ObsMask,
-    ) {
+    pub fn add_edge(&mut self, u: usize, v: usize, weight: Weight, obs_mask: ObsMask) {
         if u == v {
             return; // self-loops ignored
         }
@@ -95,12 +89,7 @@ impl SearchGraph {
     }
 
     /// Add a boundary edge (inserted at the front, matching C++ behavior).
-    pub fn add_boundary_edge(
-        &mut self,
-        u: usize,
-        weight: Weight,
-        obs_mask: ObsMask,
-    ) {
+    pub fn add_boundary_edge(&mut self, u: usize, weight: Weight, obs_mask: ObsMask) {
         self.nodes[u].neighbors.insert(0, None);
         self.nodes[u].neighbor_weights.insert(0, weight);
         self.nodes[u].neighbor_observables.insert(0, obs_mask);

@@ -59,8 +59,9 @@ fn without_noise_all_noise_types() {
          CORRELATED_ERROR(0.1) X0\nELSE_CORRELATED_ERROR(0.1) Z0\n\
          HERALDED_ERASE(0.1) 0\nHERALDED_PAULI_CHANNEL_1(0.1,0,0,0) 0\n\
          I_ERROR(0.1) 0\nII_ERROR(0.1) 0 1\n\
-         H 0"
-    ).unwrap();
+         H 0",
+    )
+    .unwrap();
     let clean = transforms::without_noise(&instrs);
     assert_eq!(clean.len(), 1);
     assert_eq!(clean[0].name().unwrap(), "H");
@@ -162,10 +163,8 @@ fn inverse_repeat_block() {
 
 #[test]
 fn normalize_feedbackless_m2d_strips_simple_controlled_x_and_records_correction() {
-    let instrs = parse_lines(
-        "R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("R 0 1\nX 0\nM 0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1] rec[-2]\n").unwrap();
 
     let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
     assert_eq!(
@@ -184,10 +183,8 @@ fn normalize_feedbackless_m2d_rejects_intervening_quantum_op() {
 
 #[test]
 fn normalize_feedbackless_m2d_preserves_annotations_while_feedback_pending() {
-    let instrs = parse_lines(
-        "M 0\nCX rec[-1] 1\nSHIFT_COORDS(1)\nTICK\nM 1\nDETECTOR rec[-1]\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("M 0\nCX rec[-1] 1\nSHIFT_COORDS(1)\nTICK\nM 1\nDETECTOR rec[-1]\n").unwrap();
 
     let normalized = transforms::normalize_feedbackless_m2d(&instrs).unwrap();
     assert_eq!(

@@ -1,5 +1,5 @@
-use rstim::parser::parse_lines;
 use rstim::executor::Executor;
+use rstim::parser::parse_lines;
 
 fn exec(circuit: &str) -> Vec<bool> {
     let instrs = parse_lines(circuit).unwrap();
@@ -46,7 +46,9 @@ fn h_nyz_period_2() {
 
 #[test]
 fn all_c_gates_period_3() {
-    for gate in &["C_XYZ", "C_ZYX", "C_NXYZ", "C_NZYX", "C_XNYZ", "C_XYNZ", "C_ZNYX", "C_ZYNX"] {
+    for gate in &[
+        "C_XYZ", "C_ZYX", "C_NXYZ", "C_NZYX", "C_XNYZ", "C_XYNZ", "C_ZNYX", "C_ZYNX",
+    ] {
         let circuit = format!("R 0\n{g} 0\n{g} 0\n{g} 0\nM 0", g = gate);
         let m = exec(&circuit);
         assert_eq!(m, vec![false], "gate {gate} is not period-3");

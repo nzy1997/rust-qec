@@ -32,7 +32,9 @@ fn ii_error_is_noop() {
 fn parser_tag_round_trip() {
     let instrs = parse_lines("I_ERROR[LEAKAGE:0.1](0.05) 0\n").unwrap();
     match &instrs[0] {
-        rstim::ir::StimInstr::Op { name, tag, args, .. } => {
+        rstim::ir::StimInstr::Op {
+            name, tag, args, ..
+        } => {
             assert_eq!(name, "I_ERROR");
             assert_eq!(tag.as_deref(), Some("LEAKAGE:0.1"));
             assert_eq!(args, &[0.05]);
@@ -45,7 +47,9 @@ fn parser_tag_round_trip() {
 fn parser_tag_no_args() {
     let instrs = parse_lines("I_ERROR[TAG] 0\n").unwrap();
     match &instrs[0] {
-        rstim::ir::StimInstr::Op { name, tag, args, .. } => {
+        rstim::ir::StimInstr::Op {
+            name, tag, args, ..
+        } => {
             assert_eq!(name, "I_ERROR");
             assert_eq!(tag.as_deref(), Some("TAG"));
             assert!(args.is_empty());
@@ -86,19 +90,19 @@ fn else_correlated_error_fires_when_first_doesnt() {
 
 #[test]
 fn correlated_error_chain_three() {
-    let m = run("CORRELATED_ERROR(0) X0\nELSE_CORRELATED_ERROR(1) X1\nELSE_CORRELATED_ERROR(1) X2\nM 0 1 2\n");
+    let m = run(
+        "CORRELATED_ERROR(0) X0\nELSE_CORRELATED_ERROR(1) X1\nELSE_CORRELATED_ERROR(1) X2\nM 0 1 2\n",
+    );
     assert_eq!(m, vec![false, true, false]);
 }
 
 #[test]
 fn correlated_error_resets_flag() {
-    let m = run(
-        "CORRELATED_ERROR(1) X0\n\
+    let m = run("CORRELATED_ERROR(1) X0\n\
          ELSE_CORRELATED_ERROR(1) X1\n\
          CORRELATED_ERROR(1) X2\n\
          ELSE_CORRELATED_ERROR(1) X3\n\
-         M 0 1 2 3\n"
-    );
+         M 0 1 2 3\n");
     assert_eq!(m, vec![true, false, true, false]);
 }
 

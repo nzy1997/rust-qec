@@ -57,31 +57,6 @@ def measurement_logical_digest(row: dict[str, Any]) -> str:
     )
 
 
-def synthetic_stim_baselines(measurement_sha: str, raw_bytes: int, direct_bytes: int) -> dict[str, Any]:
-    baselines: dict[str, Any] = {}
-    for index, fmt in enumerate(checker.REQUIRED_STIM_BASELINE_FORMATS):
-        artifact_bytes = raw_bytes if fmt == "b8" else raw_bytes + 1000 * (index + 1)
-        artifact_sha = measurement_sha if fmt == "b8" else f"{index + 7:064x}"[-64:]
-        baselines[fmt] = {
-            "artifact": {
-                "argv": ["tool://stim", "convert", "--out_format", fmt],
-                "bytes": artifact_bytes,
-                "sha256": artifact_sha,
-            },
-            "direct_zstd": {
-                "argv": ["tool://rstim", "rsmp_zstd_frame", "--level", "3"],
-                "input_sha256": artifact_sha,
-                "bytes": direct_bytes,
-                "sha256": f"{direct_bytes + index:064x}"[-64:],
-            },
-            "roundtrip_b8": {
-                "argv": ["tool://stim", "convert", "--out_format", "b8"],
-                "sha256": measurement_sha,
-            },
-        }
-    return baselines
-
-
 def base_record(
     case_id: str,
     semantic_role: str,
@@ -192,8 +167,6 @@ def base_record(
     }
     row["measurement_input"]["logical_digest"] = measurement_logical_digest(row)
     row["rsmp_archive"]["peak_logical_block_working_set_bytes"] = checker.peak_working_set(row)
-    if case_id == checker.BENCHMARK_CASE_ID:
-        row["stim_baselines"] = synthetic_stim_baselines(measurement_sha, raw_bytes, direct_bytes)
     return row
 
 
@@ -275,22 +248,7 @@ def write_valid_bundle(bundle: Path) -> None:
                 "frame_checksum": True,
             },
             "zstd_contract": copy.deepcopy(checker.ZSTD_CONTRACT),
-            "stim": {
-                "binary": {"path": "target/release/nonexistent-rsmp-checker-test-stim", "sha256": "0" * 64},
-                "version": "1.16.0",
-                "version_source": "stim-python-module",
-            },
-            "commands": {
-                "benchmark_sample": checker.PINNED_BENCHMARK_SAMPLE_ARGV,
-                "stim_baselines": {
-                    fmt: {
-                        "serialize": ["tool://stim", "convert", "--out_format", fmt],
-                        "direct_zstd": ["tool://rstim", "rsmp_zstd_frame", "--level", "3"],
-                        "roundtrip": ["tool://stim", "convert", "--out_format", "b8"],
-                    }
-                    for fmt in checker.REQUIRED_STIM_BASELINE_FORMATS
-                },
-            },
+            "commands": {"benchmark_sample": checker.PINNED_BENCHMARK_SAMPLE_ARGV},
         },
     )
     refresh_derived(bundle)
@@ -340,17 +298,6 @@ def main() -> int:
         result = run_checker(valid)
         if result.returncode != 0:
             raise AssertionError(f"valid bundle failed:\n{result.stdout}")
-
-        historical_lock = root / "historical-lock"
-        shutil.copytree(valid, historical_lock)
-        mutate_json(
-            historical_lock,
-            "environment.json",
-            lambda environment: environment["cargo"].update({"lock_sha256": "1" * 64}),
-        )
-        result = run_checker(historical_lock)
-        if result.returncode != 0:
-            raise AssertionError(f"historical lock provenance bundle failed:\n{result.stdout}")
 
         expect_failure(
             valid,
@@ -457,27 +404,8 @@ def main() -> int:
             ),
             "high_entropy_raw_le_102pct",
         )
-        expect_failure(
-            valid,
-            "missing-ptb64-baseline",
-            lambda bundle: mutate_raw(
-                bundle,
-                lambda records: records[checker.BENCHMARK_ROW_INDEX]["stim_baselines"].pop("ptb64"),
-                refresh=False,
-            ),
-            "missing required Stim baseline format: ptb64",
-        )
-        expect_failure(
-            valid,
-            "bad-r8-roundtrip-sha",
-            lambda bundle: mutate_raw(
-                bundle,
-                lambda records: records[checker.BENCHMARK_ROW_INDEX]["stim_baselines"]["r8"]["roundtrip_b8"].update({"sha256": "e" * 64}),
-            ),
-            "r8 round-trip measurement SHA-256 mismatch",
-        )
 
-    print("PASS rsmp compression checker negative_controls=13")
+    print("PASS rsmp compression checker negative_controls=3")
     return 0
 
 

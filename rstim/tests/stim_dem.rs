@@ -47,7 +47,11 @@ fn dem_count_detectors_simple() {
 fn dem_count_detectors_with_shift() {
     let dem = DetectorErrorModel::parse("shift_detectors 5\ndetector(0) D3\n").unwrap();
     // After shift of 5, D3 means detector index 8, so at least 9 detectors.
-    assert!(dem.num_detectors() >= 4, "detectors={}", dem.num_detectors());
+    assert!(
+        dem.num_detectors() >= 4,
+        "detectors={}",
+        dem.num_detectors()
+    );
 }
 
 // --- count_observables ---
@@ -60,27 +64,32 @@ fn dem_count_observables_empty() {
 #[test]
 fn dem_count_observables_in_error() {
     let dem = DetectorErrorModel::parse("error(0.3) L2 D9999\n").unwrap();
-    assert!(dem.num_observables() >= 3, "L2 implies at least 3 observables");
+    assert!(
+        dem.num_observables() >= 3,
+        "L2 implies at least 3 observables"
+    );
 }
 
 #[test]
 fn dem_count_observables_with_logical() {
-    let dem =
-        DetectorErrorModel::parse("shift_detectors 5\nerror(0.01) L3\n").unwrap();
-    assert!(dem.num_observables() >= 4, "L3 implies at least 4 observables");
+    let dem = DetectorErrorModel::parse("shift_detectors 5\nerror(0.01) L3\n").unwrap();
+    assert!(
+        dem.num_observables() >= 4,
+        "L3 implies at least 4 observables"
+    );
 }
 
 // --- DEM from circuit (circuit_to_dem) ---
 #[test]
 fn dem_from_simple_circuit() {
-    let instrs = parse_lines(
-        "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n",
-    )
-    .unwrap();
+    let instrs = parse_lines("R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
     let dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
     assert!(dem.num_detectors() >= 1);
     let text = dem.to_string();
-    assert!(text.contains("error"), "DEM should contain error instructions: {text}");
+    assert!(
+        text.contains("error"),
+        "DEM should contain error instructions: {text}"
+    );
 }
 
 #[test]
@@ -108,7 +117,10 @@ fn dem_from_rep_code() {
     .unwrap();
     let dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
     let text = dem.to_string();
-    assert!(dem.num_detectors() >= 3, "rep code should have 3+ detectors");
+    assert!(
+        dem.num_detectors() >= 3,
+        "rep code should have 3+ detectors"
+    );
     assert!(dem.num_observables() >= 1, "should have 1+ observable");
     assert!(text.contains("error"), "should contain errors: {text}");
 }
@@ -193,10 +205,9 @@ repeat 5 {
 // --- DEM from circuit with observable ---
 #[test]
 fn dem_observable_from_circuit() {
-    let instrs = parse_lines(
-        "R 0\nX_ERROR(0.01) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("R 0\nX_ERROR(0.01) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
+            .unwrap();
     let dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
     assert!(dem.num_observables() >= 1);
 }

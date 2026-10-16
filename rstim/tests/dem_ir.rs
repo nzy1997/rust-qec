@@ -51,10 +51,7 @@ fn dem_observable_instruction() {
 #[test]
 fn dem_error_with_observable() {
     let mut dem = DetectorErrorModel::new();
-    dem.add_error(
-        0.01,
-        vec![DemTarget::Detector(0), DemTarget::Observable(0)],
-    );
+    dem.add_error(0.01, vec![DemTarget::Detector(0), DemTarget::Observable(0)]);
     assert_eq!(dem.num_detectors(), 1);
     assert_eq!(dem.num_observables(), 1);
 }

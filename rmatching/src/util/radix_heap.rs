@@ -203,8 +203,10 @@ mod tests {
     #[test]
     fn cyclic_widen_stays_near_reference() {
         let reference = 4_300_000_000i64;
-        let widened =
-            widen_from_nearby_reference(Wrapping((reference as u32).wrapping_add(1_000)), reference);
+        let widened = widen_from_nearby_reference(
+            Wrapping((reference as u32).wrapping_add(1_000)),
+            reference,
+        );
         assert!(widened > reference);
         assert_eq!(widened - reference, 1_000);
     }

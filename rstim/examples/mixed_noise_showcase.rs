@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use rstim::operations as cli;
+use rstim::cli;
 use rstim::executor::Executor;
 use rstim::ir::circuit_to_string;
 use rstim::qp101::{export_qp101, export_qp101_with_sample_trace};
@@ -41,9 +41,8 @@ fn main() {
         &sample,
     );
     write_json(
-        &Path::new(env!("CARGO_MANIFEST_DIR")).join(
-            "tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise.json",
-        ),
+        &Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/qp101/surface_code_rotated_memory_x_d3_r3_mixed_noise.json"),
         &base,
     );
     write_json(

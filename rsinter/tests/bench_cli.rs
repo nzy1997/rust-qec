@@ -22,13 +22,6 @@ fn rsinter_cli_help_mentions_bench_subcommands() {
     assert!(stdout.contains("run"));
     assert!(stdout.contains("merge"));
     assert!(stdout.contains("plot"));
-    assert!(stdout.contains("plot-error-rate-csv"));
-    assert!(stdout.contains("requires rbposd-runner"), "{stdout}");
-    assert!(stdout.contains("plots require plotting"), "{stdout}");
-    assert!(
-        stdout.contains("requires a decoder runner feature"),
-        "{stdout}"
-    );
 }
 
 #[test]
@@ -40,39 +33,6 @@ fn rsinter_bench_run_help_mentions_resume_flag() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("--resume"), "{stdout}");
-}
-
-#[test]
-#[cfg(feature = "plotting")]
-fn rsinter_plot_error_rate_csv_cli_plots_measured_counts() {
-    let dir = tempfile::tempdir().unwrap();
-    let input = dir.path().join("rates.csv");
-    let output = dir.path().join("rates.svg");
-    fs::write(
-        &input,
-        "distance,physical_error_rate,shots,logical_failures\n\
-         3,0.005,2000,31\n\
-         5,0.005,2000,23\n\
-         3,0.01,2000,111\n\
-         5,0.01,2000,184\n",
-    )
-    .unwrap();
-
-    let result = Command::new(env!("CARGO_BIN_EXE_rsinter"))
-        .args([
-            "plot-error-rate-csv",
-            "--input",
-            input.to_str().unwrap(),
-            "--out",
-            output.to_str().unwrap(),
-        ])
-        .output()
-        .unwrap();
-    assert!(result.status.success(), "{result:?}");
-    let svg = fs::read_to_string(output).unwrap();
-    assert!(svg.contains("<svg"));
-    assert!(svg.contains("distance 3"));
-    assert!(svg.contains("distance 5"));
 }
 
 #[test]
@@ -292,9 +252,9 @@ fn rsinter_bench_plot_surface_compare_csv_writes_png_from_legacy_csv() {
             "bench",
             "plot-surface-compare-csv",
             "--spec",
-            "tests/fixtures/bench/minimal_surface_decoder.toml",
+            "../benchmarks/surface_decoder/spec.toml",
             "--input",
-            "tests/fixtures/bench/surface_compare_plot_semantics.csv",
+            "../benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv",
             "--out",
             out.to_str().unwrap(),
         ])
@@ -332,7 +292,7 @@ bb72-error,batched_compare,legacy_decoder,bb72,0.003,6,10,,0,12345,ms,10000,osd_
             "bench",
             "plot-bb-compare-csv",
             "--spec",
-            "tests/fixtures/bench/bb_compare_plot.toml",
+            "../benchmarks/bb_circuit_bposd_compare/plot.toml",
             "--input",
             input.to_str().unwrap(),
             "--out",
@@ -585,4 +545,29 @@ fn rsinter_bb_circuit_bposd_memory_rejects_negative_physical_error_rate() {
             .any(|line| line.split_whitespace().count() == 4),
         "invalid command printed a four-column result line: {stdout:?}"
     );
+}
+
+#[test]
+fn bb144_reproduction_evidence_note_records_required_context() {
+    let note = include_str!("../../docs/bb144_circuit_bposd_reproduction.md");
+
+    for required in [
+        "0.003\t12\t5\t0",
+        "--num-trials 50000",
+        "--seed 12345",
+        "95% one-sided Clopper-Pearson upper bound",
+        "does not claim statistical agreement",
+        "small_ldpc.png",
+        "red [[144,12,12]] LDPC curve",
+        "ldpc_vs_surface.png",
+        "red-diamond LDPC [[144,12,12]] curve",
+        "--max-bp-iterations 10000",
+        "--osd-order 7",
+        "physical_error_rate must be finite and lie in [0, 1)",
+    ] {
+        assert!(
+            note.contains(required),
+            "missing evidence token: {required}"
+        );
+    }
 }

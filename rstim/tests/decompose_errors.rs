@@ -1,21 +1,24 @@
-use rstim::dem::{DemInstruction, DetectorErrorModel};
-use rstim::error_analyzer::{decompose_errors, ErrorAnalyzer};
-use rstim::parser::parse_lines;
 use rstim::codegen::repetition_code_memory;
 use rstim::codegen::surface_code::rotated_memory_x;
+use rstim::dem::{DemInstruction, DetectorErrorModel};
+use rstim::error_analyzer::{ErrorAnalyzer, decompose_errors};
+use rstim::parser::parse_lines;
 use std::collections::BTreeMap;
 
 #[test]
 fn decompose_already_graphlike_unchanged() {
     // Rep code with X_ERROR only produces graphlike errors
-    let circuit = parse_lines("
+    let circuit = parse_lines(
+        "
         R 0 1 2
         X_ERROR(0.1) 0 1
         M 0 1 2
         DETECTOR rec[-3] rec[-2]
         DETECTOR rec[-2] rec[-1]
         OBSERVABLE_INCLUDE(0) rec[-1]
-    ").unwrap();
+    ",
+    )
+    .unwrap();
     let dem = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap();
     let text = dem.to_string();
     // All errors should have <=2 detectors per component
@@ -53,7 +56,10 @@ DETECTOR rec[-1]
     .unwrap();
 
     let err = ErrorAnalyzer::circuit_to_dem_decomposed(&circuit).unwrap_err();
-    assert!(err.contains("decompose") || err.contains("graphlike"), "{err}");
+    assert!(
+        err.contains("decompose") || err.contains("graphlike"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -86,11 +92,7 @@ detector(3, 0, 1) D3
         "{}",
         dem,
     );
-    assert_prob_multimaps_close(
-        &expected_map,
-        &actual_map,
-        &dem.to_string(),
-    );
+    assert_prob_multimaps_close(&expected_map, &actual_map, &dem.to_string());
 }
 
 #[test]
@@ -112,8 +114,14 @@ fn decompose_errors_merges_duplicate_decomposed_targets_for_larger_surface_code(
     assert_eq!(errors.get("D1 L0 ^ D12"), Some(&vec![0.007318633932043431]));
     assert_eq!(errors.get("D10 ^ D30"), Some(&vec![0.004669790293214321]));
     assert_eq!(errors.get("D11 ^ D32"), Some(&vec![0.005333333333333312]));
-    assert_eq!(errors.get("D12 ^ D16 L0"), Some(&vec![0.0026738159584462984]));
-    assert_eq!(errors.get("D13 ^ D18 L0"), Some(&vec![0.006000449842759885]));
+    assert_eq!(
+        errors.get("D12 ^ D16 L0"),
+        Some(&vec![0.0026738159584462984])
+    );
+    assert_eq!(
+        errors.get("D13 ^ D18 L0"),
+        Some(&vec![0.006000449842759885])
+    );
     assert_eq!(errors.get("D13 ^ D2 L0"), Some(&vec![0.007318633932043431]));
     assert_eq!(errors.get("D32 ^ D33"), Some(&vec![0.006000449842759885]));
     assert_eq!(errors.get("D33 ^ D56"), Some(&vec![0.0026738159584462984]));
@@ -130,9 +138,15 @@ fn decompose_errors_matches_stim_semantics_for_standard_rep_code_fixture() {
     assert_eq!(errors.get("D0 D4"), Some(&vec![0.022367932846491825]));
     assert_eq!(errors.get("D1 D5"), Some(&vec![0.024922133333333315]));
     assert_eq!(errors.get("D4 L0"), Some(&vec![0.011928888888888814]));
-    assert_eq!(errors.get("D0 L0 ^ D4 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(
+        errors.get("D0 L0 ^ D4 L0"),
+        Some(&vec![0.0026738159584462984])
+    );
     assert_eq!(errors.get("D11 ^ D7"), Some(&vec![0.0026738159584462984]));
-    assert_eq!(errors.get("D12 L0 ^ D8 L0"), Some(&vec![0.0026738159584462984]));
+    assert_eq!(
+        errors.get("D12 L0 ^ D8 L0"),
+        Some(&vec![0.0026738159584462984])
+    );
     assert_eq!(errors.get("D11 ^ D15"), Some(&vec![0.0026738159584462984]));
 }
 

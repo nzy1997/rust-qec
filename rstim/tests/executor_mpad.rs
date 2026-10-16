@@ -1,7 +1,7 @@
-use rstim::executor::Executor;
-use rstim::parser::parse_lines;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::executor::Executor;
+use rstim::parser::parse_lines;
 
 fn run(prog: &str) -> Vec<bool> {
     let instrs = parse_lines(prog).unwrap();

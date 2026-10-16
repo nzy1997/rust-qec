@@ -1,4 +1,4 @@
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use rstim::sim::packed_inverse_tableau::PackedInverseTableau;
 
@@ -18,8 +18,14 @@ fn assert_identity(num_qubits: usize) {
     assert_eq!(tableau.num_qubits(), num_qubits);
     assert_eq!(tableau.num_rows(), num_rows);
     assert_eq!(tableau.words_per_row(), words_per_row);
-    assert_eq!(tableau.x_plane_words().len(), expected_plane_len(num_qubits));
-    assert_eq!(tableau.z_plane_words().len(), expected_plane_len(num_qubits));
+    assert_eq!(
+        tableau.x_plane_words().len(),
+        expected_plane_len(num_qubits)
+    );
+    assert_eq!(
+        tableau.z_plane_words().len(),
+        expected_plane_len(num_qubits)
+    );
     assert_eq!(tableau.sign_words().len(), words_for_bits(num_rows));
 
     if num_qubits == 0 {
@@ -80,9 +86,15 @@ fn boundary_bits_63_64_129_map_to_expected_words() {
     let w = tableau.words_per_row();
 
     assert_eq!(w, 3);
-    assert_eq!(row_words(tableau.x_plane_words(), 63, w), &[1u64 << 63, 0, 0]);
+    assert_eq!(
+        row_words(tableau.x_plane_words(), 63, w),
+        &[1u64 << 63, 0, 0]
+    );
     assert_eq!(row_words(tableau.x_plane_words(), 64, w), &[0, 1, 0]);
-    assert_eq!(row_words(tableau.x_plane_words(), 129, w), &[0, 0, 1u64 << 1]);
+    assert_eq!(
+        row_words(tableau.x_plane_words(), 129, w),
+        &[0, 0, 1u64 << 1]
+    );
 
     assert_eq!(
         row_words(tableau.z_plane_words(), 130 + 63, w),

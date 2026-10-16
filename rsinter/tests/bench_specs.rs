@@ -1,11 +1,9 @@
-#![cfg(feature = "rbposd-runner")]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use rsinter::bench::registry::{
-    build_default_rust_runner_registry, expand_runner_points_for_runner, BenchCasePoint,
-    RustBenchRunner,
+    BenchCasePoint, RustBenchRunner, build_default_rust_runner_registry,
+    expand_runner_points_for_runner,
 };
 use rsinter::bench::spec::{BenchmarkSpec, RunnerSpec};
 use toml::Value;
@@ -51,7 +49,7 @@ fn rbposd_benchmark_specs_cover_lsd_and_bp_option_runners() {
 
 #[test]
 fn rbposd_benchmark_specs_reject_unknown_decoder_modes() {
-    let spec = load_spec(&surface_decoder_spec_paths()[0]);
+    let spec = load_spec(&workspace_root().join("benchmarks/surface_decoder/spec.toml"));
 
     let mut lsd_params = runner_named(&spec, LSD_RUNNER).params.clone();
     lsd_params.insert("lsd_method".into(), Value::String("bogus_lsd".into()));
@@ -70,16 +68,11 @@ fn rbposd_benchmark_specs_reject_unknown_decoder_modes() {
     );
 }
 
-fn surface_decoder_spec_paths() -> Vec<PathBuf> {
-    if std::env::var_os("RSINTER_CHECK_REPO_CONFIGS").is_some() {
-        vec![
-            workspace_root().join("benchmarks/surface_decoder/spec.toml"),
-            workspace_root().join("benchmarks/surface_decoder/full.toml"),
-        ]
-    } else {
-        vec![Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/bench/rbposd_runner_modes.toml")]
-    }
+fn surface_decoder_spec_paths() -> [PathBuf; 2] {
+    [
+        workspace_root().join("benchmarks/surface_decoder/spec.toml"),
+        workspace_root().join("benchmarks/surface_decoder/full.toml"),
+    ]
 }
 
 fn workspace_root() -> PathBuf {

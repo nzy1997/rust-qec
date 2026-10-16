@@ -1,6 +1,6 @@
 use rbposd::{
-    BpLsdDecoder, BpVariant, ChannelModel, DecoderConfig, LsdConfig, ParityCheckMatrix,
-    Schedule, Syndrome,
+    BpLsdDecoder, BpVariant, ChannelModel, DecoderConfig, LsdConfig, ParityCheckMatrix, Schedule,
+    Syndrome,
 };
 
 #[test]
@@ -27,9 +27,8 @@ fn bplsddecoder_with_bp_config_respects_max_bp_iterations() {
 
 #[test]
 fn bplsddecoder_with_bp_config_uses_product_sum_serial_execution() {
-    let pcm =
-        ParityCheckMatrix::from_sparse_rows(3, 4, vec![vec![0, 1], vec![1, 2], vec![2, 3]])
-            .unwrap();
+    let pcm = ParityCheckMatrix::from_sparse_rows(3, 4, vec![vec![0, 1], vec![1, 2], vec![2, 3]])
+        .unwrap();
     let decoder = BpLsdDecoder::with_bp_config(
         pcm.clone(),
         ChannelModel::BitFlipProbabilities(vec![0.2, 0.35, 0.2, 0.2]),

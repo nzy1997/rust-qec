@@ -650,11 +650,7 @@ fn sub_mod(lhs: u64, rhs: u64, modulus: u64) -> u64 {
 }
 
 fn neg_mod(value: u64, modulus: u64) -> u64 {
-    if value == 0 {
-        0
-    } else {
-        modulus - value
-    }
+    if value == 0 { 0 } else { modulus - value }
 }
 
 fn checked_usize_mul(
@@ -1333,7 +1329,10 @@ mod tests {
             &apm_p96_verifier_expectations(),
         )
         .unwrap_err();
-        assert!(duplicate_err.contains("duplicate support"), "{duplicate_err}");
+        assert!(
+            duplicate_err.contains("duplicate support"),
+            "{duplicate_err}"
+        );
 
         let mut out_of_range_hz = checks.hz.clone();
         out_of_range_hz[0][0] = checks.num_cols;

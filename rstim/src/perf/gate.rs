@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfCaseTier,
-    PerfComparisonSummary, PerfRecordStatus, PerfSummary, PerfVariantSummary,
+    PerfCaseTier, PerfComparisonSummary, PerfRecordStatus, PerfSummary, PerfVariantSummary,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

@@ -1,8 +1,8 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
-use rstim::data_path::{build_reference_sample, ReferenceSampleMode};
+use rand::rngs::StdRng;
+use rstim::data_path::{ReferenceSampleMode, build_reference_sample};
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch, sample_batch_with_options, SampleOptions};
+use rstim::sampler::{SampleOptions, sample_batch, sample_batch_with_options};
 use rstim::sim::bit_table::BitTable;
 
 fn assert_same_table(actual: &BitTable, expected: &BitTable) {
@@ -28,7 +28,8 @@ fn sample_batch_wrapper_matches_default_options() {
     let mut rng_a = StdRng::seed_from_u64(7);
     let mut rng_b = StdRng::seed_from_u64(7);
     let wrapped = sample_batch(&instrs, 4, &mut rng_a).unwrap();
-    let explicit = sample_batch_with_options(&instrs, 4, &mut rng_b, SampleOptions::default()).unwrap();
+    let explicit =
+        sample_batch_with_options(&instrs, 4, &mut rng_b, SampleOptions::default()).unwrap();
     assert_same_table(&wrapped.measurements, &explicit.measurements);
     assert_same_table(&wrapped.detections, &explicit.detections);
     assert_same_table(&wrapped.observable_flips, &explicit.observable_flips);

@@ -4,11 +4,11 @@ use crate::measurement_transform::{
 };
 use crate::sample_archive::dense::unpack_dense;
 use crate::sample_archive::format::{
-    checked_dense_bit_bytes, ArchiveTrailer, BlockHeader, GlobalHeader, SampleArchiveError,
-    SampleArchiveErrorCode, ARCHIVE_TRAILER_LEN, BLOCK_HEADER_LEN, BLOCK_MAGIC,
-    CODEC_SUITE_ZSTD_FRAMES_V1, FORMAT_MAJOR, FORMAT_MINOR, GLOBAL_HEADER_LEN, STREAM_CODEC_EMPTY,
+    ARCHIVE_TRAILER_LEN, ArchiveTrailer, BLOCK_HEADER_LEN, BLOCK_MAGIC, BlockHeader,
+    CODEC_SUITE_ZSTD_FRAMES_V1, GLOBAL_HEADER_LEN, GlobalHeader, STREAM_CODEC_EMPTY,
     STREAM_CODEC_FREE_DENSE_V1, STREAM_CODEC_SYNDROME_DENSE_V1,
-    STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, TRAILER_MAGIC,
+    STREAM_CODEC_SYNDROME_SPARSE_LEB128_V1, SampleArchiveError, SampleArchiveErrorCode,
+    TRAILER_MAGIC, checked_dense_bit_bytes,
 };
 use crate::sample_archive::integrity::{header_digest, trailer_prefix};
 use crate::sample_archive::limits::ArchiveLimits;
@@ -26,14 +26,11 @@ use std::io::{ErrorKind, Read};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArchiveSummary {
-    pub format_major: u16,
-    pub format_minor: u16,
     pub block_count: u64,
     pub total_shots: u64,
     pub measurement_count: u64,
     pub detector_count: u64,
     pub observable_count: u64,
-    pub circuit_sha256: [u8; 32],
 }
 
 pub struct SampleArchiveReader<R: Read> {
@@ -48,7 +45,6 @@ pub struct SampleArchiveReader<R: Read> {
     decompressed_archive_bytes: u64,
     compressed_archive_bytes: u64,
     trailer: Option<ArchiveTrailer>,
-    terminal_error: Option<SampleArchiveError>,
 }
 
 impl<R: Read> SampleArchiveReader<R> {
@@ -83,7 +79,6 @@ impl<R: Read> SampleArchiveReader<R> {
             decompressed_archive_bytes: 0,
             compressed_archive_bytes: 0,
             trailer: None,
-            terminal_error: None,
         })
     }
 
@@ -92,19 +87,6 @@ impl<R: Read> SampleArchiveReader<R> {
     }
 
     pub fn next_block(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
-        if let Some(err) = self.terminal_error {
-            return Err(err);
-        }
-        match self.next_block_impl() {
-            Ok(block) => Ok(block),
-            Err(err) => {
-                self.terminal_error = Some(err);
-                Err(err)
-            }
-        }
-    }
-
-    fn next_block_impl(&mut self) -> Result<Option<DecodedSampleBlock>, SampleArchiveError> {
         if self.trailer.is_some() {
             return Ok(None);
         }
@@ -249,9 +231,6 @@ impl<R: Read> SampleArchiveReader<R> {
     }
 
     pub fn finish(mut self) -> Result<ArchiveSummary, SampleArchiveError> {
-        if let Some(err) = self.terminal_error {
-            return Err(err);
-        }
         while self.trailer.is_none() {
             if self.next_block()?.is_none() {
                 break;
@@ -284,14 +263,11 @@ impl<R: Read> SampleArchiveReader<R> {
         let mut extra = [0u8; 1];
         match self.input.read(&mut extra) {
             Ok(0) => Ok(ArchiveSummary {
-                format_major: FORMAT_MAJOR,
-                format_minor: FORMAT_MINOR,
                 block_count: trailer.block_count,
                 total_shots: trailer.total_shots,
                 measurement_count: self.header.measurement_count,
                 detector_count: self.header.detector_count,
                 observable_count: self.header.observable_count,
-                circuit_sha256: self.header.circuit_sha256,
             }),
             Ok(_) => Err(SampleArchiveError::with_code(
                 SampleArchiveErrorCode::TrailingData,
@@ -968,10 +944,12 @@ mod tests {
             SampleArchiveReader::open(io::Cursor::new(&archive), &zero_circuit, test_limits())
                 .expect("open zero-shot reader");
         assert!(reader.next_block().expect("read trailer").is_none());
-        assert!(reader
-            .next_block()
-            .expect("trailer stays consumed")
-            .is_none());
+        assert!(
+            reader
+                .next_block()
+                .expect("trailer stays consumed")
+                .is_none()
+        );
 
         let circuit = parse("M 0\n");
         let mut bad = archive_for(&circuit, 1);

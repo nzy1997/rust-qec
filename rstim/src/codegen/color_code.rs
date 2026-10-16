@@ -1,5 +1,5 @@
-use crate::ir::{StimInstr, StimTarget};
 use super::NoiseParams;
+use crate::ir::{StimInstr, StimTarget};
 
 /// Generate a color code memory_xyz experiment circuit (uniform noise convenience wrapper).
 pub fn memory_xyz(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
@@ -10,8 +10,15 @@ pub fn memory_xyz(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> 
 ///
 /// d must be odd and >= 3. rounds must be >= 2.
 /// Layout: triangular grid with w = d + (d-1)/2 rows.
-pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
-    assert!(distance >= 3 && distance % 2 == 1, "distance must be odd and >= 3");
+pub fn memory_xyz_with_params(
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+) -> Vec<StimInstr> {
+    assert!(
+        distance >= 3 && distance % 2 == 1,
+        "distance must be odd and >= 3"
+    );
     assert!(rounds >= 2, "rounds must be >= 2");
 
     let d = distance;
@@ -41,7 +48,11 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         }
     }
 
-    let mut all_qubits: Vec<u32> = data_qubits.iter().chain(measurement_qubits.iter()).cloned().collect();
+    let mut all_qubits: Vec<u32> = data_qubits
+        .iter()
+        .chain(measurement_qubits.iter())
+        .cloned()
+        .collect();
     all_qubits.sort();
     data_qubits.sort();
     measurement_qubits.sort();
@@ -77,14 +88,7 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         m
     };
 
-    let deltas: [(i64, i64); 6] = [
-        (2, 0),
-        (1, 1),
-        (1, -1),
-        (-2, 0),
-        (-1, 1),
-        (-1, -1),
-    ];
+    let deltas: [(i64, i64); 6] = [(2, 0), (1, 1), (1, -1), (-2, 0), (-1, 1), (-1, -1)];
 
     let mut cnot_targets: [Vec<u32>; 6] = Default::default();
     for (k, &(ddx2, ddy)) in deltas.iter().enumerate() {
@@ -116,13 +120,23 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
     }
     if params.after_reset_flip_probability > 0.0 {
         for &q in &all_qubits {
-            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "X_ERROR",
+                &[params.after_reset_flip_probability],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
 
     // Head: 2 cycles
     for _ in 0..2 {
-        emit_cycle(&mut instrs, &data_qubits, &measurement_qubits, &cnot_targets, &params);
+        emit_cycle(
+            &mut instrs,
+            &data_qubits,
+            &measurement_qubits,
+            &cnot_targets,
+            &params,
+        );
     }
 
     // Detectors after head
@@ -131,12 +145,22 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         let (cx, cy) = q2p[mq as usize];
         let r1 = -((k + 1) as i32);
         let r2 = -((k + 1 + m) as i32);
-        instrs.push(op("DETECTOR", &[cx, cy, 0.0], &[StimTarget::Rec(r1), StimTarget::Rec(r2)]));
+        instrs.push(op(
+            "DETECTOR",
+            &[cx, cy, 0.0],
+            &[StimTarget::Rec(r1), StimTarget::Rec(r2)],
+        ));
     }
 
     // Body: (rounds-2) repetitions
     for _ in 0..(rounds - 2) {
-        emit_cycle(&mut instrs, &data_qubits, &measurement_qubits, &cnot_targets, &params);
+        emit_cycle(
+            &mut instrs,
+            &data_qubits,
+            &measurement_qubits,
+            &cnot_targets,
+            &params,
+        );
         instrs.push(op("SHIFT_COORDS", &[0.0, 0.0, 1.0], &[]));
         for k in (0..m).rev() {
             let mq = measurement_qubits[m - k - 1];
@@ -144,11 +168,15 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
             let r1 = -((k + 1) as i32);
             let r2 = -((k + 1 + m) as i32);
             let r3 = -((k + 1 + 2 * m) as i32);
-            instrs.push(op("DETECTOR", &[cx, cy, 0.0], &[
-                StimTarget::Rec(r1),
-                StimTarget::Rec(r2),
-                StimTarget::Rec(r3),
-            ]));
+            instrs.push(op(
+                "DETECTOR",
+                &[cx, cy, 0.0],
+                &[
+                    StimTarget::Rec(r1),
+                    StimTarget::Rec(r2),
+                    StimTarget::Rec(r3),
+                ],
+            ));
         }
     }
 
@@ -162,12 +190,20 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
     };
     if params.before_round_data_depolarization > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[params.before_round_data_depolarization],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
     if params.before_measure_flip_probability > 0.0 {
         for &q in &data_qubits {
-            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "X_ERROR",
+                &[params.before_measure_flip_probability],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
     for &q in &data_qubits {
@@ -204,7 +240,10 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         }
 
         det_targets.sort();
-        let targets: Vec<StimTarget> = det_targets.iter().map(|&r| StimTarget::Rec(-(r as i32))).collect();
+        let targets: Vec<StimTarget> = det_targets
+            .iter()
+            .map(|&r| StimTarget::Rec(-(r as i32)))
+            .collect();
         instrs.push(op("DETECTOR", &[mc.0, mc.1, 1.0], &targets));
     }
 
@@ -219,7 +258,10 @@ pub fn memory_xyz_with_params(distance: usize, rounds: usize, params: NoiseParam
         }
     }
     obs_targets.sort();
-    let obs: Vec<StimTarget> = obs_targets.iter().map(|&r| StimTarget::Rec(-(r as i32))).collect();
+    let obs: Vec<StimTarget> = obs_targets
+        .iter()
+        .map(|&r| StimTarget::Rec(-(r as i32)))
+        .collect();
     instrs.push(op("OBSERVABLE_INCLUDE", &[0.0], &obs));
 
     instrs
@@ -238,7 +280,11 @@ fn emit_cycle(
     // before_round_data_depolarization on measurement qubits (ancilla idle noise)
     if params.before_round_data_depolarization > 0.0 {
         for &q in measurement_qubits {
-            instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[params.before_round_data_depolarization],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
 
@@ -250,7 +296,11 @@ fn emit_cycle(
     // after_clifford_depolarization on data after C_XYZ
     if params.after_clifford_depolarization > 0.0 {
         for &q in data_qubits {
-            instrs.push(op("DEPOLARIZE1", &[params.after_clifford_depolarization], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "DEPOLARIZE1",
+                &[params.after_clifford_depolarization],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
 
@@ -261,7 +311,11 @@ fn emit_cycle(
             let t: Vec<StimTarget> = targets.iter().map(|&q| StimTarget::Qubit(q)).collect();
             instrs.push(op("CX", &[], &t));
             if params.after_clifford_depolarization > 0.0 {
-                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &t));
+                instrs.push(op(
+                    "DEPOLARIZE2",
+                    &[params.after_clifford_depolarization],
+                    &t,
+                ));
             }
         }
     }
@@ -272,7 +326,11 @@ fn emit_cycle(
     // before_measure_flip_probability: X_ERROR before measurement
     if params.before_measure_flip_probability > 0.0 {
         for &q in measurement_qubits {
-            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "X_ERROR",
+                &[params.before_measure_flip_probability],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
 
@@ -283,7 +341,11 @@ fn emit_cycle(
     // after_reset_flip_probability: X_ERROR after MR (which includes reset)
     if params.after_reset_flip_probability > 0.0 {
         for &q in measurement_qubits {
-            instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(q)]));
+            instrs.push(op(
+                "X_ERROR",
+                &[params.after_reset_flip_probability],
+                &[StimTarget::Qubit(q)],
+            ));
         }
     }
 }

@@ -1,6 +1,6 @@
-use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig, IlpDemDecoder};
 #[cfg(not(feature = "gurobi"))]
 use rilpqec::IlpDecodeError;
+use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig, IlpDemDecoder};
 use rstim::dem::DetectorErrorModel;
 
 #[test]

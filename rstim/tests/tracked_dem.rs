@@ -1,7 +1,5 @@
 use rstim::dem::DemTarget;
-use rstim::dem_provenance::{
-    SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource,
-};
+use rstim::dem_provenance::{SourceBranch, TrackedDemResult, TrackedErrorTerm, TrackedSource};
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::parser::parse_lines;
 
@@ -104,10 +102,8 @@ fn tracked_dem_records_repeat_iteration_target_slot_and_branch() {
 
 #[test]
 fn tracked_dem_merge_keeps_exact_source_union() {
-    let circuit = parse_lines(
-        "R 0\nX_ERROR(0.1) 0\nX_ERROR(0.2) 0\nM 0\nDETECTOR rec[-1]\n",
-    )
-    .unwrap();
+    let circuit =
+        parse_lines("R 0\nX_ERROR(0.1) 0\nX_ERROR(0.2) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
 
     let tracked = ErrorAnalyzer::circuit_to_tracked_dem(&circuit).unwrap();
 
@@ -161,7 +157,10 @@ fn tracked_dem_matches_plain_dem_for_supported_single_qubit_pauli_errors() {
     let cases = [
         ("X_ERROR", "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n"),
         ("Y_ERROR", "R 0\nY_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n"),
-        ("Z_ERROR", "H 0\nZ_ERROR(0.1) 0\nH 0\nM 0\nDETECTOR rec[-1]\n"),
+        (
+            "Z_ERROR",
+            "H 0\nZ_ERROR(0.1) 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+        ),
     ];
 
     for (name, text) in cases {

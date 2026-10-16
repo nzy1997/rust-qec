@@ -5,49 +5,36 @@ analyzing quantum error-correcting codes. Its dependency-facing APIs include:
 
 - CSS matrix validation and construction;
 - exact distance through optional HiGHS or Gurobi ILP backends;
-- randomized CSS distance upper bounds;
+- randomized CSS distance upper bounds; and
 - packed GF(2) row operations, reduced row spaces, and reusable kernel
-  workspaces under `qec_code::packed_gf2`; and
-- exact Pauli phases, signed stabilizer groups, and caller-supplied logical
-  bases under `qec_code::phased_pauli`.
+  workspaces under `qec_code::packed_gf2`.
 
-## Installation
+## Dependency status
 
-Add the library from crates.io:
+This crate is currently developed inside the `rstim` workspace and is not
+published independently. A sibling local checkout can use a path dependency:
 
 ```toml
 [dependencies]
-qec-code = "0.3.0"
+qec-code = { path = "../rstim/qec-code" }
+```
+
+Downstream Git-based prototypes should pin an exact repository revision instead
+of following a moving branch:
+
+```toml
+[dependencies]
+qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-commit>" }
 ```
 
 Enable the open-source exact ILP backend only when it is needed:
 
 ```toml
-qec-code = { version = "0.3.0", features = ["distance-ilp-highs"] }
+qec-code = { git = "https://github.com/nzy1997/rstim.git", rev = "<reviewed-commit>", features = ["distance-ilp-highs"] }
 ```
 
-The default build is a library-only build with no command-line parser or native
-solver dependency. Available opt-in features are:
-
-- `cli` exposes `qec_code::cli` and builds the `qec-code` binary;
-- `distance-ilp-highs` enables exact distance with HiGHS; and
-- `distance-ilp-gurobi` enables exact distance with Gurobi without also pulling
-  in HiGHS.
-
-Applications that previously invoked the package binary or imported
-`qec_code::cli` must add `features = ["cli"]`. Features compose, so a CLI using
-HiGHS can enable both `cli` and `distance-ilp-highs`.
-
-This crate is covered by the repository-wide
-[Apache-2.0 license](LICENSE), which is also declared in the workspace
-package metadata. Enable the distance features above only when needed.
-
-## Deterministic regular matrices
-
-`qec_code::regular_classical` provides the versioned pure-Rust generator for
-regular binary parity-check matrices used by random code families. The exact
-version-1 stream, bounded-index rule, retry behavior, and seed-7 fixture are
-documented in [`doc/regular_classical.md`](doc/regular_classical.md).
+The repository does not yet declare a project license. Resolve that before
+redistributing this crate or treating it as a released third-party dependency.
 
 ## Packed GF(2) example
 
@@ -63,16 +50,3 @@ assert!(space.contains(&target)?);
 
 The public wrappers intentionally hide the packed storage layout so internal
 elimination code can evolve without breaking downstream crates.
-
-## Signed stabilizer algebra
-
-`phased_pauli` represents `i^phase X^x Z^z`, with `Y = i XZ`. Its
-`SignedStabilizerGroup` checks generator signs as well as X/Z support, accepts
-consistent redundant checks, and returns original-generator product witnesses
-for exact membership. `validate_logical_basis` retains the caller's ordered,
-signed logical representatives. See
-[`examples/signed_stabilizer.rs`](examples/signed_stabilizer.rs) for a public
-API example that needs no CLI or solver feature.
-
-These checks establish algebraic code and basis validity and signed group
-membership. They do not establish correctness of an entire compiled circuit.

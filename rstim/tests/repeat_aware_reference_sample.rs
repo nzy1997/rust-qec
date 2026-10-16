@@ -1,5 +1,5 @@
 use rstim::data_path::{
-    build_reference_sample_with_decision, ReferenceBuildPhaseCounters, ReferenceSampleDecision,
+    ReferenceBuildPhaseCounters, ReferenceSampleDecision, build_reference_sample_with_decision,
 };
 use rstim::ir::StimInstr;
 use rstim::parser::parse_lines;

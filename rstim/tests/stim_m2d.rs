@@ -3,7 +3,7 @@
 // Avoids overlap with existing m2d.rs tests.
 
 use rstim::data_path::ReferenceSampleMode;
-use rstim::m2d::{measurements_to_detections, measurements_to_detections_with_options, M2dOptions};
+use rstim::m2d::{M2dOptions, measurements_to_detections, measurements_to_detections_with_options};
 use rstim::parser::parse_lines;
 use rstim::sim::bit_table::BitTable;
 
@@ -135,8 +135,7 @@ fn m2d_no_detectors() {
 // --- observable flip ---
 #[test]
 fn m2d_observable_flip() {
-    let instrs =
-        parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let instrs = parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let meas = single_shot_table(1, &[true]);
     let out = measurements_to_detections(&instrs, &meas).unwrap();
     assert!(out.observable_flips.get(0, 0), "observable should flip");
@@ -144,11 +143,13 @@ fn m2d_observable_flip() {
 
 #[test]
 fn m2d_observable_no_flip() {
-    let instrs =
-        parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+    let instrs = parse_lines("M 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
     let meas = single_shot_table(1, &[false]);
     let out = measurements_to_detections(&instrs, &meas).unwrap();
-    assert!(!out.observable_flips.get(0, 0), "observable should not flip");
+    assert!(
+        !out.observable_flips.get(0, 0),
+        "observable should not flip"
+    );
 }
 
 // --- multiple shots ---
@@ -170,10 +171,9 @@ fn m2d_multiple_shots() {
 // --- repeat block detectors ---
 #[test]
 fn m2d_repeat_block() {
-    let instrs = parse_lines(
-        "M !0\nDETECTOR rec[-1]\nREPEAT 2 {\n    M !0\n    DETECTOR rec[-1]\n}\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("M !0\nDETECTOR rec[-1]\nREPEAT 2 {\n    M !0\n    DETECTOR rec[-1]\n}\n")
+            .unwrap();
     // 3 measurements total (1 + 2 from repeat), all expected true (M !0).
     // Actual: all false -> all detections fire.
     let meas = single_shot_table(3, &[false, false, false]);
@@ -188,10 +188,9 @@ fn m2d_repeat_block() {
 #[test]
 fn m2d_repeated_ref() {
     // REPEAT 50 { DETECTOR rec[-2]; DETECTOR rec[-1] } references the same M 0 !1
-    let instrs = parse_lines(
-        "M 0 !1\nREPEAT 50 {\n    DETECTOR rec[-2]\n    DETECTOR rec[-1]\n}\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("M 0 !1\nREPEAT 50 {\n    DETECTOR rec[-2]\n    DETECTOR rec[-1]\n}\n")
+            .unwrap();
     let meas = single_shot_table(2, &[false, false]);
     let out = measurements_to_detections(&instrs, &meas).unwrap();
     assert_eq!(out.detections.num_major(), 100);
@@ -221,5 +220,8 @@ fn m2d_skip_reference_sample_preserves_zero_reference_behavior() {
         },
     )
     .unwrap();
-    assert_eq!(default_out.detections.get(0, 0), skipped_out.detections.get(0, 0));
+    assert_eq!(
+        default_out.detections.get(0, 0),
+        skipped_out.detections.get(0, 0)
+    );
 }

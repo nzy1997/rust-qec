@@ -1,13 +1,13 @@
 #![cfg(feature = "rmatching-runner")]
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rsinter::decode::{Decoder, RmatchingDemDecoder};
+use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    css_memory, CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
 };
 use rstim::codegen::surface_code::rotated_memory_x;
-use rstim::codegen::NoiseParams;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;

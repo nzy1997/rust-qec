@@ -20,31 +20,6 @@ The main command families are:
 - transforms: `convert`, `m2d`
 - analysis: `analyze_errors`, `explain_errors`
 - generation and export: `gen`, `render_svg`, `export_json`
-- interactive visualization: `shot_viewer`
-
-## Open the Interactive Shot Viewer
-
-`shot_viewer` starts the version-matched web application on a random loopback
-port and opens it in the default browser:
-
-```sh
-rstim shot_viewer
-```
-
-The page begins empty. Choose a local `.stim` file, sample a shot, or click an
-existing noise site to override that event's realized outcome. The circuit is
-parsed and executed locally; the server accepts only loopback requests and does
-not receive the selected file. Use `--no_open` when you want to open the printed
-URL yourself, or `--port <n>` to request a specific loopback port.
-
-The current diagram can be exported as SVG or single-page vector PDF. Both
-exports include the circuit digest, source hash, base seed, rstim version, and
-manual overrides as provenance metadata.
-
-The first version fully expands `REPEAT` blocks and rejects oversized inputs
-before simulation. Defaults allow at most 256 qubits, 5,000 expanded operations,
-5,000 noise events, 5,000 measurement results, and an estimated 100,000 SVG
-nodes.
 
 ## Inspect Circuits with `stats`
 
@@ -219,12 +194,6 @@ rstim sample_dem --shots 1000 --out_format dets --in model.dem
 As with `detect`, you can split observables into a separate stream using
 `--obs_out` and `--obs_out_format`.
 
-Add `--trace_out <PATH>` to stream a versioned manifest and one detailed JSON
-record per shot. Trace mode stages all outputs, requires named `--out` files,
-and is intentionally slower than ordinary detector sampling. See the complete
-[local training-data tutorial](training-data.md) for the schema, aligned `b8`
-files, Python loading example, reproducibility guidance, and loss caveats.
-
 ## Generate Circuits with `gen`
 
 `gen` produces common QEC benchmark circuits:
@@ -239,81 +208,7 @@ Current generator controls:
 - `--task`
 - `--distance`
 - `--rounds`
-- `--before_round_data_depolarization`
-- `--before_round_data_loss_probability` (Mid-SWAP only; alias `--before_round_data_loss`)
 - `--after_clifford_depolarization`
-- `--before_measure_flip_probability`
-- `--after_reset_flip_probability`
-- `--after_clifford_loss_probability`
-- `--operation_loss_probability` (`rotated_memory_z` loss-visible mode and Mid-SWAP only)
-- `--measurement_loss_probability` (`rotated_memory_z` loss-visible mode and Mid-SWAP only)
-
-Each Pauli-noise flag drives exactly the channel it is named after: there is
-no "uniform" shortcut, and omitted channels default to zero. In particular
-`--after_clifford_depolarization` only inserts `DEPOLARIZE1`/`DEPOLARIZE2`
-after Clifford gates; it no longer broadcasts into the other channels.
-
-For `--code surface_code --task rotated_memory_z`, setting
-`--operation_loss_probability` or `--measurement_loss_probability` selects the
-loss-visible conventional form: the circuit keeps the fixed CNOT layer order
-in every round (no alternating A/B schedule, no shuttles), uses the native
-Mid-SWAP generator's loss semantics (full rate after resets and single-qubit
-gates, half rate on each qubit of a two-qubit gate, measurement-stage `LOSS`
-immediately before each readout), emits loss-visible `MRL`/`ML` records in
-`loss_flag,value_bit` order, and places exactly one
-`TICK[rstim:logical_flip_point]` immediately after the data reset so the circuit
-can drive `export_decoder_dataset --mode measurements_blinded`:
-
-```sh
-rstim gen \
-  --code surface_code \
-  --task rotated_memory_z \
-  --distance 3 \
-  --rounds 2 \
-  --before_round_data_depolarization 0.011 \
-  --after_clifford_depolarization 0.022 \
-  --before_measure_flip_probability 0.033 \
-  --after_reset_flip_probability 0.044 \
-  --operation_loss_probability 0.055 \
-  --measurement_loss_probability 0.066 \
-  --out conventional-loss.stim
-```
-
-The native Mid-SWAP rotated-memory generator is selected by its dedicated
-surface-code task. It requires an odd distance of at least 3 and emits
-loss-visible `MRL`/`ML` records in `loss_flag,value_bit` order:
-
-```sh
-rstim gen \
-  --code surface_code \
-  --task rotated_memory_z_midswap \
-  --distance 3 \
-  --rounds 2 \
-  --before_round_data_depolarization 0.001 \
-  --before_round_data_loss_probability 0.007 \
-  --after_clifford_depolarization 0.002 \
-  --before_measure_flip_probability 0.003 \
-  --after_reset_flip_probability 0.004 \
-  --operation_loss_probability 0.005 \
-  --measurement_loss_probability 0.006 \
-  --out midswap.stim
-```
-
-For this task, the four Pauli-noise flags remain independent. Before-round
-depolarization and atom loss follow the persistent logical-to-physical mapping
-and target the physical wires carrying logical data in that round. Reset and
-measurement bit noise use `X_ERROR`; the single-qubit `H` and two-qubit `CX`
-channels use `DEPOLARIZE1` and `DEPOLARIZE2`, respectively.
-`--operation_loss_probability` controls gate/reset loss, and
-`--measurement_loss_probability` controls loss immediately before measurement.
-Measurement-stage loss is physical atom loss reported by the loss flag, not
-state-selective readout confusion.
-`--after_clifford_loss_probability` is intentionally rejected to keep the two
-loss channels unambiguous. The generated `# MIDSWAP_SHUTTLE` comments expose
-each persistent logical-to-physical remapping without changing circuit
-semantics. The generator emits exactly one `TICK[rstim:logical_flip_point]`
-immediately after the data reset and before data reset noise or loss, so the
-circuit can be validated for blinded measurement export.
 
 CSS memory circuits can be generated from explicit matrix wrappers:
 

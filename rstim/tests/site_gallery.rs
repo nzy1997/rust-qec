@@ -72,7 +72,9 @@ fn create_failing_rstim(bin_dir: &Path, exit_code: i32) -> PathBuf {
     {
         fs::write(
             &rstim,
-            format!("@echo off\n@echo fake rstim should fail with code {exit_code}\nexit {exit_code}\n"),
+            format!(
+                "@echo off\n@echo fake rstim should fail with code {exit_code}\nexit {exit_code}\n"
+            ),
         )
         .unwrap();
     }
@@ -82,8 +84,8 @@ fn create_failing_rstim(bin_dir: &Path, exit_code: i32) -> PathBuf {
 #[test]
 fn qp101_gallery_default_cargo_command_is_locked() {
     let script = include_str!("../../tools/build_qp101_gallery.py");
-    assert!(script.contains("cargo run --locked -p rstim --features cli --bin rstim --"));
-    assert!(!script.contains("cargo run -p rstim --features cli --bin rstim --"));
+    assert!(script.contains("cargo run --locked -p rstim --bin rstim --"));
+    assert!(!script.contains("cargo run -p rstim --bin rstim --"));
 }
 
 #[test]
@@ -107,8 +109,7 @@ fn qp101_gallery_builds_without_typst() {
 
     let path = std::env::var_os("PATH").unwrap();
     let joined_path = std::env::join_paths(
-        std::iter::once(mask_bin.as_path().to_path_buf())
-            .chain(std::env::split_paths(&path)),
+        std::iter::once(mask_bin.as_path().to_path_buf()).chain(std::env::split_paths(&path)),
     )
     .unwrap();
     command.env("PATH", joined_path);
@@ -123,13 +124,25 @@ fn qp101_gallery_builds_without_typst() {
 
     for (name, markers) in [
         ("basic-site.svg", vec!["q0", "H", "M"]),
-        ("repeat-detector-site.svg", vec!["repeat x2", "iter 2", "DETECTOR"]),
-        ("atom-loss-sample.svg", vec!["LOSS", "DETECTOR", "data-style-preset=\"danger\""]),
+        (
+            "repeat-detector-site.svg",
+            vec!["repeat x2", "iter 2", "DETECTOR"],
+        ),
+        (
+            "atom-loss-sample.svg",
+            vec!["LOSS", "DETECTOR", "data-style-preset=\"danger\""],
+        ),
     ] {
         let svg = fs::read_to_string(gallery_dir.join(name)).unwrap();
-        assert!(svg.starts_with("<svg"), "{name} should start with <svg: {svg}");
+        assert!(
+            svg.starts_with("<svg"),
+            "{name} should start with <svg: {svg}"
+        );
         for marker in markers {
-            assert!(svg.contains(marker), "{name} missing marker {marker}: {svg}");
+            assert!(
+                svg.contains(marker),
+                "{name} missing marker {marker}: {svg}"
+            );
         }
     }
 }
@@ -139,7 +152,11 @@ fn qp101_gallery_invalid_fixture_does_not_replace_existing_svg() {
     let temp = tempfile::tempdir().unwrap();
     let temp_root = temp.path().join("repo");
     copy_gallery_inputs(&temp_root);
-    fs::write(temp_root.join("qp101-viz/examples/basic.stim"), "REPEAT nope {\nM 0\n}\n").unwrap();
+    fs::write(
+        temp_root.join("qp101-viz/examples/basic.stim"),
+        "REPEAT nope {\nM 0\n}\n",
+    )
+    .unwrap();
     let gallery_dir = temp_root.join("_site/gallery");
     fs::create_dir_all(&gallery_dir).unwrap();
     let protected_svg = gallery_dir.join("basic-site.svg");
@@ -189,6 +206,9 @@ fn qp101_gallery_propagates_renderer_exit_code() {
         .arg(fake_rstim)
         .output()
         .unwrap();
-    assert!(!output.status.success(), "fake renderer failure should fail gallery build");
+    assert!(
+        !output.status.success(),
+        "fake renderer failure should fail gallery build"
+    );
     assert_eq!(output.status.code(), Some(37));
 }

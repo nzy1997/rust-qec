@@ -3,8 +3,6 @@ name = "surface_decoder_compare_bridge"
 version = "0.1.0"
 edition = "2024"
 license.workspace = true
-rust-version.workspace = true
-publish = false
 
 [features]
 default = []
@@ -12,10 +10,10 @@ gurobi = ["rsinter/gurobi", "rilpqec/gurobi"]
 
 [dependencies]
 rbposd = { path = "../../../rbposd" }
-qec-ilp-core = { path = "../../../qec-ilp-core", features = ["highs"] }
+qec-ilp-core = { path = "../../../qec-ilp-core" }
 rilpqec = { path = "../../../rilpqec" }
-rsinter = { path = "../../../rsinter", features = ["full"] }
-rstim = { path = "../../../rstim", default-features = false }
+rsinter = { path = "../../../rsinter" }
+rstim = { path = "../../../rstim" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

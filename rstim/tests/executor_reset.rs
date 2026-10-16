@@ -1,5 +1,5 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::{executor::Executor, parser::parse_lines};
 
 #[test]
@@ -73,7 +73,10 @@ fn mrx_records_and_resets_to_plus() {
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
         assert_eq!(out.measurements.len(), 2);
-        assert!(!out.measurements[1], "seed={seed}: MX after MRX should be 0");
+        assert!(
+            !out.measurements[1],
+            "seed={seed}: MX after MRX should be 0"
+        );
     }
 }
 
@@ -86,6 +89,9 @@ fn mry_records_and_resets_to_plus_i() {
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
         assert_eq!(out.measurements.len(), 2);
-        assert!(!out.measurements[1], "seed={seed}: MY after MRY should be 0");
+        assert!(
+            !out.measurements[1],
+            "seed={seed}: MY after MRY should be 0"
+        );
     }
 }

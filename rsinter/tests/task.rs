@@ -1,6 +1,6 @@
-use rsinter::task::{Task, CollectionOptions};
-use rstim::parser::parse_lines;
+use rsinter::task::{CollectionOptions, Task};
 use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::parser::parse_lines;
 
 #[test]
 fn strong_id_deterministic() {

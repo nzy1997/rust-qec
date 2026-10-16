@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 use crate::bench::merge::merge_result_rows;
 use crate::bench::registry::{
-    expand_runner_points_for_runner, BenchCasePoint, BenchRunContext, RustBenchRunner,
-    RustRunnerRegistry,
+    BenchCasePoint, BenchRunContext, RustBenchRunner, RustRunnerRegistry,
+    expand_runner_points_for_runner,
 };
 use crate::bench::result::{
-    read_results_jsonl, write_results_jsonl, BenchmarkResultRow, RunManifest,
+    BenchmarkResultRow, RunManifest, read_results_jsonl, write_results_jsonl,
 };
 use crate::bench::spec::{BenchmarkSpec, RunnerSpec};
 

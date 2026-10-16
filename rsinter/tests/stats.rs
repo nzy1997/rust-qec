@@ -1,5 +1,7 @@
 #[allow(unused_imports)]
-use rsinter::stats::{Fit, log_binomial, log_factorial, fit_binomial, shot_error_rate_to_piece_error_rate};
+use rsinter::stats::{
+    Fit, fit_binomial, log_binomial, log_factorial, shot_error_rate_to_piece_error_rate,
+};
 
 #[test]
 fn log_factorial_base_cases() {

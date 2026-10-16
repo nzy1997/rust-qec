@@ -180,9 +180,14 @@ fn run_sample_via_dispatch() {
     std::fs::write(&circuit_path, "R 0\nX 0\nM 0").unwrap();
     let out_path = dir.path().join("out.txt");
     let cli = cli::Cli::parse_from([
-        "rstim", "sample", "--shots", "1",
-        "--in", circuit_path.to_str().unwrap(),
-        "--out", out_path.to_str().unwrap(),
+        "rstim",
+        "sample",
+        "--shots",
+        "1",
+        "--in",
+        circuit_path.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
     ]);
     cli::run(cli).unwrap();
     assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
@@ -220,9 +225,14 @@ fn run_detect_via_dispatch() {
     std::fs::write(&circuit_path, "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]").unwrap();
     let out_path = dir.path().join("out.txt");
     let cli = cli::Cli::parse_from([
-        "rstim", "detect", "--shots", "1",
-        "--in", circuit_path.to_str().unwrap(),
-        "--out", out_path.to_str().unwrap(),
+        "rstim",
+        "detect",
+        "--shots",
+        "1",
+        "--in",
+        circuit_path.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
     ]);
     cli::run(cli).unwrap();
     assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
@@ -395,9 +405,12 @@ fn run_analyze_errors_via_dispatch() {
     std::fs::write(&circuit_path, "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]").unwrap();
     let out_path = dir.path().join("out.dem");
     let cli = cli::Cli::parse_from([
-        "rstim", "analyze_errors",
-        "--in", circuit_path.to_str().unwrap(),
-        "--out", out_path.to_str().unwrap(),
+        "rstim",
+        "analyze_errors",
+        "--in",
+        circuit_path.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
     ]);
     cli::run(cli).unwrap();
     let dem = std::fs::read_to_string(&out_path).unwrap();
@@ -413,9 +426,14 @@ fn run_sample_dem_via_dispatch() {
     std::fs::write(&dem_path, "error(1) D0 L0").unwrap();
     let out_path = dir.path().join("out.txt");
     let cli = cli::Cli::parse_from([
-        "rstim", "sample_dem", "--shots", "1",
-        "--in", dem_path.to_str().unwrap(),
-        "--out", out_path.to_str().unwrap(),
+        "rstim",
+        "sample_dem",
+        "--shots",
+        "1",
+        "--in",
+        dem_path.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
     ]);
     cli::run(cli).unwrap();
     assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
@@ -430,10 +448,16 @@ fn run_sample_dem_with_obs_via_dispatch() {
     let out_path = dir.path().join("out.txt");
     let obs_path = dir.path().join("obs.txt");
     let cli = cli::Cli::parse_from([
-        "rstim", "sample_dem", "--shots", "1",
-        "--in", dem_path.to_str().unwrap(),
-        "--out", out_path.to_str().unwrap(),
-        "--obs_out", obs_path.to_str().unwrap(),
+        "rstim",
+        "sample_dem",
+        "--shots",
+        "1",
+        "--in",
+        dem_path.to_str().unwrap(),
+        "--out",
+        out_path.to_str().unwrap(),
+        "--obs_out",
+        obs_path.to_str().unwrap(),
     ]);
     cli::run(cli).unwrap();
     assert_eq!(std::fs::read_to_string(&out_path).unwrap().trim(), "1");
@@ -516,7 +540,15 @@ fn run_sample_no_seed() {
 #[test]
 fn run_detect_01_noiseless() {
     let mut buf = Vec::new();
-    cli::run_detect("R 0\nM 0\nDETECTOR rec[-1]", 3, "01", Some(42), false, &mut buf).unwrap();
+    cli::run_detect(
+        "R 0\nM 0\nDETECTOR rec[-1]",
+        3,
+        "01",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s, "0\n0\n0\n");
 }
@@ -526,8 +558,13 @@ fn run_detect_dets_with_error() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]",
-        1, "dets", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "dets",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s.trim(), "shot D0");
 }
@@ -537,8 +574,13 @@ fn run_detect_dets_with_observable() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
-        1, "dets", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "dets",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.contains("D0"));
     assert!(s.contains("L0"));
@@ -549,8 +591,13 @@ fn run_detect_append_observables() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
-        1, "01", Some(42), true, &mut buf,
-    ).unwrap();
+        1,
+        "01",
+        Some(42),
+        true,
+        &mut buf,
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s.trim(), "11");
 }
@@ -560,8 +607,13 @@ fn run_detect_no_append() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
-        1, "01", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "01",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert_eq!(s.trim(), "1");
 }
@@ -571,8 +623,13 @@ fn run_detect_b8() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]",
-        1, "b8", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "b8",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     assert_eq!(buf, vec![0x01]);
 }
 
@@ -581,8 +638,13 @@ fn run_detect_r8() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]",
-        1, "r8", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "r8",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     assert_eq!(buf, vec![0, 0]);
 }
 
@@ -591,8 +653,13 @@ fn run_detect_hits() {
     let mut buf = Vec::new();
     cli::run_detect(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]",
-        1, "hits", Some(42), false, &mut buf,
-    ).unwrap();
+        1,
+        "hits",
+        Some(42),
+        false,
+        &mut buf,
+    )
+    .unwrap();
     assert_eq!(String::from_utf8(buf).unwrap().trim(), "0");
 }
 
@@ -600,8 +667,24 @@ fn run_detect_hits() {
 fn run_detect_seed_deterministic() {
     let mut buf1 = Vec::new();
     let mut buf2 = Vec::new();
-    cli::run_detect("H 0\nM 0\nDETECTOR rec[-1]", 10, "01", Some(42), false, &mut buf1).unwrap();
-    cli::run_detect("H 0\nM 0\nDETECTOR rec[-1]", 10, "01", Some(42), false, &mut buf2).unwrap();
+    cli::run_detect(
+        "H 0\nM 0\nDETECTOR rec[-1]",
+        10,
+        "01",
+        Some(42),
+        false,
+        &mut buf1,
+    )
+    .unwrap();
+    cli::run_detect(
+        "H 0\nM 0\nDETECTOR rec[-1]",
+        10,
+        "01",
+        Some(42),
+        false,
+        &mut buf2,
+    )
+    .unwrap();
     assert_eq!(buf1, buf2);
 }
 
@@ -649,10 +732,7 @@ fn run_detect_with_obs_rejects_dets_obs_format() {
 #[test]
 fn run_analyze_errors_basic() {
     let mut buf = Vec::new();
-    cli::run_analyze_errors(
-        "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]",
-        &mut buf,
-    ).unwrap();
+    cli::run_analyze_errors("R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]", &mut buf).unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.contains("error(0.1)"));
     assert!(s.contains("D0"));
@@ -664,7 +744,8 @@ fn run_analyze_errors_with_observable() {
     cli::run_analyze_errors(
         "R 0\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
         &mut buf,
-    ).unwrap();
+    )
+    .unwrap();
     let s = String::from_utf8(buf).unwrap();
     assert!(s.contains("D0"));
     assert!(s.contains("L0"));
@@ -801,9 +882,15 @@ fn run_sample_dem_with_obs_01() {
     let mut det_buf = Vec::new();
     let mut obs_buf = Vec::new();
     cli::run_sample_dem_with_obs(
-        "error(1) D0 L0", 1, "01", Some(42),
-        &mut det_buf, &mut obs_buf, "01",
-    ).unwrap();
+        "error(1) D0 L0",
+        1,
+        "01",
+        Some(42),
+        &mut det_buf,
+        &mut obs_buf,
+        "01",
+    )
+    .unwrap();
     assert_eq!(String::from_utf8(det_buf).unwrap().trim(), "1");
     assert_eq!(String::from_utf8(obs_buf).unwrap().trim(), "1");
 }
@@ -813,9 +900,15 @@ fn run_sample_dem_with_obs_dets_format() {
     let mut det_buf = Vec::new();
     let mut obs_buf = Vec::new();
     cli::run_sample_dem_with_obs(
-        "error(1) D0 L0", 1, "dets", Some(42),
-        &mut det_buf, &mut obs_buf, "01",
-    ).unwrap();
+        "error(1) D0 L0",
+        1,
+        "dets",
+        Some(42),
+        &mut det_buf,
+        &mut obs_buf,
+        "01",
+    )
+    .unwrap();
     let det_s = String::from_utf8(det_buf).unwrap();
     assert!(det_s.contains("D0"));
     assert!(det_s.contains("L0"));
@@ -827,9 +920,15 @@ fn run_sample_dem_with_obs_b8() {
     let mut det_buf = Vec::new();
     let mut obs_buf = Vec::new();
     cli::run_sample_dem_with_obs(
-        "error(1) D0 L0", 1, "b8", Some(42),
-        &mut det_buf, &mut obs_buf, "b8",
-    ).unwrap();
+        "error(1) D0 L0",
+        1,
+        "b8",
+        Some(42),
+        &mut det_buf,
+        &mut obs_buf,
+        "b8",
+    )
+    .unwrap();
     assert_eq!(det_buf, vec![0x01]);
     assert_eq!(obs_buf, vec![0x01]);
 }
@@ -842,7 +941,8 @@ fn pipeline_analyze_then_sample_dem() {
     cli::run_analyze_errors(
         "R 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]",
         &mut dem_buf,
-    ).unwrap();
+    )
+    .unwrap();
     let dem_text = String::from_utf8(dem_buf).unwrap();
 
     let mut result_buf = Vec::new();

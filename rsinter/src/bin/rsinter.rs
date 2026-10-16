@@ -22,7 +22,6 @@ use rsinter::bench::run::{BenchRunOptions, run_rust_benchmark_with_options};
 use rsinter::bench::spec::BenchmarkSpec;
 #[cfg(feature = "plotting")]
 use rsinter::bench::surface_compare_csv::read_surface_compare_csv;
-use rsinter::replay::{ReplayOptions, run_replay};
 
 #[derive(Parser)]
 #[command(
@@ -38,47 +37,10 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Plot a CSV of measured logical failures by distance and physical error rate.
-    ///
-    /// Requires the plotting feature.
-    PlotErrorRateCsv {
-        #[arg(long)]
-        input: PathBuf,
-        #[arg(long)]
-        out: PathBuf,
-    },
-    /// Decode a detector dataset (requires a decoder runner feature).
-    ///
-    /// Requires one of: rbposd-runner, rmatching-runner, ilp-runner.
-    Replay {
-        #[arg(long)]
-        dem: PathBuf,
-        #[arg(long)]
-        dets: PathBuf,
-        #[arg(long)]
-        decoder: String,
-        #[arg(long)]
-        decoder_config: Option<PathBuf>,
-        #[arg(long)]
-        predictions_out: PathBuf,
-        #[arg(long)]
-        stats_out: PathBuf,
-        #[arg(long, default_value_t = 65_536)]
-        batch_size: usize,
-        #[arg(
-            long,
-            help = "Validate the inferred shot count; required for zero-detector DEMs"
-        )]
-        shots: Option<usize>,
-    },
-    /// Run or plot benchmarks (runner features; plots require plotting).
-    ///
-    /// Decoder runs require their matching runner feature; plots require plotting.
     Bench {
         #[command(subcommand)]
         command: BenchCommands,
     },
-    /// Run the built-in bivariate-bicycle memory experiment (requires rbposd-runner).
     BbCircuitBposdMemory {
         #[arg(long, default_value = "bb144")]
         code_id: String,
@@ -105,7 +67,6 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum BenchCommands {
-    /// Run a benchmark spec (decoder implementations require matching runner features).
     Run {
         #[arg(long)]
         spec: String,
@@ -127,7 +88,6 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
-    /// Plot benchmark JSONL results (requires plotting).
     Plot {
         #[arg(long)]
         spec: String,
@@ -136,7 +96,6 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
-    /// Plot legacy surface-comparison CSV input (requires plotting).
     PlotSurfaceCompareCsv {
         #[arg(long)]
         spec: String,
@@ -145,7 +104,6 @@ enum BenchCommands {
         #[arg(long)]
         out: String,
     },
-    /// Plot legacy BB-comparison CSV input (requires plotting).
     PlotBbCompareCsv {
         #[arg(long)]
         spec: String,
@@ -180,30 +138,6 @@ fn main() {
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::PlotErrorRateCsv { input, out } => {
-            rsinter::plot::plot_error_rate_csv(&input, &out)?;
-        }
-        Commands::Replay {
-            dem,
-            dets,
-            decoder,
-            decoder_config,
-            predictions_out,
-            stats_out,
-            batch_size,
-            shots,
-        } => {
-            run_replay(&ReplayOptions {
-                dem,
-                dets,
-                decoder,
-                decoder_config,
-                predictions_out,
-                stats_out,
-                batch_size,
-                shots,
-            })?;
-        }
         Commands::Bench { command } => match command {
             BenchCommands::Run {
                 spec,

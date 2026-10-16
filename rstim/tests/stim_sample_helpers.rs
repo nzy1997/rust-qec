@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 
 pub fn sample_lines(program: &str, shots: usize, seed: Option<u64>) -> String {
     let instrs = rstim::parser::parse_lines(program).unwrap();
@@ -38,7 +38,8 @@ pub fn deviation(sample_content: &str, expected: &HashMap<&str, f32>) -> String 
         return "Expected distribution doesn't add up to 1.".to_string();
     }
     for (k, expected_rate) in expected.iter() {
-        let allowed_variation = 5.0 * ((*expected_rate * (1.0 - *expected_rate) / actual_total as f32).sqrt());
+        let allowed_variation =
+            5.0 * ((*expected_rate * (1.0 - *expected_rate) / actual_total as f32).sqrt());
         if *expected_rate - allowed_variation < 0.0 || *expected_rate + allowed_variation > 1.0 {
             return "Not enough samples to bound results away from extremes.".to_string();
         }

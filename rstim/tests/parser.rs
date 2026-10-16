@@ -1,5 +1,5 @@
+use rstim::ir::{StimInstr, StimTarget};
 use rstim::parser::parse_lines;
-use rstim::ir::{StimTarget, StimInstr};
 
 #[test]
 fn parses_simple_gate() {
@@ -27,7 +27,12 @@ fn parses_detector_with_rec() {
 fn parses_loss_instruction() {
     let instrs = parse_lines("LOSS(0.125) 0 2\n").unwrap();
     match &instrs[0] {
-        StimInstr::Op { name, args, targets, .. } => {
+        StimInstr::Op {
+            name,
+            args,
+            targets,
+            ..
+        } => {
             assert_eq!(name, "LOSS");
             assert_eq!(args, &[0.125]);
             assert_eq!(targets, &vec![StimTarget::Qubit(0), StimTarget::Qubit(2)]);
