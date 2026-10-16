@@ -6,26 +6,10 @@ use crate::driver::user_graph::UserGraph;
 /// comments (`#`), blank lines, `^` separator, and unknown instructions.
 pub fn parse_dem(text: &str) -> Result<UserGraph, String> {
     let mut graph = UserGraph::new();
-    let lines: Vec<&str> = text.lines().map(strip_comment).collect();
+    let lines: Vec<&str> = text.lines().collect();
     let mut detector_offset = 0usize;
     parse_block(&lines, &mut graph, &mut detector_offset)?;
-    graph.merge_parallel_dem_edges();
     Ok(graph)
-}
-
-/// Strip an inline comment without treating `#` inside an instruction tag as
-/// the start of a comment.
-fn strip_comment(line: &str) -> &str {
-    let mut in_tag = false;
-    for (index, character) in line.char_indices() {
-        match character {
-            '[' if !in_tag => in_tag = true,
-            ']' if in_tag => in_tag = false,
-            '#' if !in_tag => return &line[..index],
-            _ => {}
-        }
-    }
-    line
 }
 
 /// Parse a slice of lines into `graph`, applying `detector_offset` to all D indices.
@@ -39,7 +23,7 @@ fn parse_block(
     while i < lines.len() {
         let line = lines[i].trim();
         // Skip blank lines and comments
-        if line.is_empty() {
+        if line.is_empty() || line.starts_with('#') {
             i += 1;
             continue;
         }
@@ -50,37 +34,19 @@ fn parse_block(
         } else if line.starts_with("detector") {
             let det = parse_detector_line(line, graph, *detector_offset)?;
             max_detector = max_detector.max(det);
-        } else if line.starts_with("logical_observable") {
-            parse_logical_observable_line(line, graph)
-                .map_err(|error| format!("{error}; while parsing `{line}`"))?;
         } else if line.starts_with("shift_detectors") {
-            let shift = parse_shift_detectors_line(line)?;
-            *detector_offset = detector_offset
-                .checked_add(shift)
-                .ok_or_else(|| format!("detector offset overflow; while parsing `{line}`"))?;
+            *detector_offset += parse_shift_detectors_line(line)?;
         } else if line.starts_with("repeat") {
-            let (det, consumed) = parse_repeat(lines, i, graph, detector_offset)?;
+            let (det, consumed) =
+                parse_repeat(lines, i, graph, detector_offset)?;
             max_detector = max_detector.max(det);
             i += consumed;
             continue;
         }
-        // All other instructions are skipped.
+        // All other instructions (logical_observable, etc.) are skipped.
         i += 1;
     }
     Ok(max_detector)
-}
-
-fn parse_logical_observable_line(line: &str, graph: &mut UserGraph) -> Result<(), String> {
-    for token in line.split_whitespace().skip(1) {
-        if let Some(rest) = token.strip_prefix('L') {
-            let idx: usize = rest
-                .parse()
-                .map_err(|e| format!("bad observable index: {e}"))?;
-            graph.declare_observable(idx)?;
-            return Ok(());
-        }
-    }
-    Ok(())
 }
 
 /// Parse an `error(p) D<i> [D<j>] [L<k>...] [^ ...]` line.
@@ -106,25 +72,16 @@ fn parse_error_line(
 
         for token in segment.split_whitespace() {
             if let Some(rest) = token.strip_prefix('D') {
-                let idx: usize = rest
-                    .parse()
-                    .map_err(|e| format!("bad detector index: {e}"))?;
+                let idx: usize = rest.parse().map_err(|e| format!("bad detector index: {e}"))?;
                 max_det = max_det.max(idx);
-                let shifted = idx
-                    .checked_add(detector_offset)
-                    .ok_or_else(|| format!("detector index overflow; while parsing `{line}`"))?;
-                detectors.push(shifted);
+                detectors.push(idx + detector_offset);
             } else if let Some(rest) = token.strip_prefix('L') {
-                let idx: usize = rest
-                    .parse()
-                    .map_err(|e| format!("bad observable index: {e}"))?;
+                let idx: usize = rest.parse().map_err(|e| format!("bad observable index: {e}"))?;
                 observables.push(idx);
             }
         }
 
-        graph
-            .handle_dem_instruction(p, &detectors, observables)
-            .map_err(|error| format!("{error}; while parsing `{line}`"))?;
+        graph.handle_dem_instruction(p, &detectors, observables);
     }
     Ok(max_det)
 }
@@ -138,16 +95,12 @@ fn parse_detector_line(
 ) -> Result<usize, String> {
     for token in line.split_whitespace().skip(1) {
         if let Some(rest) = token.strip_prefix('D') {
-            let idx: usize = rest
-                .parse()
-                .map_err(|e| format!("bad detector index: {e}"))?;
+            let idx: usize = rest.parse().map_err(|e| format!("bad detector index: {e}"))?;
             // Ensure the node exists in the graph (coordinates are ignored)
-            let shifted = idx
-                .checked_add(detector_offset)
-                .ok_or_else(|| format!("detector index overflow; while parsing `{line}`"))?;
-            graph
-                .handle_dem_instruction(0.0, &[shifted], Vec::new())
-                .map_err(|error| format!("{error}; while parsing `{line}`"))?;
+            let shifted = idx + detector_offset;
+            if shifted >= graph.nodes.len() {
+                graph.nodes.resize_with(shifted + 1, Default::default);
+            }
             return Ok(idx);
         }
     }

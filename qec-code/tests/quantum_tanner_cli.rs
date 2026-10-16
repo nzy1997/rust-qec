@@ -1,5 +1,3 @@
-#![cfg(feature = "cli")]
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -26,7 +24,7 @@ fn run_quantum_tanner(matrix: &str, fixture: &str) -> Output {
 }
 
 const QUANTUM_TANNER_CLI_DOC: &str = include_str!("../doc/quantum_tanner_cli.md");
-const DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code --features cli -- ";
+const DOC_COMMAND_PREFIX: &str = "cargo run -q -p qec-code -- ";
 
 #[derive(Debug)]
 struct DocumentedCommand {

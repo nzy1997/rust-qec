@@ -16,7 +16,6 @@ use qec_code::codes::quantum_tanner::{
     ValidatedFiniteGroup,
 };
 use qec_code::codes::steane::Steane;
-use qec_code::codes::toric_3d::Toric3dSpec;
 use qec_code::css::{sparse_rows_matrix_from_json_str, CssCode, SparseRowsMatrix};
 use qec_code::distance::compute_distance;
 use qec_code::{Pauli, QecError, StabilizerCode};
@@ -2909,22 +2908,6 @@ fn built_in_css_registry_exposes_steane_checks() {
 }
 
 #[test]
-fn built_in_css_registry_exposes_toric_3d_checks() {
-    let checks = built_in_css_checks("toric_3d:lx=3,ly=3,lz=3").unwrap();
-
-    assert_eq!(checks.code_id, "toric_3d");
-    assert_eq!(checks.num_cols, 81);
-    assert_eq!(checks.hx.len(), 27);
-    assert_eq!(checks.hz.len(), 81);
-    assert_eq!(checks.hx[0], vec![0, 18, 27, 33, 54, 56]);
-    assert_eq!(checks.hz[0], vec![0, 3, 27, 36]);
-    assert_strictly_increasing_rows(&checks.hx);
-    assert_strictly_increasing_rows(&checks.hz);
-    assert_rows_in_range(&checks.hx, checks.num_cols);
-    assert_rows_in_range(&checks.hz, checks.num_cols);
-}
-
-#[test]
 fn built_in_css_catalog_lists_supported_specs() {
     let catalog = built_in_css_catalog();
     let specs = catalog.iter().map(|entry| entry.spec).collect::<Vec<_>>();
@@ -2941,9 +2924,7 @@ fn built_in_css_catalog_lists_supported_specs() {
             "repetition_x:d=<distance>",
             "repetition_z:d=<distance>",
             "surface_rotated:d=<distance>",
-            "color_666:d=<distance>",
             "toric:d=<distance>",
-            "toric_3d:lx=<period-x>,ly=<period-y>,lz=<period-z>",
         ]
     );
     assert_eq!(unique_specs.len(), specs.len());
@@ -2983,13 +2964,6 @@ fn built_in_css_catalog_lists_supported_specs() {
             .any(|entry| entry.spec == "surface_rotated:d=<distance>"
                 && entry.description.contains("distance >= 2")),
         "surface_rotated entry should describe the distance constraint: {catalog:?}"
-    );
-    assert!(
-        catalog
-            .iter()
-            .any(|entry| entry.spec == "color_666:d=<distance>"
-                && entry.description.contains("odd distance >= 3")),
-        "color_666 entry should describe the distance constraint: {catalog:?}"
     );
     assert!(
         catalog
@@ -3419,17 +3393,6 @@ fn built_in_css_code_spec_parses_fixed_and_parameterized_ids() {
         })
     );
     assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:lx=3,ly=4,lz=5"),
-        Ok(BuiltInCssCodeSpec::Family {
-            family: BuiltInCssFamily::Toric3d,
-            params: BuiltInCssParams::Toric3d(Toric3dSpec {
-                lx: 3,
-                ly: 4,
-                lz: 5,
-            }),
-        })
-    );
-    assert_eq!(
         parse_built_in_css_code_spec("bb:lx=12,ly=6,a=3:0|0:1|0:2,b=0:3|1:0|2:0"),
         Ok(BuiltInCssCodeSpec::Family {
             family: BuiltInCssFamily::BivariateBicycle,
@@ -3522,55 +3485,6 @@ fn built_in_css_code_spec_rejects_unknown_family_missing_distance_and_bad_intege
         Err(QecError::MissingBuiltInCssParameter {
             family: "toric".to_owned(),
             parameter: "d".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d"),
-        Err(QecError::MissingBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "lx".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:"),
-        Err(QecError::MissingBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "lx".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:lx=3,ly=3,lz"),
-        Err(QecError::UnexpectedBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "lz".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:lx=3,ly=3,lz=3,foo=1"),
-        Err(QecError::UnexpectedBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "foo".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:ly=3,lz=3"),
-        Err(QecError::MissingBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "lx".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:lx=3,lz=3"),
-        Err(QecError::MissingBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "ly".to_owned(),
-        })
-    );
-    assert_eq!(
-        parse_built_in_css_code_spec("toric_3d:lx=3,ly=3"),
-        Err(QecError::MissingBuiltInCssParameter {
-            family: "toric_3d".to_owned(),
-            parameter: "lz".to_owned(),
         })
     );
     assert_eq!(

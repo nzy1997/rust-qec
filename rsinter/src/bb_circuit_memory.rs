@@ -3,17 +3,15 @@ use std::time::Instant;
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use rbposd::{
-    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig, OsdVariant,
+    BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig,
     ParityCheckMatrix, Syndrome,
 };
-use serde::Serialize;
 
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::failure::FailureKind;
 
 const SX_LABELS: [&str; 7] = ["idle", "1", "4", "3", "5", "0", "2"];
 const SZ_LABELS: [&str; 7] = ["3", "5", "0", "1", "2", "4", "idle"];
-pub const BRAVYI_NOISELESS_TAIL_CYCLES: usize = 2;
 const BB_CIRCUIT_BPOSD_BENCHMARK: &str = "bb-circuit-bposd-memory";
 const BB_CIRCUIT_BPOSD_RUNNER: &str = "rbposd";
 const BB_CIRCUIT_BPOSD_LANGUAGE: &str = "rust";
@@ -38,19 +36,6 @@ impl BivariateBicycleParams {
     pub fn bb144() -> Self {
         Self {
             ell: 12,
-            m: 6,
-            a1: 3,
-            a2: 1,
-            a3: 2,
-            b1: 3,
-            b2: 1,
-            b3: 2,
-        }
-    }
-
-    pub fn bb72() -> Self {
-        Self {
-            ell: 6,
             m: 6,
             a1: 3,
             a2: 1,
@@ -209,12 +194,11 @@ pub fn build_upstream_code() -> Result<BbCode, String> {
 
 pub fn build_code(code_id: &str) -> Result<BbCode, String> {
     let params = match code_id {
-        "bb72" => BivariateBicycleParams::bb72(),
         "bb90" => BivariateBicycleParams::bb90(),
         "bb144" => BivariateBicycleParams::bb144(),
         _ => {
             return Err(format!(
-                "unknown bb code id {code_id:?}; supported ids: bb72, bb90, bb144"
+                "unknown bb code id {code_id:?}; supported ids: bb90, bb144"
             ));
         }
     };
@@ -566,7 +550,7 @@ fn select_logical_rows(
     logicals
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SimulationConfig {
     pub physical_error_rate: f64,
     pub num_cycles: usize,
@@ -590,58 +574,6 @@ impl Default for SimulationConfig {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct BbPPointConfig {
-    pub code_id: String,
-    pub physical_error_rate: f64,
-    pub num_cycles: usize,
-    pub num_trials: usize,
-    pub seed: Option<u64>,
-    pub max_bp_iterations: usize,
-    pub osd_order: usize,
-    pub osd_variant: OsdVariant,
-}
-
-impl BbPPointConfig {
-    pub fn from_simulation_config(code_id: impl Into<String>, config: SimulationConfig) -> Self {
-        Self::from_simulation_config_with_osd_variant(code_id, config, OsdVariant::Osd0)
-    }
-
-    pub fn from_simulation_config_with_osd_variant(
-        code_id: impl Into<String>,
-        config: SimulationConfig,
-        osd_variant: OsdVariant,
-    ) -> Self {
-        Self {
-            code_id: code_id.into(),
-            physical_error_rate: config.physical_error_rate,
-            num_cycles: config.num_cycles,
-            num_trials: config.num_trials,
-            seed: config.seed,
-            max_bp_iterations: config.max_bp_iterations,
-            osd_order: config.osd_order,
-            osd_variant,
-        }
-    }
-
-    fn simulation_config(&self) -> SimulationConfig {
-        SimulationConfig {
-            physical_error_rate: self.physical_error_rate,
-            num_cycles: self.num_cycles,
-            num_trials: self.num_trials,
-            seed: self.seed,
-            max_bp_iterations: self.max_bp_iterations,
-            osd_order: self.osd_order,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct BbPPointResult {
-    pub code_id: String,
-    pub result: SimulationResult,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimulationResult {
     pub physical_error_rate: f64,
     pub num_cycles: usize,
@@ -650,16 +582,11 @@ pub struct SimulationResult {
     pub profile: BbCircuitBposdProfile,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct BbCircuitBposdProfile {
     pub setup_seconds: f64,
     pub sample_seconds: f64,
     pub decode_seconds: f64,
-    pub code_build_count: usize,
-    pub syndrome_cycle_build_count: usize,
-    pub effective_model_build_count: usize,
-    pub decoder_build_count: usize,
-    pub sample_count: usize,
     pub bp_seconds: f64,
     pub osd_seconds: f64,
     pub decode_call_count: usize,
@@ -706,38 +633,6 @@ impl BbCircuitBposdProfile {
             ProfileReplayBasis::X => self.add_x_stats(stats),
         }
     }
-}
-
-pub fn validate_bb_p_point_result(result: &BbPPointResult) -> Result<(), String> {
-    let profile = &result.result.profile;
-    if profile.code_build_count != 1
-        || profile.syndrome_cycle_build_count != 1
-        || profile.effective_model_build_count != 1
-        || profile.decoder_build_count != 1
-    {
-        return Err(format!(
-            "setup/model rebuild count mismatch: code_build_count={}, syndrome_cycle_build_count={}, effective_model_build_count={}, decoder_build_count={}, expected all counters to be 1 for one p-point",
-            profile.code_build_count,
-            profile.syndrome_cycle_build_count,
-            profile.effective_model_build_count,
-            profile.decoder_build_count
-        ));
-    }
-
-    if profile.sample_count != result.result.num_trials {
-        return Err(format!(
-            "sample_count mismatch: sample_count={} num_trials={}",
-            profile.sample_count, result.result.num_trials
-        ));
-    }
-
-    if profile.decode_call_count != profile.z_decode_call_count + profile.x_decode_call_count {
-        return Err(
-            "decode_call_count must equal z_decode_call_count + x_decode_call_count".into(),
-        );
-    }
-
-    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -823,94 +718,6 @@ pub struct SampledTrial {
     pub x_logical: Vec<bool>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct BbCircuitBposdComparisonExport {
-    pub code_id: String,
-    pub physical_error_rate: f64,
-    pub num_cycles: usize,
-    pub num_trials: usize,
-    pub seed: Option<u64>,
-    pub max_bp_iterations: usize,
-    pub osd_order: usize,
-    pub rust_result: SimulationResult,
-    pub z_model: ComparisonModelExport,
-    pub x_model: ComparisonModelExport,
-    pub trials: Vec<ComparisonTrialExport>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct BbCircuitBravyiModelAuditExport {
-    pub code_id: String,
-    pub physical_error_rate: f64,
-    pub num_cycles: usize,
-    pub noiseless_tail_cycles: usize,
-    pub num_cycles_plus_tail: usize,
-    pub code: BravyiModelAuditCodeExport,
-    pub schedule: BravyiModelAuditScheduleExport,
-    pub z_model: ComparisonModelExport,
-    pub x_model: ComparisonModelExport,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct BravyiModelAuditCodeExport {
-    pub ell: usize,
-    pub m: usize,
-    pub n2: usize,
-    pub n: usize,
-    pub k: usize,
-    pub x_check_count: usize,
-    pub z_check_count: usize,
-    pub data_qubit_count: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct BravyiModelAuditScheduleExport {
-    pub sx_labels: [&'static str; 7],
-    pub sz_labels: [&'static str; 7],
-    pub operation_count: usize,
-    pub operation_count_by_kind: BTreeMap<&'static str, usize>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ComparisonModelExport {
-    pub num_checks: usize,
-    pub num_bits: usize,
-    pub sparse_rows: Vec<Vec<usize>>,
-    pub augmented_columns: Vec<Vec<usize>>,
-    pub channel_probs: Vec<f64>,
-    pub first_logical_row: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ComparisonTrialExport {
-    pub z_syndrome: Vec<bool>,
-    pub x_syndrome: Vec<bool>,
-    pub z_logical: Vec<bool>,
-    pub x_logical: Vec<bool>,
-    pub z_logical_prediction: Option<Vec<bool>>,
-    pub x_logical_prediction: Option<Vec<bool>>,
-    pub z_correction: Option<Vec<bool>>,
-    pub x_correction: Option<Vec<bool>>,
-    pub z_profile: Option<BbCircuitBposdProfile>,
-    pub x_profile: Option<BbCircuitBposdProfile>,
-}
-
-#[derive(Debug, Clone)]
-struct SimulationCaseRun {
-    result: SimulationResult,
-    models: EffectiveModels,
-    trials: Option<Vec<ComparisonTrialExport>>,
-}
-
-struct BbPPointSetup {
-    code: BbCode,
-    cycle: SyndromeCycle,
-    models: EffectiveModels,
-    z_decoder: BpOsdDecoder,
-    x_decoder: BpOsdDecoder,
-    setup_profile: BbCircuitBposdProfile,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyndromeReplayDiagnostic {
     pub syndrome_weight: usize,
@@ -918,7 +725,6 @@ pub struct SyndromeReplayDiagnostic {
     pub bp_iterations: usize,
     pub used_osd: bool,
     pub residual_syndrome_weight: usize,
-    pub osd_planner: &'static str,
     pub osd_order: usize,
     pub free_column_count: usize,
     pub candidate_search_frontier_size: usize,
@@ -939,15 +745,6 @@ pub fn build_effective_models(
     })
 }
 
-pub fn run_bb_p_point(config: BbPPointConfig) -> Result<BbPPointResult, String> {
-    let code_id = config.code_id.clone();
-    let run = run_bb_p_point_case(config, false)?;
-    Ok(BbPPointResult {
-        code_id,
-        result: run.result,
-    })
-}
-
 pub fn run_simulation(config: SimulationConfig) -> Result<SimulationResult, String> {
     run_simulation_for_code("bb144", config)
 }
@@ -956,108 +753,12 @@ pub fn run_simulation_for_code(
     code_id: &str,
     config: SimulationConfig,
 ) -> Result<SimulationResult, String> {
-    Ok(
-        run_simulation_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0, false)?
-            .result,
-    )
-}
+    validate_simulation_config(&config)?;
 
-pub fn run_simulation_for_code_with_osd_variant(
-    code_id: &str,
-    config: SimulationConfig,
-    osd_variant: OsdVariant,
-) -> Result<SimulationResult, String> {
-    Ok(run_simulation_case_for_code_with_osd_variant(code_id, config, osd_variant, false)?.result)
-}
-
-pub fn export_comparison_case_for_code(
-    code_id: &str,
-    config: SimulationConfig,
-) -> Result<BbCircuitBposdComparisonExport, String> {
-    export_comparison_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0)
-}
-
-pub fn export_bravyi_model_audit_for_code(
-    code_id: &str,
-    config: SimulationConfig,
-) -> Result<BbCircuitBravyiModelAuditExport, String> {
-    validate_model_config(&config)?;
+    let setup_started = Instant::now();
     let code = build_code(code_id)?;
     let cycle = build_syndrome_cycle(&code);
     let models = build_effective_models(&code, &cycle, &config)?;
-
-    Ok(BbCircuitBravyiModelAuditExport {
-        code_id: code_id.to_owned(),
-        physical_error_rate: config.physical_error_rate,
-        num_cycles: config.num_cycles,
-        noiseless_tail_cycles: BRAVYI_NOISELESS_TAIL_CYCLES,
-        num_cycles_plus_tail: config.num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES,
-        code: model_audit_code_export(&code),
-        schedule: model_audit_schedule_export(&cycle),
-        z_model: comparison_model_export(&models.z_faults),
-        x_model: comparison_model_export(&models.x_faults),
-    })
-}
-
-pub fn export_comparison_case_for_code_with_osd_variant(
-    code_id: &str,
-    config: SimulationConfig,
-    osd_variant: OsdVariant,
-) -> Result<BbCircuitBposdComparisonExport, String> {
-    let run =
-        run_simulation_case_for_code_with_osd_variant(code_id, config.clone(), osd_variant, true)?;
-
-    Ok(BbCircuitBposdComparisonExport {
-        code_id: code_id.to_owned(),
-        physical_error_rate: config.physical_error_rate,
-        num_cycles: config.num_cycles,
-        num_trials: config.num_trials,
-        seed: config.seed,
-        max_bp_iterations: config.max_bp_iterations,
-        osd_order: config.osd_order,
-        rust_result: run.result,
-        z_model: comparison_model_export(&run.models.z_faults),
-        x_model: comparison_model_export(&run.models.x_faults),
-        trials: run.trials.unwrap_or_default(),
-    })
-}
-
-#[cfg(test)]
-fn run_simulation_case_for_code(
-    code_id: &str,
-    config: SimulationConfig,
-    collect_trials: bool,
-) -> Result<SimulationCaseRun, String> {
-    run_simulation_case_for_code_with_osd_variant(code_id, config, OsdVariant::Osd0, collect_trials)
-}
-
-fn run_simulation_case_for_code_with_osd_variant(
-    code_id: &str,
-    config: SimulationConfig,
-    osd_variant: OsdVariant,
-    collect_trials: bool,
-) -> Result<SimulationCaseRun, String> {
-    run_bb_p_point_case(
-        BbPPointConfig::from_simulation_config_with_osd_variant(code_id, config, osd_variant),
-        collect_trials,
-    )
-}
-
-fn build_bb_p_point_setup(config: &BbPPointConfig) -> Result<BbPPointSetup, String> {
-    let simulation_config = config.simulation_config();
-    validate_simulation_config(&simulation_config)?;
-
-    let setup_started = Instant::now();
-    let mut setup_profile = BbCircuitBposdProfile::default();
-
-    let code = build_code(&config.code_id)?;
-    setup_profile.code_build_count = 1;
-
-    let cycle = build_syndrome_cycle(&code);
-    setup_profile.syndrome_cycle_build_count = 1;
-
-    let models = build_effective_models(&code, &cycle, &simulation_config)?;
-    setup_profile.effective_model_build_count = 1;
 
     if models.z_faults.channel_probs.is_empty() || models.x_faults.channel_probs.is_empty() {
         return Err("effective decoder models must contain at least one probability column".into());
@@ -1065,7 +766,6 @@ fn build_bb_p_point_setup(config: &BbPPointConfig) -> Result<BbPPointSetup, Stri
 
     let decoder_config = DecoderConfig {
         max_bp_iterations: config.max_bp_iterations,
-        osd_variant: config.osd_variant,
         osd_order: config.osd_order,
         ..DecoderConfig::default()
     };
@@ -1084,40 +784,16 @@ fn build_bb_p_point_setup(config: &BbPPointConfig) -> Result<BbPPointSetup, Stri
     )
     .map_err(|error| format!("failed to compile X-fault rbposd decoder: {error}"))?;
 
-    setup_profile.decoder_build_count = 1;
-    setup_profile.setup_seconds = setup_started.elapsed().as_secs_f64();
-
-    Ok(BbPPointSetup {
-        code,
-        cycle,
-        models,
-        z_decoder,
-        x_decoder,
-        setup_profile,
-    })
-}
-
-fn run_bb_p_point_case(
-    config: BbPPointConfig,
-    collect_trials: bool,
-) -> Result<SimulationCaseRun, String> {
-    let BbPPointSetup {
-        code,
-        cycle,
-        models,
-        z_decoder,
-        x_decoder,
-        setup_profile,
-    } = build_bb_p_point_setup(&config)?;
-
     let mut rng = match config.seed {
         Some(seed) => StdRng::seed_from_u64(seed),
         None => StdRng::from_entropy(),
     };
 
-    let mut profile = setup_profile;
+    let mut profile = BbCircuitBposdProfile {
+        setup_seconds: setup_started.elapsed().as_secs_f64(),
+        ..BbCircuitBposdProfile::default()
+    };
     let mut num_failed_trials = 0usize;
-    let mut trials = collect_trials.then(|| Vec::with_capacity(config.num_trials));
     for _ in 0..config.num_trials {
         let sample_started = Instant::now();
         let sample = simulate_trial(
@@ -1128,32 +804,17 @@ fn run_bb_p_point_case(
             &mut rng,
         );
         profile.sample_seconds += sample_started.elapsed().as_secs_f64();
-        profile.sample_count += 1;
-        let mut trial_export = collect_trials.then(|| comparison_trial_export(&sample));
 
         let decode_started = Instant::now();
         let z_result = decode_logicals(&z_decoder, &sample.z_syndrome)
             .map_err(|error| format!("failed to decode Z faults: {error}"))?;
-        let z_decode_seconds = decode_started.elapsed().as_secs_f64();
-        profile.decode_seconds += z_decode_seconds;
+        profile.decode_seconds += decode_started.elapsed().as_secs_f64();
         profile.add_z_stats(&z_result.stats);
         let predicted_z = correction_to_logicals(&z_result.correction, &models.z_faults, code.k());
-        if let Some(trial) = trial_export.as_mut() {
-            trial.z_logical_prediction = Some(predicted_z.clone());
-            trial.z_correction = Some(z_result.correction.as_slice().to_vec());
-            trial.z_profile = Some(profile_from_decode_stats(
-                ProfileReplayBasis::Z,
-                z_decode_seconds,
-                &z_result.stats,
-            ));
-        }
         if predicted_z != sample.z_logical {
             // A Z logical failure already determines the trial outcome. The X
             // decoder is intentionally skipped and contributes zero to
             // x_decode_call_count for this trial.
-            if let (Some(trials), Some(trial)) = (trials.as_mut(), trial_export.take()) {
-                trials.push(trial);
-            }
             num_failed_trials += 1;
             continue;
         }
@@ -1161,119 +822,21 @@ fn run_bb_p_point_case(
         let decode_started = Instant::now();
         let x_result = decode_logicals(&x_decoder, &sample.x_syndrome)
             .map_err(|error| format!("failed to decode X faults: {error}"))?;
-        let x_decode_seconds = decode_started.elapsed().as_secs_f64();
-        profile.decode_seconds += x_decode_seconds;
+        profile.decode_seconds += decode_started.elapsed().as_secs_f64();
         profile.add_x_stats(&x_result.stats);
         let predicted_x = correction_to_logicals(&x_result.correction, &models.x_faults, code.k());
-        if let Some(trial) = trial_export.as_mut() {
-            trial.x_logical_prediction = Some(predicted_x.clone());
-            trial.x_correction = Some(x_result.correction.as_slice().to_vec());
-            trial.x_profile = Some(profile_from_decode_stats(
-                ProfileReplayBasis::X,
-                x_decode_seconds,
-                &x_result.stats,
-            ));
-        }
         if predicted_x != sample.x_logical {
             num_failed_trials += 1;
         }
-        if let (Some(trials), Some(trial)) = (trials.as_mut(), trial_export.take()) {
-            trials.push(trial);
-        }
     }
 
-    Ok(SimulationCaseRun {
-        result: SimulationResult {
-            physical_error_rate: config.physical_error_rate,
-            num_cycles: config.num_cycles,
-            num_trials: config.num_trials,
-            num_failed_trials,
-            profile,
-        },
-        models,
-        trials,
+    Ok(SimulationResult {
+        physical_error_rate: config.physical_error_rate,
+        num_cycles: config.num_cycles,
+        num_trials: config.num_trials,
+        num_failed_trials,
+        profile,
     })
-}
-
-fn comparison_model_export(model: &EffectiveDecoderModel) -> ComparisonModelExport {
-    ComparisonModelExport {
-        num_checks: model.decoder.num_checks(),
-        num_bits: model.decoder.num_bits(),
-        sparse_rows: (0..model.decoder.num_checks())
-            .map(|row| model.decoder.row_neighbors(row).to_vec())
-            .collect(),
-        augmented_columns: model.augmented_columns.clone(),
-        channel_probs: model.channel_probs.clone(),
-        first_logical_row: model.first_logical_row,
-    }
-}
-
-fn operation_kind_label(kind: OperationKind) -> &'static str {
-    match kind {
-        OperationKind::Idle => "idle",
-        OperationKind::Cnot => "cnot",
-        OperationKind::PrepX => "prep_x",
-        OperationKind::PrepZ => "prep_z",
-        OperationKind::MeasX => "meas_x",
-        OperationKind::MeasZ => "meas_z",
-    }
-}
-
-fn model_audit_code_export(code: &BbCode) -> BravyiModelAuditCodeExport {
-    BravyiModelAuditCodeExport {
-        ell: code.ell(),
-        m: code.m(),
-        n2: code.n2(),
-        n: code.n(),
-        k: code.k(),
-        x_check_count: code.x_checks().len(),
-        z_check_count: code.z_checks().len(),
-        data_qubit_count: code.data_qubits().len(),
-    }
-}
-
-fn model_audit_schedule_export(cycle: &SyndromeCycle) -> BravyiModelAuditScheduleExport {
-    let mut operation_count_by_kind = BTreeMap::new();
-    for operation in cycle.operations() {
-        *operation_count_by_kind
-            .entry(operation_kind_label(operation.kind()))
-            .or_insert(0) += 1;
-    }
-
-    BravyiModelAuditScheduleExport {
-        sx_labels: cycle.sx_labels(),
-        sz_labels: cycle.sz_labels(),
-        operation_count: cycle.operations().len(),
-        operation_count_by_kind,
-    }
-}
-
-fn comparison_trial_export(sample: &SampledTrial) -> ComparisonTrialExport {
-    ComparisonTrialExport {
-        z_syndrome: sample.z_syndrome.clone(),
-        x_syndrome: sample.x_syndrome.clone(),
-        z_logical: sample.z_logical.clone(),
-        x_logical: sample.x_logical.clone(),
-        z_logical_prediction: None,
-        x_logical_prediction: None,
-        z_correction: None,
-        x_correction: None,
-        z_profile: None,
-        x_profile: None,
-    }
-}
-
-fn profile_from_decode_stats(
-    basis: ProfileReplayBasis,
-    decode_seconds: f64,
-    stats: &DecodeStats,
-) -> BbCircuitBposdProfile {
-    let mut profile = BbCircuitBposdProfile {
-        decode_seconds,
-        ..BbCircuitBposdProfile::default()
-    };
-    profile.add_basis_stats(basis, stats);
-    profile
 }
 
 pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> BenchmarkResultRow {
@@ -1307,20 +870,6 @@ pub fn bb_circuit_bposd_result_row(code_id: &str, result: &SimulationResult) -> 
             ("setup_seconds", result.profile.setup_seconds),
             ("sample_seconds", result.profile.sample_seconds),
             ("decode_seconds", result.profile.decode_seconds),
-            ("code_build_count", result.profile.code_build_count as f64),
-            (
-                "syndrome_cycle_build_count",
-                result.profile.syndrome_cycle_build_count as f64,
-            ),
-            (
-                "effective_model_build_count",
-                result.profile.effective_model_build_count as f64,
-            ),
-            (
-                "decoder_build_count",
-                result.profile.decoder_build_count as f64,
-            ),
-            ("sample_count", result.profile.sample_count as f64),
             ("bp_seconds", result.profile.bp_seconds),
             ("osd_seconds", result.profile.osd_seconds),
             ("decode_call_count", result.profile.decode_call_count as f64),
@@ -1364,11 +913,6 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         "setup_seconds",
         "sample_seconds",
         "decode_seconds",
-        "code_build_count",
-        "syndrome_cycle_build_count",
-        "effective_model_build_count",
-        "decoder_build_count",
-        "sample_count",
         "bp_seconds",
         "osd_seconds",
         "decode_call_count",
@@ -1381,11 +925,6 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         "gf2_full_elimination_count",
     ];
     let counter_metric_keys = [
-        "code_build_count",
-        "syndrome_cycle_build_count",
-        "effective_model_build_count",
-        "decoder_build_count",
-        "sample_count",
         "decode_call_count",
         "z_decode_call_count",
         "x_decode_call_count",
@@ -1410,32 +949,6 @@ pub fn validate_bposd_profile_result_row(row: &BenchmarkResultRow) -> Result<(),
         if counter_metric_keys.contains(&key) && value.fract() != 0.0 {
             return Err(format!("counter metric {key} must be an integer"));
         }
-    }
-
-    let code_build_count = row.metrics["code_build_count"];
-    let syndrome_cycle_build_count = row.metrics["syndrome_cycle_build_count"];
-    let effective_model_build_count = row.metrics["effective_model_build_count"];
-    let decoder_build_count = row.metrics["decoder_build_count"];
-    if code_build_count != 1.0
-        || syndrome_cycle_build_count != 1.0
-        || effective_model_build_count != 1.0
-        || decoder_build_count != 1.0
-    {
-        return Err(format!(
-            "setup/model rebuild count mismatch: code_build_count={code_build_count:.0}, syndrome_cycle_build_count={syndrome_cycle_build_count:.0}, effective_model_build_count={effective_model_build_count:.0}, decoder_build_count={decoder_build_count:.0}, expected all counters to be 1 for one p-point"
-        ));
-    }
-
-    let num_trials = row
-        .params
-        .get("num_trials")
-        .and_then(|value| value.as_u64())
-        .ok_or_else(|| "missing or invalid num_trials parameter".to_string())?;
-    let sample_count = row.metrics["sample_count"];
-    if sample_count != num_trials as f64 {
-        return Err(format!(
-            "sample_count mismatch: sample_count={sample_count:.0} num_trials={num_trials}"
-        ));
     }
 
     let decode_call_count = row.metrics["decode_call_count"];
@@ -1479,31 +992,12 @@ pub fn replay_syndrome_diagnostic(
     max_bp_iterations: usize,
     osd_order: usize,
 ) -> Result<SyndromeReplayDiagnostic, String> {
-    replay_syndrome_diagnostic_with_osd_variant(
-        model,
-        syndrome_bits,
-        num_logicals,
-        max_bp_iterations,
-        osd_order,
-        OsdVariant::Osd0,
-    )
-}
-
-pub fn replay_syndrome_diagnostic_with_osd_variant(
-    model: &EffectiveDecoderModel,
-    syndrome_bits: &[bool],
-    num_logicals: usize,
-    max_bp_iterations: usize,
-    osd_order: usize,
-    osd_variant: OsdVariant,
-) -> Result<SyndromeReplayDiagnostic, String> {
     let syndrome = Syndrome::from(syndrome_bits.to_vec());
     let diagnostic_decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
-            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
@@ -1533,7 +1027,6 @@ pub fn replay_syndrome_diagnostic_with_osd_variant(
         bp_iterations: diagnostic.bp_iterations,
         used_osd: diagnostic.used_osd,
         residual_syndrome_weight: diagnostic.residual_syndrome_weight,
-        osd_planner: diagnostic.osd_planner,
         osd_order: diagnostic.osd_order,
         free_column_count: diagnostic.free_column_count,
         candidate_search_frontier_size: diagnostic.candidate_search_frontier_size,
@@ -1573,30 +1066,11 @@ pub fn profile_syndrome_replay_for_basis(
     max_bp_iterations: usize,
     osd_order: usize,
 ) -> Result<BbCircuitBposdProfile, String> {
-    profile_syndrome_replay_for_basis_with_osd_variant(
-        basis,
-        model,
-        syndrome_bits,
-        max_bp_iterations,
-        osd_order,
-        OsdVariant::Osd0,
-    )
-}
-
-pub fn profile_syndrome_replay_for_basis_with_osd_variant(
-    basis: ProfileReplayBasis,
-    model: &EffectiveDecoderModel,
-    syndrome_bits: &[bool],
-    max_bp_iterations: usize,
-    osd_order: usize,
-    osd_variant: OsdVariant,
-) -> Result<BbCircuitBposdProfile, String> {
     let decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
-            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
@@ -1646,33 +1120,12 @@ pub fn profile_syndrome_replay_with_candidate_limit_for_basis(
     osd_order: usize,
     osd_candidate_limit: usize,
 ) -> Result<BbCircuitBposdProfile, String> {
-    profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
-        basis,
-        model,
-        syndrome_bits,
-        max_bp_iterations,
-        osd_order,
-        osd_candidate_limit,
-        OsdVariant::Osd0,
-    )
-}
-
-pub fn profile_syndrome_replay_with_candidate_limit_for_basis_and_osd_variant(
-    basis: ProfileReplayBasis,
-    model: &EffectiveDecoderModel,
-    syndrome_bits: &[bool],
-    max_bp_iterations: usize,
-    osd_order: usize,
-    osd_candidate_limit: usize,
-    osd_variant: OsdVariant,
-) -> Result<BbCircuitBposdProfile, String> {
     let syndrome = Syndrome::from(syndrome_bits.to_vec());
     let decoder = BpOsdDecoder::new(
         model.decoder.clone(),
         ChannelModel::BitFlipProbabilities(model.channel_probs.clone()),
         DecoderConfig {
             max_bp_iterations,
-            osd_variant,
             osd_order,
             ..DecoderConfig::default()
         },
@@ -1726,7 +1179,7 @@ fn build_effective_model_for_basis(
     config: &SimulationConfig,
     basis: FaultBasis,
 ) -> Result<EffectiveDecoderModel, String> {
-    let total_cycles = config.num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;
+    let total_cycles = config.num_cycles + 2;
     let num_checks = code.n2();
     let first_logical_row = num_checks * total_cycles;
     let mut grouped_columns = BTreeMap::<Vec<usize>, f64>::new();
@@ -2007,7 +1460,7 @@ fn simulate_trial<R: Rng + ?Sized>(
     physical_error_rate: f64,
     rng: &mut R,
 ) -> SampledTrial {
-    let total_cycles = num_cycles + BRAVYI_NOISELESS_TAIL_CYCLES;
+    let total_cycles = num_cycles + 2;
     let mut z_state = vec![false; code.num_circuit_qubits()];
     let mut x_state = vec![false; code.num_circuit_qubits()];
     let mut x_check_measurements = vec![vec![false; code.n2()]; total_cycles];
@@ -2206,11 +1659,10 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 mod tests {
     use super::{
         apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
-        export_bravyi_model_audit_for_code, in_row_span, nullspace, parse_schedule_slot, rref,
-        run_simulation, run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
-        validate_model_config, validate_physical_error_rate, validate_simulation_config,
-        EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
-        SimulationConfig,
+        in_row_span, nullspace, parse_schedule_slot, rref, run_simulation, sample_operation_fault,
+        sample_single_axis, validate_model_config, validate_physical_error_rate,
+        validate_simulation_config, EffectiveDecoderModel, FaultBasis, Operation, OperationKind,
+        PauliAxis, PauliFault, SimulationConfig,
     };
     use rand::{rngs::StdRng, SeedableRng};
     use rbposd::{Correction, ParityCheckMatrix};
@@ -2256,58 +1708,6 @@ mod tests {
                 "physical_error_rate must be finite and lie in [0, 1)"
             );
         }
-    }
-
-    #[test]
-    fn simulation_case_collection_is_export_only() {
-        let config = SimulationConfig {
-            physical_error_rate: 1.0e-12,
-            num_cycles: 1,
-            num_trials: 1,
-            seed: Some(12345),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        };
-
-        let legacy = run_simulation_case_for_code("bb72", config.clone(), false).unwrap();
-        assert!(legacy.trials.is_none());
-
-        let exported = run_simulation_case_for_code("bb72", config, true).unwrap();
-        assert_eq!(exported.trials.as_ref().map(Vec::len), Some(1));
-        assert_eq!(
-            legacy.result.num_failed_trials,
-            exported.result.num_failed_trials
-        );
-    }
-
-    #[test]
-    fn simulation_case_export_records_z_failure_without_x_decode() {
-        let config = SimulationConfig {
-            physical_error_rate: 0.05,
-            num_cycles: 1,
-            num_trials: 1,
-            seed: Some(1),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        };
-
-        let exported = run_simulation_case_for_code("bb72", config, true).unwrap();
-        assert_eq!(exported.result.num_failed_trials, 1);
-        assert_eq!(exported.result.profile.z_decode_call_count, 1);
-        assert_eq!(exported.result.profile.x_decode_call_count, 0);
-
-        let trials = exported.trials.unwrap();
-        assert_eq!(trials.len(), 1);
-        let trial = &trials[0];
-        assert_ne!(
-            trial.z_logical_prediction.as_ref().unwrap(),
-            &trial.z_logical
-        );
-        assert!(trial.z_correction.as_ref().is_some_and(|bits| !bits.is_empty()));
-        assert!(trial.z_profile.is_some());
-        assert!(trial.x_logical_prediction.is_none());
-        assert!(trial.x_correction.is_none());
-        assert!(trial.x_profile.is_none());
     }
 
     #[test]
@@ -2566,35 +1966,5 @@ mod tests {
         assert_eq!(FaultBasis::Z.logical_rows(&code), code.logical_x_rows());
         assert_eq!(FaultBasis::X.logical_rows(&code), code.logical_z_rows());
         assert_ne!(code.logical_x_rows(), code.logical_z_rows());
-    }
-
-    #[test]
-    fn bravyi_model_audit_export_is_model_only_and_reports_tail_rows() {
-        let export = export_bravyi_model_audit_for_code(
-            "bb72",
-            SimulationConfig {
-                physical_error_rate: 0.003,
-                num_cycles: 1,
-                num_trials: 1,
-                seed: Some(12345),
-                max_bp_iterations: 10_000,
-                osd_order: 7,
-            },
-        )
-        .unwrap();
-
-        assert_eq!(export.code_id, "bb72");
-        assert_eq!(export.code.n2, 36);
-        assert_eq!(export.code.n, 72);
-        assert_eq!(export.code.k, 12);
-        assert_eq!(export.noiseless_tail_cycles, 2);
-        assert_eq!(export.num_cycles_plus_tail, 3);
-        assert_eq!(export.z_model.first_logical_row, 36 * 3);
-        assert_eq!(export.x_model.first_logical_row, 36 * 3);
-        assert_eq!(export.z_model.num_checks, 36 * 3);
-        assert_eq!(export.x_model.num_checks, 36 * 3);
-        assert_eq!(export.schedule.sx_labels, ["idle", "1", "4", "3", "5", "0", "2"]);
-        assert_eq!(export.schedule.sz_labels, ["3", "5", "0", "1", "2", "4", "idle"]);
-        assert_eq!(export.schedule.operation_count_by_kind.get("cnot"), Some(&432));
     }
 }

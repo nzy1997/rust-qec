@@ -1,10 +1,7 @@
 use rstim::dem::DetectorErrorModel;
 
-#[cfg(feature = "ilp-runner")]
 pub use crate::ilpqec_adapter::IlpDemDecoder;
-#[cfg(feature = "rbposd-runner")]
 pub use crate::rbposd_adapter::{RbposdDemDecoder, RbposdLsdDemDecoder};
-#[cfg(feature = "rmatching-runner")]
 pub use crate::rmatching_adapter::RmatchingDemDecoder;
 
 pub trait CompiledDecoder: Send {
