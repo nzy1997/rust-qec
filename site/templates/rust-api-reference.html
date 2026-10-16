@@ -4,7 +4,7 @@
 {% block hero %}<div class="hero compact-hero"><h1>Rust API index</h1><p class="hero-copy">Choose a crate and open its versioned API documentation.</p></div>{% endblock hero %}
 {% block main %}
 <section class="task-section" aria-labelledby="rust-apis"><h2 id="rust-apis">Versioned Rust APIs</h2>
-<p>These versions are generated from the workspace manifests during the site build. They can differ by patch while remaining in the RustQEC {{ docs_version.release_line }} release line.</p>
+<p>Crate patch versions can differ within the RustQEC {{ docs_version.release_line }} release line.</p>
 <div class="table-wrap"><table><thead><tr><th>Crate</th><th>Version</th><th>Primary surface</th><th>API</th></tr></thead><tbody>
 <tr><td><code>rstim</code></td><td>{{ docs_version.packages.rstim.version }}</td><td>Circuits, simulation, DEM, formats</td><td><a href="https://docs.rs/rstim/{{ docs_version.packages.rstim.version }}/rstim/">docs.rs ↗</a></td></tr>
 <tr><td><code>rmatching</code></td><td>{{ docs_version.packages.rmatching.version }}</td><td>Graphlike MWPM decoding</td><td><a href="https://docs.rs/rmatching/{{ docs_version.packages.rmatching.version }}/rmatching/">docs.rs ↗</a></td></tr>

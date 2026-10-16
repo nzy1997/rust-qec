@@ -45,6 +45,40 @@ byte-for-byte reproducible.
 
 ## Blinded Measurement Mode
 
+The generated Mid-SWAP memory-Z circuit carries both the insertion point and
+a default logical-X representative derived from its distance and initial
+data-qubit layout. For distance 3, its marker is:
+
+```stim
+TICK[rstim:logical_flip_point] # rstim:logical_input=X:1,8,15
+```
+
+The inline comment declares the operator `X` and its physical support, not the
+random logical input bit. The default `--mode auto` selects
+`measurements_blinded` when this metadata or an explicit logical-qubit option
+is present, and `detectors` otherwise. For a generated Mid-SWAP circuit, run:
+
+```console
+rstim dataset export \
+  --circuit circuit.stim --shots 64 --seed 7 \
+  --public-out data/public --private-out data/private
+```
+
+The same default applies to the direct `rstim export_decoder_dataset` command.
+In blinded mode, explicit `--logical_x_qubits` or `--logical_z_qubits` options
+override the declared default; the chosen operator is still checked noiselessly
+against every detector and observable 0. Explicit `--mode detectors` ignores
+the default operator and rejects explicit logical-qubit options as before.
+The exported manifests always record the resolved mode, never `auto`.
+
+For a custom circuit, retain the inline metadata on its canonical marker,
+or supply the logical-qubit option explicitly as described below. The
+supported metadata spellings are `rstim:logical_input=X:qubits` and
+`rstim:logical_input=Z:qubits`, with a comma-separated, nonempty list of unique
+physical qubit indices. In auto or blinded mode, misplaced, duplicate or malformed
+declarations are rejected before export. Comment-stripping tools remove this metadata, so
+explicit support is required after such a transformation.
+
 Place the canonical tagged instruction exactly once at top level, after ideal
 logical-state initialization and before the first positive-probability noise
 instruction anywhere in the circuit:
@@ -72,7 +106,7 @@ rstim export_decoder_dataset \
   --private_out private-truth
 ```
 
-Blinded mode requires exactly one logical-qubit option. Use `--logical_x_qubits` for an ideal physical `X` representative, such as a logical X for a Z-basis memory experiment. Use `--logical_z_qubits` for an ideal physical `Z` representative, such as a logical Z for an X-basis memory experiment:
+Without circuit metadata, blinded mode requires exactly one logical-qubit option. Use `--logical_x_qubits` for an ideal physical `X` representative, such as a logical X for a Z-basis memory experiment. Use `--logical_z_qubits` for an ideal physical `Z` representative, such as a logical Z for an X-basis memory experiment:
 
 ```console
 rstim export_decoder_dataset \

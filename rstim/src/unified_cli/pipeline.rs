@@ -868,10 +868,16 @@ pub fn run_dataset_export(
     }
     .transpose()
     .map_err(|message| command_error(DATASET_EXPORT_COMMAND, "invalid_arguments", message, json))?;
+    let mode = rstim::decoder_dataset::resolve_decoder_dataset_mode(
+        &options.mode,
+        &text,
+        logical_flip.as_ref(),
+    )
+    .map_err(|message| command_error(DATASET_EXPORT_COMMAND, "invalid_arguments", message, json))?;
     rstim::operations::run_export_decoder_dataset_with_logical_flip(
         &circuit_path,
         options.shots,
-        &options.mode,
+        mode.as_str(),
         logical_flip,
         &public_out,
         &private_out,
@@ -888,7 +894,7 @@ pub fn run_dataset_export(
     })?;
     Ok(DatasetExportResult {
         shots: options.shots,
-        mode: options.mode.clone(),
+        mode: mode.as_str().to_string(),
         public_out,
         private_out,
     })

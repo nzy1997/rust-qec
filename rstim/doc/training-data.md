@@ -124,16 +124,21 @@ into superchecks using the separate loss information.
 
 ## Blinded logical-input training rows
 
-`rstim export_decoder_dataset --mode measurements_blinded --error_trace`
-produces a second tensor-friendly layout: public measurement rows, private
+For a generated Mid-SWAP circuit, `rstim dataset export --error-trace` reads
+the logical-input metadata and selects `measurements_blinded` automatically.
+It produces public measurement rows, private
 answers, private logical masks, and private physical-error traces. Every trace
 line includes `logical_input`, whose `bit` and `applied` fields equal the aligned
 mask bit and whose `pauli` / `support` fields identify the ideal representative.
 The ideal logical gate is deliberately absent from the physical `events` list.
 
-The canonical top-level `TICK[rstim:logical_flip_point]` marks where that ideal
-source-state `X` or `Z` is inserted. It must follow ideal logical-state
-initialization and precede every positive-probability noise instruction. For a
+The generator writes a top-level marker such as
+`TICK[rstim:logical_flip_point] # rstim:logical_input=X:1,8,15` to record both
+the insertion point and logical operator support. Custom circuits can supply
+the metadata or explicit overrides described in the
+[dataset export contract](decoder-dataset.md#blinded-measurement-mode).
+The marker must follow ideal logical-state initialization and precede every
+positive-probability noise instruction. For a
 published measurement row `m`, `O_public(m)` contains both the chosen source bit
 and any logical flip accumulated from physical errors. Therefore the supervised
 decoder target removes the known training-time source choice:

@@ -120,7 +120,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         for page, anchors in {
             "get-started/index.html": ("install", "first-circuit", "detector-output", "continue-rustqec", "further-learning"),
             "support/index.html": ("support-levels", "atom-loss-support-boundary"),
-            "qp101/protocol/index.html": ("schema-identity", "validation-rules"),
+            "qp101/protocol/index.html": ("scope-and-applicability", "validation-rules"),
             "validation/index.html": ("reading-results", "historical-results", "local-workflows"),
         }.items():
             text = (fixture.site_root / page).read_text(encoding="utf-8")

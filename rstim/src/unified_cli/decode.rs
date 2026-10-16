@@ -20,6 +20,7 @@ mod dataset;
 mod matching;
 #[cfg(feature = "ilp")]
 mod mle;
+pub(super) mod score;
 
 use compiler::compile_circuit;
 #[cfg(test)]

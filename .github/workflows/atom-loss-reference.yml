@@ -52,6 +52,14 @@ jobs:
       - run: python -m benchmarks.atom_loss.readiness_correctness --binary target/release/rstim --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-correctness.json
       - run: python -m benchmarks.atom_loss.readiness_correctness --self-test --binary target/release/rstim
       - run: python -m benchmarks.atom_loss.readiness_resources --binary target/release/rstim --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-resources.json
+      - name: Measure candidate resources with the full campaign
+        run: |
+          python -m benchmarks.atom_loss.readiness_resources \
+            --binary target/release/rstim \
+            --matrix docs/envelope-support.json \
+            --profile full --out drafts/ci-atom-loss/retained-resources
+      - name: Verify candidate-equivalent retained resources
+        run: python -m benchmarks.atom_loss.readiness_resources --verify drafts/ci-atom-loss/retained-resources/manifest.json
       - name: Verify historical retained resources against measured source
         run: python -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09/manifest.json --historical-source
       - run: python -m benchmarks.atom_loss.correctness --binary target/release/rstim --out drafts/ci-atom-loss/correctness.json

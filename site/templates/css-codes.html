@@ -34,7 +34,7 @@ num_sweep_bits: 0</code></pre>
   --out-format b8 --out css-detectors.b8 \
   --obs-out css-answers.b8 --obs-out-format b8
 rstim circuit dem --in css-memory.stim --out css-model.dem</code></pre>
-<p>Keep the detector rows, DEM and private answers together. A CSS code is not necessarily graphlike: matching needs each decomposed error component to involve at most two detectors. For non-graphlike models use a suitable BP-based or solver backend rather than silently discarding correlations.</p>
+<p>Keep the detector rows, DEM and private answers together. A CSS code is not necessarily graphlike: matching needs each decomposed error component to involve at most two detectors. For non-graphlike models use a suitable BP-based or solver backend.</p>
 <p><a href="../decoding/">Continue with frozen-input decoder comparison</a>.</p>
 </section>
 <section id="distance-search" class="task-section"><h2 id="distance-search-title">4. Check a distance bound</h2>
@@ -46,7 +46,7 @@ rstim circuit dem --in css-memory.stim --out css-model.dem</code></pre>
 <pre data-output="true"><code>distance: 3
 logical_class: XLike
 witness: x=[1, 1, 0, 1, 0, 0, 0] z=[0, 0, 0, 0, 0, 0, 0] weight=3</code></pre>
-<p>This exact result rules out lower weights. Larger custom exact searches require an optional ILP backend; see <a href="../qec-code-cli/#help-qec-code-code-css-distance-exact">exact-search inputs and solver options</a>. The random-window benchmark pipeline is <a href="../validation/#local-workflows">local-only workflow evidence</a>, rather than a published distance claim.</p>
+<p>This exact result rules out lower weights. Larger custom exact searches require an optional ILP backend; see <a href="../qec-code-cli/#help-qec-code-code-css-distance-exact">exact-search inputs and solver options</a>.</p>
 </section>
 
 {% endblock main %}

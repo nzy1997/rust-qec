@@ -1,12 +1,11 @@
+use rstim::decoder_dataset::{
+    DecoderDatasetArtifacts, DecoderDatasetMode, DecoderDatasetSummary, ExportDecoderDatasetConfig,
+    ExportDecoderDatasetLogicalFlipConfig, LogicalFlip, LogicalPauli, export_decoder_dataset,
+    export_decoder_dataset_with_logical_flip, export_decoder_dataset_with_logical_flip_in_batches,
+    generate_decoder_dataset_artifacts,
+};
 use rstim::operations::{
     run_export_decoder_dataset, run_export_decoder_dataset_with_logical_flip_in_batches,
-};
-use rstim::decoder_dataset::{
-    DecoderDatasetArtifacts, DecoderDatasetMode, DecoderDatasetSummary,
-    ExportDecoderDatasetConfig, ExportDecoderDatasetLogicalFlipConfig, LogicalFlip, LogicalPauli,
-    export_decoder_dataset, export_decoder_dataset_with_logical_flip,
-    export_decoder_dataset_with_logical_flip_in_batches,
-    generate_decoder_dataset_artifacts,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,15 +26,8 @@ fn released_x_only_rust_api_remains_source_compatible() {
         export_decoder_dataset;
     let _: fn(&ExportDecoderDatasetConfig) -> Result<DecoderDatasetArtifacts, String> =
         generate_decoder_dataset_artifacts;
-    let _: fn(
-        &str,
-        u64,
-        &str,
-        Option<&str>,
-        &str,
-        &str,
-        Option<u64>,
-    ) -> Result<(), String> = run_export_decoder_dataset;
+    let _: fn(&str, u64, &str, Option<&str>, &str, &str, Option<u64>) -> Result<(), String> =
+        run_export_decoder_dataset;
 
     let artifacts = generate_decoder_dataset_artifacts(&legacy).unwrap();
     assert_eq!(artifacts.public_row_kind, "detectors");
@@ -123,4 +115,39 @@ fn generalized_rust_api_accepts_a_logical_z_flip() {
 
 fn path_text(root: &Path, name: &str) -> String {
     root.join(name).to_string_lossy().into_owned()
+}
+
+#[test]
+fn rust_api_resolves_declared_support_when_no_explicit_flip_is_supplied() {
+    let root = tempfile::tempdir().unwrap();
+    let config = ExportDecoderDatasetLogicalFlipConfig {
+        circuit_text: "RX 0\nTICK[rstim:logical_flip_point] # rstim:logical_input=Z:0\nMX 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n".to_string(),
+        shots: 16,
+        mode: DecoderDatasetMode::MeasurementsBlinded,
+        logical_flip: None,
+        public_out: root.path().join("declared-public"),
+        private_out: root.path().join("declared-private"),
+        seed: Some(7),
+        error_trace: true,
+    };
+    let mut explicit = config.clone();
+    explicit.logical_flip = Some(LogicalFlip {
+        pauli: LogicalPauli::Z,
+        qubits: vec![0],
+    });
+    explicit.public_out = root.path().join("explicit-public");
+    explicit.private_out = root.path().join("explicit-private");
+    export_decoder_dataset_with_logical_flip(config).unwrap();
+    export_decoder_dataset_with_logical_flip(explicit).unwrap();
+    for (bundle, file) in [
+        ("public", "shots.b8"),
+        ("private", "answers.b8"),
+        ("private", "masks.b8"),
+        ("private", "trace.jsonl"),
+    ] {
+        assert_eq!(
+            fs::read(root.path().join(format!("declared-{bundle}/{file}"))).unwrap(),
+            fs::read(root.path().join(format!("explicit-{bundle}/{file}"))).unwrap()
+        );
+    }
 }

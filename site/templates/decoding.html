@@ -4,7 +4,7 @@
 {% block main %}
 
 <section id="decoder-families" class="task-section"><h2 id="decoder-families-title">Choose an input-compatible decoder</h2>
-<p>A decoder predicts observable flips from detector events and a detector error model. Minimum-weight perfect matching (MWPM, <code>rmatching</code>) uses graphlike error components; belief propagation with ordered-statistics decoding (BP-OSD, <code>rbposd</code>) works with parity-check models. Integer linear programming (ILP, <code>rilpqec</code>) is an optional solver path. None is universally best.</p>
+<p>A decoder predicts observable flips from detector events and a detector error model. Minimum-weight perfect matching (MWPM, <code>rmatching</code>) uses graphlike error components; belief propagation with ordered-statistics decoding (BP-OSD, <code>rbposd</code>) works with parity-check models. Integer linear programming (ILP, <code>rilpqec</code>) is an optional solver path.</p>
 <p>This experiment uses <code>rsinter replay</code> with its matching and BP-OSD runner features. The <a href="../get-started/#install">central installation section</a> lists optional tools. Decoder choice and configuration are recorded in the replay statistics.</p></section>
 <section class="task-section"><h2 id="freeze-input">1. Freeze one model and one sample batch</h2>
 {% include "partials/example-circuit.html" %}
@@ -18,7 +18,7 @@ rstim circuit detect --in circuit.stim --shots 128 --seed 7 \
   --predictions-out matching.b8 --stats-out matching.json --shots 128
 rsinter replay --dem model.dem --dets detectors.b8 --decoder rbposd \
   --predictions-out bposd.b8 --stats-out bposd.json --shots 128</code></pre>
-<p>The commands read neither answers nor masks. Replay compiles once and streams batches; statistics include dimensions, normalized configuration, input/output hashes and timing. For a fair comparison, check those input hashes agree and separate compilation time from steady decoding time.</p></section>
+<p>Both commands read the same detector file and DEM. Their statistics record input hashes so the scoring step can verify this.</p></section>
 <section class="task-section"><h2 id="score-decoders">3. Score complete predictions</h2>
 <pre data-language="Shell"><code>python3 - &lt;&lt;'PYTHON'
 import json
@@ -41,9 +41,9 @@ assert input_hashes[0] == input_hashes[1], 'Different decoder inputs'
 PYTHON</code></pre>
 <pre data-output="true"><code>matching: 0 / 128 logical errors
 bposd: 0 / 128 logical errors</code></pre>
-<p>Each disagreement is one logical failure. This tiny graphlike case verifies wiring; it cannot establish a general ranking. An incomplete prediction file or nonzero replay exit is a failed experiment, not a decoder accuracy result.</p></section>
-<section class="task-section"><h2 id="first-decode">Earlier Rust decoder example</h2><p>The earlier <a href="../examples/first-decode/src/main.rs" download>two-row matching example</a> remains available. For a complete experiment, use the <a href="../rust-api/#rust-experiment">Rust tutorial</a>.</p><span id="decode-project"></span><span id="decode-input"></span><span id="decode-code"></span><span id="decode-own-data"></span></section>
+<p>Each disagreement is one logical failure. Score only complete predictions from a successful replay.</p></section>
+<span id="first-decode" aria-hidden="true"></span><span id="decode-project" aria-hidden="true"></span><span id="decode-input" aria-hidden="true"></span><span id="decode-code" aria-hidden="true"></span><span id="decode-own-data" aria-hidden="true"></span>
 <section id="benchmark-campaigns" class="task-section"><h2 id="benchmark-campaigns-title">Scale the experiment</h2>
-<p>Use <a href="../benchmarks/decoders/">recorded decoder benchmarks</a> for full campaigns, conditions and reproduction. For parameter sweeps, use the <a href="../rsinter-cli/#commands">rsinter campaign reference</a>; retain circuit, noise model, seeds, configuration, shot counts and stopping rules. For a Rust consumer, <a href="../rust-api/">run the complete API experiment</a>. The earlier <a href="../examples/first-decode/src/main.rs" download>two-row Rust decoder example</a> remains downloadable.</p></section>
+<p>Use <a href="../benchmarks/decoders/">recorded decoder benchmarks</a> for full campaigns, conditions and reproduction. For parameter sweeps, use the <a href="../rsinter-cli/#commands">rsinter campaign reference</a>; retain circuit, noise model, seeds, configuration, shot counts and stopping rules. For a Rust consumer, <a href="../rust-api/">run the complete API experiment</a>.</p></section>
 
 {% endblock main %}

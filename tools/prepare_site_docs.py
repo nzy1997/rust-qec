@@ -21,6 +21,12 @@ PUBLIC_PACKAGES = {
     'rstim',
 }
 
+SUPPORT_ARTIFACTS = (
+    'envelope-support.json',
+    'envelope-compatibility-policy.md',
+    'envelope-mle-scope.json',
+)
+
 
 def package_versions(repo_root: Path) -> dict[str, dict[str, str]]:
     workspace = tomllib.loads((repo_root / 'Cargo.toml').read_text())['workspace']
@@ -64,6 +70,13 @@ def prepare(repo_root: Path) -> None:
     migration_heading = '## Mid-SWAP configuration migration'
     (destination / 'version-migration.md').write_text(support[support.index(migration_heading):])
     (destination / 'support-core.md').write_text(support[:support.index(migration_heading)])
+
+    # Include canonical support metadata in both Zola builds and local serve.
+    # Without these files, runtime release verification never reaches GitHub.
+    support_destination = repo_root / 'site/static/support'
+    support_destination.mkdir(parents=True, exist_ok=True)
+    for filename in SUPPORT_ARTIFACTS:
+        shutil.copyfile(repo_root / 'docs' / filename, support_destination / filename)
 
 
 if __name__ == '__main__':
