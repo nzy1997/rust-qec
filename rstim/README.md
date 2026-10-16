@@ -56,7 +56,8 @@ passing them to a matching decoder that only accepts one- and two-detector
 errors.
 
 See the [getting-started guide](doc/getting_started.md), the
-[experimental near-Clifford backend contract](doc/near-clifford.md),
+[near-Clifford usage guide](doc/near-clifford.md) (compiled execution,
+Strict/Fused arithmetic, and raw postselected counts),
 the repository's
 [complete external-consumer example](https://github.com/nzy1997/rust-qec/blob/master/examples/rust-consumer/src/main.rs),
 and the [rmatching decoder](https://github.com/nzy1997/rust-qec/tree/master/rmatching).
