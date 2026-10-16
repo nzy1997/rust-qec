@@ -1,17 +1,3 @@
-//! Belief-propagation decoders with ordered-statistics (OSD) or
-//! localized-statistics (LSD) post-processing for binary linear codes.
-//!
-//! Construct a sparse [`ParityCheckMatrix`], choose a [`ChannelModel`], and
-//! reuse a decoder for multiple syndromes. Decoder calls validate channel and
-//! syndrome dimensions and return [`DecodeError`] on invalid inputs or when a
-//! post-processor cannot find a solution.
-//!
-//! Channel probabilities must be finite and strictly between 0 and 1. LSD
-//! supports orders 0 and 1. See [`DecoderConfig`] and [`LsdConfig`] for the
-//! available algorithms and defaults.
-//!
-//! # BP+OSD example
-//!
 //! ```rust
 //! use rbposd::{BpOsdDecoder, ChannelModel, DecoderConfig, ParityCheckMatrix, Syndrome};
 //!
@@ -31,8 +17,6 @@
 //! let result = decoder.decode(&syndrome).unwrap();
 //! assert_eq!(pcm.multiply(&result.correction), syndrome);
 //! ```
-//!
-//! # BP+LSD example
 //!
 //! ```rust
 //! use rbposd::{BpLsdDecoder, ChannelModel, LsdConfig, ParityCheckMatrix, Syndrome};
@@ -72,7 +56,7 @@ pub use config::{
     BpVariant, ChannelModel, DecoderConfig, LsdConfig, LsdMethod, OsdVariant, Schedule,
 };
 pub use css::CssDecoders;
-pub use decoder::{BpOsdDecoder, DecodeResult, DecodeStats, OsdPathDiagnostic};
+pub use decoder::{BpOsdDecoder, DecodeResult};
 pub use error::DecodeError;
 pub use lsd_decoder::BpLsdDecoder;
 pub use matrix::ParityCheckMatrix;

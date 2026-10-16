@@ -780,13 +780,6 @@ fn is_sample_trace_visualization_measurement_op(name: &str) -> bool {
             | "MRXL"
             | "MRYL"
             | "MRZL"
-            | "MPP"
-            | "MXX"
-            | "MYY"
-            | "MZZ"
-            | "MPAD"
-            | "HERALDED_ERASE"
-            | "HERALDED_PAULI_CHANNEL_1"
     )
 }
 

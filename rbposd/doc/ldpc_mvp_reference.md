@@ -10,8 +10,6 @@ Included:
 - `DecoderConfig` and its default contract:
   `max_bp_iterations=30`, `early_stop=true`, `bp_variant=MinimumSum`,
   `schedule=Parallel`, `osd_variant=Osd0`
-- `BpVariant` with `MinimumSum` and `ProductSum`
-- `Schedule` with `Parallel` and `Serial`
 - `LsdConfig` and its default contract:
   `method=LocalizedStatistics`, `lsd_order=0`
 - `LsdMethod` with the first supported variant:
@@ -33,10 +31,7 @@ Included:
   OsdVariant, Schedule, DecodeError`
 
 Excluded:
-- Additional decoding algorithm variants beyond the current BP, OSD, and LSD
-  solver paths.
-- BP methods and schedules beyond the implemented `MinimumSum`, `ProductSum`,
-  `Parallel`, and `Serial` selectors.
+- Any decoding algorithm implementation (BP, OSD, or hybrid solver logic)
 - Sparse/H matrix parsing, loading, or validation beyond public error typing
 - Performance tuning, SIMD/parallel execution internals, and benchmarking hooks
 - CLI/API integration outside this crate's foundational type contract
@@ -44,8 +39,6 @@ Excluded:
 Reference fixtures:
 - Repetition-style 4-check / 5-bit code with a single-flip syndrome that BP
   should solve without OSD.
-- Small 3-check / 4-bit chain where `ProductSum + Serial` produces a
-  residual-zero BP-only correction that differs from `MinimumSum + Parallel`.
 - Small 2-check / 3-bit code that is solved by `OSD_0` when BP is disabled.
 - Small 2-check / 3-bit code with equal reliability values that locks the OSD
   tie-break outcome.
@@ -57,7 +50,6 @@ Static parity fixtures live in `rbposd/tests/fixtures/parity/`.
 Seed cases:
 
 - `bp_repetition_single_flip.json`
-- `bp_product_sum_serial_sensitive.json`
 - `osd_small_sparse_code.json`
 - `osd_equal_reliability_tiebreak.json`
 
@@ -77,25 +69,6 @@ decode paths or corrections. These are reported as
 `zero_iter_semantics_mismatch` and do not fail parity, because Rust treats
 `max_bp_iterations=0` as "disable BP and run OSD" while Python `ldpc` does not
 share that contract.
-
-## BP Method and Schedule Contract
-
-Issue #95 implements the first non-default compiled BP execution path behind
-the public selector surface:
-
-- `BpVariant::MinimumSum` keeps the existing minimum-sum check update.
-- `BpVariant::ProductSum` uses the product-sum tanh check update.
-- `Schedule::Parallel` keeps the existing check-update then variable-update
-  iteration order.
-- `Schedule::Serial` updates one check at a time and immediately refreshes
-  the affected variable messages before moving to the next check.
-
-Both `BpOsdDecoder` and `BpLsdDecoder::with_bp_config` route through the same
-selector-aware BP core. The `bp_product_sum_serial_sensitive.json` parity
-fixture documents a deterministic case where `ProductSum + Serial` returns
-`[false, true, true, false]`, while the same case under `MinimumSum + Parallel`
-returns `[true, false, false, true]`; both corrections have residual syndrome
-weight zero.
 
 ## LSD Public API Contract
 
@@ -127,41 +100,45 @@ Issue #89 checks in a minimal Rust-side fixture set under
 Fixture manifests, Python `ldpc` differential harness coverage, and broader
 fixture catalog validation are owned by #90/#98.
 
-## Shared LSD and BP-Option Fixture Catalog
+## LSD Fixture Manifest
 
-Issue #98 replaces the old LSD-only manifest with the shared catalog at
-`rbposd/tests/fixtures/catalog.json`.
+Issue #90 adds an LSD-only fixture manifest at
+`rbposd/tests/fixtures/lsd/manifest.json`.
 
-The catalog covers the checked-in LSD fixtures and
-`bp_product_sum_serial_sensitive.json`, alongside the other cataloged BP/OSD
-parity cases that remain part of the Rust stability baseline.
+The manifest covers the current checked-in LSD fixtures:
 
-Each catalog entry records:
+- `lsd_small_sparse_code.json`
+- `lsd_order_one_improves_over_baseline.json`
+- `lsd_unsatisfiable_case.json`
+
+Each manifest entry records:
 
 - fixture id
-- kind
-- decoder
-- path
-- matrix path
-- syndrome path
+- fixture path
 - provenance
-- verifier
+- verifier command
 - pass condition
 - consuming issue ids
-- modes
 
-Rust tests validate catalog coverage and reject missing provenance or verifier
-metadata instead of silently skipping malformed entries.
+Rust tests validate that each checked-in LSD fixture has exactly one manifest
+entry and that malformed metadata is rejected instead of silently skipped.
 
-The Python parity harness uses the catalog for `--include-lsd` and for
-cataloged BP-option parity cases:
+The Python parity harness can opt into these LSD fixtures with:
 
 ```bash
-python3 rbposd/scripts/parity_harness.py --include-lsd
+python3 rbposd/scripts/parity_harness.py --include-lsd --skip-generated
 ```
 
-Harness unit coverage for the catalog-backed LSD path can be run with:
+The harness path converts manifest-listed LSD fixtures into the existing parity
+report shape and compares supported `BpLsdDecoder` cases against upstream
+`ldpc`. Unsupported LSD mappings are reported as structured errors and are not
+coerced into OSD decoding.
+
+Harness unit coverage for the LSD manifest path can be run with:
 
 ```bash
 python3 -m pytest rbposd/scripts/test_parity_harness.py -k lsd
 ```
+
+Existing OSD/BP parity fixtures remain outside the #90 manifest. The broader
+shared LSD and BP-option fixture catalog remains owned by #98.

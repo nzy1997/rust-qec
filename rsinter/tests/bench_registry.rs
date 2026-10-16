@@ -26,21 +26,6 @@ fn default_rust_runner_registry_exposes_runner_names() {
     assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
 }
 
-#[cfg(all(
-    feature = "rbposd-runner",
-    not(feature = "rmatching-runner"),
-    not(feature = "ilp-runner")
-))]
-#[test]
-fn minimal_feature_registry_keeps_disabled_runner_identifiers_stable() {
-    let registry = build_default_rust_runner_registry();
-
-    assert_eq!(registry.get("rmatching").unwrap().name(), "rmatching");
-    assert_eq!(registry.get("rbposd").unwrap().name(), "rbposd");
-    assert_eq!(registry.get("rilpqec").unwrap().name(), "rilpqec");
-    assert_eq!(registry.get("predict-zero").unwrap().name(), "predict-zero");
-}
-
 #[test]
 fn default_rust_runner_names_include_workspace_decoders() {
     let names = default_rust_runner_names();
@@ -339,81 +324,6 @@ fn expand_runner_points_accepts_rbposd_lsd_params() {
     assert_eq!(points[0].distance, Some(3));
     assert_eq!(points[0].rounds, 1);
     assert_eq!(points[0].p, 0.002);
-}
-
-#[test]
-fn expand_runner_points_accepts_rbposd_bp_method_and_schedule_params() {
-    let mut params = valid_runner_params();
-    params.insert(
-        "bp_method".into(),
-        toml::Value::String("product_sum".into()),
-    );
-    params.insert("schedule".into(), toml::Value::String("serial".into()));
-
-    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
-
-    assert_eq!(points.len(), 1);
-    assert_eq!(
-        points[0]
-            .decoder_params
-            .get("bp_method")
-            .and_then(toml::Value::as_str),
-        Some("product_sum")
-    );
-    assert_eq!(
-        points[0]
-            .decoder_params
-            .get("schedule")
-            .and_then(toml::Value::as_str),
-        Some("serial")
-    );
-    assert_eq!(points[0].schedule, None);
-}
-
-#[test]
-fn expand_runner_points_keeps_css_greedy_schedule_generic_for_rbposd() {
-    let mut params = valid_css_runner_params();
-    params.insert("schedule".into(), toml::Value::String("greedy".into()));
-    params.insert(
-        "bp_method".into(),
-        toml::Value::String("minimum_sum".into()),
-    );
-
-    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
-
-    assert_eq!(points.len(), 1);
-    assert_eq!(points[0].schedule.as_deref(), Some("greedy"));
-    assert!(!points[0].decoder_params.contains_key("schedule"));
-    assert_eq!(
-        points[0]
-            .decoder_params
-            .get("bp_method")
-            .and_then(toml::Value::as_str),
-        Some("minimum_sum")
-    );
-}
-
-#[test]
-fn expand_runner_points_keeps_css_sequential_schedule_generic_for_rbposd() {
-    let mut params = valid_css_runner_params();
-    params.insert("schedule".into(), toml::Value::String("sequential".into()));
-    params.insert(
-        "bp_method".into(),
-        toml::Value::String("minimum_sum".into()),
-    );
-
-    let points = expand_runner_points_for_runner("rbposd", &params).unwrap();
-
-    assert_eq!(points.len(), 1);
-    assert_eq!(points[0].schedule.as_deref(), Some("sequential"));
-    assert!(!points[0].decoder_params.contains_key("schedule"));
-    assert_eq!(
-        points[0]
-            .decoder_params
-            .get("bp_method")
-            .and_then(toml::Value::as_str),
-        Some("minimum_sum")
-    );
 }
 
 #[test]

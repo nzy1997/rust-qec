@@ -1,6 +1,5 @@
 use crate::ir::StimInstr;
 use serde::Serialize;
-use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CircuitStatsSummary {
@@ -13,24 +12,6 @@ pub struct CircuitStatsSummary {
     pub num_observables: usize,
     pub num_ticks: usize,
     pub num_sweep_bits: usize,
-}
-
-pub fn summarize_text(text: &str) -> Result<CircuitStatsSummary, String> {
-    let instrs = crate::validation::parse_and_validate(text)?;
-    Ok(summarize(&instrs))
-}
-
-pub fn write_human(summary: &CircuitStatsSummary, out: &mut dyn Write) -> Result<(), String> {
-    writeln!(out, "instruction_count: {}", summary.instruction_count).map_err(|e| e.to_string())?;
-    writeln!(out, "repeat_blocks: {}", summary.repeat_blocks).map_err(|e| e.to_string())?;
-    writeln!(out, "max_repeat_depth: {}", summary.max_repeat_depth).map_err(|e| e.to_string())?;
-    writeln!(out, "num_qubits: {}", summary.num_qubits).map_err(|e| e.to_string())?;
-    writeln!(out, "num_measurements: {}", summary.num_measurements).map_err(|e| e.to_string())?;
-    writeln!(out, "num_detectors: {}", summary.num_detectors).map_err(|e| e.to_string())?;
-    writeln!(out, "num_observables: {}", summary.num_observables).map_err(|e| e.to_string())?;
-    writeln!(out, "num_ticks: {}", summary.num_ticks).map_err(|e| e.to_string())?;
-    writeln!(out, "num_sweep_bits: {}", summary.num_sweep_bits).map_err(|e| e.to_string())?;
-    Ok(())
 }
 
 pub fn summarize(instrs: &[StimInstr]) -> CircuitStatsSummary {
@@ -93,19 +74,77 @@ pub fn num_qubits(instrs: &[StimInstr]) -> usize {
 /// Total measurement count. M/MX/MY/MZ/MR/MRX/MRY/MRZ produce 1 per target;
 /// ML/MXL/MYL/MZL/MRL/MRXL/MRYL/MRZL produce 2 per target;
 /// MPP produces 1 per Pauli product; MXX/MYY/MZZ produce 1 per pair;
-/// MPAD produces 1 per target; HERALDED_* produce 1 per target.
+/// MPAD produces its arg count; HERALDED_* produce 1 per target.
 pub fn num_measurements(instrs: &[StimInstr]) -> usize {
-    crate::measurement_transform::num_measurements_unchecked(instrs)
+    let mut count = 0;
+    for instr in instrs {
+        match instr {
+            StimInstr::Op {
+                name,
+                targets,
+                args,
+                ..
+            } => {
+                count += match name.as_str() {
+                    "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" => targets.len(),
+                    "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL" => {
+                        2 * targets.len()
+                    }
+                    "MPP" => targets
+                        .split(|t| matches!(t, crate::ir::StimTarget::Combiner))
+                        .filter(|g| !g.is_empty())
+                        .count(),
+                    "MXX" | "MYY" | "MZZ" => targets.len() / 2,
+                    "MPAD" => args.first().map_or(0, |a| *a as usize),
+                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => targets.len(),
+                    _ => 0,
+                };
+            }
+            StimInstr::Repeat { count: c, body } => {
+                count += (*c as usize) * num_measurements(body);
+            }
+        }
+    }
+    count
 }
 
 /// Total DETECTOR annotation count.
 pub fn num_detectors(instrs: &[StimInstr]) -> usize {
-    crate::measurement_transform::num_detectors_unchecked(instrs)
+    let mut count = 0;
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, .. } if name == "DETECTOR" => count += 1,
+            StimInstr::Repeat { count: c, body } => {
+                count += (*c as usize) * num_detectors(body);
+            }
+            _ => {}
+        }
+    }
+    count
 }
 
 /// One more than the largest OBSERVABLE_INCLUDE index.
 pub fn num_observables(instrs: &[StimInstr]) -> usize {
-    crate::measurement_transform::num_observables_unchecked(instrs)
+    let mut max_idx: Option<usize> = None;
+    for instr in instrs {
+        match instr {
+            StimInstr::Op { name, args, .. } if name == "OBSERVABLE_INCLUDE" => {
+                if let Some(&idx) = args.first() {
+                    let i = idx as usize;
+                    max_idx = Some(max_idx.map_or(i, |m| m.max(i)));
+                }
+            }
+            StimInstr::Repeat { body, .. } => {
+                let inner = num_observables(body);
+                if inner > 0 {
+                    let i = inner - 1;
+                    max_idx = Some(max_idx.map_or(i, |m| m.max(i)));
+                }
+            }
+            _ => {}
+        }
+    }
+    max_idx.map_or(0, |m| m + 1)
 }
 
 /// Total TICK count.

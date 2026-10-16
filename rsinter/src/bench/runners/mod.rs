@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::StimInstr;
 use rstim::output::write_shots_b8;
 use rstim::sampler::sample_batch;
 
-use crate::bench::circuit_source::{build_circuit_for_point, BuiltCircuit};
+use crate::bench::circuit_source::{BuiltCircuit, build_circuit_for_point};
 use crate::bench::registry::{BenchCasePoint, BenchRunContext};
 use crate::bench::result::{BenchmarkResultRow, CaseSummary, MetricMap, PairMapExt, ParamMap};
 use crate::decode::Decoder;
-use crate::failure::{classify_completed, classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_completed, classify_error};
 
 pub(crate) mod params;
 pub mod predict_zero;
@@ -20,17 +20,7 @@ pub mod rbposd;
 pub mod rilpqec;
 pub mod rmatching;
 
-#[cfg(any(
-    not(feature = "rbposd-runner"),
-    not(feature = "rmatching-runner"),
-    not(feature = "ilp-runner")
-))]
-pub(crate) fn missing_feature_runner_error(runner_name: &str, feature: &str) -> String {
-    format!("runner '{runner_name}' requires Cargo feature '{feature}'")
-}
-
 pub(crate) enum DemBuildMode {
-    #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
     Decomposed,
     Raw,
 }
@@ -122,7 +112,6 @@ fn benchmark_metrics(
     ])
 }
 
-#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
 pub(crate) fn run_decoder_point(
     runner_name: &'static str,
     decoder: &dyn Decoder,
@@ -160,40 +149,6 @@ pub(crate) fn run_decoder_point_with_dem_mode(
     )
 }
 
-#[cfg(any(feature = "rmatching-runner", feature = "ilp-runner"))]
-pub(crate) fn plan_decoder_point_identity(
-    runner_name: &'static str,
-    point: &BenchCasePoint,
-    ctx: &BenchRunContext,
-    decoder_params: &crate::bench::result::ParamMap,
-) -> Result<String, String> {
-    plan_decoder_point_identity_with_dem_mode(
-        runner_name,
-        point,
-        ctx,
-        decoder_params,
-        DemBuildMode::Decomposed,
-    )
-}
-
-pub(crate) fn plan_decoder_point_identity_with_dem_mode(
-    runner_name: &'static str,
-    point: &BenchCasePoint,
-    ctx: &BenchRunContext,
-    decoder_params: &crate::bench::result::ParamMap,
-    dem_mode: DemBuildMode,
-) -> Result<String, String> {
-    let built = build_circuit_for_point(point, &ctx.spec_dir)?;
-    plan_built_decoder_point_identity_with_dem_mode(
-        runner_name,
-        built,
-        point,
-        ctx,
-        decoder_params,
-        dem_mode,
-    )
-}
-
 #[cfg(test)]
 fn run_built_decoder_point(
     runner_name: &'static str,
@@ -212,40 +167,6 @@ fn run_built_decoder_point(
         decoder_params,
         DemBuildMode::Decomposed,
     )
-}
-
-fn plan_built_decoder_point_identity_with_dem_mode(
-    runner_name: &'static str,
-    built: BuiltCircuit,
-    point: &BenchCasePoint,
-    ctx: &BenchRunContext,
-    decoder_params: &crate::bench::result::ParamMap,
-    dem_mode: DemBuildMode,
-) -> Result<String, String> {
-    let circuit = built.circuit;
-    let mut result_params = merge_decoder_params(built.params, decoder_params);
-    result_params.insert("decoder_impl".into(), serde_json::json!(runner_name));
-    result_params.insert("seed".into(), serde_json::json!(point.seed));
-    let base_case_summary = built.case_summary;
-    let dem = match dem_mode {
-        #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
-        DemBuildMode::Decomposed => ErrorAnalyzer::circuit_to_dem_decomposed(&circuit)?,
-        DemBuildMode::Raw => ErrorAnalyzer::circuit_to_dem(&circuit)?,
-    };
-    let row = benchmark_result_row(
-        ctx,
-        FailureKind::Ok,
-        result_params,
-        case_summary_with_progress(
-            base_case_summary,
-            dem.effective_num_detectors(),
-            dem.num_observables(),
-            0,
-        ),
-        MetricMap::new(),
-        None,
-    );
-    row.identity()
 }
 
 fn run_built_decoder_point_with_dem_mode(
@@ -303,7 +224,6 @@ where
     result_params.insert("seed".into(), serde_json::json!(point.seed));
     let base_case_summary = built.case_summary;
     let dem = match dem_mode {
-        #[cfg(any(feature = "rmatching-runner", feature = "ilp-runner", test))]
         DemBuildMode::Decomposed => match ErrorAnalyzer::circuit_to_dem_decomposed(&circuit) {
             Ok(dem) => dem,
             Err(decomposition_error) => {
@@ -954,11 +874,12 @@ mod tests {
         assert_eq!(row.status, "error");
         assert_eq!(row.failure_kind, FailureKind::SamplerError);
         assert_eq!(row.metrics["shots_used"], 0.0);
-        assert!(row
-            .error
-            .as_deref()
-            .unwrap()
-            .contains("sampler produced 0 observable bytes"));
+        assert!(
+            row.error
+                .as_deref()
+                .unwrap()
+                .contains("sampler produced 0 observable bytes")
+        );
     }
 
     #[test]

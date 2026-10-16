@@ -1,16 +1,11 @@
-use rsinter::bench::registry::{
-    build_default_rust_runner_registry, BenchCasePoint, BenchRunContext, RustBenchRunner,
-    RustRunnerRegistry,
-};
-use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
-use rsinter::bench::run::{run_rust_benchmark, run_rust_benchmark_with_options, BenchRunOptions};
+use rsinter::bench::registry::build_default_rust_runner_registry;
+use rsinter::bench::result::read_results_jsonl;
+use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::BenchmarkSpec;
 use rsinter::failure::FailureKind;
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-#[cfg(feature = "rbposd-runner")]
 fn issue91_surface_spec(extra_params: &str) -> String {
     format!(
         r#"
@@ -52,241 +47,6 @@ label = "Logical Error Rate"
     )
 }
 
-#[cfg(feature = "rbposd-runner")]
-fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std::path::PathBuf) {
-    let spec_text = issue91_surface_spec(extra_params);
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let artifact_root = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap();
-
-    (dir, artifact_root)
-}
-
-#[cfg(feature = "rbposd-runner")]
-fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
-    let data = fs::read(
-        artifact_root
-            .join("rbposd_lsd")
-            .join("test-run")
-            .join("results.jsonl"),
-    )
-    .unwrap();
-    read_results_jsonl(&data[..]).unwrap()
-}
-
-fn read_rows(artifact_root: &Path, runner_name: &str) -> Vec<BenchmarkResultRow> {
-    let data = fs::read(
-        artifact_root
-            .join(runner_name)
-            .join("test-run")
-            .join("results.jsonl"),
-    )
-    .unwrap();
-    read_results_jsonl(&data[..]).unwrap()
-}
-
-#[cfg(all(feature = "rbposd-runner", not(feature = "ilp-runner")))]
-#[test]
-fn disabled_rilpqec_runner_reports_required_feature_before_artifacts() {
-    let text = include_str!("fixtures/bench/minimal_steane_css_rilpqec.toml");
-    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let err = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/bench")
-            .as_path(),
-    )
-    .expect_err("disabled ILP runner must fail");
-
-    assert!(err.contains("requires Cargo feature 'ilp-runner'"), "{err}");
-    assert!(!dir
-        .path()
-        .join("rilpqec-steane")
-        .join("test-run")
-        .join("results.jsonl")
-        .exists());
-}
-
-fn write_rows_to_path(rows: &[BenchmarkResultRow], path: &Path) {
-    let mut data = Vec::new();
-    rsinter::bench::result::write_results_jsonl(rows, &mut data).unwrap();
-    fs::write(path, data).unwrap();
-}
-
-fn identity_count(rows: &[BenchmarkResultRow], identity: &str) -> usize {
-    rows.iter()
-        .filter(|row| row.identity().unwrap() == identity)
-        .count()
-}
-
-fn assert_same_identities(left: &[BenchmarkResultRow], right: &[BenchmarkResultRow]) {
-    let mut left_ids: Vec<_> = left.iter().map(|row| row.identity().unwrap()).collect();
-    let mut right_ids: Vec<_> = right.iter().map(|row| row.identity().unwrap()).collect();
-    left_ids.sort();
-    right_ids.sort();
-    assert_eq!(left_ids, right_ids);
-}
-
-struct NoPlannedIdentityRunner;
-
-impl RustBenchRunner for NoPlannedIdentityRunner {
-    fn name(&self) -> &'static str {
-        "no-planned-identity"
-    }
-
-    fn run_point(
-        &self,
-        point: &BenchCasePoint,
-        ctx: &BenchRunContext,
-    ) -> Result<BenchmarkResultRow, String> {
-        Ok(fake_result_row(ctx, point.p, "ok"))
-    }
-}
-
-fn no_planned_identity_registry() -> RustRunnerRegistry {
-    RustRunnerRegistry::from([(
-        "no-planned-identity".to_string(),
-        Box::new(NoPlannedIdentityRunner) as Box<dyn RustBenchRunner>,
-    )])
-}
-
-fn no_planned_identity_spec() -> BenchmarkSpec {
-    toml::from_str(
-        r#"
-name = "resume_fallback"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "no-planned-identity"
-language = "rust"
-impl_key = "no-planned-identity"
-
-[runner.params]
-distance = [3]
-rounds = [1]
-p = [0.1]
-max_shots = 1
-max_errors = 1
-batch_size = 1
-
-[plot]
-title = "Resume Fallback"
-
-[plot.x]
-field = "params.p"
-scale = "linear"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner"]
-label_template = "{{runner}}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "linear"
-label = "Logical Error Rate"
-"#,
-    )
-    .unwrap()
-}
-
-fn fake_result_row(ctx: &BenchRunContext, p: f64, status: &str) -> BenchmarkResultRow {
-    let failure_kind = if status == "ok" {
-        FailureKind::Ok
-    } else {
-        FailureKind::SolverFailure
-    };
-    BenchmarkResultRow {
-        benchmark: ctx.benchmark_name.clone(),
-        runner: ctx.runner_name.clone(),
-        language: ctx.language.clone(),
-        status: status.to_string(),
-        failure_kind,
-        params: BTreeMap::from([
-            ("distance".to_string(), serde_json::json!(3)),
-            ("rounds".to_string(), serde_json::json!(1)),
-            ("p".to_string(), serde_json::json!(p)),
-            ("max_shots".to_string(), serde_json::json!(1)),
-            ("max_errors".to_string(), serde_json::json!(1)),
-        ]),
-        case_summary: BTreeMap::from([
-            ("num_dets".to_string(), serde_json::json!(1)),
-            ("num_obs".to_string(), serde_json::json!(1)),
-        ]),
-        metrics: BTreeMap::from([
-            ("shots_used".to_string(), 1.0),
-            ("logical_errors".to_string(), 0.0),
-            ("logical_error_rate".to_string(), 0.0),
-        ]),
-        artifacts: BTreeMap::new(),
-        error: (status != "ok").then(|| "stale failure".to_string()),
-    }
-}
-
-#[cfg(feature = "rbposd-runner")]
-fn issue96_css_rbposd_spec(schedule: &str, extra_params: &str) -> String {
-    format!(
-        r#"
-name = "css_rbposd"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "rbposd_css"
-language = "rust"
-impl_key = "rbposd"
-
-[runner.params]
-input_type = "css"
-code_id = "steane"
-hx = "tests/fixtures/css/steane_hx.json"
-hz = "tests/fixtures/css/steane_hz.json"
-basis = "x"
-schedule = "{schedule}"
-rounds = [1]
-p = [0.0]
-max_shots = 0
-max_errors = 4
-batch_size = 4
-{extra_params}
-
-[plot]
-title = "CSS Decoder"
-
-[plot.x]
-field = "params.p"
-scale = "log"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner", "params.code_id"]
-label_template = "{{runner}} {{params.code_id}}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "log"
-label = "Logical Error Rate"
-"#
-    )
-}
-
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_writes_manifest_and_results_jsonl() {
     let spec_text = r#"
@@ -349,240 +109,6 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].language, "rust");
 }
 
-#[test]
-fn rust_benchmark_run_resumes_partial_results() {
-    let spec_text = r#"
-name = "resume_predict_zero"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "predict-zero-resume"
-language = "rust"
-impl_key = "predict-zero"
-
-[runner.params]
-input_type = "css"
-code_id = "steane"
-hx = "tests/fixtures/css/steane_hx.json"
-hz = "tests/fixtures/css/steane_hz.json"
-basis = "x"
-rounds = [1]
-p = [0.0, 0.1]
-max_shots = 4
-max_errors = 4
-batch_size = 2
-
-[plot]
-title = "Resume"
-
-[plot.x]
-field = "params.p"
-scale = "linear"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner"]
-label_template = "{{runner}}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "linear"
-label = "Logical Error Rate"
-"#;
-    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let artifact_root = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap();
-    let results_path = artifact_root
-        .join("predict-zero-resume")
-        .join("test-run")
-        .join("results.jsonl");
-    let initial_rows = read_results_jsonl(&fs::read(&results_path).unwrap()[..]).unwrap();
-    assert_eq!(initial_rows.len(), 2);
-
-    let kept = initial_rows[0].clone();
-    let mut stale_completed_duplicate = kept.clone();
-    stale_completed_duplicate.status = "error".into();
-    stale_completed_duplicate.failure_kind = FailureKind::SolverFailure;
-    stale_completed_duplicate.error = Some("stale completed duplicate".into());
-    stale_completed_duplicate.metrics.clear();
-    let mut stale = initial_rows[1].clone();
-    stale.status = "error".into();
-    stale.failure_kind = FailureKind::SolverFailure;
-    stale.error = Some("stale solver failure".into());
-    stale.metrics.clear();
-    write_rows_to_path(
-        &[kept.clone(), stale_completed_duplicate, stale.clone()],
-        &results_path,
-    );
-
-    let artifact_root = run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .unwrap();
-    let resumed_rows = read_rows(&artifact_root, "predict-zero-resume");
-    assert_eq!(resumed_rows.len(), 2);
-    assert_eq!(
-        identity_count(&resumed_rows, &kept.identity().unwrap()),
-        1,
-        "completed row identity was duplicated"
-    );
-    let stale_identity = stale.identity().unwrap();
-    assert_eq!(
-        identity_count(&resumed_rows, &stale_identity),
-        1,
-        "rerun row identity was duplicated"
-    );
-    let preserved = resumed_rows
-        .iter()
-        .find(|row| row.identity().unwrap() == kept.identity().unwrap())
-        .expect("completed row missing after resume");
-    assert_eq!(preserved.status, "ok");
-    assert_eq!(preserved.failure_kind.status(), "ok");
-    assert_eq!(preserved.error, None);
-    assert_eq!(preserved.metrics, kept.metrics);
-    assert_eq!(preserved.case_summary, kept.case_summary);
-    let refreshed = resumed_rows
-        .iter()
-        .find(|row| row.identity().unwrap() == stale_identity)
-        .expect("rerun row missing after resume");
-    assert_eq!(refreshed.status, "ok");
-    assert_eq!(refreshed.failure_kind.status(), "ok");
-    assert_eq!(refreshed.error, None);
-
-    run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .unwrap();
-    let rerun_rows = read_rows(dir.path(), "predict-zero-resume");
-    assert_eq!(rerun_rows.len(), 2);
-    assert_same_identities(&resumed_rows, &rerun_rows);
-
-    let changed_text = spec_text.replace("max_shots = 4", "max_shots = 6");
-    let changed_spec: BenchmarkSpec = toml::from_str(&changed_text).unwrap();
-    run_rust_benchmark_with_options(
-        &changed_spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .unwrap();
-    let changed_rows = read_rows(dir.path(), "predict-zero-resume");
-    assert_eq!(changed_rows.len(), 4);
-
-    fs::write(&results_path, b"{not valid jsonl\n").unwrap();
-    let err = run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .expect_err("corrupt existing JSONL must fail");
-    assert!(err.contains("failed to read resume results"), "{err}");
-    assert_eq!(fs::read(&results_path).unwrap(), b"{not valid jsonl\n");
-}
-
-#[test]
-fn rust_benchmark_resume_falls_back_when_runner_cannot_plan_identity() {
-    let spec = no_planned_identity_spec();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = no_planned_identity_registry();
-
-    let artifact_root = run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .unwrap();
-    let results_path = artifact_root
-        .join("no-planned-identity")
-        .join("test-run")
-        .join("results.jsonl");
-    let initial_rows = read_results_jsonl(&fs::read(&results_path).unwrap()[..]).unwrap();
-    assert_eq!(initial_rows.len(), 1);
-
-    let stale_ctx = BenchRunContext {
-        benchmark_name: spec.name.clone(),
-        runner_name: "no-planned-identity".into(),
-        language: "rust".into(),
-        seed: 12_345,
-        spec_dir: Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf(),
-    };
-    let stale_unplanned = fake_result_row(&stale_ctx, 0.2, "error");
-    let stale_identity = stale_unplanned.identity().unwrap();
-    write_rows_to_path(&[stale_unplanned], &results_path);
-
-    run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .unwrap();
-    let resumed_rows = read_rows(dir.path(), "no-planned-identity");
-
-    assert_eq!(resumed_rows.len(), 2);
-    assert_eq!(identity_count(&resumed_rows, &stale_identity), 1);
-    assert!(resumed_rows
-        .iter()
-        .any(|row| row.status == "ok" && row.params["p"] == serde_json::json!(0.1)));
-}
-
-#[test]
-fn rust_benchmark_resume_reports_existing_results_read_errors() {
-    let spec = no_planned_identity_spec();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = no_planned_identity_registry();
-    let results_path = dir
-        .path()
-        .join("no-planned-identity")
-        .join("test-run")
-        .join("results.jsonl");
-    fs::create_dir_all(&results_path).unwrap();
-
-    let err = run_rust_benchmark_with_options(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-        BenchRunOptions { resume: true },
-    )
-    .expect_err("unreadable existing JSONL path must fail");
-
-    assert!(err.contains("failed to read resume results"), "{err}");
-    assert!(results_path.is_dir());
-}
-
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_memory_z_input_type() {
     let spec_text = r#"
@@ -656,7 +182,6 @@ label = "Logical Error Rate"
     assert_ne!(rows[0].failure_kind, FailureKind::SamplerError);
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_results_use_runner_name_not_impl_key() {
     let spec_text = r#"
@@ -725,7 +250,6 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_records_normalized_decoder_params() {
     let spec_text = r#"
@@ -794,17 +318,11 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(10));
     assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
     assert_eq!(
-        rows[0].params["bp_method"],
-        serde_json::json!("minimum_sum")
-    );
-    assert_eq!(rows[0].params["schedule"], serde_json::json!("parallel"));
-    assert_eq!(
         rows[0].params["osd_method"],
         serde_json::json!("combination_sweep")
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_both_bp_iteration_aliases() {
     let spec_text = r#"
@@ -864,215 +382,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_benchmark_records_bp_method_and_schedule() {
-    let spec_text = r#"
-name = "surface_decoder"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "rbposd_product_sum_serial"
-language = "rust"
-impl_key = "rbposd"
-
-[runner.params]
-distance = [3]
-rounds = [3]
-p = [0.002]
-max_shots = 0
-max_errors = 5
-batch_size = 4
-bp_method = "product_sum"
-schedule = "serial"
-bp_iters = 3
-osd_order = 0
-
-[plot]
-title = "Surface Decoder"
-
-[plot.x]
-field = "params.p"
-scale = "log"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner"]
-label_template = "{runner}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "log"
-label = "Logical Error Rate"
-"#;
-
-    let spec: BenchmarkSpec = toml::from_str(spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let artifact_root = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap();
-    let data = fs::read(
-        artifact_root
-            .join("rbposd_product_sum_serial")
-            .join("test-run")
-            .join("results.jsonl"),
-    )
-    .unwrap();
-    let rows = read_results_jsonl(&data[..]).unwrap();
-
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].status, "ok");
-    assert_eq!(rows[0].error, None);
-    assert_eq!(
-        rows[0].params["bp_method"],
-        serde_json::json!("product_sum")
-    );
-    assert_eq!(rows[0].params["schedule"], serde_json::json!("serial"));
-    assert_eq!(rows[0].params["bp_algorithm"], serde_json::json!("min_sum"));
-    assert_eq!(rows[0].params["bp_iters"], serde_json::json!(3));
-    assert_eq!(
-        rows[0].params["osd_method"],
-        serde_json::json!("combination_sweep")
-    );
-    assert_eq!(rows[0].params["osd_order"], serde_json::json!(0));
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_css_benchmark_preserves_circuit_schedule_param() {
-    let spec_text = issue96_css_rbposd_spec(
-        "greedy",
-        r#"
-bp_method = "product_sum"
-bp_iters = 3
-osd_order = 0
-"#,
-    );
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let artifact_root = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap();
-    let data = fs::read(
-        artifact_root
-            .join("rbposd_css")
-            .join("test-run")
-            .join("results.jsonl"),
-    )
-    .unwrap();
-    let rows = read_results_jsonl(&data[..]).unwrap();
-
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].status, "ok");
-    assert_eq!(rows[0].params["schedule"], serde_json::json!("greedy"));
-    assert_eq!(rows[0].params["bp_schedule"], serde_json::json!("parallel"));
-    assert_eq!(
-        rows[0].params["bp_method"],
-        serde_json::json!("product_sum")
-    );
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_css_benchmark_accepts_sequential_circuit_schedule() {
-    let spec_text = issue96_css_rbposd_spec(
-        "sequential",
-        r#"
-bp_iters = 3
-osd_order = 0
-"#,
-    );
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let artifact_root = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap();
-    let data = fs::read(
-        artifact_root
-            .join("rbposd_css")
-            .join("test-run")
-            .join("results.jsonl"),
-    )
-    .unwrap();
-    let rows = read_results_jsonl(&data[..]).unwrap();
-
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].status, "ok");
-    assert_eq!(rows[0].params["schedule"], serde_json::json!("sequential"));
-    assert_eq!(rows[0].params["bp_schedule"], serde_json::json!("parallel"));
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_runner_rejects_unknown_bp_method_without_results() {
-    let spec_text = issue91_surface_spec(r#"bp_method = "sum_product""#);
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let err = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap_err();
-
-    assert_eq!(
-        err,
-        "rbposd bp_method must be \"minimum_sum\" or \"product_sum\", got \"sum_product\""
-    );
-    assert!(!dir.path().join("rbposd_lsd").exists());
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_runner_rejects_unknown_bp_schedule_without_results() {
-    let spec_text = issue91_surface_spec(r#"schedule = "flooding""#);
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let err = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap_err();
-
-    assert_eq!(
-        err,
-        "rbposd schedule must be \"parallel\" or \"serial\", got \"flooding\""
-    );
-    assert!(!dir.path().join("rbposd_lsd").exists());
-}
-
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_unsupported_bp_algorithm() {
     let spec_text = r#"
@@ -1132,9 +441,8 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
-fn unsupported_osd_method_is_rejected_without_fallback() {
+fn rbposd_benchmark_rejects_unsupported_osd_method() {
     let spec_text = r#"
 name = "surface_decoder"
 version = 1
@@ -1152,7 +460,7 @@ p = [0.002]
 max_shots = 0
 max_errors = 5
 batch_size = 4
-osd_method = "osd_cs_typo"
+osd_method = "unknown_method"
 
 [plot]
 title = "Surface Decoder"
@@ -1187,12 +495,11 @@ label = "Logical Error Rate"
 
     assert_eq!(
         err,
-        "unsupported OSD method \"osd_cs_typo\"; supported methods are combination_sweep, legacy_combination_sweep, ldpc_osd_cs, osd_cs"
+        "rbposd osd_method must be \"combination_sweep\", got \"unknown_method\""
     );
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_unknown_decoder_param_without_results() {
     let spec_text = r#"
@@ -1249,7 +556,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_lsd_param_without_artifacts() {
     let spec_text = issue91_surface_spec("bogus_lsd = 1");
@@ -1270,7 +576,6 @@ fn rbposd_runner_rejects_unknown_lsd_param_without_artifacts() {
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_mixed_osd_and_lsd_params_without_artifacts() {
     let spec_text = issue91_surface_spec(
@@ -1296,87 +601,6 @@ lsd_order = 1
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
-    let (_dir, artifact_root) = run_issue91_surface_benchmark("lsd_order = 1");
-    let rows = read_issue91_lsd_results(&artifact_root);
-
-    assert_eq!(rows.len(), 1);
-    let row = &rows[0];
-    assert_eq!(row.status, "ok");
-    assert_eq!(row.error, None);
-    assert_eq!(
-        row.params["input_type"],
-        serde_json::json!("surface_rotated_memory_x")
-    );
-    assert_eq!(row.params["distance"], serde_json::json!(3));
-    assert_eq!(row.params["rounds"], serde_json::json!(3));
-    assert_eq!(row.params["p"], serde_json::json!(0.002));
-    assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
-    assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
-    assert_eq!(row.params["schedule"], serde_json::json!("parallel"));
-    assert_eq!(row.params["bp_iters"], serde_json::json!(30));
-    assert_eq!(row.params["early_stop"], serde_json::json!(true));
-    assert_eq!(
-        row.params["lsd_method"],
-        serde_json::json!("localized_statistics")
-    );
-    assert_eq!(row.params["lsd_order"], serde_json::json!(1));
-    assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
-    assert_eq!(row.params["seed"], serde_json::json!(12_345));
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_lsd_benchmark_run_writes_results_jsonl() {
-    let (_dir, artifact_root) = run_issue91_surface_benchmark(
-        r#"
-lsd_method = "localized_statistics"
-lsd_order = 1
-"#,
-    );
-
-    let artifact_dir = artifact_root.join("rbposd_lsd").join("test-run");
-    assert!(artifact_dir.join("run_manifest.json").exists());
-    assert!(artifact_dir.join("results.jsonl").exists());
-
-    let rows = read_issue91_lsd_results(&artifact_root);
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].runner, "rbposd_lsd");
-    assert_eq!(rows[0].language, "rust");
-    assert_eq!(rows[0].status, "ok");
-    assert_eq!(rows[0].error, None);
-    assert_eq!(
-        rows[0].params["lsd_method"],
-        serde_json::json!("localized_statistics")
-    );
-    assert_eq!(rows[0].params["lsd_order"], serde_json::json!(1));
-    assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
-}
-
-#[cfg(feature = "rbposd-runner")]
-#[test]
-fn rbposd_lsd_benchmark_rejects_unknown_decoder_param_without_results() {
-    let spec_text = issue91_surface_spec("bogus_lsd = 1");
-    let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let err = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR")),
-    )
-    .unwrap_err();
-
-    assert_eq!(err, "unknown rbposd runner param: bogus_lsd");
-    assert!(!dir.path().join("rbposd_lsd").exists());
-}
-
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_run_uses_lsd_dem_adapter_and_writes_artifacts() {
     let spec_text = issue91_surface_spec(
@@ -1417,7 +641,6 @@ lsd_order = 1
     assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
 }
 
-#[cfg(all(feature = "rmatching-runner", feature = "rbposd-runner"))]
 #[test]
 fn rust_benchmark_preflights_all_runner_params_before_writing_results() {
     let spec_text = r#"
@@ -1488,7 +711,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(all(feature = "rmatching-runner", feature = "ilp-runner"))]
 #[test]
 fn rust_benchmark_preflights_decoder_param_values_before_writing_results() {
     let spec_text = r#"
@@ -1559,7 +781,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rilpqec_bad").exists());
 }
 
-#[cfg(feature = "ilp-runner")]
 #[test]
 fn rilpqec_benchmark_records_normalized_decoder_params() {
     let spec_text = r#"
@@ -1632,7 +853,7 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["verbose"], serde_json::json!(true));
 }
 
-#[cfg(all(feature = "ilp-runner", not(feature = "gurobi")))]
+#[cfg(not(feature = "gurobi"))]
 #[test]
 fn rilpqec_gurobi_without_feature_records_unsupported_failure_kind() {
     let spec_text = r#"
@@ -1707,7 +928,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "ilp-runner")]
 #[test]
 fn rilpqec_benchmark_rejects_invalid_mip_gap() {
     let spec_text = r#"
@@ -1816,7 +1036,6 @@ label = "Logical Error Rate"
     assert!(err.contains("distance"));
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_does_not_leave_stale_results_when_retry_fails() {
     let good_spec_text = r#"
@@ -1887,7 +1106,6 @@ label = "Logical Error Rate"
     assert!(!results_path.exists());
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_clears_stale_staging_dir_before_writing() {
     let spec_text = r#"
@@ -1948,7 +1166,6 @@ label = "Logical Error Rate"
     assert!(!staging_dir.exists());
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_css_input_type() {
     let spec_path =
@@ -2002,7 +1219,6 @@ fn rust_benchmark_run_supports_css_input_type() {
     );
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_reports_css_file_path_context() {
     let spec_text = r#"
@@ -2058,7 +1274,6 @@ label = "Logical Error Rate"
     assert!(err.contains("missing_hx.json"), "error was: {err}");
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2186,16 +1401,12 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].error, None);
 
     let logical_error_rate = rows[0].metrics["logical_error_rate"];
-    // This is a stochastic negative-control bound, not an exact seeded sample
-    // contract. Frame-sampler RNG consumption may change across valid sampling
-    // implementations while the predict-zero control remains intentionally bad.
     assert!(
-        (0.30..=0.65).contains(&logical_error_rate),
+        (0.35..=0.65).contains(&logical_error_rate),
         "predict-zero control LER was {logical_error_rate}"
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 #[ignore = "manual BB72 BP+OSD reference run; intentionally heavier than CI"]
 fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
@@ -2230,9 +1441,6 @@ fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
         assert_eq!(row.params["decoder_impl"], serde_json::json!("rbposd"));
         assert_eq!(row.params["seed"], serde_json::json!(12_345));
         assert_eq!(row.params["bp_algorithm"], serde_json::json!("min_sum"));
-        assert_eq!(row.params["bp_method"], serde_json::json!("minimum_sum"));
-        assert_eq!(row.params["schedule"], serde_json::json!("greedy"));
-        assert_eq!(row.params["bp_schedule"], serde_json::json!("parallel"));
         assert_eq!(row.params["bp_iters"], serde_json::json!(10_000));
         assert_eq!(
             row.params["osd_method"],
@@ -2260,7 +1468,6 @@ fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
     assert!(seen_p01);
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2307,15 +1514,6 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
         rbposd_row.params["bp_algorithm"],
         serde_json::json!("min_sum")
     );
-    assert_eq!(
-        rbposd_row.params["bp_method"],
-        serde_json::json!("minimum_sum")
-    );
-    assert_eq!(rbposd_row.params["schedule"], serde_json::json!("greedy"));
-    assert_eq!(
-        rbposd_row.params["bp_schedule"],
-        serde_json::json!("parallel")
-    );
     assert_eq!(rbposd_row.params["bp_iters"], serde_json::json!(50));
     assert_eq!(
         rbposd_row.params["osd_method"],
@@ -2348,17 +1546,12 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     assert_eq!(predict_zero_row.status, "ok");
     assert_eq!(predict_zero_row.error, None);
     let logical_error_rate = predict_zero_row.metrics["logical_error_rate"];
-    // This is a stochastic negative-control bound, not an exact seeded sample
-    // contract. Frame-sampler RNG consumption may change across valid sparse
-    // sampling implementations while the predict-zero control remains
-    // intentionally bad.
     assert!(
-        (0.70..=0.95).contains(&logical_error_rate),
+        (0.70..=0.80).contains(&logical_error_rate),
         "predict-zero fixture LER was {logical_error_rate}"
     );
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_rejects_invalid_css_observables_before_results() {
     let spec_dir = tempfile::tempdir().unwrap();

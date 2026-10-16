@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use rstim::codegen::NoiseParams;
 use rstim::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
 };
 use rstim::codegen::surface_code::{rotated_memory_x, rotated_memory_z};
-use rstim::codegen::NoiseParams;
 use rstim::ir::StimInstr;
 
 use crate::bench::registry::BenchCasePoint;
@@ -139,10 +139,7 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
             "logical_observable_source",
             serde_json::json!(observable_source),
         ),
-        (
-            "logical_observable_basis",
-            serde_json::json!(basis_label),
-        ),
+        ("logical_observable_basis", serde_json::json!(basis_label)),
         (
             "logical_failure_aggregation",
             serde_json::json!("any_logical"),
@@ -158,10 +155,12 @@ fn build_css(point: &BenchCasePoint, spec_dir: &Path) -> Result<BuiltCircuit, St
     ]);
     params.insert(
         "observables".into(),
-        serde_json::json!(point
-            .observables_path
-            .as_deref()
-            .unwrap_or("canonical_fallback")),
+        serde_json::json!(
+            point
+                .observables_path
+                .as_deref()
+                .unwrap_or("canonical_fallback")
+        ),
     );
     insert_max_wall_seconds(&mut params, point.max_wall_seconds);
     Ok(BuiltCircuit {

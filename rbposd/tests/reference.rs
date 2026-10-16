@@ -46,7 +46,6 @@ fn parity_fixture_directory_contains_the_seed_contract_cases() {
     assert_eq!(
         files,
         vec![
-            "bp_product_sum_serial_sensitive.json",
             "bp_repetition_single_flip.json",
             "osd_equal_reliability_tiebreak.json",
             "osd_small_sparse_code.json",
@@ -100,12 +99,12 @@ fn task_6_documentation_surfaces_exist() {
         "NoLsdSolution",
         "lsd_order=1",
         "lsd_small_sparse_code.json",
-        "#98",
-        "Shared LSD and BP-Option Fixture Catalog",
-        "rbposd/tests/fixtures/catalog.json",
-        "bp_product_sum_serial_sensitive.json",
+        "#90/#98",
+        "LSD Fixture Manifest",
+        "manifest.json",
         "python3 rbposd/scripts/parity_harness.py --include-lsd",
         "python3 -m pytest rbposd/scripts/test_parity_harness.py -k lsd",
+        "Existing OSD/BP parity fixtures remain outside the #90 manifest",
     ] {
         assert!(
             reference_contents.contains(required),

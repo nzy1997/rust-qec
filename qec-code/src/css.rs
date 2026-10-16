@@ -1,7 +1,7 @@
+use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::error::{QecError, Result};
 use crate::gf2;
-use crate::Pauli;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,8 +91,6 @@ pub fn sparse_rows_matrix_from_json_str(input: &str) -> Result<SparseRowsMatrix>
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CssCode {
     code: StabilizerCode,
-    hx: Vec<Vec<u8>>,
-    hz: Vec<Vec<u8>>,
 }
 
 impl CssCode {
@@ -102,9 +100,6 @@ impl CssCode {
         if !checks_are_orthogonal(&hx, &hz) {
             return Err(QecError::InvalidCssOrthogonality);
         }
-
-        let validated_hx = hx.clone();
-        let validated_hz = hz.clone();
 
         let mut stabilizer_rows = Vec::with_capacity(hx.len() + hz.len());
         for row in hx {
@@ -125,21 +120,11 @@ impl CssCode {
 
         Ok(Self {
             code: StabilizerCode::from_stabilizers(n, stabilizers)?,
-            hx: validated_hx,
-            hz: validated_hz,
         })
     }
 
     pub fn code(&self) -> &StabilizerCode {
         &self.code
-    }
-
-    pub fn hx(&self) -> &[Vec<u8>] {
-        &self.hx
-    }
-
-    pub fn hz(&self) -> &[Vec<u8>] {
-        &self.hz
     }
 }
 

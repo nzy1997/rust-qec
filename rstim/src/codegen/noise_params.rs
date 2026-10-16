@@ -5,7 +5,6 @@ pub struct NoiseParams {
     pub after_clifford_depolarization: f64,
     pub before_measure_flip_probability: f64,
     pub after_reset_flip_probability: f64,
-    pub after_clifford_loss_probability: f64,
 }
 
 impl NoiseParams {
@@ -15,16 +14,11 @@ impl NoiseParams {
             after_clifford_depolarization: noise,
             before_measure_flip_probability: noise,
             after_reset_flip_probability: noise,
-            after_clifford_loss_probability: 0.0,
         }
     }
-    pub fn none() -> Self {
-        Self::uniform(0.0)
-    }
+    pub fn none() -> Self { Self::uniform(0.0) }
 }
 
 impl Default for NoiseParams {
-    fn default() -> Self {
-        Self::none()
-    }
+    fn default() -> Self { Self::none() }
 }

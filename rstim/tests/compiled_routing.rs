@@ -1,6 +1,5 @@
 use rstim::compiled::{
-    CompiledPathDecision, SamplerPathDecision, SamplingFallbackReason, choose_analyzer_path,
-    choose_sampler_path, compile_circuit,
+    choose_analyzer_path, choose_sampler_path, compile_circuit, CompiledPathDecision,
 };
 use rstim::parser::parse_lines;
 
@@ -12,7 +11,7 @@ fn sampler_path_uses_fast_path_for_simple_repeat_circuit() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        SamplerPathDecision::FastPath
+        CompiledPathDecision::FastPath
     );
 }
 
@@ -22,7 +21,7 @@ fn sampler_path_falls_back_for_loss_circuit() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        SamplerPathDecision::Fallback(SamplingFallbackReason::Loss)
+        CompiledPathDecision::Fallback("loss instructions require the interpreted path")
     );
 }
 
@@ -32,7 +31,7 @@ fn sampler_path_falls_back_for_feedback_circuit() {
 
     assert_eq!(
         choose_sampler_path(&compiled),
-        SamplerPathDecision::Fallback(SamplingFallbackReason::MeasurementRecordFeedback)
+        CompiledPathDecision::Fallback("feedback instructions require the interpreted path")
     );
 }
 
@@ -87,7 +86,8 @@ fn analyzer_path_falls_back_for_feedback_circuit() {
 #[test]
 fn analyzer_path_falls_back_for_nested_repeat_circuit() {
     let compiled = compile_circuit(
-        &parse_lines("REPEAT 8 {\n  REPEAT 2 {\n    MR 0\n    DETECTOR rec[-1]\n  }\n}\n").unwrap(),
+        &parse_lines("REPEAT 8 {\n  REPEAT 2 {\n    MR 0\n    DETECTOR rec[-1]\n  }\n}\n")
+            .unwrap(),
     )
     .unwrap();
 

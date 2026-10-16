@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rbposd::{
-    BpLsdDecoder, BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult, DecoderConfig,
-    LsdConfig, LsdMethod, OsdVariant, ParityCheckMatrix, Schedule, Syndrome,
+    BpLsdDecoder, BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult,
+    DecoderConfig, LsdConfig, LsdMethod, OsdVariant, ParityCheckMatrix, Schedule, Syndrome,
 };
 use serde::{Deserialize, Serialize};
 
@@ -99,7 +99,6 @@ fn error_code(error: &DecodeError) -> &'static str {
         DecodeError::BpDidNotConverge => "BpDidNotConverge",
         DecodeError::NoOsdSolution => "NoOsdSolution",
         DecodeError::NoLsdSolution => "NoLsdSolution",
-        DecodeError::UnsupportedOsdMethod { .. } => "UnsupportedOsdMethod",
         DecodeError::UnsupportedLsdOrder { .. } => "UnsupportedLsdOrder",
     }
 }
@@ -137,26 +136,22 @@ impl ChannelSpec {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BpVariantSpec {
     MinimumSum,
-    ProductSum,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScheduleSpec {
     Parallel,
-    Serial,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OsdVariantSpec {
     Osd0,
-    LegacyCombinationSweep,
-    LdpcCombinationSweep,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -211,16 +206,12 @@ impl ConfigSpec {
             early_stop: self.early_stop,
             bp_variant: match self.bp_variant {
                 BpVariantSpec::MinimumSum => BpVariant::MinimumSum,
-                BpVariantSpec::ProductSum => BpVariant::ProductSum,
             },
             schedule: match self.schedule {
                 ScheduleSpec::Parallel => Schedule::Parallel,
-                ScheduleSpec::Serial => Schedule::Serial,
             },
             osd_variant: match self.osd_variant {
                 OsdVariantSpec::Osd0 => OsdVariant::Osd0,
-                OsdVariantSpec::LegacyCombinationSweep => OsdVariant::LegacyCombinationSweep,
-                OsdVariantSpec::LdpcCombinationSweep => OsdVariant::LdpcCombinationSweep,
             },
             osd_order: 0,
         }
@@ -258,12 +249,7 @@ impl ParityCase {
             .lsd_config
             .map(LsdConfigSpec::build)
             .unwrap_or_default();
-        BpLsdDecoder::with_bp_config(
-            self.matrix.build()?,
-            self.channel.build(),
-            lsd_config,
-            self.config.build(),
-        )
+        BpLsdDecoder::new(self.matrix.build()?, self.channel.build(), lsd_config)
     }
 
     pub fn decode(&self) -> Result<DecodeResult, DecodeError> {

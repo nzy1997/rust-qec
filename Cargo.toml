@@ -2,20 +2,11 @@
 members = [
     "qec-ilp-core",
     "qec-code",
-    "renvelope",
     "rstim",
-    "rstim-shot-web",
     "rsinter",
     "rbposd",
     "rmatching",
-    "benchmarks/rmatching-tools",
     "rilpqec",
     "benchmarks/surface_decoder_compare/rust_bridge",
 ]
 resolver = "3"
-
-[workspace.package]
-license = "Apache-2.0"
-rust-version = "1.88"
-repository = "https://github.com/nzy1997/rust-qec"
-homepage = "https://nzy1997.github.io/rust-qec/"

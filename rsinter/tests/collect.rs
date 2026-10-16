@@ -1,4 +1,4 @@
-use rsinter::collect::{collect, CollectOptions};
+use rsinter::collect::{CollectOptions, collect};
 use rsinter::decode::{CompiledDecoder, Decoder, VacuousDecoder};
 use rsinter::failure::FailureKind;
 use rsinter::task::{CollectionOptions, Task};

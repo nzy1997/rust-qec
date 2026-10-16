@@ -1,9 +1,9 @@
 use gurobi::{Constr, ConstrSense, Env, Model, Status, Var, VarType, attr, param};
 
 use crate::backend::BinaryBackend;
-use crate::config::{BackendKind, BinaryIlpConfig};
+use crate::config::BinaryIlpConfig;
 use crate::error::BinaryIlpError;
-use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution, ModelSolutionStatus};
+use crate::model::{BinaryIlpModel, ConstraintSense, ModelSolution};
 
 pub struct GurobiBinaryBackend {
     _env: Env,
@@ -19,7 +19,7 @@ impl GurobiBinaryBackend {
             env.set(param::OutputFlag, 0).map_err(gurobi_error)?;
         }
         if let Some(threads) = config.backend.threads {
-            env.set(param::Threads, gurobi_threads_parameter(threads)?)
+            env.set(param::Threads, threads as i32)
                 .map_err(gurobi_error)?;
         }
         if let Some(limit) = config.backend.time_limit_seconds {
@@ -96,26 +96,14 @@ impl GurobiBinaryBackend {
 }
 
 impl BinaryBackend for GurobiBinaryBackend {
-    fn kind(&self) -> BackendKind {
-        BackendKind::Gurobi
-    }
-
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError> {
         self.model.optimize().map_err(gurobi_error)?;
         let status = self.model.status().map_err(gurobi_error)?;
         let sol_count = self.model.get(attr::SolCount).map_err(gurobi_error)?;
-        let solution_status =
-            accepted_gurobi_solution_status(status, sol_count).ok_or_else(|| {
-                BinaryIlpError::Gurobi(format!(
-                    "unexpected Gurobi solve status: status={status:?}, sol_count={sol_count}"
-                ))
-            })?;
-
-        if solution_status == ModelSolutionStatus::Infeasible {
-            return Ok(ModelSolution {
-                binary_values: Vec::new(),
-                status: solution_status,
-            });
+        if !accept_gurobi_status(status, sol_count) {
+            return Err(BinaryIlpError::Gurobi(format!(
+                "unexpected Gurobi solve status: status={status:?}, sol_count={sol_count}"
+            )));
         }
 
         let values = self
@@ -125,7 +113,6 @@ impl BinaryBackend for GurobiBinaryBackend {
 
         Ok(ModelSolution {
             binary_values: values.into_iter().map(|value| value > 0.5).collect(),
-            status: solution_status,
         })
     }
 
@@ -173,14 +160,11 @@ fn gurobi_constraint_sense(sense: ConstraintSense) -> ConstrSense {
     }
 }
 
-fn accepted_gurobi_solution_status(status: Status, sol_count: i32) -> Option<ModelSolutionStatus> {
+fn accept_gurobi_status(status: Status, sol_count: i32) -> bool {
     match status {
-        Status::Optimal => Some(ModelSolutionStatus::Optimal),
-        Status::Infeasible => Some(ModelSolutionStatus::Infeasible),
-        Status::TimeLimit if sol_count > 0 => Some(ModelSolutionStatus::TimeLimit),
-        Status::SolutionLimit if sol_count > 0 => Some(ModelSolutionStatus::SolutionLimit),
-        Status::SubOptimal if sol_count > 0 => Some(ModelSolutionStatus::SubOptimal),
-        _ => None,
+        Status::Optimal => true,
+        Status::TimeLimit | Status::SolutionLimit | Status::SubOptimal => sol_count > 0,
+        _ => false,
     }
 }
 
@@ -188,74 +172,24 @@ fn gurobi_error(err: gurobi::Error) -> BinaryIlpError {
     BinaryIlpError::Gurobi(err.to_string())
 }
 
-fn gurobi_threads_parameter(threads: u32) -> Result<i32, BinaryIlpError> {
-    i32::try_from(threads).map_err(|_| {
-        BinaryIlpError::Gurobi(format!(
-            "threads value {threads} exceeds Gurobi parameter range"
-        ))
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use gurobi::Status;
 
-    use super::{accepted_gurobi_solution_status, gurobi_threads_parameter};
-    use crate::error::BinaryIlpError;
-    use crate::model::ModelSolutionStatus;
+    use super::accept_gurobi_status;
 
     #[test]
-    fn maps_gurobi_optimal_status_without_solution_count_check() {
-        assert_eq!(
-            accepted_gurobi_solution_status(Status::Optimal, 0),
-            Some(ModelSolutionStatus::Optimal),
-        );
+    fn accepts_optimal_status_without_solution_count_check() {
+        assert!(accept_gurobi_status(Status::Optimal, 0));
     }
 
     #[test]
-    fn maps_gurobi_time_limit_with_incumbent() {
-        assert_eq!(
-            accepted_gurobi_solution_status(Status::TimeLimit, 1),
-            Some(ModelSolutionStatus::TimeLimit),
-        );
-    }
-
-    #[test]
-    fn maps_gurobi_infeasible_status_without_an_incumbent() {
-        assert_eq!(
-            accepted_gurobi_solution_status(Status::Infeasible, 0),
-            Some(ModelSolutionStatus::Infeasible),
-        );
-    }
-
-    #[test]
-    fn maps_gurobi_solution_limit_with_incumbent() {
-        assert_eq!(
-            accepted_gurobi_solution_status(Status::SolutionLimit, 1),
-            Some(ModelSolutionStatus::SolutionLimit),
-        );
-    }
-
-    #[test]
-    fn maps_gurobi_suboptimal_with_incumbent() {
-        assert_eq!(
-            accepted_gurobi_solution_status(Status::SubOptimal, 1),
-            Some(ModelSolutionStatus::SubOptimal),
-        );
+    fn accepts_time_limited_run_with_incumbent() {
+        assert!(accept_gurobi_status(Status::TimeLimit, 1));
     }
 
     #[test]
     fn rejects_time_limited_run_without_incumbent() {
-        assert_eq!(accepted_gurobi_solution_status(Status::TimeLimit, 0), None);
-    }
-
-    #[test]
-    fn rejects_gurobi_thread_count_outside_parameter_range() {
-        assert_eq!(gurobi_threads_parameter(i32::MAX as u32).unwrap(), i32::MAX);
-        assert!(matches!(
-            gurobi_threads_parameter(i32::MAX as u32 + 1),
-            Err(BinaryIlpError::Gurobi(message))
-                if message.contains("exceeds Gurobi parameter range")
-        ));
+        assert!(!accept_gurobi_status(Status::TimeLimit, 0));
     }
 }

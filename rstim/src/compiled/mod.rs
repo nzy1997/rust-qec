@@ -1,16 +1,12 @@
-pub mod analyzer;
 pub mod circuit;
 pub mod path;
 pub mod sampler;
+pub mod analyzer;
 
-pub use analyzer::analyze_compiled_circuit;
 pub use circuit::{
-    CompiledBasis, CompiledBlock, CompiledCircuit, CompiledFeatureFlags, CompiledOp,
-    CompiledRepeatRegion, compile_circuit,
+    compile_circuit, CompiledBlock, CompiledCircuit, CompiledFeatureFlags, CompiledOp,
+    CompiledRepeatRegion,
 };
-pub use path::{
-    CompiledPathDecision, SamplerPathDecision, SamplingFallbackReason, choose_analyzer_path,
-    choose_sampler_path,
-};
+pub use path::{choose_analyzer_path, choose_sampler_path, CompiledPathDecision};
 pub use sampler::sample_compiled_batch;
-pub(crate) use sampler::sample_compiled_batch_with_reference;
+pub use analyzer::analyze_compiled_circuit;

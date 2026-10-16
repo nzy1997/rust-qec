@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rayon::prelude::*;
 
 use rstim::output::write_shots_b8;
@@ -11,7 +11,7 @@ use rstim::sampler::sample_batch;
 
 use crate::csv_io;
 use crate::decode::Decoder;
-use crate::failure::{classify_completed, classify_error, FailureKind};
+use crate::failure::{FailureKind, classify_completed, classify_error};
 use crate::task::Task;
 use crate::task_stats::TaskStats;
 

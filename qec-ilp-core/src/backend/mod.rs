@@ -1,6 +1,5 @@
 #[cfg(feature = "gurobi")]
 mod gurobi;
-#[cfg(feature = "highs")]
 mod highs;
 
 use crate::config::{BackendKind, BinaryIlpConfig};
@@ -8,7 +7,6 @@ use crate::error::BinaryIlpError;
 use crate::model::{BinaryIlpModel, ModelSolution};
 
 pub trait BinaryBackend {
-    fn kind(&self) -> BackendKind;
     fn solve(&mut self) -> Result<ModelSolution, BinaryIlpError>;
     fn set_rhs(&mut self, row: usize, rhs: f64) -> Result<(), BinaryIlpError>;
 }
@@ -25,7 +23,7 @@ pub fn build_binary_backend(
 ) -> Result<Box<dyn BinaryBackend>, BinaryIlpError> {
     model.validate()?;
     match config.backend.kind {
-        BackendKind::Highs => build_highs_backend(model, config),
+        BackendKind::Highs => Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?)),
         BackendKind::Auto => build_auto_backend(model, config),
         BackendKind::Gurobi => build_gurobi_backend(model, config),
     }
@@ -40,36 +38,7 @@ fn build_auto_backend(
         return Ok(Box::new(backend));
     }
 
-    #[cfg(feature = "highs")]
-    {
-        return Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?));
-    }
-
-    #[cfg(not(feature = "highs"))]
-    {
-        let _ = (model, config);
-        Err(BinaryIlpError::BackendUnavailable {
-            requested: BackendKind::Auto,
-        })
-    }
-}
-
-fn build_highs_backend(
-    model: &BinaryIlpModel,
-    config: &BinaryIlpConfig,
-) -> Result<Box<dyn BinaryBackend>, BinaryIlpError> {
-    #[cfg(feature = "highs")]
-    {
-        return Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?));
-    }
-
-    #[cfg(not(feature = "highs"))]
-    {
-        let _ = (model, config);
-        Err(BinaryIlpError::BackendUnavailable {
-            requested: BackendKind::Highs,
-        })
-    }
+    Ok(Box::new(highs::HighsBinaryBackend::new(model, config)?))
 }
 
 fn build_gurobi_backend(

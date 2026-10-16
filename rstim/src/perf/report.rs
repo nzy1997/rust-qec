@@ -67,56 +67,11 @@ fn render_case_section(out: &mut String, case: &super::PerfCaseSummary) {
         "- present variants: `{}`\n",
         case.present_variants.join("`, `")
     ));
-    if case
-        .expected_variants
-        .iter()
-        .any(|variant| variant == "rstim-interpreted-atom-loss")
-    {
-        out.push_str(
-            "- atom-loss probability: each two-qubit gate has one depolarization event and two independent per-atom loss events; using `p = 1 - 0.999^(1/3) ~= 0.0003334445062` keeps the probability of at least one error equal to `0.001`.\n",
-        );
-        out.push_str(
-            "- atom-loss execution: a self-contained 64-shot CSS frame lets each shot mask H/CX/Pauli operations independently, including later CX gates suppressed by loss, without per-shot tableau trajectories.\n",
-        );
-    }
-    for variant in &case.variants {
-        if variant.status != "completed" {
-            out.push_str(&format!(
-                "- {} status: `{}`",
-                variant.tool_variant, variant.status
-            ));
-            if let Some(reason) = &variant.failure_reason {
-                out.push_str(&format!("; reason: `{}`", reason));
-            }
-            out.push('\n');
-        }
-    }
     for variant in &case.variants {
         out.push_str(&format!(
-            "- {} median wall time: `{}` ns over `{}` measured rounds",
+            "- {} median wall time: `{}` ns over `{}` measured rounds\n",
             variant.tool_variant, variant.median_wall_time_ns, variant.sample_count
         ));
-        if let Some(rate) = variant.median_shots_per_second {
-            out.push_str(&format!(" (`{:.3}` shots/s)", rate));
-        }
-        out.push('\n');
-    }
-    if let Some(comparison) = &case.rstim_compiled_vs_stim_cli_ratio {
-        if let Some(ratio) = comparison.ratio {
-            out.push_str(&format!(
-                "- report-only Stim comparison: `{}` / `{}` = `{:.6}`\n",
-                comparison.lhs_variant, comparison.rhs_variant, ratio
-            ));
-        } else {
-            out.push_str(&format!(
-                "- report-only Stim comparison unavailable: status `{}`",
-                comparison.status
-            ));
-            if let Some(reason) = &comparison.failure_reason {
-                out.push_str(&format!("; reason: `{}`", reason));
-            }
-            out.push('\n');
-        }
     }
     for comparison in &case.comparisons {
         out.push_str(&format!(
