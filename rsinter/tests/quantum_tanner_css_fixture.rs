@@ -5,11 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rsinter::bench::registry::build_default_rust_runner_registry;
-use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
+use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
 use rsinter::bench::run::run_rust_benchmark;
 use rsinter::bench::spec::{
-    AxisSpec, BenchmarkMode, BenchmarkSpec, LogicalRateUnit, PanelSpec, PlotSpec, RunnerSpec,
-    SeriesSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    AxisSpec, BenchmarkMode, BenchmarkSpec, DEFAULT_CONFIDENCE_INTERVAL_LIKELIHOOD_FACTOR,
+    LogicalRateUnit, PanelSpec, PlotSpec, RunnerSpec, SeriesSpec,
 };
 use rsinter::failure::FailureKind;
 use toml::Value;

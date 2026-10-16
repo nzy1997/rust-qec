@@ -1,5 +1,5 @@
+use crate::util::radix_heap::{HasTime, RadixHeapQueue, cyclic_gt};
 use std::num::Wrapping;
-use crate::util::radix_heap::{cyclic_gt, HasTime, RadixHeapQueue};
 
 #[derive(Debug, Clone)]
 pub struct QueuedEventTracker {
@@ -28,11 +28,7 @@ impl QueuedEventTracker {
 
     /// Schedule a desired event. Only enqueues if no event
     /// is queued or the new event is earlier.
-    pub fn set_desired_event<E: HasTime>(
-        &mut self,
-        event: E,
-        queue: &mut RadixHeapQueue<E>,
-    ) {
+    pub fn set_desired_event<E: HasTime>(&mut self, event: E, queue: &mut RadixHeapQueue<E>) {
         self.has_desired_time = true;
         self.desired_time = event.time();
         if !self.has_queued_time || cyclic_gt(self.queued_time, event.time()) {

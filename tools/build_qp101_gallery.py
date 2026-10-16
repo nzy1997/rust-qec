@@ -22,7 +22,7 @@ GALLERY_ENTRIES = (
     GalleryEntry(
         Path("qp101-viz/examples/atom-loss-sample.stim"),
         "atom-loss-sample.svg",
-        ("--sample_shot", "--seed", "16"),
+        ("--sample_shot", "--seed", "7"),
     ),
 )
 
@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", type=Path, default=Path("_site/gallery"))
     parser.add_argument(
         "--rstim-cmd",
-        default="cargo run --locked -p rstim --features cli --bin rstim --",
+        default="cargo run --locked -p rstim --bin rstim --",
         help="Command prefix used before render_svg. Shell-style splitting is supported.",
     )
     return parser.parse_args()

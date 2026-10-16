@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::flooder::graph::MatchingGraph;
 use crate::flooder::graph_flooder::GraphFlooder;
@@ -63,41 +63,6 @@ impl UserGraph {
                 self.num_observables = obs + 1;
             }
         }
-    }
-
-    pub(crate) fn declare_observable(&mut self, observable: usize) -> Result<(), String> {
-        let count = observable
-            .checked_add(1)
-            .ok_or_else(|| format!("observable index {observable} is too large"))?;
-        if count > self.num_observables {
-            self.num_observables = count;
-            self.mwpm = None;
-        }
-        Ok(())
-    }
-
-    fn record_dem_dimensions(
-        &mut self,
-        detectors: &[usize],
-        observables: &[usize],
-    ) -> Result<(), String> {
-        if let Some(&max_detector) = detectors.iter().max() {
-            let required_len = max_detector
-                .checked_add(1)
-                .ok_or_else(|| format!("detector index {max_detector} is too large"))?;
-            if required_len > self.nodes.len() {
-                let additional = required_len - self.nodes.len();
-                self.nodes.try_reserve(additional).map_err(|_| {
-                    format!("detector index {max_detector} exceeds supported graph capacity")
-                })?;
-                self.nodes.resize_with(required_len, UserNode::default);
-                self.mwpm = None;
-            }
-        }
-        for &observable in observables {
-            self.declare_observable(observable)?;
-        }
-        Ok(())
     }
 
     /// Add an edge between two detector nodes.
@@ -322,67 +287,14 @@ impl UserGraph {
     /// Handle a detector-error-model instruction.
     ///
     /// Converts probability `p` to weight `ln((1-p)/p)` and adds the
-    /// appropriate edge. Components with more than two detectors are
-    /// hyperedges and cannot be represented by the matching graph.
-    pub fn handle_dem_instruction(
-        &mut self,
-        p: f64,
-        detectors: &[usize],
-        observables: Vec<usize>,
-    ) -> Result<(), String> {
-        if !p.is_finite() || p < 0.0 || p >= 1.0 {
-            return Err(format!(
-                "rmatching requires finite error probabilities in the range 0 <= p < 1, got {p}"
-            ));
-        }
-        self.record_dem_dimensions(detectors, &observables)?;
-        if p == 0.0 {
-            return Ok(());
-        }
+    /// appropriate edge.
+    pub fn handle_dem_instruction(&mut self, p: f64, detectors: &[usize], observables: Vec<usize>) {
         let weight = ((1.0 - p) / p).ln();
         match detectors.len() {
             2 => self.add_edge(detectors[0], detectors[1], observables, weight, p),
             1 => self.add_boundary_edge(detectors[0], observables, weight, p),
-            0 => {}
-            count => {
-                return Err(format!(
-                    "rmatching requires a graphlike DEM, but an error component has {count} detectors: {detectors:?}"
-                ));
-            }
+            _ => {}
         }
-        Ok(())
-    }
-
-    /// Merge parallel edges from a freshly parsed DEM before weight
-    /// discretization. The first mechanism's observable indices are retained,
-    /// matching PyMatching's detector-error-model ingestion semantics.
-    pub(crate) fn merge_parallel_dem_edges(&mut self) {
-        let mut merged_edges: Vec<UserEdge> = Vec::with_capacity(self.edges.len());
-        let mut edge_indices: HashMap<(usize, usize), usize> = HashMap::new();
-
-        for edge in std::mem::take(&mut self.edges) {
-            let key = if edge.node1 <= edge.node2 {
-                (edge.node1, edge.node2)
-            } else {
-                (edge.node2, edge.node1)
-            };
-
-            if let Some(&edge_index) = edge_indices.get(&key) {
-                let merged_edge = &mut merged_edges[edge_index];
-                let previous_probability = merged_edge.error_probability;
-                // Avoid subtracting nearly equal values when both probabilities are tiny.
-                let probability = previous_probability * (1.0 - edge.error_probability)
-                    + edge.error_probability * (1.0 - previous_probability);
-                merged_edge.error_probability = probability;
-                merged_edge.weight = ((1.0 - probability) / probability).ln();
-            } else {
-                edge_indices.insert(key, merged_edges.len());
-                merged_edges.push(edge);
-            }
-        }
-
-        self.edges = merged_edges;
-        self.mwpm = None;
     }
 
     pub fn get_num_edges(&self) -> usize {

@@ -29,7 +29,11 @@ fn mwpm_two_nodes_match() {
     // Run flooder until we get a region-hit-region event
     let event = mwpm.flooder.run_until_next_mwpm_notification();
     match &event {
-        MwpmEvent::RegionHitRegion { region1: _, region2: _, edge } => {
+        MwpmEvent::RegionHitRegion {
+            region1: _,
+            region2: _,
+            edge,
+        } => {
             // Two regions should collide
             assert!(edge.obs_mask != 0 || edge.loc_from.is_some());
         }
@@ -112,7 +116,11 @@ fn mwpm_blossom_formation() {
     // With 3 detection events on a triangle + boundary, the algorithm should
     // resolve all regions (either matched to each other or to boundary).
     // At least some events should have been processed.
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 }
 
 #[test]
@@ -135,8 +143,8 @@ fn mwpm_reset() {
 
 #[test]
 fn alt_tree_node_become_root() {
-    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::interop::CompressedEdge;
+    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::util::arena::Arena;
 
     let mut arena: Arena<AltTreeNode> = Arena::new();
@@ -169,8 +177,8 @@ fn alt_tree_node_become_root() {
 
 #[test]
 fn alt_tree_most_recent_common_ancestor() {
-    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::interop::CompressedEdge;
+    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::util::arena::Arena;
 
     let mut arena: Arena<AltTreeNode> = Arena::new();
@@ -254,8 +262,8 @@ fn mwpm_tree_hitting_boundary_match() {
     // So D1 matches to boundary first, then D0's tree hits D1's matched region.
     let dem = concat!(
         "error(0.1) D0 D1 L0\n",
-        "error(0.3) D1\n",         // D1 has close boundary
-        "error(0.01) D0\n",        // D0 has far boundary
+        "error(0.3) D1\n",  // D1 has close boundary
+        "error(0.01) D0\n", // D0 has far boundary
     );
     let mut m = Matching::from_dem(dem).unwrap();
 
@@ -303,7 +311,11 @@ fn mwpm_tree_absorbs_matched_pair() {
     }
 
     // All regions should be resolved
-    assert!(event_count >= 2, "Expected at least 2 events, got {}", event_count);
+    assert!(
+        event_count >= 2,
+        "Expected at least 2 events, got {}",
+        event_count
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -432,8 +444,8 @@ fn mwpm_shatter_extract_with_blossom() {
 
 #[test]
 fn alt_tree_add_child() {
-    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::interop::CompressedEdge;
+    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::util::arena::Arena;
 
     let mut arena: Arena<AltTreeNode> = Arena::new();
@@ -496,15 +508,16 @@ fn alt_tree_lca_different_trees() {
 
 #[test]
 fn alt_tree_lca_deep_tree() {
-    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::interop::CompressedEdge;
+    use rmatching::matcher::alt_tree::{AltTreeEdge, AltTreeNode};
     use rmatching::util::arena::Arena;
 
     let mut arena: Arena<AltTreeNode> = Arena::new();
     let e = CompressedEdge::empty();
 
     // Build a chain: root -> c1 -> c2 -> c3
-    let root = AltTreeIdx(arena.alloc());    arena[root.0] = AltTreeNode::new_root(RegionIdx(0));
+    let root = AltTreeIdx(arena.alloc());
+    arena[root.0] = AltTreeNode::new_root(RegionIdx(0));
 
     let c1 = AltTreeIdx(arena.alloc());
     arena[c1.0] = AltTreeNode::new_pair(RegionIdx(1), RegionIdx(2), e);
@@ -538,8 +551,8 @@ fn alt_tree_lca_deep_tree() {
 
 #[test]
 fn alt_tree_unstable_erase_not_found() {
-    use rmatching::matcher::alt_tree::{unstable_erase_by_node, AltTreeEdge};
     use rmatching::interop::CompressedEdge;
+    use rmatching::matcher::alt_tree::{AltTreeEdge, unstable_erase_by_node};
 
     let mut vec = vec![
         AltTreeEdge::new(AltTreeIdx(0), CompressedEdge::empty()),
@@ -669,13 +682,19 @@ fn matching_result_add_assign() {
     assert_eq!(a.obs_mask, 0);
     assert_eq!(a.weight, 0);
 
-    let b = MatchingResult { obs_mask: 0b101, weight: 42 };
+    let b = MatchingResult {
+        obs_mask: 0b101,
+        weight: 42,
+    };
     a += b;
     assert_eq!(a.obs_mask, 0b101);
     assert_eq!(a.weight, 42);
 
     // XOR semantics for obs_mask
-    let c = MatchingResult { obs_mask: 0b111, weight: 8 };
+    let c = MatchingResult {
+        obs_mask: 0b111,
+        weight: 8,
+    };
     a += c;
     assert_eq!(a.obs_mask, 0b010);
     assert_eq!(a.weight, 50);

@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Benchmarks — rstim{% endblock title %}
+{% block description %}Checked benchmark evidence, results, methodology, and claims limits for rstim.{% endblock description %}
+
+{% block hero %}
+<div class="hero">
+  <p class="eyebrow">Checked evidence</p>
+  <h1>Benchmarks</h1>
+  <p class="hero-copy">
+    Benchmark and reproduction evidence, checked result artifacts, the
+    methodology behind them, and the claims limits they carry.
+  </p>
+</div>
+{% endblock hero %}
+
+{% block main %}
+      <section id="benchmark-evidence" class="benchmark-evidence" aria-labelledby="benchmark-evidence-title">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence after walkthroughs</p>
+          <h2 id="benchmark-evidence-title">Benchmark and reproduction evidence</h2>
+          <p class="section-copy">
+            The site links the checked-in benchmark evidence after the workspace map
+            and feature walkthroughs so performance material is grounded in runnable
+            entry points.
+          </p>
+        </div>
+        <div class="evidence-grid">
+          <article class="compact-card">
+            <h3>Benchmark evidence</h3>
+            <p>
+              Surface-code, BB-circuit, and decoder comparison artifacts with smoke
+              and full-campaign entry points.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/benchmark-evidence.md">Evidence showcase</a>
+            </div>
+          </article>
+          <article class="compact-card">
+            <h3>Random-window distance search</h3>
+            <p>
+              QEC-code random-window upper-bound local-only evidence, no-target
+              smoke profiles, and paper-baseline comparison wiring.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-random-window-benchmark.md">Random-window showcase</a>
+            </div>
+          </article>
+          <article id="qec-code-random-window-benchmark" class="compact-card">
+            <h3><code>qec-code</code> Random-Window Distance Search</h3>
+            <p>
+              Local-only evidence for random-window upper-bound searches. The
+              source docs, case manifests, tests, and commands are checked in,
+              but generated outputs remain under
+              <code>benchmarks/out/qec_code_random_window/</code> and are not
+              checked site artifacts.
+            </p>
+            <ul class="manifest-list" aria-label="qec-code random-window Make targets">
+              <li><code>make qec-code-random-window-bench-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-full</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-multiseed-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-no-target-ladder-smoke</code></li>
+              <li><code>make qec-code-random-window-bench-issue225-readiness-smoke</code></li>
+            </ul>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/qec-code-random-window-benchmark.md">Random-window showcase</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/qec_code_random_window/README.md">Benchmark README</a>
+            </div>
+          </article>
+          <article id="future-simulator-benchmarks" class="compact-card">
+            <h3 id="rstim-vs-stim-simulator-benchmarks"><code>rstim</code> versus Stim Simulator Benchmarks</h3>
+            <p>
+              Partial checked evidence for recorded workloads and recorded environments
+              only. The checked artifacts document the selected
+              simulator-level speed/correctness checks: speed timing and
+              detector-output statistical correctness for the recorded
+              workloads in this family; this is not broad rstim/Stim parity.
+            </p>
+            <p>
+              The checked family links the showcase, fixture manifest, canonical
+              Stim fixture, speed summary/report, and correctness summary so the
+              site can show what was recorded without over-claiming beyond that
+              boundary.
+            </p>
+            <div class="docs-card-links">
+              <a href="https://github.com/nzy1997/rstim/blob/master/docs/showcases/rstim-vs-stim-simulator.md">Showcase</a>
+              <a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">Fixture README</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="checked-benchmark-results" class="checked-results-section" aria-labelledby="checked-benchmark-results-title">
+        <div class="section-heading">
+          <p class="eyebrow">Checked result artifacts</p>
+          <h2 id="checked-benchmark-results-title">Checked Benchmark Results</h2>
+          <p class="section-copy">
+            These cards are rendered from the benchmark manifest so artifact
+            links, commands, status, claims limits, and caveats stay tied to the
+            checked evidence inventory.
+          </p>
+        </div>
+        <div
+          id="checked-benchmark-result-cards"
+          class="checked-results-grid"
+          data-checked-items="surface-decoder-full bb-circuit-full rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample"
+          aria-live="polite"
+        >
+          <p>Loading checked benchmark results.</p>
+        </div>
+      </section>
+
+      <section id="benchmarks" class="benchmark-section" aria-labelledby="benchmark-title">
+        <div class="section-heading">
+          <p class="eyebrow">Benchmark methodology</p>
+          <h2 id="benchmark-title">Benchmark Methodology</h2>
+          <p class="section-copy">
+            Benchmark pages separate smoke checks, checked full artifacts,
+            extended campaigns, and reference reproduction work so the site
+            does not imply broader performance claims than the recorded
+            evidence supports.
+          </p>
+        </div>
+
+        <section class="tier-grid" aria-label="Benchmark tiers">
+          <article>
+            <h3><code>smoke</code></h3>
+            <p>
+              Local wiring checks with small cases. smoke checks verify wiring,
+              command compatibility, and artifact shape; they are not
+              statistical evidence.
+            </p>
+          </article>
+          <article>
+            <h3><code>full</code></h3>
+            <p>
+              Checked artifact campaigns with recorded provenance. full evidence can describe the committed checked run only within its recorded commands, hardware, versions, seeds, and budgets.
+            </p>
+          </article>
+          <article>
+            <h3><code>extended</code></h3>
+            <p>
+              Longer local or future campaigns that broaden case coverage but
+              remain non-publishable until their artifacts and provenance are
+              checked into the site manifest.
+            </p>
+          </article>
+          <article>
+            <h3><code>reference reproduction</code></h3>
+            <p>
+              Source-backed reproduction against an external paper, dataset,
+              or repository commit. The reproduced scope and mismatches must be
+              stated next to the result.
+            </p>
+          </article>
+        </section>
+
+        <section class="provenance-panel" aria-labelledby="provenance-title">
+          <div>
+            <p class="eyebrow">Required provenance</p>
+            <h3 id="provenance-title">Every benchmark claim needs these fields</h3>
+          </div>
+          <ul class="provenance-list">
+            <li>OS</li>
+            <li>CPU</li>
+            <li>Rust version</li>
+            <li>Python version</li>
+            <li>dependency versions</li>
+            <li>external repository commits</li>
+            <li>command line</li>
+            <li>seeds</li>
+            <li>build profile</li>
+            <li>shots or error budgets</li>
+            <li>date</li>
+          </ul>
+        </section>
+
+        <section class="evidence-policy-grid" aria-label="Evidence policy">
+          <article>
+            <h3>Publishable Evidence</h3>
+            <p>
+              Publishable evidence is tracked by git, listed in the manifest,
+              tied to source documents, and bounded by a manifest
+              <code>claims_limit</code>. It may support statements about the
+              specific committed artifact set, not broad decoder rankings.
+            </p>
+          </article>
+          <article>
+            <h3>Local-Only Evidence</h3>
+            <p>
+              Local-only evidence can validate commands and readiness, but
+              ignored generated outputs and workstation-specific timings are
+              not site-facing benchmark claims.
+            </p>
+          </article>
+          <article>
+            <h3>Claims Policy</h3>
+            <p>
+              Broad performance claims require full provenance, checked
+              artifacts, source-backed interpretation, and an explicit
+              manifest claims limit. Checked full-tier artifacts are
+              committed-run evidence, not a general decoder ordering claim.
+              Future benchmark families cannot appear without status and
+              claims-limit fields.
+            </p>
+          </article>
+        </section>
+
+        <section class="manifest-panel" aria-labelledby="manifest-title">
+          <div class="section-heading">
+            <p class="eyebrow">Manifest-backed inventory</p>
+            <h3 id="manifest-title">Benchmark Status And Claims Limits</h3>
+          </div>
+          <div id="benchmark-manifest" class="benchmark-manifest" aria-live="polite">
+            <p>Loading benchmark manifest.</p>
+          </div>
+        </section>
+      </section>
+{% endblock main %}
+
+{% block scripts %}
+<script src="{{ root }}/js/benchmarks.js"></script>
+{% endblock scripts %}

@@ -10,8 +10,12 @@ pub fn parse_lines(input: &str) -> Result<Vec<StimInstr>, String> {
             continue;
         }
         if line == "}" {
-            let body = stack.pop().ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
-            let count = repeat_counts.pop().ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
+            let body = stack
+                .pop()
+                .ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
+            let count = repeat_counts
+                .pop()
+                .ok_or_else(|| format!("line {}: unmatched }}", line_no + 1))?;
             if count == 0 {
                 return Err(format!("line {}: REPEAT 0 not allowed", line_no + 1));
             }
@@ -132,7 +136,9 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
     // prefix before this check would silently accept them.
     if token.starts_with("sweep[") && token.ends_with(']') {
         let inner = &token[6..token.len() - 1];
-        let k: u32 = inner.parse().map_err(|_| format!("bad sweep target {token}"))?;
+        let k: u32 = inner
+            .parse()
+            .map_err(|_| format!("bad sweep target {token}"))?;
         return Ok(Some(StimTarget::Sweep(k)));
     }
     Err(format!("unsupported target {token}"))
@@ -140,7 +146,9 @@ fn parse_target(token: &str) -> Result<Option<StimTarget>, String> {
 
 fn split_name_and_args(token: &str) -> Result<(&str, Option<String>, Vec<f64>), String> {
     let (name, tag, rest) = if let Some(bi) = token.find('[') {
-        let bj = token.find(']').ok_or_else(|| format!("unclosed tag bracket in {token}"))?;
+        let bj = token
+            .find(']')
+            .ok_or_else(|| format!("unclosed tag bracket in {token}"))?;
         if bj < bi {
             return Err(format!("bad tag syntax in {token}"));
         }
@@ -152,7 +160,9 @@ fn split_name_and_args(token: &str) -> Result<(&str, Option<String>, Vec<f64>), 
     };
 
     let args = if let Some(rest) = rest.strip_prefix('(') {
-        let rest = rest.strip_suffix(')').ok_or_else(|| format!("bad args {token}"))?;
+        let rest = rest
+            .strip_suffix(')')
+            .ok_or_else(|| format!("bad args {token}"))?;
         let rest = rest.trim();
         if rest.is_empty() {
             vec![]

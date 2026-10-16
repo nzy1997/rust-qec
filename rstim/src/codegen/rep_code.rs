@@ -1,5 +1,5 @@
-use crate::ir::{StimInstr, StimTarget};
 use super::NoiseParams;
+use crate::ir::{StimInstr, StimTarget};
 
 /// Generate a repetition code memory experiment circuit (uniform noise convenience wrapper).
 pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec<StimInstr> {
@@ -12,7 +12,11 @@ pub fn repetition_code_memory(distance: usize, rounds: usize, noise: f64) -> Vec
 /// Each round: reset ancillas, CNOT from data[i] and data[i+1] to ancilla[i],
 /// measure ancillas, compare with previous round via DETECTOR.
 /// Final round: measure all data qubits, create detectors and observable.
-pub fn repetition_code_memory_with_params(distance: usize, rounds: usize, params: NoiseParams) -> Vec<StimInstr> {
+pub fn repetition_code_memory_with_params(
+    distance: usize,
+    rounds: usize,
+    params: NoiseParams,
+) -> Vec<StimInstr> {
     assert!(distance >= 2, "distance must be >= 2");
     assert!(rounds >= 1, "rounds must be >= 1");
 
@@ -28,10 +32,18 @@ pub fn repetition_code_memory_with_params(distance: usize, rounds: usize, params
     }
 
     for (i, &q) in data.iter().enumerate() {
-        instrs.push(op("QUBIT_COORDS", &[2.0 * i as f64, 0.0], &[StimTarget::Qubit(q)]));
+        instrs.push(op(
+            "QUBIT_COORDS",
+            &[2.0 * i as f64, 0.0],
+            &[StimTarget::Qubit(q)],
+        ));
     }
     for (i, &q) in ancilla.iter().enumerate() {
-        instrs.push(op("QUBIT_COORDS", &[2.0 * i as f64 + 1.0, 0.0], &[StimTarget::Qubit(q)]));
+        instrs.push(op(
+            "QUBIT_COORDS",
+            &[2.0 * i as f64 + 1.0, 0.0],
+            &[StimTarget::Qubit(q)],
+        ));
     }
 
     for round in 0..rounds {
@@ -43,41 +55,69 @@ pub fn repetition_code_memory_with_params(distance: usize, rounds: usize, params
         // after_reset_flip_probability: X_ERROR after ancilla reset
         if params.after_reset_flip_probability > 0.0 {
             for &a in &ancilla {
-                instrs.push(op("X_ERROR", &[params.after_reset_flip_probability], &[StimTarget::Qubit(a)]));
+                instrs.push(op(
+                    "X_ERROR",
+                    &[params.after_reset_flip_probability],
+                    &[StimTarget::Qubit(a)],
+                ));
             }
         }
 
         // before_round_data_depolarization: DEPOLARIZE1 on data qubits at start of round
         if params.before_round_data_depolarization > 0.0 {
             for &d in &data {
-                instrs.push(op("DEPOLARIZE1", &[params.before_round_data_depolarization], &[StimTarget::Qubit(d)]));
+                instrs.push(op(
+                    "DEPOLARIZE1",
+                    &[params.before_round_data_depolarization],
+                    &[StimTarget::Qubit(d)],
+                ));
             }
         }
 
         for (i, &a) in ancilla.iter().enumerate() {
-            instrs.push(op("CX", &[], &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)]));
+            instrs.push(op(
+                "CX",
+                &[],
+                &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)],
+            ));
         }
         // after_clifford_depolarization: DEPOLARIZE2 after first CX layer
         if params.after_clifford_depolarization > 0.0 {
             for (i, &a) in ancilla.iter().enumerate() {
-                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)]));
+                instrs.push(op(
+                    "DEPOLARIZE2",
+                    &[params.after_clifford_depolarization],
+                    &[StimTarget::Qubit(data[i]), StimTarget::Qubit(a)],
+                ));
             }
         }
 
         for (i, &a) in ancilla.iter().enumerate() {
-            instrs.push(op("CX", &[], &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)]));
+            instrs.push(op(
+                "CX",
+                &[],
+                &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)],
+            ));
         }
         // after_clifford_depolarization: DEPOLARIZE2 after second CX layer
         if params.after_clifford_depolarization > 0.0 {
             for (i, &a) in ancilla.iter().enumerate() {
-                instrs.push(op("DEPOLARIZE2", &[params.after_clifford_depolarization], &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)]));
+                instrs.push(op(
+                    "DEPOLARIZE2",
+                    &[params.after_clifford_depolarization],
+                    &[StimTarget::Qubit(data[i + 1]), StimTarget::Qubit(a)],
+                ));
             }
         }
 
         // before_measure_flip_probability: X_ERROR before measurement
         if params.before_measure_flip_probability > 0.0 {
             for &a in &ancilla {
-                instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(a)]));
+                instrs.push(op(
+                    "X_ERROR",
+                    &[params.before_measure_flip_probability],
+                    &[StimTarget::Qubit(a)],
+                ));
             }
         }
 
@@ -109,7 +149,11 @@ pub fn repetition_code_memory_with_params(distance: usize, rounds: usize, params
     // before_measure_flip_probability: X_ERROR before final data measurement
     if params.before_measure_flip_probability > 0.0 {
         for &d in &data {
-            instrs.push(op("X_ERROR", &[params.before_measure_flip_probability], &[StimTarget::Qubit(d)]));
+            instrs.push(op(
+                "X_ERROR",
+                &[params.before_measure_flip_probability],
+                &[StimTarget::Qubit(d)],
+            ));
         }
     }
 

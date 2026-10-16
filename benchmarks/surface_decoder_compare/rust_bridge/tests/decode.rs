@@ -250,7 +250,11 @@ fn rilpqec_rejects_detector_width_mismatch() {
     });
 
     assert_eq!(response.status, "error");
-    assert!(response.error.contains("detector width mismatch for rilpqec"));
+    assert!(
+        response
+            .error
+            .contains("detector width mismatch for rilpqec")
+    );
 }
 
 #[test]
@@ -262,5 +266,9 @@ fn rilpqec_rejects_observable_width_mismatch() {
     });
 
     assert_eq!(response.status, "error");
-    assert!(response.error.contains("observable width mismatch for rilpqec"));
+    assert!(
+        response
+            .error
+            .contains("observable width mismatch for rilpqec")
+    );
 }

@@ -27,10 +27,7 @@ fn repeated_pair_10(count: usize) -> Vec<bool> {
 fn decompresses_prefix_and_children_in_order() {
     let tree = ReferenceSampleTree {
         prefix_bits: vec![true, true, false, true],
-        suffix_children: vec![
-            leaf(&[true, false, true], 2),
-            leaf(&[false, false], 1),
-        ],
+        suffix_children: vec![leaf(&[true, false, true], 2), leaf(&[false, false], 1)],
         repetitions: 1,
     };
 
@@ -83,16 +80,33 @@ fn factorization_matches_stim_v1_15_cases() {
 
     let mut by_two = ReferenceSampleTree {
         prefix_bits: Vec::new(),
-        suffix_children: vec![a.clone(), b.clone(), c.clone(), a.clone(), b.clone(), c.clone()],
+        suffix_children: vec![
+            a.clone(),
+            b.clone(),
+            c.clone(),
+            a.clone(),
+            b.clone(),
+            c.clone(),
+        ],
         repetitions: 7,
     };
     by_two.try_factorize(2);
-    assert_eq!(by_two.suffix_children, vec![a.clone(), b.clone(), c.clone()]);
+    assert_eq!(
+        by_two.suffix_children,
+        vec![a.clone(), b.clone(), c.clone()]
+    );
     assert_eq!(by_two.repetitions, 14);
 
     let mut by_three = ReferenceSampleTree {
         prefix_bits: Vec::new(),
-        suffix_children: vec![a.clone(), b.clone(), a.clone(), b.clone(), a.clone(), b.clone()],
+        suffix_children: vec![
+            a.clone(),
+            b.clone(),
+            a.clone(),
+            b.clone(),
+            a.clone(),
+            b.clone(),
+        ],
         repetitions: 1,
     };
     by_three.try_factorize(3);

@@ -1,8 +1,8 @@
-use rstim::codegen::css::{
-    css_memory, parse_css_matrix_json, parse_css_observable_json, CssCheckMatrices,
-    CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis,
-};
 use rstim::codegen::NoiseParams;
+use rstim::codegen::css::{
+    CssCheckMatrices, CssMemoryConfig, CssObservableSource, CssSchedule, MemoryBasis, css_memory,
+    parse_css_matrix_json, parse_css_observable_json,
+};
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::ir::circuit_to_string;
 use rstim::stats;

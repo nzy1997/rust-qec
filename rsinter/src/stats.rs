@@ -55,8 +55,16 @@ fn binary_search(func: impl Fn(i64) -> f64, min_x: i64, max_x: i64, target: f64)
     }
     let fhi = func(hi);
     let flo = func(lo);
-    let dhi = if fhi == target { 0.0 } else { (fhi - target).abs() };
-    let dlo = if flo == target { 0.0 } else { (flo - target).abs() };
+    let dhi = if fhi == target {
+        0.0
+    } else {
+        (fhi - target).abs()
+    };
+    let dlo = if flo == target {
+        0.0
+    } else {
+        (flo - target).abs()
+    };
     if dhi < dlo { hi } else { lo }
 }
 
@@ -64,7 +72,11 @@ fn binary_search(func: impl Fn(i64) -> f64, min_x: i64, max_x: i64, target: f64)
 /// Uses binary search over log_binomial likelihoods.
 pub fn fit_binomial(num_shots: u64, num_hits: u64, max_likelihood_factor: f64) -> Fit {
     if num_shots == 0 {
-        return Fit { low: Some(0.0), best: Some(0.5), high: Some(1.0) };
+        return Fit {
+            low: Some(0.0),
+            best: Some(0.5),
+            high: Some(1.0),
+        };
     }
     let best_p = num_hits as f64 / num_shots as f64;
     let log_ml = log_binomial(best_p, num_shots, num_hits);
@@ -72,13 +84,25 @@ pub fn fit_binomial(num_shots: u64, num_hits: u64, max_likelihood_factor: f64) -
     let acc: i64 = 100;
 
     let low = binary_search(
-        |exp_err| log_binomial(exp_err as f64 / (acc as f64 * num_shots as f64), num_shots, num_hits),
+        |exp_err| {
+            log_binomial(
+                exp_err as f64 / (acc as f64 * num_shots as f64),
+                num_shots,
+                num_hits,
+            )
+        },
         0,
         num_hits as i64 * acc,
         target,
     );
     let high = binary_search(
-        |exp_err| -log_binomial(exp_err as f64 / (acc as f64 * num_shots as f64), num_shots, num_hits),
+        |exp_err| {
+            -log_binomial(
+                exp_err as f64 / (acc as f64 * num_shots as f64),
+                num_shots,
+                num_hits,
+            )
+        },
         num_hits as i64 * acc,
         num_shots as i64 * acc,
         -target,

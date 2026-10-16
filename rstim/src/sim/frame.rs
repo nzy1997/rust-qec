@@ -460,7 +460,6 @@ impl FrameSimulator {
             "M" | "MZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
@@ -468,7 +467,6 @@ impl FrameSimulator {
             "MX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
                 }
@@ -480,7 +478,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -490,7 +487,6 @@ impl FrameSimulator {
             "MR" | "MRZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
@@ -499,7 +495,6 @@ impl FrameSimulator {
             "MRX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -512,7 +507,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -785,7 +779,6 @@ impl FrameSimulator {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
                     self.exec_mpp_product(product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
@@ -796,7 +789,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MYY" => {
@@ -806,7 +798,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MZZ" => {
@@ -816,7 +807,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
@@ -945,19 +935,11 @@ impl FrameSimulator {
             CompiledOp::Depolarize2 { probability, pairs } => {
                 self.exec_depolarize2_pairs(pairs, *probability, wpr, rng);
             }
-            CompiledOp::Measure {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure(*basis, qubits, *readout_probability, wpr, rng);
+            CompiledOp::Measure { basis, qubits } => {
+                self.exec_compiled_measure(*basis, qubits, wpr, rng);
             }
-            CompiledOp::MeasureReset {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure_reset(*basis, qubits, *readout_probability, wpr, rng);
+            CompiledOp::MeasureReset { basis, qubits } => {
+                self.exec_compiled_measure_reset(*basis, qubits, wpr, rng);
             }
             CompiledOp::Detector { rec_offsets } => {
                 self.exec_compiled_detector(rec_offsets, ref_sample);
@@ -1070,24 +1052,10 @@ impl FrameSimulator {
         }
     }
 
-    fn apply_readout_noise(&mut self, probability: f64, rng: &mut impl Rng) {
-        if probability == 0.0 {
-            return;
-        }
-        let mask = random_bits_with_prob(
-            self.x_table.words_per_row(),
-            self.batch_size,
-            probability,
-            rng,
-        );
-        self.m_record.xor_last_row(&mask);
-    }
-
     fn exec_compiled_measure(
         &mut self,
         basis: CompiledBasis,
         qubits: &[usize],
-        readout_probability: f64,
         wpr: usize,
         rng: &mut impl Rng,
     ) {
@@ -1095,13 +1063,11 @@ impl FrameSimulator {
             match basis {
                 CompiledBasis::Z => {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
                 CompiledBasis::X => {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
                 }
@@ -1111,7 +1077,6 @@ impl FrameSimulator {
                         *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -1125,7 +1090,6 @@ impl FrameSimulator {
         &mut self,
         basis: CompiledBasis,
         qubits: &[usize],
-        readout_probability: f64,
         wpr: usize,
         rng: &mut impl Rng,
     ) {
@@ -1133,14 +1097,12 @@ impl FrameSimulator {
             match basis {
                 CompiledBasis::Z => {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
                 CompiledBasis::X => {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -1151,7 +1113,6 @@ impl FrameSimulator {
                         *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);

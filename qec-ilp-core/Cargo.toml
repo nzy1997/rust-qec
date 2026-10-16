@@ -1,24 +1,16 @@
 [package]
 name = "qec-ilp-core"
-version = "0.3.0"
+version = "0.1.0"
 edition = "2024"
-license.workspace = true
-rust-version.workspace = true
-homepage.workspace = true
-readme = "README.md"
-documentation = "https://docs.rs/qec-ilp-core"
-publish = ["crates-io"]
-include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 description = "Backend-neutral binary ILP models for quantum error-correction tools"
-repository = "https://github.com/nzy1997/rust-qec"
+repository = "https://github.com/nzy1997/rstim"
 
 [features]
 default = []
-highs = ["dep:highs", "dep:highs-sys"]
 gurobi = ["dep:gurobi"]
 
 [dependencies]
 thiserror = "2"
-highs = { version = "2.1.0", optional = true }
-highs-sys = { version = "1.14.2", optional = true }
+highs = "2.1.0"
+highs-sys = "1.14.2"
 gurobi = { version = "0.3.4", optional = true }

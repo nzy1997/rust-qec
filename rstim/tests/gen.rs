@@ -1,9 +1,9 @@
-use rstim::circuit_gen;
-use rstim::stats;
-use rstim::sampler::sample_batch;
-use rstim::error_analyzer::ErrorAnalyzer;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::circuit_gen;
+use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::sampler::sample_batch;
+use rstim::stats;
 
 #[test]
 fn rep_code_basic_structure() {
@@ -21,7 +21,10 @@ fn rep_code_noiseless_no_detections() {
     let result = sample_batch(&instrs, 100, &mut rng).unwrap();
     for shot in 0..100 {
         for det in 0..result.detections.num_major() {
-            assert!(!result.detections.get(det, shot), "unexpected detection at d={det} shot={shot}");
+            assert!(
+                !result.detections.get(det, shot),
+                "unexpected detection at d={det} shot={shot}"
+            );
         }
     }
 }

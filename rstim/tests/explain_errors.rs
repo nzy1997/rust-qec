@@ -1,7 +1,7 @@
-use rstim::parser::parse_lines;
+use rstim::cli::run_explain_errors;
 use rstim::error_analyzer::ErrorAnalyzer;
 use rstim::explain_errors::explain;
-use rstim::cli::run_explain_errors;
+use rstim::parser::parse_lines;
 
 #[test]
 fn explain_no_detectors_fired() {
@@ -19,7 +19,8 @@ fn explain_single_detector_fired() {
     let dem = ErrorAnalyzer::circuit_to_dem(&instrs).unwrap();
     let explanations = explain(&dem, &[0]);
     assert!(!explanations.is_empty());
-    let covered: Vec<usize> = explanations.iter()
+    let covered: Vec<usize> = explanations
+        .iter()
         .flat_map(|e| e.detectors.iter().copied())
         .collect();
     assert!(covered.contains(&0));

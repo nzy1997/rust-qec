@@ -1,23 +1,31 @@
 use rstim::cli::run_convert;
-use rstim::output::{read_shots_01, read_shots_b8, read_shots_r8, read_shots_hits, read_shots_ptb64,
-                    write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_ptb64};
+use rstim::output::{
+    read_shots_01, read_shots_b8, read_shots_hits, read_shots_ptb64, read_shots_r8, write_shots_01,
+    write_shots_b8, write_shots_hits, write_shots_ptb64, write_shots_r8,
+};
 use rstim::sim::bit_table::BitTable;
 
 fn make_table(bits: usize, shots: usize, pattern: impl Fn(usize, usize) -> bool) -> BitTable {
     let mut t = BitTable::new(bits, shots);
     for b in 0..bits {
         for s in 0..shots {
-            if pattern(b, s) { t.set(b, s, true); }
+            if pattern(b, s) {
+                t.set(b, s, true);
+            }
         }
     }
     t
 }
 
 fn tables_equal(a: &BitTable, b: &BitTable) -> bool {
-    if a.num_major() != b.num_major() || a.num_minor() != b.num_minor() { return false; }
+    if a.num_major() != b.num_major() || a.num_minor() != b.num_minor() {
+        return false;
+    }
     for i in 0..a.num_major() {
         for j in 0..a.num_minor() {
-            if a.get(i, j) != b.get(i, j) { return false; }
+            if a.get(i, j) != b.get(i, j) {
+                return false;
+            }
         }
     }
     true

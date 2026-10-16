@@ -31,7 +31,9 @@ fn dem_sample_statistical() {
     let mut count = 0;
     for _ in 0..10000 {
         let (dets, _) = dem.sample(&mut rng);
-        if dets[0] { count += 1; }
+        if dets[0] {
+            count += 1;
+        }
     }
     assert!((count as f64 / 10000.0 - 0.5).abs() < 0.05);
 }
@@ -121,7 +123,14 @@ fn dem_sample_batch_with_repeat() {
 #[test]
 fn dem_sample_separator_ignored() {
     let mut dem = DetectorErrorModel::new();
-    dem.add_error(1.0, vec![DemTarget::Detector(0), DemTarget::Separator, DemTarget::Detector(1)]);
+    dem.add_error(
+        1.0,
+        vec![
+            DemTarget::Detector(0),
+            DemTarget::Separator,
+            DemTarget::Detector(1),
+        ],
+    );
     let mut rng = StdRng::seed_from_u64(42);
     let (dets, _) = dem.sample(&mut rng);
     assert_eq!(dets, vec![true, true]);

@@ -145,7 +145,7 @@ fn supports_reset_periodic_body(region: &CompiledRepeatRegion) -> bool {
 #[cfg(test)]
 mod tests {
     use super::supports_reset_periodic_body;
-    use crate::compiled::{CompiledBlock, CompiledRepeatRegion, compile_circuit};
+    use crate::compiled::{compile_circuit, CompiledBlock, CompiledRepeatRegion};
     use crate::parser::parse_lines;
 
     fn top_level_repeat_region<'a>(blocks: &'a [CompiledBlock]) -> &'a CompiledRepeatRegion {

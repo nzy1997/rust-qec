@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    PerfMeasurementRecord, PerfRecordStatus, PerfWorkload, benchmark_cases,
-    comparison_variant_labels, expected_variant_labels,
+    benchmark_cases, comparison_variant_labels, expected_variant_labels, PerfMeasurementRecord,
+    PerfRecordStatus, PerfWorkload,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

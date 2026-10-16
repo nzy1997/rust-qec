@@ -299,14 +299,6 @@ impl SampleArchiveError {
         self.code
     }
 
-    pub const fn detail(&self) -> &'static str {
-        self.detail
-    }
-
-    pub(crate) const fn with_code(code: SampleArchiveErrorCode, detail: &'static str) -> Self {
-        Self { code, detail }
-    }
-
     const fn new(code: SampleArchiveErrorCode, detail: &'static str) -> Self {
         Self { code, detail }
     }
@@ -394,12 +386,6 @@ impl GlobalHeader {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, SampleArchiveError> {
-        let header = Self::from_bytes_before_checksum(bytes)?;
-        header.validate_shape()?;
-        Ok(header)
-    }
-
-    pub(crate) fn from_bytes_before_checksum(bytes: &[u8]) -> Result<Self, SampleArchiveError> {
         require_len(bytes, GLOBAL_HEADER_LEN)?;
         validate_magic(bytes, GLOBAL_MAGIC)?;
         validate_version(bytes)?;
@@ -429,20 +415,11 @@ impl GlobalHeader {
         if get_u32(bytes, 24) != 0 || get_u16(bytes, 38) != 0 {
             return Err(malformed("nonzero reserved global field"));
         }
-        header.validate_envelope()?;
+        header.validate()?;
         Ok(header)
     }
 
-    pub(crate) fn validate_after_checksum(&self) -> Result<(), SampleArchiveError> {
-        self.validate_shape()
-    }
-
     fn validate(&self) -> Result<(), SampleArchiveError> {
-        self.validate_envelope()?;
-        self.validate_shape()
-    }
-
-    fn validate_envelope(&self) -> Result<(), SampleArchiveError> {
         if self.required_flags != 0 {
             return Err(SampleArchiveError::new(
                 SampleArchiveErrorCode::UnsupportedFeature,
@@ -458,15 +435,8 @@ impl GlobalHeader {
             || self.reference_id != REFERENCE_SIMULATE_NOISELESS
             || self.codec_suite_id != CODEC_SUITE_ZSTD_FRAMES_V1
         {
-            return Err(SampleArchiveError::new(
-                SampleArchiveErrorCode::UnsupportedFeature,
-                "unsupported v1 identifier",
-            ));
+            return Err(malformed("unsupported v1 identifier"));
         }
-        Ok(())
-    }
-
-    fn validate_shape(&self) -> Result<(), SampleArchiveError> {
         if self.max_shots_per_block == 0 {
             return Err(malformed("zero max shots per block"));
         }
@@ -559,7 +529,7 @@ impl BlockHeader {
         }
         self.first_shot
             .checked_add(self.shot_count)
-            .ok_or_else(|| limit("block shot range overflow"))?;
+            .ok_or_else(|| malformed("block shot range overflow"))?;
         validate_stream(
             self.syndrome_codec_id,
             self.syndrome_uncompressed_len,
@@ -574,10 +544,10 @@ impl BlockHeader {
         )?;
         self.syndrome_uncompressed_len
             .checked_add(self.free_uncompressed_len)
-            .ok_or_else(|| limit("uncompressed length overflow"))?;
+            .ok_or_else(|| malformed("uncompressed length overflow"))?;
         self.syndrome_compressed_len
             .checked_add(self.free_compressed_len)
-            .ok_or_else(|| limit("compressed length overflow"))?;
+            .ok_or_else(|| malformed("compressed length overflow"))?;
         Ok(())
     }
 }
@@ -745,23 +715,4 @@ const fn malformed(detail: &'static str) -> SampleArchiveError {
 }
 const fn limit(detail: &'static str) -> SampleArchiveError {
     SampleArchiveError::new(SampleArchiveErrorCode::LimitExceeded, detail)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn global_header_unknown_v1_identifiers_are_unsupported_features() {
-        let mut bytes = GlobalHeader::known_vector_v1()
-            .to_bytes()
-            .expect("known vector serializes");
-        bytes[32..34].copy_from_slice(&2u16.to_le_bytes());
-        assert_eq!(
-            GlobalHeader::from_bytes_before_checksum(&bytes)
-                .unwrap_err()
-                .code(),
-            SampleArchiveErrorCode::UnsupportedFeature
-        );
-    }
 }

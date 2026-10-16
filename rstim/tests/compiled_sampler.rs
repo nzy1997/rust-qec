@@ -1,7 +1,7 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch_with_options, SampleOptions, SamplingBackend};
+use rstim::sampler::{SampleOptions, SamplingBackend, sample_batch_with_options};
 use rstim::sim::bit_table::BitTable;
 
 fn bit_table_rows(table: &BitTable) -> Vec<Vec<bool>> {

@@ -2,7 +2,7 @@ use crate::flooder::graph_flooder::GraphFlooder;
 use crate::interop::*;
 use crate::types::*;
 
-use super::alt_tree::{unstable_erase_by_node, AltTreeEdge, AltTreeNode};
+use super::alt_tree::{AltTreeEdge, AltTreeNode, unstable_erase_by_node};
 
 // ---------------------------------------------------------------------------
 // MatchingResult
@@ -41,9 +41,7 @@ pub struct Mwpm {
 
 impl Mwpm {
     pub fn new(flooder: GraphFlooder) -> Self {
-        Mwpm {
-            flooder,
-        }
+        Mwpm { flooder }
     }
 
     // -------------------------------------------------------------------
@@ -102,7 +100,11 @@ impl Mwpm {
 
         match (alt_node_1, alt_node_2) {
             (Some(an1), Some(an2)) => {
-                let common = AltTreeNode::most_recent_common_ancestor(an1, an2, &mut self.flooder.node_arena);
+                let common = AltTreeNode::most_recent_common_ancestor(
+                    an1,
+                    an2,
+                    &mut self.flooder.node_arena,
+                );
                 if let Some(ancestor) = common {
                     self.handle_tree_hitting_same_tree(region1, region2, edge, ancestor);
                 } else {
@@ -146,17 +148,12 @@ impl Mwpm {
     // -------------------------------------------------------------------
 
     fn handle_tree_hitting_boundary(&mut self, region: RegionIdx, edge: CompressedEdge) {
-        let alt_node = self.flooder.region_arena[region.0]
-            .alt_tree_node
-            .unwrap();
+        let alt_node = self.flooder.region_arena[region.0].alt_tree_node.unwrap();
         AltTreeNode::become_root(alt_node, &mut self.flooder.node_arena);
         self.shatter_descendants_into_matches_and_freeze(alt_node);
 
         // Match region to boundary and freeze
-        self.flooder.region_arena[region.0].match_ = Some(Match {
-            region: None,
-            edge,
-        });
+        self.flooder.region_arena[region.0].match_ = Some(Match { region: None, edge });
         self.flooder.set_region_frozen(region);
     }
 
@@ -199,12 +196,8 @@ impl Mwpm {
         region2: RegionIdx,
         edge: CompressedEdge,
     ) {
-        let alt_node_1 = self.flooder.region_arena[region1.0]
-            .alt_tree_node
-            .unwrap();
-        let alt_node_2 = self.flooder.region_arena[region2.0]
-            .alt_tree_node
-            .unwrap();
+        let alt_node_1 = self.flooder.region_arena[region1.0].alt_tree_node.unwrap();
+        let alt_node_2 = self.flooder.region_arena[region2.0].alt_tree_node.unwrap();
 
         AltTreeNode::become_root(alt_node_1, &mut self.flooder.node_arena);
         AltTreeNode::become_root(alt_node_2, &mut self.flooder.node_arena);
@@ -246,13 +239,7 @@ impl Mwpm {
         let other_match = m.region.unwrap();
         let match_edge = m.edge;
 
-        let child = self.make_child(
-            alt_node,
-            matched_region,
-            other_match,
-            match_edge,
-            edge,
-        );
+        let child = self.make_child(alt_node, matched_region, other_match, match_edge, edge);
 
         // Clear the match on both sides
         self.flooder.region_arena[other_match.0].match_ = None;
@@ -276,12 +263,8 @@ impl Mwpm {
         edge: CompressedEdge,
         common_ancestor: AltTreeIdx,
     ) {
-        let alt_node_1 = self.flooder.region_arena[region1.0]
-            .alt_tree_node
-            .unwrap();
-        let alt_node_2 = self.flooder.region_arena[region2.0]
-            .alt_tree_node
-            .unwrap();
+        let alt_node_1 = self.flooder.region_arena[region1.0].alt_tree_node.unwrap();
+        let alt_node_2 = self.flooder.region_arena[region2.0].alt_tree_node.unwrap();
 
         let prune_result_1 = AltTreeNode::prune_upward_path_stopping_before(
             alt_node_1,
@@ -318,7 +301,9 @@ impl Mwpm {
         });
 
         // Detach old outer_region from tree
-        let old_outer = self.flooder.node_arena[common_ancestor.0].outer_region.unwrap();
+        let old_outer = self.flooder.node_arena[common_ancestor.0]
+            .outer_region
+            .unwrap();
         self.flooder.region_arena[old_outer.0].alt_tree_node = None;
 
         // Create blossom region in flooder
@@ -329,8 +314,11 @@ impl Mwpm {
         self.flooder.region_arena[blossom_region.0].alt_tree_node = Some(common_ancestor);
 
         // Store anchor nodes for blossom shattering
-        let inner_to_outer_loc = self.flooder.node_arena[common_ancestor.0].inner_to_outer_edge.loc_from;
-        let parent_loc = self.flooder.node_arena[common_ancestor.0].parent
+        let inner_to_outer_loc = self.flooder.node_arena[common_ancestor.0]
+            .inner_to_outer_edge
+            .loc_from;
+        let parent_loc = self.flooder.node_arena[common_ancestor.0]
+            .parent
             .as_ref()
             .and_then(|p| p.edge.loc_from);
         self.flooder.region_arena[blossom_region.0].blossom_in_parent_loc = parent_loc;
@@ -433,8 +421,12 @@ impl Mwpm {
                     child_edge,
                 );
                 child_edge = blossom_children[k2].edge;
-                let inner = self.flooder.node_arena[current_alt_node.0].inner_region.unwrap();
-                let outer = self.flooder.node_arena[current_alt_node.0].outer_region.unwrap();
+                let inner = self.flooder.node_arena[current_alt_node.0]
+                    .inner_region
+                    .unwrap();
+                let outer = self.flooder.node_arena[current_alt_node.0]
+                    .outer_region
+                    .unwrap();
                 self.flooder.set_region_shrinking(inner);
                 self.flooder.set_region_growing(outer);
                 i += 2;
@@ -456,8 +448,12 @@ impl Mwpm {
                     child_edge,
                 );
                 child_edge = blossom_children[k3].edge.reversed();
-                let inner = self.flooder.node_arena[current_alt_node.0].inner_region.unwrap();
-                let outer = self.flooder.node_arena[current_alt_node.0].outer_region.unwrap();
+                let inner = self.flooder.node_arena[current_alt_node.0]
+                    .inner_region
+                    .unwrap();
+                let outer = self.flooder.node_arena[current_alt_node.0]
+                    .outer_region
+                    .unwrap();
                 self.flooder.set_region_shrinking(inner);
                 self.flooder.set_region_growing(outer);
                 i += 2;
@@ -487,7 +483,8 @@ impl Mwpm {
         }
 
         // Update blossom alt node: inner = in_child_region
-        self.flooder.node_arena[blossom_alt_node.0].inner_region = Some(blossom_children[child_idx].region);
+        self.flooder.node_arena[blossom_alt_node.0].inner_region =
+            Some(blossom_children[child_idx].region);
         let inner_region = blossom_children[child_idx].region;
         self.flooder.set_region_shrinking(inner_region);
         self.flooder.region_arena[inner_region.0].alt_tree_node = Some(blossom_alt_node);
@@ -573,7 +570,11 @@ impl Mwpm {
         child_idx
     }
 
-    fn wrap_region_into_blossom(&mut self, region: RegionIdx, new_blossom_parent_and_top: RegionIdx) {
+    fn wrap_region_into_blossom(
+        &mut self,
+        region: RegionIdx,
+        new_blossom_parent_and_top: RegionIdx,
+    ) {
         self.flooder.region_arena[region.0].blossom_parent = Some(new_blossom_parent_and_top);
         self.wrap_region_descendants_into_blossom(region, new_blossom_parent_and_top);
     }
@@ -602,11 +603,7 @@ impl Mwpm {
         }
     }
 
-    fn clear_region_blossom_parent(
-        &mut self,
-        region: RegionIdx,
-        recompute_wrapped_radius: bool,
-    ) {
+    fn clear_region_blossom_parent(&mut self, region: RegionIdx, recompute_wrapped_radius: bool) {
         self.flooder.region_arena[region.0].blossom_parent = None;
         self.clear_region_descendant_blossom_parent(region, region, recompute_wrapped_radius);
     }
@@ -678,11 +675,7 @@ impl Mwpm {
         blossom_idx
     }
 
-    fn update_blossom_area_and_reschedule(
-        &mut self,
-        region: RegionIdx,
-        blossom_top: RegionIdx,
-    ) {
+    fn update_blossom_area_and_reschedule(&mut self, region: RegionIdx, blossom_top: RegionIdx) {
         let shell_len = self.flooder.region_arena[region.0].shell_area.len();
         for i in 0..shell_len {
             let node_idx = self.flooder.region_arena[region.0].shell_area[i];
@@ -705,10 +698,7 @@ impl Mwpm {
     // Shatter blossom and extract matches
     // -------------------------------------------------------------------
 
-    pub fn shatter_blossom_and_extract_matches(
-        &mut self,
-        region: RegionIdx,
-    ) -> MatchingResult {
+    pub fn shatter_blossom_and_extract_matches(&mut self, region: RegionIdx) -> MatchingResult {
         let boundary_edge = self.flooder.region_arena[region.0]
             .match_
             .as_ref()
@@ -719,8 +709,9 @@ impl Mwpm {
             .as_ref()
             .and_then(|m| m.region)
             .is_some();
-        let has_blossom_children =
-            !self.flooder.region_arena[region.0].blossom_children.is_empty();
+        let has_blossom_children = !self.flooder.region_arena[region.0]
+            .blossom_children
+            .is_empty();
 
         if has_match_region {
             let match_region = self.flooder.region_arena[region.0]
@@ -729,8 +720,9 @@ impl Mwpm {
                 .unwrap()
                 .region
                 .unwrap();
-            let match_region_has_blossom =
-                !self.flooder.region_arena[match_region.0].blossom_children.is_empty();
+            let match_region_has_blossom = !self.flooder.region_arena[match_region.0]
+                .blossom_children
+                .is_empty();
 
             if !has_blossom_children && !match_region_has_blossom {
                 // Base case: neither has blossom children
@@ -765,7 +757,10 @@ impl Mwpm {
         let mut res = MatchingResult::new();
         let mut region = region;
 
-        if !self.flooder.region_arena[region.0].blossom_children.is_empty() {
+        if !self.flooder.region_arena[region.0]
+            .blossom_children
+            .is_empty()
+        {
             region = self.pair_and_shatter_subblossoms(region, &mut res);
         }
 
@@ -845,9 +840,13 @@ impl Mwpm {
             match_edge.loc_to.map(|n| n.0),
             describe(match_edge.loc_from),
             describe(match_edge.loc_to),
-            self.flooder.region_arena[region.0].blossom_in_parent_loc.map(|n| n.0),
+            self.flooder.region_arena[region.0]
+                .blossom_in_parent_loc
+                .map(|n| n.0),
             describe(self.flooder.region_arena[region.0].blossom_in_parent_loc),
-            self.flooder.region_arena[region.0].blossom_in_child_loc.map(|n| n.0),
+            self.flooder.region_arena[region.0]
+                .blossom_in_child_loc
+                .map(|n| n.0),
             describe(self.flooder.region_arena[region.0].blossom_in_child_loc),
         )
     }
@@ -857,7 +856,11 @@ impl Mwpm {
         region: RegionIdx,
         res: &mut MatchingResult,
     ) -> RegionIdx {
-        let match_edge = self.flooder.region_arena[region.0].match_.as_ref().unwrap().edge;
+        let match_edge = self.flooder.region_arena[region.0]
+            .match_
+            .as_ref()
+            .unwrap()
+            .edge;
         let (subblossom, subblossom_edge) =
             self.resolve_subblossom_for_match_edge(region, match_edge);
         let children: Vec<RegionEdge> =
@@ -874,7 +877,10 @@ impl Mwpm {
         let mut subblossom_edge = subblossom_edge;
         let mut other_edge = subblossom_edge.reversed();
         if let Some(other) = blossom_match.region {
-            if !self.flooder.region_arena[other.0].blossom_children.is_empty() {
+            if !self.flooder.region_arena[other.0]
+                .blossom_children
+                .is_empty()
+            {
                 let (_, normalized_other_edge) =
                     self.resolve_subblossom_for_match_edge(other, other_edge);
                 other_edge = normalized_other_edge;
@@ -910,8 +916,14 @@ impl Mwpm {
             let r1 = re1.region;
             let r2 = re2.region;
             let e = re1.edge;
-            self.flooder.region_arena[r1.0].match_ = Some(Match { region: Some(r2), edge: e });
-            self.flooder.region_arena[r2.0].match_ = Some(Match { region: Some(r1), edge: e.reversed() });
+            self.flooder.region_arena[r1.0].match_ = Some(Match {
+                region: Some(r2),
+                edge: e,
+            });
+            self.flooder.region_arena[r2.0].match_ = Some(Match {
+                region: Some(r1),
+                edge: e.reversed(),
+            });
             let sub_res = self.shatter_blossom_and_extract_matches(r1);
             *res += sub_res;
             i += 2;
@@ -941,8 +953,9 @@ impl Mwpm {
             .as_ref()
             .and_then(|m| m.region)
             .is_some();
-        let has_blossom_children =
-            !self.flooder.region_arena[region.0].blossom_children.is_empty();
+        let has_blossom_children = !self.flooder.region_arena[region.0]
+            .blossom_children
+            .is_empty();
 
         if has_match_region {
             let match_region = self.flooder.region_arena[region.0]
@@ -951,8 +964,9 @@ impl Mwpm {
                 .unwrap()
                 .region
                 .unwrap();
-            let match_region_has_blossom =
-                !self.flooder.region_arena[match_region.0].blossom_children.is_empty();
+            let match_region_has_blossom = !self.flooder.region_arena[match_region.0]
+                .blossom_children
+                .is_empty();
 
             if !has_blossom_children && !match_region_has_blossom {
                 let edge = self.flooder.region_arena[region.0]
@@ -966,7 +980,10 @@ impl Mwpm {
                 return;
             }
         } else if !has_blossom_children {
-            if boundary_edge.loc_from.is_some() || boundary_edge.loc_to.is_some() || boundary_edge.obs_mask != 0 {
+            if boundary_edge.loc_from.is_some()
+                || boundary_edge.loc_to.is_some()
+                || boundary_edge.obs_mask != 0
+            {
                 match_edges.push(boundary_edge);
             }
             self.flooder.region_arena.free(region.0);
@@ -976,7 +993,10 @@ impl Mwpm {
         // Complex case: shatter sub-blossoms
         let mut region = region;
 
-        if !self.flooder.region_arena[region.0].blossom_children.is_empty() {
+        if !self.flooder.region_arena[region.0]
+            .blossom_children
+            .is_empty()
+        {
             region = self.pair_and_shatter_subblossoms_edges(region, match_edges);
         }
 
@@ -998,7 +1018,11 @@ impl Mwpm {
         region: RegionIdx,
         match_edges: &mut Vec<CompressedEdge>,
     ) -> RegionIdx {
-        let match_edge = self.flooder.region_arena[region.0].match_.as_ref().unwrap().edge;
+        let match_edge = self.flooder.region_arena[region.0]
+            .match_
+            .as_ref()
+            .unwrap()
+            .edge;
         let (subblossom, subblossom_edge) =
             self.resolve_subblossom_for_match_edge(region, match_edge);
         let children: Vec<RegionEdge> =
@@ -1012,7 +1036,10 @@ impl Mwpm {
         let mut subblossom_edge = subblossom_edge;
         let mut other_edge = subblossom_edge.reversed();
         if let Some(other) = blossom_match.region {
-            if !self.flooder.region_arena[other.0].blossom_children.is_empty() {
+            if !self.flooder.region_arena[other.0]
+                .blossom_children
+                .is_empty()
+            {
                 let (_, normalized_other_edge) =
                     self.resolve_subblossom_for_match_edge(other, other_edge);
                 other_edge = normalized_other_edge;
@@ -1030,7 +1057,9 @@ impl Mwpm {
             });
         }
 
-        let index = children.iter().position(|c| c.region == subblossom)
+        let index = children
+            .iter()
+            .position(|c| c.region == subblossom)
             .expect("subblossom must be in blossom_children");
         let num_children = children.len();
 
@@ -1041,8 +1070,14 @@ impl Mwpm {
             let r1 = re1.region;
             let r2 = re2.region;
             let e = re1.edge;
-            self.flooder.region_arena[r1.0].match_ = Some(Match { region: Some(r2), edge: e });
-            self.flooder.region_arena[r2.0].match_ = Some(Match { region: Some(r1), edge: e.reversed() });
+            self.flooder.region_arena[r1.0].match_ = Some(Match {
+                region: Some(r2),
+                edge: e,
+            });
+            self.flooder.region_arena[r2.0].match_ = Some(Match {
+                region: Some(r1),
+                edge: e.reversed(),
+            });
             self.shatter_blossom_and_extract_match_edges(r1, match_edges);
             i += 2;
         }
@@ -1132,7 +1167,9 @@ mod tests {
                 .alloc_with_reset(crate::flooder::fill_region::GraphFillRegion::reset_for_reuse),
         );
 
-        mwpm.flooder.region_arena[leaf.0].shell_area.push(NodeIdx(0));
+        mwpm.flooder.region_arena[leaf.0]
+            .shell_area
+            .push(NodeIdx(0));
         mwpm.flooder.region_arena[leaf.0].blossom_parent = Some(child_a);
         mwpm.flooder.region_arena[leaf.0].blossom_parent_top = Some(blossom);
 
@@ -1148,7 +1185,9 @@ mod tests {
         mwpm.flooder.region_arena[child_c.0].blossom_parent = Some(blossom);
         mwpm.flooder.region_arena[child_c.0].blossom_parent_top = Some(blossom);
 
-        mwpm.flooder.region_arena[outside.0].shell_area.push(NodeIdx(1));
+        mwpm.flooder.region_arena[outside.0]
+            .shell_area
+            .push(NodeIdx(1));
         mwpm.flooder.region_arena[outside.0].match_ = Some(Match {
             region: Some(blossom),
             edge: CompressedEdge {
@@ -1256,9 +1295,13 @@ mod tests {
                 .alloc_with_reset(crate::flooder::fill_region::GraphFillRegion::reset_for_reuse),
         );
 
-        mwpm.flooder.region_arena[leaf_a.0].shell_area.push(NodeIdx(0));
+        mwpm.flooder.region_arena[leaf_a.0]
+            .shell_area
+            .push(NodeIdx(0));
         mwpm.flooder.region_arena[leaf_a.0].blossom_parent = Some(child_a);
-        mwpm.flooder.region_arena[leaf_b.0].shell_area.push(NodeIdx(1));
+        mwpm.flooder.region_arena[leaf_b.0]
+            .shell_area
+            .push(NodeIdx(1));
         mwpm.flooder.region_arena[leaf_b.0].blossom_parent = Some(child_b);
 
         mwpm.flooder.region_arena[child_a.0].blossom_parent = Some(blossom);

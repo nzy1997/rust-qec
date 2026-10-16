@@ -16,20 +16,30 @@ fn dem_write_simple_error() {
 #[test]
 fn dem_write_error_with_observable() {
     let mut dem = DetectorErrorModel::new();
-    dem.add_error(0.01, vec![
-        DemTarget::Detector(2), DemTarget::Detector(3), DemTarget::Observable(0)
-    ]);
+    dem.add_error(
+        0.01,
+        vec![
+            DemTarget::Detector(2),
+            DemTarget::Detector(3),
+            DemTarget::Observable(0),
+        ],
+    );
     assert_eq!(dem.to_string(), "error(0.01) D2 D3 L0\n");
 }
 
 #[test]
 fn dem_write_error_with_separator() {
     let mut dem = DetectorErrorModel::new();
-    dem.add_error(0.02, vec![
-        DemTarget::Detector(2), DemTarget::Observable(0),
-        DemTarget::Separator,
-        DemTarget::Detector(5), DemTarget::Detector(6),
-    ]);
+    dem.add_error(
+        0.02,
+        vec![
+            DemTarget::Detector(2),
+            DemTarget::Observable(0),
+            DemTarget::Separator,
+            DemTarget::Detector(5),
+            DemTarget::Detector(6),
+        ],
+    );
     assert_eq!(dem.to_string(), "error(0.02) D2 L0 ^ D5 D6\n");
 }
 

@@ -36,13 +36,7 @@ impl MatchingGraph {
         }
     }
 
-    pub fn add_edge(
-        &mut self,
-        u: usize,
-        v: usize,
-        weight: SignedWeight,
-        observables: &[usize],
-    ) {
+    pub fn add_edge(&mut self, u: usize, v: usize, weight: SignedWeight, observables: &[usize]) {
         if weight < 0 {
             for &obs in observables {
                 if !self.negative_weight_observables_set.remove(&obs) {
@@ -82,12 +76,7 @@ impl MatchingGraph {
         self.nodes[v].neighbor_observables.push(obs_mask);
     }
 
-    pub fn add_boundary_edge(
-        &mut self,
-        u: usize,
-        weight: SignedWeight,
-        observables: &[usize],
-    ) {
+    pub fn add_boundary_edge(&mut self, u: usize, weight: SignedWeight, observables: &[usize]) {
         if weight < 0 {
             for &obs in observables {
                 if !self.negative_weight_observables_set.remove(&obs) {
@@ -117,9 +106,8 @@ impl MatchingGraph {
     /// Refresh derived caches after all edge insertions are complete.
     pub fn finalize_derived_state(&mut self) {
         self.negative_weight_detection_events_sorted.clear();
-        self.negative_weight_detection_events_sorted.extend(
-            self.negative_weight_detection_events_set.iter().copied(),
-        );
+        self.negative_weight_detection_events_sorted
+            .extend(self.negative_weight_detection_events_set.iter().copied());
         self.negative_weight_detection_events_sorted.sort_unstable();
     }
 }

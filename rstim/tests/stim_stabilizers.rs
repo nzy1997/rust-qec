@@ -2,8 +2,8 @@
 // Since rstim's Tableau/PauliString are not public APIs, these tests verify
 // the same stabilizer behaviors through circuit simulation with sample_batch.
 
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::parser::parse_lines;
 use rstim::sampler::sample_batch;
 
@@ -19,7 +19,10 @@ fn h_z_h_equals_x() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(out.measurements.get(0, s), "shot {s}: H Z H |0> = X|0> = |1>");
+        assert!(
+            out.measurements.get(0, s),
+            "shot {s}: H Z H |0> = X|0> = |1>"
+        );
     }
 }
 
@@ -44,7 +47,10 @@ fn h_x_h_equals_z() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(!out.measurements.get(0, s), "shot {s}: H X H |0> = Z|0> = |0>");
+        assert!(
+            !out.measurements.get(0, s),
+            "shot {s}: H X H |0> = Z|0> = |0>"
+        );
     }
 }
 
@@ -56,7 +62,10 @@ fn cnot_propagates_x_to_target() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(out.measurements.get(0, s), "shot {s}: control stays flipped");
+        assert!(
+            out.measurements.get(0, s),
+            "shot {s}: control stays flipped"
+        );
         assert!(out.measurements.get(1, s), "shot {s}: target gets flipped");
     }
 }
@@ -203,7 +212,10 @@ fn h_yz_transforms_z_to_y() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(!out.measurements.get(0, s), "shot {s}: H_YZ|0> is Y+ eigenstate");
+        assert!(
+            !out.measurements.get(0, s),
+            "shot {s}: H_YZ|0> is Y+ eigenstate"
+        );
     }
 }
 
@@ -215,7 +227,10 @@ fn h_xy_transforms_x_to_y() {
     let mut r = rng();
     let out = sample_batch(&instrs, 64, &mut r).unwrap();
     for s in 0..64 {
-        assert!(!out.measurements.get(0, s), "shot {s}: H_XY|+> is Y+ eigenstate");
+        assert!(
+            !out.measurements.get(0, s),
+            "shot {s}: H_XY|+> is Y+ eigenstate"
+        );
     }
 }
 
@@ -248,10 +263,8 @@ fn pauli_propagation_cx_chain() {
 // After 2 rounds: X0, after 6 rounds: same as 0 mod 2 = identity on extras
 #[test]
 fn pauli_propagation_repeat_cx() {
-    let instrs = parse_lines(
-        "H 0\nREPEAT 6 {\n    CX 0 1\n    CX 1 2\n    CX 2 3\n}\nM 0 1 2 3\n",
-    )
-    .unwrap();
+    let instrs =
+        parse_lines("H 0\nREPEAT 6 {\n    CX 0 1\n    CX 1 2\n    CX 2 3\n}\nM 0 1 2 3\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 256, &mut r).unwrap();
     // After 6 rounds of CX chain, the state should have specific correlations.
@@ -264,8 +277,7 @@ fn pauli_propagation_repeat_cx() {
 // MPP X0*X1 should give false, MPP Z0*Z1 should give false.
 #[test]
 fn mpp_stabilizer_commutation() {
-    let instrs =
-        parse_lines("H 0\nCNOT 0 1\nMPP X0*X1\nMPP Z0*Z1\n").unwrap();
+    let instrs = parse_lines("H 0\nCNOT 0 1\nMPP X0*X1\nMPP Z0*Z1\n").unwrap();
     let mut r = rng();
     let out = sample_batch(&instrs, 128, &mut r).unwrap();
     for s in 0..128 {

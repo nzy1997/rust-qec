@@ -1,8 +1,8 @@
-use rstim::parser::parse_lines;
-use rstim::ir::StimTarget;
-use rstim::executor::Executor;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::executor::Executor;
+use rstim::ir::StimTarget;
+use rstim::parser::parse_lines;
 
 #[test]
 fn parse_sweep_target() {

@@ -1,5 +1,5 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::{executor::Executor, parser::parse_lines};
 
 #[test]
@@ -148,7 +148,10 @@ fn cy_creates_bell_pair() {
         let mut ex = Executor::from_instrs(instrs.clone()).unwrap();
         let mut rng = StdRng::seed_from_u64(seed);
         let out = ex.run(&mut rng).unwrap();
-        assert!(!out.detectors[0], "seed={seed}: CY Bell pair detector fired");
+        assert!(
+            !out.detectors[0],
+            "seed={seed}: CY Bell pair detector fired"
+        );
     }
 }
 

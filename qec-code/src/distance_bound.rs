@@ -1,9 +1,9 @@
+use crate::Pauli;
 use crate::code::StabilizerCode;
 use crate::css::CssCode;
 use crate::distance::LogicalClass;
 use crate::error::{QecError, Result};
 use crate::gf2;
-use crate::Pauli;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 

@@ -1,5 +1,3 @@
-use rand::SeedableRng;
-use rand::rngs::StdRng;
 use rstim::ir::{StimInstr, StimTarget};
 use rstim::parser::parse_lines;
 use rstim::sim::packed_inverse_tableau::{CanonicalTableauSnapshot, PackedInverseTableau};
@@ -453,62 +451,6 @@ fn public_many_measurement_and_reset_wrappers_match_expected_basis_states() {
 }
 
 #[test]
-fn randomized_many_z_measurement_matches_legacy_rng_and_collapse() {
-    let mut packed = PackedInverseTableau::identity(4);
-    let mut legacy = StabilizerState::new(4);
-    for state_gate in [(0usize, 1usize), (1usize, 2usize), (2usize, 3usize)] {
-        if state_gate.0 == 0 {
-            packed.h(0);
-            legacy.h(0);
-        }
-        packed.cx(state_gate.0, state_gate.1);
-        legacy.cx(state_gate.0, state_gate.1);
-    }
-
-    let targets = [(0, false), (1, true), (2, false), (3, false)];
-    let mut packed_rng = StdRng::seed_from_u64(0x51a7);
-    let mut legacy_rng = StdRng::seed_from_u64(0x51a7);
-    let packed_bits = packed.measure_z_many(&targets, &mut packed_rng);
-    let legacy_bits: Vec<bool> = targets
-        .iter()
-        .map(|&(q, inverted)| (legacy.measure_z(q, &mut legacy_rng).0 == 1) ^ inverted)
-        .collect();
-
-    assert_eq!(packed_bits, legacy_bits);
-    assert_eq!(packed.canonical_snapshot(), legacy.canonical_snapshot());
-}
-
-#[test]
-fn randomized_many_z_reset_matches_legacy_rng_and_collapse() {
-    let mut packed = PackedInverseTableau::identity(3);
-    let mut legacy = StabilizerState::new(3);
-    packed.h(0);
-    legacy.h(0);
-    packed.cx(0, 1);
-    legacy.cx(0, 1);
-    packed.h(2);
-    legacy.h(2);
-
-    let targets = [(0, false), (1, true), (2, false)];
-    let mut packed_rng = StdRng::seed_from_u64(0x5e7);
-    let mut legacy_rng = StdRng::seed_from_u64(0x5e7);
-    let packed_bits = packed.measure_reset_z_many(&targets, &mut packed_rng);
-    let legacy_bits: Vec<bool> = targets
-        .iter()
-        .map(|&(q, inverted)| {
-            let raw = legacy.measure_z(q, &mut legacy_rng).0 == 1;
-            if raw {
-                legacy.x_gate(q);
-            }
-            raw ^ inverted
-        })
-        .collect();
-
-    assert_eq!(packed_bits, legacy_bits);
-    assert_eq!(packed.canonical_snapshot(), legacy.canonical_snapshot());
-}
-
-#[test]
 fn inverted_measurement_target_only_flips_reported_bit() {
     let (bits, snapshot) = apply_packed_circuit(1, "X 0\nMR !0\nM 0\n");
     assert_eq!(bits, vec![false, false]);
@@ -537,12 +479,10 @@ fn inverted_reset_measurement_targets_only_flip_reported_bits() {
 #[test]
 fn packed_and_legacy_measurement_sequence_match() {
     let circuit = deterministic_measurement_sequence(0x457, 130, 512);
-    let (packed_bits, _) = apply_packed_circuit(130, &circuit);
-    let (legacy_bits, _) = apply_legacy_circuit(130, &circuit);
-    // Biased collapses may choose different but equivalent stabilizer-generator
-    // bases. The public reference measurement sequence must still be identical;
-    // stabilizer-group equivalence is covered by packed_inverse_direct_collapse.
+    let (packed_bits, packed_snapshot) = apply_packed_circuit(130, &circuit);
+    let (legacy_bits, legacy_snapshot) = apply_legacy_circuit(130, &circuit);
     assert_eq!(packed_bits, legacy_bits);
+    assert_eq!(packed_snapshot, legacy_snapshot);
     println!("PASS packed inverse measurement and reset");
 }
 
@@ -556,8 +496,8 @@ fn deterministic_measurement_sequence_covers_every_operation_after_prefix() {
         .collect();
 
     for operation in [
-        "H", "S", "S_DAG", "X", "Y", "Z", "CX", "M", "MX", "MY", "MR", "MRX", "MRY", "R", "RX",
-        "RY",
+        "H", "S", "S_DAG", "X", "Y", "Z", "CX", "M", "MX", "MY", "MR", "MRX", "MRY",
+        "R", "RX", "RY",
     ] {
         assert!(
             operations.contains(&operation),

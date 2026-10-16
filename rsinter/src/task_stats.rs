@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Add;
 
-use crate::failure::{combine_failure_kind, FailureKind};
+use crate::failure::{FailureKind, combine_failure_kind};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskStats {

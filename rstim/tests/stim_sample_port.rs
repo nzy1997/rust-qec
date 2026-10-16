@@ -1,6 +1,6 @@
 mod stim_sample_helpers;
-use stim_sample_helpers::{sample_lines, deviation};
 use std::collections::HashMap;
+use stim_sample_helpers::{deviation, sample_lines};
 
 #[test]
 fn sample_flag_single_shot() {

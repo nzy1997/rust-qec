@@ -8,7 +8,7 @@ use crate::util::radix_heap::{HasTime, RadixHeapQueue};
 use crate::util::varying::VaryingCT;
 
 use super::fill_region::GraphFillRegion;
-use super::graph::{MatchingGraph, BOUNDARY_NODE};
+use super::graph::{BOUNDARY_NODE, MatchingGraph};
 
 pub struct GraphFlooder {
     pub graph: MatchingGraph,
@@ -41,8 +41,10 @@ impl GraphFlooder {
 
     pub fn create_detection_event(&mut self, node_idx: NodeIdx) -> RegionIdx {
         self.mark_node_touched(node_idx);
-        let region_idx =
-            RegionIdx(self.region_arena.alloc_with_reset(GraphFillRegion::reset_for_reuse));
+        let region_idx = RegionIdx(
+            self.region_arena
+                .alloc_with_reset(GraphFillRegion::reset_for_reuse),
+        );
         {
             let region = self.region_arena.get_mut(region_idx.0);
             region.radius =
@@ -99,15 +101,19 @@ impl GraphFlooder {
             FloodCheckEvent::LookAtNode { node, .. } => {
                 let node_idx = *node;
                 let tracker = &mut self.graph.nodes[node_idx.0 as usize].node_event_tracker;
-                tracker.dequeue_decision(ev, &mut self.queue, |time| {
-                    FloodCheckEvent::LookAtNode { node: node_idx, time }
+                tracker.dequeue_decision(ev, &mut self.queue, |time| FloodCheckEvent::LookAtNode {
+                    node: node_idx,
+                    time,
                 })
             }
             FloodCheckEvent::LookAtShrinkingRegion { region, .. } => {
                 let region_idx = *region;
                 let tracker = &mut self.region_arena[region_idx.0].shrink_event_tracker;
                 tracker.dequeue_decision(ev, &mut self.queue, |time| {
-                    FloodCheckEvent::LookAtShrinkingRegion { region: region_idx, time }
+                    FloodCheckEvent::LookAtShrinkingRegion {
+                        region: region_idx,
+                        time,
+                    }
                 })
             }
             FloodCheckEvent::NoEvent => true,
@@ -172,8 +178,12 @@ impl GraphFlooder {
         src_to_dst_index: usize,
         dst_idx: NodeIdx,
     ) -> MwpmEvent {
-        let src_has_region = self.graph.nodes[src_idx.0 as usize].region_that_arrived.is_some();
-        let dst_has_region = self.graph.nodes[dst_idx.0 as usize].region_that_arrived.is_some();
+        let src_has_region = self.graph.nodes[src_idx.0 as usize]
+            .region_that_arrived
+            .is_some();
+        let dst_has_region = self.graph.nodes[dst_idx.0 as usize]
+            .region_that_arrived
+            .is_some();
 
         if src_has_region && !dst_has_region {
             // Grow into empty neighbor
@@ -558,10 +568,13 @@ impl GraphFlooder {
             })
         });
 
-        let in_child = alt_tree_node.inner_to_outer_edge.loc_from.and_then(|node_idx| {
-            self.graph.nodes[node_idx.0 as usize]
-                .heir_region_on_shatter(self.region_arena.items())
-        });
+        let in_child = alt_tree_node
+            .inner_to_outer_edge
+            .loc_from
+            .and_then(|node_idx| {
+                self.graph.nodes[node_idx.0 as usize]
+                    .heir_region_on_shatter(self.region_arena.items())
+            });
 
         match (in_parent, in_child) {
             (Some(ip), Some(ic)) => MwpmEvent::BlossomShatter {
@@ -803,5 +816,4 @@ mod tests {
 
         assert_eq!(DetectorNode::local_radius_call_count(), 0);
     }
-
 }

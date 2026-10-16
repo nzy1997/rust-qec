@@ -1,4 +1,4 @@
-use rstim::compiled::{compile_circuit, CompiledBlock};
+use rstim::compiled::{CompiledBlock, compile_circuit};
 use rstim::parser::parse_lines;
 
 #[test]

@@ -103,20 +103,12 @@ pub struct DecodedSampleBlock {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LossVisibleMeasurementPair {
-    pub flag: usize,
-    pub value: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheckedMeasurementLayout {
     num_measurements: usize,
     detector_rows: Vec<Vec<usize>>,
     observable_rows: Vec<Vec<usize>>,
-    loss_visible_measurements: Vec<LossVisibleMeasurementPair>,
     expanded_instructions: u64,
     parity_terms: u64,
-    max_repeat_depth: u64,
 }
 
 impl CheckedMeasurementLayout {
@@ -131,10 +123,8 @@ impl CheckedMeasurementLayout {
             num_measurements,
             detector_rows: builder.detector_rows,
             observable_rows: builder.observable_rows,
-            loss_visible_measurements: builder.loss_visible_measurements,
             expanded_instructions: builder.expanded_instructions,
             parity_terms: builder.parity_terms,
-            max_repeat_depth: builder.max_repeat_depth,
         })
     }
 
@@ -158,21 +148,12 @@ impl CheckedMeasurementLayout {
         &self.observable_rows
     }
 
-    /// Interleaved `flag,value` record pairs produced by loss-visible measurements.
-    pub fn loss_visible_measurements(&self) -> &[LossVisibleMeasurementPair] {
-        &self.loss_visible_measurements
-    }
-
     pub fn expanded_instructions(&self) -> u64 {
         self.expanded_instructions
     }
 
     pub fn parity_terms(&self) -> u64 {
         self.parity_terms
-    }
-
-    pub fn max_repeat_depth(&self) -> u64 {
-        self.max_repeat_depth
     }
 }
 
@@ -188,9 +169,6 @@ pub struct MeasurementTransform {
     free_columns: Vec<usize>,
     equations: Vec<EchelonEquation>,
     solve_order: Vec<usize>,
-    expanded_instructions: u64,
-    parity_terms: u64,
-    max_repeat_depth: u64,
     transform_working_bytes: u64,
 }
 
@@ -297,9 +275,6 @@ impl MeasurementTransform {
             free_columns: elimination.free_columns,
             equations: elimination.equations,
             solve_order: elimination.solve_order,
-            expanded_instructions: layout.expanded_instructions,
-            parity_terms: layout.parity_terms,
-            max_repeat_depth: layout.max_repeat_depth,
             transform_working_bytes: actual_bytes,
         })
     }
@@ -348,74 +323,6 @@ impl MeasurementTransform {
         self.transform_working_bytes
     }
 
-    pub fn expanded_instructions(&self) -> u64 {
-        self.expanded_instructions
-    }
-
-    pub fn parity_terms(&self) -> u64 {
-        self.parity_terms
-    }
-
-    pub fn max_repeat_depth(&self) -> u64 {
-        self.max_repeat_depth
-    }
-
-    pub fn validate_actual_usage(
-        &self,
-        limits: MeasurementTransformLimits,
-        block_shots: Option<usize>,
-    ) -> Result<(), MeasurementTransformError> {
-        enforce_u64(
-            "max_measurements",
-            self.identity.measurement_count,
-            limits.max_measurements,
-        )?;
-        enforce_u64(
-            "max_detectors",
-            self.identity.detector_count,
-            limits.max_detectors,
-        )?;
-        enforce_u64(
-            "max_observables",
-            self.identity.observable_count,
-            limits.max_observables,
-        )?;
-        enforce_u64(
-            "max_repeat_depth",
-            self.max_repeat_depth,
-            limits.max_repeat_depth,
-        )?;
-        enforce_u64(
-            "max_expanded_instructions",
-            self.expanded_instructions,
-            limits.max_expanded_instructions,
-        )?;
-        enforce_u64(
-            "max_parity_terms",
-            self.parity_terms,
-            limits.max_parity_terms,
-        )?;
-        enforce_u64(
-            "max_transform_working_bytes",
-            self.transform_working_bytes,
-            limits.max_transform_working_bytes,
-        )?;
-        if let Some(shots) = block_shots {
-            enforce_u64(
-                "max_shots_per_block",
-                shots as u64,
-                limits.max_shots_per_block,
-            )?;
-            let block_bytes = self.estimate_block_working_bytes(shots)?;
-            enforce_u64(
-                "max_block_working_bytes",
-                block_bytes,
-                limits.max_block_working_bytes,
-            )?;
-        }
-        Ok(())
-    }
-
     pub fn estimate_block_working_bytes(
         &self,
         shots: usize,
@@ -434,14 +341,6 @@ impl MeasurementTransform {
         &self,
         measurements: &BitTable,
     ) -> Result<EncodedMeasurementBlock, MeasurementTransformError> {
-        self.encode_block_prefix(measurements, measurements.num_minor())
-    }
-
-    pub(crate) fn encode_block_prefix(
-        &self,
-        measurements: &BitTable,
-        shots: usize,
-    ) -> Result<EncodedMeasurementBlock, MeasurementTransformError> {
         if measurements.num_major() != self.num_measurements() {
             return Err(MeasurementTransformError::ShapeMismatch {
                 detail: format!(
@@ -451,14 +350,7 @@ impl MeasurementTransform {
                 ),
             });
         }
-        if shots > measurements.num_minor() {
-            return Err(MeasurementTransformError::ShapeMismatch {
-                detail: format!(
-                    "measurement shot prefix {shots} exceeds table shots {}",
-                    measurements.num_minor()
-                ),
-            });
-        }
+        let shots = measurements.num_minor();
         self.validate_block_shots(shots)?;
         let block_bytes = self.estimate_block_working_bytes(shots)?;
         enforce_bytes(
@@ -614,10 +506,8 @@ struct LayoutBuilder {
     measurement_count: u64,
     detector_rows: Vec<Vec<usize>>,
     observable_rows: Vec<Vec<usize>>,
-    loss_visible_measurements: Vec<LossVisibleMeasurementPair>,
     expanded_instructions: u64,
     parity_terms: u64,
-    max_repeat_depth: u64,
     layout_working_bytes: u64,
 }
 
@@ -628,10 +518,8 @@ impl LayoutBuilder {
             measurement_count: 0,
             detector_rows: Vec::new(),
             observable_rows: Vec::new(),
-            loss_visible_measurements: Vec::new(),
             expanded_instructions: 0,
             parity_terms: 0,
-            max_repeat_depth: 0,
             layout_working_bytes: 0,
         }
     }
@@ -660,7 +548,6 @@ impl LayoutBuilder {
                             limit: "max_repeat_depth",
                         });
                     }
-                    self.max_repeat_depth = self.max_repeat_depth.max(next_depth);
                     self.preflight_repeat_body(*count, body, next_depth)?;
                     for _ in 0..*count {
                         self.visit_instrs(body, next_depth)?;
@@ -725,40 +612,6 @@ impl LayoutBuilder {
                 xor_terms_into(&mut self.observable_rows[index], &row);
             }
             _ => {
-                if is_loss_visible_measurement(name) {
-                    let pair_count = count_qubit_like_targets(targets);
-                    let base = usize::try_from(self.measurement_count).map_err(|_| {
-                        MeasurementTransformError::LimitExceeded {
-                            limit: "max_measurements",
-                        }
-                    })?;
-                    let pair_bytes = pair_count
-                        .checked_mul(std::mem::size_of::<LossVisibleMeasurementPair>())
-                        .and_then(|value| u64::try_from(value).ok())
-                        .ok_or(MeasurementTransformError::LimitExceeded {
-                            limit: "max_transform_working_bytes",
-                        })?;
-                    self.reserve_layout_bytes(pair_bytes)?;
-                    for pair in 0..pair_count {
-                        let offset = pair.checked_mul(2).ok_or(
-                            MeasurementTransformError::LimitExceeded {
-                                limit: "max_measurements",
-                            },
-                        )?;
-                        let flag = base.checked_add(offset).ok_or(
-                            MeasurementTransformError::LimitExceeded {
-                                limit: "max_measurements",
-                            },
-                        )?;
-                        let value = flag.checked_add(1).ok_or(
-                            MeasurementTransformError::LimitExceeded {
-                                limit: "max_measurements",
-                            },
-                        )?;
-                        self.loss_visible_measurements
-                            .push(LossVisibleMeasurementPair { flag, value });
-                    }
-                }
                 let produced = count_measurements_op_u64(name, targets)?;
                 self.measurement_count = self.measurement_count.checked_add(produced).ok_or(
                     MeasurementTransformError::LimitExceeded {
@@ -934,13 +787,6 @@ impl LayoutBuilder {
             Ok(())
         }
     }
-}
-
-fn is_loss_visible_measurement(name: &str) -> bool {
-    matches!(
-        name,
-        "ML" | "MXL" | "MYL" | "MZL" | "MRL" | "MRXL" | "MRYL" | "MRZL"
-    )
 }
 
 pub(crate) fn num_measurements_unchecked(instrs: &[StimInstr]) -> usize {
@@ -1253,7 +1099,6 @@ fn xor_parity_terms_into_row(
             xor_all_valid_bits(dst, shots);
         }
     }
-    clear_invalid_bits(dst, shots);
 }
 
 fn copy_measurement_flip_row(
@@ -1263,12 +1108,10 @@ fn copy_measurement_flip_row(
     reference: bool,
     shots: usize,
 ) {
-    let src = measurements.row_words(measurement_col);
-    dst.copy_from_slice(&src[..dst.len()]);
+    dst.copy_from_slice(measurements.row_words(measurement_col));
     if reference {
         invert_valid_bits(dst, shots);
     }
-    clear_invalid_bits(dst, shots);
 }
 
 fn xor_all_valid_bits(words: &mut [u64], shots: usize) {
@@ -1287,17 +1130,6 @@ fn xor_all_valid_bits(words: &mut [u64], shots: usize) {
 
 fn invert_valid_bits(words: &mut [u64], shots: usize) {
     xor_all_valid_bits(words, shots);
-}
-
-fn clear_invalid_bits(words: &mut [u64], shots: usize) {
-    if shots == 0 || words.is_empty() {
-        return;
-    }
-    let rem = shots % 64;
-    if rem != 0 {
-        let last = shots / 64;
-        words[last] &= (1u64 << rem) - 1;
-    }
 }
 
 fn for_each_set_bit(row_words: &[u64], num_bits: usize, mut f: impl FnMut(usize)) {
@@ -1488,18 +1320,6 @@ fn enforce_bytes(
     }
 }
 
-fn enforce_u64(
-    limit: &'static str,
-    actual: u64,
-    allowed: u64,
-) -> Result<(), MeasurementTransformError> {
-    if actual > allowed {
-        Err(MeasurementTransformError::LimitExceeded { limit })
-    } else {
-        Ok(())
-    }
-}
-
 fn observable_index(args: &[f64]) -> Result<usize, MeasurementTransformError> {
     let raw = args.first().copied().unwrap_or(0.0);
     if !raw.is_finite() || raw < 0.0 || raw.fract() != 0.0 {
@@ -1533,7 +1353,6 @@ fn usize_from_u128(value: u128) -> usize {
 mod tests {
     use super::*;
     use crate::ir::PauliBasis;
-    use crate::parser::parse_lines;
 
     #[test]
     fn private_helpers_cover_edge_cases() {
@@ -1579,102 +1398,5 @@ mod tests {
                 limit: "test_limit"
             })
         ));
-
-        let circuit = parse_lines("REPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n")
-            .expect("parse repeat circuit");
-        let layout = CheckedMeasurementLayout::from_circuit_with_limits(
-            &circuit,
-            MeasurementTransformLimits::default(),
-        )
-        .expect("layout builds");
-        assert_eq!(layout.max_repeat_depth(), 1);
-
-        let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
-        assert!(transform
-            .validate_actual_usage(MeasurementTransformLimits::default(), Some(1))
-            .is_ok());
-    }
-
-    #[test]
-    fn encode_block_prefix_uses_only_requested_shots() {
-        let circuit = parse_lines("M 0 1 2\nDETECTOR rec[-3] rec[-2]\nDETECTOR rec[-2] rec[-1]\n")
-            .expect("parse transform circuit");
-        let transform = MeasurementTransform::from_circuit(&circuit).expect("transform builds");
-        let mut buffered =
-            BitTable::try_new(transform.num_measurements(), 4096).expect("buffer allocates");
-        let mut prefix =
-            BitTable::try_new(transform.num_measurements(), 65).expect("prefix allocates");
-        for row in 0..buffered.num_major() {
-            for shot in 0..buffered.num_minor() {
-                let value = if shot < prefix.num_minor() {
-                    (row * 19 + shot * 23) % 3 == 1
-                } else {
-                    true
-                };
-                buffered.set(row, shot, value);
-                if shot < prefix.num_minor() {
-                    prefix.set(row, shot, value);
-                }
-            }
-        }
-
-        let encoded_prefix = transform
-            .encode_block_prefix(&buffered, prefix.num_minor())
-            .expect("encode buffered prefix");
-        let encoded_exact = transform
-            .encode_block(&prefix)
-            .expect("encode exact prefix");
-        let encoded_exact_prefix = transform
-            .encode_block_prefix(&prefix, prefix.num_minor())
-            .expect("encode exact full prefix");
-        assert!(matches!(
-            transform
-                .encode_block_prefix(&prefix, prefix.num_minor() + 1)
-                .unwrap_err(),
-            MeasurementTransformError::ShapeMismatch { detail }
-                if detail.contains("measurement shot prefix")
-        ));
-        assert_tables_eq(
-            &encoded_exact.selected_detectors,
-            &encoded_prefix.selected_detectors,
-        );
-        assert_tables_eq(
-            &encoded_exact.free_measurements,
-            &encoded_prefix.free_measurements,
-        );
-        assert_tables_eq(
-            &encoded_exact.selected_detectors,
-            &encoded_exact_prefix.selected_detectors,
-        );
-        assert_tables_eq(
-            &encoded_exact.free_measurements,
-            &encoded_exact_prefix.free_measurements,
-        );
-        assert_row_words_eq(
-            &encoded_exact.selected_detectors,
-            &encoded_prefix.selected_detectors,
-        );
-        assert_row_words_eq(
-            &encoded_exact.free_measurements,
-            &encoded_prefix.free_measurements,
-        );
-    }
-
-    fn assert_tables_eq(left: &BitTable, right: &BitTable) {
-        assert_eq!(left.num_major(), right.num_major());
-        assert_eq!(left.num_minor(), right.num_minor());
-        for row in 0..left.num_major() {
-            for shot in 0..left.num_minor() {
-                assert_eq!(left.get(row, shot), right.get(row, shot));
-            }
-        }
-    }
-
-    fn assert_row_words_eq(left: &BitTable, right: &BitTable) {
-        assert_eq!(left.num_major(), right.num_major());
-        assert_eq!(left.num_minor(), right.num_minor());
-        for row in 0..left.num_major() {
-            assert_eq!(left.row_words(row), right.row_words(row));
-        }
     }
 }

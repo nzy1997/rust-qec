@@ -7,10 +7,10 @@ use rstim::executor::reference_sample;
 use rstim::parser::parse_lines;
 use rstim::rare_error_iterator::{rare_error_telemetry, reset_rare_error_telemetry};
 use rstim::sim::frame::{
-    depolarize2_branch_label_for_test, depolarize2_decode_event_for_test,
+    FrameSimulator, depolarize2_branch_label_for_test, depolarize2_decode_event_for_test,
     depolarize2_sampling_telemetry, reset_depolarize2_sampling_telemetry,
     reset_frame_noise_telemetry, sample_depolarize2_branch_index_for_test,
-    take_frame_noise_telemetry, FrameSimulator,
+    take_frame_noise_telemetry,
 };
 
 struct ScriptedRng {

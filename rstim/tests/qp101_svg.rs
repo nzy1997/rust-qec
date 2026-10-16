@@ -1,11 +1,9 @@
-use rstim::interactive_shot::{CircuitSession, ExpansionLimits};
 use rstim::parser::parse_lines;
 use rstim::qp101::{
     Qp101Annotation, Qp101AnnotationStyle, Qp101Display, Qp101Document, Qp101Operation,
     Qp101PauliBasis, Qp101TargetRef, export_qp101,
 };
 use rstim::qp101_svg::render_svg;
-use rstim::qp101_svg::render_svg_interactive;
 
 #[test]
 fn svg_renderer_draws_wires_gates_and_ticks() {
@@ -56,72 +54,6 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
         !svg.contains("A&B<test>"),
         "display label must not appear as raw XML-sensitive text: {svg}"
     );
-}
-
-#[test]
-fn svg_renderer_draws_single_qubit_clifford_batches_only_on_target_wires() {
-    // These are independent one-qubit operations, including the aliases accepted
-    // by circuit validation. A sparse batch must not cover the intervening wires.
-    for gate in [
-        "I",
-        "H",
-        "H_XY",
-        "H_YZ",
-        "S",
-        "SQRT_Z",
-        "S_DAG",
-        "SQRT_Z_DAG",
-        "SQRT_X",
-        "SQRT_X_DAG",
-        "SQRT_Y",
-        "SQRT_Y_DAG",
-        "X",
-        "Y",
-        "Z",
-        "C_XYZ",
-        "C_ZYX",
-        "C_NXYZ",
-        "C_NZYX",
-        "C_XNYZ",
-        "C_XYNZ",
-        "C_ZNYX",
-        "C_ZYNX",
-        "H_NXY",
-        "H_NXZ",
-        "H_NYZ",
-    ] {
-        let instrs =
-            rstim::validation::parse_and_validate(&format!("QUBIT_COORDS(0) 4\n{gate} 3 0\n"))
-                .expect("single-qubit Clifford fixture should validate");
-        let doc = export_qp101(&instrs).expect("fixture should export");
-        let svg = render_svg(&doc).expect("fixture should render");
-        let mut positions = text_positions(&svg, gate);
-        positions.sort_by_key(|(_, y)| *y);
-        assert_eq!(
-            positions.len(),
-            2,
-            "{gate} needs one label per target: {svg}"
-        );
-        assert_eq!(
-            positions[0].0, positions[1].0,
-            "{gate} batch must share a column"
-        );
-        assert_eq!(positions[0].1, text_y(&svg, "q0").unwrap(), "{gate}");
-        assert_eq!(positions[1].1, text_y(&svg, "q3").unwrap(), "{gate}");
-        let boxes: Vec<_> = svg
-            .lines()
-            .filter(|line| line.contains("class=\"gate-box\""))
-            .collect();
-        assert_eq!(boxes.len(), 2, "{gate} needs exactly two boxes: {svg}");
-        for (_, y) in positions {
-            assert!(
-                boxes.iter().any(|line| {
-                    line.contains(&format!(" y=\"{}\"", y - 14)) && line.contains(" height=\"28\"")
-                }),
-                "{gate} box must cover only its target wire: {svg}"
-            );
-        }
-    }
 }
 
 #[test]
@@ -193,11 +125,6 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
     assert!(
         svg.contains(">SWAP</text>"),
         "SWAP should retain its note label: {svg}"
-    );
-    assert_eq!(
-        text_y(&svg, "SWAP"),
-        Some(122),
-        "SWAP note should sit above its upper endpoint instead of at the top of the diagram: {svg}"
     );
 }
 
@@ -387,7 +314,7 @@ fn svg_renderer_renders_qp101_fallback_operations_and_annotations() {
         "DETECTOR",
         "D0 = m1",
         "OBS_INCLUDE(7)",
-        "L7 = m1",
+        "L7 *= m1",
         "loop: round: body",
         "NOTE: A&amp;B&lt;test&gt;",
         "SWAP",
@@ -911,7 +838,7 @@ fn svg_renderer_resolves_detector_observable_sources() {
     let observable_svg =
         render_svg(&observable_doc).expect("observable source fixture should render");
 
-    for marker in [">OBS_INCLUDE(2)</text>", ">L2 = m1</text>"] {
+    for marker in [">OBS_INCLUDE(2)</text>", ">L2 *= m1</text>"] {
         assert!(
             observable_svg.contains(marker),
             "observable SVG should contain {marker}: {observable_svg}"
@@ -988,42 +915,12 @@ fn svg_renderer_resolves_detector_observable_sources() {
     for marker in [
         ">D0 = sweep[0]*!X1</text>",
         ">OBS_INCLUDE(3)</text>",
-        ">L3 = !q1</text>",
+        ">L3 *= !q1</text>",
     ] {
         assert!(
             hand_built_svg.contains(marker),
             "hand-built source SVG should contain {marker}: {hand_built_svg}"
         );
-    }
-}
-
-#[test]
-fn svg_renderer_assigns_first_observable_include_then_accumulates() {
-    let doc = export_qp101(
-        &parse_lines(
-            "M 0 1\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
-        )
-        .expect("observable accumulation fixture should parse"),
-    )
-    .expect("observable accumulation fixture should export");
-    let svg = render_svg(&doc).expect("observable accumulation fixture should render");
-
-    for marker in [">L0 = m1</text>", ">L0 *= m2</text>", ">L1 = m2</text>"] {
-        assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
-    }
-}
-
-#[test]
-fn svg_renderer_uses_bit_parity_for_measurement_only_sources() {
-    let doc = export_qp101(
-        &parse_lines("M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n")
-            .expect("measurement parity fixture should parse"),
-    )
-    .expect("measurement parity fixture should export");
-    let svg = render_svg(&doc).expect("measurement parity fixture should render");
-
-    for marker in [">D0 = m1 ⊕ m2</text>", ">L0 = m1 ⊕ m2</text>"] {
-        assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
     }
 }
 
@@ -1047,7 +944,7 @@ fn svg_renderer_covers_source_history_edge_cases() {
     let empty_source_svg =
         render_svg(&empty_source_doc).expect("empty source labels should render");
 
-    for marker in [">D0 = -</text>", ">L5 = -</text>"] {
+    for marker in [">D0 = -</text>", ">L5 *= -</text>"] {
         assert!(
             empty_source_svg.contains(marker),
             "empty source SVG should contain {marker}: {empty_source_svg}"
@@ -1302,28 +1199,6 @@ fn svg_renderer_packs_lane_disjoint_known_noise_boxes() {
         "each known noise box should keep its own decimal probability label: {svg}"
     );
     assert_no_overlapping_rects(&element_rects(&svg, "noise-box"), &svg);
-}
-
-#[test]
-fn svg_renderer_preserves_source_order_per_lane_within_a_tick_layer() {
-    let instrs =
-        parse_lines("CX 1 3 0 2\nLOSS(0.1) 0\nTICK\n").expect("causal-order fixture should parse");
-    let doc = export_qp101(&instrs).expect("causal-order fixture should export");
-    let svg = render_svg(&doc).expect("causal-order fixture should render");
-
-    let cx_positions = text_positions(&svg, "CX");
-    assert_eq!(
-        cx_positions.len(),
-        2,
-        "fixture should render two CX pairs: {svg}"
-    );
-    let loss_x = text_xy(&svg, "LOSS")
-        .expect("LOSS label should be positioned")
-        .0;
-    assert!(
-        loss_x > cx_positions[1].0,
-        "later q0 LOSS must render after the earlier q0 CX pair: {svg}"
-    );
 }
 
 #[test]
@@ -1588,50 +1463,6 @@ fn svg_renderer_labels_measurements_with_global_anchors() {
         !reset_svg.contains(">m1</text>"),
         "reset-only gates must not receive measurement anchors: {reset_svg}"
     );
-}
-
-#[test]
-fn svg_renderer_draws_multi_target_measurements_as_independent_boxes() {
-    let instrs = parse_lines("M 0 2\nMR 1 3\n").expect("measurement fixture should parse");
-    let doc = export_qp101(&instrs).expect("measurement fixture should export");
-    let svg = render_svg(&doc).expect("measurement fixture should render");
-
-    assert_eq!(
-        svg.matches("class=\"gate-box\"").count(),
-        4,
-        "each measurement target should have one gate box: {svg}"
-    );
-    assert_eq!(svg.matches(">M</text>").count(), 2, "{svg}");
-    assert_eq!(svg.matches(">MR</text>").count(), 2, "{svg}");
-    assert_eq!(
-        svg.matches("height=\"28\"").count(),
-        4,
-        "measurement boxes must not span unrelated qubit lanes: {svg}"
-    );
-}
-
-#[test]
-fn svg_renderer_places_sample_results_over_their_measurement_targets() {
-    let instrs = parse_lines("M 0 2\n").expect("measurement result fixture should parse");
-    let mut doc = export_qp101(&instrs).expect("measurement result fixture should export");
-    match &mut doc.operations[0] {
-        Qp101Operation::Gate { annotations, .. } => {
-            let mut first = annotation("marker", Some("0"), None);
-            first.target_slots = vec![0];
-            first.tags = vec!["sample-trace".to_string(), "query-result".to_string()];
-            annotations.push(first);
-
-            let mut second = annotation("marker", Some("1"), None);
-            second.target_slots = vec![1];
-            second.tags = vec!["sample-trace".to_string(), "query-result".to_string()];
-            annotations.push(second);
-        }
-        op => panic!("expected measurement gate, got {op:?}"),
-    }
-
-    let svg = render_svg(&doc).expect("measurement result fixture should render");
-    assert_eq!(text_y(&svg, "0"), Some(34), "{svg}");
-    assert_eq!(text_y(&svg, "1"), Some(210), "{svg}");
 }
 
 #[test]
@@ -2164,37 +1995,4 @@ fn styled_annotation(
         tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
         context: None,
     }
-}
-
-#[test]
-fn interactive_svg_exposes_stable_ids_for_expanded_repeat_instances_and_results() {
-    let source = "REPEAT 2 {\n  X_ERROR(0.1) 0\n  M 0\n  DETECTOR rec[-1]\n  OBSERVABLE_INCLUDE(0) rec[-1]\n}\n";
-    let session = CircuitSession::open(source, ExpansionLimits::default())
-        .expect("interactive fixture should open");
-    let doc = export_qp101(session.instructions()).expect("fixture should export");
-    let svg = render_svg_interactive(&doc, session.circuit_digest())
-        .expect("interactive SVG should render");
-
-    assert_eq!(svg.matches("class=\"noise-site\"").count(), 2, "{svg}");
-    for event in session.catalog().events() {
-        assert!(
-            svg.contains(&format!("data-noise-event-id=\"{}\"", event.id.encode())),
-            "missing expanded event {}: {svg}",
-            event.id
-        );
-    }
-    for marker in [
-        "data-measurement-ids=\"m1\"",
-        "data-measurement-ids=\"m2\"",
-        "data-detector-id=\"d0\"",
-        "data-detector-id=\"d1\"",
-        "data-observable-id=\"l0-0\"",
-        "data-observable-id=\"l0-1\"",
-    ] {
-        assert!(svg.contains(marker), "missing {marker}: {svg}");
-    }
-
-    let plain = render_svg(&doc).expect("plain SVG should still render");
-    assert!(!plain.contains("data-noise-event-id"));
-    assert!(!plain.contains("data-measurement-ids"));
 }

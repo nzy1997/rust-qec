@@ -1,5 +1,5 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::{executor::Executor, parser::parse_lines};
 
 #[test]
@@ -85,8 +85,13 @@ fn y_error_flips_at_expected_rate() {
         let mut ex = Executor::from_instrs(instrs.clone()).unwrap();
         let mut rng = StdRng::seed_from_u64(seed as u64);
         let out = ex.run(&mut rng).unwrap();
-        if out.measurements[0] { ones += 1; }
+        if out.measurements[0] {
+            ones += 1;
+        }
     }
     let rate = ones as f64 / shots as f64;
-    assert!((rate - 0.3).abs() < 0.05, "Y_ERROR rate {rate} not near 0.3");
+    assert!(
+        (rate - 0.3).abs() < 0.05,
+        "Y_ERROR rate {rate} not near 0.3"
+    );
 }

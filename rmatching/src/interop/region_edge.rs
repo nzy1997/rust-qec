@@ -1,5 +1,5 @@
-use crate::types::*;
 use super::compressed_edge::CompressedEdge;
+use crate::types::*;
 
 #[derive(Debug, Clone)]
 pub struct RegionEdge {

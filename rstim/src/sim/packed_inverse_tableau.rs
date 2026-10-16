@@ -1,14 +1,4 @@
-use rand::Rng;
-
 use crate::data_path::ReferenceBuildPhaseCounters;
-use crate::sim::bit_transpose::transpose_64x64;
-#[cfg(test)]
-use crate::sim::bit_transpose::transpose_64x64_portable;
-
-// The common 241-qubit surface-code workload lands exactly on these two packed widths. Keep a
-// branch-free fast path for those inner loops and retain the generic fallback for every size.
-const FAST_QUBIT_WORDS: usize = 4;
-const FAST_TRANSPOSED_ROW_WORDS: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalTableauSnapshot {
@@ -25,7 +15,6 @@ pub struct PackedInverseTableau {
     x_plane: Vec<u64>,
     z_plane: Vec<u64>,
     signs: Vec<u64>,
-    row_y_count_mod4: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +33,6 @@ struct PackedTransposedInverseTableau {
     x_columns: Vec<u64>,
     z_columns: Vec<u64>,
     signs: Vec<u64>,
-    cx_targets: Vec<usize>,
 }
 
 impl PackedCanonicalRows {
@@ -222,72 +210,52 @@ impl PackedTransposedInverseTableau {
             x_columns: vec![0; num_qubits * row_words],
             z_columns: vec![0; num_qubits * row_words],
             signs: tableau.signs.clone(),
-            cx_targets: Vec::with_capacity(num_qubits),
         };
-        transpose_packed_plane(
-            &tableau.x_plane,
-            tableau.num_rows(),
-            num_qubits,
-            tableau.words_per_row,
-            &mut view.x_columns,
-        );
-        transpose_packed_plane(
-            &tableau.z_plane,
-            tableau.num_rows(),
-            num_qubits,
-            tableau.words_per_row,
-            &mut view.z_columns,
-        );
+
+        for row in 0..tableau.num_rows() {
+            let row_start = tableau.row_start(row);
+            for qubit in 0..num_qubits {
+                if bit_is_set(tableau.x_plane[row_start + qubit / 64], qubit % 64) {
+                    set_bit(view.x_column_mut(qubit), row);
+                }
+                if bit_is_set(tableau.z_plane[row_start + qubit / 64], qubit % 64) {
+                    set_bit(view.z_column_mut(qubit), row);
+                }
+            }
+        }
         view
     }
 
     fn write_back(self, tableau: &mut PackedInverseTableau) {
         assert_eq!(self.num_qubits, tableau.num_qubits);
+        tableau.x_plane.fill(0);
+        tableau.z_plane.fill(0);
         tableau.signs.clone_from_slice(&self.signs);
-        transpose_packed_plane(
-            &self.x_columns,
-            self.num_qubits,
-            tableau.num_rows(),
-            self.row_words,
-            &mut tableau.x_plane,
-        );
-        transpose_packed_plane(
-            &self.z_columns,
-            self.num_qubits,
-            tableau.num_rows(),
-            self.row_words,
-            &mut tableau.z_plane,
-        );
-        tableau.recompute_row_y_counts();
+
+        for row in 0..tableau.num_rows() {
+            let row_start = tableau.row_start(row);
+            for qubit in 0..self.num_qubits {
+                if bit_from_words(self.x_column(qubit), row) {
+                    tableau.x_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+                if bit_from_words(self.z_column(qubit), row) {
+                    tableau.z_plane[row_start + qubit / 64] |= 1u64 << (qubit % 64);
+                }
+            }
+            tableau.mask_row_padding(row);
+        }
     }
 
     fn collapse_z(&mut self, target: usize) -> bool {
-        self.collapse_z_with_pivot(target).is_some()
-    }
+        let Some(pivot) = self.find_zx_pivot(target) else {
+            return false;
+        };
 
-    fn collapse_z_with_pivot(&mut self, target: usize) -> Option<usize> {
-        let pivot = self.find_zx_pivot(target)?;
-
-        self.cx_targets.clear();
-        if self.row_words == FAST_TRANSPOSED_ROW_WORDS {
-            let support_row = self.num_qubits + target;
-            let support_word = support_row / 64;
-            let support_mask = 1u64 << (support_row % 64);
-            for qubit in pivot + 1..self.num_qubits {
-                if self.x_columns[qubit * FAST_TRANSPOSED_ROW_WORDS + support_word] & support_mask
-                    != 0
-                {
-                    self.cx_targets.push(qubit);
-                }
-            }
-        } else {
-            for qubit in pivot + 1..self.num_qubits {
-                if self.z_x(target, qubit) {
-                    self.cx_targets.push(qubit);
-                }
+        for qubit in pivot + 1..self.num_qubits {
+            if self.z_x(target, qubit) {
+                self.append_zcx(pivot, qubit);
             }
         }
-        self.append_zcx_targets(pivot);
 
         if self.z_z(target, pivot) {
             self.append_h_yz(pivot);
@@ -297,23 +265,10 @@ impl PackedTransposedInverseTableau {
         if self.z_sign(target) {
             self.append_x(pivot);
         }
-        Some(pivot)
+        true
     }
 
     fn find_zx_pivot(&self, target: usize) -> Option<usize> {
-        if self.row_words == FAST_TRANSPOSED_ROW_WORDS {
-            let support_row = self.num_qubits + target;
-            let support_word = support_row / 64;
-            let support_mask = 1u64 << (support_row % 64);
-            for qubit in 0..self.num_qubits {
-                if self.x_columns[qubit * FAST_TRANSPOSED_ROW_WORDS + support_word] & support_mask
-                    != 0
-                {
-                    return Some(qubit);
-                }
-            }
-            return None;
-        }
         (0..self.num_qubits).find(|&qubit| self.z_x(target, qubit))
     }
 
@@ -322,13 +277,6 @@ impl PackedTransposedInverseTableau {
     }
 
     fn z_z(&self, z_row_qubit: usize, z_qubit: usize) -> bool {
-        if self.row_words == FAST_TRANSPOSED_ROW_WORDS {
-            let row = self.num_qubits + z_row_qubit;
-            return bit_is_set(
-                self.z_columns[z_qubit * FAST_TRANSPOSED_ROW_WORDS + row / 64],
-                row % 64,
-            );
-        }
         bit_from_words(self.z_column(z_qubit), self.num_qubits + z_row_qubit)
     }
 
@@ -337,74 +285,16 @@ impl PackedTransposedInverseTableau {
     }
 
     fn append_zcx(&mut self, control: usize, target: usize) {
-        if self.row_words == FAST_TRANSPOSED_ROW_WORDS {
-            self.append_zcx_word::<0>(control, target);
-            self.append_zcx_word::<1>(control, target);
-            self.append_zcx_word::<2>(control, target);
-            self.append_zcx_word::<3>(control, target);
-            self.append_zcx_word::<4>(control, target);
-            self.append_zcx_word::<5>(control, target);
-            self.append_zcx_word::<6>(control, target);
-            self.append_zcx_word::<7>(control, target);
-            return;
-        }
         for word in 0..self.row_words {
-            self.append_zcx_dynamic_word(control, target, word);
+            let cx = self.x_column(control)[word];
+            let cz = self.z_column(control)[word];
+            let tx = self.x_column(target)[word];
+            let tz = self.z_column(target)[word];
+            self.signs[word] ^= (cx & tz) & !(cz ^ tx);
+            self.z_column_mut(control)[word] ^= tz;
+            self.x_column_mut(target)[word] ^= cx;
         }
-    }
-
-    fn append_zcx_targets(&mut self, control: usize) {
-        if self.row_words != FAST_TRANSPOSED_ROW_WORDS {
-            for index in 0..self.cx_targets.len() {
-                self.append_zcx(control, self.cx_targets[index]);
-            }
-            return;
-        }
-
-        let control_start = control * FAST_TRANSPOSED_ROW_WORDS;
-        let control_x: [u64; FAST_TRANSPOSED_ROW_WORDS] =
-            std::array::from_fn(|word| self.x_columns[control_start + word]);
-        let mut control_z: [u64; FAST_TRANSPOSED_ROW_WORDS] =
-            std::array::from_fn(|word| self.z_columns[control_start + word]);
-        let mut signs: [u64; FAST_TRANSPOSED_ROW_WORDS] =
-            std::array::from_fn(|word| self.signs[word]);
-
-        for &target in &self.cx_targets {
-            let target_start = target * FAST_TRANSPOSED_ROW_WORDS;
-            for word in 0..FAST_TRANSPOSED_ROW_WORDS {
-                let target_x = self.x_columns[target_start + word];
-                let target_z = self.z_columns[target_start + word];
-                signs[word] ^= (control_x[word] & target_z) & !(control_z[word] ^ target_x);
-                control_z[word] ^= target_z;
-                self.x_columns[target_start + word] = target_x ^ control_x[word];
-            }
-        }
-
-        self.z_columns[control_start..control_start + FAST_TRANSPOSED_ROW_WORDS]
-            .copy_from_slice(&control_z);
-        self.signs.copy_from_slice(&signs);
-    }
-
-    #[inline(always)]
-    fn append_zcx_word<const WORD: usize>(&mut self, control: usize, target: usize) {
-        let cx = self.x_column(control)[WORD];
-        let cz = self.z_column(control)[WORD];
-        let tx = self.x_column(target)[WORD];
-        let tz = self.z_column(target)[WORD];
-        self.signs[WORD] ^= (cx & tz) & !(cz ^ tx);
-        self.z_column_mut(control)[WORD] ^= tz;
-        self.x_column_mut(target)[WORD] ^= cx;
-    }
-
-    #[inline(always)]
-    fn append_zcx_dynamic_word(&mut self, control: usize, target: usize, word: usize) {
-        let cx = self.x_column(control)[word];
-        let cz = self.z_column(control)[word];
-        let tx = self.x_column(target)[word];
-        let tz = self.z_column(target)[word];
-        self.signs[word] ^= (cx & tz) & !(cz ^ tx);
-        self.z_column_mut(control)[word] ^= tz;
-        self.x_column_mut(target)[word] ^= cx;
+        self.mask_padding();
     }
 
     fn append_h_xz(&mut self, q: usize) {
@@ -415,6 +305,7 @@ impl PackedTransposedInverseTableau {
             self.x_column_mut(q)[word] = z;
             self.z_column_mut(q)[word] = x;
         }
+        self.mask_padding();
     }
 
     fn append_h_yz(&mut self, q: usize) {
@@ -424,12 +315,14 @@ impl PackedTransposedInverseTableau {
             self.signs[word] ^= x & !z;
             self.x_column_mut(q)[word] = x ^ z;
         }
+        self.mask_padding();
     }
 
     fn append_x(&mut self, q: usize) {
         for word in 0..self.row_words {
             self.signs[word] ^= self.z_column(q)[word];
         }
+        self.mask_padding();
     }
 
     fn x_column(&self, qubit: usize) -> &[u64] {
@@ -451,6 +344,20 @@ impl PackedTransposedInverseTableau {
         let start = qubit * self.row_words;
         &mut self.z_columns[start..start + self.row_words]
     }
+
+    fn mask_padding(&mut self) {
+        let valid_rows = 2 * self.num_qubits;
+        let tail_bits = valid_rows % 64;
+        if tail_bits != 0 {
+            let mask = (1u64 << tail_bits) - 1;
+            let last = self.row_words - 1;
+            self.signs[last] &= mask;
+            for qubit in 0..self.num_qubits {
+                self.x_column_mut(qubit)[last] &= mask;
+                self.z_column_mut(qubit)[last] &= mask;
+            }
+        }
+    }
 }
 
 impl PackedInverseTableau {
@@ -469,7 +376,6 @@ impl PackedInverseTableau {
             x_plane: vec![0; plane_len],
             z_plane: vec![0; plane_len],
             signs: vec![0; words_for_bits(num_rows)],
-            row_y_count_mod4: vec![0; num_rows],
         };
 
         for qubit in 0..num_qubits {
@@ -524,7 +430,11 @@ impl PackedInverseTableau {
     }
 
     pub fn canonical_phase(&self, row: usize) -> u8 {
-        if self.sign_bit(row) { 2 } else { 0 }
+        if self.sign_bit(row) {
+            2
+        } else {
+            0
+        }
     }
 
     pub fn set_sign_bit(&mut self, row: usize, negative: bool) {
@@ -558,7 +468,6 @@ impl PackedInverseTableau {
         }
 
         self.set_sign_bit(dst, self.sign_bit(src));
-        self.row_y_count_mod4[dst] = self.row_y_count_mod4[src];
         self.mask_row_padding(dst);
     }
 
@@ -577,10 +486,6 @@ impl PackedInverseTableau {
             self.z_plane[dst_start + offset] ^= self.z_plane[src_start + offset];
         }
 
-        self.row_y_count_mod4[dst] = words_y_count_mod4(
-            &self.x_plane[dst_start..dst_start + self.words_per_row],
-            &self.z_plane[dst_start..dst_start + self.words_per_row],
-        );
         self.mask_row_padding(dst);
     }
 
@@ -620,12 +525,17 @@ impl PackedInverseTableau {
     pub fn cx(&mut self, c: usize, t: usize) {
         self.check_qubit(c);
         self.check_qubit(t);
-        assert_ne!(c, t, "CX control and target must differ");
 
-        // These pairs are commuting inverse images of basis Paulis. Multiplying directly into
-        // the destination avoids four temporary vectors and a scan of every tableau row.
-        self.multiply_commuting_row_into(t, c);
-        self.multiply_commuting_row_into(self.num_qubits + c, self.num_qubits + t);
+        let mut x_rows = [c, t];
+        x_rows.sort_unstable();
+        let mut z_rows = [self.num_qubits + c, self.num_qubits + t];
+        z_rows.sort_unstable();
+
+        let (new_x_c, new_z_c, new_sign_c) = self.evaluate_selected_rows(&x_rows, 0, false);
+        let (new_x_nt, new_z_nt, new_sign_nt) = self.evaluate_selected_rows(&z_rows, 0, false);
+
+        self.set_row_words(c, &new_x_c, &new_z_c, new_sign_c);
+        self.set_row_words(self.num_qubits + t, &new_x_nt, &new_z_nt, new_sign_nt);
     }
 
     fn canonical_rows(&self) -> PackedCanonicalRows {
@@ -697,7 +607,6 @@ impl PackedInverseTableau {
             self.set_sign_bit(target, negative);
             self.mask_row_padding(target);
         }
-        self.recompute_row_y_counts();
     }
 
     #[doc(hidden)]
@@ -824,37 +733,6 @@ impl PackedInverseTableau {
         self.measure_z_many_biased_with_optional_counters(targets, None)
     }
 
-    /// Measures several Z observables in target order using random outcomes when required.
-    ///
-    /// The tableau is transposed once for the whole commuting measurement batch. This keeps
-    /// the result equivalent to repeated single-qubit measurements while avoiding a full
-    /// canonical materialization per target.
-    pub fn measure_z_many<R: Rng + ?Sized>(
-        &mut self,
-        targets: &[(usize, bool)],
-        rng: &mut R,
-    ) -> Vec<bool> {
-        if targets.is_empty() {
-            return Vec::new();
-        }
-        for &(q, _) in targets {
-            self.check_qubit(q);
-        }
-
-        let mut transposed = PackedTransposedInverseTableau::from_tableau(self);
-        let mut bits = Vec::with_capacity(targets.len());
-        for &(q, inverted) in targets {
-            if let Some(pivot) = transposed.collapse_z_with_pivot(q) {
-                if rng.r#gen::<bool>() {
-                    transposed.append_x(pivot);
-                }
-            }
-            bits.push(transposed.z_sign(q) ^ inverted);
-        }
-        transposed.write_back(self);
-        bits
-    }
-
     pub(crate) fn measure_z_many_biased_with_counters(
         &mut self,
         targets: &[(usize, bool)],
@@ -979,41 +857,6 @@ impl PackedInverseTableau {
 
     pub fn measure_reset_z_many_biased(&mut self, targets: &[(usize, bool)]) -> Vec<bool> {
         self.measure_reset_z_many_biased_with_optional_counters(targets, None)
-    }
-
-    /// Measures and resets several Z observables using random outcomes when required.
-    pub fn measure_reset_z_many<R: Rng + ?Sized>(
-        &mut self,
-        targets: &[(usize, bool)],
-        rng: &mut R,
-    ) -> Vec<bool> {
-        let qubits: Vec<usize> = targets.iter().map(|(q, _)| *q).collect();
-        if has_duplicate_qubits(&qubits) {
-            return targets
-                .iter()
-                .map(|&(q, inverted)| {
-                    let bit = self.measure_z_many(&[(q, inverted)], rng)[0];
-                    if bit ^ inverted {
-                        self.x_gate(q);
-                    }
-                    bit
-                })
-                .collect();
-        }
-
-        let reported = self.measure_z_many(targets, rng);
-        for (&(q, inverted), &bit) in targets.iter().zip(&reported) {
-            if bit ^ inverted {
-                self.x_gate(q);
-            }
-        }
-        reported
-    }
-
-    /// Resets several qubits to |0> while batching their commuting measurements.
-    pub fn reset_z_many<R: Rng + ?Sized>(&mut self, qubits: &[usize], rng: &mut R) {
-        let targets: Vec<(usize, bool)> = qubits.iter().map(|&q| (q, false)).collect();
-        let _ = self.measure_reset_z_many(&targets, rng);
     }
 
     pub(crate) fn measure_reset_z_many_biased_with_counters(
@@ -1415,7 +1258,6 @@ impl PackedInverseTableau {
         let b_sign = self.sign_bit(b);
         self.set_sign_bit(a, b_sign);
         self.set_sign_bit(b, a_sign);
-        self.row_y_count_mod4.swap(a, b);
     }
 
     fn set_row_words(&mut self, row: usize, x: &[u64], z: &[u64], negative: bool) {
@@ -1426,90 +1268,8 @@ impl PackedInverseTableau {
         let start = self.row_start(row);
         self.x_plane[start..start + self.words_per_row].clone_from_slice(x);
         self.z_plane[start..start + self.words_per_row].clone_from_slice(z);
-        self.row_y_count_mod4[row] = words_y_count_mod4(x, z);
         self.set_sign_bit(row, negative);
         self.mask_row_padding(row);
-    }
-
-    fn multiply_commuting_row_into(&mut self, src: usize, dst: usize) {
-        self.check_row(src);
-        self.check_row(dst);
-        assert_ne!(src, dst, "cannot multiply a row into itself");
-
-        let src_start = self.row_start(src);
-        let dst_start = self.row_start(dst);
-        let mut z_dot_x_parity = 0u32;
-        let mut result_y_count = 0u32;
-        if self.words_per_row == FAST_QUBIT_WORDS {
-            let (parity, y_count) = self.multiply_commuting_word::<0>(src_start, dst_start);
-            z_dot_x_parity ^= parity;
-            result_y_count += y_count;
-            let (parity, y_count) = self.multiply_commuting_word::<1>(src_start, dst_start);
-            z_dot_x_parity ^= parity;
-            result_y_count += y_count;
-            let (parity, y_count) = self.multiply_commuting_word::<2>(src_start, dst_start);
-            z_dot_x_parity ^= parity;
-            result_y_count += y_count;
-            let (parity, y_count) = self.multiply_commuting_word::<3>(src_start, dst_start);
-            z_dot_x_parity ^= parity;
-            result_y_count += y_count;
-        } else {
-            for offset in 0..self.words_per_row {
-                let (parity, y_count) =
-                    self.multiply_commuting_dynamic_word(src_start, dst_start, offset);
-                z_dot_x_parity ^= parity;
-                result_y_count += y_count;
-            }
-        }
-        let exponent = (2 * u8::from(self.sign_bit(dst))
-            + self.row_y_count_mod4[dst]
-            + 2 * (z_dot_x_parity as u8)
-            + 2 * u8::from(self.sign_bit(src))
-            + self.row_y_count_mod4[src])
-            % 4;
-        let result_y_count = (result_y_count % 4) as u8;
-        self.row_y_count_mod4[dst] = result_y_count;
-        let negative = sign_from_canonical_exponent(result_y_count, exponent);
-        self.set_sign_bit(dst, negative);
-    }
-
-    #[inline(always)]
-    fn multiply_commuting_word<const WORD: usize>(
-        &mut self,
-        src_start: usize,
-        dst_start: usize,
-    ) -> (u32, u32) {
-        self.multiply_commuting_dynamic_word(src_start, dst_start, WORD)
-    }
-
-    #[inline(always)]
-    fn multiply_commuting_dynamic_word(
-        &mut self,
-        src_start: usize,
-        dst_start: usize,
-        word: usize,
-    ) -> (u32, u32) {
-        let src_x = self.x_plane[src_start + word];
-        let src_z = self.z_plane[src_start + word];
-        let dst_x = self.x_plane[dst_start + word];
-        let dst_z = self.z_plane[dst_start + word];
-        let parity = (dst_z & src_x).count_ones() & 1;
-        let result_x = dst_x ^ src_x;
-        let result_z = dst_z ^ src_z;
-        let y_count = (result_x & result_z).count_ones();
-        self.x_plane[dst_start + word] = result_x;
-        self.z_plane[dst_start + word] = result_z;
-        (parity, y_count)
-    }
-
-    fn recompute_row_y_counts(&mut self) {
-        for row in 0..self.num_rows() {
-            let start = self.row_start(row);
-            self.row_y_count_mod4[row] = words_y_count_mod4(
-                &self.x_plane[start..start + self.words_per_row],
-                &self.z_plane[start..start + self.words_per_row],
-            );
-        }
     }
 
     fn evaluate_selected_rows(
@@ -1673,42 +1433,6 @@ fn unique_qubits(qubits: &[usize]) -> Vec<usize> {
     unique
 }
 
-fn transpose_packed_plane(
-    source: &[u64],
-    source_rows: usize,
-    source_columns: usize,
-    source_words_per_row: usize,
-    destination: &mut [u64],
-) {
-    let destination_words_per_row = words_for_bits(source_rows);
-    assert_eq!(
-        source.len(),
-        source_rows.saturating_mul(source_words_per_row)
-    );
-    assert_eq!(
-        destination.len(),
-        source_columns.saturating_mul(destination_words_per_row)
-    );
-    for source_row_word in 0..destination_words_per_row {
-        let source_row_start = source_row_word * 64;
-        let rows_in_tile = (source_rows - source_row_start).min(64);
-        for source_column_word in 0..source_words_per_row {
-            let source_column_start = source_column_word * 64;
-            let columns_in_tile = (source_columns - source_column_start).min(64);
-            let mut tile = [0u64; 64];
-            for (row_offset, word) in tile.iter_mut().take(rows_in_tile).enumerate() {
-                *word = source
-                    [(source_row_start + row_offset) * source_words_per_row + source_column_word];
-            }
-            transpose_64x64(&mut tile);
-            for column_offset in 0..columns_in_tile {
-                destination[(source_column_start + column_offset) * destination_words_per_row
-                    + source_row_word] = tile[column_offset];
-            }
-        }
-    }
-}
-
 fn words_for_bits(bits: usize) -> usize {
     bits.div_ceil(64)
 }
@@ -1752,87 +1476,10 @@ fn words_y_count_mod4(x: &[u64], z: &[u64]) -> u8 {
 
 fn sign_from_words(x: &[u64], z: &[u64], exponent: u8) -> bool {
     let canonical_exponent = words_y_count_mod4(x, z);
-    sign_from_canonical_exponent(canonical_exponent, exponent)
-}
-
-fn sign_from_canonical_exponent(canonical_exponent: u8, exponent: u8) -> bool {
     let diff = (exponent + 4 - canonical_exponent) % 4;
     assert!(
         diff == 0 || diff == 2,
         "packed Pauli row has non-Hermitian phase exponent {exponent}",
     );
     diff == 2
-}
-
-#[cfg(test)]
-mod transpose_tests {
-    use super::{
-        transpose_64x64, transpose_64x64_portable, transpose_packed_plane, words_for_bits,
-    };
-
-    #[test]
-    fn selected_transpose_backend_matches_portable_backend() {
-        let mut state = 0x9e37_79b9_7f4a_7c15u64;
-        for case in 0..256 {
-            let mut actual = [0u64; 64];
-            for (index, word) in actual.iter_mut().enumerate() {
-                state ^= state << 13;
-                state ^= state >> 7;
-                state ^= state << 17;
-                *word = match case {
-                    0 => 0,
-                    1 => u64::MAX,
-                    2 => 1u64 << (index % 64),
-                    _ => state,
-                };
-            }
-            let mut expected = actual;
-
-            transpose_64x64_portable(&mut expected);
-            transpose_64x64(&mut actual);
-
-            assert_eq!(actual, expected, "backend mismatch for case {case}");
-        }
-    }
-
-    #[test]
-    fn packed_plane_transpose_matches_naive_partial_tiles() {
-        for &(rows, columns) in &[
-            (1, 1),
-            (5, 73),
-            (63, 65),
-            (64, 64),
-            (65, 63),
-            (127, 129),
-            (241, 482),
-            (482, 241),
-        ] {
-            let source_words_per_row = words_for_bits(columns);
-            let destination_words_per_row = words_for_bits(rows);
-            let mut source = vec![0u64; rows * source_words_per_row];
-            for row in 0..rows {
-                for column in 0..columns {
-                    if ((row * 131 + column * 17 + row * column) % 11) < 5 {
-                        source[row * source_words_per_row + column / 64] |= 1u64 << (column % 64);
-                    }
-                }
-            }
-            let mut actual = vec![0u64; columns * destination_words_per_row];
-
-            transpose_packed_plane(&source, rows, columns, source_words_per_row, &mut actual);
-
-            for row in 0..rows {
-                for column in 0..columns {
-                    let source_bit =
-                        (source[row * source_words_per_row + column / 64] >> (column % 64)) & 1;
-                    let transposed_bit =
-                        (actual[column * destination_words_per_row + row / 64] >> (row % 64)) & 1;
-                    assert_eq!(
-                        transposed_bit, source_bit,
-                        "transpose mismatch for {rows}x{columns} at ({row}, {column})",
-                    );
-                }
-            }
-        }
-    }
 }

@@ -1,6 +1,6 @@
-use rstim::parser::parse_lines;
+use rstim::dem::{DemInstruction, DemTarget, DetectorErrorModel};
 use rstim::error_analyzer::ErrorAnalyzer;
-use rstim::dem::{DemTarget, DemInstruction, DetectorErrorModel};
+use rstim::parser::parse_lines;
 
 fn circuit_to_dem(circuit_str: &str) -> DetectorErrorModel {
     let instrs = parse_lines(circuit_str).unwrap();
@@ -13,18 +13,29 @@ fn circuit_to_dem_err(circuit_str: &str) -> Result<DetectorErrorModel, String> {
 }
 
 fn error_count(dem: &DetectorErrorModel) -> usize {
-    dem.instructions().iter().filter(|i| matches!(i, DemInstruction::Error { .. })).count()
+    dem.instructions()
+        .iter()
+        .filter(|i| matches!(i, DemInstruction::Error { .. }))
+        .count()
 }
 
 fn assert_has_error(dem: &DetectorErrorModel, prob: f64, expected_targets: &[DemTarget]) {
     let found = dem.instructions().iter().any(|instr| {
-        if let DemInstruction::Error { probability, targets } = instr {
+        if let DemInstruction::Error {
+            probability,
+            targets,
+        } = instr
+        {
             (*probability - prob).abs() < 1e-12 && targets == expected_targets
         } else {
             false
         }
     });
-    assert!(found, "expected error({prob}) {:?} but not found in:\n{dem}", expected_targets);
+    assert!(
+        found,
+        "expected error({prob}) {:?} but not found in:\n{dem}",
+        expected_targets
+    );
 }
 
 // --- No-op gates ---
@@ -43,13 +54,17 @@ fn noop_x_y_z_gates() {
 
 #[test]
 fn noop_tick_and_coords() {
-    let dem = circuit_to_dem("R 0\nQUBIT_COORDS(0,0) 0\nTICK\nSHIFT_COORDS(1,0)\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0\nQUBIT_COORDS(0,0) 0\nTICK\nSHIFT_COORDS(1,0)\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]",
+    );
     assert_eq!(error_count(&dem), 1);
 }
 
 #[test]
 fn noop_i_error_ii_error() {
-    let dem = circuit_to_dem("R 0 1\nI_ERROR(0.5) 0\nII_ERROR(0.5) 0 1\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nI_ERROR(0.5) 0\nII_ERROR(0.5) 0 1\nX_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]",
+    );
     assert_eq!(error_count(&dem), 1);
 }
 
@@ -57,7 +72,8 @@ fn noop_i_error_ii_error() {
 
 #[test]
 fn cy_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 
@@ -65,7 +81,9 @@ fn cy_gate_propagation() {
 
 #[test]
 fn xcx_gate_propagation() {
-    let result = circuit_to_dem_err("R 0 1\nX_ERROR(0.1) 0\nXCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let result = circuit_to_dem_err(
+        "R 0 1\nX_ERROR(0.1) 0\nXCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(result.is_err());
 }
 
@@ -73,7 +91,9 @@ fn xcx_gate_propagation() {
 
 #[test]
 fn xcy_gate_propagation() {
-    let result = circuit_to_dem_err("R 0 1\nX_ERROR(0.1) 0\nXCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let result = circuit_to_dem_err(
+        "R 0 1\nX_ERROR(0.1) 0\nXCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(result.is_err());
 }
 
@@ -81,7 +101,9 @@ fn xcy_gate_propagation() {
 
 #[test]
 fn ycx_gate_propagation() {
-    let result = circuit_to_dem_err("R 0 1\nX_ERROR(0.1) 0\nYCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let result = circuit_to_dem_err(
+        "R 0 1\nX_ERROR(0.1) 0\nYCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(result.is_err());
 }
 
@@ -89,7 +111,9 @@ fn ycx_gate_propagation() {
 
 #[test]
 fn ycy_gate_propagation() {
-    let result = circuit_to_dem_err("R 0 1\nX_ERROR(0.1) 0\nYCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let result = circuit_to_dem_err(
+        "R 0 1\nX_ERROR(0.1) 0\nYCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(result.is_err());
 }
 
@@ -97,7 +121,8 @@ fn ycy_gate_propagation() {
 
 #[test]
 fn ycz_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nYCZ 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nYCZ 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 
@@ -105,7 +130,9 @@ fn ycz_gate_propagation() {
 
 #[test]
 fn cxswap_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nCXSWAP 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nX_ERROR(0.1) 0\nCXSWAP 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(error_count(&dem) > 0);
 }
 
@@ -113,7 +140,9 @@ fn cxswap_gate_propagation() {
 
 #[test]
 fn swapcx_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nSWAPCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nX_ERROR(0.1) 0\nSWAPCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(error_count(&dem) > 0);
 }
 
@@ -121,7 +150,9 @@ fn swapcx_gate_propagation() {
 
 #[test]
 fn czswap_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nCZSWAP 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nX_ERROR(0.1) 0\nCZSWAP 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(error_count(&dem) > 0);
 }
 
@@ -129,7 +160,9 @@ fn czswap_gate_propagation() {
 
 #[test]
 fn iswap_dag_gate_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nISWAP_DAG 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nX_ERROR(0.1) 0\nISWAP_DAG 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(error_count(&dem) > 0);
 }
 
@@ -194,7 +227,7 @@ fn else_correlated_error() {
 #[test]
 fn pauli_channel_2_produces_errors() {
     let result = circuit_to_dem_err(
-        "R 0 1\nPAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]"
+        "R 0 1\nPAULI_CHANNEL_2(0.01,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
     );
     assert!(result.is_err());
 }
@@ -202,7 +235,7 @@ fn pauli_channel_2_produces_errors() {
 #[test]
 fn pauli_channel_2_zi_channel() {
     let result = circuit_to_dem_err(
-        "R 0 1\nPAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,0.1,0,0,0) 0 1\nMX 0\nMX 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]"
+        "R 0 1\nPAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,0.1,0,0,0) 0 1\nMX 0\nMX 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
     );
     assert!(result.is_err());
 }
@@ -211,17 +244,13 @@ fn pauli_channel_2_zi_channel() {
 
 #[test]
 fn heralded_erase_produces_errors() {
-    let dem = circuit_to_dem(
-        "R 0\nHERALDED_ERASE(1.0) 0\nM 0\nDETECTOR rec[-1]"
-    );
+    let dem = circuit_to_dem("R 0\nHERALDED_ERASE(1.0) 0\nM 0\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 
 #[test]
 fn heralded_erase_zero_prob() {
-    let dem = circuit_to_dem(
-        "R 0\nHERALDED_ERASE(0) 0\nM 0\nDETECTOR rec[-1]"
-    );
+    let dem = circuit_to_dem("R 0\nHERALDED_ERASE(0) 0\nM 0\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 0);
 }
 
@@ -229,27 +258,22 @@ fn heralded_erase_zero_prob() {
 
 #[test]
 fn heralded_pauli_channel_1_x() {
-    let dem = circuit_to_dem(
-        "R 0\nHERALDED_PAULI_CHANNEL_1(0,0.1,0,0) 0\nM 0\nDETECTOR rec[-1]"
-    );
+    let dem = circuit_to_dem("R 0\nHERALDED_PAULI_CHANNEL_1(0,0.1,0,0) 0\nM 0\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
 }
 
 #[test]
 fn heralded_pauli_channel_1_y() {
-    let dem = circuit_to_dem(
-        "R 0\nHERALDED_PAULI_CHANNEL_1(0,0,0.1,0) 0\nM 0\nDETECTOR rec[-1]"
-    );
+    let dem = circuit_to_dem("R 0\nHERALDED_PAULI_CHANNEL_1(0,0,0.1,0) 0\nM 0\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
 }
 
 #[test]
 fn heralded_pauli_channel_1_z() {
-    let result = circuit_to_dem_err(
-        "R 0\nHERALDED_PAULI_CHANNEL_1(0,0,0,0.1) 0\nMX 0\nDETECTOR rec[-1]"
-    );
+    let result =
+        circuit_to_dem_err("R 0\nHERALDED_PAULI_CHANNEL_1(0,0,0,0.1) 0\nMX 0\nDETECTOR rec[-1]");
     assert!(result.is_err());
 }
 
@@ -278,7 +302,8 @@ fn mpp_y_product() {
 
 #[test]
 fn mpp_multiple_products() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nMPP Z0 Z1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nMPP Z0 Z1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert_eq!(error_count(&dem), 1);
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0)]);
 }
@@ -299,7 +324,9 @@ fn spp_y_product() {
 
 #[test]
 fn spp_multi_qubit() {
-    let dem = circuit_to_dem("R 0 1\nSPP Z0*Z1\nX_ERROR(0.1) 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nSPP Z0*Z1\nX_ERROR(0.1) 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert!(error_count(&dem) > 0);
 }
 
@@ -349,7 +376,9 @@ fn mry_detects_both_x_and_z_errors() {
 
 #[test]
 fn cnot_alias_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem = circuit_to_dem(
+        "R 0 1\nX_ERROR(0.1) 0\nCNOT 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]",
+    );
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0), DemTarget::Detector(1)]);
 }
 
@@ -357,19 +386,22 @@ fn cnot_alias_propagation() {
 
 #[test]
 fn zcx_alias_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCX 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert_has_error(&dem, 0.1, &[DemTarget::Detector(0), DemTarget::Detector(1)]);
 }
 
 #[test]
 fn zcy_alias_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCY 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 
 #[test]
 fn zcz_alias_propagation() {
-    let dem = circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCZ 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
+    let dem =
+        circuit_to_dem("R 0 1\nX_ERROR(0.1) 0\nZCZ 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 
@@ -464,9 +496,8 @@ fn unsupported_instruction_returns_error() {
 
 #[test]
 fn depolarize2_with_mx_detectors() {
-    let dem = circuit_to_dem(
-        "RX 0 1\nDEPOLARIZE2(0.15) 0 1\nMX 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]"
-    );
+    let dem =
+        circuit_to_dem("RX 0 1\nDEPOLARIZE2(0.15) 0 1\nMX 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]");
     assert!(error_count(&dem) > 0);
 }
 

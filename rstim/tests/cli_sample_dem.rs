@@ -13,17 +13,23 @@ fn run_with_stdin(args: &[&str], stdin_data: &str) -> std::process::Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(stdin_data.as_bytes()).unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin_data.as_bytes())
+        .unwrap();
     child.wait_with_output().unwrap()
 }
 
 #[test]
 fn sample_dem_01_format() {
-    let output = run_with_stdin(
-        &["sample_dem", "--shots", "3"],
-        "error(1) D0 L0",
+    let output = run_with_stdin(&["sample_dem", "--shots", "3"], "error(1) D0 L0");
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
     let s = String::from_utf8(output.stdout).unwrap();
     for line in s.trim().split('\n') {
         assert_eq!(line, "1");
@@ -54,7 +60,13 @@ fn sample_dem_obs_out() {
     let dir = tempfile::tempdir().unwrap();
     let obs_path = dir.path().join("obs.txt");
     let output = run_with_stdin(
-        &["sample_dem", "--shots", "1", "--obs_out", obs_path.to_str().unwrap()],
+        &[
+            "sample_dem",
+            "--shots",
+            "1",
+            "--obs_out",
+            obs_path.to_str().unwrap(),
+        ],
         "error(1) D0 L0",
     );
     assert!(output.status.success());

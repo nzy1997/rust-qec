@@ -1,11 +1,11 @@
 use std::fs;
 use std::time::Instant;
 
-use qec_ilp_core::backend::{build_binary_backend, BinaryBackend};
 use qec_ilp_core::BinaryIlpConfig;
+use qec_ilp_core::backend::{BinaryBackend, build_binary_backend};
 use rbposd::DecoderConfig;
 use rilpqec::{
-    lower_dem_to_problem, BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem,
+    BackendConfig, BackendKind, IlpDecoderConfig, LoweredDemProblem, lower_dem_to_problem,
 };
 use rsinter::decode::{CompiledDecoder, Decoder, RbposdDemDecoder, RmatchingDemDecoder};
 use rstim::dem::DetectorErrorModel;

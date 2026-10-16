@@ -1,9 +1,9 @@
-use rstim::codegen::{repetition_code_memory_with_params, NoiseParams};
-use rstim::error_analyzer::ErrorAnalyzer;
-use rstim::sampler::sample_batch;
-use rstim::parser::parse_lines;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
+use rstim::codegen::{NoiseParams, repetition_code_memory_with_params};
+use rstim::error_analyzer::ErrorAnalyzer;
+use rstim::parser::parse_lines;
+use rstim::sampler::sample_batch;
 
 fn main() {
     let mut rng = StdRng::seed_from_u64(42);

@@ -116,8 +116,7 @@ impl ReferenceSampleTree {
         let mut fused: Vec<Self> = Vec::new();
         for src in flattened {
             if let Some(dst) = fused.last_mut() {
-                if dst.prefix_bits == src.prefix_bits
-                    && dst.suffix_children == src.suffix_children
+                if dst.prefix_bits == src.prefix_bits && dst.suffix_children == src.suffix_children
                 {
                     dst.repetitions = dst
                         .repetitions
@@ -125,8 +124,7 @@ impl ReferenceSampleTree {
                         .expect("reference sample tree repetitions overflow");
                     continue;
                 }
-                if src.repetitions == 1 && dst.repetitions == 1 && dst.suffix_children.is_empty()
-                {
+                if src.repetitions == 1 && dst.repetitions == 1 && dst.suffix_children.is_empty() {
                     dst.prefix_bits.extend(src.prefix_bits);
                     dst.suffix_children = src.suffix_children;
                     continue;

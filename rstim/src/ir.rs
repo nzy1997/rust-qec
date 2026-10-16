@@ -10,14 +10,22 @@ pub enum StimTarget {
     Qubit(u32),
     QubitInv(u32),
     Rec(i32),
-    Pauli { qubit: u32, basis: PauliBasis, inverted: bool },
+    Pauli {
+        qubit: u32,
+        basis: PauliBasis,
+        inverted: bool,
+    },
     Combiner,
     Sweep(u32),
 }
 
 impl StimTarget {
     pub fn pauli(qubit: u32, basis: PauliBasis, inverted: bool) -> Self {
-        StimTarget::Pauli { qubit, basis, inverted }
+        StimTarget::Pauli {
+            qubit,
+            basis,
+            inverted,
+        }
     }
 
     pub fn qubit_index(&self) -> Option<u32> {
@@ -100,7 +108,12 @@ fn write_instrs(s: &mut String, instrs: &[StimInstr], indent: usize) {
     let pad = "    ".repeat(indent);
     for instr in instrs {
         match instr {
-            StimInstr::Op { name, tag, args, targets } => {
+            StimInstr::Op {
+                name,
+                tag,
+                args,
+                targets,
+            } => {
                 s.push_str(&pad);
                 s.push_str(name);
                 if let Some(t) = tag {
@@ -111,7 +124,9 @@ fn write_instrs(s: &mut String, instrs: &[StimInstr], indent: usize) {
                 if !args.is_empty() {
                     s.push('(');
                     for (i, a) in args.iter().enumerate() {
-                        if i > 0 { s.push(','); }
+                        if i > 0 {
+                            s.push(',');
+                        }
                         if *a == (*a as i64) as f64 {
                             write!(s, "{}", *a as i64).unwrap();
                         } else {
@@ -126,8 +141,14 @@ fn write_instrs(s: &mut String, instrs: &[StimInstr], indent: usize) {
                         StimTarget::Qubit(q) => write!(s, "{q}").unwrap(),
                         StimTarget::QubitInv(q) => write!(s, "!{q}").unwrap(),
                         StimTarget::Rec(r) => write!(s, "rec[{r}]").unwrap(),
-                        StimTarget::Pauli { qubit, basis, inverted } => {
-                            if *inverted { s.push('!'); }
+                        StimTarget::Pauli {
+                            qubit,
+                            basis,
+                            inverted,
+                        } => {
+                            if *inverted {
+                                s.push('!');
+                            }
                             s.push(match basis {
                                 PauliBasis::X => 'X',
                                 PauliBasis::Y => 'Y',

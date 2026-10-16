@@ -134,9 +134,7 @@ pub enum Qp101TargetRef {
         inverted: Option<bool>,
     },
     #[serde(rename = "rec")]
-    Rec {
-        offset: i32,
-    },
+    Rec { offset: i32 },
     #[serde(rename = "pauli")]
     Pauli {
         basis: Qp101PauliBasis,
@@ -147,9 +145,7 @@ pub enum Qp101TargetRef {
     #[serde(rename = "combiner")]
     Combiner,
     #[serde(rename = "sweep")]
-    Sweep {
-        index: u32,
-    },
+    Sweep { index: u32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -764,8 +760,7 @@ fn validate_sample_trace_visualization_support_inner(
 fn is_sample_trace_visualization_measurement_op(name: &str) -> bool {
     matches!(
         name,
-        "M"
-            | "MX"
+        "M" | "MX"
             | "MY"
             | "MZ"
             | "MR"
@@ -780,21 +775,13 @@ fn is_sample_trace_visualization_measurement_op(name: &str) -> bool {
             | "MRXL"
             | "MRYL"
             | "MRZL"
-            | "MPP"
-            | "MXX"
-            | "MYY"
-            | "MZZ"
-            | "MPAD"
-            | "HERALDED_ERASE"
-            | "HERALDED_PAULI_CHANNEL_1"
     )
 }
 
 fn emits_measurement_bits(name: &str) -> bool {
     matches!(
         name,
-        "M"
-            | "MX"
+        "M" | "MX"
             | "MY"
             | "MZ"
             | "MR"
@@ -939,7 +926,11 @@ fn export_plain_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<
         .collect()
 }
 
-fn validate_no_args_or_targets(name: &str, args: &[f64], targets: &[StimTarget]) -> Result<(), String> {
+fn validate_no_args_or_targets(
+    name: &str,
+    args: &[f64],
+    targets: &[StimTarget],
+) -> Result<(), String> {
     if !args.is_empty() {
         return Err(format!("{name} expects no args, got {}", args.len()));
     }
@@ -1115,7 +1106,8 @@ mod tests {
             other => panic!("unexpected op: {other:?}"),
         }
 
-        let mut repeat_doc = export_qp101(&crate::parser::parse_lines("REPEAT 1 {\n  MRL 0\n}\n").unwrap()).unwrap();
+        let mut repeat_doc =
+            export_qp101(&crate::parser::parse_lines("REPEAT 1 {\n  MRL 0\n}\n").unwrap()).unwrap();
         let err = add_annotation_at_path(
             &mut repeat_doc.operations,
             &[],
@@ -1163,18 +1155,9 @@ mod tests {
 
     #[test]
     fn export_helpers_cover_remaining_target_and_basis_paths() {
-        assert_eq!(
-            export_pauli_basis(PauliBasis::X),
-            Qp101PauliBasis::X
-        );
-        assert_eq!(
-            export_pauli_basis(PauliBasis::Y),
-            Qp101PauliBasis::Y
-        );
-        assert_eq!(
-            export_pauli_basis(PauliBasis::Z),
-            Qp101PauliBasis::Z
-        );
+        assert_eq!(export_pauli_basis(PauliBasis::X), Qp101PauliBasis::X);
+        assert_eq!(export_pauli_basis(PauliBasis::Y), Qp101PauliBasis::Y);
+        assert_eq!(export_pauli_basis(PauliBasis::Z), Qp101PauliBasis::Z);
 
         assert_eq!(
             export_targets(&[

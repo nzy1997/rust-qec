@@ -1,8 +1,8 @@
-use rand::rngs::StdRng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rstim::output::write_shots_b8;
 use rstim::parser::parse_lines;
-use rstim::sampler::{sample_batch_with_options, SampleOptions};
+use rstim::sampler::{SampleOptions, sample_batch_with_options};
 use rstim::sim::bit_table::BitTable;
 use rstim::sim::measure_record_batch::MeasureRecordBatch;
 

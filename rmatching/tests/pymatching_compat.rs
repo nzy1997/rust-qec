@@ -216,7 +216,12 @@ fn pm_all_negative_ring_10() {
     s[5] = 1;
     let c = m.decode(&s);
     // Expected nonzero at: 0, 1, 5, 6, 7, 8, 9
-    let nonzero: Vec<usize> = c.iter().enumerate().filter(|&(_, &v)| v != 0).map(|(i, _)| i).collect();
+    let nonzero: Vec<usize> = c
+        .iter()
+        .enumerate()
+        .filter(|&(_, &v)| v != 0)
+        .map(|(i, _)| i)
+        .collect();
     assert_eq!(nonzero, vec![0, 1, 5, 6, 7, 8, 9]);
 }
 
@@ -232,7 +237,12 @@ fn pm_all_negative_ring_20() {
     s[2] = 1;
     s[10] = 1;
     let c = m.decode(&s);
-    let nonzero: Vec<usize> = c.iter().enumerate().filter(|&(_, &v)| v != 0).map(|(i, _)| i).collect();
+    let nonzero: Vec<usize> = c
+        .iter()
+        .enumerate()
+        .filter(|&(_, &v)| v != 0)
+        .map(|(i, _)| i)
+        .collect();
     assert_eq!(nonzero, vec![0, 1, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
 }
 

@@ -1,18 +1,18 @@
 #[cfg(debug_assertions)]
 mod tests {
-    use rand::rngs::StdRng;
     use rand::RngCore;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
     use rstim::compiled::compile_circuit;
     use rstim::parser::parse_lines;
     use rstim::sampler::{
-        sample_batch_with_options, SampleOptions, SampleOutputMode, SamplingBackend,
+        SampleOptions, SampleOutputMode, SamplingBackend, sample_batch_with_options,
     };
     use rstim::sim::bit_table::BitTable;
     use rstim::sim::frame::{
-        decode_instruction_wide_event_index, one_qubit_noise_instruction_telemetry,
-        reset_frame_noise_telemetry, reset_one_qubit_noise_instruction_telemetry,
-        take_frame_noise_telemetry, FrameSimulator, OneQubitNoiseSamplingPath,
+        FrameSimulator, OneQubitNoiseSamplingPath, decode_instruction_wide_event_index,
+        one_qubit_noise_instruction_telemetry, reset_frame_noise_telemetry,
+        reset_one_qubit_noise_instruction_telemetry, take_frame_noise_telemetry,
     };
 
     #[derive(Debug, Clone)]

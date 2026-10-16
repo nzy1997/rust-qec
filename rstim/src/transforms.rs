@@ -1,12 +1,20 @@
 use crate::ir::StimInstr;
 
 const NOISE_OPS: &[&str] = &[
-    "X_ERROR", "Y_ERROR", "Z_ERROR",
-    "DEPOLARIZE1", "DEPOLARIZE2",
-    "PAULI_CHANNEL_1", "PAULI_CHANNEL_2",
-    "CORRELATED_ERROR", "ELSE_CORRELATED_ERROR", "E",
-    "HERALDED_ERASE", "HERALDED_PAULI_CHANNEL_1",
-    "I_ERROR", "II_ERROR",
+    "X_ERROR",
+    "Y_ERROR",
+    "Z_ERROR",
+    "DEPOLARIZE1",
+    "DEPOLARIZE2",
+    "PAULI_CHANNEL_1",
+    "PAULI_CHANNEL_2",
+    "CORRELATED_ERROR",
+    "ELSE_CORRELATED_ERROR",
+    "E",
+    "HERALDED_ERASE",
+    "HERALDED_PAULI_CHANNEL_1",
+    "I_ERROR",
+    "II_ERROR",
 ];
 
 /// Expand all REPEAT blocks, producing a flat list of Op instructions.
@@ -52,10 +60,9 @@ pub fn without_noise(instrs: &[StimInstr]) -> Vec<StimInstr> {
 
 fn invert_gate(name: &str) -> Result<String, String> {
     match name {
-        "I" | "X" | "Y" | "Z" | "H" | "H_XY" | "H_YZ" | "H_NXY" | "H_NXZ" | "H_NYZ"
-        | "CX" | "CY" | "CZ" | "CNOT" | "ZCX" | "ZCY" | "ZCZ"
-        | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ"
-        | "SWAP" | "CZSWAP" => Ok(name.to_string()),
+        "I" | "X" | "Y" | "Z" | "H" | "H_XY" | "H_YZ" | "H_NXY" | "H_NXZ" | "H_NYZ" | "CX"
+        | "CY" | "CZ" | "CNOT" | "ZCX" | "ZCY" | "ZCZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY"
+        | "YCZ" | "SWAP" | "CZSWAP" => Ok(name.to_string()),
 
         "S" => Ok("S_DAG".to_string()),
         "S_DAG" | "SQRT_Z_DAG" => Ok("S".to_string()),
@@ -79,13 +86,12 @@ fn invert_gate(name: &str) -> Result<String, String> {
         "C_ZYNX" => Ok("C_NZYX".to_string()),
 
         n if NOISE_OPS.contains(&n) => Err(format!("cannot invert noise operation: {n}")),
-        "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ"
-        | "MPP" | "MXX" | "MYY" | "MZZ" | "MPAD" => {
-            Err(format!("cannot invert measurement: {name}"))
-        }
+        "M" | "MX" | "MY" | "MZ" | "MR" | "MRX" | "MRY" | "MRZ" | "MPP" | "MXX" | "MYY" | "MZZ"
+        | "MPAD" => Err(format!("cannot invert measurement: {name}")),
         "R" | "RX" | "RY" | "RZ" => Err(format!("cannot invert reset: {name}")),
-        "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS"
-        | "SHIFT_COORDS" => Err(format!("cannot invert annotation: {name}")),
+        "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" => {
+            Err(format!("cannot invert annotation: {name}"))
+        }
         _ => Err(format!("unknown gate for inverse: {name}")),
     }
 }
@@ -95,7 +101,12 @@ pub fn inverse(instrs: &[StimInstr]) -> Result<Vec<StimInstr>, String> {
     let mut out = Vec::with_capacity(instrs.len());
     for instr in instrs.iter().rev() {
         match instr {
-            StimInstr::Op { name, tag, args, targets } => {
+            StimInstr::Op {
+                name,
+                tag,
+                args,
+                targets,
+            } => {
                 let inv_name = invert_gate(name)?;
                 out.push(StimInstr::Op {
                     name: inv_name,
@@ -118,18 +129,26 @@ pub fn inverse(instrs: &[StimInstr]) -> Result<Vec<StimInstr>, String> {
 
 /// Remove all instruction tags, preserving structure.
 pub fn without_tags(instrs: &[StimInstr]) -> Vec<StimInstr> {
-    instrs.iter().map(|instr| match instr {
-        StimInstr::Op { name, tag: _, args, targets } => StimInstr::Op {
-            name: name.clone(),
-            tag: None,
-            args: args.clone(),
-            targets: targets.clone(),
-        },
-        StimInstr::Repeat { count, body } => StimInstr::Repeat {
-            count: *count,
-            body: without_tags(body),
-        },
-    }).collect()
+    instrs
+        .iter()
+        .map(|instr| match instr {
+            StimInstr::Op {
+                name,
+                tag: _,
+                args,
+                targets,
+            } => StimInstr::Op {
+                name: name.clone(),
+                tag: None,
+                args: args.clone(),
+                targets: targets.clone(),
+            },
+            StimInstr::Repeat { count, body } => StimInstr::Repeat {
+                count: *count,
+                body: without_tags(body),
+            },
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -205,16 +224,25 @@ fn is_feedback_operation(name: &str, targets: &[crate::ir::StimTarget]) -> bool 
     matches!(name, "CX" | "CNOT" | "ZCX" | "CY" | "ZCY" | "CZ" | "ZCZ")
         && matches!(
             targets,
-            [crate::ir::StimTarget::Rec(_), crate::ir::StimTarget::Qubit(_)]
+            [
+                crate::ir::StimTarget::Rec(_),
+                crate::ir::StimTarget::Qubit(_)
+            ]
         )
 }
 
 fn is_annotation(name: &str) -> bool {
-    matches!(name, "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS")
+    matches!(
+        name,
+        "DETECTOR" | "OBSERVABLE_INCLUDE" | "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS"
+    )
 }
 
 fn is_single_qubit_measurement(name: &str) -> bool {
-    matches!(name, "M" | "MZ" | "MR" | "MRZ" | "MX" | "MRX" | "MY" | "MRY")
+    matches!(
+        name,
+        "M" | "MZ" | "MR" | "MRZ" | "MX" | "MRX" | "MY" | "MRY"
+    )
 }
 
 fn accumulate_feedback(
@@ -228,7 +256,9 @@ fn accumulate_feedback(
         return Err(format!("unsupported feedback form for {name}"));
     }
     let (offset, qubit) = match (&targets[0], &targets[1]) {
-        (crate::ir::StimTarget::Rec(offset), crate::ir::StimTarget::Qubit(qubit)) => (*offset, *qubit as usize),
+        (crate::ir::StimTarget::Rec(offset), crate::ir::StimTarget::Qubit(qubit)) => {
+            (*offset, *qubit as usize)
+        }
         _ => return Err(format!("unsupported feedback form for {name}")),
     };
     let measurement = resolve_rec_measurement_index(measurement_count, offset)?;
@@ -259,7 +289,9 @@ fn take_measurement_correction(
     pending_z: &mut [Vec<usize>],
 ) -> Vec<usize> {
     let qubit = match target {
-        crate::ir::StimTarget::Qubit(qubit) | crate::ir::StimTarget::QubitInv(qubit) => *qubit as usize,
+        crate::ir::StimTarget::Qubit(qubit) | crate::ir::StimTarget::QubitInv(qubit) => {
+            *qubit as usize
+        }
         _ => return Vec::new(),
     };
     let x = std::mem::take(&mut pending_x[qubit]);
@@ -281,8 +313,11 @@ fn touches_pending_qubits(
     pending_x: &[Vec<usize>],
     pending_z: &[Vec<usize>],
 ) -> bool {
-    targets.iter().filter_map(|target| target.qubit_index()).any(|q| {
-        let q = q as usize;
-        !pending_x[q].is_empty() || !pending_z[q].is_empty()
-    })
+    targets
+        .iter()
+        .filter_map(|target| target.qubit_index())
+        .any(|q| {
+            let q = q as usize;
+            !pending_x[q].is_empty() || !pending_z[q].is_empty()
+        })
 }

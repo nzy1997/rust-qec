@@ -1,13 +1,16 @@
-use rstim::output::{OutputFormat, append_shots_b8, write_shots_01, write_shots_b8, write_shots_r8, write_shots_hits, write_shots_dets, write_shots_ptb64};
+use rstim::output::{
+    OutputFormat, write_shots_01, write_shots_b8, write_shots_dets, write_shots_hits,
+    write_shots_ptb64, write_shots_r8,
+};
 use rstim::sim::bit_table::BitTable;
 
 #[test]
 fn format_01_simple() {
     let mut table = BitTable::new(2, 3); // 2 bits, 3 shots
-    table.set(0, 0, true);  // shot 0: bit 0 = 1
-    table.set(1, 0, true);  // shot 0: bit 1 = 1
+    table.set(0, 0, true); // shot 0: bit 0 = 1
+    table.set(1, 0, true); // shot 0: bit 1 = 1
     table.set(0, 1, false); // shot 1: bit 0 = 0
-    table.set(1, 1, true);  // shot 1: bit 1 = 1
+    table.set(1, 1, true); // shot 1: bit 1 = 1
     // shot 2: all false
     let mut buf = Vec::new();
     write_shots_01(&table, &mut buf).unwrap();
@@ -27,7 +30,9 @@ fn format_01_empty() {
 #[test]
 fn format_b8_simple() {
     let mut table = BitTable::new(10, 1);
-    for i in 0..4 { table.set(i, 0, true); }
+    for i in 0..4 {
+        table.set(i, 0, true);
+    }
     let mut buf = Vec::new();
     write_shots_b8(&table, &mut buf).unwrap();
     assert_eq!(buf, vec![0x0F, 0x00]);
@@ -111,55 +116,6 @@ fn format_b8_multi_shot() {
 }
 
 #[test]
-fn format_b8_matches_naive_across_partial_tiles_and_shot_words() {
-    let bits = 73;
-    let shots = 130;
-    let mut table = BitTable::new(bits, shots);
-    for bit in 0..bits {
-        for shot in 0..shots {
-            if (bit * 17 + shot * 31 + bit * shot) % 11 < 5 {
-                table.set(bit, shot, true);
-            }
-        }
-    }
-
-    let mut expected = vec![0u8; shots * bits.div_ceil(8)];
-    for shot in 0..shots {
-        for bit in 0..bits {
-            if table.get(bit, shot) {
-                expected[shot * bits.div_ceil(8) + bit / 8] |= 1 << (bit % 8);
-            }
-        }
-    }
-
-    let mut actual = Vec::new();
-    write_shots_b8(&table, &mut actual).unwrap();
-    assert_eq!(actual, expected);
-}
-
-#[test]
-fn format_b8_parallel_append_matches_naive() {
-    let bits = 2_050usize;
-    let shots = 1_025usize;
-    let bytes_per_shot = bits.div_ceil(8);
-    let mut table = BitTable::new(bits, shots);
-    let mut expected = vec![0u8; shots * bytes_per_shot];
-    for bit in 0..bits {
-        for shot in 0..shots {
-            if (bit * 17 + shot * 31 + bit * shot) % 11 < 5 {
-                table.set(bit, shot, true);
-                expected[shot * bytes_per_shot + bit / 8] |= 1 << (bit % 8);
-            }
-        }
-    }
-
-    let mut actual = vec![0xaa, 0x55];
-    append_shots_b8(&table, &mut actual).unwrap();
-    assert_eq!(&actual[..2], &[0xaa, 0x55]);
-    assert_eq!(&actual[2..], expected);
-}
-
-#[test]
 fn format_hits_no_hits() {
     let table = BitTable::new(5, 1);
     let mut buf = Vec::new();
@@ -201,7 +157,10 @@ fn format_dets_simple() {
 
 #[test]
 fn output_format_from_str() {
-    assert_eq!(OutputFormat::from_str("01").unwrap(), OutputFormat::Format01);
+    assert_eq!(
+        OutputFormat::from_str("01").unwrap(),
+        OutputFormat::Format01
+    );
     assert_eq!(OutputFormat::from_str("b8").unwrap(), OutputFormat::B8);
     assert_eq!(OutputFormat::from_str("r8").unwrap(), OutputFormat::R8);
     assert_eq!(OutputFormat::from_str("hits").unwrap(), OutputFormat::Hits);
@@ -310,7 +269,9 @@ fn ptb64_more_than_64_shots() {
     // chunk0: 64 shots all set → u64::MAX
     // chunk1: 1 shot set → 1
     let mut table = BitTable::new(1, 65);
-    for s in 0..65 { table.set(0, s, true); }
+    for s in 0..65 {
+        table.set(0, s, true);
+    }
     let mut out = Vec::new();
     write_shots_ptb64(&table, &mut out).unwrap();
     assert_eq!(out.len(), 16);

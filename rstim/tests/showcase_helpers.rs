@@ -51,10 +51,12 @@ fn dem_semantic_summary_flattens_repeat_blocks_and_shifted_detectors() {
     let summary = dem_semantic_summary(&dem);
     assert!(summary.error_probabilities.contains_key("D0"));
     assert!(summary.error_probabilities.contains_key("D0 D1"));
-    assert!(summary
-        .annotation_lines
-        .iter()
-        .any(|line| line.starts_with("detector(5,0) D2")));
+    assert!(
+        summary
+            .annotation_lines
+            .iter()
+            .any(|line| line.starts_with("detector(5,0) D2"))
+    );
 }
 
 #[test]
@@ -79,7 +81,8 @@ fn render_markdown_table_includes_expected_headers() {
         "2.0".to_string(),
         "2.4".to_string(),
         "1.10x".to_string(),
-        "1.20x".to_string()]]);
+        "1.20x".to_string(),
+    ]]);
     assert!(table.contains("| Case | Gen | DEM |"));
     assert!(table.contains("repetition_code/memory d=5 r=5"));
 }
@@ -88,7 +91,11 @@ fn render_markdown_table_includes_expected_headers() {
 fn structural_circuit_summary_formats_special_targets_and_normalizes_units() {
     let instrs = vec![
         StimInstr::new("QUBIT_COORDS", vec![1.5, 2.0], vec![StimTarget::Qubit(3)]),
-        StimInstr::new("MR", vec![], vec![StimTarget::Qubit(0), StimTarget::Qubit(1)]),
+        StimInstr::new(
+            "MR",
+            vec![],
+            vec![StimTarget::Qubit(0), StimTarget::Qubit(1)],
+        ),
         StimInstr::new("MRX", vec![], vec![StimTarget::Qubit(2)]),
         StimInstr::new("MRY", vec![], vec![StimTarget::Qubit(3)]),
         StimInstr::new("MRZ", vec![], vec![StimTarget::Qubit(4)]),
@@ -143,9 +150,11 @@ fn structural_circuit_summary_formats_special_targets_and_normalizes_units() {
     assert_eq!(summary.opcode_counts["MPP"], 2);
     assert_eq!(summary.opcode_counts["S"], 1);
     assert_eq!(summary.observable_target_arities[&1], 1);
-    assert!(summary
-        .observable_includes
-        .contains("OBSERVABLE_INCLUDE(2) 8 !9 rec[-2] !Y4 X5 Z6 * sweep[7]"));
+    assert!(
+        summary
+            .observable_includes
+            .contains("OBSERVABLE_INCLUDE(2) 8 !9 rec[-2] !Y4 X5 Z6 * sweep[7]")
+    );
 }
 
 #[test]
@@ -174,19 +183,29 @@ fn dem_semantic_summary_tracks_repeats_shifts_and_observables() {
     assert_eq!(summary.error_probabilities["D0"], 0.125);
     assert_eq!(summary.error_probabilities["D2 L2 ^ D3"], 0.25);
     assert_eq!(summary.error_probabilities["D5 L2 ^ D6"], 0.25);
-    assert!(summary
-        .annotation_lines
-        .contains(&"logical_observable L4".to_string()));
-    assert!(summary
-        .annotation_lines
-        .contains(&"shift_detectors(1,2.5) 2".to_string()));
-    assert!(summary
-        .annotation_lines
-        .contains(&"shift_detectors(0,0.5) 3".to_string()));
-    assert!(summary
-        .annotation_lines
-        .contains(&"detector(1.5,0) D2".to_string()));
-    assert!(summary
-        .annotation_lines
-        .contains(&"detector(1.5,0) D5".to_string()));
+    assert!(
+        summary
+            .annotation_lines
+            .contains(&"logical_observable L4".to_string())
+    );
+    assert!(
+        summary
+            .annotation_lines
+            .contains(&"shift_detectors(1,2.5) 2".to_string())
+    );
+    assert!(
+        summary
+            .annotation_lines
+            .contains(&"shift_detectors(0,0.5) 3".to_string())
+    );
+    assert!(
+        summary
+            .annotation_lines
+            .contains(&"detector(1.5,0) D2".to_string())
+    );
+    assert!(
+        summary
+            .annotation_lines
+            .contains(&"detector(1.5,0) D5".to_string())
+    );
 }

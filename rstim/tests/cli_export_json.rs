@@ -1,8 +1,6 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use serde_json::Value;
-
 fn rstim_cmd() -> Command {
     Command::new(env!("CARGO_BIN_EXE_rstim"))
 }
@@ -101,7 +99,10 @@ fn export_json_invalid_format_does_not_modify_existing_output_file() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("unknown json format: invalid"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("unknown json format: invalid"),
+        "stderr: {stderr}"
+    );
 
     let out_text = std::fs::read_to_string(out.path()).unwrap();
     assert_eq!(out_text, "existing output should remain\n");
@@ -194,9 +195,15 @@ fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
         .collect::<Vec<_>>();
     assert_eq!(loss_annotations.len(), 2);
     assert_eq!(loss_annotations[0]["label"], "L");
-    assert_eq!(loss_annotations[0]["context"]["target_qubits"], serde_json::json!([1]));
+    assert_eq!(
+        loss_annotations[0]["context"]["target_qubits"],
+        serde_json::json!([1])
+    );
     assert_eq!(loss_annotations[1]["label"], "L");
-    assert_eq!(loss_annotations[1]["context"]["target_qubits"], serde_json::json!([2]));
+    assert_eq!(
+        loss_annotations[1]["context"]["target_qubits"],
+        serde_json::json!([2])
+    );
 
     let measurement = find_gate("gate", "M");
     let measurement_annotation = &measurement["annotations"][0];
@@ -226,7 +233,10 @@ fn export_json_sample_shot_exports_fixed_seed_sample_visualization_contract() {
         })
     );
 
-    let detector = operations.iter().find(|op| op["type"] == "detector").unwrap();
+    let detector = operations
+        .iter()
+        .find(|op| op["type"] == "detector")
+        .unwrap();
     let detector_annotation = &detector["annotations"][0];
     assert_eq!(detector_annotation["label"], "D0");
     assert_eq!(detector_annotation["context"]["detector_index"], 0);
@@ -276,8 +286,10 @@ fn export_json_can_highlight_dem_error_to_compact_output_file() {
 
 #[test]
 fn export_json_rejects_invalid_highlight_dem_error_index() {
-    let output =
-        run_export_json_with_stdin(&["--highlight_dem_error", "99"], "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n");
+    let output = run_export_json_with_stdin(
+        &["--highlight_dem_error", "99"],
+        "X_ERROR(0.1) 0\nM 0\nDETECTOR rec[-1]\n",
+    );
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("DEM error index out of range"));
@@ -310,42 +322,24 @@ fn export_json_reports_unsupported_highlight_instruction_clearly() {
     );
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains(
-        "--highlight_dem_error currently supports a subset of noise instructions"
-    ));
+    assert!(
+        stderr.contains("--highlight_dem_error currently supports a subset of noise instructions")
+    );
     assert!(stderr.contains("DEPOLARIZE2"));
 }
 
 #[test]
-fn export_json_sample_visualization_supports_all_measurement_instruction_families() {
-    for (gate, circuit) in [
-        ("MXX", "MXX 0 1\nDETECTOR rec[-1]\n"),
-        ("MYY", "MYY 0 1\nDETECTOR rec[-1]\n"),
-        ("MZZ", "MZZ 0 1\nDETECTOR rec[-1]\n"),
-        ("MPP", "MPP X0*Z1\nDETECTOR rec[-1]\n"),
-        ("MPAD", "MPAD(0) 0\nDETECTOR rec[-1]\n"),
-        ("HERALDED_ERASE", "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n"),
-        (
-            "HERALDED_PAULI_CHANNEL_1",
-            "HERALDED_PAULI_CHANNEL_1(0,1,0,0) 0\nDETECTOR rec[-1]\n",
-        ),
-    ] {
-        let output = run_export_json_with_stdin(&["--sample_shot", "--seed", "7"], circuit);
-        assert!(
-            output.status.success(),
-            "sample export failed for {gate}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let document: Value = serde_json::from_slice(&output.stdout).unwrap();
-        assert!(
-            document["operations"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|op| op["gate"] == gate),
-            "sample export omitted {gate}: {document}"
-        );
-    }
+fn export_json_reports_unsupported_sample_visualization_instruction_clearly() {
+    let output = run_export_json_with_stdin(
+        &["--sample_shot", "--seed", "1"],
+        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(
+        "--sample_shot currently supports a subset of sample visualization instructions"
+    ));
+    assert!(stderr.contains("HERALDED_ERASE"));
 }
 
 #[test]

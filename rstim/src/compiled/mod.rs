@@ -5,12 +5,12 @@ pub mod sampler;
 
 pub use analyzer::analyze_compiled_circuit;
 pub use circuit::{
-    CompiledBasis, CompiledBlock, CompiledCircuit, CompiledFeatureFlags, CompiledOp,
-    CompiledRepeatRegion, compile_circuit,
+    compile_circuit, CompiledBasis, CompiledBlock, CompiledCircuit, CompiledFeatureFlags,
+    CompiledOp, CompiledRepeatRegion,
 };
 pub use path::{
-    CompiledPathDecision, SamplerPathDecision, SamplingFallbackReason, choose_analyzer_path,
-    choose_sampler_path,
+    choose_analyzer_path, choose_sampler_path, CompiledPathDecision, SamplerPathDecision,
+    SamplingFallbackReason,
 };
 pub use sampler::sample_compiled_batch;
 pub(crate) use sampler::sample_compiled_batch_with_reference;

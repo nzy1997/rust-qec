@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use rbposd::{
     BpOsdDecoder, ChannelModel, Correction, DecodeResult, DecodeStats, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Syndrome,
@@ -2205,14 +2205,14 @@ fn apply_pauli_axis(x_state: &mut [bool], z_state: &mut [bool], qubit: usize, ax
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_pauli_fault, build_upstream_code, cnot_fault_for_index, correction_to_logicals,
-        export_bravyi_model_audit_for_code, in_row_span, nullspace, parse_schedule_slot, rref,
-        run_simulation, run_simulation_case_for_code, sample_operation_fault, sample_single_axis,
-        validate_model_config, validate_physical_error_rate, validate_simulation_config,
         EffectiveDecoderModel, FaultBasis, Operation, OperationKind, PauliAxis, PauliFault,
-        SimulationConfig,
+        SimulationConfig, apply_pauli_fault, build_upstream_code, cnot_fault_for_index,
+        correction_to_logicals, export_bravyi_model_audit_for_code, in_row_span, nullspace,
+        parse_schedule_slot, rref, run_simulation, run_simulation_case_for_code,
+        sample_operation_fault, sample_single_axis, validate_model_config,
+        validate_physical_error_rate, validate_simulation_config,
     };
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand::{SeedableRng, rngs::StdRng};
     use rbposd::{Correction, ParityCheckMatrix};
 
     #[test]
@@ -2303,7 +2303,12 @@ mod tests {
             trial.z_logical_prediction.as_ref().unwrap(),
             &trial.z_logical
         );
-        assert!(trial.z_correction.as_ref().is_some_and(|bits| !bits.is_empty()));
+        assert!(
+            trial
+                .z_correction
+                .as_ref()
+                .is_some_and(|bits| !bits.is_empty())
+        );
         assert!(trial.z_profile.is_some());
         assert!(trial.x_logical_prediction.is_none());
         assert!(trial.x_correction.is_none());
@@ -2593,8 +2598,17 @@ mod tests {
         assert_eq!(export.x_model.first_logical_row, 36 * 3);
         assert_eq!(export.z_model.num_checks, 36 * 3);
         assert_eq!(export.x_model.num_checks, 36 * 3);
-        assert_eq!(export.schedule.sx_labels, ["idle", "1", "4", "3", "5", "0", "2"]);
-        assert_eq!(export.schedule.sz_labels, ["3", "5", "0", "1", "2", "4", "idle"]);
-        assert_eq!(export.schedule.operation_count_by_kind.get("cnot"), Some(&432));
+        assert_eq!(
+            export.schedule.sx_labels,
+            ["idle", "1", "4", "3", "5", "0", "2"]
+        );
+        assert_eq!(
+            export.schedule.sz_labels,
+            ["3", "5", "0", "1", "2", "4", "idle"]
+        );
+        assert_eq!(
+            export.schedule.operation_count_by_kind.get("cnot"),
+            Some(&432)
+        );
     }
 }

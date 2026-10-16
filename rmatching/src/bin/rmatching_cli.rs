@@ -14,11 +14,15 @@ fn main() {
         std::process::exit(1);
     }
 
-    let dem_text = std::fs::read_to_string(&args[1])
-        .unwrap_or_else(|e| { eprintln!("Failed to read DEM file: {e}"); std::process::exit(1); });
+    let dem_text = std::fs::read_to_string(&args[1]).unwrap_or_else(|e| {
+        eprintln!("Failed to read DEM file: {e}");
+        std::process::exit(1);
+    });
 
-    let mut matching = Matching::from_dem(&dem_text)
-        .unwrap_or_else(|e| { eprintln!("Failed to parse DEM: {e}"); std::process::exit(1); });
+    let mut matching = Matching::from_dem(&dem_text).unwrap_or_else(|e| {
+        eprintln!("Failed to parse DEM: {e}");
+        std::process::exit(1);
+    });
 
     let stdin = io::stdin();
     let stdout = io::stdout();
@@ -27,9 +31,12 @@ fn main() {
     for line in stdin.lock().lines() {
         let line = line.unwrap();
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
-        let syndrome: Vec<u8> = line.split_whitespace()
+        let syndrome: Vec<u8> = line
+            .split_whitespace()
             .map(|s| s.parse::<u8>().expect("syndrome values must be 0 or 1"))
             .collect();
 

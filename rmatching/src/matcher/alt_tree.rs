@@ -178,14 +178,8 @@ impl AltTreeNode {
         let common_ancestor;
 
         loop {
-            let a_parent = arena[a_cur.0]
-                .parent
-                .as_ref()
-                .map(|e| e.alt_tree_node);
-            let b_parent = arena[b_cur.0]
-                .parent
-                .as_ref()
-                .map(|e| e.alt_tree_node);
+            let a_parent = arena[a_cur.0].parent.as_ref().map(|e| e.alt_tree_node);
+            let b_parent = arena[b_cur.0].parent.as_ref().map(|e| e.alt_tree_node);
 
             if a_parent.is_some() || b_parent.is_some() {
                 if let Some(ap) = a_parent {

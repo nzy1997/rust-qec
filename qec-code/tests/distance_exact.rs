@@ -1,3 +1,4 @@
+use qec_code::Pauli;
 use qec_code::distance::{DistanceResult, LogicalClass};
 use qec_code::distance_exact::{
     ExactCssDistanceBackend, ExactCssDistanceInput, ExactCssDistanceOptions,
@@ -5,7 +6,6 @@ use qec_code::distance_exact::{
     ExactCssDistanceSolverReport, ExactCssDistanceSolverStatus, ExactCssDistanceStatus,
     ExactDistanceBoundType,
 };
-use qec_code::Pauli;
 
 fn sample_distance_result() -> DistanceResult {
     let witness = Pauli::from_xz_bits(vec![1, 0, 1], vec![0, 0, 0]).unwrap();

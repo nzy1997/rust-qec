@@ -1,7 +1,0 @@
-{% extends "base.html" %}
-{% block title %}Maintainer reference — RustQEC{% endblock title %}
-{% block description %}RustQEC release gates, regression commands, evidence bundles, and publication checks for maintainers.{% endblock description %}
-{% block hero %}<div class="hero compact-hero"><h1>Release and evidence reference</h1><p class="hero-copy">Run regression checks, build release evidence and verify a candidate.</p></div>{% endblock hero %}
-{% block main %}<article class="prose">
-{{ load_data(path="generated/maintainer-reference.md", format="plain") | replace(from="# Maintainer reference", to="") | replace(from="(support-compatibility.md)", to="(../support/)") | markdown | safe }}
-</article>{% endblock main %}

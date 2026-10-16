@@ -8,7 +8,7 @@ use std::path::Path;
 
 #[cfg(not(any(tarpaulin, coverage)))]
 use rsinter::bench::registry::build_default_rust_runner_registry;
-use rsinter::bench::result::{read_results_jsonl, BenchmarkResultRow};
+use rsinter::bench::result::{BenchmarkResultRow, read_results_jsonl};
 #[cfg(not(any(tarpaulin, coverage)))]
 use rsinter::bench::run::run_rust_benchmark;
 #[cfg(not(any(tarpaulin, coverage)))]

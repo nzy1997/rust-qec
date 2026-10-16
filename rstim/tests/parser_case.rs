@@ -1,5 +1,5 @@
-use rstim::parser::parse_lines;
 use rstim::ir::StimInstr;
+use rstim::parser::parse_lines;
 
 #[test]
 fn parses_case_insensitive_names() {

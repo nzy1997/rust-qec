@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rsinter::failure::{classify_completed, classify_error, combine_failure_kind, FailureKind};
+use rsinter::failure::{FailureKind, classify_completed, classify_error, combine_failure_kind};
 
 #[test]
 fn failure_kind_public_string_matrix_is_stable() {
@@ -85,9 +85,11 @@ fn failure_kind_from_str_accepts_only_snake_case_names() {
     assert!(FailureKind::from_str("").is_err());
     assert!(FailureKind::from_str("logical-failure").is_err());
     assert!(FailureKind::from_str("sampler error").is_err());
-    assert!(FailureKind::from_str("unknown")
-        .unwrap_err()
-        .contains("unknown failure_kind"));
+    assert!(
+        FailureKind::from_str("unknown")
+            .unwrap_err()
+            .contains("unknown failure_kind")
+    );
 }
 
 #[test]

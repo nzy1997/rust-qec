@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use qec_code::css::{sparse_rows_matrix_from_json_str, SparseRowsMatrix};
+use qec_code::css::{SparseRowsMatrix, sparse_rows_matrix_from_json_str};
 use rbposd::{
     BpOsdDecoder, BpVariant, ChannelModel, Correction, DecoderConfig, OsdVariant,
     ParityCheckMatrix, Schedule, Syndrome,

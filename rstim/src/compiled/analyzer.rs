@@ -24,7 +24,10 @@ pub fn analyze_compiled_circuit(
         ..options
     };
     let mut body_dem = if decompose_channel_errors {
-        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(&region.body_source, flattened_options)
+        ErrorAnalyzer::circuit_to_dem_with_options_decomposed(
+            &region.body_source,
+            flattened_options,
+        )
     } else {
         ErrorAnalyzer::circuit_to_dem_with_options(&region.body_source, flattened_options)
     }?;

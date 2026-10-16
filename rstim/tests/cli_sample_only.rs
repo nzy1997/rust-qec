@@ -1,22 +1,28 @@
-use rstim::operations::{run_detect, run_sample, sample_cli_options};
+use rstim::cli::{run_detect, run_sample, sample_cli_options};
 use rstim::data_path::ReferenceSampleMode;
 use rstim::perf::{
-    benchmark_case_by_label, run_case_measurements, PerfRunOptions, PerfSampleOutputMode,
-    PerfVariant,
+    PerfRunOptions, PerfSampleOutputMode, PerfVariant, benchmark_case_by_label,
+    run_case_measurements,
 };
 use rstim::sampler::SampleOutputMode;
 
 #[test]
 fn sample_cli_uses_measurement_only_mode_and_preserves_output() {
     let default_options = sample_cli_options(false);
-    assert_eq!(default_options.output_mode, SampleOutputMode::MeasurementsOnly);
+    assert_eq!(
+        default_options.output_mode,
+        SampleOutputMode::MeasurementsOnly
+    );
     assert_eq!(
         default_options.reference_sample_mode,
         ReferenceSampleMode::SimulateNoiseless
     );
 
     let skipped_options = sample_cli_options(true);
-    assert_eq!(skipped_options.output_mode, SampleOutputMode::MeasurementsOnly);
+    assert_eq!(
+        skipped_options.output_mode,
+        SampleOutputMode::MeasurementsOnly
+    );
     assert_eq!(
         skipped_options.reference_sample_mode,
         ReferenceSampleMode::AssumeAllZero
@@ -71,8 +77,14 @@ fn sample_only_mode_does_not_change_detect_output() {
     .expect("detect command");
 
     let text = String::from_utf8(out).unwrap();
-    assert!(text.contains("D0"), "detect output missing detector: {text}");
-    assert!(text.contains("L0"), "detect output missing observable: {text}");
+    assert!(
+        text.contains("D0"),
+        "detect output missing detector: {text}"
+    );
+    assert!(
+        text.contains("L0"),
+        "detect output missing observable: {text}"
+    );
 }
 
 #[test]

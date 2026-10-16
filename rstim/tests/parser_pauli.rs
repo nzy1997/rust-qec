@@ -1,4 +1,4 @@
-use rstim::ir::{StimInstr, StimTarget, PauliBasis};
+use rstim::ir::{PauliBasis, StimInstr, StimTarget};
 use rstim::parser::parse_lines;
 
 #[test]

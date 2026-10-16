@@ -673,9 +673,10 @@ mod tests {
     use crate::error::QecError;
 
     use super::{
+        BitPackedRow, PackedReducedRows, RandomWindowKernelWorkspace,
         try_in_packed_reduced_row_span, try_in_reduced_row_span, try_in_row_span_with_width,
         try_nullspace_basis_with_width, try_random_window_kernel_basis_with_width, try_rank,
-        try_select_independent_rows, BitPackedRow, PackedReducedRows, RandomWindowKernelWorkspace,
+        try_select_independent_rows,
     };
 
     fn dot(lhs: &[u8], rhs: &[u8]) -> u8 {
@@ -738,9 +739,11 @@ mod tests {
             dot(&expected_xor, &rhs_dense)
         );
         assert!(BitPackedRow::zeros(144).is_zero());
-        assert!(BitPackedRow::zeros(144)
-            .eq_logical(&BitPackedRow::try_from_dense(&vec![0; 144], 144).unwrap())
-            .unwrap());
+        assert!(
+            BitPackedRow::zeros(144)
+                .eq_logical(&BitPackedRow::try_from_dense(&vec![0; 144], 144).unwrap())
+                .unwrap()
+        );
     }
 
     #[test]
