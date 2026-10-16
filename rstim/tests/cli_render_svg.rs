@@ -129,11 +129,11 @@ fn render_svg_highlight_dem_error_draws_query_markers() {
         "plain SVG should start with <svg: {plain_svg}"
     );
     assert!(
-        !plain_svg.contains(">X</text>"),
+        !plain_svg.contains("marker: X"),
         "plain SVG should not contain source highlight marker text: {plain_svg}"
     );
     assert!(
-        !plain_svg.contains(">D0</text>"),
+        !plain_svg.contains("marker: D0"),
         "plain SVG should not contain symptom highlight marker text: {plain_svg}"
     );
 
@@ -166,7 +166,7 @@ fn render_svg_highlight_dem_error_draws_query_markers() {
         highlighted_svg.starts_with("<svg"),
         "highlighted SVG should start with <svg: {highlighted_svg}"
     );
-    for marker in ["q0", "XE", "M", "DETECTOR", ">X</text>", ">D0</text>"] {
+    for marker in ["q0", "XE", "M", "DETECTOR", "marker: X", "marker: D0"] {
         assert!(
             highlighted_svg.contains(marker),
             "highlighted SVG missing marker {marker}: {highlighted_svg}"
@@ -189,11 +189,11 @@ fn render_svg_highlight_dem_error_draws_query_markers() {
         );
     }
     assert!(
-        !plain_svg.contains(">X</text>") && highlighted_svg.contains(">X</text>"),
+        !plain_svg.contains("marker: X") && highlighted_svg.contains("marker: X"),
         "source highlight text should only appear in highlighted SVG"
     );
     assert!(
-        !plain_svg.contains(">D0</text>") && highlighted_svg.contains(">D0</text>"),
+        !plain_svg.contains("marker: D0") && highlighted_svg.contains("marker: D0"),
         "symptom highlight text should only appear in highlighted SVG"
     );
 
@@ -277,29 +277,23 @@ fn render_svg_sample_shot_draws_seeded_annotations() {
             "sample-shot SVG missing base circuit marker {marker}: {stdout_svg}"
         );
     }
-    assert!(
-        !stdout_svg.contains("marker:"),
-        "sample-shot SVG should show sample results without marker prefixes: {stdout_svg}"
-    );
     for marker in [
-        ">X</text>",
-        ">L</text>",
-        ">1[L]</text>",
-        ">L=1 | M=1[L]</text>",
+        "marker: X",
+        "marker: L",
+        "marker: 1[L]",
+        "marker: L=1 | M=1[L]",
+        "marker: D0",
     ] {
         assert!(
             stdout_svg.contains(marker),
             "sample-shot SVG missing annotation marker {marker}: {stdout_svg}"
         );
     }
-    assert!(
-        !stdout_svg.contains(">D0</text>"),
-        "flipped detector sample should color the block instead of rendering blue marker text: {stdout_svg}"
-    );
     for marker in [
         "class=\"annotation annotation-preset-danger\"",
+        "class=\"annotation annotation-preset-info\"",
         "data-style-preset=\"danger\"",
-        "stroke=\"#2563eb\" fill=\"#dbeafe\"",
+        "data-style-preset=\"info\"",
     ] {
         assert!(
             stdout_svg.contains(marker),
@@ -372,31 +366,6 @@ fn render_svg_sample_shot_draws_seeded_annotations() {
 }
 
 #[test]
-fn render_svg_sample_supports_heralded_measurement_sources() {
-    let rendered_output = tempfile::NamedTempFile::new().unwrap();
-    let output = run_render_svg_with_stdin_args(
-        &[
-            "--sample_shot",
-            "--seed",
-            "7",
-            "--out",
-            rendered_output.path().to_str().unwrap(),
-        ],
-        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
-    );
-
-    assert!(
-        output.status.success(),
-        "heralded sample visualization should render: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let svg = std::fs::read_to_string(rendered_output.path()).unwrap();
-    for marker in ["HERALDED_ERASE", "m1", "D0 = m1", "sample-trace"] {
-        assert!(svg.contains(marker), "rendered SVG is missing {marker}: {svg}");
-    }
-}
-
-#[test]
 fn render_svg_sample_export_errors_preserve_existing_output() {
     let protected_output = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(protected_output.path(), "existing svg should remain").unwrap();
@@ -409,20 +378,33 @@ fn render_svg_sample_export_errors_preserve_existing_output() {
             "--out",
             protected_output.path().to_str().unwrap(),
         ],
-        "SHIFT_COORDS(1) 0\nM 0\n",
+        "HERALDED_ERASE(1) 0\nDETECTOR rec[-1]\n",
     );
 
-    assert!(!output.status.success(), "invalid export should fail");
+    assert!(
+        !output.status.success(),
+        "unsupported sample visualization instruction should fail"
+    );
     assert!(
         output.stdout.is_empty(),
         "failing sample-shot export should not write stdout: {}",
         String::from_utf8_lossy(&output.stdout)
     );
-    assert!(String::from_utf8_lossy(&output.stderr).contains("SHIFT_COORDS"));
-    assert_eq!(
-        std::fs::read_to_string(protected_output.path()).unwrap(),
-        "existing svg should remain"
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(
+            "--sample_shot currently supports a subset of sample visualization instructions"
+        ),
+        "stderr should explain sample-shot instruction support limits: {stderr}"
     );
+    assert!(
+        stderr.contains("HERALDED_ERASE"),
+        "stderr should name the unsupported instruction: {stderr}"
+    );
+
+    let protected_text = std::fs::read_to_string(protected_output.path()).unwrap();
+    assert_eq!(protected_text, "existing svg should remain");
 }
 
 #[test]
@@ -438,10 +420,7 @@ fn render_svg_documented_workflow_matches_cli() {
     let cli_doc = read_doc("rstim/doc/cli.md");
 
     for (name, doc) in [("README.md", &readme), ("rstim/doc/cli.md", &cli_doc)] {
-        assert!(
-            doc.contains("render_svg"),
-            "{name} should document render_svg"
-        );
+        assert!(doc.contains("render_svg"), "{name} should document render_svg");
         assert!(
             doc.contains("export_json"),
             "{name} should still document export_json for QP101 data export"
@@ -488,10 +467,7 @@ fn render_svg_documented_workflow_matches_cli() {
         String::from_utf8_lossy(&plain_output.stdout)
     );
     let svg = std::fs::read_to_string(output.path()).unwrap();
-    assert!(
-        svg.starts_with("<svg"),
-        "documented command produced non-SVG: {svg}"
-    );
+    assert!(svg.starts_with("<svg"), "documented command produced non-SVG: {svg}");
     for marker in ["q0", "H", "M"] {
         assert!(
             svg.contains(marker),
@@ -502,12 +478,7 @@ fn render_svg_documented_workflow_matches_cli() {
     let protected_output = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(protected_output.path(), "existing svg should remain").unwrap();
     let bad_output = run_render_svg_with_stdin_args(
-        &[
-            "--seed",
-            "7",
-            "--out",
-            protected_output.path().to_str().unwrap(),
-        ],
+        &["--seed", "7", "--out", protected_output.path().to_str().unwrap()],
         "M 0\n",
     );
     assert!(

@@ -1,36 +1,12 @@
 # Showcase Index
 
-This directory is the stable front door for runnable RustQEC workspace
+This directory is the stable front door for runnable rstim workspace
 showcases. Each showcase page should explain what the example demonstrates,
 how to run it, where the result appears, which code owns it, how to verify it,
 and what its limits are.
 
 Individual showcase pages will be added by follow-up issues. Use
 [`_template.md`](docs/showcases/_template.md) for new pages.
-
-## Benchmarked Documentation Site
-
-The [benchmarked documentation site](https://nzy1997.github.io/rust-qec/)
-turns these runnable showcase pages into a broader Pages reference with
-workspace walkthroughs, benchmark evidence, checked results, methodology and
-claims limits, and the QP101 schema browser.
-
-Build and check the same Pages tree locally:
-
-```sh
-make build-site
-python3 tools/check_site_build.py _site
-```
-
-## Visual Highlights
-
-| Compact atom-loss sample-shot circuit | Surface-code d=3 r=3 atom-loss sample |
-| --- | --- |
-| ![Seeded atom-loss sample-shot SVG render](assets/atom-loss-sample-seed7.svg) | ![Seeded surface-code d=3 r=3 atom-loss sample-shot SVG render](assets/surface-code-d3-r3-atom-loss-seed7.svg) |
-
-| Surface-code decoder comparison | BB72/BB144 circuit BP-OSD comparison |
-| --- | --- |
-| ![Surface-code decoder comparison plot](../../benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png) | ![BB72/BB144 circuit BP-OSD comparison plot](../../benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png) |
 
 ## Categories
 
@@ -76,8 +52,6 @@ harnesses, smoke runs, and reproducible comparison outputs.
 Showcases:
 
 - [`Benchmark And Reproduction Evidence`](docs/showcases/benchmark-evidence.md)
-- [`qec-code random-window benchmark`](docs/showcases/qec-code-random-window-benchmark.md)
-- [`rstim-vs-Stim Simulator Evidence`](docs/showcases/rstim-vs-stim-simulator.md)
 
 Primary code and docs:
 
@@ -86,7 +60,6 @@ Primary code and docs:
 - [`rbposd/`](rbposd/)
 - [`rilpqec/`](rilpqec/)
 - [`benchmarks/surface_decoder_compare/`](benchmarks/surface_decoder_compare/)
-- [`benchmarks/bb_circuit_bposd_compare/`](benchmarks/bb_circuit_bposd_compare/)
 - [`benchmarks/surface_decoder_compare/README.md`](benchmarks/surface_decoder_compare/README.md)
 
 ### Code Construction Workflows

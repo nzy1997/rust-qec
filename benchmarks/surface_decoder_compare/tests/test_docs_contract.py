@@ -54,13 +54,6 @@ class DocsContractTest(unittest.TestCase):
         self.assertIn("make surface-decoder-compare-full", readme)
         self.assertIn("surface-decoder-compare-smoke:", makefile)
         self.assertIn("surface-decoder-compare-full:", makefile)
-        compare_targets = makefile_targets(
-            makefile,
-            "surface-decoder-compare-smoke",
-            "surface-decoder-compare-full",
-        )
-        self.assertIn("bench plot-surface-compare-csv", compare_targets)
-        self.assertNotIn("benchmarks.surface_decoder_compare.plot_compare", compare_targets)
 
     def test_readme_and_makefile_document_rsinter_surface_benchmark_flow(self) -> None:
         readme = README_PATH.read_text()
@@ -75,37 +68,26 @@ class DocsContractTest(unittest.TestCase):
         doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text()
 
         self.assertIn("benchmarks/surface_decoder_compare/README.md", doc)
-        self.assertIn("benchmarks/bb_circuit_bposd_compare/README.md", doc)
+        self.assertIn("docs/bb144_circuit_bposd_reproduction.md", doc)
         self.assertIn("benchmarks/surface_decoder_compare/results/full/results.csv", doc)
         self.assertIn(
             "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png",
             doc,
         )
-        self.assertIn("benchmarks/bb_circuit_bposd_compare/results/full/results.csv", doc)
-        self.assertIn("benchmarks/bb_circuit_bposd_compare/results/full/summary.md", doc)
-        self.assertIn(
-            "benchmarks/bb_circuit_bposd_compare/results/full/bb_circuit_bposd_compare.png",
-            doc,
-        )
-        self.assertIn(
-            "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
-            doc,
-        )
-        self.assertIn("batched, error-budget-stopped", doc)
-        self.assertIn("paired comparison", doc)
-        self.assertIn("not a fixed-shot reproduction", doc)
-        self.assertIn("make bb-circuit-bposd-compare-full", doc)
+        self.assertIn("implementation smoke evidence", doc)
+        self.assertIn("not statistical reproduction", doc)
+        self.assertIn("bb-circuit-bposd-memory", doc)
         assert_valid_bb_circuit_command_keys(doc)
 
     def test_benchmark_evidence_showcase_rejects_bb_circuit_command_typo(self) -> None:
         doc = BENCHMARK_EVIDENCE_SHOWCASE_PATH.read_text().replace(
-            "make bb-circuit-bposd-compare-full",
-            "make bb-circuit-bposd-compare-fulll",
+            "cargo run -p rsinter -- bb-circuit-bposd-memory \\",
+            "cargo run -p rsinter -- bb-circuit-bposd-memroy \\",
             1,
         )
 
         with self.assertRaisesRegex(
-            AssertionError, "unknown BB circuit command key: bb-circuit-bposd-compare-fulll"
+            AssertionError, "unknown BB circuit command key: bb-circuit-bposd-memroy"
         ):
             assert_valid_bb_circuit_command_keys(doc)
 
@@ -164,28 +146,8 @@ def paired_rbposd_ldpc_results() -> list[PairedResult]:
     return pairs
 
 
-def makefile_targets(makefile: str, *target_names: str) -> str:
-    lines = makefile.splitlines()
-    blocks: list[str] = []
-    for index, line in enumerate(lines):
-        if not any(line == f"{target}:" for target in target_names):
-            continue
-        block = [line]
-        for next_line in lines[index + 1 :]:
-            if next_line and not next_line.startswith(("\t", " ")):
-                break
-            block.append(next_line)
-        blocks.append("\n".join(block))
-    return "\n".join(blocks)
-
-
 def assert_valid_bb_circuit_command_keys(text: str) -> None:
-    known = {
-        "bb-circuit-bposd-memory",
-        "bb-circuit-bposd-compare-smoke",
-        "bb-circuit-bposd-compare-plot-smoke",
-        "bb-circuit-bposd-compare-full",
-    }
+    known = {"bb-circuit-bposd-memory"}
     keys = set(re.findall(r"\bbb-circuit-bposd-[A-Za-z0-9_-]+\b", text))
     unknown = sorted(keys - known)
     if unknown:

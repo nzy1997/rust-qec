@@ -180,52 +180,6 @@ label = "Logical Error Rate"
 }
 
 #[test]
-fn benchmark_spec_defaults_plot_fit_kind_to_log_log() {
-    let text = r#"
-name = "surface_decoder"
-version = 1
-mode = "independent"
-
-[[runner]]
-name = "rmatching"
-language = "rust"
-impl_key = "rmatching"
-
-[runner.params]
-distance = [3]
-p = [0.002]
-rounds = [3]
-max_shots = 2000
-max_errors = 20
-batch_size = 256
-
-[plot]
-title = "Surface Decoder"
-
-[plot.fit]
-enabled = true
-
-[plot.x]
-field = "params.p"
-scale = "log"
-label = "Physical Error Rate"
-
-[plot.series]
-group_by = ["runner"]
-label_template = "{runner}"
-
-[[plot.panel]]
-metric = "metrics.logical_error_rate"
-scale = "log"
-label = "Logical Error Rate"
-"#;
-
-    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
-    assert!(spec.plot.fit.enabled);
-    assert_eq!(spec.plot.fit.kind, PlotFitKind::LogLog);
-}
-
-#[test]
 fn benchmark_spec_rejects_unsupported_plot_fit_kind() {
     let text = r#"
 name = "surface_decoder"
@@ -279,40 +233,6 @@ fn benchmark_spec_loads_from_toml_fixture() {
     let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
     assert_eq!(spec.runners[0].impl_key, "rmatching");
     assert_eq!(spec.plot.x.field, "params.p");
-}
-
-#[test]
-fn steane_minimal_feature_gate_fixtures_are_valid() {
-    for (name, text) in [
-        (
-            "minimal_steane_css_rbposd",
-            include_str!("fixtures/bench/minimal_steane_css_rbposd.toml"),
-        ),
-        (
-            "minimal_steane_css_rilpqec",
-            include_str!("fixtures/bench/minimal_steane_css_rilpqec.toml"),
-        ),
-    ] {
-        let spec: BenchmarkSpec =
-            toml::from_str(text).unwrap_or_else(|err| panic!("{name} failed to parse: {err}"));
-        spec.validate()
-            .unwrap_or_else(|err| panic!("{name} failed validation: {err}"));
-    }
-}
-
-#[test]
-fn bb_compare_plot_spec_uses_paper_style_logical_rate_per_syndrome_cycle() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/bench/bb_compare_plot.toml");
-    let text = std::fs::read_to_string(path).unwrap();
-    let spec: BenchmarkSpec = toml::from_str(&text).unwrap();
-
-    assert_eq!(spec.plot.logical_rate_unit, LogicalRateUnit::PerRound);
-    assert_eq!(spec.plot.panels[0].metric, "metrics.logical_error_rate");
-    assert_eq!(
-        spec.plot.panels[0].label,
-        "Logical Error Rate per Syndrome Cycle"
-    );
 }
 
 #[test]

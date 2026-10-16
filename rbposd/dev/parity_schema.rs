@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use rbposd::{
-    BpLsdDecoder, BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult, DecoderConfig,
-    LsdConfig, LsdMethod, OsdVariant, ParityCheckMatrix, Schedule, Syndrome,
+    BpLsdDecoder, BpOsdDecoder, BpVariant, ChannelModel, DecodeError, DecodeResult,
+    DecoderConfig, LsdConfig, LsdMethod, OsdVariant, ParityCheckMatrix, Schedule, Syndrome,
 };
 use serde::{Deserialize, Serialize};
 
@@ -99,7 +99,6 @@ fn error_code(error: &DecodeError) -> &'static str {
         DecodeError::BpDidNotConverge => "BpDidNotConverge",
         DecodeError::NoOsdSolution => "NoOsdSolution",
         DecodeError::NoLsdSolution => "NoLsdSolution",
-        DecodeError::UnsupportedOsdMethod { .. } => "UnsupportedOsdMethod",
         DecodeError::UnsupportedLsdOrder { .. } => "UnsupportedLsdOrder",
     }
 }
@@ -151,12 +150,10 @@ pub enum ScheduleSpec {
     Serial,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OsdVariantSpec {
     Osd0,
-    LegacyCombinationSweep,
-    LdpcCombinationSweep,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -219,8 +216,6 @@ impl ConfigSpec {
             },
             osd_variant: match self.osd_variant {
                 OsdVariantSpec::Osd0 => OsdVariant::Osd0,
-                OsdVariantSpec::LegacyCombinationSweep => OsdVariant::LegacyCombinationSweep,
-                OsdVariantSpec::LdpcCombinationSweep => OsdVariant::LdpcCombinationSweep,
             },
             osd_order: 0,
         }

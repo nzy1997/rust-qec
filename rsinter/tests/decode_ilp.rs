@@ -1,9 +1,7 @@
-#![cfg(feature = "ilp-runner")]
-
 use std::collections::HashMap;
 
 use rilpqec::{BackendConfig, BackendKind, IlpDecoderConfig};
-use rsinter::collect::{CollectOptions, collect};
+use rsinter::collect::{collect, CollectOptions};
 use rsinter::decode::{Decoder, IlpDemDecoder as RsinterIlpDemDecoder};
 use rsinter::task::{CollectionOptions, Task};
 use rstim::dem::DetectorErrorModel;
@@ -111,7 +109,11 @@ fn ilp_dem_decoder_reports_unavailable_gurobi_backend() {
             verbose: false,
         },
     });
-    let err = decoder.compile_for_dem(&dem).err().unwrap();
+    let compiled = decoder.compile_for_dem(&dem).unwrap();
+
+    let err = compiled
+        .decode_shots_bit_packed(&[0b0000_0001], 1, 1, 1)
+        .unwrap_err();
 
     assert!(
         err.contains("no ILP backend is available"),

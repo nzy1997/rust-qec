@@ -8,9 +8,7 @@ pub enum BinaryIlpError {
     UnknownBinaryVar(usize),
     #[error("model row references an unknown integer variable index {0}")]
     UnknownIntegerVar(usize),
-    #[error(
-        "binary variable {index} must have integral bounds within [0, 1], got [{lower}, {upper}]"
-    )]
+    #[error("binary variable {index} must have integral bounds within [0, 1], got [{lower}, {upper}]")]
     InvalidBinaryVarBounds {
         index: usize,
         lower: f64,
@@ -20,9 +18,6 @@ pub enum BinaryIlpError {
     UnknownConstraintRow(usize),
     #[error("no ILP backend is available for kind {requested:?}")]
     BackendUnavailable { requested: BackendKind },
-    #[error("{backend:?} reached its time limit without a feasible incumbent")]
-    TimeLimitWithoutIncumbent { backend: BackendKind },
-    #[cfg(feature = "highs")]
     #[error("HiGHS backend error: {0}")]
     Highs(String),
     #[cfg(feature = "gurobi")]

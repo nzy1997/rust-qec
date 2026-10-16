@@ -11,11 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-try:
-    from tools import check_site_manifest
-except ModuleNotFoundError:
-    import check_site_manifest  # type: ignore[no-redef]
-
 
 REQUIRED_SHOWCASE_SECTIONS = (
     "What This Shows",
@@ -30,18 +25,6 @@ REQUIRED_INDEX_SECTIONS = (
     "Categories",
     "Documentation Follow-Up Policy",
     "Page Contract",
-)
-
-RSTIM_VS_STIM_SHOWCASE = Path("docs/showcases/rstim-vs-stim-simulator.md")
-RSTIM_VS_STIM_COMMAND_REQUIREMENTS = (
-    (
-        "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness",
-        "missing rstim-vs-Stim correctness command link",
-    ),
-    (
-        "cargo run -p rstim --features cli --bin rstim -- perf run",
-        "missing rstim-vs-Stim speed command link",
-    ),
 )
 
 PLACEHOLDER_LIMITS = {"", "tbd", "todo", "n/a", "none"}
@@ -196,28 +179,6 @@ def links_to_planning_docs(text: str) -> bool:
     return False
 
 
-def is_rstim_vs_stim_showcase(path: Path, repo_root: Path) -> bool:
-    try:
-        relative = path.resolve().relative_to(repo_root.resolve())
-    except ValueError:
-        return False
-    return relative == RSTIM_VS_STIM_SHOWCASE
-
-
-def validate_rstim_vs_stim_commands(path: Path, repo_root: Path, text: str) -> list[str]:
-    if not is_rstim_vs_stim_showcase(path, repo_root):
-        return []
-    errors = [
-        error
-        for required_command, error in RSTIM_VS_STIM_COMMAND_REQUIREMENTS
-        if required_command not in text
-    ]
-    match = check_site_manifest.find_broad_rstim_vs_stim_claim(text)
-    if match is not None:
-        errors.append(f"broad rstim-vs-Stim claim is not allowed: {match}")
-    return errors
-
-
 def validate_showcase_page(path: Path, repo_root: Path) -> list[str]:
     text = read_text(path)
     headings = parse_headings(text)
@@ -236,7 +197,6 @@ def validate_showcase_page(path: Path, repo_root: Path) -> list[str]:
         if limits_is_placeholder(limits_body):
             errors.append("Limits section must contain non-placeholder text")
 
-    errors.extend(validate_rstim_vs_stim_commands(path, repo_root, text))
     return errors
 
 
@@ -353,44 +313,6 @@ Run the self-test command and expect exit code 0.
 This fixture covers checker structure only, not full documentation prose.
 """
 
-RSTIM_VS_STIM_VALID_SHOWCASE = """# rstim-vs-Stim Simulator Evidence
-
-## What This Shows
-
-This fixture shows the specialized command contract.
-
-## Run It
-
-```sh
-python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \\
-  --cases benchmarks/rstim_vs_stim_simulator/cases.smoke.toml \\
-  --shots 20000 \\
-  --out /tmp/rstim-vs-stim-correctness.json
-
-cargo run -p rstim --features cli --bin rstim -- perf run \\
-  --case stim-style-surface-sample-d11-r100-b1024 \\
-  --warmup-rounds 0 \\
-  --measure-rounds 1 \\
-  --out /tmp/rstim-vs-stim-speed.jsonl
-```
-
-## Expected Result
-
-The commands write reviewer-readable evidence.
-
-## Code
-
-See [`benchmarks/rstim_vs_stim_simulator/README.md`](benchmarks/rstim_vs_stim_simulator/README.md).
-
-## Verification
-
-Run the showcase checker.
-
-## Limits
-
-This fixture covers checker command validation only.
-"""
-
 
 def run_self_test() -> list[str]:
     errors: list[str] = []
@@ -398,11 +320,6 @@ def run_self_test() -> list[str]:
         root = Path(tmp)
         write_fixture(root, "Cargo.toml", "[workspace]\n")
         write_fixture(root, "README.md", "# Fixture Root\n")
-        write_fixture(
-            root,
-            "benchmarks/rstim_vs_stim_simulator/README.md",
-            "# Rstim vs Stim Simulator\n",
-        )
         showcase_dir = root / "docs/showcases"
         valid = write_fixture(root, "docs/showcases/valid.md", VALID_SHOWCASE)
         missing_expected = write_fixture(
@@ -438,11 +355,6 @@ def run_self_test() -> list[str]:
                 template_limits_text,
             ),
         )
-        rstim_vs_stim = write_fixture(
-            root,
-            "docs/showcases/rstim-vs-stim-simulator.md",
-            RSTIM_VS_STIM_VALID_SHOWCASE,
-        )
         bad_link = write_fixture(
             root,
             "docs/showcases/bad-link.md",
@@ -476,49 +388,6 @@ def run_self_test() -> list[str]:
 
         if validate_showcase_page(valid, root):
             errors.append("valid showcase fixture should pass")
-        if validate_showcase_page(rstim_vs_stim, root):
-            errors.append("rstim-vs-Stim showcase fixture should pass")
-        for phrase in ("rstim is faster than Stim", "rstim beats Stim", "full Stim parity"):
-            rstim_vs_stim.write_text(
-                RSTIM_VS_STIM_VALID_SHOWCASE + f"\n{phrase}\n",
-                encoding="utf-8",
-            )
-            broad_claim_errors = validate_showcase_page(rstim_vs_stim, root)
-            if not any(
-                "broad rstim-vs-Stim claim is not allowed" in error
-                for error in broad_claim_errors
-            ):
-                errors.append(
-                    f"rstim-vs-Stim fixture with broad claim {phrase!r} did not fail: "
-                    f"{broad_claim_errors}"
-                )
-        rstim_vs_stim.write_text(
-            RSTIM_VS_STIM_VALID_SHOWCASE.replace(
-                "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness",
-                "python3 -m benchmarks.rstim_vs_stim_simulator.missing_correctness",
-            ),
-            encoding="utf-8",
-        )
-        missing_correctness_errors = validate_showcase_page(rstim_vs_stim, root)
-        if not any("correctness command" in error for error in missing_correctness_errors):
-            errors.append(
-                "rstim-vs-Stim fixture without correctness command did not fail: "
-                f"{missing_correctness_errors}"
-            )
-        rstim_vs_stim.write_text(
-            RSTIM_VS_STIM_VALID_SHOWCASE.replace(
-                "cargo run -p rstim --features cli --bin rstim -- perf run",
-                "cargo run -p rstim --features cli --bin rstim -- perf missing-run",
-            ),
-            encoding="utf-8",
-        )
-        missing_speed_errors = validate_showcase_page(rstim_vs_stim, root)
-        if not any("speed command" in error for error in missing_speed_errors):
-            errors.append(
-                "rstim-vs-Stim fixture without speed command did not fail: "
-                f"{missing_speed_errors}"
-            )
-        rstim_vs_stim.write_text(RSTIM_VS_STIM_VALID_SHOWCASE, encoding="utf-8")
         expected_failures = [
             (missing_expected, "Expected Result"),
             (missing_limits, "Limits"),

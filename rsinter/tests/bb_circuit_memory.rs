@@ -1,10 +1,7 @@
-#![cfg(feature = "rbposd-runner")]
-
 use rsinter::bb_circuit_memory::{
     bb_circuit_bposd_result_row, build_code, build_effective_models, build_syndrome_cycle,
-    build_upstream_code, export_comparison_case_for_code, run_bb_p_point, run_simulation,
-    run_simulation_for_code, sample_seeded_trial, validate_bb_p_point_result,
-    validate_bposd_profile_result_row, BbPPointConfig, OperationKind, SimulationConfig,
+    build_upstream_code, run_simulation, run_simulation_for_code, sample_seeded_trial,
+    validate_bposd_profile_result_row, OperationKind, SimulationConfig,
 };
 
 #[test]
@@ -42,61 +39,11 @@ fn build_code_supports_bb90_and_preserves_bb144_defaults() {
 }
 
 #[test]
-fn build_code_supports_bb72_smoke_shape() {
-    let bb72 = build_code("bb72").unwrap();
-    assert_eq!(bb72.ell(), 6);
-    assert_eq!(bb72.m(), 6);
-    assert_eq!(bb72.n2(), 36);
-    assert_eq!(bb72.n(), 72);
-    assert_eq!(bb72.k(), 12);
-    assert!(bb72.hx_rows().iter().all(|row| row.len() == 6));
-    assert!(bb72.hz_rows().iter().all(|row| row.len() == 6));
-}
-
-#[test]
 fn build_code_rejects_unknown_code_id_with_supported_values() {
     let error = build_code("bb999").unwrap_err();
     assert!(error.contains("bb999"), "{error}");
-    assert!(error.contains("bb72"), "{error}");
     assert!(error.contains("bb90"), "{error}");
     assert!(error.contains("bb144"), "{error}");
-}
-
-#[test]
-fn comparison_case_export_contains_models_samples_and_profile() {
-    let export = export_comparison_case_for_code(
-        "bb72",
-        SimulationConfig {
-            physical_error_rate: 1.0e-12,
-            num_cycles: 1,
-            num_trials: 1,
-            seed: Some(12345),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        },
-    )
-    .unwrap();
-
-    assert_eq!(export.code_id, "bb72");
-    assert_eq!(export.num_trials, 1);
-    assert_eq!(export.seed, Some(12345));
-    assert_eq!(export.max_bp_iterations, 10);
-    assert_eq!(export.osd_order, 0);
-    assert_eq!(export.z_model.num_checks, 36 * 3);
-    assert_eq!(export.x_model.num_checks, 36 * 3);
-    assert_eq!(export.z_model.first_logical_row, 36 * 3);
-    assert_eq!(export.x_model.first_logical_row, 36 * 3);
-    assert_eq!(export.trials.len(), 1);
-    assert_eq!(export.trials[0].z_syndrome.len(), export.z_model.num_checks);
-    assert_eq!(export.trials[0].x_syndrome.len(), export.x_model.num_checks);
-    assert_eq!(export.trials[0].z_logical.len(), bb72_logical_len());
-    assert_eq!(export.trials[0].x_logical.len(), bb72_logical_len());
-    assert!(export.rust_result.profile.setup_seconds.is_finite());
-    assert!(export.rust_result.profile.decode_seconds.is_finite());
-}
-
-fn bb72_logical_len() -> usize {
-    build_code("bb72").unwrap().k()
 }
 
 #[test]
@@ -308,120 +255,6 @@ fn effective_models_only_use_basis_specific_logical_rows() {
 }
 
 #[test]
-fn bb_p_point_runner_reuses_setup_across_trials() {
-    let result = run_bb_p_point(BbPPointConfig::from_simulation_config(
-        "bb72",
-        SimulationConfig {
-            physical_error_rate: 0.0,
-            num_cycles: 1,
-            num_trials: 8,
-            seed: Some(17),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        },
-    ))
-    .unwrap();
-
-    assert_eq!(result.code_id, "bb72");
-    assert_eq!(result.result.num_trials, 8);
-    assert_eq!(result.result.num_failed_trials, 0);
-
-    let profile = &result.result.profile;
-    println!("{}", serde_json::to_string_pretty(profile).unwrap());
-    assert_eq!(profile.code_build_count, 1);
-    assert_eq!(profile.syndrome_cycle_build_count, 1);
-    assert_eq!(profile.effective_model_build_count, 1);
-    assert_eq!(profile.decoder_build_count, 1);
-    assert_eq!(profile.sample_count, 8);
-    assert_eq!(profile.z_decode_call_count, 8);
-    assert_eq!(profile.x_decode_call_count, 8);
-    assert_eq!(
-        profile.decode_call_count,
-        profile.z_decode_call_count + profile.x_decode_call_count
-    );
-
-    validate_bb_p_point_result(&result).unwrap();
-}
-
-#[test]
-fn bb_p_point_runner_rejects_per_trial_setup_rebuild() {
-    let mut result = run_bb_p_point(BbPPointConfig::from_simulation_config(
-        "bb72",
-        SimulationConfig {
-            physical_error_rate: 0.0,
-            num_cycles: 1,
-            num_trials: 8,
-            seed: Some(17),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        },
-    ))
-    .unwrap();
-
-    result.result.profile.code_build_count = 8;
-    result.result.profile.effective_model_build_count = 8;
-    result.result.profile.decoder_build_count = 8;
-
-    let error = validate_bb_p_point_result(&result).unwrap_err();
-    assert!(
-        error.contains("setup/model rebuild count mismatch"),
-        "{error}"
-    );
-}
-
-#[test]
-fn bb_circuit_bposd_row_rejects_per_trial_setup_rebuild() {
-    let result = run_bb_p_point(BbPPointConfig::from_simulation_config(
-        "bb72",
-        SimulationConfig {
-            physical_error_rate: 0.0,
-            num_cycles: 1,
-            num_trials: 8,
-            seed: Some(17),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        },
-    ))
-    .unwrap();
-
-    let mut row = bb_circuit_bposd_result_row("bb72", &result.result);
-    row.metrics.insert("code_build_count".to_string(), 8.0);
-    row.metrics
-        .insert("syndrome_cycle_build_count".to_string(), 8.0);
-    row.metrics
-        .insert("effective_model_build_count".to_string(), 8.0);
-    row.metrics.insert("decoder_build_count".to_string(), 8.0);
-
-    let error = validate_bposd_profile_result_row(&row).unwrap_err();
-    assert!(
-        error.contains("setup/model rebuild count mismatch"),
-        "{error}"
-    );
-}
-
-#[test]
-fn bb_circuit_bposd_row_rejects_sample_count_mismatch() {
-    let result = run_bb_p_point(BbPPointConfig::from_simulation_config(
-        "bb72",
-        SimulationConfig {
-            physical_error_rate: 0.0,
-            num_cycles: 1,
-            num_trials: 8,
-            seed: Some(17),
-            max_bp_iterations: 10,
-            osd_order: 0,
-        },
-    ))
-    .unwrap();
-
-    let mut row = bb_circuit_bposd_result_row("bb72", &result.result);
-    row.metrics.insert("sample_count".to_string(), 7.0);
-
-    let error = validate_bposd_profile_result_row(&row).unwrap_err();
-    assert!(error.contains("sample_count mismatch"), "{error}");
-}
-
-#[test]
 fn bb_circuit_bposd_timing_counters_partition_decode_work() {
     let result = run_simulation_for_code(
         "bb90",
@@ -440,11 +273,6 @@ fn bb_circuit_bposd_timing_counters_partition_decode_work() {
     assert!(profile.setup_seconds.is_finite());
     assert!(profile.sample_seconds.is_finite());
     assert!(profile.decode_seconds.is_finite());
-    assert_eq!(profile.code_build_count, 1);
-    assert_eq!(profile.syndrome_cycle_build_count, 1);
-    assert_eq!(profile.effective_model_build_count, 1);
-    assert_eq!(profile.decoder_build_count, 1);
-    assert_eq!(profile.sample_count, 1);
     assert!(profile.decode_call_count > 0);
     assert_eq!(
         profile.decode_call_count,
@@ -464,11 +292,6 @@ fn bb_circuit_bposd_timing_counters_partition_decode_work() {
         "setup_seconds",
         "sample_seconds",
         "decode_seconds",
-        "code_build_count",
-        "syndrome_cycle_build_count",
-        "effective_model_build_count",
-        "decoder_build_count",
-        "sample_count",
         "bp_seconds",
         "osd_seconds",
         "decode_call_count",
@@ -502,10 +325,6 @@ fn bb_circuit_bposd_timing_counters_reject_incomplete_rows() {
     let mut missing = bb_circuit_bposd_result_row("bb90", &result);
     missing.metrics.remove("decode_call_count");
     assert!(validate_bposd_profile_result_row(&missing).is_err());
-
-    let mut missing_setup = bb_circuit_bposd_result_row("bb90", &result);
-    missing_setup.metrics.remove("effective_model_build_count");
-    assert!(validate_bposd_profile_result_row(&missing_setup).is_err());
 
     let mut non_finite = bb_circuit_bposd_result_row("bb90", &result);
     non_finite

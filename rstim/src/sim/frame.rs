@@ -1,185 +1,9 @@
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-use crate::rare_error_iterator::rare_error_telemetry;
 use rand::Rng;
-#[cfg(debug_assertions)]
-use std::cell::Cell;
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-use std::cell::RefCell;
 
-use crate::compiled::{CompiledBasis, CompiledBlock, CompiledOp};
+use crate::compiled::CompiledBlock;
 use crate::ir::{PauliBasis, StimInstr, StimTarget};
-use crate::rare_error_iterator::RareErrorIndexSampler;
 use crate::sim::bit_table::BitTable;
 use crate::sim::measure_record_batch::MeasureRecordBatch;
-
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-#[doc(hidden)]
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct FrameNoiseTelemetryRecord {
-    pub operation: &'static str,
-    pub sampling_path: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub targets: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pairs: Option<usize>,
-    pub iterator_builds: usize,
-    pub attempt_count: usize,
-}
-
-#[cfg(debug_assertions)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OneQubitNoiseSamplingPath {
-    None,
-    Sparse,
-    Dense,
-}
-
-#[cfg(debug_assertions)]
-impl Default for OneQubitNoiseSamplingPath {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct OneQubitNoiseInstructionTelemetry {
-    pub sampling_path: OneQubitNoiseSamplingPath,
-    pub iterator_builds: usize,
-    pub attempt_count: usize,
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Depolarize2SamplingTelemetry {
-    pub sampling_path: &'static str,
-    pub iterator_builds: usize,
-    pub attempt_count: usize,
-}
-
-#[cfg(debug_assertions)]
-impl Default for Depolarize2SamplingTelemetry {
-    fn default() -> Self {
-        Self {
-            sampling_path: "none",
-            iterator_builds: 0,
-            attempt_count: 0,
-        }
-    }
-}
-
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-thread_local! {
-    static FRAME_NOISE_TELEMETRY: RefCell<Vec<FrameNoiseTelemetryRecord>> =
-        const { RefCell::new(Vec::new()) };
-}
-
-#[cfg(debug_assertions)]
-thread_local! {
-    static ONE_QUBIT_NOISE_SAMPLING_PATH: Cell<OneQubitNoiseSamplingPath> =
-        const { Cell::new(OneQubitNoiseSamplingPath::None) };
-    static ONE_QUBIT_NOISE_ITERATOR_BUILDS: Cell<usize> = const { Cell::new(0) };
-    static ONE_QUBIT_NOISE_ATTEMPT_COUNT: Cell<usize> = const { Cell::new(0) };
-    static DEPOLARIZE2_SAMPLING_TELEMETRY: RefCell<Depolarize2SamplingTelemetry> =
-        const { RefCell::new(Depolarize2SamplingTelemetry {
-            sampling_path: "none",
-            iterator_builds: 0,
-            attempt_count: 0,
-        }) };
-}
-
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-#[doc(hidden)]
-pub fn reset_frame_noise_telemetry() {
-    FRAME_NOISE_TELEMETRY.with(|telemetry| telemetry.borrow_mut().clear());
-}
-
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-#[doc(hidden)]
-pub fn take_frame_noise_telemetry() -> Vec<FrameNoiseTelemetryRecord> {
-    FRAME_NOISE_TELEMETRY.with(|telemetry| std::mem::take(&mut *telemetry.borrow_mut()))
-}
-
-#[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-fn record_frame_noise_instruction(
-    operation: &'static str,
-    sampling_path: &'static str,
-    targets: Option<usize>,
-    pairs: Option<usize>,
-    iterator_builds: usize,
-    attempt_count: usize,
-) {
-    FRAME_NOISE_TELEMETRY.with(|telemetry| {
-        telemetry.borrow_mut().push(FrameNoiseTelemetryRecord {
-            operation,
-            sampling_path,
-            targets,
-            pairs,
-            iterator_builds,
-            attempt_count,
-        });
-    });
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn reset_one_qubit_noise_instruction_telemetry() {
-    ONE_QUBIT_NOISE_SAMPLING_PATH.with(|path| path.set(OneQubitNoiseSamplingPath::None));
-    ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(|builds| builds.set(0));
-    ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(|attempts| attempts.set(0));
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn one_qubit_noise_instruction_telemetry() -> OneQubitNoiseInstructionTelemetry {
-    OneQubitNoiseInstructionTelemetry {
-        sampling_path: ONE_QUBIT_NOISE_SAMPLING_PATH.with(Cell::get),
-        iterator_builds: ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(Cell::get),
-        attempt_count: ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(Cell::get),
-    }
-}
-
-#[cfg(debug_assertions)]
-fn record_one_qubit_noise_instruction(
-    sampling_path: OneQubitNoiseSamplingPath,
-    iterator_builds: usize,
-    attempt_count: usize,
-) {
-    ONE_QUBIT_NOISE_SAMPLING_PATH.with(|path| path.set(sampling_path));
-    ONE_QUBIT_NOISE_ITERATOR_BUILDS.with(|builds| builds.set(iterator_builds));
-    ONE_QUBIT_NOISE_ATTEMPT_COUNT.with(|attempts| attempts.set(attempt_count));
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn reset_depolarize2_sampling_telemetry() {
-    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| {
-        *telemetry.borrow_mut() = Depolarize2SamplingTelemetry::default();
-    });
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn depolarize2_sampling_telemetry() -> Depolarize2SamplingTelemetry {
-    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| *telemetry.borrow())
-}
-
-#[cfg(debug_assertions)]
-fn record_depolarize2_sampling(
-    sampling_path: &'static str,
-    iterator_builds: usize,
-    attempt_count: usize,
-) {
-    DEPOLARIZE2_SAMPLING_TELEMETRY.with(|telemetry| {
-        *telemetry.borrow_mut() = Depolarize2SamplingTelemetry {
-            sampling_path,
-            iterator_builds,
-            attempt_count,
-        };
-    });
-}
 
 pub struct FrameSimulator {
     pub num_qubits: usize,
@@ -188,65 +12,23 @@ pub struct FrameSimulator {
     pub z_table: BitTable,
     pub m_record: MeasureRecordBatch,
     last_correlated_error_occurred: Vec<u64>,
-    depolarize_scratch: DepolarizeScratch,
     det_records: Vec<Vec<u64>>,
     obs_records: Vec<Vec<u64>>,
-    materialize_detector_observable_outputs: bool,
-    detector_materializations: usize,
-    observable_materializations: usize,
 }
 
 impl FrameSimulator {
     pub fn new(num_qubits: usize, batch_size: usize) -> Self {
-        Self::try_new(num_qubits, batch_size).expect("trusted FrameSimulator dimensions allocate")
-    }
-
-    pub fn try_new(num_qubits: usize, batch_size: usize) -> Result<Self, String> {
-        let words_per_row = batch_size
-            .checked_add(63)
-            .ok_or_else(|| "batch size overflows frame row width".to_string())?
-            / 64;
-        let x_table = BitTable::try_new(num_qubits, batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-        let z_table = BitTable::try_new(num_qubits, batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-        let mut last_correlated_error_occurred = Vec::new();
-        last_correlated_error_occurred
-            .try_reserve_exact(words_per_row)
-            .map_err(|err| format!("frame allocation failed: {err}"))?;
-        last_correlated_error_occurred.resize(words_per_row, 0u64);
-        Ok(Self {
+        let words_per_row = (batch_size + 63) / 64;
+        Self {
             num_qubits,
             batch_size,
-            x_table,
-            z_table,
+            x_table: BitTable::new(num_qubits, batch_size),
+            z_table: BitTable::new(num_qubits, batch_size),
             m_record: MeasureRecordBatch::new(batch_size),
-            last_correlated_error_occurred,
-            depolarize_scratch: DepolarizeScratch::new(),
+            last_correlated_error_occurred: vec![0u64; words_per_row],
             det_records: Vec::new(),
             obs_records: Vec::new(),
-            materialize_detector_observable_outputs: true,
-            detector_materializations: 0,
-            observable_materializations: 0,
-        })
-    }
-
-    pub(crate) fn randomize_initial_z_frames(&mut self, rng: &mut impl Rng) {
-        for q in 0..self.num_qubits {
-            self.z_table.randomize_row(q, rng);
         }
-    }
-
-    pub(crate) fn set_materialize_detector_observable_outputs(&mut self, enabled: bool) {
-        self.materialize_detector_observable_outputs = enabled;
-    }
-
-    pub(crate) fn detector_materializations(&self) -> usize {
-        self.detector_materializations
-    }
-
-    pub(crate) fn observable_materializations(&self) -> usize {
-        self.observable_materializations
     }
 
     pub fn run(
@@ -257,12 +39,7 @@ impl FrameSimulator {
     ) -> Result<(), String> {
         for instr in instrs {
             match instr {
-                StimInstr::Op {
-                    name,
-                    args,
-                    targets,
-                    ..
-                } => {
+                StimInstr::Op { name, args, targets, .. } => {
                     self.exec_op(name.as_str(), args, targets, ref_sample, rng)?;
                 }
                 StimInstr::Repeat { count, body } => {
@@ -285,7 +62,7 @@ impl FrameSimulator {
             match block {
                 CompiledBlock::Ops(ops) => {
                     for op in ops {
-                        self.exec_compiled_op(op, ref_sample, rng)?;
+                        self.exec_op(op.name.as_str(), &op.args, &op.targets, ref_sample, rng)?;
                     }
                 }
                 CompiledBlock::Repeat(region) => {
@@ -460,7 +237,6 @@ impl FrameSimulator {
             "M" | "MZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
@@ -468,7 +244,6 @@ impl FrameSimulator {
             "MX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
                 }
@@ -480,7 +255,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -490,7 +264,6 @@ impl FrameSimulator {
             "MR" | "MRZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
@@ -499,7 +272,6 @@ impl FrameSimulator {
             "MRX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -512,7 +284,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -542,72 +313,102 @@ impl FrameSimulator {
             }
 
             // --- Noise channels ---
+
             "X_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                let qubits = qubits(targets)?;
-                self.exec_x_error_qubits(&qubits, p, wpr, rng)?;
+                for q in qubits(targets)? {
+                    let noise = random_bits_with_prob(wpr, p, rng);
+                    let x = self.x_table.row_words_mut(q);
+                    for w in 0..wpr { x[w] ^= noise[w]; }
+                }
             }
             "Z_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+                    let noise = random_bits_with_prob(wpr, p, rng);
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { z[w] ^= noise[w]; }
                 }
             }
             "Y_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
+                    let noise = random_bits_with_prob(wpr, p, rng);
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { x[w] ^= noise[w]; }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { z[w] ^= noise[w]; }
                 }
             }
             "DEPOLARIZE1" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                // The dense path reuses depolarize scratch instead of allocating per target.
-                self.exec_depolarize1(targets, p, wpr, rng)?;
+                if p <= 0.0 { /* skip */ }
+                else {
+                    for q in qubits(targets)? {
+                        let mut xf = vec![0u64; wpr];
+                        let mut zf = vec![0u64; wpr];
+                        for w in 0..wpr {
+                            for bit in 0..64u32 {
+                                if rng.r#gen::<f64>() < p {
+                                    match rng.gen_range(0u8..3) {
+                                        0 => xf[w] |= 1u64 << bit,
+                                        1 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
+                                        _ => zf[w] |= 1u64 << bit,
+                                    }
+                                }
+                            }
+                        }
+                        let x = self.x_table.row_words_mut(q);
+                        for w in 0..wpr { x[w] ^= xf[w]; }
+                        let z = self.z_table.row_words_mut(q);
+                        for w in 0..wpr { z[w] ^= zf[w]; }
+                    }
+                }
             }
             "DEPOLARIZE2" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                // random_bits_with_prob_into reuses depolarize scratch instead of allocating per target pair.
-                self.exec_depolarize2(targets, p, wpr, rng)?;
+                if p > 0.0 {
+                    for (qa, qb) in qubit_pairs(targets)? {
+                        let mut xa = vec![0u64; wpr];
+                        let mut za = vec![0u64; wpr];
+                        let mut xb = vec![0u64; wpr];
+                        let mut zb = vec![0u64; wpr];
+                        for w in 0..wpr {
+                            for bit in 0..64u32 {
+                                if rng.r#gen::<f64>() < p {
+                                    let r = rng.gen_range(0u8..15);
+                                    let (pa, pb) = two_qubit_pauli(r);
+                                    apply_pauli_bits(pa, &mut xa, &mut za, w, bit);
+                                    apply_pauli_bits(pb, &mut xb, &mut zb, w, bit);
+                                }
+                            }
+                        }
+                        let x = self.x_table.row_words_mut(qa);
+                        for w in 0..wpr { x[w] ^= xa[w]; }
+                        let z = self.z_table.row_words_mut(qa);
+                        for w in 0..wpr { z[w] ^= za[w]; }
+                        let x = self.x_table.row_words_mut(qb);
+                        for w in 0..wpr { x[w] ^= xb[w]; }
+                        let z = self.z_table.row_words_mut(qb);
+                        for w in 0..wpr { z[w] ^= zb[w]; }
+                    }
+                }
             }
 
             "CORRELATED_ERROR" | "E" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
-                apply_pauli_noise_to_targets(
-                    &mut self.x_table,
-                    &mut self.z_table,
-                    targets,
-                    &noise,
-                    wpr,
-                );
+                let noise = random_bits_with_prob(wpr, p, rng);
+                apply_pauli_noise_to_targets(&mut self.x_table, &mut self.z_table, targets, &noise, wpr);
                 self.last_correlated_error_occurred = noise;
             }
             "ELSE_CORRELATED_ERROR" => {
                 let p = args.first().copied().unwrap_or(0.0);
-                let candidate = random_bits_with_prob(wpr, self.batch_size, p, rng);
+                let candidate = random_bits_with_prob(wpr, p, rng);
                 let mut noise = vec![0u64; wpr];
                 for w in 0..wpr {
                     noise[w] = candidate[w] & !self.last_correlated_error_occurred[w];
                 }
-                apply_pauli_noise_to_targets(
-                    &mut self.x_table,
-                    &mut self.z_table,
-                    targets,
-                    &noise,
-                    wpr,
-                );
+                apply_pauli_noise_to_targets(&mut self.x_table, &mut self.z_table, targets, &noise, wpr);
                 for w in 0..wpr {
                     self.last_correlated_error_occurred[w] |= noise[w];
                 }
@@ -634,40 +435,21 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= xf[w];
-                    }
+                    for w in 0..wpr { x[w] ^= xf[w]; }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= zf[w];
-                    }
+                    for w in 0..wpr { z[w] ^= zf[w]; }
                 }
             }
             "PAULI_CHANNEL_2" => {
-                let probs: Vec<f64> = (0..15)
-                    .map(|i| args.get(i).copied().unwrap_or(0.0))
-                    .collect();
+                let probs: Vec<f64> = (0..15).map(|i| args.get(i).copied().unwrap_or(0.0)).collect();
                 let mut cum = [0.0f64; 15];
                 cum[0] = probs[0];
-                for i in 1..15 {
-                    cum[i] = cum[i - 1] + probs[i];
-                }
+                for i in 1..15 { cum[i] = cum[i - 1] + probs[i]; }
                 let paulis: [(u8, u8); 15] = [
-                    (0, 1),
-                    (0, 2),
-                    (0, 3),
-                    (1, 0),
-                    (1, 1),
-                    (1, 2),
-                    (1, 3),
-                    (2, 0),
-                    (2, 1),
-                    (2, 2),
-                    (2, 3),
-                    (3, 0),
-                    (3, 1),
-                    (3, 2),
-                    (3, 3),
+                    (0, 1), (0, 2), (0, 3),
+                    (1, 0), (1, 1), (1, 2), (1, 3),
+                    (2, 0), (2, 1), (2, 2), (2, 3),
+                    (3, 0), (3, 1), (3, 2), (3, 3),
                 ];
                 for (qa, qb) in qubit_pairs(targets)? {
                     let mut xa = vec![0u64; wpr];
@@ -687,28 +469,20 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(qa);
-                    for w in 0..wpr {
-                        x[w] ^= xa[w];
-                    }
+                    for w in 0..wpr { x[w] ^= xa[w]; }
                     let z = self.z_table.row_words_mut(qa);
-                    for w in 0..wpr {
-                        z[w] ^= za[w];
-                    }
+                    for w in 0..wpr { z[w] ^= za[w]; }
                     let x = self.x_table.row_words_mut(qb);
-                    for w in 0..wpr {
-                        x[w] ^= xb[w];
-                    }
+                    for w in 0..wpr { x[w] ^= xb[w]; }
                     let z = self.z_table.row_words_mut(qb);
-                    for w in 0..wpr {
-                        z[w] ^= zb[w];
-                    }
+                    for w in 0..wpr { z[w] ^= zb[w]; }
                 }
             }
 
             "HERALDED_ERASE" => {
                 let p = args.first().copied().unwrap_or(0.0);
                 for q in qubits(targets)? {
-                    let herald = random_bits_with_prob(wpr, self.batch_size, p, rng);
+                    let herald = random_bits_with_prob(wpr, p, rng);
                     self.m_record.push_row(&herald);
                     let mut xf = vec![0u64; wpr];
                     let mut zf = vec![0u64; wpr];
@@ -718,10 +492,7 @@ impl FrameSimulator {
                             let bit = bits.trailing_zeros();
                             match rng.gen_range(0u8..4) {
                                 1 => xf[w] |= 1u64 << bit,
-                                2 => {
-                                    xf[w] |= 1u64 << bit;
-                                    zf[w] |= 1u64 << bit;
-                                }
+                                2 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
                                 3 => zf[w] |= 1u64 << bit,
                                 _ => {}
                             }
@@ -729,13 +500,9 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= xf[w];
-                    }
+                    for w in 0..wpr { x[w] ^= xf[w]; }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= zf[w];
-                    }
+                    for w in 0..wpr { z[w] ^= zf[w]; }
                 }
             }
             "HERALDED_PAULI_CHANNEL_1" => {
@@ -745,7 +512,7 @@ impl FrameSimulator {
                 let pz = args.get(3).copied().unwrap_or(0.0);
                 let total = pi + px + py + pz;
                 for q in qubits(targets)? {
-                    let herald = random_bits_with_prob(wpr, self.batch_size, total, rng);
+                    let herald = random_bits_with_prob(wpr, total, rng);
                     self.m_record.push_row(&herald);
                     let mut xf = vec![0u64; wpr];
                     let mut zf = vec![0u64; wpr];
@@ -768,24 +535,20 @@ impl FrameSimulator {
                         }
                     }
                     let x = self.x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= xf[w];
-                    }
+                    for w in 0..wpr { x[w] ^= xf[w]; }
                     let z = self.z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= zf[w];
-                    }
+                    for w in 0..wpr { z[w] ^= zf[w]; }
                 }
             }
 
             "I_ERROR" | "II_ERROR" => {}
 
             // --- Multi-qubit Pauli measurements ---
+
             "MPP" => {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
                     self.exec_mpp_product(product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
@@ -796,7 +559,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MYY" => {
@@ -806,7 +568,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MZZ" => {
@@ -816,11 +577,11 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
             // --- SPP ---
+
             "SPP" | "SPP_DAG" => {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
@@ -829,10 +590,6 @@ impl FrameSimulator {
             }
 
             "DETECTOR" => {
-                if !self.materialize_detector_observable_outputs {
-                    return Ok(());
-                }
-                self.detector_materializations += 1;
                 let wpr = self.m_record.words_per_row();
                 let mut result = vec![0u64; wpr];
                 let mut ref_parity = false;
@@ -847,17 +604,11 @@ impl FrameSimulator {
                     }
                 }
                 if ref_parity {
-                    for w in &mut result {
-                        *w ^= !0u64;
-                    }
+                    for w in &mut result { *w ^= !0u64; }
                 }
                 self.det_records.push(result);
             }
             "OBSERVABLE_INCLUDE" => {
-                if !self.materialize_detector_observable_outputs {
-                    return Ok(());
-                }
-                self.observable_materializations += 1;
                 let idx = args.first().copied().unwrap_or(0.0) as usize;
                 let wpr = self.m_record.words_per_row();
                 while self.obs_records.len() <= idx {
@@ -867,8 +618,7 @@ impl FrameSimulator {
                 for t in targets {
                     if let StimTarget::Rec(offset) = t {
                         let k = (-*offset) as usize;
-                        self.m_record
-                            .xor_lookback_into(k, &mut self.obs_records[idx]);
+                        self.m_record.xor_lookback_into(k, &mut self.obs_records[idx]);
                         let m_idx = self.m_record.len() - k;
                         if m_idx < ref_sample.len() && ref_sample[m_idx] {
                             ref_parity = !ref_parity;
@@ -876,9 +626,7 @@ impl FrameSimulator {
                     }
                 }
                 if ref_parity {
-                    for w in &mut self.obs_records[idx] {
-                        *w ^= !0u64;
-                    }
+                    for w in &mut self.obs_records[idx] { *w ^= !0u64; }
                 }
             }
 
@@ -891,84 +639,6 @@ impl FrameSimulator {
             }
 
             _ => return Err(format!("frame_sim: unsupported instruction {}", name)),
-        }
-        Ok(())
-    }
-
-    fn exec_compiled_op(
-        &mut self,
-        op: &CompiledOp,
-        ref_sample: &[bool],
-        rng: &mut impl Rng,
-    ) -> Result<(), String> {
-        let wpr = self.x_table.words_per_row();
-        match op {
-            CompiledOp::Tick
-            | CompiledOp::QubitCoords
-            | CompiledOp::ShiftCoords
-            | CompiledOp::NoOp => {}
-            CompiledOp::H { qubits } => {
-                for &q in qubits {
-                    do_h(&mut self.x_table, &mut self.z_table, q);
-                }
-            }
-            CompiledOp::Reset { basis, qubits } => self.exec_compiled_reset(*basis, qubits, rng),
-            CompiledOp::XError {
-                probability,
-                qubits,
-            } => {
-                self.exec_x_error_qubits(qubits, *probability, wpr, rng)?;
-            }
-            CompiledOp::YError {
-                probability,
-                qubits,
-            } => {
-                self.exec_y_error_qubits(qubits, *probability, wpr, rng);
-            }
-            CompiledOp::ZError {
-                probability,
-                qubits,
-            } => {
-                self.exec_z_error_qubits(qubits, *probability, wpr, rng);
-            }
-            CompiledOp::Depolarize1 {
-                probability,
-                qubits,
-            } => {
-                self.exec_depolarize1_qubits(qubits, *probability, wpr, rng)?;
-            }
-            CompiledOp::Cx { pairs } => {
-                for &(control, target) in pairs {
-                    do_cx(&mut self.x_table, &mut self.z_table, control, target);
-                }
-            }
-            CompiledOp::Depolarize2 { probability, pairs } => {
-                self.exec_depolarize2_pairs(pairs, *probability, wpr, rng);
-            }
-            CompiledOp::Measure {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure(*basis, qubits, *readout_probability, wpr, rng);
-            }
-            CompiledOp::MeasureReset {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure_reset(*basis, qubits, *readout_probability, wpr, rng);
-            }
-            CompiledOp::Detector { rec_offsets } => {
-                self.exec_compiled_detector(rec_offsets, ref_sample);
-            }
-            CompiledOp::ObservableInclude {
-                observable_index,
-                rec_offsets,
-            } => self.exec_compiled_observable_include(*observable_index, rec_offsets, ref_sample),
-            CompiledOp::UnsupportedSamplerOp { name } => {
-                return Err(format!("compiled sampler: unsupported instruction {name}"));
-            }
         }
         Ok(())
     }
@@ -996,12 +666,8 @@ impl FrameSimulator {
 
         // 2. CX fold onto anchor
         let anchor = product.terms.last().unwrap().0;
-        let non_anchor: Vec<usize> = product
-            .terms
-            .iter()
-            .map(|&(q, _)| q)
-            .filter(|&q| q != anchor)
-            .collect();
+        let non_anchor: Vec<usize> = product.terms.iter()
+            .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
         for &q in &non_anchor {
             do_cx(&mut self.x_table, &mut self.z_table, q, anchor);
         }
@@ -1042,12 +708,8 @@ impl FrameSimulator {
 
         // 2. CX fold onto anchor
         let anchor = product.terms.last().unwrap().0;
-        let non_anchor: Vec<usize> = product
-            .terms
-            .iter()
-            .map(|&(q, _)| q)
-            .filter(|&q| q != anchor)
-            .collect();
+        let non_anchor: Vec<usize> = product.terms.iter()
+            .map(|&(q, _)| q).filter(|&q| q != anchor).collect();
         for &q in &non_anchor {
             do_cx(&mut self.x_table, &mut self.z_table, q, anchor);
         }
@@ -1070,564 +732,9 @@ impl FrameSimulator {
         }
     }
 
-    fn apply_readout_noise(&mut self, probability: f64, rng: &mut impl Rng) {
-        if probability == 0.0 {
-            return;
-        }
-        let mask = random_bits_with_prob(
-            self.x_table.words_per_row(),
-            self.batch_size,
-            probability,
-            rng,
-        );
-        self.m_record.xor_last_row(&mask);
-    }
-
-    fn exec_compiled_measure(
-        &mut self,
-        basis: CompiledBasis,
-        qubits: &[usize],
-        readout_probability: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        for &q in qubits {
-            match basis {
-                CompiledBasis::Z => {
-                    self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.x_table.clear_row(q);
-                    self.z_table.randomize_row(q, rng);
-                }
-                CompiledBasis::X => {
-                    self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                }
-                CompiledBasis::Y => {
-                    let mut tmp = vec![0u64; wpr];
-                    for (w, word) in tmp.iter_mut().enumerate() {
-                        *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
-                    }
-                    self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.x_table.clear_row(q);
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                    self.z_table.randomize_row(q, rng);
-                }
-            }
-        }
-    }
-
-    fn exec_compiled_measure_reset(
-        &mut self,
-        basis: CompiledBasis,
-        qubits: &[usize],
-        readout_probability: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        for &q in qubits {
-            match basis {
-                CompiledBasis::Z => {
-                    self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.x_table.clear_row(q);
-                    self.z_table.clear_row(q);
-                    self.z_table.randomize_row(q, rng);
-                }
-                CompiledBasis::X => {
-                    self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.x_table.clear_row(q);
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                }
-                CompiledBasis::Y => {
-                    let mut tmp = vec![0u64; wpr];
-                    for (w, word) in tmp.iter_mut().enumerate() {
-                        *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
-                    }
-                    self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
-                    self.x_table.clear_row(q);
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                    self.z_table.randomize_row(q, rng);
-                }
-            }
-        }
-    }
-
-    fn exec_compiled_reset(&mut self, basis: CompiledBasis, qubits: &[usize], rng: &mut impl Rng) {
-        for &q in qubits {
-            match basis {
-                CompiledBasis::Z => {
-                    self.x_table.clear_row(q);
-                    self.z_table.randomize_row(q, rng);
-                }
-                CompiledBasis::X => {
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                }
-                CompiledBasis::Y => {
-                    self.x_table.clear_row(q);
-                    self.z_table.clear_row(q);
-                    self.x_table.randomize_row(q, rng);
-                    self.z_table.randomize_row(q, rng);
-                }
-            }
-        }
-    }
-
-    fn exec_depolarize1(
-        &mut self,
-        targets: &[StimTarget],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) -> Result<(), String> {
-        let qubits = qubits(targets)?;
-        self.exec_depolarize1_qubits(&qubits, p, wpr, rng)
-    }
-
-    fn exec_depolarize2(
-        &mut self,
-        targets: &[StimTarget],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) -> Result<(), String> {
-        let pairs = qubit_pairs(targets)?;
-        self.exec_depolarize2_pairs(&pairs, p, wpr, rng);
-        Ok(())
-    }
-
-    fn exec_depolarize1_qubits(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) -> Result<(), String> {
-        let attempt_count = instruction_wide_attempt_count(qubits.len(), self.batch_size)?;
-        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
-            self.exec_depolarize1_qubits_sparse(qubits, p, attempt_count, rng);
-        } else {
-            self.exec_depolarize1_qubits_dense(qubits, p, wpr, rng);
-        }
-        Ok(())
-    }
-
-    fn exec_x_error_qubits(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) -> Result<(), String> {
-        let attempt_count = instruction_wide_attempt_count(qubits.len(), self.batch_size)?;
-        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
-            self.exec_x_error_qubits_sparse(qubits, p, attempt_count, rng);
-        } else {
-            self.exec_x_error_qubits_dense(qubits, p, wpr, rng);
-        }
-        Ok(())
-    }
-
-    fn exec_x_error_qubits_dense(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let attempt_count = qubits.len().saturating_mul(self.batch_size);
-        #[cfg(debug_assertions)]
-        record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "X_ERROR",
-            "dense",
-            Some(qubits.len()),
-            None,
-            0,
-            attempt_count,
-        );
-        for &q in qubits {
-            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
-            let x = self.x_table.row_words_mut(q);
-            for w in 0..wpr {
-                x[w] ^= noise[w];
-            }
-        }
-    }
-
-    fn exec_x_error_qubits_sparse(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        attempt_count: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let builds_before = rare_error_telemetry().iterator_builds;
-        let mut events = RareErrorIndexSampler::new(p, attempt_count);
-        while let Some(event_index) = events.next_index(rng) {
-            let Some((target_index, shot_index)) =
-                decode_instruction_wide_event_index(event_index, self.batch_size)
-            else {
-                continue;
-            };
-            let q = qubits[target_index];
-            toggle_row_bit(self.x_table.row_words_mut(q), shot_index);
-        }
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let iterator_builds = {
-            let builds_after = rare_error_telemetry().iterator_builds;
-            builds_after.saturating_sub(builds_before)
-        };
-        #[cfg(debug_assertions)]
-        record_one_qubit_noise_instruction(
-            OneQubitNoiseSamplingPath::Sparse,
-            iterator_builds,
-            attempt_count,
-        );
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "X_ERROR",
-            "sparse",
-            Some(qubits.len()),
-            None,
-            iterator_builds,
-            attempt_count,
-        );
-    }
-
-    fn exec_y_error_qubits(&mut self, qubits: &[usize], p: f64, wpr: usize, rng: &mut impl Rng) {
-        for &q in qubits {
-            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
-            let x = self.x_table.row_words_mut(q);
-            for w in 0..wpr {
-                x[w] ^= noise[w];
-            }
-            let z = self.z_table.row_words_mut(q);
-            for w in 0..wpr {
-                z[w] ^= noise[w];
-            }
-        }
-    }
-
-    fn exec_z_error_qubits(&mut self, qubits: &[usize], p: f64, wpr: usize, rng: &mut impl Rng) {
-        for &q in qubits {
-            let noise = random_bits_with_prob(wpr, self.batch_size, p, rng);
-            let z = self.z_table.row_words_mut(q);
-            for w in 0..wpr {
-                z[w] ^= noise[w];
-            }
-        }
-    }
-
-    fn exec_depolarize1_qubits_dense(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let attempt_count = qubits.len().saturating_mul(self.batch_size);
-        #[cfg(debug_assertions)]
-        record_one_qubit_noise_instruction(OneQubitNoiseSamplingPath::Dense, 0, attempt_count);
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "DEPOLARIZE1",
-            "dense",
-            Some(qubits.len()),
-            None,
-            0,
-            attempt_count,
-        );
-        if p <= 0.0 {
-            return;
-        }
-        for &q in qubits {
-            {
-                let scratch = &mut self.depolarize_scratch;
-                scratch.prepare_one(wpr);
-                random_bits_with_prob_into(&mut scratch.events, self.batch_size, p, rng);
-                for w in 0..wpr {
-                    let mut bits = scratch.events[w];
-                    while bits != 0 {
-                        let bit = bits.trailing_zeros();
-                        match rng.gen_range(0u8..3) {
-                            0 => scratch.x_a[w] |= 1u64 << bit,
-                            1 => {
-                                scratch.x_a[w] |= 1u64 << bit;
-                                scratch.z_a[w] |= 1u64 << bit;
-                            }
-                            _ => scratch.z_a[w] |= 1u64 << bit,
-                        }
-                        bits &= bits - 1;
-                    }
-                }
-            }
-            let scratch = &self.depolarize_scratch;
-            let x = self.x_table.row_words_mut(q);
-            for w in 0..wpr {
-                x[w] ^= scratch.x_a[w];
-            }
-            let z = self.z_table.row_words_mut(q);
-            for w in 0..wpr {
-                z[w] ^= scratch.z_a[w];
-            }
-        }
-    }
-
-    fn exec_depolarize1_qubits_sparse(
-        &mut self,
-        qubits: &[usize],
-        p: f64,
-        attempt_count: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let builds_before = rare_error_telemetry().iterator_builds;
-        let mut events = RareErrorIndexSampler::new(p, attempt_count);
-        while let Some(event_index) = events.next_index(rng) {
-            let Some((target_index, shot_index)) =
-                decode_instruction_wide_event_index(event_index, self.batch_size)
-            else {
-                continue;
-            };
-            let q = qubits[target_index];
-            match rng.gen_range(0u8..3) {
-                0 => toggle_row_bit(self.x_table.row_words_mut(q), shot_index),
-                1 => {
-                    toggle_row_bit(self.x_table.row_words_mut(q), shot_index);
-                    toggle_row_bit(self.z_table.row_words_mut(q), shot_index);
-                }
-                _ => toggle_row_bit(self.z_table.row_words_mut(q), shot_index),
-            }
-        }
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let iterator_builds = {
-            let builds_after = rare_error_telemetry().iterator_builds;
-            builds_after.saturating_sub(builds_before)
-        };
-        #[cfg(debug_assertions)]
-        record_one_qubit_noise_instruction(
-            OneQubitNoiseSamplingPath::Sparse,
-            iterator_builds,
-            attempt_count,
-        );
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "DEPOLARIZE1",
-            "sparse",
-            Some(qubits.len()),
-            None,
-            iterator_builds,
-            attempt_count,
-        );
-    }
-
-    fn exec_depolarize2_pairs(
-        &mut self,
-        pairs: &[(usize, usize)],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        if p <= 0.0 || pairs.is_empty() || self.batch_size == 0 {
-            let attempt_count = pairs.len().saturating_mul(self.batch_size);
-            #[cfg(debug_assertions)]
-            record_depolarize2_sampling("empty", 0, attempt_count);
-            #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-            record_frame_noise_instruction(
-                "DEPOLARIZE2",
-                "empty",
-                None,
-                Some(pairs.len()),
-                0,
-                attempt_count,
-            );
-            return;
-        }
-
-        let attempt_count = pairs.len() * self.batch_size;
-        if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
-            self.exec_depolarize2_pairs_sparse_instruction_wide(pairs, p, attempt_count, rng);
-        } else {
-            self.exec_depolarize2_pairs_dense(pairs, p, wpr, rng);
-        }
-    }
-
-    fn exec_depolarize2_pairs_sparse_instruction_wide(
-        &mut self,
-        pairs: &[(usize, usize)],
-        p: f64,
-        attempt_count: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let iterator_builds_before =
-            crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
-
-        let mut events = RareErrorIndexSampler::new(p, attempt_count);
-
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        let iterator_builds = {
-            let iterator_builds_after =
-                crate::rare_error_iterator::rare_error_telemetry().iterator_builds;
-            iterator_builds_after.saturating_sub(iterator_builds_before)
-        };
-        #[cfg(debug_assertions)]
-        record_depolarize2_sampling("sparse", iterator_builds, attempt_count);
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "DEPOLARIZE2",
-            "sparse",
-            None,
-            Some(pairs.len()),
-            iterator_builds,
-            attempt_count,
-        );
-
-        while let Some(event_index) = events.next_index(rng) {
-            let (pair_index, shot_index) = decode_depolarize2_event(event_index, self.batch_size);
-            let (qa, qb) = pairs[pair_index];
-            let branch = sample_depolarize2_branch_index(rng);
-            let (pa, pb) = two_qubit_pauli(branch);
-            let word = shot_index / 64;
-            let bit = (shot_index % 64) as u32;
-            let mask = 1u64 << bit;
-            apply_pauli_mask_to_tables(pa, &mut self.x_table, &mut self.z_table, qa, word, mask);
-            apply_pauli_mask_to_tables(pb, &mut self.x_table, &mut self.z_table, qb, word, mask);
-        }
-    }
-
-    fn exec_depolarize2_pairs_dense(
-        &mut self,
-        pairs: &[(usize, usize)],
-        p: f64,
-        wpr: usize,
-        rng: &mut impl Rng,
-    ) {
-        #[cfg(debug_assertions)]
-        record_depolarize2_sampling("dense", 0, pairs.len() * self.batch_size);
-        #[cfg(any(debug_assertions, feature = "benchmark-telemetry"))]
-        record_frame_noise_instruction(
-            "DEPOLARIZE2",
-            "dense",
-            None,
-            Some(pairs.len()),
-            0,
-            pairs.len().saturating_mul(self.batch_size),
-        );
-
-        for &(qa, qb) in pairs {
-            {
-                let scratch = &mut self.depolarize_scratch;
-                scratch.prepare_two(wpr);
-                random_bits_with_prob_into(&mut scratch.events, self.batch_size, p, rng);
-                for w in 0..wpr {
-                    let mut bits = scratch.events[w];
-                    while bits != 0 {
-                        let bit = bits.trailing_zeros();
-                        let branch = sample_depolarize2_branch_index(rng);
-                        let (pa, pb) = two_qubit_pauli(branch);
-                        apply_pauli_bits(pa, &mut scratch.x_a, &mut scratch.z_a, w, bit);
-                        apply_pauli_bits(pb, &mut scratch.x_b, &mut scratch.z_b, w, bit);
-                        bits &= bits - 1;
-                    }
-                }
-            }
-            let scratch = &self.depolarize_scratch;
-            let x = self.x_table.row_words_mut(qa);
-            for w in 0..wpr {
-                x[w] ^= scratch.x_a[w];
-            }
-            let z = self.z_table.row_words_mut(qa);
-            for w in 0..wpr {
-                z[w] ^= scratch.z_a[w];
-            }
-            let x = self.x_table.row_words_mut(qb);
-            for w in 0..wpr {
-                x[w] ^= scratch.x_b[w];
-            }
-            let z = self.z_table.row_words_mut(qb);
-            for w in 0..wpr {
-                z[w] ^= scratch.z_b[w];
-            }
-        }
-    }
-
-    fn exec_compiled_detector(&mut self, rec_offsets: &[usize], ref_sample: &[bool]) {
-        if !self.materialize_detector_observable_outputs {
-            return;
-        }
-        self.detector_materializations += 1;
-        let wpr = self.m_record.words_per_row();
-        let mut result = vec![0u64; wpr];
-        let mut ref_parity = false;
-        for &k in rec_offsets {
-            self.m_record.xor_lookback_into(k, &mut result);
-            let m_idx = self.m_record.len() - k;
-            if m_idx < ref_sample.len() && ref_sample[m_idx] {
-                ref_parity = !ref_parity;
-            }
-        }
-        if ref_parity {
-            for word in &mut result {
-                *word ^= !0u64;
-            }
-        }
-        self.det_records.push(result);
-    }
-
-    fn exec_compiled_observable_include(
-        &mut self,
-        observable_index: usize,
-        rec_offsets: &[usize],
-        ref_sample: &[bool],
-    ) {
-        if !self.materialize_detector_observable_outputs {
-            return;
-        }
-        self.observable_materializations += 1;
-        let wpr = self.m_record.words_per_row();
-        while self.obs_records.len() <= observable_index {
-            self.obs_records.push(vec![0u64; wpr]);
-        }
-        let mut ref_parity = false;
-        for &k in rec_offsets {
-            self.m_record
-                .xor_lookback_into(k, &mut self.obs_records[observable_index]);
-            let m_idx = self.m_record.len() - k;
-            if m_idx < ref_sample.len() && ref_sample[m_idx] {
-                ref_parity = !ref_parity;
-            }
-        }
-        if ref_parity {
-            for word in &mut self.obs_records[observable_index] {
-                *word ^= !0u64;
-            }
-        }
-    }
-
     pub fn measurements(&self, ref_sample: &[bool]) -> BitTable {
-        self.try_measurements(ref_sample)
-            .expect("trusted measurement output dimensions allocate")
-    }
-
-    pub fn try_measurements(&self, ref_sample: &[bool]) -> Result<BitTable, String> {
         let num_measurements = self.m_record.len();
-        let mut result = BitTable::try_new(num_measurements, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(num_measurements, self.batch_size);
         for m in 0..num_measurements {
             let src = self.m_record.lookback_words(num_measurements - m);
             let dst = result.row_words_mut(m);
@@ -1638,37 +745,25 @@ impl FrameSimulator {
                 }
             }
         }
-        Ok(result)
+        result
     }
 
     pub fn detections(&self) -> BitTable {
-        self.try_detections()
-            .expect("trusted detection output dimensions allocate")
-    }
-
-    pub fn try_detections(&self) -> Result<BitTable, String> {
         let n = self.det_records.len();
-        let mut result = BitTable::try_new(n, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(n, self.batch_size);
         for (i, row) in self.det_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        Ok(result)
+        result
     }
 
     pub fn observable_flips(&self) -> BitTable {
-        self.try_observable_flips()
-            .expect("trusted observable output dimensions allocate")
-    }
-
-    pub fn try_observable_flips(&self) -> Result<BitTable, String> {
         let n = self.obs_records.len();
-        let mut result = BitTable::try_new(n, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(n, self.batch_size);
         for (i, row) in self.obs_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        Ok(result)
+        result
     }
 }
 
@@ -1814,213 +909,18 @@ fn qubit_pairs_ignoring_inv(targets: &[StimTarget]) -> Result<Vec<(usize, usize)
 
 // --- Noise helpers ---
 
-const SPARSE_BERNOULLI_MAX_PROBABILITY: f64 = 0.02;
-
-#[doc(hidden)]
-pub fn decode_instruction_wide_event_index(
-    event_index: usize,
-    shots: usize,
-) -> Option<(usize, usize)> {
-    if shots == 0 {
-        return None;
-    }
-    Some((event_index / shots, event_index % shots))
-}
-
-fn instruction_wide_attempt_count(target_count: usize, shots: usize) -> Result<usize, String> {
-    target_count
-        .checked_mul(shots)
-        .ok_or_else(|| "instruction-wide noise attempt count overflowed usize".to_string())
-}
-
-fn toggle_row_bit(row: &mut [u64], shot_index: usize) {
-    let word = shot_index / 64;
-    let bit = shot_index % 64;
-    row[word] ^= 1u64 << bit;
-}
-
-const DEPOLARIZE2_BRANCHES: [(u8, u8); 15] = [
-    (0, 1),
-    (0, 2),
-    (0, 3),
-    (1, 0),
-    (1, 1),
-    (1, 2),
-    (1, 3),
-    (2, 0),
-    (2, 1),
-    (2, 2),
-    (2, 3),
-    (3, 0),
-    (3, 1),
-    (3, 2),
-    (3, 3),
-];
-
-fn sample_depolarize2_branch_index(rng: &mut impl Rng) -> usize {
-    rng.gen_range(0..DEPOLARIZE2_BRANCHES.len())
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn sample_depolarize2_branch_index_for_test(rng: &mut impl Rng) -> usize {
-    sample_depolarize2_branch_index(rng)
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn depolarize2_branch_label_for_test(branch_index: usize) -> Option<&'static str> {
-    match DEPOLARIZE2_BRANCHES.get(branch_index).copied()? {
-        (0, 1) => Some("IX"),
-        (0, 2) => Some("IY"),
-        (0, 3) => Some("IZ"),
-        (1, 0) => Some("XI"),
-        (1, 1) => Some("XX"),
-        (1, 2) => Some("XY"),
-        (1, 3) => Some("XZ"),
-        (2, 0) => Some("YI"),
-        (2, 1) => Some("YX"),
-        (2, 2) => Some("YY"),
-        (2, 3) => Some("YZ"),
-        (3, 0) => Some("ZI"),
-        (3, 1) => Some("ZX"),
-        (3, 2) => Some("ZY"),
-        (3, 3) => Some("ZZ"),
-        _ => None,
-    }
-}
-
-fn decode_depolarize2_event(event_index: usize, shots: usize) -> (usize, usize) {
-    debug_assert!(shots > 0);
-    (event_index / shots, event_index % shots)
-}
-
-#[cfg(debug_assertions)]
-#[doc(hidden)]
-pub fn depolarize2_decode_event_for_test(event_index: usize, shots: usize) -> (usize, usize) {
-    decode_depolarize2_event(event_index, shots)
-}
-
-fn random_bits_with_prob(words: usize, valid_bits: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
+fn random_bits_with_prob(words: usize, p: f64, rng: &mut impl Rng) -> Vec<u64> {
     let mut result = vec![0u64; words];
-    random_bits_with_prob_into(&mut result, valid_bits, p, rng);
-    result
-}
-
-fn random_bits_with_prob_into(result: &mut [u64], valid_bits: usize, p: f64, rng: &mut impl Rng) {
-    result.fill(0);
-    if p <= 0.0 {
-        return;
-    }
-    if p >= 1.0 {
-        result.fill(!0u64);
-        mask_unused_bits(result, valid_bits);
-        return;
-    }
-
-    let threshold = probability_threshold_u64(p);
-    if threshold == 0 {
-        return;
-    }
-
-    if p <= SPARSE_BERNOULLI_MAX_PROBABILITY {
-        random_sparse_bits_with_prob_into(result, valid_bits, p, rng);
-    } else {
-        random_dense_bits_with_threshold_into(result, valid_bits, threshold, rng);
-    }
-}
-
-fn random_dense_bits_with_threshold_into(
-    result: &mut [u64],
-    valid_bits: usize,
-    threshold: u64,
-    rng: &mut impl Rng,
-) {
-    for (word_idx, word) in result.iter_mut().enumerate() {
-        let valid_in_word = valid_bits.saturating_sub(word_idx * 64).min(64);
-        for bit in 0..valid_in_word {
-            if rng.r#gen::<u64>() < threshold {
-                *word |= 1u64 << bit;
+    if p <= 0.0 { return result; }
+    if p >= 1.0 { result.fill(!0u64); return result; }
+    for w in &mut result {
+        for bit in 0..64u32 {
+            if rng.r#gen::<f64>() < p {
+                *w |= 1u64 << bit;
             }
         }
     }
-}
-
-fn random_sparse_bits_with_prob_into(
-    result: &mut [u64],
-    valid_bits: usize,
-    p: f64,
-    rng: &mut impl Rng,
-) {
-    debug_assert!(p > 0.0 && p <= SPARSE_BERNOULLI_MAX_PROBABILITY);
-    debug_assert!(valid_bits <= result.len().saturating_mul(64));
-    let log_one_minus_p = (-p).ln_1p();
-    let mut next_candidate = 0usize;
-    while next_candidate < valid_bits {
-        let mut u = rng.r#gen::<f64>();
-        while u == 0.0 {
-            u = rng.r#gen::<f64>();
-        }
-        let skip = (u.ln() / log_one_minus_p).floor() as usize;
-        let shot = next_candidate.saturating_add(skip);
-        if shot >= valid_bits {
-            break;
-        }
-        let word_idx = shot / 64;
-        let bit = shot % 64;
-        let mask = 1u64 << bit;
-        result[word_idx] |= mask;
-        next_candidate = shot + 1;
-    }
-}
-
-#[derive(Default)]
-struct DepolarizeScratch {
-    events: Vec<u64>,
-    x_a: Vec<u64>,
-    z_a: Vec<u64>,
-    x_b: Vec<u64>,
-    z_b: Vec<u64>,
-}
-
-impl DepolarizeScratch {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    fn prepare_one(&mut self, words: usize) {
-        resize_and_clear(&mut self.events, words);
-        resize_and_clear(&mut self.x_a, words);
-        resize_and_clear(&mut self.z_a, words);
-    }
-
-    fn prepare_two(&mut self, words: usize) {
-        self.prepare_one(words);
-        resize_and_clear(&mut self.x_b, words);
-        resize_and_clear(&mut self.z_b, words);
-    }
-}
-
-fn resize_and_clear(words: &mut Vec<u64>, len: usize) {
-    words.resize(len, 0);
-    words.fill(0);
-}
-
-fn probability_threshold_u64(p: f64) -> u64 {
-    (p * 18_446_744_073_709_551_616.0) as u64
-}
-
-fn mask_unused_bits(words: &mut [u64], valid_bits: usize) {
-    if words.is_empty() {
-        return;
-    }
-    let valid_in_last = valid_bits % 64;
-    if valid_in_last != 0 {
-        let mask = (1u64 << valid_in_last) - 1;
-        if let Some(last) = words.last_mut() {
-            *last &= mask;
-        }
-    }
+    result
 }
 
 fn apply_pauli_noise_to_targets(
@@ -2036,65 +936,40 @@ fn apply_pauli_noise_to_targets(
             match basis {
                 PauliBasis::X => {
                     let x = x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { x[w] ^= noise[w]; }
                 }
                 PauliBasis::Y => {
                     let x = x_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        x[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { x[w] ^= noise[w]; }
                     let z = z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { z[w] ^= noise[w]; }
                 }
                 PauliBasis::Z => {
                     let z = z_table.row_words_mut(q);
-                    for w in 0..wpr {
-                        z[w] ^= noise[w];
-                    }
+                    for w in 0..wpr { z[w] ^= noise[w]; }
                 }
             }
         }
     }
 }
 
-fn two_qubit_pauli(branch: usize) -> (u8, u8) {
-    DEPOLARIZE2_BRANCHES
-        .get(branch)
-        .copied()
-        .expect("DEPOLARIZE2 branch index must be in 0..15")
+fn two_qubit_pauli(r: u8) -> (u8, u8) {
+    let mut idx = 0u8;
+    for a in 0..4u8 {
+        for b in 0..4u8 {
+            if a == 0 && b == 0 { continue; }
+            if idx == r { return (a, b); }
+            idx += 1;
+        }
+    }
+    (0, 0)
 }
 
 fn apply_pauli_bits(p: u8, xf: &mut [u64], zf: &mut [u64], w: usize, bit: u32) {
     match p {
         1 => xf[w] |= 1u64 << bit,
-        2 => {
-            xf[w] |= 1u64 << bit;
-            zf[w] |= 1u64 << bit;
-        }
+        2 => { xf[w] |= 1u64 << bit; zf[w] |= 1u64 << bit; }
         3 => zf[w] |= 1u64 << bit,
-        _ => {}
-    }
-}
-
-fn apply_pauli_mask_to_tables(
-    p: u8,
-    x_table: &mut BitTable,
-    z_table: &mut BitTable,
-    q: usize,
-    word: usize,
-    mask: u64,
-) {
-    match p {
-        1 => x_table.row_words_mut(q)[word] ^= mask,
-        2 => {
-            x_table.row_words_mut(q)[word] ^= mask;
-            z_table.row_words_mut(q)[word] ^= mask;
-        }
-        3 => z_table.row_words_mut(q)[word] ^= mask,
         _ => {}
     }
 }
@@ -2114,11 +989,7 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
 
     for target in targets {
         match target {
-            StimTarget::Pauli {
-                qubit,
-                basis,
-                inverted: inv,
-            } => {
+            StimTarget::Pauli { qubit, basis, inverted: inv } => {
                 if !after_combiner && !current_terms.is_empty() {
                     products.push(PauliProduct {
                         terms: std::mem::take(&mut current_terms),
@@ -2139,10 +1010,7 @@ fn split_pauli_products(targets: &[StimTarget]) -> Result<Vec<PauliProduct>, Str
         }
     }
     if !current_terms.is_empty() {
-        products.push(PauliProduct {
-            terms: current_terms,
-            inverted,
-        });
+        products.push(PauliProduct { terms: current_terms, inverted });
     }
     Ok(products)
 }

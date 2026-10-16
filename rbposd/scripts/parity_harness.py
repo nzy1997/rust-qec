@@ -387,7 +387,6 @@ def run_rust_case(repo_root: Path, case_path: Path) -> dict[str, Any]:
     command = [
         "cargo",
         "run",
-        "--locked",
         "--quiet",
         "-p",
         "rbposd",

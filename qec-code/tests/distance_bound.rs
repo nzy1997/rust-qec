@@ -6,11 +6,9 @@ use qec_code::distance_bound::{
     validate_random_window_upper_bound_result, validate_randomized_upper_bound_result,
     verify_issue_225_ladder_case, BoundType, BoundValidationContext, DistanceBoundMethod,
     DistanceBoundProvenance, DistanceBoundResult, DistanceBoundStatus, DistanceBoundWitness,
-    Issue225LadderCase, RandomWindowSearchStats, RandomWindowUpperBoundOptions,
-    RandomizedUpperBoundOptions,
+    Issue225LadderCase, RandomWindowUpperBoundOptions, RandomizedUpperBoundOptions,
 };
 use qec_code::{Pauli, QecError, StabilizerCode};
-use std::time::{Duration, Instant};
 
 fn css_from_sparse_rows(num_cols: usize, hx: Vec<Vec<usize>>, hz: Vec<Vec<usize>>) -> CssCode {
     let hx = SparseRowsMatrix::new(num_cols, hx).unwrap().to_dense_rows();
@@ -104,115 +102,6 @@ fn pinned_random_window_options() -> RandomWindowUpperBoundOptions {
     }
 }
 
-const ISSUE_225_RANDOM_WINDOW_SEED: u64 = 7;
-const ISSUE_225_RANDOMIZED_NEGATIVE_CONTROL_SEED: u64 = 225;
-const ISSUE_225_PER_CASE_CAP: Duration = Duration::from_secs(300);
-
-#[derive(Debug)]
-struct Issue225LadderEvidenceRow {
-    case_id: String,
-    expected_upper_bound: usize,
-    observed_upper_bound: usize,
-    method: DistanceBoundMethod,
-    seed: u64,
-    elapsed: Duration,
-}
-
-fn issue_225_random_window_options(case: &Issue225LadderCase) -> RandomWindowUpperBoundOptions {
-    RandomWindowUpperBoundOptions {
-        iterations: 5000,
-        restarts: 8,
-        seed: ISSUE_225_RANDOM_WINDOW_SEED,
-        target_weight: Some(case.target_weight),
-    }
-}
-
-fn issue_225_randomized_negative_control_options(
-    case: &Issue225LadderCase,
-) -> RandomizedUpperBoundOptions {
-    RandomizedUpperBoundOptions {
-        iterations: 5000,
-        restarts: 8,
-        seed: ISSUE_225_RANDOMIZED_NEGATIVE_CONTROL_SEED,
-        target_weight: Some(case.target_weight),
-    }
-}
-
-fn run_issue_225_random_window_case(case: &Issue225LadderCase) -> Issue225LadderEvidenceRow {
-    let css = css_from_built_in_code_id(&case.code_id);
-    let options = issue_225_random_window_options(case);
-    let started = Instant::now();
-    let result = random_window_css_upper_bound(&css, options).unwrap_or_else(|error| {
-        panic!("{} random-window-upper-bound failed: {error}", case.case_id)
-    });
-    let elapsed = started.elapsed();
-
-    verify_issue_225_ladder_case(
-        case,
-        &result,
-        &css,
-        DistanceBoundMethod::RandomWindowUpperBound,
-    )
-    .unwrap_or_else(|error| {
-        panic!(
-            "{} random-window ladder verifier rejected result: {error}",
-            case.case_id
-        )
-    });
-
-    assert!(
-        elapsed <= ISSUE_225_PER_CASE_CAP,
-        "{} exceeded issue-225 per-case cap: elapsed {:.3}s > 300s",
-        case.case_id,
-        elapsed.as_secs_f64()
-    );
-
-    Issue225LadderEvidenceRow {
-        case_id: case.case_id.clone(),
-        expected_upper_bound: case.expected_upper_bound,
-        observed_upper_bound: result.upper_bound,
-        method: result.method,
-        seed: ISSUE_225_RANDOM_WINDOW_SEED,
-        elapsed,
-    }
-}
-
-fn run_issue_225_random_window_ladder<'a>(
-    cases: impl IntoIterator<Item = &'a Issue225LadderCase>,
-) -> Vec<Issue225LadderEvidenceRow> {
-    println!("case_id\texpected\tobserved\tmethod\tseed\telapsed_s");
-    let mut rows = Vec::new();
-    for case in cases {
-        let row = run_issue_225_random_window_case(case);
-        println!(
-            "{}\t{}\t{}\t{}\t{}\t{:.3}",
-            row.case_id,
-            row.expected_upper_bound,
-            row.observed_upper_bound,
-            row.method.label(),
-            row.seed,
-            row.elapsed.as_secs_f64()
-        );
-        rows.push(row);
-    }
-    rows
-}
-
-fn clear_random_window_search_timing(
-    result: &mut qec_code::distance_bound::DistanceBoundResult<RandomWindowUpperBoundOptions>,
-) {
-    let stats = result
-        .search_stats
-        .as_mut()
-        .expect("random-window result should carry stats");
-    stats.permutation_time_ns = 0;
-    stats.kernel_basis_time_ns = 0;
-    stats.span_filter_time_ns = 0;
-    stats.witness_validation_time_ns = 0;
-    stats.best_update_time_ns = 0;
-    stats.total_search_time_ns = 0;
-}
-
 #[test]
 fn css_code_preserves_dense_component_rows_for_search() {
     let css = CssCode::from_hx_hz(vec![vec![1, 1, 0]], vec![vec![0, 0, 1]]).unwrap();
@@ -229,15 +118,8 @@ fn random_window_upper_bound_finds_surface_and_toric_distance_under_pinned_optio
 
         let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
         let second = random_window_css_upper_bound(&css, options).unwrap();
-        let mut first_without_timing = first.clone();
-        let mut second_without_timing = second.clone();
-        clear_random_window_search_timing(&mut first_without_timing);
-        clear_random_window_search_timing(&mut second_without_timing);
 
-        assert_eq!(
-            first_without_timing, second_without_timing,
-            "{code_id} should be deterministic"
-        );
+        assert_eq!(first, second, "{code_id} should be deterministic");
         assert_eq!(first.method, DistanceBoundMethod::RandomWindowUpperBound);
         assert_eq!(first.upper_bound, 5, "{code_id}");
         assert_eq!(first.witness.weight, 5, "{code_id}");
@@ -342,12 +224,8 @@ fn random_window_upper_bound_returns_best_witness_after_exhausting_iterations() 
 
     let first = random_window_css_upper_bound(&css, options.clone()).unwrap();
     let second = random_window_css_upper_bound(&css, options).unwrap();
-    let mut first_without_timing = first.clone();
-    let mut second_without_timing = second.clone();
-    clear_random_window_search_timing(&mut first_without_timing);
-    clear_random_window_search_timing(&mut second_without_timing);
 
-    assert_eq!(first_without_timing, second_without_timing);
+    assert_eq!(first, second);
     assert_eq!(first.upper_bound, 1);
     assert_eq!(first.logical_class, LogicalClass::ZLike);
     validate_random_window_upper_bound_result(
@@ -358,129 +236,6 @@ fn random_window_upper_bound_returns_best_witness_after_exhausting_iterations() 
         },
     )
     .unwrap();
-}
-
-#[test]
-fn random_window_upper_bound_reports_search_stats() {
-    let css = css_from_built_in_code_id("surface_rotated:d=5");
-    let target_result = random_window_css_upper_bound(
-        &css,
-        RandomWindowUpperBoundOptions {
-            iterations: 20,
-            restarts: 2,
-            seed: 7,
-            target_weight: Some(5),
-        },
-    )
-    .unwrap();
-
-    let json = serde_json::to_value(&target_result).unwrap();
-    let search_stats = json["search_stats"]
-        .as_object()
-        .expect("random-window result should serialize search_stats");
-    for field in [
-        "permutations_sampled",
-        "kernel_basis_generations",
-        "component_candidates_generated",
-        "zero_candidates_rejected",
-        "weight_pruned_candidates",
-        "stabilizer_span_candidates_rejected",
-        "witness_validation_candidates_rejected",
-        "valid_witnesses_found",
-        "best_witness_updates",
-    ] {
-        assert!(
-            search_stats[field].as_u64().is_some(),
-            "{field} should serialize as a non-negative integer"
-        );
-    }
-
-    let stats = target_result
-        .search_stats
-        .expect("random-window result should carry stats");
-    assert!(stats.permutations_sampled > 0);
-    assert!(stats.component_candidates_generated >= stats.valid_witnesses_found);
-    assert!(stats.component_candidates_generated >= stats.best_witness_updates);
-    assert!(stats.valid_witnesses_found >= stats.best_witness_updates);
-    assert!(stats.target_reached);
-
-    let no_target = random_window_css_upper_bound(
-        &css,
-        RandomWindowUpperBoundOptions {
-            iterations: 2,
-            restarts: 1,
-            seed: 7,
-            target_weight: None,
-        },
-    )
-    .unwrap();
-    let no_target_stats = no_target
-        .search_stats
-        .expect("random-window result should carry stats");
-    assert!(no_target_stats.permutations_sampled > 0);
-    assert!(!no_target_stats.target_reached);
-}
-
-#[test]
-fn random_window_upper_bound_reports_search_timing() {
-    let css = css_from_built_in_code_id("surface_rotated:d=5");
-    let result = random_window_css_upper_bound(
-        &css,
-        RandomWindowUpperBoundOptions {
-            iterations: 20,
-            restarts: 1,
-            seed: 7,
-            target_weight: Some(5),
-        },
-    )
-    .unwrap();
-
-    let json = serde_json::to_value(&result).unwrap();
-    let search_stats = json["search_stats"]
-        .as_object()
-        .expect("random-window result should serialize search_stats");
-    let timing_fields = [
-        "permutation_time_ns",
-        "kernel_basis_time_ns",
-        "span_filter_time_ns",
-        "witness_validation_time_ns",
-        "best_update_time_ns",
-        "total_search_time_ns",
-    ];
-    for field in timing_fields {
-        assert!(
-            search_stats[field].as_u64().is_some(),
-            "{field} should serialize as a non-negative integer"
-        );
-    }
-    assert!(
-        search_stats["total_search_time_ns"].as_u64().unwrap() > 0,
-        "completed non-empty random-window run should report positive total search time"
-    );
-
-    let stats = result
-        .search_stats
-        .expect("random-window result should carry stats");
-    let named_stage_sum = stats.permutation_time_ns
-        + stats.kernel_basis_time_ns
-        + stats.span_filter_time_ns
-        + stats.witness_validation_time_ns
-        + stats.best_update_time_ns;
-    assert!(stats.total_search_time_ns >= named_stage_sum);
-
-    let randomized = randomized_css_upper_bound(
-        &css,
-        RandomizedUpperBoundOptions {
-            iterations: 20,
-            restarts: 1,
-            seed: 7,
-            target_weight: Some(5),
-        },
-    )
-    .unwrap();
-    let randomized_json = serde_json::to_value(&randomized).unwrap();
-    assert_eq!(randomized_json["method"], "randomized-upper-bound");
-    assert!(randomized_json.get("search_stats").is_none());
 }
 
 #[test]
@@ -503,7 +258,6 @@ fn completed_bound_result_serializes_with_upper_bound_contract() {
     assert_eq!(json["options"]["target_weight"], serde_json::Value::Null);
     assert_eq!(json["provenance"]["tool"], "qec-code");
     assert_eq!(json["provenance"]["method_revision"], 1);
-    assert!(json.get("search_stats").is_none());
 }
 
 #[test]
@@ -526,10 +280,6 @@ fn random_window_upper_bound_result_serializes_contract() {
     assert_eq!(json["options"]["target_weight"], 1);
     assert_eq!(json["provenance"]["tool"], "qec-code");
     assert_eq!(json["provenance"]["method_revision"], 1);
-    assert_eq!(
-        json["search_stats"],
-        serde_json::to_value(RandomWindowSearchStats::default()).unwrap()
-    );
 }
 
 #[test]
@@ -1010,76 +760,6 @@ fn issue_225_ladder_verifier_rejects_wrong_method_label() {
             "surface_rotated_d5 expected method random-window-upper-bound, got randomized-upper-bound"
                 .to_owned(),
         )
-    );
-}
-
-#[test]
-fn issue_225_random_window_upper_bound_smoke_ladder() {
-    let cases = issue_225_ladder_cases();
-    let smoke_cases = cases
-        .iter()
-        .filter(|case| case.tier == "smoke")
-        .collect::<Vec<_>>();
-    let smoke_ids = smoke_cases
-        .iter()
-        .map(|case| case.case_id.as_str())
-        .collect::<Vec<_>>();
-
-    assert_eq!(
-        smoke_ids,
-        ["surface_rotated_d5", "toric_d5", "bb72"],
-        "issue-225 smoke tier changed: {smoke_ids:?}"
-    );
-
-    let rows = run_issue_225_random_window_ladder(smoke_cases.into_iter());
-    assert_eq!(rows.len(), 3, "issue-225 smoke ladder checked row count");
-}
-
-#[test]
-#[ignore = "full issue-225 ladder: cargo test -p qec-code issue_225_random_window_upper_bound_full_ladder -- --ignored --nocapture"]
-fn issue_225_random_window_upper_bound_full_ladder() {
-    let cases = issue_225_ladder_cases();
-    assert_eq!(
-        cases.len(),
-        8,
-        "issue-225 full ladder must include all eight cases"
-    );
-
-    let rows = run_issue_225_random_window_ladder(cases.iter());
-    assert_eq!(rows.len(), 8, "issue-225 full ladder checked row count");
-}
-
-#[test]
-fn issue_225_current_randomized_upper_bound_ladder_negative_control() {
-    let case = issue_225_case("surface_rotated_d5");
-    let css = css_from_built_in_code_id(&case.code_id);
-    let result =
-        randomized_css_upper_bound(&css, issue_225_randomized_negative_control_options(&case))
-            .unwrap();
-
-    assert_eq!(result.method, DistanceBoundMethod::RandomizedUpperBound);
-    assert!(
-        result.upper_bound > case.expected_upper_bound,
-        "{} negative control is no longer loose: expected upper_bound > {}, got {}",
-        case.case_id,
-        case.expected_upper_bound,
-        result.upper_bound
-    );
-
-    let error = verify_issue_225_ladder_case(
-        &case,
-        &result,
-        &css,
-        DistanceBoundMethod::RandomizedUpperBound,
-    )
-    .expect_err("expected current randomized baseline to fail issue-225 ladder target");
-
-    assert_eq!(
-        error,
-        QecError::DistanceBoundValidationFailed(format!(
-            "{} expected upper_bound <= {}, got {}",
-            case.case_id, case.expected_upper_bound, result.upper_bound
-        ))
     );
 }
 
