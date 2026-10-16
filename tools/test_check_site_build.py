@@ -11,39 +11,6 @@ RSTIM_DEM_SUMMARY_PATH = "benchmarks/rstim_vs_stim_simulator/results/release-dem
 
 
 class SiteBuildCheckerTest(unittest.TestCase):
-    def test_tutorial_paths_are_not_assets_but_runtime_references_are_checked(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        page = fixture.site_root / "atom-loss/index.html"
-        original = page.read_text()
-        example = "<pre><code>Path('data/private/answers.b8')</code></pre>"
-        page.write_text(original.replace('</main>', example + '</main>'))
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-        self.assertFalse(any(result.status == 'FAIL' for result in results), check_site_build.format_summary(results))
-        for reference in ["<script>fetch('data/private/answers.b8')</script>", '<a href="data/private/answers.b8">Download</a>']:
-            page.write_text(original.replace('</main>', example + reference + '</main>'))
-            results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-            self.assertTrue(any(result.status == 'FAIL' and 'data/private/answers.b8' in result.detail for result in results))
-
-    def test_valid_site_does_not_require_benchmark_campaign_route(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        self.assertFalse((fixture.site_root / "benchmark-campaigns/index.html").exists())
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-
-        self.assertFalse(
-            any(result.status == "FAIL" for result in results),
-            check_site_build.format_summary(results),
-        )
-
-    def test_missing_installer_cannot_pass_site_checks(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        (fixture.site_root / "install.sh").unlink()
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-        self.assertTrue(any(result.status == "FAIL" and "install.sh" in result.detail for result in results))
-
     def test_self_test_exercises_required_mutations(self) -> None:
         self.assertEqual(check_site_build.run_self_test(), [])
 
@@ -70,7 +37,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertNotIn("FAIL", output)
         for marker in [
             "PASS QP101 assets",
-            "PASS site pages",
+            "PASS workspace overview",
             "PASS benchmark methodology",
             "PASS checked benchmark artifacts",
             "PASS checked benchmark provenance",
@@ -84,117 +51,6 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertIn("partial checked evidence", output)
         self.assertIn("not_recorded", output)
         self.assertIn("checked artifact hashes", output)
-
-    def test_valid_fixture_includes_rsmp_showcase_pages_contract(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-
-        index = (fixture.site_root / "index.html").read_text(encoding="utf-8")
-        showcase = (fixture.site_root / "rsmp-v1-showcase/index.html").read_text(encoding="utf-8")
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-        summary = check_site_build.format_summary(results)
-
-        self.assertNotIn("FAIL", summary)
-        self.assertIn('href="rsmp-v1-showcase/"', index)
-        for marker in [
-            "RSMP v1",
-            "11.98%",
-            "57.14%",
-            "pack_samples",
-            "unpack_samples",
-            "Projected",
-            "requires the original circuit, not a DEM",
-            "Sweep-bit circuits are unsupported",
-            "non-hermetic checker behavior",
-        ]:
-            self.assertIn(marker, showcase)
-
-    def test_valid_fixture_includes_new_guides_and_shared_docs_script(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-        summary = check_site_build.format_summary(results)
-
-        self.assertNotIn("FAIL", summary)
-        for page, anchors in {
-            "get-started/index.html": ("install", "first-circuit", "detector-output", "continue-rustqec", "further-learning"),
-            "support/index.html": ("support-levels", "atom-loss-support-boundary"),
-            "qp101/protocol/index.html": ("scope-and-applicability", "validation-rules"),
-            "validation/index.html": ("reading-results", "historical-results", "local-workflows"),
-        }.items():
-            text = (fixture.site_root / page).read_text(encoding="utf-8")
-            for anchor in anchors:
-                self.assertIn(f'id="{anchor}"', text)
-        self.assertTrue((fixture.site_root / "js/docs.js").is_file())
-
-    def test_rejects_missing_new_page_or_docs_script(self) -> None:
-        for relative in [
-            "get-started/index.html",
-            "support/index.html",
-            "qp101/protocol/index.html",
-            "validation/index.html",
-            "js/docs.js",
-        ]:
-            with self.subTest(relative=relative):
-                fixture = check_site_build.make_fixture_site()
-                self.addCleanup(fixture.cleanup)
-                (fixture.site_root / relative).unlink()
-
-                results = check_site_build.check_site_build(
-                    fixture.site_root, repo_root=fixture.repo_root
-                )
-
-                self.assertTrue(
-                    any(result.status == "FAIL" and relative in result.detail for result in results),
-                    check_site_build.format_summary(results),
-                )
-
-    def test_rejects_missing_new_page_anchor(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        page = fixture.site_root / "validation/index.html"
-        page.write_text(
-            page.read_text(encoding="utf-8").replace('id="historical-results"', 'id="history"'),
-            encoding="utf-8",
-        )
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-
-        self.assertTrue(
-            any(
-                result.status == "FAIL"
-                and result.area == "site pages"
-                and "validation/index.html" in result.detail
-                and "historical-results" in result.detail
-                for result in results
-            ),
-            check_site_build.format_summary(results),
-        )
-
-    def test_rejects_page_without_shared_docs_script(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        page = fixture.site_root / "qp101/protocol/index.html"
-        page.write_text(
-            page.read_text(encoding="utf-8").replace(
-                '<script src="../../js/docs.js"></script>', ""
-            ),
-            encoding="utf-8",
-        )
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-
-        self.assertTrue(
-            any(
-                result.status == "FAIL"
-                and result.area == "site pages"
-                and "qp101/protocol/index.html" in result.detail
-                and "missing required scripts: js/docs.js" in result.detail
-                for result in results
-            ),
-            check_site_build.format_summary(results),
-        )
 
     def test_rejects_missing_qp101_schema(self) -> None:
         fixture = check_site_build.make_fixture_site()
@@ -282,8 +138,8 @@ class SiteBuildCheckerTest(unittest.TestCase):
         index_path = fixture.site_root / "index.html"
         index_path.write_text(
             index_path.read_text(encoding="utf-8")
-            + '<a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/surface_decoder_compare/README.md">surface docs</a>\n'
-            + '<a href="https://github.com/nzy1997/rust-qec/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">rstim docs</a>\n',
+            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/surface_decoder_compare/README.md">surface docs</a>\n'
+            + '<a href="https://github.com/nzy1997/rstim/blob/master/benchmarks/rstim_vs_stim_simulator/README.md">rstim docs</a>\n',
             encoding="utf-8",
         )
 
@@ -321,7 +177,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
     def test_invalid_app_js_blocks_provenance_pass(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        (fixture.site_root / "js/benchmarks.js").write_bytes(b"\xff\xfe\xfa")
+        (fixture.site_root / "app.js").write_bytes(b"\xff\xfe\xfa")
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
         summary = check_site_build.format_summary(results)
@@ -331,31 +187,23 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 result.status == "FAIL"
                 and result.area == "checked benchmark provenance"
                 and "provenance" in result.detail
-                and "js/benchmarks.js" in result.detail
+                and "app.js" in result.detail
                 for result in results
             ),
             summary,
         )
         self.assertNotIn("PASS checked benchmark provenance", summary)
 
-    def test_rejects_missing_distributed_evidence_boundary(self) -> None:
+    def test_rejects_missing_claims_policy_caveat(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        check_site_build.replace_site_phrase(
-            fixture,
-            "checked full artifacts support",
-            "checked full artifacts describe",
-        )
+        index = fixture.site_root / "index.html"
+        index.write_text(index.read_text(encoding="utf-8").replace("Claims Policy", "Claims"), encoding="utf-8")
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
 
         self.assertTrue(
-            any(
-                result.status == "FAIL"
-                and "benchmark methodology" in result.area
-                and "checked full artifacts support" in result.detail
-                for result in results
-            ),
+            any(result.status == "FAIL" and "benchmark methodology" in result.area and "Claims Policy" in result.detail for result in results),
             check_site_build.format_summary(results),
         )
 
@@ -366,7 +214,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         outside.write_text("outside\n", encoding="utf-8")
         index = fixture.site_root / "index.html"
         index.write_text(
-            index.read_text(encoding="utf-8").replace('href="simulator/"', 'href="../outside.txt"', 1),
+            index.read_text(encoding="utf-8").replace('href="QP101-ZY.md"', 'href="../outside.txt"', 1),
             encoding="utf-8",
         )
 
@@ -376,7 +224,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertTrue(
             any(
                 result.status == "FAIL"
-                and result.area == "site pages"
+                and result.area == "workspace overview"
                 and "../outside.txt" in result.detail
                 and "escape" in result.detail
                 for result in results
@@ -389,8 +237,8 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.addCleanup(fixture.cleanup)
         outside = fixture.repo_root / "outside.txt"
         outside.write_text("outside\n", encoding="utf-8")
-        app = fixture.site_root / "js/benchmarks.js"
-        app.write_text(app.read_text(encoding="utf-8") + '\nconst escaped = "../../outside.txt";\n', encoding="utf-8")
+        app = fixture.site_root / "app.js"
+        app.write_text(app.read_text(encoding="utf-8") + '\nconst escaped = "../outside.txt";\n', encoding="utf-8")
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
         summary = check_site_build.format_summary(results)
@@ -398,8 +246,8 @@ class SiteBuildCheckerTest(unittest.TestCase):
         self.assertTrue(
             any(
                 result.status == "FAIL"
-                and result.area == "site pages"
-                and "../../outside.txt" in result.detail
+                and result.area == "workspace overview"
+                and "../outside.txt" in result.detail
                 and "escape" in result.detail
                 for result in results
             ),
@@ -407,13 +255,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
         )
 
     def test_missing_index_or_app_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in (
-            "index.html",
-            "get-started/index.html",
-            "validation/index.html",
-            "js/benchmarks.js",
-            "js/docs.js",
-        ):
+        for relative in ("index.html", "app.js"):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
@@ -429,12 +271,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 )
 
     def test_invalid_utf8_returns_fail_summary_instead_of_raising(self) -> None:
-        for relative in (
-            "index.html",
-            "js/benchmarks.js",
-            "js/docs.js",
-            "data/benchmark-site.json",
-        ):
+        for relative in ("index.html", "app.js", "data/benchmark-site.json"):
             with self.subTest(relative=relative):
                 fixture = check_site_build.make_fixture_site()
                 self.addCleanup(fixture.cleanup)
@@ -449,13 +286,13 @@ class SiteBuildCheckerTest(unittest.TestCase):
                     summary,
                 )
 
-    def test_rejects_missing_evidence_phrase_even_if_manifest_keeps_it(self) -> None:
+    def test_rejects_missing_claims_policy_phrase_even_if_manifest_keeps_it(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        check_site_build.replace_site_phrase(
-            fixture,
-            "not a general performance claim",
-            "not a universal speed ranking",
+        index = fixture.site_root / "index.html"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace("committed-run evidence", "checked-run evidence"),
+            encoding="utf-8",
         )
 
         results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
@@ -464,7 +301,7 @@ class SiteBuildCheckerTest(unittest.TestCase):
             any(
                 result.status == "FAIL"
                 and "benchmark methodology" in result.area
-                and "not a general performance claim" in result.detail
+                and "committed-run evidence" in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),
@@ -473,10 +310,10 @@ class SiteBuildCheckerTest(unittest.TestCase):
     def test_rejects_unmanifested_checked_artifact_link(self) -> None:
         fixture = check_site_build.make_fixture_site()
         self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "decoding/index.html"
+        index = fixture.site_root / "index.html"
         index.write_text(
             index.read_text(encoding="utf-8")
-            + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
+            + '<a href="benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
             encoding="utf-8",
         )
 
@@ -493,9 +330,9 @@ class SiteBuildCheckerTest(unittest.TestCase):
         missing_artifact = (
             "benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/not-in-manifest.json"
         )
-        index = fixture.site_root / "simulator/index.html"
+        index = fixture.site_root / "index.html"
         index.write_text(
-            index.read_text(encoding="utf-8") + f'<a href="../{missing_artifact}">bad</a>\n',
+            index.read_text(encoding="utf-8") + f'<a href="{missing_artifact}">bad</a>\n',
             encoding="utf-8",
         )
 
@@ -506,50 +343,6 @@ class SiteBuildCheckerTest(unittest.TestCase):
                 result.status == "FAIL"
                 and result.area == "checked benchmark artifacts"
                 and missing_artifact in result.detail
-                for result in results
-            ),
-            check_site_build.format_summary(results),
-        )
-
-    def test_rejects_root_absolute_html_href(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "index.html"
-        index.write_text(
-            index.read_text(encoding="utf-8").replace('href="simulator/"', 'href="/simulator/"', 1),
-            encoding="utf-8",
-        )
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-
-        self.assertTrue(
-            any(
-                result.status == "FAIL"
-                and result.area == "site pages"
-                and "root-absolute" in result.detail
-                for result in results
-            ),
-            check_site_build.format_summary(results),
-        )
-
-    def test_rejects_broken_cross_page_anchor(self) -> None:
-        fixture = check_site_build.make_fixture_site()
-        self.addCleanup(fixture.cleanup)
-        index = fixture.site_root / "index.html"
-        index.write_text(
-            index.read_text(encoding="utf-8").replace(
-                'href="simulator/#circuit-simulation"', 'href="simulator/#missing-anchor"', 1
-            ),
-            encoding="utf-8",
-        )
-
-        results = check_site_build.check_site_build(fixture.site_root, repo_root=fixture.repo_root)
-
-        self.assertTrue(
-            any(
-                result.status == "FAIL"
-                and result.area == "site pages"
-                and "missing-anchor" in result.detail
                 for result in results
             ),
             check_site_build.format_summary(results),

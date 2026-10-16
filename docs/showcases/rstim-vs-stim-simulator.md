@@ -10,7 +10,7 @@ from those artifacts.
 The workload is the Stim-style surface-code sample case
 `stim-style-surface-sample-d11-r100-b1024`. Its canonical circuit input is the
 checked Stim-generated `.stim` fixture introduced by issue
-[#385](https://github.com/nzy1997/rust-qec/issues/385), not a circuit regenerated
+[#385](https://github.com/nzy1997/rstim/issues/385), not a circuit regenerated
 by `rstim`. The full fixture is
 [`benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim`](benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim).
 
@@ -23,7 +23,7 @@ The evidence has two independent tracks:
   `rstim`-vs-Stim ratios.
 
 The older umbrella issue
-[#38](https://github.com/nzy1997/rust-qec/issues/38) is historical context for the
+[#38](https://github.com/nzy1997/rstim/issues/38) is historical context for the
 surface-code benchmark direction. This page narrows that umbrella to the
 recorded simulator workloads, commands, and environments below.
 
@@ -47,20 +47,20 @@ python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness \
 Run the selected speed case:
 
 ```sh
-cargo run -p rstim --features cli --bin rstim -- perf run \
+cargo run -p rstim --bin rstim -- perf run \
   --case stim-style-surface-sample-d11-r100-b1024 \
-  --warmup-rounds 2 \
-  --measure-rounds 11 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
   --out /tmp/rstim-vs-stim-speed.jsonl
 ```
 
 Summarize and render the speed evidence:
 
 ```sh
-cargo run -p rstim --features cli --bin rstim -- perf summarize \
+cargo run -p rstim --bin rstim -- perf summarize \
   --in /tmp/rstim-vs-stim-speed.jsonl \
   --out /tmp/rstim-vs-stim-summary.json
-cargo run -p rstim --features cli --bin rstim -- perf report \
+cargo run -p rstim --bin rstim -- perf report \
   --in /tmp/rstim-vs-stim-summary.json \
   --out /tmp/rstim-vs-stim-report.md
 ```
@@ -79,10 +79,9 @@ failure.
 
 The selected speed run writes `/tmp/rstim-vs-stim-speed.jsonl` with records for
 only `stim-style-surface-sample-d11-r100-b1024`. Available variants include
-`stim-cli`, `rstim-interpreted`, `rstim-compiled`, and
-`rstim-interpreted-atom-loss`; failed or unavailable variants are represented
-with explicit statuses such as `tool_failed`, `timed_out`, or
-`missing_variant`.
+`stim-cli`, `rstim-interpreted`, and `rstim-compiled`; failed or unavailable
+variants are represented with explicit statuses such as `tool_failed`,
+`timed_out`, or `missing_variant`.
 
 The summary JSON reports `median_shots_per_second` for completed sample
 variants. The Markdown report contains the selected case label, `shots/s`, and
@@ -103,12 +102,8 @@ Checked post-optimization release evidence is published separately as
 and
 [`benchmarks/rstim_vs_stim_simulator/results/release/environment.json`](benchmarks/rstim_vs_stim_simulator/results/release/environment.json).
 This release-profile run records only
-`stim-style-surface-sample-d11-r100-b1024` with 2 warmup rounds, 11 measured
-rounds, and the environment metadata captured by the selected-case runner.
-For its atom-loss variant, one depolarization event and two independent
-per-atom loss events after each two-qubit gate all use
-`p = 1 - 0.999^(1/3) ~= 0.0003334445062`, keeping the probability of at least
-one error equal to `0.001`.
+`stim-style-surface-sample-d11-r100-b1024` with 0 warmup rounds, 1 measured
+round, and the environment metadata captured by the selected-case runner.
 
 ## Expanded Checked Evidence
 
@@ -128,31 +123,14 @@ is evidence for those cases, commands, seeds, and recorded tool versions only.
 ### Release speed evidence
 
 The following observations are scoped to the checked release-profile runs,
-their recorded measurement counts, and their recorded environments:
+their single measured round, and their recorded environments:
 
 | Case | Workload | `rstim` variant | `rstim` median wall time | Stim variant | Stim median wall time | Throughput | Case-scoped result |
 |---|---:|---|---:|---|---:|---:|---|
-| [`stim-style-surface-sample-d11-r100-b1024`](benchmarks/rstim_vs_stim_simulator/results/release/summary.json) | sample | `rstim-compiled` | 8.926 ms | `stim-cli` | 243.594 ms | 114,717 vs 4,204 shots/s | `rstim` recorded 27.29x faster |
+| [`stim-style-surface-sample-d11-r100-b1024`](benchmarks/rstim_vs_stim_simulator/results/release/summary.json) | sample | `rstim-compiled` | 586.794 ms | `stim-cli` | 182.963 ms | 1,745 vs 5,597 shots/s | `rstim` recorded 3.21x slower |
 | [`rep-sample-d13-r13`](benchmarks/rstim_vs_stim_simulator/results/release-repetition-sample/summary.json) | sample | `rstim-compiled` | 1.738 ms | `stim-cli` | 86.111 ms | 11.51M vs 232k shots/s | `rstim` recorded 49.6x faster |
 | [`surface-detect-d13-r13`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/summary.json) | detect | `rstim-compiled` | 34.339 ms | `stim-cli` | 266.172 ms | n/a | `rstim` recorded 7.75x faster |
 | [`stim-style-surface-dem-sample-d11-r100-b1024`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/summary.json) | sample_dem | `rstim-sample-dem` | 3,112.766 ms | `stim-sample-dem` | 383.724 ms | 329 vs 2,669 shots/s | `rstim` recorded 8.11x slower |
-
-In the same refreshed surface-sample run, `rstim-interpreted-atom-loss` records
-1,203.424 ms versus 10.567 ms for `rstim-interpreted`, a 113.88x wall-time
-ratio for this fixture.
-
-The separate [split precompile/sample/`b8` evidence](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/summary.json)
-records one-time precompilation separately, then splits each call into the
-implementation's sampling path and `b8` output step. The headline total excludes
-both precompilation and pipe transport. Across 7 measured 1,024-shot calls after
-2 warmups, total medians are 4.481 ms for `rstim` precompiled, 16.128 ms for
-Stim precompiled, 7.529 ms for `rstim` interpreted, 16.815 ms for Stim direct,
-and 4.266 ms for `rstim` precompiled with atom loss. In this recorded run
-`rstim` is 3.60x faster in the precompiled pair. The atom-loss result is in the
-same roughly 4 ms range as `rstim` precompiled; its small lead is within
-run-to-run variation and is not treated as an atom-loss speedup claim. Stim
-returns bit-packed samples directly, so its packing work is inside its sampling
-phase; the total remains the cross-implementation comparison boundary.
 
 Companion reports and environments are checked at
 [`results/release/`](benchmarks/rstim_vs_stim_simulator/results/release/report.md),
@@ -160,8 +138,6 @@ Companion reports and environments are checked at
 [`results/release-surface-detect/`](benchmarks/rstim_vs_stim_simulator/results/release-surface-detect/report.md),
 and
 [`results/release-dem-sample/`](benchmarks/rstim_vs_stim_simulator/results/release-dem-sample/report.md).
-The split five-path call-level report and environment are checked under
-[`results/compiled-steady-release/`](benchmarks/rstim_vs_stim_simulator/results/compiled-steady-release/report.md).
 
 These relationships describe only the named cases under the captured release
 profiles and environments. They are not timing thresholds or cross-machine
@@ -205,10 +181,10 @@ Speed evidence:
 
 Issue context:
 
-- [`#38 Performance Benchmarks on Surface Codes`](https://github.com/nzy1997/rust-qec/issues/38)
-- [`#385 Add a shared rstim-vs-Stim simulator fixture catalog`](https://github.com/nzy1997/rust-qec/issues/385)
-- [`#386 Add a statistical sample-correctness verifier against Stim`](https://github.com/nzy1997/rust-qec/issues/386)
-- [`#390 Report shots/s and rstim-vs-Stim ratios for sample speed evidence`](https://github.com/nzy1997/rust-qec/issues/390)
+- [`#38 Performance Benchmarks on Surface Codes`](https://github.com/nzy1997/rstim/issues/38)
+- [`#385 Add a shared rstim-vs-Stim simulator fixture catalog`](https://github.com/nzy1997/rstim/issues/385)
+- [`#386 Add a statistical sample-correctness verifier against Stim`](https://github.com/nzy1997/rstim/issues/386)
+- [`#390 Report shots/s and rstim-vs-Stim ratios for sample speed evidence`](https://github.com/nzy1997/rstim/issues/390)
 
 ## Verification
 
@@ -227,7 +203,7 @@ Negative controls for this page:
   Limits`;
 - removing `python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness`
   must fail with `missing rstim-vs-Stim correctness command link`;
-- removing `cargo run -p rstim --features cli --bin rstim -- perf run` must fail with
+- removing `cargo run -p rstim --bin rstim -- perf run` must fail with
   `missing rstim-vs-Stim speed command link`.
 
 Run the checker self-test for the negative-control fixtures:

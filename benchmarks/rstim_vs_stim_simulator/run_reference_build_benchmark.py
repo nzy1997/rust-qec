@@ -25,22 +25,15 @@ EXPECTED_STIM_VERSION = "1.15.0"
 CANONICAL_WARMUP_ROUNDS = 2
 CANONICAL_MEASURE_ROUNDS = 7
 STIM_VARIANT = "stim-reference-b8"
-RSTIM_CANONICAL_VARIANT = "rstim-canonical-reference-b8"
-RSTIM_DIRECT_VARIANT = "rstim-direct-repeat-reference-b8"
+RSTIM_VARIANT = "rstim-packed-reference-b8"
 STIM_BACKEND = "stim_reference"
-RSTIM_CANONICAL_BACKEND = "canonical_roundtrip"
-RSTIM_DIRECT_BACKEND = "direct_inverse_repeat_folded"
-BASELINE_SUMMARY_SHA256 = "614658cf8213b486752f1fe53b7d864561abbe41c2eefd799fc8fa34883270a5"
+RSTIM_BACKEND = "packed_inverse"
 SEED_POLICY = "deterministic_no_seed_reference_builds"
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_DIR.parents[1]
 MODULE_NAME = "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark"
 STIM_WORKER_MODULE = "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build"
-PYTHON_ROLE = "tool://python"
-STIM_PYTHON_ROLE = "tool://stim-python"
-RSTIM_WORKER_ROLE = "tool://rstim-reference-worker"
-RSTIM_WORKER_VERSION = "rstim 0.1.1"
 
 
 class RunnerError(RuntimeError):
@@ -59,27 +52,12 @@ def default_stim_worker_argv(stim_python: str) -> list[str]:
     return [stim_python, "-m", STIM_WORKER_MODULE, "--protocol", PROTOCOL]
 
 
-def default_rstim_worker_argv(rstim_worker: str, *, strategy: str = "direct") -> list[str]:
-    argv = [rstim_worker, "--protocol", PROTOCOL]
-    if strategy != "direct":
-        argv.extend(["--strategy", strategy])
-    return argv
-
-
-def logical_stim_worker_argv() -> list[str]:
-    return default_stim_worker_argv(STIM_PYTHON_ROLE)
-
-
-def logical_rstim_worker_argv(*, strategy: str = "direct") -> list[str]:
-    return default_rstim_worker_argv(RSTIM_WORKER_ROLE, strategy=strategy)
-
-
-def _rstim_worker_has_phase_counters(variant: str) -> bool:
-    return variant in {RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT}
+def default_rstim_worker_argv(rstim_worker: str) -> list[str]:
+    return [rstim_worker, "--protocol", PROTOCOL]
 
 
 def write_artifact_hashes(out_dir: Path) -> None:
-    filenames = ("raw.jsonl", "summary.json", "baseline-summary.json", "report.md", "environment.json")
+    filenames = ("raw.jsonl", "summary.json", "report.md", "environment.json")
     payload = {filename: sha256_file(out_dir / filename) for filename in filenames}
     (out_dir / "artifact-sha256.json").write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
@@ -307,7 +285,6 @@ def _run_variant(
                     "protocol": PROTOCOL,
                     "type": "build_reference",
                     "request_id": round_index,
-                    "include_phase_counters": _rstim_worker_has_phase_counters(variant),
                 }
             )
             _validate_build_response(
@@ -316,13 +293,8 @@ def _run_variant(
                 backend=backend,
                 request_id=round_index,
             )
-            phase_counters = response.get("phase_counters")
-            if _rstim_worker_has_phase_counters(variant):
-                if not isinstance(phase_counters, dict):
-                    raise RunnerError(f"{variant} phase_counters must be present")
-            elif phase_counters is not None and not isinstance(phase_counters, dict):
-                raise RunnerError(f"{variant} phase_counters must be an object")
-            record = {
+            records.append(
+                {
                     "protocol": PROTOCOL,
                     "variant": variant,
                     "phase": "warmup" if round_index < warmup_rounds else "measured",
@@ -336,10 +308,8 @@ def _run_variant(
                     "timer_scope": response["timer_scope"],
                     "parse_count": response["parse_count"],
                     "reference_build_count": response["reference_build_count"],
-            }
-            if isinstance(phase_counters, dict):
-                record["phase_counters"] = phase_counters
-            records.append(record)
+                }
+            )
         session.close()
         return records
     except BaseException:
@@ -349,11 +319,7 @@ def _run_variant(
 
 def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
     variants: list[dict[str, Any]] = []
-    for variant, backend in (
-        (STIM_VARIANT, STIM_BACKEND),
-        (RSTIM_CANONICAL_VARIANT, RSTIM_CANONICAL_BACKEND),
-        (RSTIM_DIRECT_VARIANT, RSTIM_DIRECT_BACKEND),
-    ):
+    for variant, backend in ((STIM_VARIANT, STIM_BACKEND), (RSTIM_VARIANT, RSTIM_BACKEND)):
         variant_records = [record for record in records if record["variant"] == variant]
         measured = [record for record in variant_records if record["phase"] == "measured"]
         elapsed = [record["elapsed_ns"] for record in measured]
@@ -372,22 +338,10 @@ def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
                 "final_reference_build_count": variant_records[-1]["reference_build_count"],
             }
         )
-    canonical_median = next(
-        item["median_elapsed_ns"]
-        for item in variants
-        if item["variant"] == RSTIM_CANONICAL_VARIANT
-    )
-    direct_median = next(
-        item["median_elapsed_ns"]
-        for item in variants
-        if item["variant"] == RSTIM_DIRECT_VARIANT
-    )
-    direct_speedup = canonical_median / direct_median
     return {
         "protocol": PROTOCOL,
         "timer_scope": TIMER_SCOPE,
-        "measured_records": 21,
-        "direct_speedup": round(direct_speedup, 6),
+        "measured_records": sum(item["count"] for item in variants),
         "variants": variants,
     }
 
@@ -405,43 +359,28 @@ def render_report(summary: dict[str, Any]) -> str:
             f"{variant['median_elapsed_ns']} | {variant['max_elapsed_ns']} | {variant['backend']} | "
             f"{variant['parse_count']} | {variant['final_reference_build_count']} | {variant['byte_sha256']} |"
         )
-    lines.extend(["", f"direct_speedup={summary['direct_speedup']:.6f}"])
     return "\n".join(lines) + "\n"
-
-
-def preserve_baseline_summary(out_dir: Path) -> None:
-    source = out_dir / "summary.json"
-    target = out_dir / "baseline-summary.json"
-    if target.exists():
-        if sha256_file(target) != BASELINE_SUMMARY_SHA256:
-            raise RunnerError("baseline-summary.json SHA-256 mismatch")
-        return
-    if not source.is_file():
-        raise RunnerError("cannot preserve baseline summary before summary.json exists")
-    if sha256_file(source) != BASELINE_SUMMARY_SHA256:
-        raise RunnerError("existing summary.json SHA-256 does not match required baseline")
-    target.write_bytes(source.read_bytes())
 
 
 def _runner_argv(args: argparse.Namespace) -> list[str]:
     return [
-        PYTHON_ROLE,
+        sys.executable,
         "-m",
         MODULE_NAME,
         "--fixture",
-        _repo_relative_posix(args.fixture, "runner_argv fixture"),
+        str(args.fixture),
         "--manifest",
-        _repo_relative_posix(args.manifest, "runner_argv manifest"),
+        str(args.manifest),
         "--stim-python",
-        STIM_PYTHON_ROLE,
+        str(args.stim_python),
         "--rstim-worker",
-        RSTIM_WORKER_ROLE,
+        str(args.rstim_worker),
         "--warmup-rounds",
         str(args.warmup_rounds),
         "--measure-rounds",
         str(args.measure_rounds),
         "--out-dir",
-        _repo_relative_or_abs(args.out_dir),
+        str(args.out_dir),
     ]
 
 
@@ -450,15 +389,7 @@ def _repo_relative_or_abs(path: Path) -> str:
     try:
         return str(resolved.relative_to(REPO_ROOT))
     except ValueError:
-        return str(path)
-
-
-def _repo_relative_posix(path: Path, label: str) -> str:
-    resolved = path.resolve()
-    try:
-        return resolved.relative_to(REPO_ROOT).as_posix()
-    except ValueError as error:
-        raise RunnerError(f"{label} must be under repository root: {resolved}") from error
+        return str(resolved)
 
 
 def collect_environment(
@@ -471,6 +402,8 @@ def collect_environment(
     git_dirty: bool,
     stim_version: str,
 ) -> dict[str, Any]:
+    stim_worker_argv = default_stim_worker_argv(str(args.stim_python))
+    rstim_worker_argv = default_rstim_worker_argv(str(args.rstim_worker))
     runner_python_path = Path(sys.executable).resolve()
     stim_python_path = _resolve_executable(str(args.stim_python))
     rstim_worker_path = _resolve_executable(str(args.rstim_worker))
@@ -479,48 +412,32 @@ def collect_environment(
         "protocol": PROTOCOL,
         "timer_scope": TIMER_SCOPE,
         "seed_policy": SEED_POLICY,
-        "fixture_path": _repo_relative_posix(fixture, "fixture"),
+        "fixture_path": _repo_relative_or_abs(fixture),
         "fixture_sha256": fixture_sha256,
-        "manifest_path": _repo_relative_posix(manifest, "manifest"),
+        "manifest_path": _repo_relative_or_abs(manifest),
         "manifest_sha256": EXPECTED_MANIFEST_SHA256,
         "stim_version": stim_version,
         "worker_argv": {
-            STIM_VARIANT: logical_stim_worker_argv(),
-            RSTIM_CANONICAL_VARIANT: logical_rstim_worker_argv(strategy="canonical"),
-            RSTIM_DIRECT_VARIANT: logical_rstim_worker_argv(),
+            STIM_VARIANT: stim_worker_argv,
+            RSTIM_VARIANT: rstim_worker_argv,
         },
         "canonical_worker_argv": {
-            STIM_VARIANT: logical_stim_worker_argv(),
-            RSTIM_CANONICAL_VARIANT: logical_rstim_worker_argv(strategy="canonical"),
-            RSTIM_DIRECT_VARIANT: logical_rstim_worker_argv(),
+            STIM_VARIANT: default_stim_worker_argv("python3"),
+            RSTIM_VARIANT: default_rstim_worker_argv("target/release/rstim_reference_build_worker"),
         },
         "runner_argv": _runner_argv(args),
-        "runtime_identities": [
-            {
-                "role": PYTHON_ROLE,
-                "version": platform.python_version(),
-                "basename": runner_python_path.name,
-                "sha256": sha256_file(runner_python_path),
-            },
-            {
-                "role": STIM_PYTHON_ROLE,
-                "version": stim_version,
-                "basename": stim_python_path.name,
-                "sha256": sha256_file(stim_python_path),
-            },
-            {
-                "role": RSTIM_WORKER_ROLE,
-                "version": RSTIM_WORKER_VERSION,
-                "basename": "rstim_reference_build_worker",
-                "sha256": sha256_file(rstim_worker_path),
-            },
-        ],
+        "runner_python_executable": str(runner_python_path),
+        "runner_python_executable_sha256": sha256_file(runner_python_path),
         "warmup_rounds": args.warmup_rounds,
         "measure_rounds": args.measure_rounds,
         "git_commit": git_commit,
         "git_dirty": git_dirty,
         "os": platform.platform(),
         "cpu_model": _cpu_model(),
+        "python_executable": str(stim_python_path),
+        "python_executable_sha256": sha256_file(stim_python_path),
+        "rstim_worker_binary_path": str(rstim_worker_path),
+        "rstim_worker_binary_sha256": sha256_file(rstim_worker_path),
         "rustc_version": _probe_stdout_or_failed(["rustc", "--version"]),
         "cargo_version": _probe_stdout_or_failed(["cargo", "--version"]),
         "python_version": platform.python_version(),
@@ -535,8 +452,6 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
         raise RunnerError(f"fixture does not exist: {fixture}")
     if not manifest.is_file():
         raise RunnerError(f"manifest does not exist: {manifest}")
-    _repo_relative_posix(fixture, "fixture")
-    _repo_relative_posix(manifest, "manifest")
     manifest_sha256 = sha256_file(manifest)
     if manifest_sha256 != EXPECTED_MANIFEST_SHA256:
         raise RunnerError(
@@ -551,14 +466,7 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
     if stim_version != EXPECTED_STIM_VERSION:
         raise RunnerError(f"requires stim=={EXPECTED_STIM_VERSION}, got {stim_version}")
     stim_command = default_stim_worker_argv(str(args.stim_python))
-    rstim_canonical_command = default_rstim_worker_argv(
-        str(args.rstim_worker), strategy="canonical"
-    )
-    rstim_direct_command = default_rstim_worker_argv(str(args.rstim_worker))
-
-    out_dir = args.out_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    preserve_baseline_summary(out_dir)
+    rstim_command = default_rstim_worker_argv(str(args.rstim_worker))
 
     records: list[dict[str, Any]] = []
     records.extend(
@@ -573,25 +481,17 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
     )
     records.extend(
         _run_variant(
-            variant=RSTIM_CANONICAL_VARIANT,
-            backend=RSTIM_CANONICAL_BACKEND,
-            command=rstim_canonical_command,
-            fixture=fixture,
-            warmup_rounds=args.warmup_rounds,
-            measure_rounds=args.measure_rounds,
-        )
-    )
-    records.extend(
-        _run_variant(
-            variant=RSTIM_DIRECT_VARIANT,
-            backend=RSTIM_DIRECT_BACKEND,
-            command=rstim_direct_command,
+            variant=RSTIM_VARIANT,
+            backend=RSTIM_BACKEND,
+            command=rstim_command,
             fixture=fixture,
             warmup_rounds=args.warmup_rounds,
             measure_rounds=args.measure_rounds,
         )
     )
 
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "raw.jsonl").write_text(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
@@ -617,8 +517,8 @@ def run_reference_build_benchmark(args: argparse.Namespace) -> None:
     )
     write_artifact_hashes(out_dir)
     print(
-        "PASS packed reference-build evidence "
-        f"variants=3 direct_speedup={summary['direct_speedup']:.6f}"
+        "PASS packed reference-build benchmark "
+        f"variants=2 measured={summary['measured_records']}"
     )
 
 

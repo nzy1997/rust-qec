@@ -10,7 +10,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-#[cfg(feature = "rbposd-runner")]
 fn issue91_surface_spec(extra_params: &str) -> String {
     format!(
         r#"
@@ -52,7 +51,6 @@ label = "Logical Error Rate"
     )
 }
 
-#[cfg(feature = "rbposd-runner")]
 fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std::path::PathBuf) {
     let spec_text = issue91_surface_spec(extra_params);
     let spec: BenchmarkSpec = toml::from_str(&spec_text).unwrap();
@@ -71,7 +69,6 @@ fn run_issue91_surface_benchmark(extra_params: &str) -> (tempfile::TempDir, std:
     (dir, artifact_root)
 }
 
-#[cfg(feature = "rbposd-runner")]
 fn read_issue91_lsd_results(artifact_root: &Path) -> Vec<BenchmarkResultRow> {
     let data = fs::read(
         artifact_root
@@ -92,34 +89,6 @@ fn read_rows(artifact_root: &Path, runner_name: &str) -> Vec<BenchmarkResultRow>
     )
     .unwrap();
     read_results_jsonl(&data[..]).unwrap()
-}
-
-#[cfg(all(feature = "rbposd-runner", not(feature = "ilp-runner")))]
-#[test]
-fn disabled_rilpqec_runner_reports_required_feature_before_artifacts() {
-    let text = include_str!("fixtures/bench/minimal_steane_css_rilpqec.toml");
-    let spec: BenchmarkSpec = toml::from_str(text).unwrap();
-    let dir = tempfile::tempdir().unwrap();
-    let registry = build_default_rust_runner_registry();
-
-    let err = run_rust_benchmark(
-        &spec,
-        "rust",
-        dir.path(),
-        &registry,
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/bench")
-            .as_path(),
-    )
-    .expect_err("disabled ILP runner must fail");
-
-    assert!(err.contains("requires Cargo feature 'ilp-runner'"), "{err}");
-    assert!(!dir
-        .path()
-        .join("rilpqec-steane")
-        .join("test-run")
-        .join("results.jsonl")
-        .exists());
 }
 
 fn write_rows_to_path(rows: &[BenchmarkResultRow], path: &Path) {
@@ -239,7 +208,6 @@ fn fake_result_row(ctx: &BenchRunContext, p: f64, status: &str) -> BenchmarkResu
     }
 }
 
-#[cfg(feature = "rbposd-runner")]
 fn issue96_css_rbposd_spec(schedule: &str, extra_params: &str) -> String {
     format!(
         r#"
@@ -286,7 +254,6 @@ label = "Logical Error Rate"
     )
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_writes_manifest_and_results_jsonl() {
     let spec_text = r#"
@@ -582,7 +549,6 @@ fn rust_benchmark_resume_reports_existing_results_read_errors() {
     assert!(results_path.is_dir());
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_memory_z_input_type() {
     let spec_text = r#"
@@ -656,7 +622,6 @@ label = "Logical Error Rate"
     assert_ne!(rows[0].failure_kind, FailureKind::SamplerError);
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_results_use_runner_name_not_impl_key() {
     let spec_text = r#"
@@ -725,7 +690,6 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["seed"], serde_json::json!(12_345));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_records_normalized_decoder_params() {
     let spec_text = r#"
@@ -804,7 +768,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_both_bp_iteration_aliases() {
     let spec_text = r#"
@@ -864,7 +827,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_records_bp_method_and_schedule() {
     let spec_text = r#"
@@ -945,7 +907,6 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["osd_order"], serde_json::json!(0));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_css_benchmark_preserves_circuit_schedule_param() {
     let spec_text = issue96_css_rbposd_spec(
@@ -987,7 +948,6 @@ osd_order = 0
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_css_benchmark_accepts_sequential_circuit_schedule() {
     let spec_text = issue96_css_rbposd_spec(
@@ -1024,7 +984,6 @@ osd_order = 0
     assert_eq!(rows[0].params["bp_schedule"], serde_json::json!("parallel"));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_bp_method_without_results() {
     let spec_text = issue91_surface_spec(r#"bp_method = "sum_product""#);
@@ -1048,7 +1007,6 @@ fn rbposd_runner_rejects_unknown_bp_method_without_results() {
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_bp_schedule_without_results() {
     let spec_text = issue91_surface_spec(r#"schedule = "flooding""#);
@@ -1072,7 +1030,6 @@ fn rbposd_runner_rejects_unknown_bp_schedule_without_results() {
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_unsupported_bp_algorithm() {
     let spec_text = r#"
@@ -1132,7 +1089,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn unsupported_osd_method_is_rejected_without_fallback() {
     let spec_text = r#"
@@ -1192,7 +1148,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_benchmark_rejects_unknown_decoder_param_without_results() {
     let spec_text = r#"
@@ -1249,7 +1204,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_lsd_param_without_artifacts() {
     let spec_text = issue91_surface_spec("bogus_lsd = 1");
@@ -1270,7 +1224,6 @@ fn rbposd_runner_rejects_unknown_lsd_param_without_artifacts() {
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_mixed_osd_and_lsd_params_without_artifacts() {
     let spec_text = issue91_surface_spec(
@@ -1296,7 +1249,6 @@ lsd_order = 1
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     let (_dir, artifact_root) = run_issue91_surface_benchmark("lsd_order = 1");
@@ -1327,7 +1279,6 @@ fn rbposd_lsd_benchmark_records_normalized_decoder_params() {
     assert_eq!(row.params["seed"], serde_json::json!(12_345));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_benchmark_run_writes_results_jsonl() {
     let (_dir, artifact_root) = run_issue91_surface_benchmark(
@@ -1355,7 +1306,6 @@ lsd_order = 1
     assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_benchmark_rejects_unknown_decoder_param_without_results() {
     let spec_text = issue91_surface_spec("bogus_lsd = 1");
@@ -1376,7 +1326,6 @@ fn rbposd_lsd_benchmark_rejects_unknown_decoder_param_without_results() {
     assert!(!dir.path().join("rbposd_lsd").exists());
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_run_uses_lsd_dem_adapter_and_writes_artifacts() {
     let spec_text = issue91_surface_spec(
@@ -1417,7 +1366,6 @@ lsd_order = 1
     assert_eq!(rows[0].params["decoder_impl"], serde_json::json!("rbposd"));
 }
 
-#[cfg(all(feature = "rmatching-runner", feature = "rbposd-runner"))]
 #[test]
 fn rust_benchmark_preflights_all_runner_params_before_writing_results() {
     let spec_text = r#"
@@ -1488,7 +1436,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rbposd_bad").exists());
 }
 
-#[cfg(all(feature = "rmatching-runner", feature = "ilp-runner"))]
 #[test]
 fn rust_benchmark_preflights_decoder_param_values_before_writing_results() {
     let spec_text = r#"
@@ -1559,7 +1506,6 @@ label = "Logical Error Rate"
     assert!(!dir.path().join("rilpqec_bad").exists());
 }
 
-#[cfg(feature = "ilp-runner")]
 #[test]
 fn rilpqec_benchmark_records_normalized_decoder_params() {
     let spec_text = r#"
@@ -1632,7 +1578,7 @@ label = "Logical Error Rate"
     assert_eq!(rows[0].params["verbose"], serde_json::json!(true));
 }
 
-#[cfg(all(feature = "ilp-runner", not(feature = "gurobi")))]
+#[cfg(not(feature = "gurobi"))]
 #[test]
 fn rilpqec_gurobi_without_feature_records_unsupported_failure_kind() {
     let spec_text = r#"
@@ -1707,7 +1653,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "ilp-runner")]
 #[test]
 fn rilpqec_benchmark_rejects_invalid_mip_gap() {
     let spec_text = r#"
@@ -1816,7 +1761,6 @@ label = "Logical Error Rate"
     assert!(err.contains("distance"));
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_does_not_leave_stale_results_when_retry_fails() {
     let good_spec_text = r#"
@@ -1887,7 +1831,6 @@ label = "Logical Error Rate"
     assert!(!results_path.exists());
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_clears_stale_staging_dir_before_writing() {
     let spec_text = r#"
@@ -1948,7 +1891,6 @@ label = "Logical Error Rate"
     assert!(!staging_dir.exists());
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_css_input_type() {
     let spec_path =
@@ -2002,7 +1944,6 @@ fn rust_benchmark_run_supports_css_input_type() {
     );
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_reports_css_file_path_context() {
     let spec_text = r#"
@@ -2058,7 +1999,6 @@ label = "Logical Error Rate"
     assert!(err.contains("missing_hx.json"), "error was: {err}");
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_supports_bb72_css_explicit_observables() {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2195,7 +2135,6 @@ label = "Logical Error Rate"
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 #[ignore = "manual BB72 BP+OSD reference run; intentionally heavier than CI"]
 fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
@@ -2260,7 +2199,6 @@ fn manual_bb72_css_bposd_reference_fixture_records_paper_params() {
     assert!(seen_p01);
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     let spec_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2358,7 +2296,6 @@ fn rust_benchmark_run_supports_bb72_css_bposd_fixture() {
     );
 }
 
-#[cfg(feature = "rmatching-runner")]
 #[test]
 fn rust_benchmark_run_rejects_invalid_css_observables_before_results() {
     let spec_dir = tempfile::tempdir().unwrap();

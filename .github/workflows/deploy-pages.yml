@@ -20,52 +20,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          rustup target add wasm32-unknown-unknown
-
-      - name: Install WebAssembly bindings tool
-        run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
+        run: rustup toolchain install stable --profile minimal && rustup default stable
 
       - uses: Swatinem/rust-cache@v2
-
-      - name: Install Zola
-        run: |
-          curl -fsSL https://github.com/getzola/zola/releases/download/v0.22.1/zola-v0.22.1-x86_64-unknown-linux-gnu.tar.gz \
-            | sudo tar -xz -C /usr/local/bin zola
-          zola --version
 
       - name: Build benchmarked documentation site
         run: make build-site
 
-      - name: Check built site
-        run: python3 tools/check_site_build.py _site
-
-      - name: Install browser test engines
-        run: |
-          npm --prefix web/shot-viewer ci
-          npx --prefix web/shot-viewer playwright install --with-deps chromium firefox
-
-      - name: Test interactive shot viewer
-        run: npm --prefix web/shot-viewer run test:e2e
-
-      - name: Build registered documentation versions
-        run: |
-          python3 -m unittest tools.test_site_versions
-          python3 tools/site_versions.py build --site-root _site --output _pages
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _pages
+          path: _site
 
   deploy:
     environment:

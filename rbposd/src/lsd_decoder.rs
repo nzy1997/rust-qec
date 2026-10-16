@@ -6,11 +6,10 @@ use crate::config::{ChannelModel, DecoderConfig, LsdConfig, LsdMethod};
 use crate::decoder::{DecodeResult, DecodeStats};
 use crate::decoder_core::BpCore;
 use crate::error::DecodeError;
-use crate::lsd::{LsdWorkspace, decode_lsd_with_workspace};
+use crate::lsd::{decode_lsd_with_workspace, LsdWorkspace};
 use crate::matrix::ParityCheckMatrix;
 use crate::vector::{Correction, Syndrome};
 
-/// Reusable belief-propagation decoder with localized-statistics fallback.
 #[derive(Debug)]
 pub struct BpLsdDecoder {
     pcm: ParityCheckMatrix,
@@ -35,7 +34,6 @@ impl Clone for BpLsdDecoder {
 }
 
 impl BpLsdDecoder {
-    /// Construct a decoder with the default BP configuration.
     pub fn new(
         pcm: ParityCheckMatrix,
         channel: ChannelModel,
@@ -44,9 +42,6 @@ impl BpLsdDecoder {
         Self::with_bp_config(pcm, channel, config, DecoderConfig::default())
     }
 
-    /// Construct a decoder with explicit LSD and BP configurations.
-    ///
-    /// Returns [`DecodeError::UnsupportedLsdOrder`] for orders above 1.
     pub fn with_bp_config(
         pcm: ParityCheckMatrix,
         channel: ChannelModel,
@@ -76,7 +71,6 @@ impl BpLsdDecoder {
         })
     }
 
-    /// Decode one syndrome, reusing internal workspaces.
     pub fn decode(&self, syndrome: &Syndrome) -> Result<DecodeResult, DecodeError> {
         if syndrome.len() != self.pcm.num_checks() {
             return Err(DecodeError::DimensionMismatch {

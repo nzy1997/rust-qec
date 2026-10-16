@@ -1,5 +1,3 @@
-#![cfg(feature = "rbposd-runner")]
-
 use rbposd::{OsdVariant, ParityCheckMatrix};
 use serde::Deserialize;
 

@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import json
 import re
-import statistics
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,41 +14,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from benchmarks.rstim_vs_stim_simulator.portable_provenance import load_catalog
-
-
-EXPECTED_CASE_ID = "stim_surface_d11_r100"
-EXPECTED_STIM_VERSION = "1.15.0"
-EXPECTED_FIXTURE_SHA256 = "a49acb5edf3de447d47e401b012d043730b8b45077d5118a615066c2b5e8b229"
-EXPECTED_MANIFEST_SHA256 = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c921"
-TIMER_SCOPE = "process_spawn_stdout_stderr_drain_exit"
-OUTPUT_FORMAT = "b8"
-CORRECTNESS_MODE = "detect"
-CORRECTNESS_OUTPUT_FORMAT = "01"
-EXPECTED_OUTPUT_BITS = 12_121
-EXPECTED_BYTES_PER_SHOT = 1_516
-EXPECTED_OUTPUT_BYTES = 1_552_384
-EXPECTED_DETECTORS = 12_000
-EXPECTED_OBSERVABLES = 1
-EXPECTED_OPERATION_TOTALS = {
-    "X_ERROR": {"instructions": 203, "targets": 24_362, "iterator_builds": 203, "attempt_count": 24_946_688},
-    "DEPOLARIZE1": {"instructions": 200, "targets": 12_000, "iterator_builds": 200, "attempt_count": 12_288_000},
-    "DEPOLARIZE2": {"instructions": 400, "pairs": 44_000, "iterator_builds": 400, "attempt_count": 45_056_000},
-}
-OPERATION_ORDER = tuple(EXPECTED_OPERATION_TOTALS)
-
-
-class RunnerError(RuntimeError):
-    pass
+from benchmarks.rstim_vs_stim_simulator import run_frame_instruction_wide_benchmark as runner
 
 
 REQUIRED_FILES = (
     "raw.jsonl",
     "summary.json",
     "report.md",
-    "paired-raw.jsonl",
-    "paired-summary.json",
-    "paired-report.md",
     "environment.json",
     "fixture-load.json",
     "correctness-summary.json",
@@ -60,18 +31,6 @@ SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 GIT_COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
 CANONICAL_FIXTURE = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
 CANONICAL_MANIFEST = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/cases.full.toml"
-CATALOG_PATH = REPO_ROOT / "benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml"
-BUNDLE_ID = "frame-instruction-wide-release"
-RUNTIME_ROLE = "tool://rstim"
-RUNTIME_IDENTITY_FIELDS = frozenset({"role", "version", "basename", "sha256"})
-PAIRED_BASELINE_VARIANT = "baseline-rstim-frame-noise-b8"
-PAIRED_CANDIDATE_VARIANT = "candidate-rstim-frame-noise-b8"
-PAIRED_VARIANTS = (PAIRED_BASELINE_VARIANT, PAIRED_CANDIDATE_VARIANT)
-PAIRED_TOOL_ROLES = {
-    PAIRED_BASELINE_VARIANT: "tool://rstim-baseline-frame-noise",
-    PAIRED_CANDIDATE_VARIANT: "tool://rstim-candidate-frame-noise",
-}
-PAIRED_BASELINE_REVISION = "f10d1ed024d3519318ed244c9095724074519595"
 
 
 def sha256_file(path: Path) -> str:
@@ -92,21 +51,21 @@ def load_json_object(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def load_raw_records(path: Path, label: str = "raw.jsonl") -> list[dict[str, Any]]:
+def load_raw_records(path: Path) -> list[dict[str, Any]]:
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as error:
-        raise ValueError(f"could not read {label}: {error}") from error
+        raise ValueError(f"could not read raw.jsonl: {error}") from error
     records = []
     for line_number, line in enumerate(lines, start=1):
         if not line.strip():
-            raise ValueError(f"{label} line {line_number} must not be blank")
+            raise ValueError(f"raw.jsonl line {line_number} must not be blank")
         try:
             record = json.loads(line)
         except json.JSONDecodeError as error:
-            raise ValueError(f"{label} line {line_number} is not valid JSON") from error
+            raise ValueError(f"raw.jsonl line {line_number} is not valid JSON") from error
         if not isinstance(record, dict):
-            raise ValueError(f"{label} line {line_number} must be a JSON object")
+            raise ValueError(f"raw.jsonl line {line_number} must be a JSON object")
         records.append(record)
     return records
 
@@ -136,20 +95,20 @@ def _require_digest(value: Any, message: str) -> str:
 def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
     if len(records) != 3:
         raise ValueError("raw.jsonl must contain exactly three measured operation rows")
-    if [record.get("operation") for record in records] != list(OPERATION_ORDER):
+    if [record.get("operation") for record in records] != list(runner.OPERATION_ORDER):
         raise ValueError("raw.jsonl operations must be X_ERROR, DEPOLARIZE1, DEPOLARIZE2")
     for record in records:
-        _require_equal(record.get("case_id"), EXPECTED_CASE_ID, "raw case_id must be stim_surface_d11_r100")
+        _require_equal(record.get("case_id"), runner.EXPECTED_CASE_ID, "raw case_id must be stim_surface_d11_r100")
         _require_equal(record.get("phase"), "measured", "raw phase must be measured")
         _require_int(record.get("round_index"), 0, "raw round_index")
         _require_int(record.get("seed"), 7, "raw seed")
         _require_equal(record.get("sampling_path"), "sparse", "raw sampling_path must be sparse")
-        _require_equal(record.get("timer_scope"), TIMER_SCOPE, "raw timer_scope must match measurement timer")
-        _require_equal(record.get("output_format"), OUTPUT_FORMAT, "raw output_format must be b8")
-        _require_int(record.get("output_bits"), EXPECTED_OUTPUT_BITS, "raw output_bits")
-        _require_int(record.get("bytes_per_shot"), EXPECTED_BYTES_PER_SHOT, "raw bytes_per_shot")
-        _require_int(record.get("actual_output_bytes"), EXPECTED_OUTPUT_BYTES, "raw actual_output_bytes")
-        _require_int(record.get("expected_output_bytes"), EXPECTED_OUTPUT_BYTES, "raw expected_output_bytes")
+        _require_equal(record.get("timer_scope"), runner.TIMER_SCOPE, "raw timer_scope must match measurement timer")
+        _require_equal(record.get("output_format"), runner.OUTPUT_FORMAT, "raw output_format must be b8")
+        _require_int(record.get("output_bits"), runner.EXPECTED_OUTPUT_BITS, "raw output_bits")
+        _require_int(record.get("bytes_per_shot"), runner.EXPECTED_BYTES_PER_SHOT, "raw bytes_per_shot")
+        _require_int(record.get("actual_output_bytes"), runner.EXPECTED_OUTPUT_BYTES, "raw actual_output_bytes")
+        _require_int(record.get("expected_output_bytes"), runner.EXPECTED_OUTPUT_BYTES, "raw expected_output_bytes")
         _require_digest(record.get("stdout_sha256"), "raw stdout_sha256")
         elapsed = record.get("elapsed_ns")
         if not isinstance(elapsed, int) or isinstance(elapsed, bool) or elapsed <= 0:
@@ -170,7 +129,7 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
             if record.get(field) != first.get(field):
                 raise ValueError(f"raw measurement field {field} must be identical across operation rows")
 
-    for operation, expected in EXPECTED_OPERATION_TOTALS.items():
+    for operation, expected in runner.EXPECTED_OPERATION_TOTALS.items():
         row = next(record for record in records if record.get("operation") == operation)
         for field, value in expected.items():
             _require_int(row.get(field), value, f"{operation} {field}")
@@ -183,240 +142,21 @@ def validate_raw_semantics(records: list[dict[str, Any]]) -> dict[str, int]:
     return {"iterator_builds": total_builds, "attempt_count": total_attempts}
 
 
-def derive_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    if not records:
-        raise RunnerError("cannot derive summary from empty raw records")
-    first = records[0]
-    operations: list[dict[str, Any]] = []
-    for operation in OPERATION_ORDER:
-        matches = [record for record in records if record.get("operation") == operation]
-        if len(matches) != 1:
-            raise RunnerError(f"raw records must contain exactly one {operation} row")
-        row = dict(matches[0])
-        operation_summary = {
-            "operation": operation,
-            "sampling_path": row["sampling_path"],
-            "instructions": row["instructions"],
-            "iterator_builds": row["iterator_builds"],
-            "attempt_count": row["attempt_count"],
-        }
-        if operation == "DEPOLARIZE2":
-            operation_summary["pairs"] = row["pairs"]
-        else:
-            operation_summary["targets"] = row["targets"]
-        operations.append(operation_summary)
-    return {
-        "case_id": first["case_id"],
-        "seed": first["seed"],
-        "shots": 1024,
-        "phase": "measured",
-        "round_index": 0,
-        "operations": operations,
-        "totals": {
-            "instructions": sum(row["instructions"] for row in operations),
-            "iterator_builds": sum(row["iterator_builds"] for row in operations),
-            "attempt_count": sum(row["attempt_count"] for row in operations),
-        },
-        "measurement": {
-            "timer_scope": TIMER_SCOPE,
-            "output_format": OUTPUT_FORMAT,
-            "output_bits": first["output_bits"],
-            "bytes_per_shot": first["bytes_per_shot"],
-            "expected_output_bytes": first["expected_output_bytes"],
-            "actual_output_bytes": first["actual_output_bytes"],
-            "stdout_sha256": first["stdout_sha256"],
-            "elapsed_ns": first["elapsed_ns"],
-        },
-    }
-
-
-def render_report(summary: dict[str, Any]) -> str:
-    lines = [
-        "# Instruction-Wide Frame-Noise Evidence",
-        "",
-        f"Case: `{summary['case_id']}`",
-        f"Seed: `{summary['seed']}`",
-        f"Timer scope: `{summary['measurement']['timer_scope']}`",
-        "",
-        "| Operation | Instructions/builds | Targets/pairs | Attempts |",
-        "|---|---:|---:|---:|",
-    ]
-    for row in summary["operations"]:
-        target_value = row.get("pairs", row.get("targets"))
-        lines.append(
-            f"| `{row['operation']}` | {row['iterator_builds']} | {target_value} | {row['attempt_count']} |"
-        )
-    totals = summary["totals"]
-    target_total = sum(row.get("pairs", row.get("targets", 0)) for row in summary["operations"])
-    lines.extend(
-        [
-            f"| **Total** | **{totals['iterator_builds']}** | **{target_total}** | **{totals['attempt_count']}** |",
-            "",
-            "Measurement output:",
-            f"- bits per shot: {summary['measurement']['output_bits']}",
-            f"- bytes per shot: {summary['measurement']['bytes_per_shot']}",
-            f"- bytes for run: {summary['measurement']['actual_output_bytes']}",
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
 def validate_summary_and_report(records: list[dict[str, Any]], summary: dict[str, Any], report: str) -> None:
-    expected_summary = derive_summary(records)
+    expected_summary = runner.derive_summary(records)
     if summary != expected_summary:
         raise ValueError("summary.json does not match summary derived from raw.jsonl")
-    expected_report = render_report(expected_summary)
+    expected_report = runner.render_report(expected_summary)
     if report != expected_report:
         raise ValueError("report.md does not match report derived from raw.jsonl")
 
 
-def _paired_canonical_argv(variant: str, seed: int) -> list[str]:
-    return [
-        PAIRED_TOOL_ROLES[variant],
-        "sample",
-        "--skip_reference_sample",
-        "--shots",
-        "1024",
-        "--seed",
-        str(seed),
-        "--out_format",
-        OUTPUT_FORMAT,
-        "--in",
-        "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
-    ]
-
-
-def _validate_paired_raw_records(records: list[dict[str, Any]]) -> None:
-    if len(records) != 18:
-        raise ValueError("paired-raw.jsonl must contain exactly 18 records")
-    if {record.get("variant") for record in records} != set(PAIRED_VARIANTS):
-        raise ValueError("paired-raw.jsonl variants must be baseline-rstim-frame-noise-b8 and candidate-rstim-frame-noise-b8")
-    if [record.get("ordering_slot") for record in records] != list(range(18)):
-        raise ValueError("paired-raw.jsonl ordering_slot values must be 0 through 17")
-
-    for variant in PAIRED_VARIANTS:
-        variant_records = [record for record in records if record.get("variant") == variant]
-        warmup_records = [record for record in variant_records if record.get("phase") == "warmup"]
-        measured_records = [record for record in variant_records if record.get("phase") == "measured"]
-        if len(warmup_records) != 2 or len(measured_records) != 7:
-            raise ValueError(f"paired-raw.jsonl {variant} must contain two warmup and seven measured records")
-        if {record.get("seed") for record in variant_records} != set(range(9)):
-            raise ValueError(f"paired-raw.jsonl {variant} seeds must be 0 through 8")
-        if {record.get("round_index") for record in warmup_records} != {0, 1}:
-            raise ValueError(f"paired-raw.jsonl {variant} warmup round_index values must be 0 and 1")
-        if {record.get("round_index") for record in measured_records} != set(range(7)):
-            raise ValueError(f"paired-raw.jsonl {variant} measured round_index values must be 0 through 6")
-        expected_label = "baseline" if variant == PAIRED_BASELINE_VARIANT else "candidate"
-        revisions = {record.get("resolved_revision") for record in variant_records}
-        if len(revisions) != 1 or not all(isinstance(revision, str) and GIT_COMMIT_RE.fullmatch(revision) for revision in revisions):
-            raise ValueError(f"paired-raw.jsonl {variant} resolved_revision must be one commit SHA")
-        if variant == PAIRED_BASELINE_VARIANT and revisions != {PAIRED_BASELINE_REVISION}:
-            raise ValueError(f"paired-raw.jsonl baseline resolved_revision must be {PAIRED_BASELINE_REVISION}")
-        for record in variant_records:
-            _require_equal(record.get("case_id"), EXPECTED_CASE_ID, "paired-raw case_id must be stim_surface_d11_r100")
-            _require_equal(record.get("revision_label"), expected_label, "paired-raw revision_label must match variant")
-            _require_int(record.get("shots"), 1024, "paired-raw shots")
-            _require_int(record.get("measurement_count"), EXPECTED_OUTPUT_BITS, "paired-raw measurement_count")
-            _require_equal(record.get("output_format"), OUTPUT_FORMAT, "paired-raw output_format must be b8")
-            _require_int(record.get("expected_output_bytes"), EXPECTED_OUTPUT_BYTES, "paired-raw expected_output_bytes")
-            _require_int(record.get("actual_output_bytes"), EXPECTED_OUTPUT_BYTES, "paired-raw actual_output_bytes")
-            _require_equal(record.get("timer_scope"), TIMER_SCOPE, "paired-raw timer_scope must match measurement timer")
-            _require_int(record.get("exit_code"), 0, "paired-raw exit_code")
-            _require_digest(record.get("stdout_sha256"), "paired-raw stdout_sha256")
-            if not isinstance(record.get("stderr_bytes"), int) or isinstance(record["stderr_bytes"], bool) or record["stderr_bytes"] < 0:
-                raise ValueError("paired-raw stderr_bytes must be a nonnegative integer")
-            if not isinstance(record.get("elapsed_ns"), int) or isinstance(record["elapsed_ns"], bool) or record["elapsed_ns"] <= 0:
-                raise ValueError("paired-raw elapsed_ns must be a positive integer")
-            seed = record.get("seed")
-            if not isinstance(seed, int) or isinstance(seed, bool):
-                raise ValueError("paired-raw seed must be an integer")
-            if record.get("argv") != _paired_canonical_argv(variant, seed):
-                raise ValueError(f"paired-raw {variant} command must be the canonical --skip_reference_sample b8 command")
-
-
-def _derive_paired_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
-    variants: list[dict[str, Any]] = []
-    for variant in PAIRED_VARIANTS:
-        measured_records = [record for record in records if record["variant"] == variant and record["phase"] == "measured"]
-        elapsed_ns = [record["elapsed_ns"] for record in measured_records]
-        variants.append({
-            "variant": variant,
-            "measured_count": len(elapsed_ns),
-            "median_elapsed_ns": statistics.median(elapsed_ns),
-            "mean_elapsed_ns": statistics.mean(elapsed_ns),
-            "min_elapsed_ns": min(elapsed_ns),
-            "max_elapsed_ns": max(elapsed_ns),
-            "elapsed_ns": {
-                "samples": elapsed_ns,
-                "sample_count": len(elapsed_ns),
-                "min": min(elapsed_ns),
-                "max": max(elapsed_ns),
-                "mean": statistics.mean(elapsed_ns),
-                "median": statistics.median(elapsed_ns),
-            },
-            "total_output_bytes": sum(record["actual_output_bytes"] for record in measured_records),
-            "stdout_sha256": [record["stdout_sha256"] for record in measured_records],
-        })
-    ratio = variants[1]["median_elapsed_ns"] / variants[0]["median_elapsed_ns"]
-    return {
-        "module": "benchmarks.rstim_vs_stim_simulator.run_paired_frame_noise",
-        "case_id": EXPECTED_CASE_ID,
-        "timer_scope": TIMER_SCOPE,
-        "baseline_revision": next(
-            record["resolved_revision"] for record in records if record["variant"] == PAIRED_BASELINE_VARIANT
-        ),
-        "candidate_revision": next(record["resolved_revision"] for record in records if record["variant"] == PAIRED_CANDIDATE_VARIANT),
-        "expected_output_bytes": EXPECTED_OUTPUT_BYTES,
-        "measured_record_count": 14,
-        "candidate_over_baseline": ratio,
-        "outcome": "improved" if ratio <= 0.95 else "neutral" if ratio <= 1.05 else "regressed",
-        "variants": variants,
-    }
-
-
-def _render_paired_report(summary: dict[str, Any]) -> str:
-    lines = [
-        "# Paired Frame-Noise Benchmark",
-        "",
-        f"Case: `{EXPECTED_CASE_ID}`",
-        f"Timer scope: `{TIMER_SCOPE}`",
-        f"Expected stdout bytes per process: `{EXPECTED_OUTPUT_BYTES}`",
-        f"Candidate over baseline: `{summary['candidate_over_baseline']}`",
-        f"Outcome: `{summary['outcome']}`",
-        "",
-        "| Variant | Measured runs | Median elapsed (ns) |",
-        "| --- | ---: | ---: |",
-    ]
-    for variant in summary["variants"]:
-        lines.append(f"| {variant['variant']} | {variant['measured_count']} | {variant['median_elapsed_ns']} |")
-    return "\n".join(lines) + "\n"
-
-
-def validate_paired_evidence(records: list[dict[str, Any]], summary: dict[str, Any], report: str) -> dict[str, Any]:
-    _validate_paired_raw_records(records)
-    ratio = summary.get("candidate_over_baseline")
-    if not isinstance(ratio, (int, float)) or isinstance(ratio, bool) or ratio <= 0:
-        raise ValueError("paired-summary candidate_over_baseline must be a positive number")
-    expected_outcome = "improved" if ratio <= 0.95 else "neutral" if ratio <= 1.05 else "regressed"
-    if summary.get("outcome") != expected_outcome:
-        raise ValueError(f"paired-summary outcome must be {expected_outcome}")
-    if ratio > 1.05:
-        raise ValueError("candidate frame-noise path exceeds 1.05 non-regression limit")
-    expected_summary = _derive_paired_summary(records)
-    if summary != expected_summary:
-        raise ValueError("paired-summary.json does not match summary derived from paired-raw.jsonl")
-    if report != _render_paired_report(expected_summary):
-        raise ValueError("paired-report.md does not match report derived from paired-raw.jsonl")
-    return {"candidate_over_baseline": ratio, "outcome": expected_outcome}
-
-
 def validate_fixture_load(payload: dict[str, Any]) -> int:
-    _require_equal(payload.get("case_id"), EXPECTED_CASE_ID, "fixture-load case_id must match")
+    _require_equal(payload.get("case_id"), runner.EXPECTED_CASE_ID, "fixture-load case_id must match")
     _require_equal(payload.get("status"), "pass", "fixture-load status must be pass")
-    _require_int(payload.get("actual_measurements"), EXPECTED_OUTPUT_BITS, "fixture-load actual_measurements")
-    _require_int(payload.get("actual_detectors"), EXPECTED_DETECTORS, "fixture-load actual_detectors")
-    _require_int(payload.get("actual_observables"), EXPECTED_OBSERVABLES, "fixture-load actual_observables")
+    _require_int(payload.get("actual_measurements"), runner.EXPECTED_OUTPUT_BITS, "fixture-load actual_measurements")
+    _require_int(payload.get("actual_detectors"), runner.EXPECTED_DETECTORS, "fixture-load actual_detectors")
+    _require_int(payload.get("actual_observables"), runner.EXPECTED_OBSERVABLES, "fixture-load actual_observables")
     operations = payload.get("operations")
     if not isinstance(operations, dict):
         raise ValueError("fixture-load operations must be an object")
@@ -490,71 +230,7 @@ def _validate_path_hash(environment: dict[str, Any], path_field: str, hash_field
     return path
 
 
-def _normalize_runtime_identity(raw_identity: Any, label: str) -> dict[str, str]:
-    if not isinstance(raw_identity, dict):
-        raise ValueError(f"{label} must be an object")
-    unsupported = sorted(set(raw_identity) - RUNTIME_IDENTITY_FIELDS)
-    if unsupported:
-        raise ValueError(f"{label} unsupported field(s): {', '.join(unsupported)}")
-    missing = [field for field in ("role", "version", "basename", "sha256") if field not in raw_identity]
-    if missing:
-        raise ValueError(f"{label} missing required field(s): {', '.join(missing)}")
-    role = raw_identity["role"]
-    version = raw_identity["version"]
-    basename = raw_identity["basename"]
-    digest = _require_digest(raw_identity["sha256"], f"{label} sha256")
-    if role != RUNTIME_ROLE:
-        raise ValueError(f"{label} role must be {RUNTIME_ROLE}")
-    if not isinstance(version, str) or not version:
-        raise ValueError(f'{label} field "version" must be a nonempty string')
-    if not isinstance(basename, str) or not basename:
-        raise ValueError(f'{label} field "basename" must be a nonempty string')
-    if "/" in basename or "\\" in basename:
-        raise ValueError(f'{label} field "basename" must not contain path separators')
-    return {"role": role, "version": version, "basename": basename, "sha256": digest}
-
-
-def load_catalog_runtime_identity() -> dict[str, str]:
-    catalog = load_catalog(CATALOG_PATH)
-    if catalog.get("schema") != 2:
-        raise ValueError("evidence catalog schema must be 2")
-    bundles = catalog.get("bundles")
-    if not isinstance(bundles, list):
-        raise ValueError("evidence catalog bundles must be an array")
-    matching_bundles = [bundle for bundle in bundles if isinstance(bundle, dict) and bundle.get("id") == BUNDLE_ID]
-    if len(matching_bundles) != 1:
-        raise ValueError(f'evidence catalog must contain exactly one bundle "{BUNDLE_ID}"')
-    identities = matching_bundles[0].get("runtime_identities")
-    if not isinstance(identities, list):
-        raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" runtime_identities must be an array')
-    if len(identities) != 1:
-        raise ValueError(f'evidence catalog bundle "{BUNDLE_ID}" must contain exactly one runtime identity')
-    return _normalize_runtime_identity(identities[0], f'evidence catalog bundle "{BUNDLE_ID}" runtime identity')
-
-
-def validate_environment_runtime_identity(environment: dict[str, Any]) -> dict[str, str]:
-    identities = environment.get("runtime_identities")
-    if not isinstance(identities, list):
-        raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
-    if len(identities) != 1:
-        raise ValueError("environment runtime_identities must contain exactly one tool://rstim identity")
-    identity = _normalize_runtime_identity(identities[0], "environment runtime_identities[0]")
-    catalog_identity = load_catalog_runtime_identity()
-    if identity != catalog_identity:
-        raise ValueError("environment runtime identity must match schema-v2 catalog identity")
-    return identity
-
-
-def validate_runtime_binary(runtime_binary: Path, identity: dict[str, str]) -> None:
-    if not runtime_binary.is_file():
-        raise ValueError(f"runtime binary path does not exist: {runtime_binary}")
-    if sha256_file(runtime_binary) != identity["sha256"]:
-        raise ValueError("runtime binary SHA-256 does not match recorded identity")
-
-
-def validate_environment(
-    environment: dict[str, Any], results_dir: Path, verify_runtime_binary: Path | None = None
-) -> None:
+def validate_environment(environment: dict[str, Any], results_dir: Path) -> None:
     if not isinstance(environment.get("git_commit"), str) or GIT_COMMIT_RE.fullmatch(environment["git_commit"]) is None:
         raise ValueError("environment git_commit must be a 40-character lowercase hex commit SHA")
     if not isinstance(environment.get("git_dirty"), bool):
@@ -563,13 +239,13 @@ def validate_environment(
         raise ValueError("environment git_dirty must be false for published release evidence")
     for field, expected in (
         ("profile", "release"),
-        ("case_id", EXPECTED_CASE_ID),
+        ("case_id", runner.EXPECTED_CASE_ID),
         ("shots", 1024),
         ("seed", 7),
         ("warmup_rounds", 0),
         ("measure_rounds", 1),
-        ("timer_scope", TIMER_SCOPE),
-        ("stim_version", EXPECTED_STIM_VERSION),
+        ("timer_scope", runner.TIMER_SCOPE),
+        ("stim_version", runner.EXPECTED_STIM_VERSION),
     ):
         _require_equal(environment.get(field), expected, f"environment {field} must be {expected}")
     for field in ("rstim_version", "rustc_version", "os", "cpu_model"):
@@ -577,21 +253,14 @@ def validate_environment(
             raise ValueError(f"environment {field} must be nonempty")
     fixture = _validate_path_hash(environment, "fixture", "fixture_sha256")
     manifest = _validate_path_hash(environment, "manifest", "manifest_sha256")
-    runtime_identity = validate_environment_runtime_identity(environment)
-    _require_equal(
-        environment["rstim_version"],
-        runtime_identity["version"],
-        "environment rstim_version must match runtime identity version",
-    )
-    if verify_runtime_binary is not None:
-        validate_runtime_binary(verify_runtime_binary, runtime_identity)
+    _validate_path_hash(environment, "rstim_binary", "rstim_binary_sha256")
     if fixture != CANONICAL_FIXTURE.resolve():
         raise ValueError("environment fixture must name the canonical fixture")
     if manifest != CANONICAL_MANIFEST.resolve():
         raise ValueError("environment manifest must name the canonical manifest")
-    if environment["fixture_sha256"] != EXPECTED_FIXTURE_SHA256:
+    if environment["fixture_sha256"] != runner.EXPECTED_FIXTURE_SHA256:
         raise ValueError("environment fixture_sha256 must match canonical fixture digest")
-    if environment["manifest_sha256"] != EXPECTED_MANIFEST_SHA256:
+    if environment["manifest_sha256"] != runner.EXPECTED_MANIFEST_SHA256:
         raise ValueError("environment manifest_sha256 must match canonical manifest digest")
     runner_argv = environment.get("runner_argv")
     if not isinstance(runner_argv, list) or not all(isinstance(item, str) and item for item in runner_argv):
@@ -616,58 +285,43 @@ def validate_environment(
 def validate_artifact_hashes(results_dir: Path) -> None:
     manifest = load_json_object(results_dir / "artifact-sha256.json", "artifact-sha256.json")
     if set(manifest) != set(ARTIFACT_FILES):
-        raise ValueError("artifact-sha256.json must hash exactly the nine non-hash-manifest files")
+        raise ValueError("artifact-sha256.json must hash exactly the six non-hash-manifest files")
     for filename in ARTIFACT_FILES:
         digest = _require_digest(manifest.get(filename), f"artifact-sha256.json {filename}")
         if digest != sha256_file(results_dir / filename):
             raise ValueError(f"artifact-sha256.json {filename} does not match {filename}")
 
 
-def validate_bundle(results_dir: Path, verify_runtime_binary: Path | None = None) -> dict[str, Any]:
+def validate_bundle(results_dir: Path) -> tuple[int, int, int]:
     validate_required_files(results_dir)
     records = load_raw_records(results_dir / "raw.jsonl")
     raw_totals = validate_raw_semantics(records)
     summary = load_json_object(results_dir / "summary.json", "summary.json")
     report = (results_dir / "report.md").read_text(encoding="utf-8")
     validate_summary_and_report(records, summary, report)
-    paired_evidence = validate_paired_evidence(
-        load_raw_records(results_dir / "paired-raw.jsonl", "paired-raw.jsonl"),
-        load_json_object(results_dir / "paired-summary.json", "paired-summary.json"),
-        (results_dir / "paired-report.md").read_text(encoding="utf-8"),
-    )
     legacy_setups = validate_fixture_load(load_json_object(results_dir / "fixture-load.json", "fixture-load.json"))
     validate_correctness(load_json_object(results_dir / "correctness-summary.json", "correctness-summary.json"))
-    validate_environment(
-        load_json_object(results_dir / "environment.json", "environment.json"), results_dir, verify_runtime_binary
-    )
+    validate_environment(load_json_object(results_dir / "environment.json", "environment.json"), results_dir)
     validate_artifact_hashes(results_dir)
-    return {
-        "builds": raw_totals["iterator_builds"],
-        "attempts": raw_totals["attempt_count"],
-        "legacy_setups": legacy_setups,
-        **paired_evidence,
-    }
+    return raw_totals["iterator_builds"], raw_totals["attempt_count"], legacy_setups
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Check instruction-wide frame-noise evidence bundle.")
     parser.add_argument("--dir", type=Path, required=True)
-    parser.add_argument("--verify-runtime-binary", type=Path)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        result = validate_bundle(args.dir, args.verify_runtime_binary)
-    except (OSError, ValueError, RunnerError) as error:
+        builds, attempts, legacy_setups = validate_bundle(args.dir)
+    except (OSError, ValueError, runner.RunnerError) as error:
         print(error, file=sys.stderr)
         return 1
     print(
         "PASS instruction-wide frame-noise evidence "
-        f"outcome={result['outcome']} builds={result['builds']} "
-        f"legacy_setups={result['legacy_setups']} candidate_over_baseline={result['candidate_over_baseline']} "
-        f"attempts={result['attempts']}"
+        f"builds={builds} attempts={attempts} legacy_setups={legacy_setups}"
     )
     return 0
 

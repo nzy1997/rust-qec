@@ -18,11 +18,7 @@ fn read_repo_file(relative: &str) -> String {
 
 fn assert_repo_file_exists(relative: &str) {
     let path = repo_root().join(relative);
-    assert!(
-        Path::new(&path).is_file(),
-        "missing site resource {}",
-        path.display()
-    );
+    assert!(Path::new(&path).is_file(), "missing site resource {}", path.display());
 }
 
 fn assert_contains_all(haystack: &str, markers: &[&str], context: &str) {
@@ -108,11 +104,7 @@ fn assert_item_has_text_list_marker(item: &Value, field: &str, marker: &str) {
     );
 }
 
-fn js_function_body<'a>(
-    source: &'a str,
-    function_name: &str,
-    next_function_marker: &str,
-) -> &'a str {
+fn js_function_body<'a>(source: &'a str, function_name: &str, next_function_marker: &str) -> &'a str {
     let signature = format!("function {function_name}(");
     let function_start = source
         .find(&signature)
@@ -131,9 +123,7 @@ fn js_function_body<'a>(
                 .unwrap_or(next_function_start)
         })
         .unwrap_or_else(|| {
-            panic!(
-                "function {function_name} is missing marker {next_function_marker:?} after its body"
-            )
+            panic!("function {function_name} is missing marker {next_function_marker:?} after its body")
         });
     &source[body_start..body_end]
 }
@@ -154,31 +144,6 @@ const CANONICAL_PROVENANCE_KEYS: &[&str] = &[
     "shots_or_error_budget",
     "artifact_hashes",
 ];
-
-const EVIDENCE_PAGE_TEMPLATES: &[&str] = &[
-    "site/templates/benchmark-simulation.html",
-    "site/templates/benchmark-decoders.html",
-    "site/templates/css-codes.html",
-    "site/templates/validation.html",
-];
-
-fn combined_evidence_pages() -> String {
-    EVIDENCE_PAGE_TEMPLATES
-        .iter()
-        .map(|relative| read_repo_file(relative))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn evidence_assignment_count(sources: &str, item_id: &str) -> usize {
-    sources
-        .split("data-evidence-items=\"")
-        .skip(1)
-        .filter_map(|suffix| suffix.split_once('"').map(|(assigned, _)| assigned))
-        .flat_map(str::split_whitespace)
-        .filter(|assigned| *assigned == item_id)
-        .count()
-}
 
 fn checked_artifact_paths(item: &Value) -> Vec<&str> {
     item["artifacts"]
@@ -252,9 +217,9 @@ fn assert_canonical_provenance(item_id: &str, item: &Value) {
         .unwrap_or_else(|| panic!("{item_id} provenance.artifact_hashes.value must be an object"));
 
     for path in checked_artifact_paths(item) {
-        let hash_entry = hash_values.get(path).unwrap_or_else(|| {
-            panic!("{item_id} provenance.artifact_hashes is missing checked artifact {path}")
-        });
+        let hash_entry = hash_values
+            .get(path)
+            .unwrap_or_else(|| panic!("{item_id} provenance.artifact_hashes is missing checked artifact {path}"));
         assert!(
             hash_entry
                 .get("sha256")
@@ -267,7 +232,7 @@ fn assert_canonical_provenance(item_id: &str, item: &Value) {
 
 #[test]
 fn checked_result_provenance_styles_wrap_long_values() {
-    let styles = read_repo_file("site/static/styles.css");
+    let styles = read_repo_file("site/styles.css");
 
     assert_contains_all(
         &styles,
@@ -302,7 +267,7 @@ fn readme_links_benchmarked_site() {
             context,
         );
         assert!(
-            text.contains("https://nzy1997.github.io/rust-qec/"),
+            text.contains("https://nzy1997.github.io/rstim/"),
             "{context} must link to the GitHub Pages documentation site"
         );
     }
@@ -317,12 +282,9 @@ fn pages_workflow_builds_benchmarked_site() {
         &workflow,
         &[
             "actions/configure-pages@v5",
-            "zola-v0.22.1-x86_64-unknown-linux-gnu.tar.gz",
             "run: make build-site",
-            "run: python3 tools/check_site_build.py _site",
             "actions/upload-pages-artifact@v3",
-            "python3 tools/site_versions.py build --site-root _site --output _pages",
-            "path: _pages",
+            "path: _site",
             "actions/deploy-pages@v4",
         ],
         "Pages deployment workflow",
@@ -350,50 +312,42 @@ fn pages_workflow_builds_benchmarked_site() {
     assert_contains_all(
         &makefile,
         &[
-            "python3 tools/prepare_site_docs.py",
-            "zola --root site build --output-dir $(CURDIR)/_site",
-            "mkdir -p _site/examples _site/data",
+            "cp site/index.html site/styles.css site/app.js _site/",
+            "cp site/benchmark-site.json _site/data/benchmark-site.json",
             "python3 tools/build_qp101_gallery.py --repo-root . --out-dir _site/gallery",
             "python3 tools/copy_site_benchmark_data.py --repo-root . --site-root _site site/benchmark-site.json",
         ],
         "Makefile build-site target",
     );
-    assert!(
-        makefile.find("python3 tools/prepare_site_docs.py")
-            < makefile.find("zola --root site build --output-dir $(CURDIR)/_site"),
-        "canonical docs must be staged inside the Zola root before the site build"
-    );
 }
 
 #[test]
 fn qp101_browser_resources_are_preserved() {
-    let qp101 = read_repo_file("site/templates/qp101.html");
-    let browser = read_repo_file("site/static/js/qp101-browser.js");
+    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/app.js");
 
     for marker in [
         "id=\"qp101\"",
-        "href=\"../qp101.schema.json\"",
-        "href=\"protocol/\"",
-        "href=\"../QP101-ZY.md\"",
-        "href=\"../examples/basic.qp101.json\"",
-        "href=\"../examples/repeat-detector.qp101.json\"",
-        "href=\"../examples/atom-loss-sample.qp101.json\"",
+        "href=\"#qp101\"",
+        "href=\"qp101.schema.json\"",
+        "href=\"QP101-ZY.md\"",
+        "href=\"examples/basic.qp101.json\"",
+        "href=\"examples/repeat-detector.qp101.json\"",
+        "href=\"examples/atom-loss-sample.qp101.json\"",
         "id=\"schema-browser\"",
         "id=\"operations\"",
         "id=\"gallery\"",
         "id=\"examples\"",
-        "src=\"../gallery/basic-site.svg\"",
-        "src=\"../gallery/repeat-detector-site.svg\"",
-        "src=\"../gallery/atom-loss-sample.svg\"",
+        "src=\"gallery/basic-site.svg\"",
+        "src=\"gallery/repeat-detector-site.svg\"",
+        "src=\"gallery/atom-loss-sample.svg\"",
     ] {
-        assert!(
-            qp101.contains(marker),
-            "QP101 template is missing marker {marker}"
-        );
+        assert!(index.contains(marker), "site index is missing marker {marker}");
     }
+
     assert!(
-        browser.contains("fetch(ROOT + \"/qp101.schema.json\")"),
-        "schema browser must fetch qp101.schema.json through the relative-root contract"
+        app.contains("fetch(\"qp101.schema.json\")"),
+        "schema browser must keep fetching qp101.schema.json"
     );
 
     for relative in [
@@ -411,571 +365,120 @@ fn qp101_browser_resources_are_preserved() {
 }
 
 #[test]
-fn task_oriented_content_pages_are_linked() {
-    let navigation = read_repo_file("site/templates/partials/docs-navigation.html");
-    assert_eq!(navigation.matches("<a href=").count(), 20);
-    assert_contains_all(
-        &navigation,
-        &[
-            "Tutorials",
-            "CLI &amp; formats",
-            "Benchmarks",
-            "Support &amp; versions",
-            "/rust-api/",
-            "/qec-code-cli/",
-            "/rsinter-cli/",
-            "/circuit-format/",
-            "/data-formats/",
-            "/benchmarks/simulation/",
-            "/benchmarks/decoders/",
-            "/versions/",
-        ],
-        "twenty primary pages in four groups",
-    );
-    for route in ["simulator", "detector-models", "atom-loss-concepts"] {
-        let content = read_repo_file(&format!("site/content/{route}/_index.md"));
-        assert!(content.contains("legacy-guide.html"));
-        assert!(!navigation.contains(&format!("/{route}/")));
-    }
-    assert_contains_all(
-        &read_repo_file("site/templates/get-started.html"),
-        &[
-            "rstim circuit dem",
-            "id=\"logical-error-rate\"",
-            "rstim surface-code-ler",
-        ],
-        "complete introductory workflow",
-    );
-    assert_contains_all(
-        &read_repo_file("site/templates/css-codes.html"),
-        &[
-            "num_cols",
-            "--hx hx.json --hz hz.json",
-            "bound_type: upper",
-            "rstim circuit detect",
-        ],
-        "custom CSS experiment",
-    );
-    assert_contains_all(
-        &read_repo_file("site/templates/decoding.html"),
-        &[
-            "--decoder rmatching",
-            "--decoder rbposd",
-            "Different decoder inputs",
-        ],
-        "frozen-input comparison",
-    );
-}
-
-#[test]
-fn new_documentation_routes_use_canonical_sources() {
-    let get_started = read_repo_file("site/templates/get-started.html");
-    let installer = read_repo_file("site/static/install.sh");
-    let support = read_repo_file("site/templates/support.html");
-    let protocol = read_repo_file("site/templates/protocol.html");
-    let base = read_repo_file("site/templates/base.html");
-    let prepare_docs = read_repo_file("tools/prepare_site_docs.py");
-    let installer_version = installer
-        .lines()
-        .find_map(|line| line.strip_prefix("VERSION="))
-        .expect("native installer must pin a release version");
-    assert_eq!(installer_version, "v0.3.3");
-
-    assert_contains_all(
-        &get_started,
-        &[
-            "id=\"install\"",
-            "cargo install --locked --path rstim --force",
-            "id=\"continue-rustqec\"",
-            "id=\"further-learning\"",
-        ],
-        "source-install onboarding entry point",
-    );
-    assert_contains_all(
-        &installer,
-        &["archive=rustqec-$VERSION-$target.tar.gz"],
-        "pinned historical installer",
-    );
-    assert_contains_all(
-        &support,
-        &["generated/support-core.md", "../qp101/protocol/"],
-        "rendered support contract page",
-    );
-    assert_contains_all(
-        &protocol,
-        &[
-            "generated/qp101-protocol.md",
-            "../../QP101-ZY.md",
-            "download",
-        ],
-        "rendered QP101 protocol page",
-    );
-    assert_contains_all(
-        &base,
-        &[
-            "{{ root }}/get-started/",
-            "{{ root }}/support/",
-            "{{ root }}/validation/",
-            "{{ root }}/js/docs.js",
-        ],
-        "shared documentation navigation",
-    );
-    assert_contains_all(
-        &prepare_docs,
-        &[
-            "site/generated",
-            "rstim/doc/QP101-ZY.md",
-            "docs/support-compatibility.md",
-            "shutil.copyfile",
-        ],
-        "canonical documentation staging script",
-    );
-}
-
-#[test]
-fn get_started_uses_one_noisy_circuit_for_definition_and_sampling() {
-    let circuit = read_repo_file("site/static/examples/getting-started.stim");
-    let page = read_repo_file("site/templates/get-started.html");
-    let makefile = read_repo_file("Makefile");
-
-    assert_contains_all(
-        &circuit,
-        &["X_ERROR(0.1) 0", "X_ERROR(0.1) 1", "CX 0 1"],
-        "get-started circuit",
-    );
-    assert_contains_all(
-        &page,
-        &[
-            "rstim render_svg --in circuit.stim --out circuit.svg",
-            "rstim circuit dem --in circuit.stim",
-            "--in circuit.stim \\",
-            "rstim render_svg --sample_shot --seed 86 --in circuit.stim",
-            "id=\"surface-code\"",
-            "The four <code>0.02</code> values set error probabilities",
-            "<li><code>--after-clifford-depolarization</code>",
-            "depolarizing errors after Clifford gates",
-            "<li><code>--before-round-data-depolarization</code>",
-            "<li><code>--after-reset-flip-probability</code>",
-            "<li><code>--before-measure-flip-probability</code>",
-            "id=\"surface-sample\"",
-            "--in surface.stim --shots 1 --seed 0",
-            "010010100000010000000000\t1",
-            "id=\"decode\"",
-            "A decoder predicts whether <code>L0</code> flipped from the detector events",
-            "<code>--decoder rmatching</code> selects the included matching decoder",
-            "a remaining component involving three or more detectors (a hyperedge) is rejected",
-            "id=\"logical-error-rate\"",
-            "rstim circuit decode \\",
-            "--decoder rmatching \\",
-            "--dem surface.dem --in surface-detectors.01",
-            "cat surface-predictions.01</code></pre>\n<pre data-output=\"true\"><code>1</code></pre>",
-            "rstim surface-code-ler \\",
-            "--distances 3,5,7 --rounds 9,15,21 \\",
-            "--physical-error-rates 0.008,0.009,0.01,0.011,0.012 \\",
-            "--shots 10000 --seed 86 --out-dir .",
-            "logical error rate per round",
-            "Distance 7</th>",
-            "href=\"../css-codes/\"",
-            "href=\"../rust-api/\"",
-            "href=\"../decoding/\"",
-            "href=\"../qp101/\"",
-            "https://github.com/quantumlib/Stim",
-            "https://github.com/oscarhiggott/PyMatching",
-            "https://errorcorrectionzoo.org/c/rotated_surface",
-            "https://arxiv.org/abs/1208.0928",
-        ],
-        "get-started commands",
-    );
-    assert!(
-        !page.contains("noisy.stim"),
-        "get-started page must not introduce a second circuit"
-    );
-    assert!(
-        !page.contains("grep -E '^(MR|DETECTOR)'"),
-        "get-started page must not confuse circuit instructions with DEM output"
-    );
-    assert!(
-        !page.contains("<code>surface.stim</code> is the circuit"),
-        "get-started page must not repeat circuit annotation details"
-    );
-    for removed_text in [
-        "A seeded example run",
-        "href=\"../examples/surface-code-ler.csv\"",
-        "Use rmatching from Rust",
-        "Sample more circuits",
-        "Prepare training data",
-        "Explore circuits visually",
-        "What is included?",
-        "Add optional CLI features",
-        "Build from source</h2>",
-    ] {
-        assert!(
-            !page.contains(removed_text),
-            "remove extra plot text: {removed_text}"
-        );
-    }
-    assert!(
-        page.find("A decoder predicts whether").unwrap()
-            < page.find("<code>--decoder rmatching</code>").unwrap(),
-        "get-started must define the decoder task before naming rmatching"
-    );
-    assert!(
-        !page.to_lowercase().contains("python"),
-        "get-started page should only show the Rust workflow"
-    );
-    assert!(
-        !page.contains("cargo run")
-            && !page
-                .split_once("id=\"first-circuit\"")
-                .unwrap()
-                .1
-                .contains("rsinter")
-            && !page.contains("repository root"),
-        "get-started commands should use the installed rstim binary"
-    );
-    assert!(
-        makefile.contains("target/debug/rstim surface-code-ler --distances 3,5,7 --rounds 9,15,21 --physical-error-rates 0.008,0.009,0.01,0.011,0.012 --shots 10000 --seed 86"),
-        "site build should generate the plotted data with rstim"
-    );
-    assert!(
-        makefile.contains("--sample_shot --seed 86 --in site/static/examples/getting-started.stim"),
-        "sampled diagram must use the same circuit as the definition"
-    );
-}
-
-#[test]
-fn homepage_features_atom_loss_and_routes_installation_to_get_started() {
-    let index = read_repo_file("site/templates/index.html");
-    let get_started = read_repo_file("site/templates/get-started.html");
-    let readme = read_repo_file("README.md");
-    let styles = read_repo_file("site/static/layout.css");
+fn workspace_feature_walkthroughs_are_linked() {
+    let index = read_repo_file("site/index.html");
 
     assert_contains_all(
         &index,
         &[
-            "id=\"atom-loss\"",
-            "Install with Cargo",
-            "href=\"get-started/#install\"",
-            "From atom-loss circuits to loss-aware decoding",
-            "href=\"atom-loss/\"",
-            "href=\"get-started/#first-circuit\"",
-            "Envelope decoding · Beta",
+            "id=\"workspace-overview\"",
+            "id=\"feature-walkthroughs\"",
+            "id=\"benchmark-evidence\"",
+            "rstim",
+            "rsinter",
+            "rmatching",
+            "rbposd",
+            "rilpqec",
+            "qec-code",
+            "qec-ilp-core",
+            "docs/showcases/rstim-cli-dem-pipeline.md",
+            "docs/showcases/rstim-render-svg-atom-loss.md",
+            "docs/showcases/qec-code-css-construction.md",
+            "docs/showcases/benchmark-evidence.md",
+            "docs/showcases/qec-code-random-window-benchmark.md",
+            "docs/showcases/README.md",
+            "rstim/doc/cli.md",
+            "rstim stats",
+            "rstim sample",
+            "rstim sample_dem",
+            "rstim detect",
+            "rstim analyze_errors",
+            "rstim render_svg",
+            "rstim export_json",
+            "rsinter bench",
+            "code css",
+            "random-window-upper-bound",
         ],
-        "homepage atom-loss feature and installation routes",
+        "workspace walkthrough site source",
     );
-    assert_contains_all(
-        &get_started,
-        &[
-            "cargo install --locked --path rstim --force",
-            "id=\"first-circuit\"",
-            "id=\"continue-rustqec\"",
-            "https://www.rust-lang.org/tools/install",
-            "rstim render_svg --in circuit.stim --out circuit.svg",
-            "rstim circuit detect \\",
-            "rstim render_svg --sample_shot --seed 86",
-        ],
-        "linked unified installation instructions",
-    );
-    assert!(
-        !index.contains("Download v0.3.0"),
-        "homepage hero must not promote a release download button"
-    );
-    let hero_actions = index
-        .split_once("class=\"actions\"")
-        .expect("homepage must provide primary actions")
-        .1
-        .split_once("</div>")
-        .expect("homepage actions must have a closing container")
-        .0;
-    assert_contains_all(
-        hero_actions,
-        &["class=\"button primary\" href=\"get-started/#install\""],
-        "homepage primary Cargo action",
-    );
-    assert!(
-        !hero_actions.contains("get-started/#first-circuit"),
-        "homepage primary actions must not skip installation prerequisites"
-    );
-    assert!(
-        !index.contains("only need the command line tools"),
-        "native installer copy must not undermine Cargo as the default path"
-    );
-    assert_contains_all(
-        &readme,
-        &[
-            "cargo install --locked --path rstim --force",
-            "rstim circuit stats",
-            "rstim capabilities --format json",
-        ],
-        "README installation section",
-    );
-    assert_contains_all(
-        &styles,
-        &[
-            ".home-atom-loss",
-            ".loss-workflow",
-            ".loss-workflow-actions",
-        ],
-        "homepage atom-loss feature styles",
-    );
-}
 
-#[test]
-fn learning_paths_are_prose_and_homepage_describes_rust_and_cli() {
-    let index = read_repo_file("site/templates/index.html");
-    let get_started = read_repo_file("site/templates/get-started.html");
-
-    assert_contains_all(
+    assert_contains_all_case_insensitive(
         &index,
-        &["native Rust APIs and a unified CLI", "href=\"validation/\""],
-        "homepage Rust API and CLI value proposition",
-    );
-
-    let after_plot = get_started
-        .split_once("id=\"continue-rustqec\"")
-        .expect("tutorial must link to further documentation")
-        .1;
-    assert_contains_all(
-        after_plot,
         &[
-            "href=\"../css-codes/\"",
-            "href=\"../rust-api/\"",
-            "href=\"../decoding/\"",
-            "href=\"../qp101/\"",
-            "inspired by <a href=\"https://github.com/quantumlib/Stim\">Stim</a>",
-            "https://github.com/oscarhiggott/PyMatching",
-            "https://errorcorrectionzoo.org/c/rotated_surface",
-            "https://arxiv.org/abs/1208.0928",
+            "circuit parsing",
+            "sampling",
+            "detection",
+            "dem extraction",
+            "svg/qp101 export",
+            "decoder experiments",
+            "css construction",
+            "distance-search workflows",
         ],
-        "tutorial continuation and further reading",
+        "workspace walkthrough copy",
     );
-    assert!(
-        !after_plot.contains("<ul") && !after_plot.contains("<li"),
-        "tutorial continuation should connect its links in prose",
-    );
-    assert!(
-        !after_plot.contains("getting_started.ipynb")
-            && !after_plot.contains("follow that example"),
-        "further learning should describe the projects' relationship instead of attributing sweep parameters",
-    );
-}
-
-#[test]
-fn sampling_data_page_preserves_training_and_loss_contracts() {
-    let page = read_repo_file("site/templates/sampling-data.html");
-    let base = read_repo_file("site/templates/base.html");
-    let index = read_repo_file("site/templates/index.html");
-    let styles = read_repo_file("site/static/styles.css");
-
-    assert_contains_all(
-        &page,
-        &[
-            "id=\"choose-path\"",
-            "id=\"sample\"",
-            "id=\"export\"",
-            "id=\"b8-format\"",
-            "id=\"loss-tensors\"",
-            "id=\"marker-contract\"",
-            "id=\"load-and-check\"",
-            "circuit sample",
-            "dataset export",
-            "mkdir -p data",
-            "measurements_blinded",
-            "rstim:logical_input=X:1,8,15",
-            "The exporter reads this metadata and selects blinded measurements automatically.",
-            "--error-trace",
-            "shots.b8",
-            "answers.b8",
-            "masks.b8",
-            "trace.jsonl",
-            "lsb_first",
-            "measurement_loss_mask",
-            "detector_valid",
-            "TICK[rstim:logical_flip_point]",
-            "before every positive-probability noise instruction",
-            "load_blinded_training_data.py",
-            "required by the loader below",
-        ],
-        "sampling and training-data page",
-    );
-    assert!(!page.contains("--mode measurements_blinded"));
-    assert!(!page.contains("--logical-x-qubits"));
-    assert_contains_all(
-        &base,
-        &[
-            "href=\"{{ root }}/sampling-data/\"",
-            ">Sampling &amp; training data</a>",
-        ],
-        "sampling-data navigation",
-    );
-    assert_contains_all(
-        &index,
-        &["href=\"sampling-data/\"", "Sampling &amp; training data"],
-        "sampling-data homepage entry",
-    );
-    assert_contains_all(
-        &styles,
-        &[
-            ".data-pipeline",
-            ".data-choice-grid",
-            ".bundle-grid",
-            ".data-note",
-        ],
-        "sampling-data styles",
-    );
-    assert_repo_file_exists("site/content/sampling-data/_index.md");
-}
-
-#[test]
-fn decode_campaigns_navigation_and_validation_evidence_are_unified() {
-    let index = read_repo_file("site/templates/index.html");
-    let base = read_repo_file("site/templates/base.html");
-    let decoding = format!(
-        "{}\n{}",
-        read_repo_file("site/templates/decoding.html"),
-        read_repo_file("site/templates/benchmark-decoders.html")
-    );
-    let validation = read_repo_file("site/templates/validation.html");
-    let styles = read_repo_file("site/static/styles.css");
-
-    for removed in [
-        "Explore the workspace",
-        "RSMP v1 showcase",
-        "href=\"benchmark-campaigns/\"",
-    ] {
-        assert!(
-            !index.contains(removed),
-            "home page still contains removed UI marker {removed}"
-        );
-    }
-    assert!(
-        !base.contains(">Bench</a>"),
-        "top navigation still contains the removed Bench item"
-    );
-    assert!(
-        !repo_root()
-            .join("site/templates/benchmark-campaigns.html")
-            .exists(),
-        "obsolete benchmark-campaigns template still exists"
-    );
-    assert!(
-        !repo_root()
-            .join("site/content/benchmark-campaigns/_index.md")
-            .exists(),
-        "obsolete benchmark-campaigns content route still exists"
-    );
-
-    assert_contains_all(
-        &decoding,
-        &[
-            "id=\"decoder-families\"",
-            "id=\"benchmark-campaigns\"",
-            "decoder-evidence",
-            "surface-decoder-full",
-            "bb-circuit-full",
-        ],
-        "merged Decode page",
-    );
-    for moved_item in [
-        "surface-decoder-local-smoke",
-        "bb-circuit-local-readiness",
-        "rbposd-parity-gate",
-    ] {
-        assert!(
-            !decoding.contains(moved_item),
-            "Decode page still embeds moved evidence item {moved_item}"
-        );
-    }
-    assert_contains_all(
-        &validation,
-        &[
-            "id=\"reading-results\"",
-            "id=\"historical-results\"",
-            "id=\"local-workflows\"",
-            "rstim-vs-stim-full",
-            "rstim-vs-stim-release",
-            "rstim-perf-ci",
-            "rbposd-parity-gate",
-            "surface-decoder-local-smoke",
-            "bb-circuit-local-readiness",
-            "qec-code-random-window-local-pipeline",
-        ],
-        "central performance and validation page",
-    );
-    assert_contains_all(
-        &base,
-        &[
-            "section.extra.nav",
-            "nav-link",
-            "current",
-            "aria-current=\"page\"",
-        ],
-        "active navigation template",
-    );
-    assert_contains_all(
-        &styles,
-        &[
-            ".nav-link.current",
-            ".decoder-evidence .result-card.has-plot",
-        ],
-        "active navigation and full-width decoder evidence styles",
-    );
-
-    for relative in [
-        "site/content/_index.md",
-        "site/content/simulator/_index.md",
-        "site/content/detector-models/_index.md",
-        "site/content/decoding/_index.md",
-        "site/content/css-codes/_index.md",
-        "site/content/rsmp-v1-showcase/_index.md",
-        "site/content/qp101/_index.md",
-        "site/content/get-started/_index.md",
-        "site/content/support/_index.md",
-        "site/content/qp101/protocol/_index.md",
-        "site/content/validation/_index.md",
-    ] {
-        assert!(
-            read_repo_file(relative).contains("nav ="),
-            "{relative} is missing its active navigation key"
-        );
-    }
 }
 
 #[test]
 fn benchmark_methodology_lists_required_provenance() {
-    let evidence_pages = combined_evidence_pages();
-    let app = read_repo_file("site/static/js/benchmarks.js");
+    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/app.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
-    let manifest: Value =
-        serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .expect("site benchmark manifest must be valid JSON");
 
     for marker in [
-        "data-evidence-items=",
-        "Smoke runs check wiring",
-        "checked full artifacts support",
-        "not a general performance claim",
-        "local-only",
+        "id=\"benchmarks\"",
+        "Benchmark Methodology",
+        "Claims Policy",
+        "smoke",
+        "full",
+        "extended",
+        "reference reproduction",
+        "Publishable Evidence",
+        "Local-Only Evidence",
+        "smoke checks verify wiring",
+        "full evidence can describe the committed checked run",
     ] {
         assert!(
-            evidence_pages.contains(marker),
-            "distributed benchmark methodology is missing marker {marker}"
+            index.contains(marker),
+            "benchmark methodology is missing marker {marker}"
+        );
+    }
+
+    for field in [
+        "OS",
+        "CPU",
+        "Rust version",
+        "Python version",
+        "dependency versions",
+        "external repository commits",
+        "command line",
+        "seeds",
+        "build profile",
+        "shots or error budgets",
+        "date",
+    ] {
+        assert!(
+            index.contains(field),
+            "benchmark methodology is missing provenance field {field}"
         );
     }
 
     for marker in [
-        "fetch(ROOT + \"/data/benchmark-site.json\")",
-        "evidenceContainers",
-        "renderEvidenceContainers",
+        "id=\"benchmark-manifest\"",
+        "fetch(\"data/benchmark-site.json\")",
+        "renderBenchmarkManifest",
         "family.status",
         "family.claims_limit",
         "item.status",
         "item.claims_limit",
         "repoSourceHref",
-        "https://github.com/nzy1997/rust-qec/blob/master/",
+        "https://github.com/nzy1997/rstim/blob/master/",
         "repoSourceHref(path)",
     ] {
+        let source = if marker.starts_with("id=") { &index } else { &app };
         assert!(
-            app.contains(marker),
+            source.contains(marker),
             "manifest-backed benchmark rendering is missing marker {marker}"
         );
     }
@@ -983,10 +486,7 @@ fn benchmark_methodology_lists_required_provenance() {
     let families = manifest["families"]
         .as_array()
         .expect("manifest families must be an array");
-    assert!(
-        !families.is_empty(),
-        "manifest must list benchmark families"
-    );
+    assert!(!families.is_empty(), "manifest must list benchmark families");
     for family in families {
         assert!(
             family["status"].as_str().is_some(),
@@ -999,10 +499,7 @@ fn benchmark_methodology_lists_required_provenance() {
         let items = family["evidence_items"]
             .as_array()
             .expect("family evidence_items must be an array");
-        assert!(
-            !items.is_empty(),
-            "family must list evidence items: {family:?}"
-        );
+        assert!(!items.is_empty(), "family must list evidence items: {family:?}");
         for item in items {
             assert!(
                 item["status"].as_str().is_some(),
@@ -1018,11 +515,11 @@ fn benchmark_methodology_lists_required_provenance() {
 
 #[test]
 fn checked_benchmark_artifacts_are_linked() {
-    let evidence_pages = combined_evidence_pages();
-    let app = read_repo_file("site/static/js/benchmarks.js");
+    let index = read_repo_file("site/index.html");
+    let app = read_repo_file("site/app.js");
     let manifest_text = read_repo_file("site/benchmark-site.json");
-    let manifest: Value =
-        serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .expect("site benchmark manifest must be valid JSON");
 
     const CHECKED_ITEM_IDS: &[&str] = &[
         "surface-decoder-full",
@@ -1034,20 +531,56 @@ fn checked_benchmark_artifacts_are_linked() {
         "rstim-vs-stim-release-surface-detect",
         "rstim-vs-stim-release-dem-sample",
     ];
+    const CHECKED_ITEM_ORDER: &str = "surface-decoder-full bb-circuit-full rstim-vs-stim-correctness rstim-vs-stim-full rstim-vs-stim-release rstim-vs-stim-release-repetition-sample rstim-vs-stim-release-surface-detect rstim-vs-stim-release-dem-sample";
+
+    assert_contains_all(
+        &index,
+        &[
+            "id=\"checked-benchmark-results\"",
+            "id=\"checked-benchmark-result-cards\"",
+            &format!("data-checked-items=\"{CHECKED_ITEM_ORDER}\""),
+            "Checked Benchmark Results",
+        ],
+        "checked benchmark result section",
+    );
+
     for item_id in CHECKED_ITEM_IDS {
-        assert_eq!(
-            evidence_assignment_count(&evidence_pages, item_id),
-            1,
-            "checked evidence item ID {item_id} must be assigned to exactly one content page"
+        assert!(
+            index.contains(item_id),
+            "site/index.html is missing checked evidence item ID {item_id}"
         );
+        assert!(
+            app.contains(item_id),
+            "site/app.js is missing checked evidence item ID {item_id}"
+        );
+    }
+    let app_items_start = app
+        .find("const checkedBenchmarkItems")
+        .expect("site/app.js must define checkedBenchmarkItems");
+    let app_items_end = app[app_items_start..]
+        .find("];\n")
+        .map(|offset| app_items_start + offset)
+        .expect("site/app.js checkedBenchmarkItems must be an array");
+    let app_items = &app[app_items_start..app_items_end];
+    assert_eq!(
+        app_items.matches('"').count() / 2,
+        CHECKED_ITEM_IDS.len(),
+        "site/app.js checkedBenchmarkItems must contain exactly the site/index.html IDs"
+    );
+    let mut ordered_cursor = 0;
+    for item_id in CHECKED_ITEM_IDS {
+        let marker = format!("\"{item_id}\"");
+        let offset = app_items[ordered_cursor..]
+            .find(&marker)
+            .unwrap_or_else(|| panic!("site/app.js checkedBenchmarkItems is out of order at {item_id}"));
+        ordered_cursor += offset + marker.len();
     }
 
     assert_contains_all(
         &app,
         &[
-            "evidenceContainers",
-            "renderEvidenceContainers",
-            "container.dataset.evidenceItems",
+            "const checkedBenchmarkItems",
+            "renderCheckedBenchmarkResults",
             "findEvidenceItem",
             "item.artifacts",
             "artifact.checked",
@@ -1075,12 +608,12 @@ fn checked_benchmark_artifacts_are_linked() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !evidence_pages.contains(hardcoded_path),
-            "checked artifact path {hardcoded_path} must come from the manifest, not a content template"
+            !index.contains(hardcoded_path),
+            "checked artifact path {hardcoded_path} must come from the manifest, not index.html"
         );
         assert!(
             !app.contains(hardcoded_path),
-            "checked artifact path {hardcoded_path} must come from the manifest, not benchmarks.js"
+            "checked artifact path {hardcoded_path} must come from the manifest, not app.js"
         );
     }
 
@@ -1101,11 +634,7 @@ fn checked_benchmark_artifacts_are_linked() {
             ),
         ],
     );
-    assert_item_has_text_list_marker(
-        surface_item,
-        "commands",
-        "make surface-decoder-compare-full",
-    );
+    assert_item_has_text_list_marker(surface_item, "commands", "make surface-decoder-compare-full");
     assert_item_has_text_list_marker(surface_item, "caveats", "committed run");
     assert!(
         surface_item["claims_limit"]
@@ -1152,14 +681,8 @@ fn checked_benchmark_artifacts_are_linked() {
     let (rstim_vs_stim_family, rstim_vs_stim_correctness_item) =
         find_evidence_item(&manifest, "rstim-vs-stim-correctness");
     assert_eq!(rstim_vs_stim_family["status"].as_str(), Some("partial"));
-    assert_eq!(
-        rstim_vs_stim_correctness_item["status"].as_str(),
-        Some("existing")
-    );
-    assert_eq!(
-        rstim_vs_stim_correctness_item["tier"].as_str(),
-        Some("full")
-    );
+    assert_eq!(rstim_vs_stim_correctness_item["status"].as_str(), Some("existing"));
+    assert_eq!(rstim_vs_stim_correctness_item["tier"].as_str(), Some("full"));
     assert_exact_checked_artifacts(
         rstim_vs_stim_correctness_item,
         &[
@@ -1187,7 +710,10 @@ fn checked_benchmark_artifacts_are_linked() {
                 "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
                 "stim-fixture",
             ),
-            ("docs/showcases/rstim-vs-stim-simulator.md", "showcase"),
+            (
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                "showcase",
+            ),
         ],
     );
     assert_item_has_text_list_marker(
@@ -1195,7 +721,11 @@ fn checked_benchmark_artifacts_are_linked() {
         "commands",
         "python3 tools/check_rstim_vs_stim_expanded_correctness.py",
     );
-    assert_item_has_text_list_marker(rstim_vs_stim_correctness_item, "caveats", "eight");
+    assert_item_has_text_list_marker(
+        rstim_vs_stim_correctness_item,
+        "caveats",
+        "eight",
+    );
     assert!(
         rstim_vs_stim_correctness_item["claims_limit"]
             .as_str()
@@ -1228,10 +758,7 @@ fn checked_benchmark_artifacts_are_linked() {
     );
 
     let (_, rstim_vs_stim_release_item) = find_evidence_item(&manifest, "rstim-vs-stim-release");
-    assert_eq!(
-        rstim_vs_stim_release_item["status"].as_str(),
-        Some("existing")
-    );
+    assert_eq!(rstim_vs_stim_release_item["status"].as_str(), Some("existing"));
     assert_eq!(rstim_vs_stim_release_item["tier"].as_str(), Some("release"));
     assert_exact_checked_artifacts(
         rstim_vs_stim_release_item,
@@ -1315,7 +842,8 @@ fn checked_benchmark_artifacts_are_linked() {
         ],
     );
 
-    let (_, dem_sample_item) = find_evidence_item(&manifest, "rstim-vs-stim-release-dem-sample");
+    let (_, dem_sample_item) =
+        find_evidence_item(&manifest, "rstim-vs-stim-release-dem-sample");
     assert_eq!(dem_sample_item["status"].as_str(), Some("existing"));
     assert_eq!(dem_sample_item["tier"].as_str(), Some("release"));
     assert_exact_checked_artifacts(
@@ -1356,23 +884,19 @@ fn checked_benchmark_artifacts_are_linked() {
 
 #[test]
 fn checked_benchmark_provenance_is_manifest_backed() {
-    let app = read_repo_file("site/static/js/benchmarks.js");
-    let evidence_pages = combined_evidence_pages();
+    let app = read_repo_file("site/app.js");
+    let index = read_repo_file("site/index.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
     let manifest: Value =
         serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
 
-    let checked_renderer = js_function_body(
-        &app,
-        "renderEvidenceContainers",
-        "\n  if (benchmarkManifest || evidenceContainers.length)",
-    );
+    let checked_renderer = js_function_body(&app, "renderCheckedBenchmarkResults", "\n  function renderNav(");
 
     assert_contains_all(
         checked_renderer,
         &[
-            "container.innerHTML",
-            "container.dataset.evidenceItems",
+            "checkedBenchmarkResults.innerHTML",
+            "checkedBenchmarkItems",
             "findEvidenceItem",
             "renderProvenance(item.provenance)",
         ],
@@ -1392,8 +916,8 @@ fn checked_benchmark_provenance_is_manifest_backed() {
         "benchmarks/bb_circuit_bposd_compare/results/full/reference_gap_report.md",
     ] {
         assert!(
-            !evidence_pages.contains(hardcoded),
-            "checked provenance value {hardcoded} must come from the manifest renderer, not a content template"
+            !index.contains(hardcoded),
+            "checked provenance value {hardcoded} must come from the manifest renderer, not index.html"
         );
     }
 
@@ -1405,35 +929,52 @@ fn checked_benchmark_provenance_is_manifest_backed() {
 
 #[test]
 fn qec_code_and_future_benchmarks_are_classified() {
-    let simulator = read_repo_file("site/templates/benchmark-simulation.html");
-    let css_codes = read_repo_file("site/templates/css-codes.html");
-    let validation = read_repo_file("site/templates/validation.html");
+    let index = read_repo_file("site/index.html");
     let manifest_text = read_repo_file("site/benchmark-site.json");
-    let manifest: Value =
-        serde_json::from_str(&manifest_text).expect("site benchmark manifest must be valid JSON");
+    let manifest: Value = serde_json::from_str(&manifest_text)
+        .expect("site benchmark manifest must be valid JSON");
 
     assert_contains_all(
-        &format!("{css_codes}\n{validation}"),
+        &index,
         &[
-            "id=\"css-construction\"",
-            "id=\"distance-search\"",
-            "local-only",
-            "qec-code-random-window-local-pipeline",
+            "id=\"qec-code-random-window-benchmark\"",
+            "<code>qec-code</code>",
+            "Random-Window Distance Search",
+            "Local-only evidence",
+            "QEC-code random-window upper-bound local-only evidence",
+            "benchmarks/out/qec_code_random_window/",
+            "docs/showcases/qec-code-random-window-benchmark.md",
+            "benchmarks/qec_code_random_window/README.md",
+            "qec-code-random-window-bench-smoke",
+            "qec-code-random-window-bench-full",
+            "qec-code-random-window-bench-no-target-smoke",
+            "qec-code-random-window-bench-no-target-multiseed-smoke",
+            "qec-code-random-window-bench-no-target-ladder-smoke",
+            "qec-code-random-window-bench-issue225-readiness-smoke",
+            "id=\"future-simulator-benchmarks\"",
+            "id=\"rstim-vs-stim-simulator-benchmarks\"",
+            "<code>rstim</code>",
+            "versus Stim Simulator Benchmarks",
+            "Partial checked evidence",
+            "recorded workloads and recorded environments",
+            "not broad rstim/Stim parity",
+            "speed/correctness checks",
+            "docs/showcases/rstim-vs-stim-simulator.md",
+            "benchmarks/rstim_vs_stim_simulator/README.md",
         ],
-        "qec-code benchmark content section",
+        "qec-code and future benchmark site sections",
     );
-    let detector_models = read_repo_file("site/templates/benchmark-simulation.html");
-    let simulator_evidence = format!("{simulator}\n{detector_models}\n{validation}");
-    assert_contains_all(
-        &simulator_evidence,
-        &[
-            "rstim-vs-stim-correctness",
-            "rstim-vs-stim-release",
-            "rstim-vs-stim-release-surface-detect",
-            "rstim-vs-stim-release-dem-sample",
-            "recorded environments",
-        ],
-        "rstim-versus-Stim simulator evidence section",
+    let rstim_section_start = index
+        .find("id=\"future-simulator-benchmarks\"")
+        .expect("rstim-vs-stim site section must exist");
+    let rstim_section_end = index[rstim_section_start..]
+        .find("</article>")
+        .map(|offset| rstim_section_start + offset)
+        .expect("rstim-vs-stim site section must close");
+    let rstim_section = &index[rstim_section_start..rstim_section_end];
+    assert!(
+        !rstim_section.contains("DEM extraction") && !rstim_section.contains("conversion"),
+        "rstim-vs-stim site copy must not claim unchecked DEM extraction or conversion evidence"
     );
 
     let families = manifest["families"]
@@ -1453,13 +994,9 @@ fn qec_code_and_future_benchmarks_are_classified() {
     let qec_items = qec_family["evidence_items"]
         .as_array()
         .expect("qec-code family evidence_items must be an array");
+    assert!(!qec_items.is_empty(), "qec-code family must list evidence items");
     assert!(
-        !qec_items.is_empty(),
-        "qec-code family must list evidence items"
-    );
-    assert!(
-        !css_codes
-            .contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
+        !index.contains("QEC-code random-window upper-bound evidence, no-target smoke profiles"),
         "qec-code random-window site copy must not describe evidence without local-only or partial status"
     );
     for item in qec_items {
@@ -1526,7 +1063,10 @@ fn qec_code_and_future_benchmarks_are_classified() {
                 "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
                 "stim-fixture",
             ),
-            ("docs/showcases/rstim-vs-stim-simulator.md", "showcase"),
+            (
+                "docs/showcases/rstim-vs-stim-simulator.md",
+                "showcase",
+            ),
         ],
     );
     for item in rstim_vs_stim_items {

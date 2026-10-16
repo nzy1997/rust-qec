@@ -23,18 +23,6 @@ REPO_ROOT = PACKAGE_DIR.parents[1]
 EXPECTED_STIM_VERSION = "1.15.0"
 KNOWN_ANSWER_CIRCUIT = "X 0\nM 0\n"
 KNOWN_ANSWER_OUTPUT = b"\x01"
-KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
-FAIR_MANIFEST_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
-BASELINE_SUMMARY_SHA256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
-BASELINE_RATIO = 3.576
-REFERENCE_SUMMARY_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json"
-REFERENCE_VARIANT = "rstim-direct-repeat-reference-b8"
-REFERENCE_STRATEGY = "direct_inverse_repeat_folded"
-REFERENCE_CHECKER = "tools/check_rstim_vs_stim_reference_build_evidence.py"
-TOOL_ROLES = {
-    "stim-cli-b8": "tool://stim",
-    "rstim-cli-b8": "tool://rstim",
-}
 
 build_rstim = run_speed_case.build_rstim
 
@@ -217,39 +205,6 @@ def _expand_argv(
     return argv
 
 
-def _recorded_argv(
-    *,
-    variant: str,
-    case: dict[str, Any],
-    shots: int,
-    seed: int,
-    input_token: str | None = None,
-) -> list[str]:
-    if variant not in TOOL_ROLES:
-        raise RuntimeError(f"unsupported fair CLI variant: {variant}")
-    return [
-        TOOL_ROLES[variant],
-        "sample",
-        "--shots",
-        str(shots),
-        "--seed",
-        str(seed),
-        "--out_format",
-        case["output_format"],
-        "--in",
-        input_token if input_token is not None else case["canonical_input_path"],
-    ]
-
-
-def _runtime_identity(*, role: str, version: str, binary: Path) -> dict[str, str]:
-    return {
-        "role": role,
-        "version": version,
-        "basename": binary.name,
-        "sha256": _sha256_file(binary),
-    }
-
-
 def _variant_templates(case: dict[str, Any]) -> list[tuple[str, list[str]]]:
     argv = case.get("argv")
     if not isinstance(argv, dict):
@@ -294,13 +249,7 @@ def _run_known_answer_preflight(
             results.append(
                 {
                     "variant": variant,
-                    "argv": _recorded_argv(
-                        variant=variant,
-                        case=case,
-                        shots=1,
-                        seed=0,
-                        input_token=KNOWN_ANSWER_INPUT_TOKEN,
-                    ),
+                    "argv": argv,
                     "exit_code": result.exit_code,
                     "stdout_hex": result.stdout.hex(),
                     "stdout_sha256": hashlib.sha256(result.stdout).hexdigest(),
@@ -382,12 +331,7 @@ def _run_rounds(
                         phase=phase,
                         round_index=round_index,
                         seed=round_seed,
-                        argv=_recorded_argv(
-                            variant=variant,
-                            case=case,
-                            shots=case["shots"],
-                            seed=round_seed,
-                        ),
+                        argv=argv,
                         result=result,
                     )
                 )
@@ -432,79 +376,7 @@ def _summary(records: list[dict[str, Any]], *, case: dict[str, Any]) -> dict[str
     }
 
 
-def _variant_summary(summary: dict[str, Any], variant: str) -> dict[str, Any]:
-    matches = [item for item in summary["variants"] if item["variant"] == variant]
-    if len(matches) != 1:
-        raise RuntimeError(f"summary must contain exactly one {variant} variant")
-    return matches[0]
-
-
-def _rstim_over_stim(summary: dict[str, Any]) -> float:
-    stim_median = float(_variant_summary(summary, "stim-cli-b8")["elapsed_ns"]["median"])
-    rstim_median = float(_variant_summary(summary, "rstim-cli-b8")["elapsed_ns"]["median"])
-    if stim_median <= 0:
-        raise RuntimeError("stim median must be positive")
-    return rstim_median / stim_median
-
-
-def _rounded_ratio(value: float) -> float:
-    return round(value, 3)
-
-
-def _reference_evidence(*, repo_root: Path) -> dict[str, str]:
-    summary_path = repo_root / REFERENCE_SUMMARY_REPO_PATH
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    direct = next(
-        (variant for variant in summary["variants"] if variant["variant"] == REFERENCE_VARIANT),
-        None,
-    )
-    if direct is None or direct.get("backend") != REFERENCE_STRATEGY:
-        raise RuntimeError("reference-build summary does not record direct inverse repeat folded strategy")
-    return {
-        "slot": "reference-build-release",
-        "summary_path": REFERENCE_SUMMARY_REPO_PATH,
-        "summary_sha256": _sha256_file(summary_path),
-        "reference_variant": REFERENCE_VARIANT,
-        "reference_strategy": REFERENCE_STRATEGY,
-        "checker": REFERENCE_CHECKER,
-    }
-
-
-def _comparison(
-    baseline_summary: dict[str, Any],
-    candidate_summary: dict[str, Any],
-    reference_evidence: dict[str, str],
-) -> dict[str, Any]:
-    baseline_ratio = _rounded_ratio(_rstim_over_stim(baseline_summary))
-    candidate_ratio = _rounded_ratio(_rstim_over_stim(candidate_summary))
-    baseline_stim = _variant_summary(baseline_summary, "stim-cli-b8")["elapsed_ns"]["median"]
-    baseline_rstim = _variant_summary(baseline_summary, "rstim-cli-b8")["elapsed_ns"]["median"]
-    candidate_stim = _variant_summary(candidate_summary, "stim-cli-b8")["elapsed_ns"]["median"]
-    candidate_rstim = _variant_summary(candidate_summary, "rstim-cli-b8")["elapsed_ns"]["median"]
-    return {
-        "baseline_rstim_over_stim": baseline_ratio,
-        "candidate_rstim_over_stim": candidate_ratio,
-        "ratio_delta_from_baseline": _rounded_ratio(candidate_ratio - baseline_ratio),
-        "baseline_median_ns": {
-            "stim-cli-b8": baseline_stim,
-            "rstim-cli-b8": baseline_rstim,
-        },
-        "candidate_median_ns": {
-            "stim-cli-b8": candidate_stim,
-            "rstim-cli-b8": candidate_rstim,
-        },
-        "reference_summary_path": reference_evidence["summary_path"],
-        "reference_summary_sha256": reference_evidence["summary_sha256"],
-        "reference_variant": reference_evidence["reference_variant"],
-        "reference_strategy": reference_evidence["reference_strategy"],
-        "claim": (
-            f"Candidate rstim/Stim median ratio is {candidate_ratio:.3f}x, "
-            f"change from baseline is {candidate_ratio - baseline_ratio:+.3f}x."
-        ),
-    }
-
-
-def _render_report(summary: dict[str, Any], comparison: dict[str, Any] | None = None) -> str:
+def _render_report(summary: dict[str, Any]) -> str:
     lines = [
         "# Fair CLI sampling benchmark",
         "",
@@ -520,20 +392,8 @@ def _render_report(summary: dict[str, Any], comparison: dict[str, Any] | None = 
             f"| {variant['variant']} | {variant['sample_count']} | {elapsed['median']} | "
             f"{elapsed['min']} | {elapsed['max']} |"
         )
-    if comparison is not None:
-        lines.extend(
-            [
-                "",
-                "## Baseline comparison",
-                "",
-                f"Baseline rstim/Stim ratio: {comparison['baseline_rstim_over_stim']:.3f}x",
-                f"Candidate rstim/Stim ratio: {comparison['candidate_rstim_over_stim']:.3f}x",
-                f"Change from baseline: {comparison['ratio_delta_from_baseline']:+.3f}x",
-                f"Reference strategy: {comparison['reference_strategy']}",
-                "",
-            ]
-        )
-    return "\n".join(lines).rstrip() + "\n"
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _collect_environment(
@@ -548,7 +408,6 @@ def _collect_environment(
     rstim_version: str,
     records: list[dict[str, Any]],
     preflight_results: list[dict[str, Any]],
-    reference_evidence: dict[str, str],
     repo_root: Path,
 ) -> dict[str, Any]:
     source_manifest = str(case["source_manifest_path"])
@@ -564,9 +423,9 @@ def _collect_environment(
         "stim_version": stim_version,
         "rstim_version": rstim_version,
         "rustc_version": _version_or_failed(["rustc", "--version"], cwd=repo_root),
-        "manifest": FAIR_MANIFEST_REPO_PATH,
+        "manifest": str(args.manifest),
         "manifest_sha256": _sha256_file(manifest_path),
-        "fair_manifest_path": FAIR_MANIFEST_REPO_PATH,
+        "fair_manifest_path": str(args.manifest),
         "fair_manifest_sha256": _sha256_file(manifest_path),
         "source_manifest": source_manifest,
         "source_manifest_sha256": _sha256_file(source_manifest_path),
@@ -574,10 +433,10 @@ def _collect_environment(
         "fixture": fixture,
         "fixture_sha256": _sha256_file(input_path),
         "fixture_path": fixture,
-        "runtime_identities": [
-            _runtime_identity(role="tool://stim", version=stim_version, binary=stim_binary),
-            _runtime_identity(role="tool://rstim", version=rstim_version, binary=rstim_binary),
-        ],
+        "stim_binary": str(stim_binary),
+        "stim_binary_sha256": _sha256_file(stim_binary),
+        "rstim_binary": str(rstim_binary),
+        "rstim_binary_sha256": _sha256_file(rstim_binary),
         "round_argv": [
             {
                 "variant": record["variant"],
@@ -592,7 +451,6 @@ def _collect_environment(
         "measure_rounds": args.measure_rounds,
         "known_answer_preflight": "passed",
         "known_answer_preflight_details": preflight_results,
-        "reference_evidence": reference_evidence,
     }
 
 
@@ -600,45 +458,10 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _preserve_baseline(out_dir: Path, *, repo_root: Path) -> Path:
-    baseline_path = out_dir / "baseline-summary.json"
-    if not baseline_path.exists():
-        existing_summary = out_dir / "summary.json"
-        fallback = repo_root / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/baseline-summary.json"
-        source = existing_summary if existing_summary.exists() else fallback
-        if not source.exists():
-            source = repo_root / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/summary.json"
-        baseline_path.write_bytes(source.read_bytes())
-    if _sha256_file(baseline_path) != BASELINE_SUMMARY_SHA256:
-        raise RuntimeError("baseline-summary.json SHA-256 mismatch")
-    return baseline_path
-
-
-def _write_artifact_hashes(out_dir: Path) -> None:
-    artifact_files = (
-        "raw.jsonl",
-        "summary.json",
-        "baseline-summary.json",
-        "comparison.json",
-        "report.md",
-        "environment.json",
-    )
-    _write_json(
-        out_dir / "artifact-sha256.json",
-        {filename: _sha256_file(out_dir / filename) for filename in artifact_files},
-    )
-
-
 def run_fair_cli(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     if args.warmup_rounds < 0 or args.measure_rounds < 1:
         raise ValueError("warmup rounds must be nonnegative and measure rounds must be positive")
 
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = _resolve_repo_path(args.manifest, repo_root=repo_root)
     case = _load_validated_case(args, manifest_path=manifest_path, repo_root=repo_root)
     templates = _variant_templates(case)
@@ -666,10 +489,6 @@ def run_fair_cli(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> di
     )
 
     summary = _summary(records, case=case)
-    baseline_path = _preserve_baseline(out_dir, repo_root=repo_root)
-    baseline_summary = _load_json(baseline_path)
-    reference_evidence = _reference_evidence(repo_root=repo_root)
-    comparison = _comparison(baseline_summary, summary, reference_evidence)
     environment = _collect_environment(
         args=args,
         case=case,
@@ -681,19 +500,18 @@ def run_fair_cli(args: argparse.Namespace, *, repo_root: Path = REPO_ROOT) -> di
         rstim_version=rstim_version,
         records=records,
         preflight_results=preflight_results,
-        reference_evidence=reference_evidence,
         repo_root=repo_root,
     )
 
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "raw.jsonl").write_text(
         "".join(json.dumps(record, sort_keys=True) + "\n" for record in records),
         encoding="utf-8",
     )
     _write_json(out_dir / "summary.json", summary)
-    _write_json(out_dir / "comparison.json", comparison)
     _write_json(out_dir / "environment.json", environment)
-    (out_dir / "report.md").write_text(_render_report(summary, comparison), encoding="utf-8")
-    _write_artifact_hashes(out_dir)
+    (out_dir / "report.md").write_text(_render_report(summary), encoding="utf-8")
     return summary
 
 

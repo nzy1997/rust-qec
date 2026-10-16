@@ -27,8 +27,7 @@ MANIFEST_DIGEST = "9fc35393f362f709e90bfd64ab08eda5140844974a7e685fd1e5614f67e0c
 MEASUREMENT_BITS = 12121
 PACKED_BYTES = 1516
 STIM_VARIANT = "stim-reference-b8"
-RSTIM_CANONICAL_VARIANT = "rstim-canonical-reference-b8"
-RSTIM_DIRECT_VARIANT = "rstim-direct-repeat-reference-b8"
+RSTIM_VARIANT = "rstim-packed-reference-b8"
 
 
 def sha256_file(path: Path) -> str:
@@ -60,7 +59,6 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         backend: str,
         packed: bytes | None = None,
         launched_marker: Path | None = None,
-        omit_phase_counters: bool = False,
     ) -> Path:
         if packed is None:
             packed = b"\x00" * PACKED_BYTES
@@ -80,27 +78,12 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 DIGEST = {REFERENCE_DIGEST!r}
                 PACKED = {packed!r}
                 LAUNCHED_MARKER = {marker_value!r}
-                OMIT_PHASE_COUNTERS = {omit_phase_counters!r}
 
                 parser = argparse.ArgumentParser()
                 parser.add_argument("--protocol", required=True)
-                parser.add_argument("--strategy", choices=["direct", "canonical"], default="direct")
                 args = parser.parse_args()
                 if args.protocol != PROTOCOL:
                     raise SystemExit(f"wrong protocol: {{args.protocol}}")
-                backend = "canonical_roundtrip" if args.strategy == "canonical" else {backend!r}
-                phase_counters = {{
-                    "measurement_reset_batches": 5,
-                    "canonical_materializations": 12121 if args.strategy == "canonical" else 0,
-                    "canonical_writebacks": 12121 if args.strategy == "canonical" else 0,
-                    "direct_inverse_batches": 0 if args.strategy == "canonical" else 5,
-                    "transposed_collapse_batches": 0 if args.strategy == "canonical" else 2,
-                    "collapse_pivots": 120,
-                    "expanded_repeat_iterations": 99,
-                    "executed_repeat_iterations": 99 if args.strategy == "canonical" else 1,
-                    "skipped_repeat_iterations": 0 if args.strategy == "canonical" else 98,
-                    "measurement_bits": 12121,
-                }}
                 if LAUNCHED_MARKER is not None:
                     Path(LAUNCHED_MARKER).write_text("launched", encoding="utf-8")
 
@@ -124,11 +107,11 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                     if request.get("request_id") != expected_request_id:
                         raise SystemExit(f"wrong request id: {{request!r}}")
                     reference_build_count += 1
-                    response = {{
+                    print(json.dumps({{
                         "protocol": PROTOCOL,
                         "type": "reference_built",
                         "request_id": expected_request_id,
-                        "backend": backend,
+                        "backend": {backend!r},
                         "parse_count": 1,
                         "reference_build_count": reference_build_count,
                         "measurement_bits": {MEASUREMENT_BITS},
@@ -136,26 +119,14 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                         "packed_base64": base64.b64encode(PACKED).decode("ascii"),
                         "byte_sha256": DIGEST,
                         "timer_scope": {TIMER_SCOPE!r},
-                        "elapsed_ns": (3000 if args.strategy == "canonical" else 1000) + expected_request_id,
-                    }}
-                    if not OMIT_PHASE_COUNTERS:
-                        response["phase_counters"] = phase_counters
-                    print(json.dumps(response), flush=True)
+                        "elapsed_ns": 1000 + expected_request_id,
+                    }}), flush=True)
                 """
             ),
             encoding="utf-8",
         )
         path.chmod(0o755)
         return path
-
-    def _seed_baseline_summary(self, out_dir: Path) -> None:
-        out_dir.mkdir()
-        (out_dir / "summary.json").write_bytes(
-            (
-                ROOT
-                / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/baseline-summary.json"
-            ).read_bytes()
-        )
 
     def _write_stim_python_launcher(
         self,
@@ -193,7 +164,6 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         manifest: Path,
         stim_python: Path,
         rstim_worker: Path,
-        fixture: Path = FIXTURE,
         warmup_rounds: int = 2,
         measure_rounds: int = 7,
     ) -> subprocess.CompletedProcess[str]:
@@ -203,7 +173,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 "-m",
                 "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark",
                 "--fixture",
-                str(fixture),
+                str(FIXTURE),
                 "--manifest",
                 str(manifest),
                 "--stim-python",
@@ -227,10 +197,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
             stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
+            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
-            self._seed_baseline_summary(out_dir)
 
             expected_git_commit = command_stdout(["git", "rev-parse", "HEAD"])
             expected_git_dirty = bool(command_stdout(["git", "status", "--porcelain"]))
@@ -245,7 +214,6 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             expected_files = {
                 "raw.jsonl",
                 "summary.json",
-                "baseline-summary.json",
                 "report.md",
                 "environment.json",
                 "artifact-sha256.json",
@@ -259,13 +227,10 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 self.assertEqual(digest, sha256_file(out_dir / name))
 
             raw = load_jsonl(out_dir / "raw.jsonl")
-            self.assertEqual(len(raw), 27)
-            self.assertEqual(
-                {record["variant"] for record in raw},
-                {STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT},
-            )
+            self.assertEqual(len(raw), 18)
+            self.assertEqual({record["variant"] for record in raw}, {STIM_VARIANT, RSTIM_VARIANT})
             packed = b"\x00" * PACKED_BYTES
-            for variant in (STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT):
+            for variant in (STIM_VARIANT, RSTIM_VARIANT):
                 records = [record for record in raw if record["variant"] == variant]
                 self.assertEqual([record["round"] for record in records], list(range(9)))
                 self.assertEqual(
@@ -285,36 +250,23 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                     self.assertEqual(record["packed_bytes"], PACKED_BYTES)
                     self.assertEqual(record["byte_sha256"], REFERENCE_DIGEST)
                     self.assertEqual(base64.b64decode(record["packed_base64"]), packed)
-                    if variant == RSTIM_CANONICAL_VARIANT:
-                        self.assertEqual(record["phase_counters"]["canonical_materializations"], 12121)
-                        self.assertEqual(record["phase_counters"]["executed_repeat_iterations"], 99)
-                    elif variant == RSTIM_DIRECT_VARIANT:
-                        self.assertEqual(record["phase_counters"]["canonical_materializations"], 0)
-                        self.assertEqual(record["phase_counters"]["executed_repeat_iterations"], 1)
-                        self.assertEqual(record["phase_counters"]["skipped_repeat_iterations"], 98)
             self.assertEqual(
                 {record["variant"]: record["backend"] for record in raw if record["round"] == 0},
                 {
                     STIM_VARIANT: "stim_reference",
-                    RSTIM_CANONICAL_VARIANT: "canonical_roundtrip",
-                    RSTIM_DIRECT_VARIANT: "direct_inverse_repeat_folded",
+                    RSTIM_VARIANT: "packed_inverse",
                 },
             )
 
             summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["protocol"], PROTOCOL)
             self.assertEqual(summary["timer_scope"], TIMER_SCOPE)
-            self.assertEqual(summary["measured_records"], 21)
-            self.assertGreaterEqual(summary["direct_speedup"], 2.0)
+            self.assertEqual(summary["measured_records"], 14)
             summary_by_variant = {variant["variant"]: variant for variant in summary["variants"]}
-            self.assertEqual(
-                set(summary_by_variant),
-                {STIM_VARIANT, RSTIM_CANONICAL_VARIANT, RSTIM_DIRECT_VARIANT},
-            )
+            self.assertEqual(set(summary_by_variant), {STIM_VARIANT, RSTIM_VARIANT})
             expected_backends = {
                 STIM_VARIANT: "stim_reference",
-                RSTIM_CANONICAL_VARIANT: "canonical_roundtrip",
-                RSTIM_DIRECT_VARIANT: "direct_inverse_repeat_folded",
+                RSTIM_VARIANT: "packed_inverse",
             }
             for variant_name, expected_backend in expected_backends.items():
                 variant = summary_by_variant[variant_name]
@@ -364,30 +316,35 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 "worker_argv",
                 "canonical_worker_argv",
                 "runner_argv",
-                "runtime_identities",
+                "runner_python_executable",
+                "runner_python_executable_sha256",
                 "warmup_rounds",
                 "measure_rounds",
                 "git_commit",
                 "git_dirty",
                 "os",
                 "cpu_model",
+                "python_executable",
+                "python_executable_sha256",
+                "rstim_worker_binary_path",
+                "rstim_worker_binary_sha256",
                 "rustc_version",
                 "cargo_version",
                 "python_version",
             ):
                 self.assertIn(key, environment)
             expected_runner_argv = [
-                "tool://python",
+                sys.executable,
                 "-m",
                 "benchmarks.rstim_vs_stim_simulator.run_reference_build_benchmark",
                 "--fixture",
-                FIXTURE_REL,
+                str(FIXTURE),
                 "--manifest",
-                MANIFEST_REL,
+                str(MANIFEST),
                 "--stim-python",
-                "tool://stim-python",
+                str(stim_python),
                 "--rstim-worker",
-                "tool://rstim-reference-worker",
+                str(rstim_worker),
                 "--warmup-rounds",
                 "2",
                 "--measure-rounds",
@@ -397,20 +354,27 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             ]
             expected_worker_argv = {
                 STIM_VARIANT: [
-                    "tool://stim-python",
+                    str(stim_python),
                     "-m",
                     "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
                     "--protocol",
                     PROTOCOL,
                 ],
-                RSTIM_CANONICAL_VARIANT: [
-                    "tool://rstim-reference-worker",
+                RSTIM_VARIANT: [str(rstim_worker), "--protocol", PROTOCOL],
+            }
+            expected_canonical_worker_argv = {
+                STIM_VARIANT: [
+                    "python3",
+                    "-m",
+                    "benchmarks.rstim_vs_stim_simulator.workers.stim_reference_build",
                     "--protocol",
                     PROTOCOL,
-                    "--strategy",
-                    "canonical",
                 ],
-                RSTIM_DIRECT_VARIANT: ["tool://rstim-reference-worker", "--protocol", PROTOCOL],
+                RSTIM_VARIANT: [
+                    "target/release/rstim_reference_build_worker",
+                    "--protocol",
+                    PROTOCOL,
+                ],
             }
             self.assertEqual(environment["profile"], "release")
             self.assertEqual(environment["protocol"], PROTOCOL)
@@ -422,26 +386,15 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["manifest_sha256"], MANIFEST_DIGEST)
             self.assertEqual(environment["stim_version"], "1.15.0")
             self.assertEqual(environment["runner_argv"], expected_runner_argv)
-            self.assertEqual(environment["worker_argv"], expected_worker_argv)
-            self.assertEqual(environment["canonical_worker_argv"], expected_worker_argv)
-            runtime_identities = {identity["role"]: identity for identity in environment["runtime_identities"]}
-            self.assertEqual(
-                set(runtime_identities),
-                {"tool://python", "tool://stim-python", "tool://rstim-reference-worker"},
-            )
             expected_runner_python = Path(sys.executable).resolve()
-            self.assertEqual(runtime_identities["tool://python"]["version"], platform.python_version())
-            self.assertEqual(runtime_identities["tool://python"]["basename"], expected_runner_python.name)
-            self.assertEqual(runtime_identities["tool://python"]["sha256"], sha256_file(expected_runner_python))
-            self.assertEqual(runtime_identities["tool://stim-python"]["version"], "1.15.0")
-            self.assertEqual(runtime_identities["tool://stim-python"]["basename"], stim_python.name)
-            self.assertEqual(
-                runtime_identities["tool://stim-python"]["sha256"],
-                sha256_file(stim_python),
-            )
-            self.assertEqual(runtime_identities["tool://rstim-reference-worker"]["version"], "rstim 0.1.1")
-            self.assertEqual(runtime_identities["tool://rstim-reference-worker"]["basename"], "rstim_reference_build_worker")
-            self.assertEqual(runtime_identities["tool://rstim-reference-worker"]["sha256"], sha256_file(rstim_worker))
+            self.assertEqual(environment["runner_python_executable"], str(expected_runner_python))
+            self.assertEqual(environment["runner_python_executable_sha256"], sha256_file(expected_runner_python))
+            self.assertEqual(environment["worker_argv"], expected_worker_argv)
+            self.assertEqual(environment["canonical_worker_argv"], expected_canonical_worker_argv)
+            self.assertEqual(environment["python_executable"], str(stim_python.resolve()))
+            self.assertEqual(environment["python_executable_sha256"], sha256_file(stim_python))
+            self.assertEqual(environment["rstim_worker_binary_path"], str(rstim_worker.resolve()))
+            self.assertEqual(environment["rstim_worker_binary_sha256"], sha256_file(rstim_worker))
             self.assertEqual(environment["rustc_version"], command_stdout(["rustc", "--version"]))
             self.assertEqual(environment["cargo_version"], command_stdout(["cargo", "--version"]))
             self.assertEqual(environment["python_version"], platform.python_version())
@@ -455,11 +408,6 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             self.assertEqual(environment["git_dirty"], expected_git_dirty)
             self.assertEqual(environment["warmup_rounds"], 2)
             self.assertEqual(environment["measure_rounds"], 7)
-            self.assertEqual(
-                hash_manifest["baseline-summary.json"],
-                "614658cf8213b486752f1fe53b7d864561abbe41c2eefd799fc8fa34883270a5",
-            )
-
 
     def test_runner_rejects_bad_decoded_packed_payload_before_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -470,10 +418,9 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
                 backend="stim_reference",
                 packed=bad_payload,
             )
-            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
+            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
             out_dir = directory / "out"
-            self._seed_baseline_summary(out_dir)
 
             result = self._run_runner(
                 out_dir,
@@ -484,59 +431,13 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0, result.stdout)
             self.assertIn("decoded packed bytes SHA-256", result.stderr)
-            self.assertFalse((out_dir / "raw.jsonl").exists(), "runner wrote artifacts after rejecting packed bytes")
-
-    def test_runner_rejects_missing_rstim_phase_counters_before_artifacts(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            directory = Path(temp_dir)
-            stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(
-                directory,
-                backend="direct_inverse_repeat_folded",
-                omit_phase_counters=True,
-            )
-            stim_python = self._write_stim_python_launcher(directory, stim_worker)
-            out_dir = directory / "out"
-            self._seed_baseline_summary(out_dir)
-
-            result = self._run_runner(
-                out_dir,
-                manifest=MANIFEST,
-                stim_python=stim_python,
-                rstim_worker=rstim_worker,
-            )
-
-            self.assertNotEqual(result.returncode, 0, result.stdout)
-            self.assertIn(f"{RSTIM_CANONICAL_VARIANT} phase_counters must be present", result.stderr)
-            self.assertFalse((out_dir / "raw.jsonl").exists(), "runner wrote artifacts after missing counters")
-
-    def test_runner_rejects_out_of_repository_fixture_before_artifacts(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            directory = Path(temp_dir)
-            fixture = directory / "external.stim"
-            fixture.write_bytes(FIXTURE.read_bytes())
-            stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
-            stim_python = self._write_stim_python_launcher(directory, stim_worker)
-            out_dir = directory / "out"
-
-            result = self._run_runner(
-                out_dir,
-                fixture=fixture,
-                manifest=MANIFEST,
-                stim_python=stim_python,
-                rstim_worker=rstim_worker,
-            )
-
-            self.assertNotEqual(result.returncode, 0, result.stdout)
-            self.assertIn("fixture must be under repository root", result.stderr)
-            self.assertFalse(out_dir.exists(), "runner wrote artifacts for an external fixture")
+            self.assertFalse(out_dir.exists(), "runner wrote artifacts after rejecting packed bytes")
 
     def test_runner_rejects_noncanonical_round_counts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
             stim_worker = self._write_fake_worker(directory, backend="stim_reference")
-            rstim_worker = self._write_fake_worker(directory, backend="direct_inverse_repeat_folded")
+            rstim_worker = self._write_fake_worker(directory, backend="packed_inverse")
             stim_python = self._write_stim_python_launcher(directory, stim_worker)
 
             for warmup_rounds, measure_rounds in ((1, 7), (2, 6)):
@@ -566,7 +467,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
             )
             rstim_worker = self._write_fake_worker(
                 directory,
-                backend="direct_inverse_repeat_folded",
+                backend="packed_inverse",
                 launched_marker=launched,
             )
             stim_python = self._write_stim_python_launcher(
@@ -615,6 +516,8 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
     def test_runner_rejects_wrong_manifest_hash_before_launching_workers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
+            bad_manifest = directory / "cases.full.toml"
+            bad_manifest.write_text(MANIFEST.read_text(encoding="utf-8") + "\n# wrong digest\n", encoding="utf-8")
             launched = directory / "worker-launched"
             worker = directory / "worker.py"
             worker.write_text(
@@ -633,7 +536,7 @@ class RunReferenceBuildBenchmarkTest(unittest.TestCase):
 
             result = self._run_runner(
                 directory / "out",
-                manifest=FIXTURE,
+                manifest=bad_manifest,
                 stim_python=stim_python,
                 rstim_worker=worker,
             )

@@ -30,17 +30,6 @@ SHOTS = 1024
 MEASUREMENT_COUNT = 12121
 OUTPUT_FORMAT = "b8"
 TIMER_SCOPE = "cli_end_to_end"
-FIXTURE_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim"
-FAIR_MANIFEST_REPO_PATH = "benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml"
-BASELINE_SUMMARY = ROOT / "benchmarks/rstim_vs_stim_simulator/results/fair-cli-release/baseline-summary.json"
-REFERENCE_SUMMARY = ROOT / "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json"
-BASELINE_SUMMARY_SHA256 = "131ca52cce2c9108bc7bc7c638070f6c82d1a636d6554dbc9df21697e7f8ef07"
-REFERENCE_STRATEGY = "direct_inverse_repeat_folded"
-KNOWN_ANSWER_INPUT_TOKEN = "artifact://known-answer-preflight.stim"
-TOOL_ROLES = {
-    "stim-cli-b8": "tool://stim",
-    "rstim-cli-b8": "tool://rstim",
-}
 EXPECTED_OUTPUT_BYTES = 1_552_384
 EXPECTED_OUTPUT_SHA256 = hashlib.sha256(bytes(range(256)) * 6064).hexdigest()
 RAW_RECORD_KEYS = {
@@ -143,8 +132,6 @@ def write_fake_cli(path: Path, *, mode: str) -> Path:
                 sys.exit(0)
 
             sys.stdout.buffer.write(payload)
-            if MODE == "slow-success":
-                time.sleep(0.01)
             sys.exit(0)
             """
         ),
@@ -179,7 +166,7 @@ def make_args(out_dir: Path, *, warmup_rounds: int = 2, measure_rounds: int = 7)
     )
 
 
-def expected_execution_argv(binary: Path, seed: int) -> list[str]:
+def expected_argv(binary: Path, seed: int) -> list[str]:
     return [
         str(binary.resolve()),
         "sample",
@@ -191,36 +178,6 @@ def expected_execution_argv(binary: Path, seed: int) -> list[str]:
         OUTPUT_FORMAT,
         "--in",
         str(FIXTURE),
-    ]
-
-
-def expected_recorded_argv(variant: str, seed: int) -> list[str]:
-    return [
-        TOOL_ROLES[variant],
-        "sample",
-        "--shots",
-        str(SHOTS),
-        "--seed",
-        str(seed),
-        "--out_format",
-        OUTPUT_FORMAT,
-        "--in",
-        FIXTURE_REPO_PATH,
-    ]
-
-
-def expected_preflight_argv(variant: str) -> list[str]:
-    return [
-        TOOL_ROLES[variant],
-        "sample",
-        "--shots",
-        "1",
-        "--seed",
-        "0",
-        "--out_format",
-        OUTPUT_FORMAT,
-        "--in",
-        KNOWN_ANSWER_INPUT_TOKEN,
     ]
 
 
@@ -265,7 +222,7 @@ class RunFairCliTest(unittest.TestCase):
 
         self.assertEqual({record["variant"] for record in records}, {"stim-cli-b8", "rstim-cli-b8"})
         self.assertEqual({record["phase"] for record in records}, {"warmup", "measured"})
-        for variant in ("stim-cli-b8", "rstim-cli-b8"):
+        for variant, binary in (("stim-cli-b8", stim), ("rstim-cli-b8", rstim)):
             variant_records = [record for record in records if record["variant"] == variant]
             self.assertEqual([record["seed"] for record in variant_records], list(range(9)))
             self.assertEqual(
@@ -273,34 +230,9 @@ class RunFairCliTest(unittest.TestCase):
                 [("warmup", 0), ("warmup", 1)] + [("measured", index) for index in range(7)],
             )
             for record in variant_records:
-                self.assertEqual(record["argv"], expected_recorded_argv(variant, record["seed"]))
+                self.assertEqual(record["argv"], expected_argv(binary, record["seed"]))
 
         summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
-        baseline = json.loads((out_dir / "baseline-summary.json").read_text(encoding="utf-8"))
-        comparison = json.loads((out_dir / "comparison.json").read_text(encoding="utf-8"))
-        self.assertEqual(
-            hashlib.sha256((out_dir / "baseline-summary.json").read_bytes()).hexdigest(),
-            BASELINE_SUMMARY_SHA256,
-        )
-        self.assertEqual(comparison["baseline_rstim_over_stim"], 3.576)
-        self.assertEqual(
-            comparison["candidate_rstim_over_stim"],
-            run_fair_cli._rounded_ratio(run_fair_cli._rstim_over_stim(summary)),
-        )
-        self.assertEqual(
-            comparison["ratio_delta_from_baseline"],
-            round(comparison["candidate_rstim_over_stim"] - comparison["baseline_rstim_over_stim"], 3),
-        )
-        self.assertEqual(comparison["reference_strategy"], REFERENCE_STRATEGY)
-        self.assertEqual(
-            comparison["reference_summary_path"],
-            "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json",
-        )
-        self.assertEqual(
-            comparison["reference_summary_sha256"],
-            hashlib.sha256(REFERENCE_SUMMARY.read_bytes()).hexdigest(),
-        )
-        self.assertNotEqual(summary, baseline)
         measured = [record for record in records if record["phase"] == "measured"]
         self.assertEqual(len(measured), 14)
         for variant in ("stim-cli-b8", "rstim-cli-b8"):
@@ -326,10 +258,6 @@ class RunFairCliTest(unittest.TestCase):
             self.assertIn(summary_variant["variant"], report_text)
             self.assertIn(str(summary_variant["sample_count"]), report_text)
             self.assertIn(str(summary_variant["elapsed_ns"]["median"]), report_text)
-        self.assertIn("Baseline rstim/Stim ratio: 3.576x", report_text)
-        self.assertIn("Candidate rstim/Stim ratio:", report_text)
-        self.assertIn("Change from baseline:", report_text)
-        self.assertNotRegex(report_text, r"(?i)\bparity\b")
         self.assertNotRegex(report_text, r"(?i)warmup.*(?:sample[_ ]?count|samples?).*\\b2\\b")
 
         environment = json.loads((out_dir / "environment.json").read_text(encoding="utf-8"))
@@ -339,12 +267,8 @@ class RunFairCliTest(unittest.TestCase):
         self.assertEqual(environment["stim_version"], "1.15.0")
         self.assertEqual(environment["rstim_version"], "rstim 0.0.0-test")
         self.assertTrue(environment["rustc_version"])
-        self.assertEqual(environment["manifest"], FAIR_MANIFEST_REPO_PATH)
+        self.assertEqual(environment["manifest"], str(FAIR_MANIFEST))
         self.assertEqual(environment["manifest_sha256"], hashlib.sha256(FAIR_MANIFEST.read_bytes()).hexdigest())
-        self.assertEqual(environment["fair_manifest_path"], FAIR_MANIFEST_REPO_PATH)
-        self.assertEqual(
-            environment["fair_manifest_sha256"], hashlib.sha256(FAIR_MANIFEST.read_bytes()).hexdigest()
-        )
         self.assertEqual(environment["source_manifest"], "benchmarks/rstim_vs_stim_simulator/cases.full.toml")
         self.assertEqual(
             environment["source_manifest_sha256"], hashlib.sha256(SOURCE_MANIFEST.read_bytes()).hexdigest()
@@ -354,52 +278,16 @@ class RunFairCliTest(unittest.TestCase):
             "benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.stim",
         )
         self.assertEqual(environment["fixture_sha256"], hashlib.sha256(FIXTURE.read_bytes()).hexdigest())
-        self.assertNotIn("stim_binary", environment)
-        self.assertNotIn("rstim_binary", environment)
-        self.assertNotIn("stim_binary_sha256", environment)
-        self.assertNotIn("rstim_binary_sha256", environment)
-        self.assertEqual(
-            environment["runtime_identities"],
-            [
-                {
-                    "role": "tool://stim",
-                    "version": "1.15.0",
-                    "basename": "stim",
-                    "sha256": hashlib.sha256(stim.read_bytes()).hexdigest(),
-                },
-                {
-                    "role": "tool://rstim",
-                    "version": "rstim 0.0.0-test",
-                    "basename": "rstim",
-                    "sha256": hashlib.sha256(rstim.read_bytes()).hexdigest(),
-                },
-            ],
-        )
+        self.assertEqual(environment["stim_binary"], str(stim.resolve()))
+        self.assertEqual(environment["stim_binary_sha256"], hashlib.sha256(stim.read_bytes()).hexdigest())
+        self.assertEqual(environment["rstim_binary"], str(rstim.resolve()))
+        self.assertEqual(environment["rstim_binary_sha256"], hashlib.sha256(rstim.read_bytes()).hexdigest())
         self.assertEqual(environment["warmup_rounds"], 2)
         self.assertEqual(environment["measure_rounds"], 7)
         self.assertEqual(environment["profile"], "release")
         self.assertEqual(environment["timer_scope"], TIMER_SCOPE)
         self.assertEqual(environment["seed_policy"], "round_index_0_through_8")
         self.assertEqual(environment["known_answer_preflight"], "passed")
-        reference_evidence = environment["reference_evidence"]
-        self.assertEqual(reference_evidence["slot"], "reference-build-release")
-        self.assertEqual(
-            reference_evidence["summary_path"],
-            "benchmarks/rstim_vs_stim_simulator/results/reference-build-release/summary.json",
-        )
-        self.assertEqual(
-            reference_evidence["summary_sha256"], hashlib.sha256(REFERENCE_SUMMARY.read_bytes()).hexdigest()
-        )
-        self.assertEqual(reference_evidence["reference_variant"], "rstim-direct-repeat-reference-b8")
-        self.assertEqual(reference_evidence["reference_strategy"], REFERENCE_STRATEGY)
-        self.assertEqual(reference_evidence["checker"], "tools/check_rstim_vs_stim_reference_build_evidence.py")
-        details_by_variant = {
-            detail["variant"]: detail
-            for detail in environment["known_answer_preflight_details"]
-        }
-        self.assertEqual(set(details_by_variant), {"stim-cli-b8", "rstim-cli-b8"})
-        for variant, detail in details_by_variant.items():
-            self.assertEqual(detail["argv"], expected_preflight_argv(variant))
 
         expected_round_argv = [
             {
@@ -412,13 +300,6 @@ class RunFairCliTest(unittest.TestCase):
             for record in records
         ]
         self.assertEqual(environment["round_argv"], expected_round_argv)
-        artifact_hashes = json.loads((out_dir / "artifact-sha256.json").read_text(encoding="utf-8"))
-        self.assertEqual(
-            set(artifact_hashes),
-            {"raw.jsonl", "summary.json", "baseline-summary.json", "comparison.json", "report.md", "environment.json"},
-        )
-        for filename, digest in artifact_hashes.items():
-            self.assertEqual(digest, hashlib.sha256((out_dir / filename).read_bytes()).hexdigest())
         return records
 
     def test_main_writes_symmetric_artifacts_for_all_rounds(self) -> None:
@@ -427,7 +308,7 @@ class RunFairCliTest(unittest.TestCase):
             fake_bin = root / "bin"
             fake_bin.mkdir()
             stim = write_fake_cli(fake_bin / "stim", mode="success")
-            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="slow-success")
+            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="success")
             out_dir = root / "out"
             invocations = root / "invocations.txt"
             with (
@@ -449,11 +330,8 @@ class RunFairCliTest(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertTrue((out_dir / "raw.jsonl").is_file())
             self.assertTrue((out_dir / "summary.json").is_file())
-            self.assertTrue((out_dir / "baseline-summary.json").is_file())
-            self.assertTrue((out_dir / "comparison.json").is_file())
             self.assertTrue((out_dir / "report.md").is_file())
             self.assertTrue((out_dir / "environment.json").is_file())
-            self.assertTrue((out_dir / "artifact-sha256.json").is_file())
             build.assert_called_once()
             self.assert_artifacts(out_dir, stim, rstim)
             logged_invocations = read_invocations(invocations)
@@ -466,32 +344,7 @@ class RunFairCliTest(unittest.TestCase):
                 binary_invocations = [
                     call for call in benchmark_invocations if Path(call[0]).resolve() == binary.resolve()
                 ]
-                self.assertEqual(
-                    binary_invocations,
-                    [expected_execution_argv(binary, seed) for seed in range(9)],
-                )
-
-    def test_preserves_existing_summary_as_baseline_before_candidate_write(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            root = Path(temp_dir)
-            fake_bin = root / "bin"
-            fake_bin.mkdir()
-            write_fake_cli(fake_bin / "stim", mode="success")
-            rstim = write_fake_cli(root / "target" / "release" / "rstim", mode="success")
-            out_dir = root / "out"
-            out_dir.mkdir()
-            (out_dir / "summary.json").write_bytes(BASELINE_SUMMARY.read_bytes())
-            with (
-                mock.patch.dict(os.environ, {"PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"}),
-                mock.patch("benchmarks.rstim_vs_stim_simulator.run_fair_cli.build_rstim", return_value=rstim),
-            ):
-                run_fair_cli.run_fair_cli(make_args(out_dir, warmup_rounds=0, measure_rounds=1), repo_root=ROOT)
-
-            self.assertEqual((out_dir / "baseline-summary.json").read_bytes(), BASELINE_SUMMARY.read_bytes())
-            self.assertNotEqual(
-                hashlib.sha256((out_dir / "summary.json").read_bytes()).hexdigest(),
-                BASELINE_SUMMARY_SHA256,
-            )
+                self.assertEqual(binary_invocations, [expected_argv(binary, seed) for seed in range(9)])
 
     def test_main_requires_all_cli_flags(self) -> None:
         full_args = [

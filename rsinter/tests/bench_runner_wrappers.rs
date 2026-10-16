@@ -1,14 +1,9 @@
-#[cfg(feature = "rbposd-runner")]
 use std::collections::BTreeMap;
 
-#[cfg(any(feature = "rbposd-runner", feature = "ilp-runner"))]
 use rsinter::bench::registry::{BenchCasePoint, BenchRunContext, RustBenchRunner};
-#[cfg(feature = "rbposd-runner")]
 use rsinter::bench::runners::rbposd::RbposdRunner;
-#[cfg(feature = "ilp-runner")]
 use rsinter::bench::runners::rilpqec::RilpqecRunner;
 
-#[cfg(feature = "rbposd-runner")]
 fn rbposd_point_with_decoder_params(
     decoder_params: BTreeMap<String, toml::Value>,
 ) -> BenchCasePoint {
@@ -32,7 +27,6 @@ fn rbposd_point_with_decoder_params(
     }
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_handles_zero_shot_benchmark_points() {
     let runner = RbposdRunner;
@@ -53,7 +47,6 @@ fn rbposd_runner_handles_zero_shot_benchmark_points() {
     assert_eq!(row.metrics["shots_used"], 0.0);
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_accepts_lsd_params() {
     let runner = RbposdRunner;
@@ -68,7 +61,6 @@ fn rbposd_runner_preflight_accepts_lsd_params() {
     runner.preflight_point(&point).unwrap();
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_accepts_ldpc_osd_cs_method() {
     let runner = RbposdRunner;
@@ -83,7 +75,6 @@ fn rbposd_runner_preflight_accepts_ldpc_osd_cs_method() {
     runner.preflight_point(&point).unwrap();
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_runs_ldpc_osd_cs_method() {
     let runner = RbposdRunner;
@@ -110,7 +101,6 @@ fn rbposd_runner_runs_ldpc_osd_cs_method() {
     assert_eq!(row.params["osd_order"], serde_json::json!(7));
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_defaults_lsd_method_when_order_is_set() {
     let runner = RbposdRunner;
@@ -122,7 +112,6 @@ fn rbposd_runner_preflight_defaults_lsd_method_when_order_is_set() {
     runner.preflight_point(&point).unwrap();
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_defaults_lsd_order_when_method_is_set() {
     let runner = RbposdRunner;
@@ -134,7 +123,6 @@ fn rbposd_runner_preflight_defaults_lsd_order_when_method_is_set() {
     runner.preflight_point(&point).unwrap();
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_accepts_bp_method_and_schedule_params() {
     let runner = RbposdRunner;
@@ -149,7 +137,6 @@ fn rbposd_runner_accepts_bp_method_and_schedule_params() {
     runner.preflight_point(&point).unwrap();
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_bp_method() {
     let runner = RbposdRunner;
@@ -166,7 +153,6 @@ fn rbposd_runner_rejects_unknown_bp_method() {
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_rejects_unknown_bp_schedule() {
     let runner = RbposdRunner;
@@ -183,7 +169,6 @@ fn rbposd_runner_rejects_unknown_bp_schedule() {
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_rejects_unsupported_lsd_method() {
     let runner = RbposdRunner;
@@ -200,7 +185,6 @@ fn rbposd_runner_preflight_rejects_unsupported_lsd_method() {
     );
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_rejects_unsupported_lsd_order() {
     let runner = RbposdRunner;
@@ -214,7 +198,6 @@ fn rbposd_runner_preflight_rejects_unsupported_lsd_order() {
     assert_eq!(err, "rbposd lsd_order must be <= 1, got 2");
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_rejects_negative_lsd_order() {
     let runner = RbposdRunner;
@@ -228,7 +211,6 @@ fn rbposd_runner_preflight_rejects_negative_lsd_order() {
     assert_eq!(err, "lsd_order must be non-negative");
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_rejects_non_integer_lsd_order() {
     let runner = RbposdRunner;
@@ -242,7 +224,6 @@ fn rbposd_runner_preflight_rejects_non_integer_lsd_order() {
     assert_eq!(err, "lsd_order must be an integer");
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_runner_preflight_rejects_mixed_osd_and_lsd_params() {
     let runner = RbposdRunner;
@@ -256,7 +237,6 @@ fn rbposd_runner_preflight_rejects_mixed_osd_and_lsd_params() {
     assert_eq!(err, "rbposd params must not mix OSD and LSD decoder params");
 }
 
-#[cfg(feature = "rbposd-runner")]
 #[test]
 fn rbposd_lsd_runner_order_changes_benchmark_logical_error_rate() {
     let runner = RbposdRunner;
@@ -309,7 +289,6 @@ fn rbposd_lsd_runner_order_changes_benchmark_logical_error_rate() {
     );
 }
 
-#[cfg(feature = "ilp-runner")]
 #[test]
 fn rilpqec_runner_handles_zero_shot_benchmark_points() {
     let runner = RilpqecRunner;

@@ -1,5 +1,3 @@
-#![cfg(feature = "plotting")]
-
 use rsinter::bench::plot::{
     log_log_fit_for_plot, logical_rate_fit_for_plot, render_benchmark_plot,
 };
@@ -1894,7 +1892,9 @@ fn confidence_interval_probe_rows() -> Vec<BenchmarkResultRow> {
 
 fn surface_compare_fixture_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/bench/surface_compare_plot_semantics.csv")
+        .parent()
+        .unwrap()
+        .join("benchmarks/surface_decoder_compare/tests/fixtures/rsinter_plot_semantics.csv")
 }
 
 fn surface_compare_fixture_rows() -> Vec<BenchmarkResultRow> {

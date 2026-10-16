@@ -41,7 +41,6 @@ pub struct ModelSolution {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelSolutionStatus {
     Optimal,
-    Infeasible,
     TimeLimit,
     SolutionLimit,
     SubOptimal,

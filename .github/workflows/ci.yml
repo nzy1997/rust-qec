@@ -2,232 +2,40 @@ name: CI
 
 on:
   push:
-    branches: [master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Check tracked file policy
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          args=(--head "$HEAD_SHA")
-          if [ "$EVENT_NAME" = pull_request ]; then
-            args+=(--base "$PR_BASE_SHA")
-          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
-            args+=(--base "$HEAD_SHA^")
-          elif [ -n "$PUSH_BEFORE_SHA" ] && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$PUSH_BEFORE_SHA^{commit}" 2>/dev/null; then
-            args+=(--base "$PUSH_BEFORE_SHA")
-          else
-            args+=(--base "$HEAD_SHA^")
-          fi
-          python3 tools/check_tracked_file_sizes.py "${args[@]}"
-      - name: Fetch pinned benchmark artifacts
-        run: python3 tools/fetch_benchmark_artifacts.py
-      - name: Install system deps
-        run: |
-          sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
-            if [ -f "$source_file" ]; then
-              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
-            fi
-          done
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            update
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            install -y pkg-config libfontconfig1-dev
-      - name: Install Stim CLI
-        run: python3 -m pip install stim
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal && rustup default stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Test repository governance gates
-        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes tools.test_fetch_benchmark_artifacts
-      - name: Check entangled near-Clifford benchmark evidence
-        run: |
-          python3 benchmarks/near_clifford/entangled/verify.py benchmarks/near_clifford/results/apple-m4-entangled-2026-09-30.json --git-sources
-          python3 benchmarks/near_clifford/entangled/test_contract.py
-          python3 -O benchmarks/near_clifford/entangled/test_contract.py
-      - name: Check near-Clifford row-operation evidence
-        run: |
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-scale-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-entangled-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/test_contract.py
-          python3 -O benchmarks/near_clifford/row_ops/test_contract.py
-      - name: Check near-Clifford Pauli-product evidence
-        run: |
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-scale-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-entangled-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/pauli_products/verify.py benchmarks/near_clifford/results/apple-m4-pauli-support-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/pauli_products/test_contract.py
-          python3 -O benchmarks/near_clifford/pauli_products/test_contract.py
-          python3 benchmarks/near_clifford/pauli_products/test_report.py
-          python3 -O benchmarks/near_clifford/pauli_products/test_report.py
-      - name: Check current near-Clifford baseline protocol
-        run: |
-          python3 -m pip install numpy==2.4.6
-          cargo fmt --manifest-path benchmarks/near_clifford/sota/Cargo.toml --check
-          python3 benchmarks/near_clifford/sota/test_lowering.py
-          python3 -O benchmarks/near_clifford/sota/test_lowering.py
-          python3 benchmarks/near_clifford/sota/test_contract.py
-          python3 -O benchmarks/near_clifford/sota/test_contract.py
-          python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
-      - name: Check compiled near-Clifford native-input evidence
-        run: |
-          cargo fmt --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml --check
-          python3 benchmarks/near_clifford/compiled_sota/test_contract.py
-          python3 -O benchmarks/near_clifford/compiled_sota/test_contract.py
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json --git-sources
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
-          python3 -O benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
-      - name: Check native CPU peer benchmark contracts
-        run: |
-          python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
-          python3 -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
-      - name: Minimal rsinter build, smoke, and dependency graph
-        run: |
-          cargo build --locked -p rsinter --no-default-features --features rbposd-runner
-          minimal_out="$(mktemp -d)"
-          target/debug/rsinter bench run \
-            --spec rsinter/tests/fixtures/bench/minimal_steane_css_rbposd.toml \
-            --language rust \
-            --out "$minimal_out"
-          cargo tree --locked -p rsinter \
-            --no-default-features --features rbposd-runner \
-            --edges normal,build > /tmp/rsinter-minimal-tree.txt
-          if rg -n '(rmatching|rilpqec|qec-ilp-core|highs|highs-sys|plotters)( |$)' /tmp/rsinter-minimal-tree.txt; then
-            echo "ERROR: minimal dependency graph contains a disabled capability" >&2
-            exit 1
-          fi
-          cargo test --locked -p rsinter --no-default-features --no-run
-          cargo test --locked -p rsinter --no-default-features --features rbposd-runner
-          rm -r "$minimal_out"
-          rm /tmp/rsinter-minimal-tree.txt
-      - run: cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
-      - name: Check optional code-distance backend boundaries
-        run: |
-          cargo test --locked -p qec-code --no-default-features --features distance-ilp-highs --test logical_distance --test distance_backend_features
-  checked-evidence-portability:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check portable evidence bundles
-        run: |
-          test ! -d target
-          python3 tools/check_all_portable_evidence.py \
-            --catalog benchmarks/rstim_vs_stim_simulator/evidence_bundles.toml
-          test ! -d target
-  publication-evidence-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check publication benchmark evidence bundle
-        run: |
-          test ! -d target
-          make publication-evidence-check
-          test ! -d target
-  rsmp-v1-readiness:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
-            if [ -f "$source_file" ]; then
-              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
-            fi
-          done
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            update
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            install -y pkg-config libfontconfig1-dev
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
-      - name: Fetch locked Cargo dependencies
-        run: cargo fetch --locked
-      - name: Run rsmp v1 readiness
-        id: rsmp_readiness
-        continue-on-error: true
-        run: CARGO_NET_OFFLINE=true make rsmp-v1-readiness
-      - name: Publish readiness failure summary
-        if: always() && steps.rsmp_readiness.outcome != 'success'
-        run: |
-          echo "## rsmp v1 readiness failed" >> "$GITHUB_STEP_SUMMARY"
-          if [ -f benchmarks/out/rsmp-v1/readiness.json ]; then
-            python3 -c 'import json; d=json.load(open("benchmarks/out/rsmp-v1/readiness.json")); print("- status:", d.get("status")); print("- failed checks:", ", ".join(c.get("check", "?") for c in d.get("failed_checks", [])) or "none")' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- readiness.json was not produced" >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: Upload rsmp v1 readiness artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rsmp-v1-readiness
-          path: benchmarks/out/rsmp-v1/
-      - name: Fail on rsmp v1 readiness error
-        if: steps.rsmp_readiness.outcome != 'success'
-        run: exit 1
+      - name: Install system dependencies
+        run: sudo apt-get install -y libfontconfig1-dev
+      - run: cargo test --workspace
   perf-gate:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
       (github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'run-perf'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
-            if [ -f "$source_file" ]; then
-              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
-            fi
-          done
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            update
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            install -y pkg-config libfontconfig1-dev
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
@@ -238,7 +46,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p perf-artifacts
-          cargo run --locked -p rstim --features cli --bin rstim -- perf ci --out-dir perf-artifacts
+          cargo run -p rstim --bin rstim -- perf ci --out-dir perf-artifacts
       - name: Publish perf report
         if: always()
         run: |
@@ -256,36 +64,24 @@ jobs:
         run: exit 1
   coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Install system deps
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
-          for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
-            if [ -f "$source_file" ]; then
-              sudo sed -i 's|http://azure.archive.ubuntu.com|https://archive.ubuntu.com|g' "$source_file"
-            fi
-          done
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            update
-          sudo timeout 5m apt-get \
-            -o Acquire::Retries=3 \
-            -o Acquire::http::Timeout=30 \
-            -o Acquire::https::Timeout=30 \
-            install -y pkg-config libfontconfig1-dev
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
         run: python3 -m pip install stim
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: sudo apt-get install -y libfontconfig1-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
-        run: cargo llvm-cov --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:

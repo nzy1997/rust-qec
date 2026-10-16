@@ -1,32 +1,17 @@
 [package]
 name = "rsinter"
-version = "0.3.0"
+version = "0.1.1"
 edition = "2024"
-license.workspace = true
-rust-version.workspace = true
-repository.workspace = true
-homepage.workspace = true
-readme = "README.md"
-documentation = "https://docs.rs/rsinter"
-description = "Experimental parallel sampling and decoder benchmark harness for RustQEC"
-publish = ["crates-io"]
-include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/README.md", "/LICENSE", "/Cargo.toml", "/Cargo.lock"]
 
 [features]
 default = []
-rbposd-runner = ["dep:rbposd"]
-rmatching-runner = ["dep:rmatching"]
-ilp-runner = ["dep:rilpqec", "dep:qec-ilp-core", "qec-ilp-core/highs"]
-plotting = ["dep:plotters"]
-full = ["rbposd-runner", "rmatching-runner", "ilp-runner", "plotting"]
-gurobi = ["ilp-runner", "rilpqec/gurobi"]
+gurobi = ["rilpqec/gurobi"]
 
 [dependencies]
-rstim = { version = "0.3.0", path = "../rstim", default-features = false, features = ["codegen-css"] }
-rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
-rbposd = { version = "0.3.0", path = "../rbposd", optional = true }
-rilpqec = { version = "0.3.0", path = "../rilpqec", optional = true }
-qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
+rstim = { path = "../rstim" }
+rmatching = { path = "../rmatching", features = ["bench"] }
+rbposd = { path = "../rbposd" }
+rilpqec = { path = "../rilpqec" }
 rand = "0.8"
 rayon = "1"
 clap = { version = "4", features = ["derive"] }
@@ -35,17 +20,12 @@ serde_json = "1"
 csv = "1"
 sha2 = "0.10"
 toml = "0.8"
-tempfile = "3"
-plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"], optional = true }
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend", "bitmap_encoder", "line_series", "full_palette", "ttf"] }
 
 [dev-dependencies]
-qec-code = { version = "0.3.0", path = "../qec-code", features = ["cli"] }
+qec-code = { path = "../qec-code" }
+tempfile = "3"
 
 [[bin]]
 name = "rsinter"
 path = "src/bin/rsinter.rs"
-
-[[example]]
-name = "surface_code_threshold"
-path = "examples/surface_code_threshold.rs"
-required-features = ["plotting"]

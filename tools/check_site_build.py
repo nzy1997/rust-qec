@@ -39,117 +39,19 @@ class SiteFixture:
         self.tempdir.cleanup()
 
 
-PAGE_FILES = (
+REQUIRED_FILES = (
     "index.html",
-    "get-started/index.html",
-    "atom-loss/index.html",
-    "atom-loss-concepts/index.html",
-    "atom-loss-evidence/index.html",
-    "docs/index.html",
-    "reference/index.html",
-    "support/index.html",
-    "maintainers/index.html",
-    "simulator/index.html",
-    "sampling-data/index.html",
-    "detector-models/index.html",
-    "decoding/index.html",
-    "css-codes/index.html",
-    "rsmp-v1-showcase/index.html",
-    "qp101/index.html",
-    "qp101/protocol/index.html",
-    "validation/index.html",
-    "interactive/index.html",
-    "interactive/local/index.html",
-    "rust-api/index.html", "rust-api-reference/index.html",
-    "qec-code-cli/index.html", "rsinter-cli/index.html",
-    "circuit-format/index.html", "data-formats/index.html", "versions/index.html",
-    "benchmarks/simulation/index.html", "benchmarks/decoders/index.html",
-)
-JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js", "js/shot-startup.js")
-PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
-PAGE_REQUIRED_ANCHORS = {
-    "atom-loss/index.html": ("loss-information", "model-loss", "sample-loss", "decode-loss", "check-predictions", "supported-circuits"),
-    "atom-loss-concepts/index.html": ("loss-record", "data-boundary", "choose-decoder", "supported-circuits"),
-    "atom-loss-evidence/index.html": ("atom-loss-results", "loss-correctness", "loss-sampling-throughput", "loss-logical-error-rate", "loss-accuracy-time", "loss-seed-accuracy", "loss-timing-sweep", "loss-adapter-stages", "loss-evidence-methods"),
-    "index.html": ("capabilities",),
-    "get-started/index.html": (
-        "install",
-        "first-circuit",
-        "detector-output",
-        "continue-rustqec",
-        "further-learning",
-    ),
-    "support/index.html": (
-        "support-and-compatibility-contract",
-        "support-levels",
-        "atom-loss-support-boundary",
-        "mid-swap-configuration-migration",
-        "compatibility-and-deprecation-policy",
-        "maintainer-procedures",
-    ),
-    "rust-api/index.html": ("rust-project", "rust-experiment", "rust-results"),
-    "rust-api-reference/index.html": ("rust-apis",),
-    "qec-code-cli/index.html": ("commands", "help-qec-code-code-css-distance-exact"),
-    "rsinter-cli/index.html": ("commands", "help-rsinter-replay", "help-rsinter-bench-run"),
-    "circuit-format/index.html": ("atom-loss-extensions", "loss-subset-v1"),
-    "data-formats/index.html": ("01-and-b8", "dataset-export-contract"),
-    "versions/index.html": ("mid-swap-configuration-migration", "compatibility-and-deprecation-policy"),
-    "benchmarks/simulation/index.html": ("simulation-results-title", "dem-results-title"),
-    "benchmarks/decoders/index.html": ("decoder-results-title", "benchmark-campaigns"),
-    "reference/index.html": ("reference-boundary", "rustqec-commands", "command-circuit-stats", "command-decode", "common-options", "exit-codes", "machine-contract", "rust-apis"),
-    "maintainers/index.html": ("atom-loss-regression-controls", "decoder-release-readiness-gate", "publication-evidence-bundle", "release-checklist"),
-    "simulator/index.html": ("circuit-simulation",),
-    "sampling-data/index.html": (
-        "choose-path",
-        "sample",
-        "export",
-        "b8-format",
-        "loss-tensors",
-        "marker-contract",
-        "load-and-check",
-    ),
-    "detector-models/index.html": ("dem-extraction",),
-    "decoding/index.html": ("decoder-families", "benchmark-campaigns"),
-    "css-codes/index.html": ("css-construction", "distance-search"),
-    "rsmp-v1-showcase/index.html": (
-        "rsmp-overview",
-        "rsmp-transform",
-        "rsmp-workflow",
-        "rsmp-compression",
-        "rsmp-scale",
-        "rsmp-evidence",
-    ),
-    "qp101/index.html": ("qp101", "operations", "schema-browser", "gallery", "examples"),
-    "qp101/protocol/index.html": (
-        "qp101-zy-quantum-circuit-json-format",
-        "scope-and-applicability",
-        "core-json-document",
-        "validation-rules",
-        "compatibility-notes",
-    ),
-    "validation/index.html": ("reading-results", "historical-results", "local-workflows"),
-    "interactive/index.html": ("shot-viewer",),
-    "interactive/local/index.html": ("shot-viewer",),
-}
-REQUIRED_FILES = PAGE_FILES + JS_FILES + (
-    "install.sh",
     "styles.css",
+    "app.js",
     "data/benchmark-site.json",
-    "data/docs-search.json",
     "QP101-ZY.md",
     "qp101.schema.json",
     "examples/basic.qp101.json",
     "examples/repeat-detector.qp101.json",
     "examples/atom-loss-sample.qp101.json",
-    "examples/getting-started.stim",
-    "examples/getting-started.svg",
     "gallery/basic-site.svg",
     "gallery/repeat-detector-site.svg",
     "gallery/atom-loss-sample.svg",
-    "interactive/app.js",
-    "interactive/shot-viewer.css",
-    "interactive/fixed-circuit.stim",
-    "interactive/pkg/rstim_shot_web_bg.wasm",
 )
 QP101_REQUIRED_FILES = (
     "qp101.schema.json",
@@ -161,18 +63,36 @@ QP101_REQUIRED_FILES = (
     "gallery/repeat-detector-site.svg",
     "gallery/atom-loss-sample.svg",
 )
+REQUIRED_ANCHORS = (
+    "docs-home",
+    "workspace-overview",
+    "feature-walkthroughs",
+    "benchmark-evidence",
+    "checked-benchmark-results",
+    "benchmarks",
+    "benchmark-manifest",
+    "checked-benchmark-result-cards",
+    "qp101",
+    "schema-browser",
+    "operations",
+    "gallery",
+    "examples",
+)
 CLAIMS_POLICY_PHRASES = (
-    "Smoke runs check wiring",
-    "checked full artifacts support",
-    "not a general performance claim",
-    "local-only",
+    "Claims Policy",
+    "Publishable Evidence",
+    "Local-Only Evidence",
+    "smoke checks verify wiring",
+    "full evidence can describe the committed checked run",
+    "committed-run evidence",
+    "not a general decoder ordering claim",
 )
 CHECKED_ARTIFACT_REFERENCE_RE = re.compile(
     r"benchmarks/(?:surface_decoder_compare|bb_circuit_bposd_compare)/results/full/[A-Za-z0-9._/-]+"
     r"|benchmarks/rstim_vs_stim_simulator/(?:results/(?:full|distributions|release|release-repetition-sample|release-surface-detect|release-dem-sample)/[A-Za-z0-9._/-]+|cases\.full\.toml|fixtures/[A-Za-z0-9._/-]+\.stim)"
 )
 STRING_LITERAL_PATH_RE = re.compile(r"""["']([A-Za-z0-9_./-]+\.[A-Za-z0-9]+(?:[?#][^"']*)?)["']""")
-ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css"}
+ROOT_LEVEL_SITE_FILES = {"qp101.schema.json", "QP101-ZY.md", "styles.css", "app.js", "index.html"}
 
 
 class HtmlCollector(HTMLParser):
@@ -243,131 +163,68 @@ def collect_local_string_paths(*texts: str) -> set[str]:
         for value in STRING_LITERAL_PATH_RE.findall(text):
             normalized = normalize_local_reference(value)
             if normalized is not None and ("/" in normalized or normalized in ROOT_LEVEL_SITE_FILES):
-                found.add(value)
+                found.add(normalized)
     return found
 
 
-def resolve_site_reference(site_root: Path, base_dir: Path, value: str) -> tuple[str | None, Path | None, str | None]:
+def resolve_site_reference(site_root: Path, value: str) -> tuple[str | None, Path | None, str | None]:
     normalized = normalize_local_reference(value)
     if normalized is None:
         return None, None, None
-    origin = site_root if value.startswith("/") else base_dir
-    candidate = (origin / normalized).resolve(strict=False)
+    candidate = (site_root / normalized).resolve(strict=False)
     try:
         candidate.relative_to(site_root)
     except ValueError:
-        return normalized, None, f"path escape outside built site: {value}"
+        return normalized, None, f"path escape outside built site: {normalized}"
     return normalized, candidate, None
 
 
-def read_text_file(path: Path, label: str | None = None) -> tuple[str | None, str | None]:
-    name = label or path.name
+def read_text_file(path: Path) -> tuple[str | None, str | None]:
     try:
         return path.read_text(encoding="utf-8"), None
     except UnicodeDecodeError as exc:
-        return None, f"{name}: invalid UTF-8 ({exc})"
+        return None, f"{path.name}: invalid UTF-8 ({exc})"
     except OSError as exc:
-        return None, f"{name}: {exc.strerror or exc}"
+        return None, f"{path.name}: {exc.strerror or exc}"
 
 
-def check_page_reference(
-    site_root: Path,
-    page: str,
-    page_dir: Path,
-    value: str,
-    ids_by_page: dict[str, set[str]],
-) -> str | None:
-    if value.startswith("#"):
-        anchor = value[1:]
-        if anchor and anchor not in ids_by_page.get(page, set()):
-            return f"{page}: missing same-page anchor #{anchor}"
-        return None
-    if is_external_link(value):
-        return None
-    split = urlsplit(value)
-    if split.scheme or split.netloc or not split.path:
-        return None
-    if split.path.startswith("/"):
-        return f"{page}: root-absolute reference breaks subpath deploy: {value}"
-    normalized, candidate, error = resolve_site_reference(site_root, page_dir, split.path)
-    if error is not None:
-        return f"{page}: {error}"
-    if normalized is None or candidate is None:
-        return None
-    target = candidate / "index.html" if candidate.is_dir() else candidate
-    if not target.exists():
-        return f"{page}: missing local reference {value}"
-    if split.fragment:
-        try:
-            target_page = target.relative_to(site_root).as_posix()
-        except ValueError:
-            return None
-        target_ids = ids_by_page.get(target_page)
-        if target_ids is not None and split.fragment not in target_ids:
-            return f"{page}: missing anchor #{split.fragment} in {target_page}"
-    return None
+def check_workspace_overview(site_root: Path, index_text: str, collector: HtmlCollector, app_text: str) -> CheckResult:
+    missing_anchors = [anchor for anchor in REQUIRED_ANCHORS if anchor not in collector.ids]
+    if missing_anchors:
+        return fail("workspace overview", f"missing required anchors: {', '.join(missing_anchors)}")
 
+    missing_refs: list[str] = []
+    for href in collector.hrefs:
+        if href.startswith("#"):
+            anchor = href[1:]
+            if anchor and anchor not in collector.ids:
+                missing_refs.append(f"missing same-page anchor #{anchor}")
+            continue
+        normalized, candidate, error = resolve_site_reference(site_root, href)
+        if error is not None:
+            missing_refs.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
+            missing_refs.append(normalized)
+    for src in collector.srcs:
+        normalized, candidate, error = resolve_site_reference(site_root, src)
+        if error is not None:
+            missing_refs.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
+            missing_refs.append(normalized)
 
-def check_pages(
-    site_root: Path,
-    page_data: dict[str, tuple[str, HtmlCollector]],
-    js_texts: dict[str, str],
-) -> CheckResult:
-    problems: list[str] = []
-    ids_by_page = {page: collector.ids for page, (_, collector) in page_data.items()}
+    string_paths = collect_local_string_paths(index_text, app_text)
+    missing_string_paths: list[str] = []
+    for path in sorted(string_paths):
+        normalized, candidate, error = resolve_site_reference(site_root, path)
+        if error is not None:
+            missing_string_paths.append(error)
+        elif normalized is not None and candidate is not None and not candidate.exists():
+            missing_string_paths.append(normalized)
+    if missing_refs or missing_string_paths:
+        details = missing_refs + missing_string_paths
+        return fail("workspace overview", "missing local references: " + ", ".join(details))
 
-    for page, (text, collector) in page_data.items():
-        page_dir = (site_root / page).parent
-        missing_anchors = [
-            anchor for anchor in PAGE_REQUIRED_ANCHORS.get(page, ()) if anchor not in collector.ids
-        ]
-        if missing_anchors:
-            problems.append(f"{page}: missing required anchors: {', '.join(missing_anchors)}")
-
-        for value in collector.hrefs + collector.srcs:
-            problem = check_page_reference(site_root, page, page_dir, value, ids_by_page)
-            if problem is not None:
-                problems.append(problem)
-
-        script_texts: list[str] = []
-        page_scripts: set[str] = set()
-        for src in collector.srcs:
-            if not urlsplit(src).path.endswith(".js"):
-                continue
-            _, candidate, _ = resolve_site_reference(site_root, page_dir, src)
-            if candidate is not None and candidate.is_file():
-                rel = candidate.relative_to(site_root).as_posix()
-                page_scripts.add(rel)
-                if rel in js_texts:
-                    script_texts.append(js_texts[rel])
-
-        missing_scripts = [script for script in PAGE_REQUIRED_SCRIPTS if script not in page_scripts]
-        if missing_scripts:
-            problems.append(f"{page}: missing required scripts: {', '.join(missing_scripts)}")
-
-        # Tutorial code references files produced on the reader's machine, not
-        # deployed assets. Actual href/src attributes remain checked above.
-        runtime_html = re.sub(r"<(pre|code)\b[^>]*>.*?</\1>", "", text, flags=re.S | re.I)
-        for path in sorted(collect_local_string_paths(runtime_html)):
-            if path.startswith("/"):
-                problems.append(f"{page}: root-absolute reference breaks subpath deploy: {path}")
-                continue
-            normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
-            if error is not None:
-                problems.append(f"{page}: {error}")
-            elif normalized is not None and candidate is not None and not candidate.exists():
-                problems.append(f"{page}: missing local reference {path}")
-
-        for path in sorted(collect_local_string_paths(*script_texts)):
-            normalized, candidate, error = resolve_site_reference(site_root, page_dir, path)
-            if error is not None:
-                problems.append(f"{page}: {error}")
-            elif normalized is not None and candidate is not None and not candidate.exists():
-                problems.append(f"{page}: missing local reference {path}")
-
-    if problems:
-        return fail("site pages", "; ".join(problems))
-    return pass_("site pages", "required anchors, cross-page links, and local references are present")
+    return pass_("workspace overview", "required anchors and local built-site references are present")
 
 
 def check_manifest_and_artifacts(site_root: Path, repo_root: Path) -> tuple[list[CheckResult], dict[str, object] | None, list[str]]:
@@ -403,7 +260,7 @@ def check_benchmark_methodology(index_text: str) -> CheckResult:
     return pass_("benchmark methodology", "claims-policy phrases are present")
 
 
-def check_checked_artifacts(site_root: Path, combined_text: str, manifest: dict[str, object] | None) -> CheckResult:
+def check_checked_artifacts(site_root: Path, index_text: str, app_text: str, manifest: dict[str, object] | None) -> CheckResult:
     if manifest is None:
         return fail("checked benchmark artifacts", "manifest could not be loaded")
     checked = check_site_manifest.iter_checked_artifact_paths(manifest)
@@ -414,7 +271,7 @@ def check_checked_artifacts(site_root: Path, combined_text: str, manifest: dict[
         return fail("checked benchmark artifacts", "missing copied checked artifacts: " + ", ".join(missing))
 
     checked_paths = {artifact for _, artifact in checked}
-    references = sorted(set(CHECKED_ARTIFACT_REFERENCE_RE.findall(combined_text)))
+    references = sorted(set(CHECKED_ARTIFACT_REFERENCE_RE.findall(index_text + "\n" + app_text)))
     unexpected = [ref for ref in references if ref not in checked_paths]
     if unexpected:
         return fail(
@@ -573,53 +430,35 @@ def check_site_build(site_root: Path, repo_root: Path | None = None) -> list[Che
 
     results.append(check_non_empty_files(site_root, QP101_REQUIRED_FILES, "QP101 assets"))
 
-    page_data: dict[str, tuple[str, HtmlCollector]] = {}
-    js_texts: dict[str, str] = {}
-    read_errors: list[str] = []
-    for page in PAGE_FILES:
-        text, error = read_text_file(site_root / page, label=page)
-        if error is not None:
-            read_errors.append(error)
-            continue
-        collector = HtmlCollector()
-        collector.feed(text)
-        page_data[page] = (text, collector)
-    for js_file in JS_FILES:
-        text, error = read_text_file(site_root / js_file, label=js_file)
-        if error is not None:
-            read_errors.append(error)
-        else:
-            js_texts[js_file] = text
+    index_text, index_error = read_text_file(site_root / "index.html")
+    app_text, app_error = read_text_file(site_root / "app.js")
+    collector: HtmlCollector | None = None
+    workspace_read_errors = [error for error in (index_error, app_error) if error is not None]
 
-    if read_errors:
-        results.append(fail("site pages", "could not read built-site files: " + "; ".join(read_errors)))
-    else:
-        results.append(check_pages(site_root, page_data, js_texts))
+    if index_text is not None:
+        collector = HtmlCollector()
+        collector.feed(index_text)
+
+    if workspace_read_errors:
+        results.append(fail("workspace overview", "could not read built-site files: " + "; ".join(workspace_read_errors)))
+    elif collector is not None and app_text is not None:
+        results.append(check_workspace_overview(site_root, index_text, collector, app_text))
 
     manifest_results, manifest, manifest_site_errors = check_manifest_and_artifacts(site_root, repo_root)
     results.extend(manifest_results)
-    results.append(check_checked_provenance(manifest, manifest_site_errors + read_errors))
-
-    evidence_page_names = (
-        "benchmarks/simulation/index.html",
-        "benchmarks/decoders/index.html",
-        "css-codes/index.html",
-        "validation/index.html",
-    )
-    evidence_pages = [page_data[name][0] for name in evidence_page_names if name in page_data]
-    if len(evidence_pages) != len(evidence_page_names):
-        missing = [name for name in evidence_page_names if name not in page_data]
-        results.append(fail("benchmark methodology", "could not read built-site files: " + ", ".join(missing)))
+    results.append(check_checked_provenance(manifest, manifest_site_errors + workspace_read_errors))
+    if index_text is None:
+        results.append(fail("benchmark methodology", "could not read built-site files: index.html"))
     else:
-        results.append(check_benchmark_methodology("\n".join(evidence_pages)))
+        results.append(check_benchmark_methodology(index_text))
 
-    if read_errors:
-        results.append(fail("checked benchmark artifacts", "could not read built-site files: " + "; ".join(read_errors)))
-    else:
-        combined_text = "\n".join(
-            [text for text, _ in page_data.values()] + [js_texts[js_file] for js_file in JS_FILES]
+    if index_text is None or app_text is None:
+        unreadable = ", ".join(
+            name for name, text in (("index.html", index_text), ("app.js", app_text)) if text is None
         )
-        results.append(check_checked_artifacts(site_root, combined_text, manifest))
+        results.append(fail("checked benchmark artifacts", f"could not read built-site files: {unreadable}"))
+    else:
+        results.append(check_checked_artifacts(site_root, index_text, app_text, manifest))
     results.append(check_local_only_future(site_root, manifest))
 
     return results
@@ -914,7 +753,7 @@ def make_fixture_site() -> SiteFixture:
                         "commands": [
                             "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                             "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
-                            "cargo run -p rstim --features cli --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                            "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
                             "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
                             "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                             "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
@@ -923,7 +762,7 @@ def make_fixture_site() -> SiteFixture:
                             [
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.validate_cases benchmarks/rstim_vs_stim_simulator/cases.full.toml",
                                 "python3 -m benchmarks.rstim_vs_stim_simulator.verify_correctness --cases benchmarks/rstim_vs_stim_simulator/cases.full.toml --shots 1024 --out /tmp/rstim-vs-stim-correctness.json",
-                                "cargo run -p rstim --features cli --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
+                                "cargo run -p rstim --bin rstim -- perf ci --case stim-style-surface-sample-d11-r100-b1024 --warmup-rounds 0 --measure-rounds 1 --out-dir /tmp/rstim-vs-stim-perf-ci",
                                 "cp /tmp/rstim-vs-stim-perf-ci/summary.json benchmarks/rstim_vs_stim_simulator/results/full/speed-summary.json",
                                 "cp /tmp/rstim-vs-stim-perf-ci/report.md benchmarks/rstim_vs_stim_simulator/results/full/speed-report.md",
                                 "cp /tmp/rstim-vs-stim-correctness.json benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
@@ -984,18 +823,14 @@ def make_fixture_site() -> SiteFixture:
 
     for relative, text in {
         "styles.css": "body { font-family: sans-serif; }\n",
-        "install.sh": "#!/bin/sh\nexit 0\n",
         "QP101-ZY.md": "# QP101-ZY\n",
         "qp101.schema.json": '{ "title": "QP101" }\n',
         "examples/basic.qp101.json": '{ "name": "basic" }\n',
         "examples/repeat-detector.qp101.json": '{ "name": "repeat" }\n',
         "examples/atom-loss-sample.qp101.json": '{ "name": "atom-loss" }\n',
-        "examples/getting-started.stim": "R 0\nM 0\n",
-        "examples/getting-started.svg": "<svg><title>getting started</title></svg>\n",
         "gallery/basic-site.svg": "<svg><title>basic</title></svg>\n",
         "gallery/repeat-detector-site.svg": "<svg><title>repeat</title></svg>\n",
         "gallery/atom-loss-sample.svg": "<svg><title>atom-loss</title></svg>\n",
-        "rsmp-v1-showcase/og.png": "png\n",
         "benchmarks/surface_decoder_compare/results/full/results.csv": "distance,shots\n",
         "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png": "png\n",
         "benchmarks/bb_circuit_bposd_compare/results/full/results.csv": "distance,shots\n",
@@ -1016,357 +851,83 @@ def make_fixture_site() -> SiteFixture:
         site_root / "index.html",
         """<!doctype html>
 <html lang="en">
-<body data-root=".">
+<body>
   <nav>
-    <a href="./">Home</a>
-    <a href="simulator/">Simulator</a>
-    <a href="detector-models/">Detector models</a>
-    <a href="decoding/">Decoding</a>
-    <a href="css-codes/">CSS Codes</a>
-    <a href="rsmp-v1-showcase/">RSMP v1</a>
-    <a href="qp101/">QP101</a>
+    <a href="#docs-home">Overview</a>
+    <a href="#workspace-overview">Workspace</a>
+    <a href="#feature-walkthroughs">Walkthroughs</a>
+    <a href="#benchmark-evidence">Evidence</a>
+    <a href="#checked-benchmark-results">Results</a>
+    <a href="#benchmarks">Methodology</a>
+    <a href="#qp101">QP101</a>
+    <a href="#operations">Operations</a>
+    <a href="#gallery">Gallery</a>
+    <a href="#examples">Examples</a>
   </nav>
-  <section id="capabilities">
-    <a href="simulator/#circuit-simulation">simulation</a>
-    <a href="detector-models/#dem-extraction">detector models</a>
-    <a href="decoding/#decoder-families">decoders</a>
-    <a href="decoding/#benchmark-campaigns">campaigns</a>
-    <a href="css-codes/#css-construction">CSS codes</a>
+  <section id="docs-home"></section>
+  <section id="workspace-overview"></section>
+  <section id="feature-walkthroughs"></section>
+  <section id="benchmark-evidence"></section>
+  <section id="checked-benchmark-results">
+    <div id="checked-benchmark-result-cards"></div>
+    <a href="benchmarks/surface_decoder_compare/results/full/results.csv">surface csv</a>
+    <img src="benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png" alt="surface">
   </section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "get-started/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="install"><a href="../support/">support</a></section>
-  <section id="first-circuit"></section>
-  <section id="detector-output"></section>
-  <section id="continue-rustqec"></section>
-  <section id="further-learning"></section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "support/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <h1 id="support-and-compatibility-contract">Support and compatibility contract</h1>
-  <h2 id="support-levels">Support levels</h2>
-  <h2 id="atom-loss-support-boundary">Atom-loss support boundary</h2>
-  <h2 id="mid-swap-configuration-migration">Mid-SWAP configuration migration</h2>
-  <h2 id="compatibility-and-deprecation-policy">Compatibility and deprecation policy</h2>
-  <h2 id="evidence-and-known-exclusions">Evidence and known exclusions</h2>
-  <h2 id="maintainer-procedures">Maintainer procedures</h2>
-  <a href="../maintainers/">Maintainer reference</a>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "reference/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <h1 id="reference-boundary">Reference</h1>
-  <section id="rustqec-commands">
-    <h2>rustqec commands</h2>
-    <h3 id="command-circuit-stats">circuit.stats</h3>
-    <h3 id="command-decode">decode</h3>
+  <section id="benchmarks">
+    <h2>Benchmark Methodology</h2>
+    <p>smoke checks verify wiring</p>
+    <p>full evidence can describe the committed checked run only.</p>
+    <p>checked full-tier artifacts are committed-run evidence.</p>
+    <p>not a general decoder ordering claim.</p>
+    <article><h3>Publishable Evidence</h3></article>
+    <article><h3>Local-Only Evidence</h3></article>
+    <article><h3>Claims Policy</h3></article>
+    <div id="benchmark-manifest"></div>
   </section>
-  <section id="common-options"><h2>Common options</h2></section>
-  <section id="exit-codes"><h2>Exit codes</h2></section>
-  <section id="machine-contract"><h2>Machine contract</h2></section>
-  <section id="rust-apis"><h2>Rust APIs</h2></section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "maintainers/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <h1>Maintainer reference</h1>
-  <section id="atom-loss-regression-controls"></section>
-  <section id="decoder-release-readiness-gate"></section>
-  <section id="publication-evidence-bundle"></section>
-  <section id="release-checklist"></section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "rsmp-v1-showcase/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <nav>
-    <a href="../">Home</a>
-    <a href="../simulator/">Simulator</a>
-    <a href="../decoding/">Decoding</a>
-    <a href="../css-codes/">CSS Codes</a>
-    <a href="../qp101/">QP101</a>
-  </nav>
-  <section id="rsmp-overview">
-    <h1>RSMP v1</h1>
-    <p>requires the original circuit, not a DEM</p>
-    <p>Sweep-bit circuits are unsupported</p>
-  </section>
-  <section id="rsmp-transform"></section>
-  <section id="rsmp-workflow">
-    <code>pack_samples</code>
-    <code>unpack_samples</code>
-  </section>
-  <section id="rsmp-compression">
-    <p>11.98%</p>
-    <p>57.14%</p>
-  </section>
-  <section id="rsmp-scale">
-    <p>Projected</p>
-  </section>
-  <section id="rsmp-evidence">
-    <p>non-hermetic checker behavior</p>
-    <img src="og.png" alt="RSMP v1 social preview">
-  </section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "simulator/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="circuit-simulation">
-    <p>Sampling evidence is not a general performance claim.</p>
-  </section>
-  <script src="../js/benchmarks.js"></script>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "sampling-data/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="choose-path"></section>
-  <section id="sample"></section>
-  <section id="export"></section>
-  <section id="b8-format"></section>
-  <section id="loss-tensors"></section>
-  <section id="marker-contract"></section>
-  <section id="load-and-check"></section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "detector-models/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="dem-extraction">
-  </section>
-  <script src="../js/benchmarks.js"></script>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "decoding/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="decoder-families"></section>
-  <section id="benchmark-campaigns">
-    <p>Smoke runs check wiring; checked full artifacts support only their recorded cases.</p>
-    <div data-evidence-items="surface-decoder-full bb-circuit-full"></div>
-    <a href="../benchmarks/surface_decoder_compare/results/full/results.csv">surface csv</a>
-  </section>
-  <script src="../js/benchmarks.js"></script>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "css-codes/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="css-construction"></section>
-  <section id="distance-search">
-    <p>Random-window results remain local-only.</p>
-  </section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "qp101/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
   <section id="qp101">
-    <a href="../qp101.schema.json">schema</a>
-    <a href="../QP101-ZY.md">protocol</a>
-    <a href="../examples/basic.qp101.json">basic</a>
+    <a href="qp101.schema.json">schema</a>
+    <a href="QP101-ZY.md">protocol</a>
+    <a href="examples/basic.qp101.json">basic</a>
   </section>
-  <section id="operations"></section>
   <section id="schema-browser"></section>
+  <section id="operations"></section>
   <section id="gallery">
-    <img src="../gallery/basic-site.svg" alt="basic">
-    <img src="../gallery/repeat-detector-site.svg" alt="repeat">
-    <img src="../gallery/atom-loss-sample.svg" alt="atom">
+    <img src="gallery/basic-site.svg" alt="basic">
+    <img src="gallery/repeat-detector-site.svg" alt="repeat">
+    <img src="gallery/atom-loss-sample.svg" alt="atom">
   </section>
   <section id="examples">
-    <a href="../examples/repeat-detector.qp101.json">repeat</a>
-    <a href="../examples/atom-loss-sample.qp101.json">atom loss</a>
-  </section>
-  <script src="../js/qp101-browser.js"></script>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "qp101/protocol/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="../..">
-  <h1 id="qp101-zy-quantum-circuit-json-format">QP101-ZY: Quantum Circuit JSON Format</h1>
-  <h2 id="scope-and-applicability">Scope And Applicability</h2>
-  <h2 id="core-json-document">Core JSON Document</h2>
-  <a href="../../qp101.schema.json">Download JSON Schema</a>
-  <h2 id="validation-rules">Validation Rules</h2>
-  <h2 id="compatibility-notes">Compatibility Notes</h2>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "validation/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="reading-results">
-    <p>Smoke runs check wiring; checked full artifacts support only named cases and are not a general performance claim.</p>
-  </section>
-  <section id="historical-results">
-    <div data-evidence-items="rstim-vs-stim-full rstim-perf-ci"></div>
-  </section>
-  <section id="local-workflows">
-    <p>Local workflow evidence remains local-only.</p>
-    <div data-evidence-items="qec-code-smoke"></div>
-  </section>
-  <script src="../js/benchmarks.js"></script>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "interactive/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="..">
-  <section id="shot-viewer">
-    <script src="app.js"></script>
+    <a href="examples/repeat-detector.qp101.json">repeat</a>
+    <a href="examples/atom-loss-sample.qp101.json">atom loss</a>
   </section>
 </body>
 </html>
 """,
     )
     write_text(
-        site_root / "interactive/local/index.html",
-        """<!doctype html>
-<html lang="en">
-<body data-root="../..">
-  <section id="shot-viewer">
-    <script src="../app.js"></script>
-  </section>
-</body>
-</html>
-""",
-    )
-    write_text(
-        site_root / "interactive/app.js",
-        """const viewer = document.getElementById("shot-viewer");
-fetch("fixed-circuit.stim");
-const wasmPath = "pkg/rstim_shot_web_bg.wasm";
-""",
-    )
-    write_text(site_root / "interactive/shot-viewer.css", ".shot-viewer { display: block; }\n")
-    write_text(site_root / "interactive/fixed-circuit.stim", "M 0\n")
-    write_text(site_root / "interactive/pkg/rstim_shot_web_bg.wasm", "wasm\n")
-    write_text(
-        site_root / "js/benchmarks.js",
-        """const evidenceContainers = document.querySelectorAll("[data-evidence-items]");
-function renderEvidenceContainers(manifest) {
-  evidenceContainers.forEach((container) => container.dataset.evidenceItems);
-  return manifest;
-}
+        site_root / "app.js",
+        """const checkedBenchmarkItems = ["surface-decoder-full", "bb-circuit-full", "rstim-vs-stim-full"];
+function renderBenchmarkManifest(manifest) { return manifest; }
+function renderCheckedBenchmarkResults(manifest) { return manifest; }
 function renderProvenance(provenance) { return provenance; }
 const manifestMarkers = ["family.status", "family.claims_limit", "item.status", "item.claims_limit"];
 const checkedMarkers = ["item.artifacts", "item.commands", "item.caveats", "artifact.checked"];
 const provenanceMarkers = ["item.provenance", "renderProvenance(item.provenance)", "artifact_hashes"];
-const ROOT = "..";
-fetch(ROOT + "/data/benchmark-site.json");
+fetch("data/benchmark-site.json");
 const localRefs = [
-  "/benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
-  "/benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
+  "qp101.schema.json",
+  "examples/basic.qp101.json",
+  "examples/repeat-detector.qp101.json",
+  "examples/atom-loss-sample.qp101.json",
+  "gallery/basic-site.svg",
+  "gallery/repeat-detector-site.svg",
+  "gallery/atom-loss-sample.svg",
+  "benchmarks/bb_circuit_bposd_compare/results/full/results.csv",
+  "benchmarks/rstim_vs_stim_simulator/results/full/correctness-summary.json",
 ];
 artifact.kind === "image";
 """,
     )
-    write_text(
-        site_root / "js/qp101-browser.js",
-        """const status = document.getElementById("schema-status");
-fetch("/qp101.schema.json");
-const localRefs = [
-  "/examples/basic.qp101.json",
-  "/gallery/basic-site.svg",
-];
-""",
-    )
-    write_text(
-        site_root / "js/docs.js",
-        """const pageToc = document.querySelector(".page-toc");
-const copyBlocks = document.querySelectorAll("pre code");
-""",
-    )
-    write_text(site_root / "js/shot-startup.js", '// Shot Lab startup state reporting')
-
-    write_text(site_root / "docs/index.html", '<html><body><main><h1>Documentation</h1></main></body></html>')
-    write_text(site_root / "js/search.js", '// Local documentation search')
-    write_text(site_root / "data/docs-search.json", '[]')
-
-    for page in ("atom-loss/index.html", "atom-loss-concepts/index.html", "atom-loss-evidence/index.html"):
-        write_text(site_root / page, '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[page]) + '</main></body></html>')
-
-    for target, sources in (
-        ('benchmarks/simulation/index.html', ('simulator/index.html', 'detector-models/index.html')),
-        ('benchmarks/decoders/index.html', ('decoding/index.html',)),
-    ):
-        assignments = ' '.join(re.findall(r'data-evidence-items="([^"]+)"', '\n'.join((site_root / page).read_text() for page in sources)))
-        write_text(site_root / target, '<html><body><main><h1>Benchmarks</h1>' + ''.join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[target]) + f'<div data-evidence-items="{assignments}"></div><p>' + ' '.join(CLAIMS_POLICY_PHRASES) + '</p></main></body></html>')
-    for page in PAGE_FILES:
-        page_path = site_root / page
-        if not page_path.exists():
-            write_text(page_path, '<html><body><main><h1>Documentation</h1>' + ''.join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS.get(page, ())) + '</main></body></html>')
-        page_text = page_path.read_text(encoding="utf-8")
-        if "</body>" not in page_text:
-            raise AssertionError(f"fixture page {page} has no closing body tag")
-        depth = len(Path(page).parent.parts)
-        docs_src = "../" * depth + "js/docs.js"
-        page_path.write_text(
-            page_text.replace("</body>", f'  <script src="{docs_src}"></script>\n</body>', 1),
-            encoding="utf-8",
-        )
 
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
     subprocess.run(
@@ -1414,14 +975,6 @@ def remove_surface_provenance(manifest_path: Path) -> None:
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
-def replace_site_phrase(fixture: SiteFixture, phrase: str, replacement: str) -> None:
-    for relative in PAGE_FILES:
-        page = fixture.site_root / relative
-        text = page.read_text(encoding="utf-8")
-        if phrase in text:
-            page.write_text(text.replace(phrase, replacement), encoding="utf-8")
-
-
 def run_self_test() -> list[str]:
     failures: list[str] = []
     fixture = make_fixture_site()
@@ -1432,46 +985,24 @@ def run_self_test() -> list[str]:
 
         mutations: list[tuple[str, Callable[[SiteFixture], None], str]] = [
             ("missing_qp101_schema", lambda f: (f.site_root / "qp101.schema.json").unlink(), "qp101.schema.json"),
-            ("missing_docs_script", lambda f: (f.site_root / "js/docs.js").unlink(), "js/docs.js"),
-            (
-                "missing_validation_anchor",
-                lambda f: (f.site_root / "validation/index.html").write_text(
-                    (f.site_root / "validation/index.html")
-                    .read_text(encoding="utf-8")
-                    .replace('id="historical-results"', 'id="history"'),
-                    encoding="utf-8",
-                ),
-                "historical-results",
-            ),
-            (
-                "protocol_missing_shared_docs_script",
-                lambda f: (f.site_root / "qp101/protocol/index.html").write_text(
-                    (f.site_root / "qp101/protocol/index.html")
-                    .read_text(encoding="utf-8")
-                    .replace('<script src="../../js/docs.js"></script>', ""),
-                    encoding="utf-8",
-                ),
-                "missing required scripts: js/docs.js",
-            ),
             (
                 "missing_checked_plot",
                 lambda f: (f.site_root / "benchmarks/surface_decoder_compare/results/full/surface_decoder_compare.png").unlink(),
                 "surface_decoder_compare.png",
             ),
             (
-                "missing_evidence_boundary",
-                lambda f: replace_site_phrase(
-                    f,
-                    "checked full artifacts support",
-                    "checked full artifacts describe",
+                "missing_claims_policy",
+                lambda f: (f.site_root / "index.html").write_text(
+                    (f.site_root / "index.html").read_text(encoding="utf-8").replace("Claims Policy", "Claims"),
+                    encoding="utf-8",
                 ),
-                "checked full artifacts support",
+                "Claims Policy",
             ),
             (
                 "unmanifested_checked_link",
-                lambda f: (f.site_root / "decoding/index.html").write_text(
-                    (f.site_root / "decoding/index.html").read_text(encoding="utf-8")
-                    + '<a href="../benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
+                lambda f: (f.site_root / "index.html").write_text(
+                    (f.site_root / "index.html").read_text(encoding="utf-8")
+                    + '<a href="benchmarks/surface_decoder_compare/results/full/not-in-manifest.csv">bad</a>\n',
                     encoding="utf-8",
                 ),
                 "not listed as a checked manifest artifact",
@@ -1495,7 +1026,7 @@ def run_self_test() -> list[str]:
                     (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
                     (f.site_root / "index.html").write_text(
                         (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                            'href="simulator/"', 'href="../outside.txt"', 1
+                            'href="QP101-ZY.md"', 'href="../outside.txt"', 1
                         ),
                         encoding="utf-8",
                     ),
@@ -1506,13 +1037,12 @@ def run_self_test() -> list[str]:
                 "js_escape_outside_site",
                 lambda f: (
                     (f.repo_root / "outside.txt").write_text("outside\n", encoding="utf-8"),
-                    (f.site_root / "js/benchmarks.js").write_text(
-                        (f.site_root / "js/benchmarks.js").read_text(encoding="utf-8")
-                        + '\nconst escaped = "../../outside.txt";\n',
+                    (f.site_root / "app.js").write_text(
+                        (f.site_root / "app.js").read_text(encoding="utf-8") + '\nconst escaped = "../outside.txt";\n',
                         encoding="utf-8",
                     ),
                 ),
-                "path escape outside built site: ../../outside.txt",
+                "path escape outside built site: ../outside.txt",
             ),
             (
                 "invalid_utf8_index",
@@ -1520,29 +1050,9 @@ def run_self_test() -> list[str]:
                 "index.html: invalid UTF-8",
             ),
             (
-                "invalid_utf8_benchmarks_js",
-                lambda f: (f.site_root / "js/benchmarks.js").write_bytes(b"\xff\xfe\xfa"),
-                "js/benchmarks.js: invalid UTF-8",
-            ),
-            (
-                "broken_cross_page_anchor",
-                lambda f: (f.site_root / "index.html").write_text(
-                    (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                        'href="simulator/#circuit-simulation"', 'href="simulator/#missing-anchor"', 1
-                    ),
-                    encoding="utf-8",
-                ),
-                "missing anchor #missing-anchor",
-            ),
-            (
-                "root_absolute_href",
-                lambda f: (f.site_root / "index.html").write_text(
-                    (f.site_root / "index.html").read_text(encoding="utf-8").replace(
-                        'href="simulator/"', 'href="/simulator/"', 1
-                    ),
-                    encoding="utf-8",
-                ),
-                "root-absolute reference breaks subpath deploy",
+                "invalid_utf8_app",
+                lambda f: (f.site_root / "app.js").write_bytes(b"\xff\xfe\xfa"),
+                "app.js: invalid UTF-8",
             ),
         ]
 

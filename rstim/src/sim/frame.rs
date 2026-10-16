@@ -198,37 +198,21 @@ pub struct FrameSimulator {
 
 impl FrameSimulator {
     pub fn new(num_qubits: usize, batch_size: usize) -> Self {
-        Self::try_new(num_qubits, batch_size).expect("trusted FrameSimulator dimensions allocate")
-    }
-
-    pub fn try_new(num_qubits: usize, batch_size: usize) -> Result<Self, String> {
-        let words_per_row = batch_size
-            .checked_add(63)
-            .ok_or_else(|| "batch size overflows frame row width".to_string())?
-            / 64;
-        let x_table = BitTable::try_new(num_qubits, batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-        let z_table = BitTable::try_new(num_qubits, batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
-        let mut last_correlated_error_occurred = Vec::new();
-        last_correlated_error_occurred
-            .try_reserve_exact(words_per_row)
-            .map_err(|err| format!("frame allocation failed: {err}"))?;
-        last_correlated_error_occurred.resize(words_per_row, 0u64);
-        Ok(Self {
+        let words_per_row = (batch_size + 63) / 64;
+        Self {
             num_qubits,
             batch_size,
-            x_table,
-            z_table,
+            x_table: BitTable::new(num_qubits, batch_size),
+            z_table: BitTable::new(num_qubits, batch_size),
             m_record: MeasureRecordBatch::new(batch_size),
-            last_correlated_error_occurred,
+            last_correlated_error_occurred: vec![0u64; words_per_row],
             depolarize_scratch: DepolarizeScratch::new(),
             det_records: Vec::new(),
             obs_records: Vec::new(),
             materialize_detector_observable_outputs: true,
             detector_materializations: 0,
             observable_materializations: 0,
-        })
+        }
     }
 
     pub(crate) fn randomize_initial_z_frames(&mut self, rng: &mut impl Rng) {
@@ -460,7 +444,6 @@ impl FrameSimulator {
             "M" | "MZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
@@ -468,7 +451,6 @@ impl FrameSimulator {
             "MX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
                 }
@@ -480,7 +462,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -490,7 +471,6 @@ impl FrameSimulator {
             "MR" | "MRZ" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
@@ -499,7 +479,6 @@ impl FrameSimulator {
             "MRX" => {
                 for q in qubits_ignoring_inv(targets)? {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -512,7 +491,6 @@ impl FrameSimulator {
                         tmp[w] = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -785,7 +763,6 @@ impl FrameSimulator {
                 let products = split_pauli_products(targets)?;
                 for product in &products {
                     self.exec_mpp_product(product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
@@ -796,7 +773,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MYY" => {
@@ -806,7 +782,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
             "MZZ" => {
@@ -816,7 +791,6 @@ impl FrameSimulator {
                         inverted: false,
                     };
                     self.exec_mpp_product(&product, rng);
-                    self.apply_readout_noise(args.first().copied().unwrap_or(0.0), rng);
                 }
             }
 
@@ -945,19 +919,11 @@ impl FrameSimulator {
             CompiledOp::Depolarize2 { probability, pairs } => {
                 self.exec_depolarize2_pairs(pairs, *probability, wpr, rng);
             }
-            CompiledOp::Measure {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure(*basis, qubits, *readout_probability, wpr, rng);
+            CompiledOp::Measure { basis, qubits } => {
+                self.exec_compiled_measure(*basis, qubits, wpr, rng);
             }
-            CompiledOp::MeasureReset {
-                basis,
-                qubits,
-                readout_probability,
-            } => {
-                self.exec_compiled_measure_reset(*basis, qubits, *readout_probability, wpr, rng);
+            CompiledOp::MeasureReset { basis, qubits } => {
+                self.exec_compiled_measure_reset(*basis, qubits, wpr, rng);
             }
             CompiledOp::Detector { rec_offsets } => {
                 self.exec_compiled_detector(rec_offsets, ref_sample);
@@ -1070,24 +1036,10 @@ impl FrameSimulator {
         }
     }
 
-    fn apply_readout_noise(&mut self, probability: f64, rng: &mut impl Rng) {
-        if probability == 0.0 {
-            return;
-        }
-        let mask = random_bits_with_prob(
-            self.x_table.words_per_row(),
-            self.batch_size,
-            probability,
-            rng,
-        );
-        self.m_record.xor_last_row(&mask);
-    }
-
     fn exec_compiled_measure(
         &mut self,
         basis: CompiledBasis,
         qubits: &[usize],
-        readout_probability: f64,
         wpr: usize,
         rng: &mut impl Rng,
     ) {
@@ -1095,13 +1047,11 @@ impl FrameSimulator {
             match basis {
                 CompiledBasis::Z => {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
                 CompiledBasis::X => {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
                 }
@@ -1111,7 +1061,6 @@ impl FrameSimulator {
                         *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -1125,7 +1074,6 @@ impl FrameSimulator {
         &mut self,
         basis: CompiledBasis,
         qubits: &[usize],
-        readout_probability: f64,
         wpr: usize,
         rng: &mut impl Rng,
     ) {
@@ -1133,14 +1081,12 @@ impl FrameSimulator {
             match basis {
                 CompiledBasis::Z => {
                     self.m_record.push_row(self.x_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.z_table.randomize_row(q, rng);
                 }
                 CompiledBasis::X => {
                     self.m_record.push_row(self.z_table.row_words(q));
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -1151,7 +1097,6 @@ impl FrameSimulator {
                         *word = self.x_table.row_words(q)[w] ^ self.z_table.row_words(q)[w];
                     }
                     self.m_record.push_row(&tmp);
-                    self.apply_readout_noise(readout_probability, rng);
                     self.x_table.clear_row(q);
                     self.z_table.clear_row(q);
                     self.x_table.randomize_row(q, rng);
@@ -1620,14 +1565,8 @@ impl FrameSimulator {
     }
 
     pub fn measurements(&self, ref_sample: &[bool]) -> BitTable {
-        self.try_measurements(ref_sample)
-            .expect("trusted measurement output dimensions allocate")
-    }
-
-    pub fn try_measurements(&self, ref_sample: &[bool]) -> Result<BitTable, String> {
         let num_measurements = self.m_record.len();
-        let mut result = BitTable::try_new(num_measurements, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(num_measurements, self.batch_size);
         for m in 0..num_measurements {
             let src = self.m_record.lookback_words(num_measurements - m);
             let dst = result.row_words_mut(m);
@@ -1638,37 +1577,25 @@ impl FrameSimulator {
                 }
             }
         }
-        Ok(result)
+        result
     }
 
     pub fn detections(&self) -> BitTable {
-        self.try_detections()
-            .expect("trusted detection output dimensions allocate")
-    }
-
-    pub fn try_detections(&self) -> Result<BitTable, String> {
         let n = self.det_records.len();
-        let mut result = BitTable::try_new(n, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(n, self.batch_size);
         for (i, row) in self.det_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        Ok(result)
+        result
     }
 
     pub fn observable_flips(&self) -> BitTable {
-        self.try_observable_flips()
-            .expect("trusted observable output dimensions allocate")
-    }
-
-    pub fn try_observable_flips(&self) -> Result<BitTable, String> {
         let n = self.obs_records.len();
-        let mut result = BitTable::try_new(n, self.batch_size)
-            .map_err(|err| format!("BitTable allocation failed: {err:?}"))?;
+        let mut result = BitTable::new(n, self.batch_size);
         for (i, row) in self.obs_records.iter().enumerate() {
             result.row_words_mut(i).copy_from_slice(row);
         }
-        Ok(result)
+        result
     }
 }
 

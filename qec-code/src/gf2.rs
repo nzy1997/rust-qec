@@ -78,7 +78,7 @@ impl BitPackedRow {
         if index >= self.width {
             return Err(QecError::RowWidthMismatch {
                 expected: self.width,
-                actual: index.saturating_add(1),
+                actual: index + 1,
             });
         }
         Ok(self.bit(index))

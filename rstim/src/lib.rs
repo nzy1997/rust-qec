@@ -2,17 +2,10 @@ pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-extern crate self as rstim;
-
-#[cfg(feature = "unified-cli")]
-pub mod unified_cli;
-
 pub mod ir;
-mod loss_sampler;
 pub mod recorder;
 pub mod parser;
 pub mod executor;
-pub mod interactive_shot;
 pub mod data_path;
 pub mod sim;
 pub mod coords;
@@ -21,39 +14,21 @@ pub mod dem;
 pub mod dem_provenance;
 pub mod error_analyzer;
 pub mod showcase;
-#[cfg(feature = "shot-viewer")]
-pub mod shot_viewer;
 pub mod output;
-pub mod result_stream;
-#[cfg(feature = "cli")]
 pub mod cli;
-pub mod operations;
 pub mod stats;
-#[cfg(feature = "plotting")]
-pub mod surface_code_ler;
 pub mod transforms;
 pub mod circuit_gen;
 pub mod codegen;
 pub mod m2d;
 pub mod explain_errors;
-pub mod measurement_transform;
-pub mod near_clifford;
 pub mod qp101;
 pub mod qp101_svg;
 pub mod sample_trace;
-#[cfg(feature = "cli")]
-mod detect_trace;
 pub mod perf;
 pub mod compiled;
-pub mod sample_archive;
-pub mod decoder_dataset;
-pub mod validation;
 
-pub use sampler::{
-    CompiledLossMeasurementSampler, CompiledMeasurementSampler,
-    CompiledMeasurementSamplerDiagnostics,
-};
+pub use sampler::{CompiledMeasurementSampler, CompiledMeasurementSamplerDiagnostics};
 
 #[doc(hidden)]
 pub mod rare_error_iterator;
-pub mod reference_sample_tree;

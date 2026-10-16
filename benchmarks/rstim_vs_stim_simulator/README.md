@@ -137,7 +137,7 @@ per-case selected marginal and pair rates, tolerances, sample counts, tool
 status, stderr, and failure reasons. By default the verifier uses
 `target/release/rstim` if it already exists, otherwise `target/debug/rstim` if
 it exists, and otherwise falls back to
-`cargo run --offline --quiet -p rstim --features cli --bin rstim --`, so the documented smoke
+`cargo run --offline --quiet -p rstim --bin rstim --`, so the documented smoke
 command works in a normal checkout without needing a separate prebuild step.
 
 Run the verifier negative control:
@@ -160,8 +160,8 @@ Run a single public speed case with an explicit `rstim` build profile:
 python3 -m benchmarks.rstim_vs_stim_simulator.run_speed_case \
   --profile release \
   --case stim-style-surface-sample-d11-r100-b1024 \
-  --warmup-rounds 2 \
-  --measure-rounds 11 \
+  --warmup-rounds 0 \
+  --measure-rounds 1 \
   --out-dir /tmp/rstim-speed-release
 ```
 
@@ -170,61 +170,10 @@ The runner builds `target/release/rstim` for `--profile release` or
 `rstim perf summarize`, and `rstim perf report`. It writes `raw.jsonl`,
 `summary.json`, `report.md`, and `environment.json` under `--out-dir`.
 
-The selected public case reports four items: Stim CLI, interpreted rstim,
-compiled rstim, and interpreted rstim with atom loss. Only the fourth item
-uses the paired atom-loss fixture, and the report prints the atom-loss versus
-interpreted ratio. Its probability contract is
-`p = 1 - 0.999^(1/3) ~= 0.0003334445062`: one depolarization event plus two
-independent per-atom loss events per two-qubit gate preserve an aggregate error
-probability of `0.001`.
-
 This runner is for selected-case evidence only. It does not set a timing
 threshold, update checked results, or optimize sampler internals.
 
-## Split Precompile, Sample, and `b8` Evidence
-
-Compare five surface-code sampling paths under one output boundary:
-
-```sh
-python3 -m benchmarks.rstim_vs_stim_simulator.run_compiled_steady \
-  --manifest benchmarks/rstim_vs_stim_simulator/fair_cli_cases.toml \
-  --case stim_surface_d11_r100 \
-  --profile release \
-  --warmup-rounds 2 \
-  --measure-rounds 7 \
-  --seed 0 \
-  --out-dir /tmp/rstim-compiled-steady
-```
-
-The worker records one-time precompilation separately, then splits each measured
-call into the implementation's sampling path and its `b8` output step. The
-headline total is the sum of those two worker-local phases and excludes both
-one-time precompilation and stdin/stdout pipe transport. Precompiled variants
-reuse a sampler; direct variants include per-batch setup required by that
-implementation in their sampling-path phase. Worker startup and initial fixture
-parsing occur before all recorded timers.
-
-The phase boundary follows each public API: Stim's `sample(bit_packed=True)`
-returns an already packed array, so its packing work remains inside the sampling
-path and its `b8` step is only byte serialization. `rstim` returns an internal
-bit table and converts it through its `b8` writer. The total is therefore the
-fair output-boundary comparison; phase columns explain where each implementation
-spends that total.
-
-The atom-loss row precompiles and reuses its loss operation plan and noiseless
-reference. Its self-contained CSS frame masks H/CX/Pauli operations independently
-for 64 shots at a time, including CX gates skipped after loss, while preserving
-the same output boundary as the other four rows.
-
 ## Selected DEM Speed Evidence
-
-Fetch the generated 13 MB DEM fixture from the pinned benchmark-artifact
-revision before running or checking this case:
-
-```sh
-python3 tools/fetch_benchmark_artifacts.py \
-  --path benchmarks/rstim_vs_stim_simulator/fixtures/stim_surface_code_rotated_memory_z_d11_r100.dem
-```
 
 Run the checked release-profile DEM sampling evidence case:
 
