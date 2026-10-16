@@ -219,6 +219,14 @@ pub(super) struct Dataset {
 }
 
 pub(super) fn read_dataset(path: &Path) -> Result<Dataset, DecodeFailure> {
+    read_bundle(path, false)
+}
+
+pub(super) fn read_dataset_for_scoring(path: &Path) -> Result<Dataset, DecodeFailure> {
+    read_bundle(path, true)
+}
+
+fn read_bundle(path: &Path, for_scoring: bool) -> Result<Dataset, DecodeFailure> {
     let manifest_path = path.join("manifest.json");
     let circuit_path = path.join("circuit.stim");
     let shots_path = path.join("shots.b8");
@@ -233,10 +241,20 @@ pub(super) fn read_dataset(path: &Path) -> Result<Dataset, DecodeFailure> {
     let manifest_bytes = fs::read(&manifest_path)
         .map_err(|error| DecodeFailure::new("missing_dataset_file", format!("{error}")))?;
     let manifest = parse_manifest(&manifest_bytes)?;
-    if manifest.mode != "measurements_blinded" || manifest.row.kind != "measurements" {
+    let supported_mode = if for_scoring {
+        (manifest.mode == "measurements_blinded" && manifest.row.kind == "measurements")
+            || (manifest.mode == "detectors" && manifest.row.kind == "detectors")
+    } else {
+        manifest.mode == "measurements_blinded" && manifest.row.kind == "measurements"
+    };
+    if !supported_mode {
         return Err(DecodeFailure::new(
             "unsupported_dataset_mode",
-            "decode requires a measurements_blinded dataset",
+            if for_scoring {
+                "score requires a detectors or measurements_blinded dataset"
+            } else {
+                "decode requires a measurements_blinded dataset"
+            },
         ));
     }
     if manifest.row.encoding != "b8" || manifest.row.bit_order != "lsb_first" {
@@ -405,7 +423,7 @@ pub(super) fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn sha256_file(path: &Path) -> Result<String, DecodeFailure> {
+pub(super) fn sha256_file(path: &Path) -> Result<String, DecodeFailure> {
     let file = File::open(path)
         .map_err(|error| DecodeFailure::new("missing_dataset_file", error.to_string()))?;
     let mut reader = BufReader::new(file);

@@ -511,16 +511,12 @@ fn dataset_export_then_decode_closes_the_midswap_loop() {
             circuit.to_str().unwrap(),
             "--shots",
             "8",
-            "--mode",
-            "measurements_blinded",
             "--public-out",
             public.to_str().unwrap(),
             "--private-out",
             private.to_str().unwrap(),
             "--seed",
             "7",
-            "--logical-x-qubits",
-            "1,8,15",
         ])
         .output()
         .unwrap();
@@ -554,6 +550,22 @@ fn dataset_export_then_decode_closes_the_midswap_loop() {
     assert_eq!(std::fs::metadata(&predictions).unwrap().len(), 8);
     let stats: serde_json::Value = serde_json::from_slice(&std::fs::read(&stats).unwrap()).unwrap();
     assert_eq!(stats["shot_count"], 8);
+
+    let output = rustqec_cmd()
+        .args([
+            "dataset",
+            "score",
+            "--dataset",
+            public.to_str().unwrap(),
+            "--private",
+            private.to_str().unwrap(),
+            "--predictions",
+            predictions.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{:?}", output);
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Scored shots: 8"));
 }
 
 #[test]
@@ -804,8 +816,10 @@ fn capabilities_lists_the_pipeline_verbs_with_contracts() {
         .unwrap();
     assert_eq!(
         mode["values"],
-        serde_json::json!(["detectors", "measurements_blinded"])
+        serde_json::json!(["auto", "detectors", "measurements_blinded"])
     );
+    assert_eq!(mode["required"], false);
+    assert_eq!(mode["default"], "auto");
     let trace_argument = export["arguments"]
         .as_array()
         .unwrap()

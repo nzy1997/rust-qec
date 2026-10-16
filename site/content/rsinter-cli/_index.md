@@ -6,11 +6,11 @@ root = ".."
 nav = "rsinter-cli"
 cli_key = "rsinter"
 +++
-`rsinter` provides experimental decoder replay and benchmark orchestration. Replay consumes frozen detector inputs; benchmark campaigns generate or collect cases. Neither is a supported universal decoder ranking.
+`rsinter` provides experimental decoder replay and benchmark orchestration. Replay consumes frozen detector inputs; benchmark campaigns generate or collect cases.
 
 ## Decoder replay
 
-`replay` reads a DEM and `b8` detector rows and writes `b8` observable predictions plus JSON statistics. It compiles the decoder once and streams batches. Inputs, configuration and output paths must be distinct; outputs are installed after successful validation and decoding. `--shots` validates the inferred count and is required for a zero-detector model. [Compare two decoders](../decoding/) on the same input before running a large campaign.
+`replay` reads a DEM and `b8` detector rows and writes `b8` observable predictions plus JSON statistics. It compiles the decoder once and streams batches. Inputs, configuration and output paths must be distinct; outputs are installed after successful validation and decoding. `--shots` validates the inferred count and is required for a zero-detector model. Statistics include dimensions, normalized configuration, input/output hashes and timing. [Compare two decoders](../decoding/) on the same input before running a large campaign.
 
 | Decoder | Feature | Configuration |
 | --- | --- | --- |

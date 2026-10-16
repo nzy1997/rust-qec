@@ -35,6 +35,7 @@ COMPAT_MANIFEST = Path("rstim/tests/fixtures/rsmp/v1/manifest.toml")
 COMPAT_ARCHIVE = Path("rstim/tests/fixtures/rsmp/v1/compat-v1.rsmp")
 NORMATIVE_DOC = Path("rstim/doc/rsmp-v1.md")
 CLI_DOC = Path("rstim/doc/rsmp-cli.md")
+MAINTAINER_DOC = Path("docs/maintainer-reference.md")
 COMPRESSION_DIR = Path("benchmarks/rstim_vs_stim_simulator/results/rsmp-v1")
 CORRUPTION_SUMMARY_NAME = "corruption-summary.json"
 
@@ -791,8 +792,10 @@ def validate_documentation(
 ) -> None:
     normative_path = repo_path(ctx.repo_root, NORMATIVE_DOC)
     cli_doc_path = repo_path(ctx.repo_root, CLI_DOC)
+    maintainer_path = repo_path(ctx.repo_root, MAINTAINER_DOC)
     normative = normative_path.read_text(encoding="utf-8")
     cli_doc = cli_doc_path.read_text(encoding="utf-8")
+    maintainer = maintainer_path.read_text(encoding="utf-8")
 
     transform = extract_section(normative, "Circuit-Derived Lossless Transform")
     require_all(
@@ -860,9 +863,18 @@ def validate_documentation(
         ["immutable", "additive", "compat-v1.rsmp", "sparse", "dense"],
         "normative documentation does not cover compatibility fixture policy",
     )
-    compression = extract_section(normative, "Compression Evidence and Claim Limits")
+    compression = extract_section(normative, "Compression Evidence")
     require_all(
         compression,
+        [
+            "../../benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/",
+            "../../docs/maintainer-reference.md#rsmp-compression-evidence",
+        ],
+        "normative documentation does not link compression evidence and reproduction guidance",
+    )
+    compression_guidance = extract_section(maintainer, "RSMP compression evidence")
+    require_all(
+        compression_guidance,
         [
             "benchmark_raw_lt_20pct",
             "benchmark_zstd_lt_75pct",
@@ -870,7 +882,7 @@ def validate_documentation(
             "python3 tools/check_rsmp_v1_compression_evidence.py",
             "No fixed wall-clock performance gate",
         ],
-        "normative documentation does not cover compression evidence gates",
+        "maintainer documentation does not cover compression evidence gates and claim limits",
     )
     operational = extract_section(cli_doc, "Operational Semantics")
     require_all(
@@ -910,6 +922,7 @@ def validate_documentation(
     report["documentation"] = {
         "normative_doc_sha256": sha256_file(normative_path),
         "cli_doc_sha256": sha256_file(cli_doc_path),
+        "maintainer_doc_sha256": sha256_file(maintainer_path),
         "normalized_help_sha256": sha256_bytes(canonical_json(help_model).encode("utf-8")),
     }
 

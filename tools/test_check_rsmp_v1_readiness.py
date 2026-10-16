@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools import check_rsmp_v1_compression_evidence as compression_checker
+from tools import check_rsmp_v1_readiness as readiness_checker
 
 
 CHECKER = REPO_ROOT / "tools" / "check_rsmp_v1_readiness.py"
@@ -25,6 +26,55 @@ PASS_LINE = (
     "compatibility=1 compression=pass"
 )
 COMPRESSION_DIR = Path("benchmarks/rstim_vs_stim_simulator/results/rsmp-v1")
+
+
+class RsmpV1DocumentationControls(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory(prefix="rstim-rsmp-docs-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.context = readiness_checker.ReadinessContext(self.root, self.root / "out")
+        for relative in (readiness_checker.NORMATIVE_DOC, readiness_checker.CLI_DOC,
+                         readiness_checker.MAINTAINER_DOC):
+            target = self.root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO_ROOT / relative, target)
+
+    def test_split_documentation_retains_all_source_hashes(self) -> None:
+        report: dict[str, Any] = {}
+        readiness_checker.validate_documentation(self.context, report, run_commands=False)
+        for key, relative in (
+            ("normative_doc_sha256", readiness_checker.NORMATIVE_DOC),
+            ("cli_doc_sha256", readiness_checker.CLI_DOC),
+            ("maintainer_doc_sha256", readiness_checker.MAINTAINER_DOC),
+        ):
+            self.assertEqual(report["documentation"][key],
+                             readiness_checker.sha256_file(self.root / relative))
+
+    def test_rejects_removed_compression_links(self) -> None:
+        self.reject_removed_phrases(readiness_checker.NORMATIVE_DOC, [
+            "../../benchmarks/rstim_vs_stim_simulator/results/rsmp-v1/",
+            "../../docs/maintainer-reference.md#rsmp-compression-evidence",
+        ], "normative documentation does not link compression evidence")
+
+    def test_rejects_removed_maintainer_gates_commands_and_claim_limits(self) -> None:
+        self.reject_removed_phrases(readiness_checker.MAINTAINER_DOC, [
+            "benchmark_raw_lt_20pct", "benchmark_zstd_lt_75pct",
+            "high_entropy_raw_le_102pct",
+            "python3 tools/check_rsmp_v1_compression_evidence.py",
+            "No fixed\nwall-clock performance gate",
+        ], "maintainer documentation does not cover compression evidence gates and claim limits")
+
+    def reject_removed_phrases(self, relative: Path, phrases: list[str], message: str) -> None:
+        path = self.root / relative
+        original = path.read_text(encoding="utf-8")
+        for phrase in phrases:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, original)
+                path.write_text(original.replace(phrase, ""), encoding="utf-8")
+                with self.assertRaisesRegex(readiness_checker.ReadinessFailure, message):
+                    readiness_checker.validate_documentation(self.context, {}, run_commands=False)
+        path.write_text(original, encoding="utf-8")
 
 
 class RsmpV1ReadinessNegativeControls(unittest.TestCase):
@@ -97,6 +147,7 @@ class RsmpV1ReadinessNegativeControls(unittest.TestCase):
         shutil.copy2(REPO_ROOT / "Cargo.lock", temp_root / "Cargo.lock")
         self.copy_tree("rstim/tests/fixtures/rsmp", temp_root)
         self.copy_tree("rstim/doc", temp_root)
+        self.copy_file(readiness_checker.MAINTAINER_DOC, temp_root)
         self.copy_tree(COMPRESSION_DIR, temp_root)
         benchmark = Path(
             "benchmarks/rstim_vs_stim_simulator/fixtures/"

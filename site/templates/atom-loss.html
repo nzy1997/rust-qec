@@ -8,27 +8,59 @@
 </div>
 {% endblock hero %}
 {% block main %}
-<section class="task-section" aria-labelledby="loss-information">
-  <h2 id="loss-information">The experiment at a glance</h2>
-  <p>Atom loss removes a qubit until reset. A loss flag records whether its measurement is missing; a decoder uses these flags and surviving measurements to predict the logical flip.</p>
-  <div class="content-links"><a href="../examples/atom-loss/tutorial.zip" download>Download example ↓</a></div>
-  <ol class="loss-flow" aria-label="Experiment workflow">
-    <li><span>01</span><strong>Generate</strong><small>circuit.stim</small></li>
-    <li><span>02</span><strong>Sample</strong><small>public + private</small></li>
-    <li><span>03</span><strong>Decode</strong><small>public → predictions</small></li>
-    <li><span>04</span><strong>Check</strong><small>predictions + answers</small></li>
-  </ol>
-  <p class="loss-inline-note"><strong>Data boundary</strong> Only public records enter the decoder. Private answers are used at the final scoring step.</p>
-  <details class="loss-disclosure"><summary>Run the downloaded example</summary>
-    <p>The example ZIP contains <code>run.sh</code>, <code>check.py</code> and a README. Extract it, then run all four steps:</p>
-    <pre data-language="Shell"><code>sh run.sh</code></pre>
-  </details>
-  <details class="loss-disclosure"><summary>Decoder support and scope</summary>
-    <p>Envelope matching is <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> within its declared Mid-SWAP scope. This tutorial exercises one generated case. <a href="../support/#atom-loss-support-boundary">Decoder choices and exact support limits →</a></p>
-  </details>
+<section class="task-section" aria-labelledby="why-atom-loss">
+  <h2 id="why-atom-loss">Why atom loss needs its own decoder</h2>
+  <p><strong>Atom loss.</strong> In a neutral-atom quantum computer, each physical qubit is stored in an atom held in a trap. An atom-loss error occurs when that atom escapes: its quantum state is no longer available to the computation, and later gates involving it cannot run as intended.</p>
+  <p><strong>Why it matters.</strong> Atom loss is a major error source in neutral-atom hardware. A missing atom can disrupt repeated error-correction checks until it is replaced. Detecting which atom is missing also gives the decoder useful information about the error location, helping it recover the logical information encoded across the remaining atoms.</p>
+  <p><strong>The decoding challenge.</strong> Ordinary measurement (<code>M</code>) records only a value bit; loss-aware measurement (<a href="../circuit-format/#atom-loss-extensions"><code>ML</code></a>) also records whether the atom is missing. A loss flag at readout tells us which atom is missing, but may not tell us when it disappeared. Loss before a gate and loss after it can affect different checks; one missing atom can disrupt several later interactions. The decoder must use the surviving measurements while accounting for these possible histories and ordinary Pauli errors. With multiple losses, the number of possible histories grows rapidly. See the <a href="https://arxiv.org/html/2502.20558v3#S2">delayed loss detection framework</a> for background.</p>
+  <p id="loss-information">The four steps below generate a Mid-SWAP memory-Z circuit, sample 64 shots, decode them with Envelope matching and check the predictions. With <code>rstim</code> <a href="../get-started/">installed</a> and on your PATH, copy and run the commands in order in the same empty working directory.</p>
+</section>
+<section class="task-section loss-step" aria-labelledby="model-loss"><h2 id="model-loss">1. Generate the circuit</h2>
+  <p>Create a distance-3, two-round Mid-SWAP memory circuit. Mid-SWAP exchanges data/check roles during the checks so readout can reveal loss.</p>
+<pre data-language="Shell" data-atom-loss-step="model"><code>rstim circuit gen \
+  --code surface_code --task rotated_memory_z_midswap \
+  --distance 3 --rounds 2 --after-clifford-depolarization 0.002 \
+  --operation-loss-probability 0.002 \
+  --measurement-loss-probability 0.003 \
+  --out circuit.stim</code></pre>
+  <p><code>--after-clifford-depolarization</code> sets Pauli noise after Clifford gates. <code>--operation-loss-probability</code> sets loss on gate targets; <code>--measurement-loss-probability</code> sets loss at readout.</p>
+  <div class="loss-circuit-crops" id="loss-circuit-crops">
+    <figure class="loss-circuit-crop">
+      <img src="../examples/atom-loss/operation-loss-crop.svg" width="544" height="176" alt="Circuit crop on q2: H, D1 with probability 0.002, then LOSS with probability 0.002">
+      <figcaption><strong>Operation loss.</strong> <code>LOSS(0.002)</code> follows the H gate on q2. <code>D1</code> is the separate Pauli depolarization channel.</figcaption>
+    </figure>
+    <figure class="loss-circuit-crop">
+      <img src="../examples/atom-loss/measurement-loss-crop.svg" width="328" height="176" alt="Circuit crop on q2: LOSS with probability 0.003 immediately before the final ML readout, which produces loss flag and value records">
+      <figcaption><strong>Measurement loss.</strong> <code>LOSS(0.003)</code> appears immediately before <code>ML</code>, which records a loss flag and measurement value.</figcaption>
+    </figure>
+  </div>
+</section>
+<section class="task-section loss-step" aria-labelledby="sample-loss"><h2 id="sample-loss">2. Sample 64 shots</h2>
+  <p>The decoder reads the circuit and measurements (<code>shots.b8</code>) from <code>data/public/</code>; <code>data/private/</code> holds the answers (<code>answers.b8</code>) and input masks for scoring only.</p>
+<pre data-language="Shell" data-atom-loss-step="sample"><code>mkdir -p data
+rstim dataset export \
+  --circuit circuit.stim --shots 64 --seed 7 \
+  --public-out data/public --private-out data/private</code></pre>
+  <p>The generated circuit records the logical-input insertion point and logical-X qubits for its layout. The exporter reads this metadata automatically, privately randomizes the input bit and exports the loss flag/value measurements.</p>
+</section>
+<section class="task-section loss-step" aria-labelledby="decode-loss"><h2 id="decode-loss">3. Decode public records</h2>
+  <p>Envelope matching builds a graph conditioned on the observed loss pattern, then predicts one logical flip per shot from the public records.</p>
+<pre data-language="Shell" data-atom-loss-step="decode"><code>rstim decode --decoder envelope-matching \
+  --dataset data/public \
+  --out predictions.b8 --stats-out decode-stats.json</code></pre>
+  <p><code>predictions.b8</code> contains one predicted bit per shot, stored in one byte for this one-observable circuit. <code>decode-stats.json</code> records shot counts, compilation and decoding time, and failures.</p>
+</section>
+<section class="task-section loss-step" aria-labelledby="check-predictions"><h2 id="check-predictions">4. Check the predictions</h2>
+  <p>Compare the predictions with the matching private answer bundle:</p>
+<pre data-language="Shell" data-atom-loss-step="check"><code>rstim dataset score \
+  --dataset data/public --private data/private \
+  --predictions predictions.b8 --decode-stats decode-stats.json</code></pre>
+  <pre data-output="true" data-language="Expected output · seed 7"><code>Scored shots: 64
+Logical errors: 0 / 64</code></pre>
+  <p>Each shot with a disagreement between a prediction and its private answer counts as one logical error. Compare predictions directly with <code>answers.b8</code>, which already accounts for the hidden input masks. Add <code>--format json</code> for a structured result including the logical error rate.</p>
 </section>
 <section class="task-section"><h2 id="loss-record">The loss model and stored record</h2>
-<p><code>LOSS(p)</code> removes each present target independently with probability p. A lost atom stays absent until reset. Single-qubit gates skip it; a two-qubit gate is skipped when either partner is absent. These are the simulator's explicit model choices.</p>
+<p><code>LOSS(p)</code> removes each present target independently with probability p. A lost atom stays absent until reset. Single-qubit gates skip it; a two-qubit gate is skipped when either partner is absent.</p>
 <p><code>ML</code> stores two bits per target: loss flag first, then value. A flag of 0 means the value is a measurement outcome. A flag of 1 means the stored value is a placeholder; it must not become ordinary syndrome evidence. <code>MRL</code> reports the same pair and then resets, restoring the atom.</p>
 <pre data-language="Shell" data-loss-model-example="true"><code>cat &gt; loss-record.stim &lt;&lt;'STIM'
 R 0
@@ -41,87 +73,23 @@ rstim circuit sample --in loss-record.stim --shots 1 --seed 7 \
   --out-format 01 --out loss-record.01 &gt; /dev/null
 cat loss-record.01</code></pre>
 <pre data-output="true"><code>1100</code></pre>
-<p>The first <code>11</code> is a lost flag plus placeholder. After reset, <code>00</code> is a present atom measured in |0⟩. This small example demonstrates sampling semantics; it does not meet the native decoder's full circuit contract.</p>
-<p>A heralded loss readout identifies an interval in which loss occurred, rather than its exact physical time. Keep flags alongside values and use surviving checks. The <a href="../circuit-format/#atom-loss-extensions">instruction reference</a> separates simulator semantics from the native decoder's Z-only, flat-circuit acceptance rules.</p></section>
+<p>The first <code>11</code> is a lost flag plus placeholder. After reset, <code>00</code> is a present atom measured in |0⟩. See the <a href="../circuit-format/#atom-loss-extensions">instruction reference</a> for the full readout rules.</p></section>
 <section class="task-section"><h2 id="midswap-gadget">What the Mid-SWAP gadget changes</h2>
 <p>The generator alternates the order of four CX layers. After the first physical layer in each round it exchanges the logical data/check roles of the participating wires; later gates and readout use the updated mapping. Reading and resetting the current check roles helps expose losses that would otherwise remain on a data role.</p>
-<figure class="result-plot midswap-schedule"><div class="diagram-scroll"><img src="../examples/atom-loss/midswap-schedule.svg" alt="Mid-SWAP round schedule: first CX layer, role exchange, remaining CX layers, and check-role loss-visible measurement and reset"></div><figcaption>This is a schedule diagram. Physical wire identities stay fixed; the generated circuit records role exchanges with MIDSWAP_SHUTTLE comments and does not insert a literal SWAP instruction.</figcaption></figure>
-<p>The model keeps physical loss state attached to its wire until reset; changing a logical role does not itself restore a lost atom. The generated circuit below is the executable definition. Inspect it with <code>rstim render_svg</code> or <a href="../interactive/">Shot Lab</a> to see actual gates and paired flag/value records.</p>
-</section>
-<section class="task-section loss-step" aria-labelledby="model-loss"><h2 id="model-loss">1. Generate the circuit</h2>
-  <p>Create a distance-3, two-round Mid-SWAP memory circuit. Mid-SWAP exchanges data/check roles during the checks so readout can reveal loss.</p>
-<pre data-language="Shell" data-atom-loss-step="model"><code>rstim circuit gen \
-  --code surface_code --task rotated_memory_z_midswap \
-  --distance 3 --rounds 2 --after-clifford-depolarization 0.002 \
-  --operation-loss-probability 0.002 \
-  --measurement-loss-probability 0.003 \
-  --out circuit.stim</code></pre>
-  <p><code>--after-clifford-depolarization</code> sets Pauli noise after Clifford gates. <code>--operation-loss-probability</code> sets loss on gate targets; <code>--measurement-loss-probability</code> sets loss at readout. All four steps use <code>circuit.stim</code>.</p>
-</section>
-<section class="task-section loss-step" aria-labelledby="sample-loss"><h2 id="sample-loss">2. Sample 64 shots</h2>
-  <p>Export loss-visible measurements and keep the answer key in a separate bundle.</p>
-<pre data-language="Shell" data-atom-loss-step="sample"><code>mkdir -p data
-rstim dataset export \
-  --circuit circuit.stim --shots 64 --seed 7 \
-  --mode measurements_blinded --logical-x-qubits 1,8,15 \
-  --public-out data/public --private-out data/private</code></pre>
-  <div class="loss-bundle-grid" data-toc-skip>
-    <div><span class="loss-label">DECODER INPUT</span><h3>data/public/</h3><p>Circuit, manifest and measurement rows in <code>shots.b8</code>.</p></div>
-    <div><span class="loss-label">SCORING ONLY</span><h3>data/private/</h3><p>Logical-error targets in <code>answers.b8</code>, input masks and a manifest.</p></div>
-  </div>
-  <p class="loss-inline-note"><strong>Changing the layout?</strong> The logical-X support <code>1,8,15</code> is specific to this circuit. Recompute it and regenerate both bundles together.</p>
-</section>
-<section class="task-section loss-step" aria-labelledby="decode-loss"><h2 id="decode-loss">3. Decode public records</h2>
-  <p>Envelope matching builds a graph conditioned on the observed loss pattern, then predicts one logical flip per shot from the public records.</p>
-<pre data-language="Shell" data-atom-loss-step="decode"><code>rstim decode --decoder envelope-matching \
-  --dataset data/public \
-  --out predictions.b8 --stats-out decode-stats.json</code></pre>
-  <p class="loss-output"><strong>Creates</strong> <code>predictions.b8</code> and <code>decode-stats.json</code>.</p>
-  <details class="loss-disclosure"><summary>What is in the output?</summary><p>The prediction file contains one byte per shot in this one-observable example. Statistics report shot counts, distinct loss patterns, compilation and decoding time, and failures.</p><p><a href="#choose-decoder">Compare matching and exact MLE →</a></p></details>
-</section>
-<section class="task-section loss-step" aria-labelledby="check-predictions"><h2 id="check-predictions">4. Check the predictions</h2>
-  <p>Save <a href="../examples/atom-loss/check.py" download>check.py ↓</a> in your working directory (also included in the example ZIP), then run:</p>
-  <pre data-language="Shell"><code>python3 check.py</code></pre>
-  <pre data-output="true" data-language="Expected output · seed 7"><code>Decoded shots: 64
-Loss patterns: 10
-Logical errors: 0 / 64</code></pre>
-  <p>Each disagreement between a prediction and its private answer counts as one logical error.</p>
-  <details class="loss-disclosure"><summary>Or copy the complete check into your terminal</summary>
-<pre data-language="Shell" data-atom-loss-step="check"><code>python3 - &lt;&lt;'PY'
-import json
-from pathlib import Path
-
-public = json.loads(Path('data/public/manifest.json').read_text())
-private = json.loads(Path('data/private/manifest.json').read_text())
-stats = json.loads(Path('decode-stats.json').read_text())
-predictions = Path('predictions.b8').read_bytes()
-answers = Path('data/private/answers.b8').read_bytes()
-assert public['dataset_id'] == private['dataset_id'], 'Mismatched datasets'
-assert public['circuit']['observables'] == 1, 'This check expects one observable'
-assert (
-    len(predictions) == len(answers) == public['shots'] == stats['shot_count']
-), 'Incomplete rows'
-assert all(bit in (0, 1) for bit in predictions + answers), 'Invalid padding bits'
-errors = sum(predicted != answer for predicted, answer in zip(predictions, answers))
-print(f"Decoded shots: {stats['shot_count']}")
-print(f"Loss patterns: {stats['distinct_loss_patterns']}")
-print(f"Logical errors: {errors} / {public['shots']}")
-PY</code></pre>
-  </details>
-  <p class="loss-inline-note"><strong>Interpretation</strong> Zero errors in 64 shots checks this example. It does not establish a zero logical error rate.</p>
+<figure class="result-plot midswap-schedule"><div class="diagram-scroll"><img src="../examples/atom-loss/midswap-schedule.svg" alt="Mid-SWAP round schedule: first CX layer, role exchange, remaining CX layers, and check-role loss-visible measurement and reset"></div><figcaption>Physical wire identities stay fixed while data/check roles change.</figcaption></figure>
+<p>Physical loss stays attached to its wire until reset; changing a logical role does not restore a lost atom. Inspect the circuit with <code>rstim render_svg</code> or <a href="../interactive/">Shot Lab</a> to see gates and paired flag/value records.</p>
 </section>
 <section class="task-section"><h2 id="choose-decoder">Decoder choices and method sources</h2>
-<p><code>envelope-matching</code> is included in the default CLI and uses matching on a loss-conditioned graph. <code>envelope-mle</code> requires the optional <code>ilp</code> build and searches for the most likely fault configuration in the implemented envelope model. It is not a claim of optimal decoding for an arbitrary physical noise model.</p>
-<p>These implementations reproduce methods described in <a href="https://arxiv.org/abs/2603.04156v2">Liu et al., Achieving Optimal-Distance Atom-Loss Correction via Pauli Envelope (v2)</a>. That pinned version is the reproduction reference; subsequent paper revisions may differ. For delayed loss detection background, see <a href="https://arxiv.org/abs/2502.20558v3">Baranes et al., Leveraging Qubit Loss Detection in Fault Tolerant Quantum Algorithms</a>. Algorithm derivations are left to the original papers.</p>
-<p>Envelope matching is <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span>; its <span data-evidence-link="envelope-matching">release evidence is not published and verified yet</span>. Envelope MLE is <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span>; its <span data-evidence-link="envelope-mle">release evidence is not published and verified yet</span>.</p>
-<p>Matching and MLE have independently verified release evidence and different supported workloads. See the <a href="../support/#atom-loss-support-boundary">support table</a> and <a href="../atom-loss-evidence/#loss-accuracy-time">measured accuracy and timing</a>. A decoder accepting a circuit does not establish a Supported claim for every distance, loss rate or batch size.</p>
+<p><code>envelope-matching</code>, used in this tutorial, is included in the default CLI and uses matching on a loss-conditioned graph. <code>envelope-mle</code> requires the optional <code>ilp</code> build and finds the most likely fault configuration within the envelope model.</p>
+<p data-decoder-support-summary="envelope-matching,envelope-mle">See the <a href="../support/#atom-loss-support-boundary">support table</a> for release status.</p>
+<p>The methods follow <a href="https://arxiv.org/abs/2603.04156v2">Liu et al., Pauli Envelope (v2)</a>, the pinned reproduction reference. For background on delayed loss detection, see <a href="https://arxiv.org/abs/2502.20558v3">Baranes et al.</a></p>
 </section>
 <section class="task-section" aria-labelledby="supported-circuits">
   <h2 id="supported-circuits">Troubleshooting &amp; support</h2>
-  <details class="loss-disclosure"><summary id="troubleshoot-unsupported-circuit">The decoder reports unsupported_circuit</summary><p>The input falls outside the compiler’s acceptance rules. Start with the exact circuit above, then compare your changes with the <a href="../support/#atom-loss-support-boundary">support contract</a>. A rejection is not a logical prediction.</p></details>
-  <details class="loss-disclosure"><summary id="troubleshoot-different-output">The output differs from the example</summary><p>Check the CLI version, seed 7, 64 shots, circuit parameters and decoder choice. Use a fresh directory and rerun all four steps. Do not score a failed or incomplete decoding run.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-unsupported-circuit">The decoder reports unsupported_circuit</summary><p>The input falls outside the compiler’s acceptance rules. Start with the exact circuit above, then compare your changes with the <a href="../support/#atom-loss-support-boundary">support contract</a>.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-different-output">The output differs from the example</summary><p>Check the CLI version, seed 7, 64 shots, circuit parameters and decoder choice. Use a fresh directory and rerun all four steps.</p></details>
   <details class="loss-disclosure"><summary id="troubleshoot-dataset-mismatch">The check reports mismatched datasets or incomplete rows</summary><p>Regenerate the public and private bundles together, then rerun decoding. Both manifests must share a <code>dataset_id</code>, and prediction, answer and statistics counts must agree. Do not combine files from different runs.</p></details>
-  <details class="loss-disclosure"><summary id="troubleshoot-input-masks">Should I apply the private input masks again?</summary><p>No. The physical logical-error targets already account for the hidden logical-input masks. Compare predictions directly with <code>answers.b8</code>.</p></details>
+  <details class="loss-disclosure"><summary id="troubleshoot-input-masks">Should I apply the private input masks again?</summary><p>No. Compare predictions directly with <code>answers.b8</code> as in <a href="#check-predictions">step 4</a>.</p></details>
 </section>
 <section class="task-section" aria-labelledby="next-steps">
   <span id="atom-loss-results" aria-hidden="true"></span><h2 id="next-steps">Take the next step</h2>

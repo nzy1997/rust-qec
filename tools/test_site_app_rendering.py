@@ -112,6 +112,11 @@ class SiteAppRenderingTest(unittest.TestCase):
 
             (async () => {
               const html = await renderCheckedCards(manifest);
+              for (const card of html.split('class="result-card-copy"').slice(1)) {
+                const visibleCopy = card.split('<details class="evidence-details evidence-provenance">')[0];
+                assertExcludes(visibleCopy, '<strong>Claims limit:</strong>');
+                assertIncludes(card, '<strong>Claims limit:</strong>');
+              }
               const surfaceItem = evidenceItem(manifest, "surface-decoder-full");
               const artifactHashes = surfaceItem.provenance.artifact_hashes.value;
               const artifactPath = Object.keys(artifactHashes)[0];

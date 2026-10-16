@@ -5,9 +5,6 @@ selects the development branch or a stable release; individual crates may have
 different patch versions. Package requirements such as `rstim >=0.3.1,<0.4.0`
 apply to that crate.
 
-Decoder support levels apply only when the published release's evidence bundle
-verifies them. Each interface also has the input limits described below.
-
 ## Support levels
 
 **Supported** means the documented behavior is checked within its declared
@@ -16,63 +13,45 @@ identifies research workflows without a supported-interface promise.
 
 | Surface | Level | Supported boundary |
 | --- | --- | --- |
-| `rstim` unified CLI and its capability/error envelopes | Supported | Use the commands and structured error codes advertised by `rstim capabilities --format json`. The CLI rejects unsupported inputs with a named error code instead of silently producing a result. |
-| `rstim` circuit APIs and CLI | Supported | The documented simulator and CLI inputs are supported within their documented command-specific limits. The contract does not extend to every Stim extension or every analysis/export mode. |
-| Atom-loss `envelope-matching` decoder | <span data-decoder-support-copy="envelope-matching">Beta unless v0.3.3 publication verification succeeds</span> | Flat loss-visible Mid-SWAP memory-Z circuits within the declared circuit contract and the measured operating envelope. The v0.3.1 and v0.3.2 candidates did not complete consistent publication verification. Finite tested size/loss points are not an untested Cartesian-product or universal latency guarantee. |
-| Atom-loss `envelope-mle` decoder | <span data-decoder-support-copy="envelope-mle">Beta unless v0.3.3 publication verification succeeds</span> | Exactly four measured Mid-SWAP workload points declared by the executable scope plan [`docs/envelope-mle-scope.json`](envelope-mle-scope.json): d=3/r=2 at loss 0.002 and d=3/r=1 at loss 0.01, each at batches 1,024 and 16,384, with no interpolation. Requires the `ilp` feature or an official native archive; the conventional fixture and every unlisted size/loss/batch point are outside the Supported promise. |
-| Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | These are useful implementation and evidence tools. Their presence does not establish a universal decoder comparison, a universal Stim/PyMatching replacement, or a publication-scale result. |
+| `rstim` unified CLI and its capability/error envelopes | Supported | Commands and structured error codes advertised by `rstim capabilities --format json` |
+| `rstim` circuit APIs and CLI | Supported | Documented simulator and CLI inputs within command-specific limits; support varies by analysis/export mode |
+| Atom-loss envelope decoders | [Decoder-specific status below](#atom-loss-support-boundary) | Loss-visible Z readout circuits; build requirements and tested operating points below |
+| Decoder experiments, benchmark harnesses, and optional visualization/research workflows | Experimental | Inputs and methodology are specific to each workflow |
 
 ## Atom-loss support boundary
 
-The atom-loss support promise is defined per decoder by the executable matrix
-[`docs/envelope-support.json`](envelope-support.json). The matrix records each
-decoder's build features and maturity, the circuit contract (families, readout
-basis, allowed instructions, observable/sweep/REPEAT restrictions), the
-revision the promise applies to, and the expected acceptance or rejection for
-every declared behavior. Users should treat this matrix as the authoritative
-machine-readable boundary. The commands that verify it before a release live
-in the [maintainer reference](maintainer-reference.md).
+The machine-readable [support matrix](envelope-support.json) records each
+decoder's build requirements, circuit limits, applicable revision and expected
+acceptance or rejection outcomes. Status is verified against published release
+evidence; verification procedures are in the [maintainer reference](maintainer-reference.md).
 
 ### Decoder-specific support table
 
 | Property | `envelope-matching` | `envelope-mle` |
 | --- | --- | --- |
-| Maturity | <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> (verified by its release evidence bundle) | <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span> (verified independently by its release evidence bundle and [MLE scope plan](envelope-mle-scope.json)) |
+| Maturity | <span data-decoder-support-copy="envelope-matching">Beta unless publication verification succeeds</span> | <span data-decoder-support-copy="envelope-mle">Beta unless publication verification succeeds</span> |
 | Build requirement | Default CLI builds | `--features ilp` or an official native archive |
-| Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; allowed ties are defined by the independent correctness suite) | Exact most-likely fault configuration of the declared envelope model |
-| Mid-SWAP family (`midswap` fixtures) | Checked acceptance domain; measured operating ranges in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md) (workload/machine-specific) | Supported domain: the four measured d=3 points in the [MLE scope plan](envelope-mle-scope.json): r=2 at loss 0.002 and r=1 at loss 0.01, each with batches 1,024 and 16,384. No unmeasured loss/batch interpolation or universal timing guarantee. |
+| Objective | Minimum-weight matching on a loss-conditioned graph (an approximation; optimal ties allowed) | Exact most-likely fault configuration of the declared envelope model |
+| Mid-SWAP family (`midswap` fixtures) | Flat memory-Z circuits within the circuit contract; tested operating points are in the [resource report](../benchmarks/atom_loss/readiness/resources/report.md). Untested combinations of size/loss points and latency on other machines are unpromised. | The four workload points in [MLE Supported scope](#mle-supported-scope) below |
 | Conventional Stim-annotated family | Isolated checked example (pinned fixture only) | Excluded: rejects the pinned fixture as `unsupported_circuit` (candidate limit) before publishing any output file |
 | Per-shot timeout | Rejected (`--shot-timeout-ms` is MLE-only) | `--shot-timeout-ms`; timeout stops the batch with `decode_timeout` (exit 3), writing diagnostic statistics but no predictions |
 | Infeasible shot | Not applicable | `decode_infeasible` (exit 3), diagnostic statistics but no predictions |
 | Unsupported input | `unsupported_circuit` (exit 2), no prediction or statistics files | Same |
 
-Unsupported input, timeout, and infeasible outcomes are distinct results:
-compilation rejection produces neither predictions nor statistics, while MLE
-timeout/infeasible may emit diagnostic statistics with zero completed
-predictions. For any circuit outside the checked domain, treat
-`unsupported_circuit` as a support-boundary result: do not reinterpret it as a
-prediction, and do not rely on absent output files.
-
 ### MLE Supported scope
 
-The MLE Supported domain and its evidence requirements are declared as a
-machine-readable plan, [`docs/envelope-mle-scope.json`](envelope-mle-scope.json)
-(issue #721). The plan pins the finite supported grid — Mid-SWAP distance 3,
-r=2 at loss 0.002 and r=1 at loss 0.01, each at batches 1,024 and 16,384 —
-the required correctness/resource/installed-platform evidence for
-every declared point, the candidate-limit and solve-only timeout semantics,
-and the standing exclusion of the conventional family. The offline validation
-suite classifies jobs as `in-domain` or
-`outside-supported-domain`; these are support classifications, not logical
-predictions. Run that suite from the [maintainer reference](maintainer-reference.md).
+The [MLE scope plan](envelope-mle-scope.json) covers Mid-SWAP distance 3:
 
-Out-of-domain inputs are unpromised, not automatically rejected: only the
-hard limits (candidate count, REPEAT blocks, unsupported instructions) produce
-a guaranteed structured rejection. v0.3.3 can record the first promotion only
-after every required case, the release gate on the exact source, and the
-post-publication asset verification succeed. Later Supported releases must
-pass the same gate again. Maintainer regression, gate, and publication-bundle
-commands live in the [maintainer reference](maintainer-reference.md).
+| Rounds | Loss parameter | Batch shots |
+| --- | --- | --- |
+| 2 | 0.002 | 1,024 and 16,384 |
+| 1 | 0.01 | 1,024 and 16,384 |
+
+The conventional family and unlisted size/loss/batch points are outside the
+Supported promise. There is no interpolation or universal timing guarantee.
+Out-of-domain inputs can still be accepted; only hard limits such as candidate
+count, `REPEAT` blocks and unsupported instructions guarantee rejection.
+The per-shot timeout applies to solving.
 
 ## Mid-SWAP configuration migration
 
@@ -115,10 +94,6 @@ let config = MidSwapConfig {
 let circuit = rotated_memory_z_midswap(config).unwrap();
 assert!(!circuit.is_empty());
 ```
-
-The valid form is compiled by the `MidSwapConfig` rustdoc test. The obsolete
-form is intentionally marked `compile_fail`; it documents a migration rather
-than a compatibility shim.
 
 ## Compatibility and deprecation policy
 

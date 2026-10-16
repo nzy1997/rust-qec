@@ -6,7 +6,7 @@
 <section class="task-section" aria-labelledby="simulation-results-title">
   <div class="section-heading">
     <h2 id="simulation-results-title">Compare the surface-code sampling paths</h2>
-    <p class="section-copy">Pinned release measurements for named fixtures; these results are case-scoped and are not a general performance claim.</p>
+    <p class="section-copy">Release-build measurements on the surface-code fixture below.</p>
   </div>
   <h3>Five surface-code sampling paths</h3>
   <p class="section-copy">One-time precompilation is shown separately. <strong>Sample + output</strong> is the worker-local Sample phase plus <code>b8</code> output and excludes both precompilation and pipe transport. Precompiled rows reuse a sampler; direct rows include their per-batch setup in the Sample column. Samples/s is calculated from Sample + output.</p>
@@ -41,7 +41,7 @@
   <div class="section-heading">
     <h2 id="dem-results-title">Detection and DEM sampling</h2>
   </div>
-  <p>These are separate, recorded workloads. Compare implementations only within the same workload and metric; reproduction details and limits are below.</p>
+  <p>Detection is measured as elapsed time; DEM sampling is measured as throughput. Compare implementations within each workload and metric.</p>
   <div class="table-wrap result-table">
     <table>
       <thead><tr><th>Workload</th><th>Implementation</th><th>Metric</th><th>Result</th></tr></thead>

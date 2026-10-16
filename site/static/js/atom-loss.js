@@ -26,12 +26,15 @@
   };
   const upgradeDecoderBadges = async () => {
     const badges = [...document.querySelectorAll('[data-decoder-badge]')];
+    const summaries = [...document.querySelectorAll('[data-decoder-support-summary]')];
+    const summaryNames = summary => summary.dataset.decoderSupportSummary.split(',').map(name => name.trim());
     const names = new Set([
       ...badges.map(badge => badge.dataset.decoderBadge),
       ...[...document.querySelectorAll('[data-decoder-support-copy]')]
         .map(copy => copy.dataset.decoderSupportCopy),
       ...[...document.querySelectorAll('[data-evidence-link]')]
         .map(link => link.dataset.evidenceLink),
+      ...summaries.flatMap(summaryNames),
     ]);
     if (!names.size) return;
     let matrix;
@@ -45,6 +48,7 @@
     const decoders = matrix && matrix.schema_version === 'rustqec.envelope-support.v1'
       ? matrix.decoders : null;
     if (!decoders) return;
+    const verified = new Map();
     for (const name of names) {
       const decoder = decoders[name];
       const published = decoder && decoder.published_support;
@@ -92,6 +96,7 @@
           || !(label.d || '').split(',').includes(name)) {
         continue;
       }
+      verified.set(name, published);
       for (const badge of badges.filter(item => item.dataset.decoderBadge === name)) {
         const link = document.createElement('a');
         link.href = published.release_url;
@@ -110,9 +115,17 @@
         const evidenceLink = document.createElement('a');
         evidenceLink.href = published.release_url;
         evidenceLink.dataset.evidenceLink = name;
-        evidenceLink.textContent = 'version-bound evidence bundle';
+        evidenceLink.textContent = 'release evidence is published and verified';
         placeholder.replaceWith(evidenceLink);
       }
+    }
+    for (const summary of summaries) {
+      const names = summaryNames(summary);
+      if (!names.length || !names.every(name => verified.has(name))) continue;
+      const releases = new Set(names.map(name => verified.get(name).release));
+      summary.textContent = releases.size === 1
+        ? `Both decoders are Supported since ${[...releases][0]}.`
+        : `Both decoders are Supported (${names.map(name => `${DECODER_LABELS[name]} since ${verified.get(name).release}`).join('; ')}).`;
     }
   };
   upgradeDecoderBadges();

@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
-from tools.prepare_site_docs import prepare
+from tools.prepare_site_docs import SUPPORT_ARTIFACTS, prepare
 
 
 class PrepareSiteDocsTests(unittest.TestCase):
@@ -35,18 +35,29 @@ class PrepareSiteDocsTests(unittest.TestCase):
             for source, _ in pairs:
                 path = root / source
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('# Original\nUnicode: 量子\n## Mid-SWAP configuration migration\nMigration body\n')
+                path.write_text('# Original\nUnicode: €\n## Mid-SWAP configuration migration\nMigration body\n')
+            for filename in SUPPORT_ARTIFACTS:
+                (root / 'docs' / filename).write_text('original support metadata\n')
             prepare(root)
-            self.assertEqual((root / 'site/generated/support-core.md').read_text(), '# Original\nUnicode: 量子\n')
+            self.assertEqual((root / 'site/generated/support-core.md').read_text(), '# Original\nUnicode: €\n')
             self.assertEqual((root / 'site/generated/version-migration.md').read_text(), '## Mid-SWAP configuration migration\nMigration body\n')
             version = json.loads((root / 'site/generated/docs-version.json').read_text())
             self.assertEqual(version['id'], 'master')
             self.assertEqual(version['release_line'], '0.3')
             self.assertEqual(version['packages']['rstim']['version'], '0.3.1')
+            for filename in SUPPORT_ARTIFACTS:
+                self.assertEqual((root / 'site/static/support' / filename).read_bytes(),
+                                 (root / 'docs' / filename).read_bytes())
+                (root / 'docs' / filename).write_text('updated support metadata\n')
             for source, target in pairs:
                 self.assertEqual((root / source).read_bytes(), (root / 'site/generated' / target).read_bytes())
                 (root / source).write_text('# Revised\n## Mid-SWAP configuration migration\nNew migration\n')
             prepare(root)
+            for filename in SUPPORT_ARTIFACTS:
+                self.assertEqual((root / 'site/static/support' / filename).read_text(),
+                                 'updated support metadata\n')
+                self.assertEqual((root / 'docs' / filename).read_text(),
+                                 'updated support metadata\n')
             for source, target in pairs:
                 self.assertEqual((root / 'site/generated' / target).read_text(), '# Revised\n## Mid-SWAP configuration migration\nNew migration\n')
                 self.assertEqual((root / source).read_text(), '# Revised\n## Mid-SWAP configuration migration\nNew migration\n')

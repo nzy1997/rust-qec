@@ -3,6 +3,7 @@ from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -21,7 +22,8 @@ class CodeBlocks(HTMLParser):
         if tag == 'pre':
             attributes = dict(attrs)
             self.current = {'text': '', 'output': attributes.get('data-output') == 'true',
-                            'language': attributes.get('data-language', 'Shell')}
+                            'language': attributes.get('data-language', 'Shell'),
+                            'training_step': attributes.get('data-training-step')}
 
     def handle_data(self, data):
         if self.current is not None:
@@ -104,6 +106,37 @@ class GuideExampleTest(unittest.TestCase):
             result = subprocess.run(['sh', '-eu'], input=command, cwd=tmp,
                 env=self.env, text=True, capture_output=True, check=True)
             self.assertEqual(result.stdout.strip(), '1100')
+
+    def test_training_guide_uses_generated_metadata_and_loads_aligned_labels(self):
+        parser = CodeBlocks()
+        parser.feed((REPO / 'site/templates/sampling-data.html').read_text())
+        steps = {block['training_step']: block['text'] for block in parser.blocks
+                 if block['training_step']}
+        self.assertEqual(list(steps), ['generate', 'export', 'load'])
+        with tempfile.TemporaryDirectory(prefix='qec-training-guide-') as tmp:
+            work = Path(tmp)
+            shutil.copyfile(REPO / 'rstim/doc/examples/load_blinded_training_data.py',
+                            work / 'load_blinded_training_data.py')
+            for step, script in steps.items():
+                result = subprocess.run(['sh', '-eu'], input=script, cwd=work,
+                    env=self.env, text=True, capture_output=True, timeout=120)
+                self.assertEqual(result.returncode, 0, f'{step}: {result.stderr}')
+            self.assertIn('PASS training alignment shots=100000', result.stdout)
+            public = json.loads((work / 'data/public/manifest.json').read_text())
+            self.assertEqual(public['mode'], 'measurements_blinded')
+            self.assertEqual(public['row']['bits'], 50)
+            self.assertEqual((work / 'data/public/shots.b8').stat().st_size, 700000)
+            trace_path = work / 'data/private/trace.jsonl'
+            with trace_path.open() as trace:
+                first = json.loads(next(trace))
+            self.assertEqual(first['logical_input']['support'], [1, 8, 15])
+            # Corrupt alignment must fail before a training batch is accepted.
+            masks = work / 'data/private/masks.b8'
+            masks.write_bytes(masks.read_bytes()[:-1])
+            rejected = subprocess.run(['sh', '-eu'], input=steps['load'], cwd=work,
+                env=self.env, text=True, capture_output=True, timeout=120)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertNotIn('PASS training alignment', rejected.stdout)
 
     def test_downloaded_rust_experiment_is_complete_and_runs_locked(self):
         source = REPO / 'site/static/examples/rust-experiment'

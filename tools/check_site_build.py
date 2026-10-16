@@ -122,7 +122,6 @@ PAGE_REQUIRED_ANCHORS = {
     "qp101/index.html": ("qp101", "operations", "schema-browser", "gallery", "examples"),
     "qp101/protocol/index.html": (
         "qp101-zy-quantum-circuit-json-format",
-        "schema-identity",
         "scope-and-applicability",
         "core-json-document",
         "validation-rules",
@@ -1241,7 +1240,6 @@ def make_fixture_site() -> SiteFixture:
 <html lang="en">
 <body data-root="../..">
   <h1 id="qp101-zy-quantum-circuit-json-format">QP101-ZY: Quantum Circuit JSON Format</h1>
-  <h2 id="schema-identity">Schema identity</h2>
   <h2 id="scope-and-applicability">Scope And Applicability</h2>
   <h2 id="core-json-document">Core JSON Document</h2>
   <a href="../../qp101.schema.json">Download JSON Schema</a>

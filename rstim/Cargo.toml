@@ -196,6 +196,14 @@ name = "unified_dataset_import"
 required-features = ["unified-cli"]
 
 [[test]]
+name = "unified_dataset_score"
+required-features = ["unified-cli"]
+
+[[test]]
+name = "unified_dataset_auto"
+required-features = ["unified-cli"]
+
+[[test]]
 name = "unified_decode"
 required-features = ["unified-cli"]
 

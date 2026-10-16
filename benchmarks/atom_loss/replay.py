@@ -9,6 +9,19 @@ from .run import ROOT, checked, generate, logical_x
 from .shot_data import cases_from, validate_dataset
 
 
+def verify_generated_circuit(generated, archived, distance, label):
+    if generated == archived:
+        return
+    marker = b'TICK[rstim:logical_flip_point]\n'
+    # Older evidence predates the generator's default logical-input metadata.
+    # Permit only that exact declaration, with independently derived support;
+    # all other circuit bytes must still match the archived source.
+    support = logical_x(archived.decode(), distance).encode()
+    annotated = marker[:-1] + b' # rstim:logical_input=X:' + support + b'\n'
+    if archived.count(marker) != 1 or generated != archived.replace(marker, annotated, 1):
+        raise ValueError('Regenerated circuit mismatch: '+label)
+
+
 def replay(archive, binary):
     checked_cases=[]
     with zipfile.ZipFile(archive) as z, tempfile.TemporaryDirectory() as tmp:
@@ -19,7 +32,11 @@ def replay(archive, binary):
             validate_dataset(read,case)
             work=Path(tmp)/label;work.mkdir();circuit=work/'circuit.stim'
             generate(binary,circuit,case['distance'],case['rounds'],case['loss_probability'],case['pauli_probability'])
-            if circuit.read_bytes()!=read('public/circuit.stim'): raise ValueError('Regenerated circuit mismatch: '+label)
+            archived = read('public/circuit.stim')
+            verify_generated_circuit(circuit.read_bytes(), archived, case['distance'], label)
+            # Keep the original circuit identity while checking regenerated
+            # measurement, mask and answer bytes below.
+            circuit.write_bytes(archived)
             generation=json.loads(read('private/manifest.json'))['generation']
             if generation['batch_shots']!=10000: raise ValueError('Unsupported CLI batch size')
             checked([binary,'dataset','export','--circuit',circuit,'--shots',case['shots'],
