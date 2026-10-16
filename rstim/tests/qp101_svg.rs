@@ -59,6 +59,72 @@ fn svg_renderer_draws_wires_gates_and_ticks() {
 }
 
 #[test]
+fn svg_renderer_draws_single_qubit_clifford_batches_only_on_target_wires() {
+    // These are independent one-qubit operations, including the aliases accepted
+    // by circuit validation. A sparse batch must not cover the intervening wires.
+    for gate in [
+        "I",
+        "H",
+        "H_XY",
+        "H_YZ",
+        "S",
+        "SQRT_Z",
+        "S_DAG",
+        "SQRT_Z_DAG",
+        "SQRT_X",
+        "SQRT_X_DAG",
+        "SQRT_Y",
+        "SQRT_Y_DAG",
+        "X",
+        "Y",
+        "Z",
+        "C_XYZ",
+        "C_ZYX",
+        "C_NXYZ",
+        "C_NZYX",
+        "C_XNYZ",
+        "C_XYNZ",
+        "C_ZNYX",
+        "C_ZYNX",
+        "H_NXY",
+        "H_NXZ",
+        "H_NYZ",
+    ] {
+        let instrs =
+            rstim::validation::parse_and_validate(&format!("QUBIT_COORDS(0) 4\n{gate} 3 0\n"))
+                .expect("single-qubit Clifford fixture should validate");
+        let doc = export_qp101(&instrs).expect("fixture should export");
+        let svg = render_svg(&doc).expect("fixture should render");
+        let mut positions = text_positions(&svg, gate);
+        positions.sort_by_key(|(_, y)| *y);
+        assert_eq!(
+            positions.len(),
+            2,
+            "{gate} needs one label per target: {svg}"
+        );
+        assert_eq!(
+            positions[0].0, positions[1].0,
+            "{gate} batch must share a column"
+        );
+        assert_eq!(positions[0].1, text_y(&svg, "q0").unwrap(), "{gate}");
+        assert_eq!(positions[1].1, text_y(&svg, "q3").unwrap(), "{gate}");
+        let boxes: Vec<_> = svg
+            .lines()
+            .filter(|line| line.contains("class=\"gate-box\""))
+            .collect();
+        assert_eq!(boxes.len(), 2, "{gate} needs exactly two boxes: {svg}");
+        for (_, y) in positions {
+            assert!(
+                boxes.iter().any(|line| {
+                    line.contains(&format!(" y=\"{}\"", y - 14)) && line.contains(" height=\"28\"")
+                }),
+                "{gate} box must cover only its target wire: {svg}"
+            );
+        }
+    }
+}
+
+#[test]
 fn svg_renderer_rejects_zero_qubits() {
     let doc = Qp101Document {
         standard: "QP101-ZY".to_string(),
@@ -942,11 +1008,7 @@ fn svg_renderer_assigns_first_observable_include_then_accumulates() {
     .expect("observable accumulation fixture should export");
     let svg = render_svg(&doc).expect("observable accumulation fixture should render");
 
-    for marker in [
-        ">L0 = m1</text>",
-        ">L0 *= m2</text>",
-        ">L1 = m2</text>",
-    ] {
+    for marker in [">L0 = m1</text>", ">L0 *= m2</text>", ">L1 = m2</text>"] {
         assert!(svg.contains(marker), "SVG missing {marker}: {svg}");
     }
 }
@@ -954,10 +1016,8 @@ fn svg_renderer_assigns_first_observable_include_then_accumulates() {
 #[test]
 fn svg_renderer_uses_bit_parity_for_measurement_only_sources() {
     let doc = export_qp101(
-        &parse_lines(
-            "M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
-        )
-        .expect("measurement parity fixture should parse"),
+        &parse_lines("M 0 1\nDETECTOR rec[-2] rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n")
+            .expect("measurement parity fixture should parse"),
     )
     .expect("measurement parity fixture should export");
     let svg = render_svg(&doc).expect("measurement parity fixture should render");
