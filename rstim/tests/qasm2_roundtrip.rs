@@ -219,3 +219,119 @@ fn overwritten_outputs_unused_declarations_namespace_and_large_angles_survive_ro
         2
     );
 }
+
+#[test]
+fn minimum_exact_angle_coefficients_survive_export_and_stabilizer_classification() {
+    for (gate, expected) in [
+        ("rx((-9223372036854775807-1)*pi)", P::U(0, 0., 0., 0.)),
+        ("ry((-9223372036854775807-1)*pi)", P::U(0, 0., 0., 0.)),
+        ("rz((-9223372036854775807-1)*pi)", P::U(0, 0., 0., 0.)),
+        (
+            "U((-9223372036854775807-1)*pi,(-9223372036854775807-1)*pi,pi)",
+            P::U(0, 0., 0., PI),
+        ),
+    ] {
+        let input = format!("OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; {gate} q[0];");
+        let checked = from_qasm(&input).unwrap();
+        let output = to_qasm(&checked, &ExportOptions::default(), &QasmLimits::default()).unwrap();
+        assert!(
+            output.text.contains("(-9223372036854775807-1)"),
+            "{}",
+            output.text
+        );
+        let restored = from_qasm(&output.text).unwrap();
+        let plan = restored
+            .lower(Backend::Stabilizer, &QasmLimits::default())
+            .unwrap();
+        assert_unitary(&[expected], &plan);
+    }
+}
+
+#[test]
+fn unrepresentable_exact_denominators_are_reported_without_float_substitution() {
+    for (first, second, denominator) in [
+        (2147483648u64, 4294967296u64, 1u64 << 63),
+        (4294967295, 4294967297, u64::MAX),
+    ] {
+        for name in ["rx", "ry", "rz"] {
+            let text = format!(
+                "OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; {name}(pi/{first}/{second}) q[0];"
+            );
+            let program = from_qasm(&text).unwrap();
+            let OperationKind::Gate { gate, .. } = &program.operations()[0].kind else {
+                panic!()
+            };
+            let angle = match gate {
+                rstim::qasm::Gate::Rx(a) | rstim::qasm::Gate::Ry(a) | rstim::qasm::Gate::Rz(a) => a,
+                _ => panic!(),
+            };
+            assert_eq!(
+                *angle,
+                rstim::qasm::Angle::pi_ratio(1, denominator).unwrap()
+            );
+            let error =
+                to_qasm(&program, &ExportOptions::default(), &QasmLimits::default()).unwrap_err();
+            assert_eq!(error.code, rstim::qasm::ErrorCode::Unrepresentable);
+            assert!(error.message.contains("denominator"));
+            assert!(error.origin.is_some());
+        }
+    }
+    let program =
+        from_qasm("OPENQASM 2.0; qreg q[1]; U(pi/4294967295/4294967297,0,0) q[0];").unwrap();
+    assert_eq!(
+        to_qasm(&program, &ExportOptions::default(), &QasmLimits::default())
+            .unwrap_err()
+            .code,
+        rstim::qasm::ErrorCode::Unrepresentable
+    );
+}
+
+#[test]
+fn many_singleton_registers_reimport_with_correct_nearby_and_oldest_feedback() {
+    const RECORDS: usize = 8192;
+    let mut instructions = vec![native("I", vec![], &[2])];
+    for index in 0..RECORDS {
+        instructions.push(native("M", vec![], &[0]));
+        instructions.push(StimInstr::new(
+            "CX",
+            vec![],
+            vec![StimTarget::Rec(-1), StimTarget::Qubit(1)],
+        ));
+        instructions.push(StimInstr::new(
+            "CZ",
+            vec![],
+            vec![StimTarget::Rec(-((index + 1) as i32)), StimTarget::Qubit(2)],
+        ));
+    }
+    let output = export_stim(
+        &instructions,
+        &ExportOptions::default(),
+        &QasmLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(output.classical_registers.len(), RECORDS);
+    let program = from_qasm(&output.text).unwrap();
+    assert_eq!(program.classical_registers(), output.classical_registers);
+    let plan = program
+        .lower(Backend::Stabilizer, &QasmLimits::default())
+        .unwrap();
+    assert_eq!(plan.measurement_events.len(), RECORDS);
+    for (index, group) in program.operations()[1..].chunks_exact(3).enumerate() {
+        assert!(matches!(group[0].kind,OperationKind::Measure{qubit:0,bit}if bit==index));
+        assert!(
+            matches!(group[1].kind,OperationKind::Conditional{bit,value:true,gate:rstim::qasm::Pauli::X,..}if bit==index)
+        );
+        assert!(matches!(
+            group[2].kind,
+            OperationKind::Conditional {
+                bit: 0,
+                value: true,
+                gate: rstim::qasm::Pauli::Z,
+                ..
+            }
+        ));
+    }
+    let output_again =
+        to_qasm(&program, &ExportOptions::default(), &QasmLimits::default()).unwrap();
+    assert_eq!(output.text, output_again.text);
+}

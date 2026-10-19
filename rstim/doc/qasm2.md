@@ -127,6 +127,11 @@ The writer emits portable primitive `U`/`CX` operations, without a header or
 helper names that might collide with a source register. This also avoids relying
 on tool-specific gates such as `sx` or `swap`. Gate names and original source
 formatting are not reconstructed.
+Exact expression literals use the signed 64-bit integer range, including an
+arithmetic spelling for its minimum value. A checked angle can have an exact
+unsigned 64-bit denominator produced by several divisions; export rejects a
+denominator above `i64::MAX` with `qasm_unrepresentable_export` instead of
+silently replacing it with a floating-point parameter.
 
 | Native instruction family | Export behavior |
 | --- | --- |

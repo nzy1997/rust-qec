@@ -558,6 +558,8 @@ struct Frontend<'a> {
     includes: Vec<String>,
     defs: HashMap<String, Definition>,
     symbols: HashSet<String>,
+    quantum_register_names: HashMap<String, usize>,
+    classical_register_names: HashMap<String, usize>,
     circuit: QasmCircuit,
     statements: Vec<Statement>,
 }
@@ -689,6 +691,12 @@ impl Frontend<'_> {
                             &span,
                         ));
                     }
+                    let names = if q {
+                        &mut self.quantum_register_names
+                    } else {
+                        &mut self.classical_register_names
+                    };
+                    names.insert(name.clone(), regs.len());
                     regs.push(Register { name, size, offset });
                 }
                 Item::Definition(d) => {
@@ -742,12 +750,7 @@ impl Frontend<'_> {
                 Ok(())
             }
             Statement::Conditional(name, _, s, span) => {
-                if !self
-                    .circuit
-                    .classical_registers
-                    .iter()
-                    .any(|r| r.name == *name)
-                {
+                if !self.classical_register_names.contains_key(name) {
                     return Err(error(
                         ErrorCode::Type,
                         "condition requires a declared classical register",
@@ -907,12 +910,18 @@ impl Frontend<'_> {
                 &o.span,
             ));
         }
-        let regs = if quantum {
-            &self.circuit.quantum_registers
+        let (regs, names) = if quantum {
+            (
+                &self.circuit.quantum_registers,
+                &self.quantum_register_names,
+            )
         } else {
-            &self.circuit.classical_registers
+            (
+                &self.circuit.classical_registers,
+                &self.classical_register_names,
+            )
         };
-        let reg = regs.iter().find(|r| r.name == o.name).ok_or_else(|| {
+        let register_index = names.get(&o.name).ok_or_else(|| {
             error(
                 ErrorCode::Type,
                 format!(
@@ -923,6 +932,7 @@ impl Frontend<'_> {
                 &o.span,
             )
         })?;
+        let reg = &regs[*register_index];
         if let Some(i) = o.index {
             if i >= reg.size {
                 return Err(error(
@@ -1222,18 +1232,14 @@ impl Frontend<'_> {
                 self.push(OperationKind::Barrier { qubits }, span, stack)
             }
             Statement::Conditional(name, value, body, span) => {
-                let reg = self
-                    .circuit
-                    .classical_registers
-                    .iter()
-                    .find(|r| r.name == *name)
-                    .ok_or_else(|| {
-                        error(
-                            ErrorCode::Type,
-                            "condition requires a declared classical register",
-                            span,
-                        )
-                    })?;
+                let index = self.classical_register_names.get(name).ok_or_else(|| {
+                    error(
+                        ErrorCode::Type,
+                        "condition requires a declared classical register",
+                        span,
+                    )
+                })?;
+                let reg = &self.circuit.classical_registers[*index];
                 let (size, bit) = (reg.size, reg.offset);
                 // First validate the actual operation even if the condition is unsupported.
                 let start = self.circuit.operations.len();
@@ -1366,6 +1372,8 @@ pub(super) fn parse(
         includes: vec![],
         defs: HashMap::new(),
         symbols: HashSet::new(),
+        quantum_register_names: HashMap::new(),
+        classical_register_names: HashMap::new(),
         circuit: QasmCircuit {
             quantum_registers: vec![],
             classical_registers: vec![],

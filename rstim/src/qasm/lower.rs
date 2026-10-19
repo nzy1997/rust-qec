@@ -244,7 +244,11 @@ fn validate_operation(
             bit: b, targets, ..
         } => {
             bit(*b)?;
-            if !regs.iter().any(|r| r.offset == *b && r.size == 1) {
+            if regs
+                .binary_search_by_key(b, |r| r.offset)
+                .ok()
+                .is_none_or(|index| regs[index].size != 1)
+            {
                 return Err(QasmError::new(
                     ErrorCode::Unsupported,
                     "v1 feedback requires a one-bit classical register",

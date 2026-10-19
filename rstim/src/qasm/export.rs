@@ -50,6 +50,24 @@ pub fn to_qasm(
     }
     let mut omitted_annotations = Vec::new();
     for (index, op) in circuit.operations.iter().enumerate() {
+        if let OperationKind::Gate { gate, .. } = &op.kind {
+            let angles: &[&Angle] = match gate {
+                Gate::Rx(angle) | Gate::Ry(angle) | Gate::Rz(angle) => &[angle],
+                Gate::U { theta, phi, lambda } => &[theta, phi, lambda],
+                _ => &[],
+            };
+            for angle in angles {
+                if matches!(angle, Angle::Rational {denominator, ..} if *denominator > i64::MAX as u64)
+                {
+                    let mut error = QasmError::new(
+                        ErrorCode::Unrepresentable,
+                        "exact angle denominator exceeds the supported signed 64-bit expression integer range; choose a representable exact parameter",
+                    );
+                    error.origin = op.origin.clone();
+                    return Err(error);
+                }
+            }
+        }
         let result = match &op.kind {
             OperationKind::Gate { gate, targets } => {
                 let operands = targets
@@ -94,8 +112,8 @@ pub fn to_qasm(
             } => {
                 let reg = circuit
                     .classical_registers
-                    .iter()
-                    .find(|r| r.offset == *bit && r.size == 1)
+                    .binary_search_by_key(bit, |r| r.offset)
+                    .map(|index| &circuit.classical_registers[index])
                     .expect("validated singleton condition");
                 let gate = match gate {
                     Pauli::X => Gate::X,
@@ -138,10 +156,9 @@ pub fn export_stim(
 }
 
 fn operand(registers: &[Register], index: usize) -> String {
-    let reg = registers
-        .iter()
-        .find(|r| index >= r.offset && index - r.offset < r.size)
-        .expect("validated register operand");
+    // Validation guarantees positive widths and contiguous, increasing offsets.
+    let register_index = registers.partition_point(|r| r.offset <= index) - 1;
+    let reg = &registers[register_index];
     format!("{}[{}]", reg.name, index - reg.offset)
 }
 
