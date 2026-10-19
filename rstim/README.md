@@ -43,6 +43,9 @@ Optional features are intentionally additive:
 - `plotting` adds the self-contained `rstim surface-code-ler` experiment and SVG plot.
 - `benchmark-tools` builds benchmark workers and examples.
 - `benchmark-telemetry` enables internal benchmark instrumentation.
+- `qasm` enables checked OpenQASM 2.0 import with register layouts, ordered
+  measurements, and explicit stabilizer or near-Clifford lowering. See the
+  [QASM 2 guide](doc/qasm2.md).
 
 The development checkout combines all public commands in one executable.
 Install it with `cargo install --locked --path rstim --force`. This combined release

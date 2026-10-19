@@ -48,6 +48,8 @@ pub mod compiled;
 pub mod sample_archive;
 pub mod decoder_dataset;
 pub mod validation;
+#[cfg(feature = "qasm")]
+pub mod qasm;
 
 pub use sampler::{
     CompiledLossMeasurementSampler, CompiledMeasurementSampler,
