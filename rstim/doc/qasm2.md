@@ -1,6 +1,6 @@
 # OpenQASM 2.0 conversion
 
-Enable the optional `qasm` feature for semantic OpenQASM 2.0 import. The frontend
+Enable the optional `qasm` feature for semantic OpenQASM 2.0 import and export. The frontend
 parses a syntax tree, checks scopes and types, resolves gate definitions, and
 constructs ordered operations before choosing an execution target. It does not
 replace gate names in source strings.
@@ -99,6 +99,53 @@ uses the literal original body rather than silently substituting a differently
 defined tool-specific gate. This matters when comparing with other importers;
 see [Qiskit's phase convention notes](https://quantum.cloud.ibm.com/docs/en/api/qiskit/qasm2#openqasm-2-phase-conventions).
 
+## Export checked and native circuits
+
+```rust
+use rstim::qasm::{from_qasm, to_qasm, export_stim, ExportOptions, QasmLimits};
+
+let limits = QasmLimits::default();
+let options = ExportOptions::default();
+let program = from_qasm("OPENQASM 2.0; qreg h[1]; creg c[1]; measure h -> c;")?;
+let output = to_qasm(&program, &options, &limits)?;
+assert!(output.text.contains("qreg h[1]"));
+
+let native = rstim::parser::parse_lines("H 0\nCX 0 1\nMX 0\nMR 1\n")?;
+let output = export_stim(&native, &options, &limits)?;
+assert_eq!(output.classical_registers.len(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Checked-document export preserves declared registers and each measurement's
+destination. Native Stim export has no original classical layout; it creates
+one-bit `m0`, `m1`, ... registers in record order. This allows record feedback
+to use legal QASM 2 register-equality conditions. Basis measurements restore the
+post-measurement quantum state; inverted measurements complement their output
+without changing that state. Reset does not add a visible measurement result.
+
+The writer emits portable primitive `U`/`CX` operations, without a header or
+helper names that might collide with a source register. This also avoids relying
+on tool-specific gates such as `sx` or `swap`. Gate names and original source
+formatting are not reconstructed.
+
+| Native instruction family | Export behavior |
+| --- | --- |
+| I/H/Paulis/S and inverse, SQRT_X/Y/Z and inverse, CX/CY/CZ/SWAP aliases | Checked primitive decompositions |
+| T/T_DAG and R_X/R_Y/R_Z | Coherent rotations; exact binary half-turn periods retained |
+| M/MZ/MX/MY, MR/MRZ/MRX/MRY, inverted measurement targets | Basis-preserving projective instruments |
+| R/RZ/RX/RY | Unobserved reset in the corresponding basis |
+| Record-controlled X/Y/Z | Singleton-register equality feedback |
+| Positive REPEAT | Bounded expansion, including empty-body work accounting |
+| TICK | Barrier; empty ticks have an explicit omission report |
+| Detector/observable/coordinate annotations and tags | Strict rejection by default |
+| Noise, loss, sweep, MPP/MXX/MYY/MZZ, SPP, MPAD and unknown gates | Rejected, including zero-probability noise |
+
+`ExportOptions { omit_annotations: true }` explicitly requests a projection that
+omits QEC and layout annotations. Every removed item appears in
+`omitted_annotations` with its instruction/repeat path. This option never permits
+discarding quantum noise, reset, measurement, feedback, or unknown operations.
+Export performs validation without compiling or simulating a near-Clifford plan.
+
 ## Includes, diagnostics and limits
 
 `from_qasm` supplies the bundled standard header and otherwise has no implicit
@@ -117,7 +164,7 @@ Declared idle register width remains governed by the qubit/classical-bit limits.
 Gate expansion also charges broadcast-lane operand visits against
 `max_operations * max_gate_depth`, including calls to empty gate bodies.
 `max_output_bytes` is
-reserved for document serialization and export; parsing/lowering do not consume
+used by QASM export and reserved for document serialization; parsing/lowering do not consume
 that budget. File reads
 are bounded separately by `FileResolver::max_file_bytes`. Expressions use checked
 bounded rational arithmetic where possible, otherwise finite FP64 values.
