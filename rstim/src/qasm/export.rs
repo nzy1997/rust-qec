@@ -49,6 +49,7 @@ pub fn to_qasm(
         }
     }
     let mut omitted_annotations = Vec::new();
+    let mut report_bytes = 0;
     for (index, op) in circuit.operations.iter().enumerate() {
         if let OperationKind::Gate { gate, .. } = &op.kind {
             let angles: &[&Angle] = match gate {
@@ -87,12 +88,16 @@ pub fn to_qasm(
             )),
             OperationKind::Barrier { qubits } => {
                 if qubits.is_empty() {
-                    omitted_annotations.push(OmittedAnnotation {
-                        name: "EMPTY_BARRIER".into(),
-                        instruction_path: vec![index],
-                        source: "barrier;".into(),
-                    });
-                    Ok(())
+                    push_omission(
+                        &mut omitted_annotations,
+                        &mut report_bytes,
+                        OmittedAnnotation {
+                            name: "EMPTY_BARRIER".into(),
+                            instruction_path: vec![index],
+                            source: "barrier;".into(),
+                        },
+                        limits.max_output_bytes,
+                    )
                 } else {
                     writer.push(&format!(
                         "barrier {};\n",
@@ -120,14 +125,13 @@ pub fn to_qasm(
                     Pauli::Y => Gate::Y,
                     Pauli::Z => Gate::Z,
                 };
-                for target in targets {
+                targets.iter().try_for_each(|target| {
                     writer.gate(
                         &gate,
                         &[operand(&circuit.quantum_registers, *target as usize)],
                         &format!("if({}=={}) ", reg.name, u8::from(*value)),
-                    )?;
-                }
-                Ok(())
+                    )
+                })
             }
         };
         result.map_err(|mut e| {
@@ -237,6 +241,35 @@ fn invalid(message: impl Into<String>) -> QasmError {
 }
 fn unsupported(message: impl Into<String>) -> QasmError {
     QasmError::new(ErrorCode::Unrepresentable, message)
+}
+
+fn push_omission(
+    report: &mut Vec<OmittedAnnotation>,
+    used_bytes: &mut usize,
+    annotation: OmittedAnnotation,
+    max_bytes: usize,
+) -> Result<(), QasmError> {
+    let bytes = annotation
+        .name
+        .len()
+        .checked_add(annotation.source.len())
+        .and_then(|n| {
+            annotation
+                .instruction_path
+                .len()
+                .checked_mul(std::mem::size_of::<usize>())
+                .and_then(|path_bytes| n.checked_add(path_bytes))
+        })
+        .ok_or_else(|| limit("annotation report size overflow"))?;
+    let total = used_bytes
+        .checked_add(bytes)
+        .ok_or_else(|| limit("annotation report size overflow"))?;
+    if total > max_bytes {
+        return Err(limit("annotation report byte limit exceeded"));
+    }
+    report.push(annotation);
+    *used_bytes = total;
+    Ok(())
 }
 
 /// Lift into ordered semantic operations without compiling or simulating.
@@ -383,25 +416,18 @@ impl Lifter<'_> {
                 "{name} requires explicit annotation omission"
             )));
         }
-        let bytes = name
-            .len()
-            .checked_add(source.len())
-            .and_then(|n| n.checked_add(path.len().saturating_mul(std::mem::size_of::<usize>())))
-            .ok_or_else(|| limit("annotation report size overflow"))?;
-        self.report_bytes = self
-            .report_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("annotation report size overflow"))?;
-        if self.report_bytes > self.limits.max_output_bytes {
-            return Err(limit("annotation report byte limit exceeded"));
-        }
-        self.omitted.push(OmittedAnnotation {
-            name: name.into(),
-            instruction_path: path.into(),
-            source,
-        });
-        Ok(())
+        push_omission(
+            &mut self.omitted,
+            &mut self.report_bytes,
+            OmittedAnnotation {
+                name: name.into(),
+                instruction_path: path.into(),
+                source,
+            },
+            self.limits.max_output_bytes,
+        )
     }
+
     fn expand(
         &mut self,
         instructions: &[StimInstr],
@@ -758,4 +784,60 @@ fn half_turn_angle(value: f64) -> Result<Angle, QasmError> {
         return Angle::pi_ratio(numerator, denominator);
     }
     Angle::radians(value * std::f64::consts::PI)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_semantic_fences_report_omission_with_a_bounded_payload_and_origin() {
+        let origin = SourceSpan {
+            source: "semantic-document".into(),
+            line: 7,
+            column: 1,
+            offset: 12,
+            length: 8,
+            expansion: Vec::new(),
+        };
+        let mut circuit = from_qasm("OPENQASM 2.0;").unwrap();
+        circuit.operations.push(Operation {
+            kind: OperationKind::Barrier { qubits: Vec::new() },
+            origin: Some(origin.clone()),
+        });
+        let output = to_qasm(&circuit, &ExportOptions::default(), &QasmLimits::default()).unwrap();
+        assert_eq!(output.text, "OPENQASM 2.0;\n");
+        assert_eq!(
+            output.omitted_annotations,
+            vec![OmittedAnnotation {
+                name: "EMPTY_BARRIER".into(),
+                instruction_path: vec![0],
+                source: "barrier;".into(),
+            }]
+        );
+        let limits = QasmLimits {
+            // The QASM header fits exactly; only the structured omission report
+            // exceeds this limit. Documents cannot bypass native report bounds.
+            max_output_bytes: output.text.len(),
+            ..QasmLimits::default()
+        };
+        let error = to_qasm(&circuit, &ExportOptions::default(), &limits).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert!(error.message.contains("annotation report byte limit"));
+        assert_eq!(error.origin, Some(origin.clone()));
+
+        let bounded = QasmLimits {
+            max_output_bytes: 32,
+            ..QasmLimits::default()
+        };
+        to_qasm(&circuit, &ExportOptions::default(), &bounded).unwrap();
+        let second_origin = SourceSpan { line: 8, ..origin };
+        circuit.operations.push(Operation {
+            kind: OperationKind::Barrier { qubits: Vec::new() },
+            origin: Some(second_origin.clone()),
+        });
+        let error = to_qasm(&circuit, &ExportOptions::default(), &bounded).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert_eq!(error.origin, Some(second_origin));
+    }
 }

@@ -335,3 +335,18 @@ fn many_singleton_registers_reimport_with_correct_nearby_and_oldest_feedback() {
         to_qasm(&program, &ExportOptions::default(), &QasmLimits::default()).unwrap();
     assert_eq!(output.text, output_again.text);
 }
+
+#[test]
+fn condition_register_lookup_never_accepts_quantum_or_gate_identifiers() {
+    for name in ["q", "custom", "missing"] {
+        let source = format!(
+            "OPENQASM 2.0; gate custom a {{ U(pi,0,pi) a; }} qreg q[1]; if({name}==0) U(pi,0,pi) q[0];"
+        );
+        let error = from_qasm(&source).unwrap_err();
+        assert_eq!(error.code, rstim::qasm::ErrorCode::Type);
+        assert!(error.message.contains("declared classical register"));
+        let origin = error.origin.unwrap();
+        assert_eq!(origin.source, "<input>");
+        assert_eq!(&source[origin.offset..origin.offset + origin.length], "if");
+    }
+}

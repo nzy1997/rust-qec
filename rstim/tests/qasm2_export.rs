@@ -721,3 +721,191 @@ fn repeated_global_ticks_reserve_cumulative_targets_before_allocation() {
         ErrorCode::Limit
     );
 }
+
+#[test]
+fn native_instruction_payload_and_annotation_reports_obey_their_own_budgets() {
+    for (instruction, limits) in [
+        (
+            op("SQRT_X", vec![qubit(0)]),
+            QasmLimits {
+                max_source_bytes: 5,
+                ..QasmLimits::default()
+            },
+        ),
+        (
+            StimInstr::Op {
+                name: "H".into(),
+                tag: Some("long-label".into()),
+                args: vec![],
+                targets: vec![qubit(0)],
+            },
+            QasmLimits {
+                max_source_bytes: 5,
+                ..QasmLimits::default()
+            },
+        ),
+        (
+            StimInstr::new("DETECTOR", vec![0., 1., 2.], vec![]),
+            QasmLimits {
+                max_operations: 2,
+                ..QasmLimits::default()
+            },
+        ),
+        (
+            op("H", vec![qubit(0), qubit(1), qubit(2)]),
+            QasmLimits {
+                max_operations: 2,
+                ..QasmLimits::default()
+            },
+        ),
+    ] {
+        let error = lift(
+            &[instruction],
+            &ExportOptions {
+                omit_annotations: true,
+            },
+            &limits,
+        )
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert!(error.message.contains("native instruction size"));
+    }
+    let limits = QasmLimits {
+        max_output_bytes: 8,
+        ..QasmLimits::default()
+    };
+    let error = lift(
+        &[StimInstr::new("SHIFT_COORDS", vec![1.], vec![])],
+        &ExportOptions {
+            omit_annotations: true,
+        },
+        &limits,
+    )
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Limit);
+    assert!(error.message.contains("annotation report byte limit"));
+}
+
+#[test]
+fn compressed_repeat_arithmetic_overflow_is_rejected_before_any_expansion() {
+    let limits = QasmLimits {
+        max_operations: usize::MAX,
+        ..QasmLimits::default()
+    };
+    for (instructions, message) in [
+        (
+            vec![StimInstr::Repeat {
+                count: u64::MAX,
+                body: vec![op("H", vec![qubit(0)])],
+            }],
+            "repeat expansion count overflow",
+        ),
+        (
+            vec![
+                StimInstr::Repeat {
+                    count: u64::MAX,
+                    body: vec![],
+                },
+                StimInstr::Repeat {
+                    count: 1,
+                    body: vec![],
+                },
+            ],
+            "native instruction count overflow",
+        ),
+    ] {
+        let error = lift(&instructions, &ExportOptions::default(), &limits).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert!(error.message.contains(message), "{error}");
+    }
+}
+
+#[test]
+fn malformed_annotation_and_measurement_operands_cannot_be_hidden_by_omission() {
+    for instruction in [
+        op("DETECTOR", vec![qubit(0)]),
+        op("OBSERVABLE_INCLUDE", vec![]),
+        StimInstr::new("OBSERVABLE_INCLUDE", vec![0.5], vec![]),
+        StimInstr::new("OBSERVABLE_INCLUDE", vec![u32::MAX as f64 + 1.], vec![]),
+        StimInstr::new("QUBIT_COORDS", vec![0.], vec![StimTarget::QubitInv(0)]),
+        op("M", vec![StimTarget::Rec(-1)]),
+        op("R_X", vec![]),
+        StimInstr::new("R_X", vec![0.5], vec![]),
+        op("T", vec![]),
+        op("T_DAG", vec![]),
+    ] {
+        let error = lift(
+            std::slice::from_ref(&instruction),
+            &ExportOptions {
+                omit_annotations: true,
+            },
+            &QasmLimits::default(),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::Type, "{instruction:?}: {error}");
+    }
+}
+
+#[test]
+fn every_semantic_operation_retains_its_source_when_output_exceeds_the_byte_budget() {
+    for operation in [
+        "h q[0];",
+        "measure q[0] -> c[0];",
+        "reset q[0];",
+        "barrier q[0];",
+        "if(c==0) x q[0];",
+        "if(c==1) y q[0];",
+        "if(c==1) z q[0];",
+    ] {
+        let source =
+            format!("OPENQASM 2.0; include \"qelib1.inc\"; qreg q[1]; creg c[1]; {operation}");
+        let circuit = from_qasm(&source).unwrap();
+        let output = to_qasm(&circuit, &ExportOptions::default(), &QasmLimits::default()).unwrap();
+        let limits = QasmLimits {
+            max_output_bytes: output.text.len() - 1,
+            ..QasmLimits::default()
+        };
+        let error = to_qasm(&circuit, &ExportOptions::default(), &limits).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert_eq!(
+            error.origin,
+            circuit.operations().last().unwrap().origin,
+            "{operation}"
+        );
+    }
+}
+
+#[test]
+fn feedback_aliases_remain_singleton_conditions_for_both_cz_operand_orders() {
+    let mut instructions = vec![op("M", vec![qubit(0)])];
+    for name in ["CNOT", "ZCX", "ZCY", "ZCZ"] {
+        instructions.push(op(name, vec![StimTarget::Rec(-1), qubit(1)]));
+    }
+    instructions.push(op("ZCZ", vec![qubit(1), StimTarget::Rec(-1)]));
+    let lifted = lift(
+        &instructions,
+        &ExportOptions::default(),
+        &QasmLimits::default(),
+    )
+    .unwrap();
+    let gates = lifted
+        .circuit
+        .operations()
+        .iter()
+        .filter_map(|op| match op.kind {
+            OperationKind::Conditional {
+                bit: 0,
+                value: true,
+                gate,
+                ..
+            } => Some(gate),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(gates, [Pauli::X, Pauli::X, Pauli::Y, Pauli::Z, Pauli::Z]);
+    let output = export(&instructions);
+    from_qasm(&output.text)
+        .unwrap()
+        .lower(Backend::Stabilizer, &QasmLimits::default())
+        .unwrap();
+}
