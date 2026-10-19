@@ -17,7 +17,11 @@ def documentation_only(path: str) -> bool:
         return False
     if path.startswith(("site/", "qp101-viz/")):
         return True
-    if path.startswith(("docs/", ".AGENTS/")) or re.match(r"^[^/]+/docs?/", path):
+    # Package doc/docs trees can contain include_str! inputs and contract tests.
+    # Keep them in the Rust gate even after the input file has been deleted.
+    if re.match(r"^[^/]+/docs?/", path):
+        return False
+    if path.startswith(("docs/", ".AGENTS/")):
         # Documentation examples and schemas can be executable test inputs.
         return Path(path).suffix in {".md", ".rst", ".png", ".jpg", ".jpeg", ".svg", ".pdf"}
     if path in {"AGENTS.md", "LICENSE", "LICENSE-MIT", "LICENSE-APACHE"}:

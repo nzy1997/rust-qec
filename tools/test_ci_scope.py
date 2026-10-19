@@ -15,8 +15,16 @@ class ScopeTests(unittest.TestCase):
         self.assertEqual(select_scope("pull_request", ["site/templates/benchmark-simulation.html"]),
                          {"rust": False, "coverage": False})
 
-    def test_package_documentation_stays_light(self):
-        self.assertFalse(select_scope("pull_request", ["rstim/doc/QP101-ZY.md", "rsinter/README.md"])["rust"])
+    def test_repository_documentation_stays_light(self):
+        self.assertFalse(select_scope("pull_request", ["docs/maintainer-reference.md", "rsinter/README.md"])["rust"])
+
+    def test_package_contract_documentation_keeps_rust_tests(self):
+        for path in ["qec-code/doc/hyperbolic_5_5_contract.md",
+                     "qec-code/doc/perturbed_hgp_contract.md",
+                     "qec-code/doc/css_distance.md", "qec-code/docs/future_contract.md",
+                     "rstim/doc/QP101-ZY.md"]:
+            with self.subTest(path=path):
+                self.assertTrue(select_scope("pull_request", [path])["rust"])
 
     def test_unknown_paths_and_runtime_inputs_fail_towards_full_tests(self):
         for path in ["Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml",
@@ -73,6 +81,30 @@ class GitSelectionTests(unittest.TestCase):
         (self.root / "src/lib.rs").unlink()
         self.commit()
         self.assertTrue(select_scope("pull_request", changed_paths(self.base, cwd=self.root))["rust"])
+
+    def prepare_contract(self, name):
+        path = self.root / "qec-code/doc" / name
+        path.parent.mkdir(parents=True)
+        path.write_text("# Contract\ncontract_version: 1\n")
+        self.commit()
+        return path, self.git("rev-parse", "HEAD").strip()
+
+    def test_modified_contract_document_runs_rust_tests(self):
+        path, base = self.prepare_contract("hyperbolic_5_5_contract.md")
+        path.write_text("# Incomplete contract\n")
+        self.commit()
+        changed = changed_paths(base, cwd=self.root)
+        self.assertEqual(changed, ["qec-code/doc/hyperbolic_5_5_contract.md"])
+        self.assertTrue(select_scope("pull_request", changed)["rust"])
+
+    def test_deleted_contract_document_runs_rust_tests(self):
+        path, base = self.prepare_contract("perturbed_hgp_contract.md")
+        path.unlink()
+        self.commit()
+        changed = changed_paths(base, cwd=self.root)
+        self.assertEqual(changed, ["qec-code/doc/perturbed_hgp_contract.md"])
+        self.assertFalse(path.exists())
+        self.assertTrue(select_scope("pull_request", changed)["rust"])
 
     def test_base_branch_only_changes_do_not_expand_pr_scope(self):
         self.git("checkout", "-qb", "base-update")

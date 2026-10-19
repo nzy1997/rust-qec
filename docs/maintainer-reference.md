@@ -18,9 +18,11 @@ The five required checks keep their existing names: `test`, `coverage`,
 On PRs, `tools/ci_scope.py` compares the PR head with its merge base. Known
 documentation and site-only changes skip Rust setup and compilation inside
 `test`; repository policy tests still run. Unknown files, Rust files, build
-inputs, assets, and test fixtures select the Rust gate. Deleted and renamed
-files count, and an unreadable diff fails the check. The Rust gate uses
-`make test` plus the minimal-feature and optional-backend checks.
+inputs, assets, test fixtures, and package `doc/` and `docs/` trees select the
+Rust gate. Package documentation can be embedded by `include_str!` or checked
+by integration tests, so its Markdown files also keep Rust validation.
+Deleted and renamed files count, and an unreadable diff fails the check.
+The Rust gate uses `make test` plus the minimal-feature and optional-backend checks.
 
 `coverage` reports the policy in its job summary on PRs. Coverage generation
 runs on master pushes, weekly CI runs, and manual runs, alongside full Rust
@@ -31,7 +33,7 @@ PR. No ruleset changes are needed for this selection policy.
 | --- | --- | --- |
 | Native support | Rust/build/native-support inputs; Linux MSRV and macOS stable | Four platform/toolchain cells on relevant master pushes, weekly, or manually |
 | Crates.io readiness | Rust, manifests, library READMEs, and package tooling | Every master push or manual run |
-| Near-Clifford diagnostic evidence | Near-Clifford implementation, simulator, benchmark evidence/protocol, and artifact tooling | Relevant master pushes, weekly, or manually |
+| Near-Clifford diagnostic evidence | Near-Clifford implementation, simulator, benchmark evidence/protocol, artifact tooling, Cargo manifests/lockfiles, build scripts, and toolchain/Cargo configuration | Relevant master pushes, weekly, or manually |
 | Atom-loss correctness reference | Sampler, circuit, decoder, atom-loss evidence, and envelope inputs; candidate correctness and smoke resources | Weekly/manual runs also execute the full contract, historical replay, and resource campaigns |
 | Native release archives | Manifests, release/build/install tooling, and envelope policy | Manual immutable-tag builds retain all release and publication gates |
 | Interactive shot quality | Viewer and documentation build inputs | Weekly or manually |

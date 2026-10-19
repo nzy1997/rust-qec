@@ -3,6 +3,11 @@ name: Near-Clifford diagnostic evidence
 on:
   push:
     paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/build.rs'
+      - 'rust-toolchain*'
+      - '.cargo/**'
       - 'benchmarks/near_clifford/**'
       - 'tools/fetch_benchmark_artifacts.py'
       - 'tools/test_fetch_benchmark_artifacts.py'
@@ -15,6 +20,11 @@ on:
     branches: [master]
   pull_request:
     paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/build.rs'
+      - 'rust-toolchain*'
+      - '.cargo/**'
       - 'benchmarks/near_clifford/**'
       - 'tools/fetch_benchmark_artifacts.py'
       - 'tools/test_fetch_benchmark_artifacts.py'
