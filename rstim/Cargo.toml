@@ -22,7 +22,7 @@ ilp = ["unified-cli", "dep:qec-ilp-core", "qec-ilp-core/highs"]
 codegen-css = ["dep:qec-code"]
 shot-viewer = []
 plotting = ["dep:csv", "dep:plotters", "dep:tempfile"]
-qasm = []
+qasm = ["serde_json/float_roundtrip"]
 
 [dependencies]
 rand = "0.8"
@@ -224,3 +224,11 @@ required-features = ["unified-cli"]
 [[test]]
 name = "css_codegen"
 required-features = ["codegen-css"]
+
+[[test]]
+name = "cli_qasm2"
+required-features = ["qasm", "unified-cli"]
+
+[[test]]
+name = "qasm2_feature_boundaries"
+required-features = ["unified-cli"]

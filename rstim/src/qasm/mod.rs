@@ -13,6 +13,7 @@
 //! # Ok::<(), rstim::qasm::QasmError>(())
 //! ```
 
+mod document;
 mod export;
 mod expr;
 mod frontend;

@@ -45,7 +45,8 @@ Optional features are intentionally additive:
 - `benchmark-telemetry` enables internal benchmark instrumentation.
 - `qasm` enables checked OpenQASM 2.0 import/export with register layouts, ordered
   measurements, and explicit stabilizer or near-Clifford lowering. See the
-  [QASM 2 guide](doc/qasm2.md).
+  [QASM 2 guide](doc/qasm2.md). Add `unified-cli` to expose `circuit import-qasm`,
+  `circuit export-qasm`, and document sampling with explicit result views.
 
 The development checkout combines all public commands in one executable.
 Install it with `cargo install --locked --path rstim --force`. This combined release

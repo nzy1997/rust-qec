@@ -1,0 +1,1 @@
+OPENQASM 2.0; gate f(a) q { U(a/0,0,0) q;
