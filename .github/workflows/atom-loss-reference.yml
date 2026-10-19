@@ -3,24 +3,38 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - '**/*.rs'
-      - '**/Cargo.toml'
+      - 'Cargo.toml'
       - 'Cargo.lock'
+      - '**/Cargo.toml'
       - 'rust-toolchain*'
       - '.cargo/**'
-      - 'benchmarks/**'
-      - 'rstim/**'
-      - 'rstim-shot-web/**'
-      - 'rsinter/**'
-      - 'renvelope/**'
-      - 'rmatching/**'
-      - 'qec-ilp-core/**'
-      - 'qec-code/**'
-      - 'rbposd/**'
-      - 'rilpqec/**'
+      - 'benchmarks/atom_loss/**'
+      - 'rstim/src/**'
+      - '!rstim/src/qp101_svg.rs'
+      - '!rstim/src/shot_viewer.rs'
+      - '!rstim/src/perf.rs'
+      - '!rstim/src/perf/**'
+      - 'rstim/examples/**'
+      - 'rstim/tests/fixtures/**'
+      - 'rsinter/src/**'
+      - 'renvelope/src/**'
+      - 'rmatching/src/**'
+      - 'qec-ilp-core/src/**'
+      - 'qec-code/src/**'
+      - 'rbposd/src/**'
+      - 'rilpqec/src/**'
+      - 'tools/*envelope*'
       - 'tools/fetch_docs_artifacts.py'
       - 'tools/docs_artifacts_revision.txt'
+      - 'tools/fetch_benchmark_artifacts.py'
+      - 'docs/envelope*'
+      - 'site/static/data/atom-loss/**'
       - '.github/workflows/atom-loss-reference.yml'
+  schedule:
+    - cron: "47 2 * * 1"
+concurrency:
+  group: atom-loss-reference-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -47,26 +61,38 @@ jobs:
       - run: pip install -r benchmarks/atom_loss/requirements.txt
       - run: cargo build --release --locked -p rstim --features benchmark-tools,ilp --bin rstim --example export_matching_benchmark --example export_decoder_oracle --example offline_matching_benchmark
       - run: python -m unittest benchmarks.atom_loss.test_reference benchmarks.atom_loss.test_source_contract benchmarks.atom_loss.test_figure_contract benchmarks.atom_loss.test_chain_reference benchmarks.atom_loss.test_decoder_contract benchmarks.atom_loss.test_sampler_mutations benchmarks.atom_loss.test_workload_contract benchmarks.atom_loss.test_standalone_contract
+        if: github.event_name != 'pull_request'
+      - name: Check finite atom-loss contracts
+        if: github.event_name == 'pull_request'
+        run: python -m unittest benchmarks.atom_loss.test_decoder_contract benchmarks.atom_loss.test_chain_reference
       - run: python3 tools/check_envelope_support.py --binary target/release/rstim --matrix docs/envelope-support.json --out drafts/ci-atom-loss/support.json
       - run: python3 tools/check_envelope_support.py --self-test --binary target/release/rstim
       - run: python -m benchmarks.atom_loss.readiness_correctness --binary target/release/rstim --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-correctness.json
       - run: python -m benchmarks.atom_loss.readiness_correctness --self-test --binary target/release/rstim
       - run: python -m benchmarks.atom_loss.readiness_resources --binary target/release/rstim --matrix docs/envelope-support.json --profile smoke --out drafts/ci-atom-loss/readiness-resources.json
       - name: Measure candidate resources with the full campaign
+        if: github.event_name != 'pull_request'
         run: |
           python -m benchmarks.atom_loss.readiness_resources \
             --binary target/release/rstim \
             --matrix docs/envelope-support.json \
             --profile full --out drafts/ci-atom-loss/retained-resources
       - name: Verify candidate-equivalent retained resources
+        if: github.event_name != 'pull_request'
         run: python -m benchmarks.atom_loss.readiness_resources --verify drafts/ci-atom-loss/retained-resources/manifest.json
       - name: Verify historical retained resources against measured source
+        if: github.event_name != 'pull_request'
         run: python -m benchmarks.atom_loss.readiness_resources --verify benchmarks/atom_loss/readiness/resources-selective-coherent-2026-10-09/manifest.json --historical-source
       - run: python -m benchmarks.atom_loss.correctness --binary target/release/rstim --out drafts/ci-atom-loss/correctness.json
       - run: python -m benchmarks.atom_loss.decoder_reference --out drafts/ci-atom-loss/decoder-correctness.json --compare site/static/data/atom-loss/decoder-correctness.json
       - run: python -m benchmarks.atom_loss.chain_reference --out drafts/ci-atom-loss/chain-correctness.json --compare site/static/data/atom-loss/chain-correctness.json
       - run: python -m benchmarks.atom_loss.verify --historical-source
+        if: github.event_name != 'pull_request'
       - run: python -O -m benchmarks.atom_loss.verify --historical-source
+        if: github.event_name != 'pull_request'
       - run: python -m benchmarks.atom_loss.replay
+        if: github.event_name != 'pull_request'
       - run: python -m benchmarks.atom_loss.replay --archive site/static/data/atom-loss/accuracy-seeds.zip
+        if: github.event_name != 'pull_request'
       - run: python -m benchmarks.atom_loss.decoder_replay --historical-source
+        if: github.event_name != 'pull_request'

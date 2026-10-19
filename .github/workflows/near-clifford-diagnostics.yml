@@ -2,9 +2,41 @@ name: Near-Clifford diagnostic evidence
 
 on:
   push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/build.rs'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'benchmarks/near_clifford/**'
+      - 'tools/fetch_benchmark_artifacts.py'
+      - 'tools/test_fetch_benchmark_artifacts.py'
+      - 'tools/benchmark_artifacts*'
+      - 'tools/history_commit_map.txt'
+      - 'rstim/src/near_clifford.rs'
+      - 'rstim/src/near_clifford/**'
+      - 'rstim/src/sim/**'
+      - '.github/workflows/near-clifford-diagnostics.yml'
     branches: [master]
   pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/build.rs'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'benchmarks/near_clifford/**'
+      - 'tools/fetch_benchmark_artifacts.py'
+      - 'tools/test_fetch_benchmark_artifacts.py'
+      - 'tools/benchmark_artifacts*'
+      - 'tools/history_commit_map.txt'
+      - 'rstim/src/near_clifford.rs'
+      - 'rstim/src/near_clifford/**'
+      - 'rstim/src/sim/**'
+      - '.github/workflows/near-clifford-diagnostics.yml'
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "31 2 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -293,3 +325,62 @@ jobs:
           if [[ "$PYTHON_MODE" == optimized ]]; then python_flags=(-O); fi
           evidence="benchmarks/near_clifford/results/$PUBLICATION"
           python3 "${python_flags[@]}" benchmarks/near_clifford/application_counts/test_contract.py "$evidence"
+  baseline-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            benchmarks/near_clifford/sota -> target
+            benchmarks/near_clifford/compiled_sota -> target
+      - name: Fetch pinned benchmark artifacts
+        run: python3 tools/fetch_benchmark_artifacts.py
+      - name: Check entangled near-Clifford benchmark evidence
+        run: |
+          python3 benchmarks/near_clifford/entangled/verify.py benchmarks/near_clifford/results/apple-m4-entangled-2026-09-30.json --git-sources
+          python3 benchmarks/near_clifford/entangled/test_contract.py
+          python3 -O benchmarks/near_clifford/entangled/test_contract.py
+      - name: Check near-Clifford row-operation evidence
+        run: |
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-scale-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-entangled-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/test_contract.py
+          python3 -O benchmarks/near_clifford/row_ops/test_contract.py
+      - name: Check near-Clifford Pauli-product evidence
+        run: |
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-scale-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-entangled-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/pauli_products/verify.py benchmarks/near_clifford/results/apple-m4-pauli-support-2026-10-03.json --git-sources
+          python3 benchmarks/near_clifford/pauli_products/test_contract.py
+          python3 -O benchmarks/near_clifford/pauli_products/test_contract.py
+          python3 benchmarks/near_clifford/pauli_products/test_report.py
+          python3 -O benchmarks/near_clifford/pauli_products/test_report.py
+      - name: Check current near-Clifford baseline protocol
+        run: |
+          python3 -m pip install numpy==2.4.6
+          cargo fmt --manifest-path benchmarks/near_clifford/sota/Cargo.toml --check
+          python3 benchmarks/near_clifford/sota/test_lowering.py
+          python3 -O benchmarks/near_clifford/sota/test_lowering.py
+          python3 benchmarks/near_clifford/sota/test_contract.py
+          python3 -O benchmarks/near_clifford/sota/test_contract.py
+          python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
+      - name: Check compiled near-Clifford native-input evidence
+        run: |
+          cargo fmt --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml --check
+          python3 benchmarks/near_clifford/compiled_sota/test_contract.py
+          python3 -O benchmarks/near_clifford/compiled_sota/test_contract.py
+          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json --git-sources
+          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
+          python3 -O benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
+      - name: Check native CPU peer benchmark contracts
+        run: |
+          python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
+          python3 -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'

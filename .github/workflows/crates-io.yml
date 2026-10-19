@@ -2,6 +2,28 @@ name: Crates.io readiness
 
 on:
   pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'Makefile'
+      - 'tools/*crate*'
+      - 'tools/*installed_quickstart*'
+      - 'tools/*rmatching_readme*'
+      - 'tools/*rbposd_repo*'
+      - 'tools/*rsinter_repo*'
+      - '*/README*'
+      - '**/LICENSE*'
+      - 'benchmarks/surface_decoder/*.toml'
+      - 'benchmarks/bb_circuit_bposd_compare/plot.toml'
+      - 'benchmarks/surface_decoder_compare/tests/fixtures/**'
+      - 'docs/bb144_circuit_bposd_reproduction.md'
+      - 'rsinter/tests/fixtures/**'
+      - 'rstim/assets/**'
+      - 'rsinter/configs/**'
+      - '.github/workflows/crates-io.yml'
     types: [opened, synchronize, reopened]
   push:
     branches: [master]
