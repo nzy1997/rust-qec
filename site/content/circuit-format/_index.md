@@ -23,6 +23,20 @@ A record target `rec[-k]` refers to the kth most recent stored bit at that point
 
 RustQEC reads Stim-style syntax. Accepted instructions vary by execution, analysis, export and decoder; see the [support contract](../support/). For shared instructions, consult [Stim's gate reference](https://github.com/quantumlib/Stim/wiki/Stim-v1.13-Gate-Reference).
 
+## OpenQASM 2.0 conversion
+
+Enable the optional `qasm` feature to import QASM 2.0 into a checked semantic
+document or export the supported native instruction subset. Declarations,
+register operands, gate definitions and parameter expressions are checked before
+lowering. Measurement, reset and single-bit Pauli feedback execute in order;
+T gates and general rotations require an explicit near-Clifford backend.
+
+Keep the semantic JSON document for register names and classical destinations.
+Native Stim text is an execution projection. Noise, loss and unsupported quantum
+operations are rejected on QASM export; QEC annotation omission is explicit and
+reported. Follow the [QASM round-trip tutorial](../qasm2/#first-qasm-round-trip)
+and its [support matrix](../qasm2/#supported-profile).
+
 ## Atom-loss extensions
 
 The simulator uses a gate-cancellation model: `LOSS(p) q...` independently removes each still-present target with probability p, and loss persists until reset. Ideal single-qubit gates do nothing to absent atoms; a two-qubit interaction is skipped if either partner is absent. `DEPOLARIZE2` also skips an incomplete pair.

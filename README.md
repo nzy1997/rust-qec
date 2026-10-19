@@ -44,6 +44,9 @@ those pages; do not edit the generated copies.
 
 With RustQEC you can:
 
+- [Import, sample and export OpenQASM 2.0 circuits](rstim/doc/qasm2.md),
+  with checked register layouts, measurement/reset and classical feedback.
+
 - [Trace a circuit through stats, detector events, detector-error-model
   extraction, and DEM sampling](docs/showcases/rstim-cli-dem-pipeline.md).
 - [Render circuit diagrams as SVG, including seeded atom-loss sample-shot
@@ -102,7 +105,17 @@ executable also supports the simulator commands, including `render_svg`, and
 
 Optional [OpenQASM 2 conversion](rstim/doc/qasm2.md) supports checked import/export,
 ordered measurement/reset, Pauli feedback, and explicit near-Clifford execution.
-Build with `--features qasm` to enable the conversion commands.
+Enable it when installing from this development checkout:
+
+```sh
+cargo install --locked --path rstim --features qasm --force
+rstim circuit import-qasm --in input.qasm --out program.qasm2.json --backend near-clifford
+rstim circuit export-qasm --in program.qasm2.json --in-format qasm2-json --out output.qasm
+```
+
+Keep `program.qasm2.json` for register names, overwritten classical bits and
+subsequent sampling. The [runnable QASM tutorial](rstim/doc/qasm2.md#first-qasm-round-trip)
+shows both result views, backend selection and the supported export subset.
 
 The published v0.3.3 native installer still contains the previous two-command
 layout. A single-binary native archive will be available after the unified CLI
@@ -227,6 +240,8 @@ exclusions for this release line.
   Rust API orientation.
 - [`rstim` CLI reference](rstim/doc/cli.md): `stats`, `sample`, `detect`,
   `analyze_errors`, `render_svg`, `export_json`, and related commands.
+- [OpenQASM 2.0 conversion](rstim/doc/qasm2.md): semantic import/export,
+  near-Clifford execution, classical output views and supported-profile checks.
 - [Local neural-decoder training data](rstim/doc/training-data.md): aligned
   detector/observable `b8` streams plus versioned per-shot simulator traces.
 - [`rmatching` decoder docs](rmatching/README.md): MWPM decoder entry point for

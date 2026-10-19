@@ -62,12 +62,13 @@ PAGE_FILES = (
     "interactive/local/index.html",
     "rust-api/index.html", "rust-api-reference/index.html",
     "qec-code-cli/index.html", "rsinter-cli/index.html",
-    "circuit-format/index.html", "data-formats/index.html", "versions/index.html",
+    "circuit-format/index.html", "qasm2/index.html", "data-formats/index.html", "versions/index.html",
     "benchmarks/simulation/index.html", "benchmarks/decoders/index.html",
 )
 JS_FILES = ("js/qp101-browser.js", "js/benchmarks.js", "js/docs.js", "js/search.js", "js/shot-startup.js")
 PAGE_REQUIRED_SCRIPTS = ("js/docs.js",)
 PAGE_REQUIRED_ANCHORS = {
+    "qasm2/index.html": ("first-qasm-round-trip", "supported-profile", "persistent-semantic-documents", "command-line-workflows"),
     "atom-loss/index.html": ("loss-information", "model-loss", "sample-loss", "decode-loss", "check-predictions", "supported-circuits"),
     "atom-loss-concepts/index.html": ("loss-record", "data-boundary", "choose-decoder", "supported-circuits"),
     "atom-loss-evidence/index.html": ("atom-loss-results", "loss-correctness", "loss-sampling-throughput", "loss-logical-error-rate", "loss-accuracy-time", "loss-seed-accuracy", "loss-timing-sweep", "loss-adapter-stages", "loss-evidence-methods"),
@@ -1344,6 +1345,7 @@ const copyBlocks = document.querySelectorAll("pre code");
     write_text(site_root / "docs/index.html", '<html><body><main><h1>Documentation</h1></main></body></html>')
     write_text(site_root / "js/search.js", '// Local documentation search')
     write_text(site_root / "data/docs-search.json", '[]')
+    write_text(site_root / "qasm2/index.html", '<html><body><main><h1>OpenQASM 2.0</h1>' + ''.join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS['qasm2/index.html']) + '<script src="../js/docs.js"></script></main></body></html>')
 
     for page in ("atom-loss/index.html", "atom-loss-concepts/index.html", "atom-loss-evidence/index.html"):
         write_text(site_root / page, '<html><body><main><h1>Atom loss</h1>' + "".join(f'<h2 id="{anchor}">{anchor}</h2>' for anchor in PAGE_REQUIRED_ANCHORS[page]) + '</main></body></html>')

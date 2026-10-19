@@ -21,6 +21,25 @@ nav = "data-formats"
 
 For a row with logical bits `[1,0,1]`, b8 contains byte `0x05`. Two three-bit rows take two bytes, not one packed six-bit stream. Empty-width data cannot reveal the shot count from byte length; callers must preserve it explicitly. The [CLI help](../reference/#all-commands) lists other formats supported by each command; not every command accepts the same encodings.
 
+## QASM semantic documents and result views
+
+`rstim.qasm2-program.v1` JSON stores checked operations, declared registers and
+source provenance for QASM import/export. It is separate from native Stim text,
+QP101 drawing data and shot encodings. Use `circuit sample --in-format qasm2-json`
+to sample a document with an explicit backend.
+
+The default `--result-view measurement-record` retains every measurement in
+execution order. `--result-view classical` writes final classical-register values
+in declaration order, then increasing bit index; overwritten results are replaced
+and unwritten bits stay zero. Integer conditions interpret bit 0 as the least
+significant bit. The same `01` or `b8` encoding can therefore have different row
+widths depending on the selected view. Preserve the document and result-view
+choice alongside the shots.
+
+The [QASM feedback example](../qasm2/#first-qasm-round-trip) demonstrates two stored
+measurements and a single final classical bit. These shots do not carry detector
+or observable semantics; QASM documents are not direct DEM/decoder input.
+
 ## Loss records and derived features
 
 For each loss-visible readout, the flag is stored before the value. Preserve both bits, retain their record indices, and deinterleave them into distinct value/mask channels for training. A lost value is a placeholder. Raw detector parities involving it are not reliable syndrome evidence. The [training tutorial](../sampling-data/#loss-tensors) gives tensor shapes and a checked loader.

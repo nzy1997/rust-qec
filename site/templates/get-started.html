@@ -11,6 +11,11 @@
 <p class="start-requirements">Requires Rust and Cargo. <a href="https://www.rust-lang.org/tools/install">Install Rust</a> first.</p>
 <p>Install this development version from a repository checkout once. After installation, the commands below work from any directory:</p>
 <pre data-language="Shell"><code>cargo install --locked --path rstim --force</code></pre>
+<details class="loss-disclosure"><summary>Optional OpenQASM 2.0 conversion</summary>
+<p>Enable QASM import/export when installing from this development checkout:</p>
+<pre data-language="Shell"><code>cargo install --locked --path rstim --features qasm --force</code></pre>
+<p>The <a href="../qasm2/">QASM tutorial</a> covers semantic checks, ordered measurement and feedback, explicit near-Clifford execution and register-preserving round trips.</p>
+</details>
 <details class="loss-disclosure"><summary>Additional tool for the CSS-code tutorial</summary>
 <p>The CSS-code tutorial uses the separate <code>qec-code</code> executable. Install it once from the same repository checkout:</p>
 <pre data-language="Shell"><code>cargo install --locked --path qec-code --features cli</code></pre>
