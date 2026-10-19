@@ -63,13 +63,17 @@ test('home routes first-time users to the workflow and docs links to the API ref
 });
 
 test('CLI reference is generated from the executable capabilities contract', async ({ page }) => {
-  const binary = fileURLToPath(new URL('../../../target/debug/rstim', import.meta.url));
-  const capabilities = JSON.parse(execFileSync(binary, ['capabilities', '--format', 'json'], { encoding: 'utf8' }));
+  const capabilities = JSON.parse(execFileSync('cargo', [
+    'run', '--quiet', '--locked', '-p', 'rstim', '--features', 'qasm', '--bin', 'rstim',
+    '--', 'capabilities', '--format', 'json',
+  ], { cwd: fileURLToPath(new URL('../../../', import.meta.url)), encoding: 'utf8' }));
   await page.goto('/reference/');
   expect(await page.locator('.reference-command > h3 code').allTextContents()).toEqual(
     capabilities.commands.map(command => `rstim ${command.argv.join(' ')}`),
   );
   await expect(page.locator('#command-circuit-gen')).toContainText('rstim circuit gen');
+  await expect(page.locator('#command-circuit-import-qasm')).toContainText('rstim circuit import-qasm');
+  await expect(page.locator('#command-circuit-export-qasm')).toContainText('rstim circuit export-qasm');
   await expect(page.locator('#command-circuit-gen').locator('xpath=..')).toContainText('--before-round-data-loss-probability');
   await expect(page.locator('#command-decode').locator('xpath=..')).toContainText('decode_timeout');
   await expect(page.locator('main')).toContainText('rstim capabilities --format json');
