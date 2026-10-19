@@ -114,6 +114,8 @@ work: each gate/condition target or barrier qubit counts once, and each
 measurement/reset counts once. Wide barriers therefore share one cumulative
 budget instead of allocating an unbounded target list per source statement.
 Declared idle register width remains governed by the qubit/classical-bit limits.
+Gate expansion also charges broadcast-lane operand visits against
+`max_operations * max_gate_depth`, including calls to empty gate bodies.
 `max_output_bytes` is
 reserved for document serialization and export; parsing/lowering do not consume
 that budget. File reads

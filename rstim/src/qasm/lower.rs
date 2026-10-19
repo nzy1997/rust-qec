@@ -2,6 +2,11 @@ use super::*;
 use crate::ir::{StimInstr, StimTarget};
 use std::collections::HashSet;
 
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../tests/support/qasm2_reference.rs"]
+mod boundary_reference;
+
 /// Final classical storage is distinct from the append-only quantum record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "measurement", rename_all = "snake_case")]
@@ -581,5 +586,279 @@ mod target_budget_tests {
         let error = validate(&circuit, &limits).unwrap_err();
         assert_eq!(error.code, ErrorCode::Limit);
         assert!(error.message.contains("operand work"));
+    }
+}
+
+#[cfg(test)]
+mod checked_semantic_boundary_tests {
+    use super::*;
+
+    fn circuit(kind: OperationKind) -> QasmCircuit {
+        QasmCircuit {
+            quantum_registers: vec![Register {
+                name: "q".into(),
+                size: 2,
+                offset: 0,
+            }],
+            classical_registers: vec![Register {
+                name: "c".into(),
+                size: 1,
+                offset: 0,
+            }],
+            operations: vec![Operation {
+                kind,
+                origin: Some(SourceSpan {
+                    source: "document".into(),
+                    line: 1,
+                    column: 1,
+                    offset: 0,
+                    length: 1,
+                    expansion: vec![],
+                }),
+            }],
+        }
+    }
+
+    #[test]
+    fn malformed_semantic_operations_never_reach_a_backend() {
+        for (kind, code) in [
+            (
+                OperationKind::Gate {
+                    gate: Gate::CX,
+                    targets: vec![0],
+                },
+                ErrorCode::Type,
+            ),
+            (
+                OperationKind::Gate {
+                    gate: Gate::CX,
+                    targets: vec![0, 0],
+                },
+                ErrorCode::Type,
+            ),
+            (
+                OperationKind::Gate {
+                    gate: Gate::X,
+                    targets: vec![2],
+                },
+                ErrorCode::Type,
+            ),
+            (OperationKind::Measure { qubit: 0, bit: 1 }, ErrorCode::Type),
+            (OperationKind::Reset { qubit: 2 }, ErrorCode::Type),
+            (OperationKind::Barrier { qubits: vec![2] }, ErrorCode::Type),
+            (
+                OperationKind::Conditional {
+                    bit: 1,
+                    value: true,
+                    gate: Pauli::X,
+                    targets: vec![0],
+                },
+                ErrorCode::Type,
+            ),
+            (
+                OperationKind::Conditional {
+                    bit: 0,
+                    value: true,
+                    gate: Pauli::X,
+                    targets: vec![],
+                },
+                ErrorCode::Type,
+            ),
+            (
+                OperationKind::Gate {
+                    gate: Gate::Rx(Angle::Rational {
+                        numerator: 1,
+                        denominator: 0,
+                        pi: true,
+                    }),
+                    targets: vec![0],
+                },
+                ErrorCode::Type,
+            ),
+            (
+                OperationKind::Gate {
+                    gate: Gate::Ry(Angle::Radians {
+                        value: f64::INFINITY,
+                    }),
+                    targets: vec![0],
+                },
+                ErrorCode::Type,
+            ),
+        ] {
+            let program = circuit(kind);
+            let error = lower(&program, Backend::NearClifford, &QasmLimits::default()).unwrap_err();
+            assert_eq!(error.code, code);
+            assert_eq!(error.origin.unwrap().source, "document");
+        }
+        let mut program = circuit(OperationKind::Conditional {
+            bit: 0,
+            value: true,
+            gate: Pauli::X,
+            targets: vec![0],
+        });
+        program.classical_registers[0].size = 2;
+        assert_eq!(
+            validate(&program, &QasmLimits::default()).unwrap_err().code,
+            ErrorCode::Unsupported
+        );
+    }
+
+    #[test]
+    fn semantic_registers_must_have_unique_valid_names_and_contiguous_positive_widths() {
+        for registers in [
+            vec![Register {
+                name: "if".into(),
+                size: 1,
+                offset: 0,
+            }],
+            vec![Register {
+                name: "Upper".into(),
+                size: 1,
+                offset: 0,
+            }],
+            vec![Register {
+                name: "q".into(),
+                size: 0,
+                offset: 0,
+            }],
+            vec![Register {
+                name: "q".into(),
+                size: 1,
+                offset: 1,
+            }],
+            vec![
+                Register {
+                    name: "q".into(),
+                    size: 1,
+                    offset: 0,
+                },
+                Register {
+                    name: "q".into(),
+                    size: 1,
+                    offset: 1,
+                },
+            ],
+            vec![
+                Register {
+                    name: "q".into(),
+                    size: 1,
+                    offset: 0,
+                },
+                Register {
+                    name: "other".into(),
+                    size: 1,
+                    offset: 0,
+                },
+            ],
+        ] {
+            let program = QasmCircuit {
+                quantum_registers: registers,
+                classical_registers: vec![],
+                operations: vec![],
+            };
+            assert_eq!(
+                validate(&program, &QasmLimits::default()).unwrap_err().code,
+                ErrorCode::Type
+            );
+        }
+        let mut program = circuit(OperationKind::Reset { qubit: 0 });
+        program.classical_registers[0].name = "q".into();
+        assert_eq!(
+            validate(&program, &QasmLimits::default()).unwrap_err().code,
+            ErrorCode::Type
+        );
+        let limits = QasmLimits {
+            max_qubits: usize::MAX,
+            max_classical_bits: usize::MAX,
+            ..Default::default()
+        };
+        for registers in [
+            vec![
+                Register {
+                    name: "q".into(),
+                    size: usize::MAX,
+                    offset: 0,
+                },
+                Register {
+                    name: "other".into(),
+                    size: 1,
+                    offset: usize::MAX,
+                },
+            ],
+            vec![Register {
+                name: "q".into(),
+                size: u32::MAX as usize + 1,
+                offset: 0,
+            }],
+        ] {
+            let program = QasmCircuit {
+                quantum_registers: registers,
+                classical_registers: vec![],
+                operations: vec![],
+            };
+            assert_eq!(
+                validate(&program, &limits).unwrap_err().code,
+                ErrorCode::Limit
+            );
+        }
+        let mut program = circuit(OperationKind::Reset { qubit: 0 });
+        assert_eq!(
+            validate(
+                &program,
+                &QasmLimits {
+                    max_qubits: 1,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::Limit
+        );
+        program.operations.push(Operation {
+            kind: OperationKind::Reset { qubit: 1 },
+            origin: None,
+        });
+        assert_eq!(
+            validate(
+                &program,
+                &QasmLimits {
+                    max_operations: 1,
+                    ..Default::default()
+                }
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::Limit
+        );
+    }
+
+    #[test]
+    fn typed_clifford_variants_match_independent_full_operators() {
+        use super::boundary_reference::{Primitive as P, assert_unitary};
+        use std::f64::consts::{FRAC_PI_2, PI};
+        for (gate, expected) in [
+            (Gate::S, vec![P::U(0, 0., 0., FRAC_PI_2)]),
+            (Gate::SDag, vec![P::U(0, 0., 0., -FRAC_PI_2)]),
+            (Gate::SqrtX, vec![P::U(0, FRAC_PI_2, -FRAC_PI_2, FRAC_PI_2)]),
+            (
+                Gate::SqrtXDag,
+                vec![P::U(0, -FRAC_PI_2, -FRAC_PI_2, FRAC_PI_2)],
+            ),
+            (Gate::SqrtY, vec![P::U(0, FRAC_PI_2, 0., 0.)]),
+            (Gate::SqrtYDag, vec![P::U(0, -FRAC_PI_2, 0., 0.)]),
+            (Gate::SWAP, vec![P::CX(0, 1), P::CX(1, 0), P::CX(0, 1)]),
+            (Gate::Z, vec![P::U(0, 0., 0., PI)]),
+        ] {
+            let targets = if matches!(gate, Gate::SWAP) {
+                vec![0, 1]
+            } else {
+                vec![0]
+            };
+            let program = circuit(OperationKind::Gate { gate, targets });
+            let plan = lower(&program, Backend::Stabilizer, &QasmLimits::default()).unwrap();
+            // All input columns share one phase comparison. Replacing any of
+            // these gates by identity changes this independently specified map.
+            assert_unitary(&expected, &plan);
+        }
     }
 }

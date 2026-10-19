@@ -722,22 +722,22 @@ impl Frontend<'_> {
             Statement::Call(c) => {
                 self.call_check(c, &[], None)?;
                 for o in &c.operands {
-                    self.operand(o, true, None)?;
+                    self.operand_range(o, true, None)?;
                 }
                 Ok(())
             }
             Statement::Measure(q, c, _) => {
-                self.operand(q, true, None)?;
-                self.operand(c, false, None)?;
+                self.operand_range(q, true, None)?;
+                self.operand_range(c, false, None)?;
                 Ok(())
             }
             Statement::Reset(q, _) => {
-                self.operand(q, true, None)?;
+                self.operand_range(q, true, None)?;
                 Ok(())
             }
             Statement::Barrier(qs, _) => {
                 for q in qs {
-                    self.operand(q, true, None)?;
+                    self.operand_range(q, true, None)?;
                 }
                 Ok(())
             }
@@ -888,16 +888,17 @@ impl Frontend<'_> {
         }
         Ok(())
     }
-    fn operand(
+    fn operand_range(
         &self,
         o: &Operand,
         quantum: bool,
         locals: Option<&HashMap<String, u32>>,
-    ) -> Result<(Vec<usize>, bool), QasmError> {
+    ) -> Result<(std::ops::Range<usize>, bool), QasmError> {
         if let Some(locals) = locals {
             if o.index.is_none() {
                 if let Some(q) = locals.get(&o.name) {
-                    return Ok((vec![*q as usize], false));
+                    let index = *q as usize;
+                    return Ok((index..index + 1, false));
                 }
             }
             return Err(error(
@@ -930,10 +931,28 @@ impl Frontend<'_> {
                     &o.span,
                 ));
             }
-            Ok((vec![reg.offset + i], false))
+            Ok((reg.offset + i..reg.offset + i + 1, false))
         } else {
-            Ok(((reg.offset..reg.offset + reg.size).collect(), true))
+            Ok((reg.offset..reg.offset + reg.size, true))
         }
+    }
+    fn operand(
+        &self,
+        operand: &Operand,
+        quantum: bool,
+        locals: Option<&HashMap<String, u32>>,
+    ) -> Result<(Vec<usize>, bool), QasmError> {
+        let (range, whole) = self.operand_range(operand, quantum, locals)?;
+        // Visibility and type checking resolve spans without allocating target
+        // vectors. Materialize only after the expansion budget admits the width.
+        if range.len() > self.limits.max_operations {
+            return Err(error(
+                ErrorCode::Limit,
+                "operand width exceeds expanded operand work limit",
+                &operand.span,
+            ));
+        }
+        Ok((range.collect(), whole))
     }
     fn push(
         &mut self,
@@ -1016,25 +1035,68 @@ impl Frontend<'_> {
         let operands = c
             .operands
             .iter()
-            .map(|o| self.operand(o, true, locals))
+            .map(|o| self.operand_range(o, true, locals))
             .collect::<Result<Vec<_>, _>>()?;
         let mut width = None;
-        for (values, whole) in &operands {
+        for (range, whole) in &operands {
+            if range.len() > self.limits.max_operations {
+                return Err(error(
+                    ErrorCode::Limit,
+                    "operand width exceeds expanded operand work limit",
+                    &c.span,
+                ));
+            }
             if *whole {
-                if width.is_some_and(|n| n != values.len()) {
+                if width.is_some_and(|n| n != range.len()) {
                     return Err(error(
                         ErrorCode::Type,
                         "register broadcast widths differ",
                         &c.span,
                     ));
                 }
-                width = Some(values.len());
+                width = Some(range.len());
             }
         }
+        let lane_work = width
+            .unwrap_or(1)
+            .checked_mul(operands.len().max(1))
+            .ok_or_else(|| {
+                error(
+                    ErrorCode::Limit,
+                    "gate broadcast work overflows the supported range",
+                    &c.span,
+                )
+            })?;
+        // The call already charged one step. Empty definitions still consume
+        // work while checking each lane's operands, even without emitted ops.
+        self.expansion_steps = self
+            .expansion_steps
+            .checked_add(lane_work.saturating_sub(1))
+            .ok_or_else(|| {
+                error(
+                    ErrorCode::Limit,
+                    "gate expansion work limit exceeded",
+                    &c.span,
+                )
+            })?;
+        if self.expansion_steps
+            > self
+                .limits
+                .max_operations
+                .saturating_mul(self.limits.max_gate_depth.max(1))
+        {
+            return Err(error(
+                ErrorCode::Limit,
+                "gate expansion work limit exceeded",
+                &c.span,
+            ));
+        }
         for i in 0..width.unwrap_or(1) {
+            // Each broadcast lane has one scalar per formal. Retaining ranges
+            // avoids the width-times-arity allocation for repeated registers.
             let targets: Vec<u32> = operands
                 .iter()
-                .map(|(v, whole)| v[if *whole { i } else { 0 }] as u32)
+                .map(|(range, whole)| (range.start + if *whole { i } else { 0 }) as u32)
                 .collect();
             let mut seen = HashSet::new();
             if targets.iter().any(|q| !seen.insert(*q)) {

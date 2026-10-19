@@ -375,3 +375,31 @@ fn read_source(path: &Path, max: usize) -> Result<String, QasmError> {
     }
     Ok(source)
 }
+
+#[cfg(test)]
+mod source_boundary_tests {
+    use super::*;
+
+    #[test]
+    fn source_reader_reports_disappeared_files_and_checks_streamed_size() {
+        let directory = tempfile::tempdir().unwrap();
+        assert_eq!(
+            read_source(&directory.path().join("missing.qasm"), 16)
+                .unwrap_err()
+                .code,
+            ErrorCode::Io
+        );
+        let source = directory.path().join("valid.qasm");
+        std::fs::write(&source, "OPENQASM 2.0;").unwrap();
+        assert_eq!(read_source(&source, usize::MAX).unwrap(), "OPENQASM 2.0;");
+        #[cfg(unix)]
+        {
+            // Character streams need not advertise their eventual byte count.
+            // The read cap must enforce the same limit as regular-file metadata.
+            assert_eq!(
+                read_source(Path::new("/dev/zero"), 4).unwrap_err().code,
+                ErrorCode::Limit
+            );
+        }
+    }
+}

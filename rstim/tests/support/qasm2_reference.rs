@@ -396,6 +396,24 @@ fn native(n: usize, instructions: &[StimInstr]) -> Vec<Branch> {
                     }
                 }
             }
+        } else if name == "SWAP" {
+            // Native SWAP is a basis-row permutation. Keep this independent
+            // of the three-CX source recipe used by operator comparisons.
+            for pair in targets.chunks_exact(2) {
+                let a = pair[0].qubit_index().expect("qubit") as usize;
+                let b = pair[1].qubit_index().expect("qubit") as usize;
+                for branch in &mut branches {
+                    let d = branch.kraus.len().isqrt();
+                    for row in 0..d {
+                        if row & (1 << a) != 0 && row & (1 << b) == 0 {
+                            let other = row ^ (1 << a) ^ (1 << b);
+                            for col in 0..d {
+                                branch.kraus.swap(row * d + col, other * d + col);
+                            }
+                        }
+                    }
+                }
+            }
         } else if name == "TICK" {
             continue;
         } else {
