@@ -125,6 +125,10 @@ jobs:
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
       - run: cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
+      - name: Check semantic OpenQASM 2 conversion
+        run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary
+      - name: Check QASM semantic invariants
+        run: 'cargo test --locked -p rstim --no-default-features --features qasm --lib qasm::'
       - name: Check optional code-distance backend boundaries
         run: |
           cargo test --locked -p qec-code --no-default-features --features distance-ilp-highs --test logical_distance --test distance_backend_features
@@ -285,7 +289,7 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
-        run: cargo llvm-cov --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
+        run: cargo llvm-cov --locked --workspace --features rstim/qasm,rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
         with:
