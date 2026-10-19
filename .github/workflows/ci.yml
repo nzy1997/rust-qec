@@ -126,7 +126,7 @@ jobs:
           rm /tmp/rsinter-minimal-tree.txt
       - run: cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
       - name: Check semantic OpenQASM 2 conversion
-        run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary
+        run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary --test qasm2_export --test qasm2_roundtrip
       - name: Check QASM semantic invariants
         run: 'cargo test --locked -p rstim --no-default-features --features qasm --lib qasm::'
       - name: Check optional code-distance backend boundaries
