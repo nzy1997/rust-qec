@@ -16,7 +16,13 @@ class ScopeTests(unittest.TestCase):
                          {"rust": False, "coverage": False})
 
     def test_repository_documentation_stays_light(self):
-        self.assertFalse(select_scope("pull_request", ["docs/maintainer-reference.md", "rsinter/README.md"])["rust"])
+        self.assertFalse(select_scope("pull_request", [".AGENTS/AGENTS.md", "rsinter/README.md"])["rust"])
+
+    def test_top_level_documentation_keeps_rust_tests(self):
+        for path in ["docs/showcases/rstim-cli-dem-pipeline.md",
+                     "docs/maintainer-reference.md", "docs/future_contract.md"]:
+            with self.subTest(path=path):
+                self.assertTrue(select_scope("pull_request", [path])["rust"])
 
     def test_package_contract_documentation_keeps_rust_tests(self):
         for path in ["qec-code/doc/hyperbolic_5_5_contract.md",
@@ -103,6 +109,30 @@ class GitSelectionTests(unittest.TestCase):
         self.commit()
         changed = changed_paths(base, cwd=self.root)
         self.assertEqual(changed, ["qec-code/doc/perturbed_hgp_contract.md"])
+        self.assertFalse(path.exists())
+        self.assertTrue(select_scope("pull_request", changed)["rust"])
+
+    def prepare_showcase(self):
+        path = self.root / "docs/showcases/rstim-cli-dem-pipeline.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("# CLI showcase\n```stim\nREPEAT two {\n  M 0\n}\n```\n")
+        self.commit()
+        return path, self.git("rev-parse", "HEAD").strip()
+
+    def test_validated_showcase_input_edit_runs_rust_tests(self):
+        path, base = self.prepare_showcase()
+        path.write_text(path.read_text().replace("REPEAT two", "REPEAT 2"))
+        self.commit()
+        changed = changed_paths(base, cwd=self.root)
+        self.assertEqual(changed, ["docs/showcases/rstim-cli-dem-pipeline.md"])
+        self.assertTrue(select_scope("pull_request", changed)["rust"])
+
+    def test_deleted_showcase_runs_rust_tests(self):
+        path, base = self.prepare_showcase()
+        path.unlink()
+        self.commit()
+        changed = changed_paths(base, cwd=self.root)
+        self.assertEqual(changed, ["docs/showcases/rstim-cli-dem-pipeline.md"])
         self.assertFalse(path.exists())
         self.assertTrue(select_scope("pull_request", changed)["rust"])
 

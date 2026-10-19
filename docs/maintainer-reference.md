@@ -15,12 +15,13 @@ The five required checks keep their existing names: `test`, `coverage`,
 `publication-evidence-check`. Do not add workflow-level path filters to their
 `CI` workflow: the repository and release gates require successful reports.
 
-On PRs, `tools/ci_scope.py` compares the PR head with its merge base. Known
-documentation and site-only changes skip Rust setup and compilation inside
-`test`; repository policy tests still run. Unknown files, Rust files, build
-inputs, assets, test fixtures, and package `doc/` and `docs/` trees select the
-Rust gate. Package documentation can be embedded by `include_str!` or checked
-by integration tests, so its Markdown files also keep Rust validation.
+On PRs, `tools/ci_scope.py` compares the PR head with its merge base. Site-only
+changes and recognized README, license, and agent-instruction files skip Rust
+setup and compilation inside `test`; repository policy tests still run.
+Unknown files, Rust files, build inputs, assets, test fixtures, top-level
+`docs/`, and package `doc/` and `docs/` trees select the Rust gate. Documentation
+can be embedded by `include_str!` or read as executable examples by integration
+tests, so Markdown under those documentation trees keeps Rust validation.
 Deleted and renamed files count, and an unreadable diff fails the check.
 The Rust gate uses `make test` plus the minimal-feature and optional-backend checks.
 
