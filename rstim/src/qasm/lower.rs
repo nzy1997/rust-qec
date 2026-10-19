@@ -65,6 +65,17 @@ impl LoweredQasmCircuit {
     }
 }
 
+/// Retained semantic operands, including wide scoped barriers and feedback.
+pub(super) fn target_work(kind: &OperationKind) -> usize {
+    match kind {
+        OperationKind::Gate { targets, .. } | OperationKind::Conditional { targets, .. } => {
+            targets.len()
+        }
+        OperationKind::Barrier { qubits } => qubits.len(),
+        OperationKind::Measure { .. } | OperationKind::Reset { .. } => 1,
+    }
+}
+
 pub(super) fn validate(circuit: &QasmCircuit, limits: &QasmLimits) -> Result<(), QasmError> {
     let mut names = HashSet::new();
     let qubits = validate_registers(&circuit.quantum_registers, limits.max_qubits, &mut names)?;
@@ -79,7 +90,20 @@ pub(super) fn validate(circuit: &QasmCircuit, limits: &QasmLimits) -> Result<(),
     if circuit.operations.len() > limits.max_operations {
         return Err(limit("expanded operation count exceeds limit"));
     }
+    let mut targets = 0usize;
     for operation in &circuit.operations {
+        targets = targets
+            .checked_add(target_work(&operation.kind))
+            .ok_or_else(|| {
+                let mut error = limit("expanded operand work overflows the supported range");
+                error.origin = operation.origin.clone();
+                error
+            })?;
+        if targets > limits.max_operations {
+            let mut error = limit("expanded operand work exceeds limit");
+            error.origin = operation.origin.clone();
+            return Err(error);
+        }
         validate_operation(&operation.kind, qubits, bits, &circuit.classical_registers).map_err(
             |mut e| {
                 e.origin = operation.origin.clone();
@@ -493,4 +517,69 @@ impl Builder<'_> {
 
 fn limit(message: &str) -> QasmError {
     QasmError::new(ErrorCode::Limit, message)
+}
+
+#[cfg(test)]
+mod target_budget_tests {
+    use super::*;
+
+    #[test]
+    fn semantic_target_budget_is_shared_across_all_operation_kinds() {
+        let limits = QasmLimits {
+            max_operations: 8,
+            ..Default::default()
+        };
+        let mut circuit = QasmCircuit {
+            quantum_registers: vec![Register {
+                name: "q".into(),
+                size: 4,
+                offset: 0,
+            }],
+            classical_registers: vec![Register {
+                name: "c".into(),
+                size: 1,
+                offset: 0,
+            }],
+            operations: vec![
+                Operation {
+                    kind: OperationKind::Barrier {
+                        qubits: vec![0, 1, 2],
+                    },
+                    origin: None,
+                },
+                Operation {
+                    kind: OperationKind::Gate {
+                        gate: Gate::CX,
+                        targets: vec![0, 1],
+                    },
+                    origin: None,
+                },
+                Operation {
+                    kind: OperationKind::Measure { qubit: 0, bit: 0 },
+                    origin: None,
+                },
+                Operation {
+                    kind: OperationKind::Reset { qubit: 2 },
+                    origin: None,
+                },
+                Operation {
+                    kind: OperationKind::Conditional {
+                        bit: 0,
+                        value: true,
+                        gate: Pauli::X,
+                        targets: vec![1],
+                    },
+                    origin: None,
+                },
+            ],
+        };
+        validate(&circuit, &limits).unwrap();
+        circuit.operations.push(Operation {
+            kind: OperationKind::Reset { qubit: 3 },
+            origin: None,
+        });
+        let error = validate(&circuit, &limits).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Limit);
+        assert!(error.message.contains("operand work"));
+    }
 }

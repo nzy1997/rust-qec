@@ -370,3 +370,76 @@ fn primitive_u_feedback_is_classified_by_exact_semantics() {
         );
     }
 }
+
+#[test]
+fn wide_barriers_share_a_cumulative_expanded_operand_budget() {
+    let limits = QasmLimits {
+        max_operations: 64,
+        max_qubits: 32,
+        ..Default::default()
+    };
+    let checked = qasm::parse_and_check(
+        "OPENQASM 2.0; qreg q[32]; barrier q; barrier q;",
+        "barriers.qasm",
+        &RejectIncludes,
+        &limits,
+    )
+    .unwrap();
+    assert_eq!(checked.operations().len(), 2);
+    let error = qasm::parse_and_check(
+        "OPENQASM 2.0; qreg q[32]; barrier q; barrier q; barrier q;",
+        "barriers.qasm",
+        &RejectIncludes,
+        &limits,
+    )
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Limit);
+    assert!(error.message.contains("operand work"));
+    assert_eq!(error.origin.unwrap().source, "barriers.qasm");
+    // Declared idle width has its own bound; it does not retain 32 operands.
+    let small = QasmLimits {
+        max_operations: 1,
+        max_qubits: 32,
+        ..Default::default()
+    };
+    let checked = qasm::parse_and_check(
+        "OPENQASM 2.0; qreg q[32];",
+        "idle.qasm",
+        &RejectIncludes,
+        &small,
+    )
+    .unwrap();
+    assert_eq!(checked.num_qubits(), 32);
+    checked.lower(qasm::Backend::Stabilizer, &small).unwrap();
+    let too_small = QasmLimits {
+        max_qubits: 31,
+        ..small
+    };
+    assert_eq!(
+        qasm::parse_and_check(
+            "OPENQASM 2.0; qreg q[32];",
+            "idle.qasm",
+            &RejectIncludes,
+            &too_small
+        )
+        .unwrap_err()
+        .code,
+        ErrorCode::Limit
+    );
+}
+
+#[test]
+fn conditional_replacement_charges_each_retained_target_once() {
+    let limits = QasmLimits {
+        max_operations: 2,
+        ..Default::default()
+    };
+    let program = qasm::parse_and_check(
+        "OPENQASM 2.0; qreg q[1]; creg c[1]; if(c==0) U(pi,0,pi) q; if(c==1) U(0,0,pi) q;",
+        "conditional.qasm",
+        &RejectIncludes,
+        &limits,
+    )
+    .unwrap();
+    assert_eq!(program.operations().len(), 2);
+}

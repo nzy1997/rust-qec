@@ -108,7 +108,13 @@ filesystem or network access. `parse_and_check` accepts an explicit
 The reserved bundled standard header wins over unrelated working-directory files.
 
 `QasmLimits` bounds source bytes, tokens, include files/depth, gate and expression
-depth, expanded operations, qubits and classical bits. `max_output_bytes` is
+depth, expanded operations, qubits and classical bits. `max_operations` separately
+bounds the number of retained operations and their cumulative expanded operand
+work: each gate/condition target or barrier qubit counts once, and each
+measurement/reset counts once. Wide barriers therefore share one cumulative
+budget instead of allocating an unbounded target list per source statement.
+Declared idle register width remains governed by the qubit/classical-bit limits.
+`max_output_bytes` is
 reserved for document serialization and export; parsing/lowering do not consume
 that budget. File reads
 are bounded separately by `FileResolver::max_file_bytes`. Expressions use checked

@@ -554,6 +554,7 @@ struct Frontend<'a> {
     files: usize,
     tokens: usize,
     expansion_steps: usize,
+    retained_targets: usize,
     includes: Vec<String>,
     defs: HashMap<String, Definition>,
     symbols: HashSet<String>,
@@ -947,6 +948,24 @@ impl Frontend<'_> {
                 span,
             ));
         }
+        let targets = self
+            .retained_targets
+            .checked_add(super::lower::target_work(&kind))
+            .ok_or_else(|| {
+                error(
+                    ErrorCode::Limit,
+                    "expanded operand work overflows the supported range",
+                    span,
+                )
+            })?;
+        if targets > self.limits.max_operations {
+            return Err(error(
+                ErrorCode::Limit,
+                "expanded operand work exceeds limit",
+                span,
+            ));
+        }
+        self.retained_targets = targets;
         let mut origin = span.clone();
         origin.expansion.extend_from_slice(stack);
         self.circuit.operations.push(Operation {
@@ -1127,18 +1146,16 @@ impl Frontend<'_> {
                 Ok(())
             }
             Statement::Barrier(qs, span) => {
-                let mut qubits = vec![];
-                for q in qs {
-                    qubits.extend(
-                        self.operand(q, true, locals)?
-                            .0
-                            .into_iter()
-                            .map(|q| q as u32),
-                    );
-                }
+                let mut qubits = Vec::new();
                 let mut seen = HashSet::new();
-                if qubits.iter().any(|q| !seen.insert(*q)) {
-                    return Err(error(ErrorCode::Type, "aliased barrier operands", span));
+                for q in qs {
+                    for index in self.operand(q, true, locals)?.0 {
+                        let index = index as u32;
+                        if !seen.insert(index) {
+                            return Err(error(ErrorCode::Type, "aliased barrier operands", span));
+                        }
+                        qubits.push(index);
+                    }
                 }
                 self.push(OperationKind::Barrier { qubits }, span, stack)
             }
@@ -1174,6 +1191,11 @@ impl Frontend<'_> {
                     ));
                 }
                 let expanded = self.circuit.operations.split_off(start);
+                // Replace the temporary expanded gates with semantic conditions;
+                // only retained operations consume this target-storage budget.
+                for operation in &expanded {
+                    self.retained_targets -= super::lower::target_work(&operation.kind);
+                }
                 for op in expanded {
                     let OperationKind::Gate { gate, targets } = op.kind else {
                         return Err(error(
@@ -1278,6 +1300,7 @@ pub(super) fn parse(
         files: 0,
         tokens: 0,
         expansion_steps: 0,
+        retained_targets: 0,
         includes: vec![],
         defs: HashMap::new(),
         symbols: HashSet::new(),
