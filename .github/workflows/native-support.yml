@@ -2,9 +2,35 @@ name: Native support
 
 on:
   push:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'Makefile'
+      - 'rstim/assets/**'
+      - 'rsinter/configs/**'
+      - 'tools/*native_support*'
+      - 'docs/support-compatibility.md'
+      - '.github/workflows/native-support.yml'
     branches: [master]
   pull_request:
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'rust-toolchain*'
+      - '.cargo/**'
+      - 'Makefile'
+      - 'rstim/assets/**'
+      - 'rsinter/configs/**'
+      - 'tools/*native_support*'
+      - 'docs/support-compatibility.md'
+      - '.github/workflows/native-support.yml'
     types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "13 2 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -13,43 +39,34 @@ concurrency:
 
 jobs:
   native-support:
-    name: Native support / ${{ matrix.cell }}
+    name: Native support / ${{ matrix.cell_prefix }}-${{ matrix.toolchain == 'stable' && 'stable' || 'msrv' }}
     strategy:
       fail-fast: false
       matrix:
+        runner: [ubuntu-24.04, macos-15]
+        toolchain: ['1.88.0', stable]
+        exclude:
+          - runner: ${{ github.event_name == 'pull_request' && 'ubuntu-24.04' || 'none' }}
+            toolchain: stable
+          - runner: ${{ github.event_name == 'pull_request' && 'macos-15' || 'none' }}
+            toolchain: '1.88.0'
         include:
-          - cell: ubuntu-24.04-x86_64-msrv
-            runner: ubuntu-24.04
+          - runner: ubuntu-24.04
+            cell_prefix: ubuntu-24.04-x86_64
             runner_os: Linux
             runner_arch: X64
             machine: x86_64
             target: x86_64-unknown-linux-gnu
-            toolchain: 1.88.0
-          - cell: ubuntu-24.04-x86_64-stable
-            runner: ubuntu-24.04
-            runner_os: Linux
-            runner_arch: X64
-            machine: x86_64
-            target: x86_64-unknown-linux-gnu
-            toolchain: stable
-          - cell: macos-15-aarch64-msrv
-            runner: macos-15
+          - runner: macos-15
+            cell_prefix: macos-15-aarch64
             runner_os: macOS
             runner_arch: ARM64
             machine: arm64
             target: aarch64-apple-darwin
-            toolchain: 1.88.0
-          - cell: macos-15-aarch64-stable
-            runner: macos-15
-            runner_os: macOS
-            runner_arch: ARM64
-            machine: arm64
-            target: aarch64-apple-darwin
-            toolchain: stable
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
-      NATIVE_CELL: ${{ matrix.cell }}
+      NATIVE_CELL: ${{ matrix.cell_prefix }}-${{ matrix.toolchain == 'stable' && 'stable' || 'msrv' }}
       EXPECTED_RUNNER_OS: ${{ matrix.runner_os }}
       EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
       EXPECTED_MACHINE: ${{ matrix.machine }}
@@ -120,6 +137,6 @@ jobs:
       - name: Upload native support evidence
         uses: actions/upload-artifact@v4
         with:
-          name: native-support-${{ matrix.cell }}
+          name: native-support-${{ matrix.cell_prefix }}-${{ matrix.toolchain == 'stable' && 'stable' || 'msrv' }}
           path: native-support-evidence/evidence.json
           if-no-files-found: error

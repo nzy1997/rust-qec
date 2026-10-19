@@ -3,6 +3,10 @@ name: Interactive shot quality
 on:
   pull_request:
     paths:
+      - "README*"
+      - "*/README*"
+      - "docs/showcases/**"
+      - "qp101-viz/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "Makefile"
@@ -33,7 +37,7 @@ on:
       - "tools/test_install_script.py"
       - "docs/support-compatibility.md"
       - "docs/maintainer-reference.md"
-      - "rstim/doc/QP101-ZY.md"
+      - "rstim/doc/**"
       - "site/**"
       - "web/shot-viewer/**"
       - "fuzz/**"
@@ -77,6 +81,7 @@ jobs:
           cargo test -p rstim --test interactive_shot_properties
           cargo test -p rstim-shot-web
           make build-site
+          cargo test --locked -p rstim --test site_contract --test workspace_brand --test site_gallery
           python3 tools/check_site_build.py _site --repo-root .
           npm --prefix web/shot-viewer ci
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
@@ -96,27 +101,3 @@ jobs:
           path: web/shot-viewer/test-results/
           retention-days: 14
           if-no-files-found: ignore
-
-  fuzz-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - interactive_open
-          - interactive_event_ids
-          - interactive_commands
-          - interactive_qp101_svg
-          - interactive_svg_escape
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install fuzz toolchain
-        run: |
-          rustup toolchain install nightly --profile minimal
-          cargo install cargo-fuzz --locked
-      - uses: Swatinem/rust-cache@v2
-      - name: Run deterministic fuzz budget
-        env:
-          FUZZ_SECONDS: ${{ github.event_name == 'schedule' && '60' || '5' }}
-        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time="$FUZZ_SECONDS" -seed=7

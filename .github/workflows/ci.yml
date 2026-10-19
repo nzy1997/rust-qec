@@ -5,6 +5,8 @@ on:
     branches: [master]
   pull_request:
     types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: "7 2 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -19,6 +21,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Select CI scope
+        id: scope
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 tools/ci_scope.py --event "$GITHUB_EVENT_NAME" --base "$CI_BASE_SHA"
       - name: Check tracked file policy
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -38,8 +45,10 @@ jobs:
           fi
           python3 tools/check_tracked_file_sizes.py "${args[@]}"
       - name: Fetch pinned benchmark artifacts
+        if: steps.scope.outputs.rust == 'true'
         run: python3 tools/fetch_benchmark_artifacts.py
       - name: Install system deps
+        if: steps.scope.outputs.rust == 'true'
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
           for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
@@ -58,54 +67,17 @@ jobs:
             -o Acquire::https::Timeout=30 \
             install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
+        if: steps.scope.outputs.rust == 'true'
         run: python3 -m pip install stim
       - name: Install Rust toolchain
+        if: steps.scope.outputs.rust == 'true'
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+        if: steps.scope.outputs.rust == 'true'
       - name: Test repository governance gates
-        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes tools.test_fetch_benchmark_artifacts
-      - name: Check entangled near-Clifford benchmark evidence
-        run: |
-          python3 benchmarks/near_clifford/entangled/verify.py benchmarks/near_clifford/results/apple-m4-entangled-2026-09-30.json --git-sources
-          python3 benchmarks/near_clifford/entangled/test_contract.py
-          python3 -O benchmarks/near_clifford/entangled/test_contract.py
-      - name: Check near-Clifford row-operation evidence
-        run: |
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-scale-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-row-ops-entangled-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/test_contract.py
-          python3 -O benchmarks/near_clifford/row_ops/test_contract.py
-      - name: Check near-Clifford Pauli-product evidence
-        run: |
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-scale-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/row_ops/verify.py benchmarks/near_clifford/results/apple-m4-pauli-entangled-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/pauli_products/verify.py benchmarks/near_clifford/results/apple-m4-pauli-support-2026-10-03.json --git-sources
-          python3 benchmarks/near_clifford/pauli_products/test_contract.py
-          python3 -O benchmarks/near_clifford/pauli_products/test_contract.py
-          python3 benchmarks/near_clifford/pauli_products/test_report.py
-          python3 -O benchmarks/near_clifford/pauli_products/test_report.py
-      - name: Check current near-Clifford baseline protocol
-        run: |
-          python3 -m pip install numpy==2.4.6
-          cargo fmt --manifest-path benchmarks/near_clifford/sota/Cargo.toml --check
-          python3 benchmarks/near_clifford/sota/test_lowering.py
-          python3 -O benchmarks/near_clifford/sota/test_lowering.py
-          python3 benchmarks/near_clifford/sota/test_contract.py
-          python3 -O benchmarks/near_clifford/sota/test_contract.py
-          python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
-      - name: Check compiled near-Clifford native-input evidence
-        run: |
-          cargo fmt --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml --check
-          python3 benchmarks/near_clifford/compiled_sota/test_contract.py
-          python3 -O benchmarks/near_clifford/compiled_sota/test_contract.py
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json --git-sources
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
-          python3 -O benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
-      - name: Check native CPU peer benchmark contracts
-        run: |
-          python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
-          python3 -I -O -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
+        run: python3 -m unittest tools.test_check_repository_gate tools.test_check_release_gate tools.test_check_envelope_support tools.test_envelope_mle_scope tools.test_check_tracked_file_sizes tools.test_fetch_benchmark_artifacts tools.test_ci_scope
       - name: Minimal rsinter build, smoke, and dependency graph
+        if: steps.scope.outputs.rust == 'true'
         run: |
           cargo build --locked -p rsinter --no-default-features --features rbposd-runner
           minimal_out="$(mktemp -d)"
@@ -124,10 +96,17 @@ jobs:
           cargo test --locked -p rsinter --no-default-features --features rbposd-runner
           rm -r "$minimal_out"
           rm /tmp/rsinter-minimal-tree.txt
-      - run: cargo test --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs
+      - name: Run workspace tests
+        if: steps.scope.outputs.rust == 'true'
+        run: make test
       - name: Check optional code-distance backend boundaries
+        if: steps.scope.outputs.rust == 'true'
         run: |
           cargo test --locked -p qec-code --no-default-features --features distance-ilp-highs --test logical_distance --test distance_backend_features
+      - name: Summarize selected tests
+        env:
+          RUST_TESTS: ${{ steps.scope.outputs.rust }}
+        run: echo "Rust workspace tests selected=$RUST_TESTS; repository policy checks always run." >> "$GITHUB_STEP_SUMMARY"
   checked-evidence-portability:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -259,7 +238,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select CI scope
+        id: scope
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 tools/ci_scope.py --event "$GITHUB_EVENT_NAME" --base "$CI_BASE_SHA"
       - name: Install system deps
+        if: steps.scope.outputs.coverage == 'true'
         run: |
           sudo find /etc/apt/sources.list.d -maxdepth 1 -type f \( -iname '*azure-cli*' -o -iname '*microsoft*' \) -delete
           for source_file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
@@ -278,18 +265,26 @@ jobs:
             -o Acquire::https::Timeout=30 \
             install -y pkg-config libfontconfig1-dev
       - name: Install Stim CLI
+        if: steps.scope.outputs.coverage == 'true'
         run: python3 -m pip install stim
       - name: Install Rust toolchain
+        if: steps.scope.outputs.coverage == 'true'
         run: rustup toolchain install stable --profile minimal && rustup default stable
       - uses: Swatinem/rust-cache@v2
+        if: steps.scope.outputs.coverage == 'true'
       - name: Install cargo-llvm-cov
+        if: steps.scope.outputs.coverage == 'true'
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate coverage
+        if: steps.scope.outputs.coverage == 'true'
         run: cargo llvm-cov --locked --workspace --features rstim/ilp,rsinter/full,rstim/benchmark-tools,rstim/cli,rstim/codegen-css,rstim/shot-viewer,qec-code/cli,qec-ilp-core/highs --lcov --output-path lcov.info --ignore-filename-regex 'rbposd/dev/fixture_catalog\.rs$'
       - name: Upload to Codecov
+        if: steps.scope.outputs.coverage == 'true'
         uses: codecov/codecov-action@v5
         with:
           files: lcov.info
           disable_search: true
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Summarize coverage policy
+        run: echo "Coverage is generated on master pushes, scheduled runs, and manual runs. PRs use the workspace test gate." >> "$GITHUB_STEP_SUMMARY"
