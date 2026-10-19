@@ -100,6 +100,10 @@ The last two outputs are `shot D0 L0` and `error(1) D0 L0`. The same `rstim`
 executable also supports the simulator commands, including `render_svg`, and
 `rstim capabilities --format json` lists the structured command contract.
 
+Optional [OpenQASM 2 conversion](rstim/doc/qasm2.md) supports checked import/export,
+ordered measurement/reset, Pauli feedback, and explicit near-Clifford execution.
+Build with `--features qasm` to enable the conversion commands.
+
 The published v0.3.3 native installer still contains the previous two-command
 layout. A single-binary native archive will be available after the unified CLI
 release; until then, install this development build from source.

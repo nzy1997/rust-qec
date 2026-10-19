@@ -169,8 +169,8 @@ Declared idle register width remains governed by the qubit/classical-bit limits.
 Gate expansion also charges broadcast-lane operand visits against
 `max_operations * max_gate_depth`, including calls to empty gate bodies.
 `max_output_bytes` is
-used by QASM export and reserved for document serialization; parsing/lowering do not consume
-that budget. File reads
+used by QASM export and semantic JSON input/output; QASM parsing/lowering do not
+consume that budget. File reads
 are bounded separately by `FileResolver::max_file_bytes`. Expressions use checked
 bounded rational arithmetic where possible, otherwise finite FP64 values.
 Invalid domains, non-finite results and excessive expansion fail explicitly.
@@ -179,3 +179,88 @@ Invalid domains, non-finite results and excessive expansion fail explicitly.
 context. Syntax/type errors, valid unsupported constructs and backend limitations
 are distinct. Conversion failures never remove unsupported operations and
 continue with a different circuit.
+
+## Persistent semantic documents
+
+`QasmCircuit::to_json(&limits)` produces schema `rstim.qasm2-program.v1`.
+`QasmCircuit::from_json(text, &limits)` checks the schema, every nested field,
+register layout, operation arity, angle domain, provenance, and all resource
+limits before returning a usable document. Unknown fields and malformed
+operations fail rather than changing meaning. Floating-point angles retain
+their FP64 values through serialization; exact rational multiples of pi retain
+their integer representation.
+
+The document stores expanded typed operations, declared quantum/classical
+registers, and optional source spans. It does not store a second executable plan
+or a cached classical-output map that could disagree with those operations.
+Lowering recomputes measurement events and final classical bindings. Keeping the
+document is the normal workflow for a semantic round trip; `.stim` is an explicit
+execution projection with a warning about lost layout information.
+
+## Command-line workflows
+
+Build conversion commands with both optional features:
+
+```sh
+cargo build --locked -p rstim --no-default-features --features qasm,unified-cli
+RSTIM=target/debug/rstim
+$RSTIM circuit import-qasm --in input.qasm --out program.qasm2.json --backend near-clifford
+$RSTIM circuit export-qasm --in program.qasm2.json --in-format qasm2-json --out output.qasm
+$RSTIM circuit sample --in program.qasm2.json --in-format qasm2-json --backend near-clifford --result-view classical --shots 1024 --seed 7 --out shots.01
+$RSTIM circuit export-qasm --in native.stim --out native.qasm
+```
+
+For a Clifford-only program, choose `--backend stabilizer` (the default).
+Near-Clifford sampling requires an explicit selection and accepts
+`--max-active-rank` (default 16). Exceeding that limit fails with an actionable
+error; rank limits are never automatically raised. Conversion itself does not
+sample or compile the potentially expensive near-Clifford execution state.
+
+Import defaults to `--out-format qasm2-json`; `--out-format stim` requests the
+execution projection and reports layout loss. Export defaults to
+`--in-format stim`; use `--in-format qasm2-json` to retain the original layout.
+`--omit-annotations` reports every omitted native annotation and never removes
+noise or unsupported quantum operations.
+
+Omitting `--in`, or passing `--in -`, reads stdin. File imports resolve relative
+includes beside the including file. Stdin imports require explicit
+`--include-dir PATH` for external includes; nested includes then resolve beside
+the included file. The bundled standard header remains available in either
+case. Circuit artifacts go to the required `--out` file; JSON/human reports go
+to stdout and diagnostics go to stderr. Failed validation or sampling leaves an
+existing output file intact.
+
+Sampling defaults to `--result-view measurement-record`. The `classical` view
+uses declared register order, preserves unwritten zeros, and selects the latest
+measurement assigned to each bit. It requires a semantic document; a plain Stim
+file has no classical layout. Supported shot encodings are `01`, `b8`, `r8`,
+`hits`, and `ptb64`. Existing Stim-only sampling defaults are unchanged.
+QASM documents are not direct input to detection-event, DEM, or decoder commands.
+`rstim capabilities --format json` advertises the conversion commands only when
+the feature is enabled.
+
+## Verification and reference implementations
+
+Ordinary Rust tests use an independent full-matrix and labelled-instrument
+interpreter for small circuits. Comparisons use one common unitary phase, or
+outcome-labelled Choi matrices for measurement/reset/feedback. Generated
+properties cover source/document/export and native/export/import round trips;
+they check quantum state changes as well as final classical results. Focused
+CLI tests cover both backends, result views, file/stdin handling, atomic output,
+and disabled-feature behavior.
+
+The dedicated [QASM workflow](../../.github/workflows/qasm2.yml) runs an
+independent strict Qiskit parser and pinned upstream Stim differential checks.
+Run its external check locally with the exact pinned dependencies in that
+workflow and `python3 tools/qasm2_conformance.py --binary target/debug/rstim`.
+The same workflow smoke-tests the bounded `qasm2_parse` and `qasm2_document`
+fuzz targets. The general CI suite also exercises feature combinations and
+includes conversion code in coverage.
+
+Stim's [exporter](https://github.com/quantumlib/Stim/blob/6f15adb47f54fbec6c5f68a673f453f3d5c0a9fd/src/stim/util_top/export_qasm.cc)
+informed basis/inverted-measurement decompositions and explicit failure behavior.
+The [yao-rs converter](https://github.com/GiggleLiu/yao-rs/blob/4a398fe0a641b98792f8d3c28c56c2b79e84cedb/src/qasm.rs)
+informed the AST/type-check/expansion architecture. Its measurement treatment is
+not an execution oracle. rstim uses its own bounded frontend because the examined
+`openqasm` 0.1.2 parser stores real literals as FP32 and lacks scientific notation.
+These references guide interoperability; they do not replace semantic tests.

@@ -1,0 +1,58 @@
+name: QASM 2 semantic compatibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'rstim/**'
+      - 'fuzz/**'
+      - 'tools/qasm2*'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/qasm2.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'rstim/**'
+      - 'fuzz/**'
+      - 'tools/qasm2*'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/qasm2.yml'
+
+concurrency:
+  group: qasm2-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r tools/qasm2-requirements.txt
+      - run: cargo build --locked -p rstim --no-default-features --features qasm,unified-cli --bin rstim
+      - run: python tools/qasm2_conformance.py --binary target/debug/rstim
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz -> target
+      - run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Fuzz source parsing, export, and reimport
+        run: cargo +nightly fuzz run qasm2_parse -- -max_total_time=15 -max_len=4096 -timeout=5 -rss_limit_mb=1024
+      - name: Fuzz semantic document invariants
+        run: cargo +nightly fuzz run qasm2_document -- -max_total_time=15 -max_len=16384 -timeout=5 -rss_limit_mb=1024

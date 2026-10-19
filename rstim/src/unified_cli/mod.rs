@@ -12,6 +12,8 @@ mod matching;
 #[doc(hidden)]
 pub use decode::benchmark::{export_decoder_oracle_dataset, export_matching_dataset};
 mod pipeline;
+#[cfg(feature = "qasm")]
+mod qasm_cli;
 
 pub const SCHEMA_VERSION: &str = "rustqec.cli.v1";
 const CIRCUIT_STATS_COMMAND: &str = "circuit.stats";
@@ -145,6 +147,12 @@ enum DatasetCommand {
 
 #[derive(Debug, Subcommand)]
 enum CircuitCommand {
+    /// Import checked OpenQASM 2.0 into a semantic document or Stim projection
+    #[cfg(feature = "qasm")]
+    ImportQasm(qasm_cli::ImportOptions),
+    /// Export supported native or semantic circuits as OpenQASM 2.0
+    #[cfg(feature = "qasm")]
+    ExportQasm(qasm_cli::ExportOptionsCLI),
     /// Summarize circuit structure and counts
     Stats {
         /// Read the circuit from a file instead of stdin
@@ -230,6 +238,22 @@ enum CircuitCommand {
         /// Select human-readable or versioned JSON output
         #[arg(long, value_enum, default_value_t = pipeline::PipelineFormat::Json)]
         format: pipeline::PipelineFormat,
+        /// Input circuit format; ordinary Stim remains the default
+        #[cfg(feature = "qasm")]
+        #[arg(long, value_enum, default_value = "stim")]
+        in_format: qasm_cli::InputFormat,
+        /// Explicit execution backend; no fallback is performed
+        #[cfg(feature = "qasm")]
+        #[arg(long, value_enum, default_value = "stabilizer")]
+        backend: qasm_cli::CliBackend,
+        /// Return all measurement events or final declared classical bits
+        #[cfg(feature = "qasm")]
+        #[arg(long, value_enum, default_value = "measurement-record")]
+        result_view: qasm_cli::ResultView,
+        /// Near-Clifford active rank budget
+        #[cfg(feature = "qasm")]
+        #[arg(long, default_value_t = 16)]
+        max_active_rank: usize,
     },
     /// Sample detection events and observable flips from a circuit
     Detect {
@@ -455,6 +479,36 @@ where
     })?;
     let error_format = cli.error_format;
     match cli.command {
+        #[cfg(feature = "qasm")]
+        Command::Circuit {
+            command: CircuitCommand::ImportQasm(options),
+        } => qasm_cli::run_import(&options, error_format, stdin)
+            .and_then(|report| {
+                write_qasm_success(
+                    qasm_cli::IMPORT_COMMAND,
+                    &report,
+                    &options.out,
+                    options.format,
+                    error_format,
+                    stdout,
+                )
+            })
+            .map_err(RunError::Command),
+        #[cfg(feature = "qasm")]
+        Command::Circuit {
+            command: CircuitCommand::ExportQasm(options),
+        } => qasm_cli::run_export(&options, error_format, stdin)
+            .and_then(|report| {
+                write_qasm_success(
+                    qasm_cli::EXPORT_COMMAND,
+                    &report,
+                    &options.out,
+                    options.format,
+                    error_format,
+                    stdout,
+                )
+            })
+            .map_err(RunError::Command),
         Command::Circuit {
             command: CircuitCommand::Stats { input, format },
         } => {
@@ -519,8 +573,48 @@ where
                     seed,
                     skip_reference_sample,
                     format,
+                    #[cfg(feature = "qasm")]
+                    in_format,
+                    #[cfg(feature = "qasm")]
+                    backend,
+                    #[cfg(feature = "qasm")]
+                    result_view,
+                    #[cfg(feature = "qasm")]
+                    max_active_rank,
                 },
         } => {
+            #[cfg(feature = "qasm")]
+            if in_format != qasm_cli::InputFormat::Stim
+                || backend != qasm_cli::CliBackend::Stabilizer
+                || result_view != qasm_cli::ResultView::MeasurementRecord
+                || max_active_rank != 16
+            {
+                let options = qasm_cli::SampleOptions {
+                    shots,
+                    input,
+                    out,
+                    out_format,
+                    seed,
+                    skip_reference_sample,
+                    format,
+                    in_format,
+                    backend,
+                    result_view,
+                    max_active_rank,
+                };
+                return qasm_cli::run_sample(&options, error_format, stdin)
+                    .and_then(|report| {
+                        write_qasm_success(
+                            pipeline::CIRCUIT_SAMPLE_COMMAND,
+                            &report,
+                            &options.out,
+                            format,
+                            error_format,
+                            stdout,
+                        )
+                    })
+                    .map_err(RunError::Command);
+            }
             let options = pipeline::SampleOptions {
                 shots,
                 input,
@@ -921,6 +1015,215 @@ fn write_pipeline_success<T: Serialize>(
     })
 }
 
+#[cfg(feature = "qasm")]
+fn write_qasm_success(
+    command: &'static str,
+    report: &qasm_cli::Report,
+    out: &std::path::Path,
+    format: pipeline::PipelineFormat,
+    error_format: Option<ErrorFormat>,
+    stdout: &mut dyn Write,
+) -> Result<(), CommandError> {
+    let artifacts = vec![out.display().to_string()];
+    let result = match format {
+        pipeline::PipelineFormat::Json => write_json(
+            stdout,
+            &SuccessEnvelope {
+                schema_version: SCHEMA_VERSION,
+                status: "ok",
+                command,
+                result: &report.result,
+                warnings: report.warnings.clone(),
+                artifacts,
+            },
+        ),
+        pipeline::PipelineFormat::Human => {
+            write_pipeline_success(
+                command,
+                &report.result,
+                artifacts,
+                format,
+                error_format,
+                stdout,
+            )?;
+            report
+                .warnings
+                .iter()
+                .try_for_each(|warning| writeln!(stdout, "warning: {warning}"))
+                .map_err(|cause| cause.to_string())
+        }
+    };
+    result.map_err(|message| CommandError {
+        command,
+        code: "output_error",
+        message,
+        json: format.is_json(error_format),
+        exit_code: 2,
+    })
+}
+
+fn feature_capabilities(commands: Vec<Capability>) -> Vec<Capability> {
+    #[cfg(feature = "qasm")]
+    {
+        let mut commands = commands;
+        let arg = |name, flag, required, values, default| ArgumentCapability {
+            name,
+            flag,
+            required,
+            values,
+            default,
+        };
+        let qasm_errors = || {
+            [
+                "qasm_parse_error",
+                "qasm_type_error",
+                "qasm_unsupported_construct",
+                "qasm_backend_unsupported",
+                "qasm_unrepresentable_export",
+                "qasm_missing_layout",
+                "qasm_limit_exceeded",
+                "qasm_io_error",
+                "qasm_invalid_document",
+            ]
+            .into_iter()
+            .map(|code| ErrorCapability {
+                code,
+                exit_code: 2,
+                channel: "stderr",
+            })
+            .collect::<Vec<_>>()
+        };
+        if let Some(sample) = commands
+            .iter_mut()
+            .find(|command| command.name == pipeline::CIRCUIT_SAMPLE_COMMAND)
+        {
+            sample.arguments.extend([
+                arg(
+                    "in_format",
+                    "--in-format",
+                    false,
+                    vec!["stim", "qasm2-json"],
+                    Some("stim"),
+                ),
+                arg(
+                    "backend",
+                    "--backend",
+                    false,
+                    vec!["stabilizer", "near-clifford"],
+                    Some("stabilizer"),
+                ),
+                arg(
+                    "result_view",
+                    "--result-view",
+                    false,
+                    vec!["measurement-record", "classical"],
+                    Some("measurement-record"),
+                ),
+                arg(
+                    "max_active_rank",
+                    "--max-active-rank",
+                    false,
+                    vec!["non_negative_integer"],
+                    Some("16"),
+                ),
+            ]);
+            sample.errors.extend(qasm_errors());
+        }
+        for (name, verb, import) in [
+            (qasm_cli::IMPORT_COMMAND, "import-qasm", true),
+            (qasm_cli::EXPORT_COMMAND, "export-qasm", false),
+        ] {
+            let mut arguments = vec![
+                arg("input", "--in", false, vec!["path"], Some("stdin")),
+                arg("out", "--out", true, vec!["path"], None),
+                arg(
+                    "format",
+                    "--format",
+                    false,
+                    vec!["human", "json"],
+                    Some("json"),
+                ),
+            ];
+            if import {
+                arguments.extend([
+                    arg(
+                        "out_format",
+                        "--out-format",
+                        false,
+                        vec!["qasm2-json", "stim"],
+                        Some("qasm2-json"),
+                    ),
+                    arg(
+                        "backend",
+                        "--backend",
+                        false,
+                        vec!["stabilizer", "near-clifford"],
+                        Some("stabilizer"),
+                    ),
+                    arg("include_dirs", "--include-dir", false, vec!["path"], None),
+                ]);
+            } else {
+                arguments.extend([
+                    arg(
+                        "in_format",
+                        "--in-format",
+                        false,
+                        vec!["stim", "qasm2-json"],
+                        Some("stim"),
+                    ),
+                    arg(
+                        "omit_annotations",
+                        "--omit-annotations",
+                        false,
+                        vec!["flag"],
+                        None,
+                    ),
+                ]);
+            }
+            let mut errors = qasm_errors();
+            errors.extend(
+                [
+                    "invalid_arguments",
+                    "invalid_circuit",
+                    "input_error",
+                    "output_error",
+                ]
+                .into_iter()
+                .map(|code| ErrorCapability {
+                    code,
+                    exit_code: 2,
+                    channel: "stderr",
+                }),
+            );
+            commands.push(Capability {
+                name,
+                argv: vec!["circuit", verb],
+                input_sources: vec!["stdin", "file"],
+                formats: vec!["human", "json"],
+                output_schema: SCHEMA_VERSION,
+                arguments,
+                success_exit_code: 0,
+                errors,
+                decoders: Vec::new(),
+                artifacts: vec![ArtifactCapability {
+                    name: "circuit",
+                    flag: "--out",
+                    format: if import {
+                        "rstim.qasm2-program.v1+json|stim"
+                    } else {
+                        "openqasm-2.0"
+                    },
+                }],
+            });
+        }
+        commands
+    }
+    #[cfg(not(feature = "qasm"))]
+    {
+        commands
+    }
+}
+
 fn write_capabilities(
     _format: CapabilitiesFormat,
     error_format: Option<ErrorFormat>,
@@ -938,7 +1241,7 @@ fn write_capabilities(
                 values: vec!["human", "json"],
                 default: None,
             }],
-            commands: vec![
+            commands: feature_capabilities(vec![
                 Capability {
                     name: CIRCUIT_STATS_COMMAND,
                     argv: vec!["circuit", "stats"],
@@ -1872,7 +2175,7 @@ fn write_capabilities(
                         },
                     ],
                 },
-            ],
+            ]),
         },
     )
     .map_err(|message| CommandError {
@@ -1954,6 +2257,16 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let is_stats = command_words
         .windows(2)
         .any(|pair| pair[0] == "circuit" && pair[1] == "stats");
+    let qasm_command = ["import-qasm", "export-qasm"].iter().find_map(|verb| {
+        command_words
+            .windows(2)
+            .any(|pair| pair[0] == "circuit" && pair[1] == *verb)
+            .then_some(if *verb == "import-qasm" {
+                "circuit.import-qasm"
+            } else {
+                "circuit.export-qasm"
+            })
+    });
     let pipeline_command = ["gen", "sample", "detect", "dem", "decode"]
         .iter()
         .find_map(|verb| {
@@ -1978,6 +2291,8 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let is_decode = command_words.contains(&"decode");
     let command = if is_stats {
         CIRCUIT_STATS_COMMAND
+    } else if let Some(qasm_command) = qasm_command {
+        qasm_command
     } else if let Some(pipeline_command) = pipeline_command {
         pipeline_command
     } else if is_dataset_export {
@@ -1999,7 +2314,7 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         Some(_) => true,
         None if is_capabilities || is_decode => true,
         None if is_dataset_score => matches!(explicit_output_format, Some(Some("json"))),
-        None if pipeline_command.is_some() || is_dataset_export => {
+        None if pipeline_command.is_some() || qasm_command.is_some() || is_dataset_export => {
             !matches!(explicit_output_format, Some(Some("human")))
         }
         None if is_stats => match explicit_output_format {

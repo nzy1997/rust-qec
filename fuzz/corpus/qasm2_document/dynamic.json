@@ -1,0 +1,1 @@
+{"schema": "rstim.qasm2-program.v1", "quantum_registers": [{"name": "q", "size": 1, "offset": 0}], "classical_registers": [{"name": "c", "size": 1, "offset": 0}], "operations": [{"kind": {"kind": "measure", "qubit": 0, "bit": 0}, "origin": null}, {"kind": {"kind": "conditional", "bit": 0, "value": false, "gate": "X", "targets": [0]}, "origin": null}]}

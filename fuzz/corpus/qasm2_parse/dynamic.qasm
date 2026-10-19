@@ -1,0 +1,1 @@
+OPENQASM 2.0; qreg q[2]; creg c[1]; U(pi/2,0,pi) q[0]; measure q[0] -> c[0]; if(c==0) U(pi,0,pi) q[1]; reset q[0]; measure q[1] -> c[0];
