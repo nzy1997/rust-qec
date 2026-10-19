@@ -666,3 +666,58 @@ fn extreme_finite_half_turns_fail_cleanly_or_export_without_panicking() {
         }
     }
 }
+
+#[test]
+fn repeated_global_ticks_reserve_cumulative_targets_before_allocation() {
+    let options = ExportOptions::default();
+    let limits = QasmLimits {
+        max_operations: 65,
+        ..QasmLimits::default()
+    };
+    let repeated = |count| {
+        vec![
+            op("I", vec![qubit(31)]),
+            StimInstr::Repeat {
+                count,
+                body: vec![op("TICK", vec![])],
+            },
+        ]
+    };
+    let lifted = lift(&repeated(2), &options, &limits).unwrap();
+    assert_eq!(lifted.circuit.operations().len(), 3);
+    assert!(
+        matches!(&lifted.circuit.operations()[2].kind, OperationKind::Barrier {qubits} if qubits.len() == 32)
+    );
+    let error = lift(&repeated(3), &options, &limits).unwrap_err();
+    assert_eq!(error.code, ErrorCode::Limit);
+    assert!(error.message.contains("target work"));
+
+    // Before the cumulative guard this small compressed input attempted to
+    // retain more than six gigabytes of barrier target arrays.
+    let compressed = vec![
+        op("I", vec![qubit(4095)]),
+        StimInstr::Repeat {
+            count: 400_000,
+            body: vec![op("TICK", vec![])],
+        },
+    ];
+    assert_eq!(
+        lift(&compressed, &options, &QasmLimits::default())
+            .unwrap_err()
+            .code,
+        ErrorCode::Limit
+    );
+
+    // A caller can widen max_qubits independently; refuse the first gigantic
+    // target collection before allocating it.
+    let wide = vec![op("I", vec![qubit(1_000_000)]), op("TICK", vec![])];
+    let limits = QasmLimits {
+        max_qubits: 1_000_001,
+        max_operations: 16,
+        ..QasmLimits::default()
+    };
+    assert_eq!(
+        lift(&wide, &options, &limits).unwrap_err().code,
+        ErrorCode::Limit
+    );
+}

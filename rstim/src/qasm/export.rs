@@ -266,6 +266,7 @@ pub fn lift(
         options,
         limits,
         report_bytes: 0,
+        target_work: 0,
     };
     builder.expand(instructions, &mut Vec::new())?;
     super::lower::validate(&builder.circuit, limits)?;
@@ -344,12 +345,21 @@ struct Lifter<'a> {
     options: &'a ExportOptions,
     limits: &'a QasmLimits,
     report_bytes: usize,
+    target_work: usize,
 }
 impl Lifter<'_> {
+    fn checked_target_work(&self, additional: usize) -> Result<usize, QasmError> {
+        self.target_work
+            .checked_add(additional)
+            .filter(|work| *work <= self.limits.max_operations)
+            .ok_or_else(|| limit("lifted target work exceeds operation limit"))
+    }
     fn push(&mut self, kind: OperationKind) -> Result<(), QasmError> {
         if self.circuit.operations.len() >= self.limits.max_operations {
             return Err(limit("lifted operation count exceeds limit"));
         }
+        let targets = super::lower::target_work(&kind);
+        self.target_work = self.checked_target_work(targets)?;
         self.circuit
             .operations
             .push(Operation { kind, origin: None });
@@ -496,6 +506,9 @@ impl Lifter<'_> {
                 if width == 0 {
                     self.omit("TICK", path, "TICK\n".into(), false)
                 } else {
+                    // A compressed repeat of global ticks must not allocate
+                    // width * repetitions targets before the writer budget runs.
+                    self.checked_target_work(width)?;
                     self.push(OperationKind::Barrier {
                         qubits: (0..width as u32).collect(),
                     })
