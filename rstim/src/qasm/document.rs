@@ -311,3 +311,27 @@ fn invalid(message: impl Into<String>) -> QasmError {
 fn limit(message: impl Into<String>) -> QasmError {
     QasmError::new(ErrorCode::Limit, message)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bounded_writer_flush_preserves_complete_prefix_and_rejects_excess_bytes() {
+        let mut writer = BoundedWriter {
+            bytes: Vec::new(),
+            max: 5,
+            exceeded: false,
+        };
+        writer.write_all(b"[1,").unwrap();
+        writer.flush().unwrap();
+        writer.write_all(b"2]").unwrap();
+        writer.flush().unwrap();
+        assert_eq!(writer.bytes, b"[1,2]");
+        assert!(writer.write_all(b"extra").is_err());
+        assert_eq!(
+            writer.bytes, b"[1,2]",
+            "the bounded sink must retain its accepted prefix"
+        );
+    }
+}

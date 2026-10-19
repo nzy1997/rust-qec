@@ -723,3 +723,83 @@ pub fn run_sample(
         warnings: Vec::new(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::StimTarget;
+    use std::io::Cursor;
+
+    #[test]
+    fn native_preflight_checks_depth_and_iteration_contract_on_prebuilt_ir() {
+        let limits = QasmLimits {
+            max_gate_depth: 1,
+            ..Default::default()
+        };
+        let zero = [StimInstr::Repeat {
+            count: 0,
+            body: Vec::new(),
+        }];
+        let error = native_layout(SAMPLE_COMMAND, &zero, &limits, true).unwrap_err();
+        assert_eq!(error.code, "qasm_limit_exceeded");
+        assert!(error.message.contains("zero repeat"));
+        let deep = [StimInstr::Repeat {
+            count: 1,
+            body: vec![StimInstr::Repeat {
+                count: 1,
+                body: vec![StimInstr::new("M", vec![], vec![StimTarget::Qubit(0)])],
+            }],
+        }];
+        let error = native_layout(SAMPLE_COMMAND, &deep, &limits, true).unwrap_err();
+        assert_eq!(error.code, "qasm_limit_exceeded");
+        assert!(error.message.contains("repeat depth"));
+        let admitted = [StimInstr::Repeat {
+            count: 2,
+            body: vec![StimInstr::new("M", vec![], vec![StimTarget::Qubit(0)])],
+        }];
+        assert_eq!(
+            native_layout(SAMPLE_COMMAND, &admitted, &limits, true).unwrap(),
+            (1, 2)
+        );
+    }
+
+    #[test]
+    fn sampling_budget_includes_word_padding_and_requires_measurement_encodings() {
+        let limits = QasmLimits {
+            max_output_bytes: 64,
+            ..Default::default()
+        };
+        // Eight bit rows at one shot fill one 64-byte packed table. A ninth
+        // row exceeds this budget despite its small serialized b8 payload.
+        sample_budget(1, 0, 8, 0, OutputFormat::B8, &limits, true).unwrap();
+        let error = sample_budget(1, 0, 9, 0, OutputFormat::B8, &limits, true).unwrap_err();
+        assert_eq!(error.code, "qasm_limit_exceeded");
+        let error = sample_budget(1, 0, 0, 0, OutputFormat::Dets, &limits, true).unwrap_err();
+        assert_eq!(error.code, "qasm_limit_exceeded");
+    }
+
+    #[test]
+    fn stabilizer_helper_enforces_backend_capability_before_publication() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("keep");
+        std::fs::write(&out, "keep").unwrap();
+        let options = SampleOptions {
+            shots: 1,
+            input: None,
+            out: out.clone(),
+            out_format: "01".to_owned(),
+            seed: Some(1),
+            skip_reference_sample: false,
+            format: PipelineFormat::Json,
+            in_format: InputFormat::Stim,
+            backend: CliBackend::Stabilizer,
+            result_view: ResultView::MeasurementRecord,
+            max_active_rank: 16,
+        };
+        let error = run_sample(&options, None, &mut Cursor::new("R_X(0.1) 0\nM 0\n"))
+            .err()
+            .expect("unsupported native backend");
+        assert_eq!(error.code, "qasm_backend_unsupported");
+        assert_eq!(std::fs::read_to_string(out).unwrap(), "keep");
+    }
+}

@@ -11,11 +11,14 @@ struct Invocation {
     stderr: Vec<u8>,
 }
 fn invoke(args: &[&str], input: &str) -> Invocation {
+    invoke_bytes(args, input.as_bytes())
+}
+fn invoke_bytes(args: &[&str], input: &[u8]) -> Invocation {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let result = rstim::unified_cli::run(
         std::iter::once("rstim").chain(args.iter().copied()),
-        &mut Cursor::new(input.as_bytes()),
+        &mut Cursor::new(input),
         &mut stdout,
     );
     if let Err(error) = &result {
@@ -783,4 +786,461 @@ fn empty_measurement_records_still_emit_declared_classical_zeros_and_zero_shots(
         );
         assert!(std::fs::read(&out).unwrap().is_empty());
     }
+}
+
+#[test]
+fn read_failures_and_invalid_utf8_preserve_output_and_command_error_context() {
+    struct BrokenReader;
+    impl std::io::Read for BrokenReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::other("injected upstream read failure"))
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("keep.txt");
+    std::fs::write(&out, "keep").unwrap();
+    let missing = dir.path().join("missing-input");
+    for (verb, command, extra) in [
+        ("import-qasm", "circuit.import-qasm", vec![]),
+        ("export-qasm", "circuit.export-qasm", vec![]),
+        (
+            "sample",
+            "circuit.sample",
+            vec!["--shots", "1", "--backend", "near-clifford"],
+        ),
+    ] {
+        let mut args = vec!["circuit", verb, "--out", path(&out)];
+        args.extend(extra);
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let err = rstim::unified_cli::run(
+            std::iter::once("rstim").chain(args.iter().copied()),
+            &mut BrokenReader,
+            &mut stdout,
+        )
+        .unwrap_err();
+        rstim::unified_cli::write_error(&err, &mut stdout, &mut stderr);
+        let report: Value = serde_json::from_slice(&stderr).unwrap();
+        assert_eq!(report["command"], command);
+        assert_eq!(report["error"]["code"], "input_error");
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("upstream read failure")
+        );
+        assert!(stdout.is_empty());
+        let result = invoke_bytes(&args, &[0xff]);
+        assert!(!result.ok);
+        assert!(result.stdout.is_empty());
+        let report: Value = serde_json::from_slice(&result.stderr).unwrap();
+        assert_eq!(report["error"]["code"], "input_error");
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("UTF-8")
+        );
+        args.extend(["--in", path(&missing)]);
+        let code = if verb == "import-qasm" {
+            "qasm_io_error"
+        } else {
+            "input_error"
+        };
+        failure(&args, "", command, code);
+        assert_eq!(std::fs::read_to_string(&out).unwrap(), "keep");
+    }
+}
+
+#[test]
+fn failing_atomic_publication_cleans_temporaries_and_preserves_destination_directories() {
+    let dir = tempfile::tempdir().unwrap();
+    let destination = dir.path().join("existing-dir");
+    std::fs::create_dir(&destination).unwrap();
+    std::fs::write(destination.join("sentinel"), "keep").unwrap();
+    let missing = dir.path().join("missing-parent/output");
+    for (verb, command, source, extra) in [
+        (
+            "import-qasm",
+            "circuit.import-qasm",
+            "OPENQASM 2.0;",
+            vec![],
+        ),
+        ("export-qasm", "circuit.export-qasm", "M 0\n", vec![]),
+        (
+            "sample",
+            "circuit.sample",
+            "M 0\n",
+            vec!["--shots", "1", "--backend", "near-clifford"],
+        ),
+    ] {
+        for path_out in [&missing, &destination] {
+            let mut args = vec!["circuit", verb, "--out", path(path_out)];
+            args.extend(extra.iter().copied());
+            failure(&args, source, command, "output_error");
+        }
+        assert_eq!(
+            std::fs::read_to_string(destination.join("sentinel")).unwrap(),
+            "keep"
+        );
+        assert_eq!(
+            std::fs::read_dir(dir.path()).unwrap().count(),
+            1,
+            "failed publication must clean temporary files"
+        );
+    }
+}
+
+#[test]
+fn stdin_includes_reject_invalid_utf8_and_oversize_files_without_publication() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("keep");
+    std::fs::write(&out, "keep").unwrap();
+    let included = dir.path().join("g.inc");
+    let source = "OPENQASM 2.0; include \"g.inc\";";
+    let args = [
+        "circuit",
+        "import-qasm",
+        "--include-dir",
+        path(dir.path()),
+        "--out",
+        path(&out),
+    ];
+    std::fs::write(&included, [0xff]).unwrap();
+    failure(&args, source, "circuit.import-qasm", "qasm_io_error");
+    std::fs::write(&included, vec![b' '; 4 * 1024 * 1024 + 1]).unwrap();
+    failure(&args, source, "circuit.import-qasm", "qasm_limit_exceeded");
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "keep");
+}
+
+#[test]
+fn human_conversion_and_sampling_reports_show_artifacts_warnings_and_selected_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("converted");
+    for (args, source, expected) in [
+        (
+            vec![
+                "circuit",
+                "import-qasm",
+                "--format",
+                "human",
+                "--out-format",
+                "stim",
+                "--out",
+                path(&out),
+            ],
+            DYNAMIC,
+            "Stim execution projection omits",
+        ),
+        (
+            vec![
+                "circuit",
+                "export-qasm",
+                "--format",
+                "human",
+                "--omit-annotations",
+                "--out",
+                path(&out),
+            ],
+            "M 0\nDETECTOR rec[-1]\n",
+            "Omitted annotation DETECTOR",
+        ),
+        (
+            vec![
+                "circuit",
+                "sample",
+                "--format",
+                "human",
+                "--backend",
+                "near-clifford",
+                "--shots",
+                "2",
+                "--out",
+                path(&out),
+            ],
+            "M 0\n",
+            "backend: near-clifford",
+        ),
+    ] {
+        let result = invoke(&args, source);
+        assert!(result.ok, "{}", String::from_utf8_lossy(&result.stderr));
+        assert!(result.stderr.is_empty());
+        let text = String::from_utf8(result.stdout).unwrap();
+        assert!(text.contains("status: ok"));
+        assert!(text.contains("artifact: "));
+        assert!(text.contains(expected), "{text}");
+    }
+    let result = invoke(
+        &[
+            "circuit",
+            "import-qasm",
+            "--format",
+            "human",
+            "--error-format",
+            "json",
+            "--out",
+            path(&out),
+        ],
+        "invalid",
+    );
+    assert!(!result.ok);
+    let report: Value = serde_json::from_slice(&result.stderr).unwrap();
+    assert_eq!(report["command"], "circuit.import-qasm");
+}
+
+#[test]
+fn bounded_native_repeats_preserve_records_and_cross_iteration_feedback() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("native.01");
+    let source = "X 0\nREPEAT 2 {\nM 0\nCX rec[-1] 1\n}\nM 1\n";
+    let report = success(
+        &[
+            "circuit",
+            "sample",
+            "--shots",
+            "2",
+            "--backend",
+            "near-clifford",
+            "--out",
+            path(&out),
+        ],
+        source,
+    );
+    assert_eq!(report["result"]["num_measurements"], 3);
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "110\n110\n");
+    let qasm = dir.path().join("repeat.qasm");
+    success(&["circuit", "export-qasm", "--out", path(&qasm)], source);
+    let checked = rstim::qasm::from_qasm(&std::fs::read_to_string(&qasm).unwrap()).unwrap();
+    let plan = checked
+        .lower(Backend::Stabilizer, &QasmLimits::default())
+        .unwrap();
+    assert_eq!(plan.measurement_events.len(), 3);
+    success(
+        &[
+            "circuit",
+            "sample",
+            "--shots",
+            "2",
+            "--backend",
+            "near-clifford",
+            "--out",
+            path(&out),
+        ],
+        "REPEAT 3 {\n}\n",
+    );
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "\n\n");
+}
+
+#[test]
+fn unsupported_native_shapes_bad_formats_and_backend_only_flags_do_not_replace_outputs() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("keep");
+    std::fs::write(&out, "keep").unwrap();
+    let args = [
+        "circuit",
+        "sample",
+        "--shots",
+        "1",
+        "--backend",
+        "near-clifford",
+        "--out",
+        path(&out),
+    ];
+    failure(&args, "M bad-target\n", "circuit.sample", "invalid_circuit");
+    failure(
+        &args,
+        "CX 0\n",
+        "circuit.sample",
+        "qasm_backend_unsupported",
+    );
+    failure(&args, "M 5000\n", "circuit.sample", "qasm_limit_exceeded");
+    failure(
+        &[
+            "circuit",
+            "sample",
+            "--shots",
+            "1",
+            "--out",
+            path(&out),
+            "--max-active-rank",
+            "3",
+        ],
+        "M 0\n",
+        "circuit.sample",
+        "invalid_arguments",
+    );
+    let doc = dir.path().join("doc.json");
+    import_document(&doc, DYNAMIC, "stabilizer");
+    failure(
+        &[
+            "circuit",
+            "sample",
+            "--shots",
+            "1",
+            "--in",
+            path(&doc),
+            "--in-format",
+            "qasm2-json",
+            "--out-format",
+            "bad",
+            "--out",
+            path(&out),
+        ],
+        "",
+        "circuit.sample",
+        "invalid_arguments",
+    );
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "keep");
+}
+
+#[test]
+fn report_channel_failures_leave_completed_artifacts_and_return_output_errors() {
+    struct BrokenReport {
+        only_warning: bool,
+    }
+    impl std::io::Write for BrokenReport {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if !self.only_warning || bytes.starts_with(b"warning: ") {
+                Err(std::io::Error::other("report channel closed"))
+            } else {
+                Ok(bytes.len())
+            }
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("published.stim");
+    for (format, only_warning) in [("json", false), ("human", false), ("human", true)] {
+        let args = [
+            "rstim",
+            "circuit",
+            "import-qasm",
+            "--out",
+            path(&out),
+            "--out-format",
+            "stim",
+            "--format",
+            format,
+            "--error-format",
+            "json",
+        ];
+        let err = rstim::unified_cli::run(
+            args,
+            &mut Cursor::new(DYNAMIC),
+            &mut BrokenReport { only_warning },
+        )
+        .unwrap_err();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        rstim::unified_cli::write_error(&err, &mut stdout, &mut stderr);
+        let report: Value = serde_json::from_slice(&stderr).unwrap();
+        assert_eq!(report["command"], "circuit.import-qasm");
+        assert_eq!(report["error"]["code"], "output_error");
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("report channel closed")
+        );
+        let native = std::fs::read_to_string(&out).unwrap();
+        assert!(native.contains("M 0"));
+        assert!(native.contains("rec[-1]"));
+    }
+}
+
+#[test]
+fn include_directory_search_falls_through_missing_files_and_respects_declared_priority() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = dir.path().join("first");
+    let second = dir.path().join("second");
+    std::fs::create_dir(&first).unwrap();
+    std::fs::create_dir(&second).unwrap();
+    std::fs::write(second.join("g.inc"), "gate pulse a { U(pi,0,pi) a; }").unwrap();
+    let out = dir.path().join("program.json");
+    let samples = dir.path().join("result.01");
+    let source =
+        "OPENQASM 2.0; include \"g.inc\"; qreg q[1]; creg c[1]; pulse q[0]; measure q[0] -> c[0];";
+    let args = [
+        "circuit",
+        "import-qasm",
+        "--include-dir",
+        path(&first),
+        "--include-dir",
+        path(&second),
+        "--out",
+        path(&out),
+    ];
+    for (first_definition, expected) in
+        [(None, "1\n"), (Some("gate pulse a { U(0,0,0) a; }"), "0\n")]
+    {
+        if let Some(definition) = first_definition {
+            std::fs::write(first.join("g.inc"), definition).unwrap();
+        }
+        success(&args, source);
+        success(
+            &[
+                "circuit",
+                "sample",
+                "--in",
+                path(&out),
+                "--in-format",
+                "qasm2-json",
+                "--shots",
+                "1",
+                "--out",
+                path(&samples),
+            ],
+            "",
+        );
+        assert_eq!(std::fs::read_to_string(&samples).unwrap(), expected);
+    }
+}
+
+#[test]
+fn separate_native_operation_and_measurement_budgets_preflight_expansion_before_execution() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("keep");
+    std::fs::write(&out, "keep").unwrap();
+    let args = [
+        "circuit",
+        "sample",
+        "--backend",
+        "near-clifford",
+        "--shots",
+        "1",
+        "--out",
+        path(&out),
+    ];
+    // Charging only repeat iterations would overlook the doubled expanded work.
+    failure(
+        &args,
+        "REPEAT 1000000 {\nI 0\n}\n",
+        "circuit.sample",
+        "qasm_limit_exceeded",
+    );
+    // One multi-target measurement op can exceed the event budget on its own.
+    let source = format!(
+        "M {}\n",
+        "0 ".repeat(QasmLimits::default().max_operations + 1)
+    );
+    failure(&args, &source, "circuit.sample", "qasm_limit_exceeded");
+    let shots = QasmLimits::default().max_output_bytes.to_string();
+    failure(
+        &[
+            "circuit",
+            "sample",
+            "--backend",
+            "near-clifford",
+            "--shots",
+            &shots,
+            "--out",
+            path(&out),
+        ],
+        "M 0\n",
+        "circuit.sample",
+        "qasm_limit_exceeded",
+    );
+    assert_eq!(std::fs::read_to_string(&out).unwrap(), "keep");
 }
