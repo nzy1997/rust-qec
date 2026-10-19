@@ -22,6 +22,7 @@ ilp = ["unified-cli", "dep:qec-ilp-core", "qec-ilp-core/highs"]
 codegen-css = ["dep:qec-code"]
 shot-viewer = []
 plotting = ["dep:csv", "dep:plotters", "dep:tempfile"]
+qasm = []
 
 [dependencies]
 rand = "0.8"
