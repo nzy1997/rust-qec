@@ -128,7 +128,7 @@ jobs:
       - name: Check semantic OpenQASM 2 conversion
         run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary
       - name: Check QASM semantic invariants
-        run: cargo test --locked -p rstim --no-default-features --features qasm --lib qasm::
+        run: 'cargo test --locked -p rstim --no-default-features --features qasm --lib qasm::'
       - name: Check optional code-distance backend boundaries
         run: |
           cargo test --locked -p qec-code --no-default-features --features distance-ilp-highs --test logical_distance --test distance_backend_features
