@@ -132,6 +132,7 @@ enum LayerItem<'a> {
         gate: &'a str,
         control_lane: usize,
         target_lane: usize,
+        annotations: Vec<&'a Qp101Annotation>,
     },
     SwapPair {
         lane_a: usize,
@@ -990,15 +991,32 @@ fn operation_layer_items<'a>(
             gate,
             targets,
             controls,
+            raw_targets,
+            annotations,
             ..
-        } if gate == "CX" || gate == "CZ" => {
+        } if is_quantum_controlled_gate(gate, raw_targets.as_deref()) => {
             if let Some(pairs) = controlled_pairs(targets, controls, num_qubits, gate)? {
                 return Ok(pairs
                     .into_iter()
-                    .map(|(control_lane, target_lane)| LayerItem::ControlledPair {
-                        gate,
-                        control_lane,
-                        target_lane,
+                    .enumerate()
+                    .map(|(pair_index, (control_lane, target_lane))| {
+                        let slots = if controls.is_empty() {
+                            vec![pair_index * 2, pair_index * 2 + 1]
+                        } else {
+                            vec![pair_index]
+                        };
+                        LayerItem::ControlledPair {
+                            gate,
+                            control_lane,
+                            target_lane,
+                            annotations: annotations_for_target_slots(
+                                annotations,
+                                &slots,
+                                pair_index == 0,
+                                &entry.repeat_iterations,
+                                interaction_digest.is_some(),
+                            ),
+                        }
                     })
                     .collect());
             }
@@ -1267,8 +1285,14 @@ fn render_layer_item(
             gate,
             control_lane,
             target_lane,
+            annotations,
         } => {
             render_controlled_pair(out, x, *control_lane, *target_lane, gate);
+            let lanes = [
+                (*control_lane).min(*target_lane),
+                (*control_lane).max(*target_lane),
+            ];
+            render_annotation_refs_with_line_offset(out, x, &lanes, annotations, 0);
             Ok(())
         }
         LayerItem::SwapPair { lane_a, lane_b } => {
@@ -1945,7 +1969,7 @@ fn render_gate(
     let measurement_targets = measurement_targets(gate, targets, raw_targets, num_qubits, state)?;
 
     match gate {
-        "CX" | "CZ" => {
+        "CX" | "CNOT" | "ZCX" | "CZ" | "ZCZ" if is_quantum_controlled_gate(gate, raw_targets) => {
             if let Some(pairs) = controlled_pairs(targets, controls, num_qubits, gate)? {
                 for (control_lane, target_lane) in &pairs {
                     render_controlled_pair(out, x, *control_lane, *target_lane, gate);
@@ -1989,6 +2013,15 @@ fn render_gate(
         measurement_annotation_line_offset(&measurement_targets),
     );
     Ok(())
+}
+
+fn is_quantum_controlled_gate(gate: &str, raw_targets: Option<&[Qp101TargetRef]>) -> bool {
+    matches!(gate, "CX" | "CNOT" | "ZCX" | "CZ" | "ZCZ")
+        && raw_targets.is_none_or(|targets| {
+            targets
+                .iter()
+                .all(|target| matches!(target, Qp101TargetRef::Qubit { .. }))
+        })
 }
 
 fn controlled_pairs(
@@ -2344,15 +2377,23 @@ fn render_controlled_pair(
     out.push_str(&format!(
         "<circle class=\"control\" cx=\"{x}\" cy=\"{control_y}\" r=\"6\" fill=\"#111827\" />\n"
     ));
-    out.push_str(&format!(
-        "<rect class=\"target {gate}\" x=\"{}\" y=\"{}\" width=\"{GATE_WIDTH}\" height=\"{GATE_HEIGHT}\" rx=\"4\" ry=\"4\" stroke=\"#111827\" fill=\"#eef2ff\" />\n",
-        x - GATE_WIDTH / 2,
-        target_y - GATE_HEIGHT / 2
-    ));
-    out.push_str(&format!(
-        "<text x=\"{x}\" y=\"{target_y}\" fill=\"#111827\" text-anchor=\"middle\" dominant-baseline=\"middle\">{}</text>\n",
-        escape_xml(gate)
-    ));
+    if matches!(gate, "CZ" | "ZCZ") {
+        out.push_str(&format!(
+            "<circle class=\"target {gate}\" cx=\"{x}\" cy=\"{target_y}\" r=\"6\" fill=\"#111827\" />\n"
+        ));
+    } else {
+        let radius = 12;
+        out.push_str(&format!(
+            "<circle class=\"target {gate}\" cx=\"{x}\" cy=\"{target_y}\" r=\"{radius}\" stroke=\"#111827\" stroke-width=\"1.5\" fill=\"#ffffff\" />\n"
+        ));
+        out.push_str(&format!(
+            "<path class=\"target-plus\" d=\"M {} {target_y} H {} M {x} {} V {}\" stroke=\"#111827\" stroke-width=\"1.5\" fill=\"none\" />\n",
+            x - radius,
+            x + radius,
+            target_y - radius,
+            target_y + radius
+        ));
+    }
 }
 
 fn render_swap_pair(out: &mut String, x: i32, lane_a: usize, lane_b: usize) {

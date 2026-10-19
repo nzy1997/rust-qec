@@ -184,7 +184,7 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
     );
     assert!(
         svg.contains("class=\"target CZ\""),
-        "CZ should render a labeled target box: {svg}"
+        "CZ should render a second solid dot: {svg}"
     );
     assert!(
         svg.contains("class=\"SWAP\""),
@@ -199,6 +199,177 @@ fn svg_renderer_draws_cz_and_swap_specializations() {
         Some(122),
         "SWAP note should sit above its upper endpoint instead of at the top of the diagram: {svg}"
     );
+}
+
+#[test]
+fn svg_renderer_draws_standard_controlled_gate_symbols() {
+    for gate in ["CX", "CNOT", "ZCX", "CZ", "ZCZ"] {
+        for explicit_controls in [false, true] {
+            let instrs = parse_lines(&format!("{gate} 3 0 1 2\n"))
+                .expect("controlled gate fixture should parse");
+            let mut doc = export_qp101(&instrs).expect("fixture should export");
+            if explicit_controls {
+                let Qp101Operation::Gate {
+                    targets, controls, ..
+                } = &mut doc.operations[0]
+                else {
+                    panic!("fixture should export a gate");
+                };
+                *targets = vec![0, 2];
+                *controls = vec![3, 1];
+            }
+            let session =
+                CircuitSession::open(&format!("{gate} 3 0 1 2\n"), ExpansionLimits::default())
+                    .expect("fixture session should open");
+            for svg in [
+                render_svg(&doc).expect("fixture should render"),
+                render_svg_interactive(&doc, session.circuit_digest())
+                    .expect("interactive fixture should render"),
+            ] {
+                let targets = controlled_target_positions(&svg, gate);
+                assert_eq!(targets.len(), 2, "one target per pair: {svg}");
+                let controls: Vec<_> = svg
+                    .lines()
+                    .filter(|line| line.starts_with("<circle class=\"control\""))
+                    .collect();
+                assert_eq!(controls.len(), 2, "one control per pair: {svg}");
+                for ((x, y), (control, control_lane, target_lane)) in targets
+                    .iter()
+                    .zip([(controls[0], "q3", "q0"), (controls[1], "q1", "q2")])
+                {
+                    let control_y = text_y(&svg, control_lane).expect("control lane");
+                    assert_eq!(svg_attr_i32(control, "cx"), Some(*x));
+                    assert_eq!(svg_attr_i32(control, "cy"), Some(control_y));
+                    assert_eq!(Some(*y), text_y(&svg, target_lane));
+                    assert!(svg.contains(&format!(
+                        "<line class=\"{gate}\" x1=\"{x}\" y1=\"{control_y}\" x2=\"{x}\" y2=\"{y}\""
+                    )), "connector must join the two endpoints: {svg}");
+                }
+                assert!(
+                    !svg.contains("<rect"),
+                    "controlled gates need no boxes: {svg}"
+                );
+                assert!(
+                    text_positions(&svg, gate).is_empty(),
+                    "gate names should not be visible: {svg}"
+                );
+                let target_nodes: Vec<_> = svg
+                    .lines()
+                    .filter(|line| line.starts_with(&format!("<circle class=\"target {gate}\"")))
+                    .collect();
+                if matches!(gate, "CZ" | "ZCZ") {
+                    assert!(
+                        target_nodes
+                            .iter()
+                            .all(|line| line.contains("r=\"6\" fill=\"#111827\""))
+                    );
+                    assert!(!svg.contains("target-plus"));
+                } else {
+                    assert!(
+                        target_nodes
+                            .iter()
+                            .all(|line| line.contains("r=\"12\"")
+                                && line.contains("fill=\"#ffffff\""))
+                    );
+                    for (x, y) in targets {
+                        assert!(
+                            svg.contains(&format!(
+                                "<path class=\"target-plus\" d=\"M {} {y} H {} M {x} {} V {}\"",
+                                x - 12,
+                                x + 12,
+                                y - 12,
+                                y + 12
+                            )),
+                            "CNOT must draw a centered plus: {svg}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn svg_renderer_keeps_annotations_with_their_controlled_pair() {
+    for gate in ["CX", "CNOT", "ZCX", "CZ", "ZCZ"] {
+        for explicit_controls in [false, true] {
+            let session =
+                CircuitSession::open(&format!("{gate} 3 0 1 2\n"), ExpansionLimits::default())
+                    .expect("annotated controlled gate fixture should open");
+            let mut doc = export_qp101(session.instructions()).expect("fixture should export");
+            let Qp101Operation::Gate {
+                targets,
+                controls,
+                annotations,
+                ..
+            } = &mut doc.operations[0]
+            else {
+                panic!("fixture should export a gate");
+            };
+            annotations.push(annotation("note", Some("batch-note"), None));
+            let mut pair_note = annotation("note", Some("pair-note"), None);
+            pair_note.target_slots = vec![if explicit_controls { 1 } else { 3 }];
+            annotations.push(pair_note);
+            if explicit_controls {
+                *targets = vec![0, 2];
+                *controls = vec![3, 1];
+            }
+            for svg in [
+                render_svg(&doc).expect("fixture should render"),
+                render_svg_interactive(&doc, session.circuit_digest())
+                    .expect("interactive fixture should render"),
+            ] {
+                let pairs = controlled_target_positions(&svg, gate);
+                let batch_note = text_positions(&svg, "note: batch-note");
+                let pair_note = text_positions(&svg, "note: pair-note");
+                assert_eq!(batch_note.len(), 1, "batch note must appear once: {svg}");
+                assert_eq!(pair_note.len(), 1, "target note must appear once: {svg}");
+                assert_eq!(
+                    batch_note[0].0, pairs[0].0,
+                    "batch note belongs to the first pair"
+                );
+                assert_eq!(
+                    pair_note[0].0, pairs[1].0,
+                    "target note belongs to the second pair"
+                );
+                assert_ne!(
+                    pairs[0].0, pairs[1].0,
+                    "conflicting pairs must use separate columns"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn svg_renderer_keeps_classical_feedback_out_of_quantum_controlled_pairs() {
+    for gate in ["CX", "CNOT", "ZCX", "CZ", "ZCZ"] {
+        for control in ["rec[-1]", "sweep[0]"] {
+            let source = format!("M 0\n{gate} {control} 1 {control} 2\n");
+            let session = CircuitSession::open(&source, ExpansionLimits::default())
+                .expect("classical feedback fixture should open");
+            let doc = export_qp101(session.instructions()).expect("fixture should export");
+            for svg in [
+                render_svg(&doc).expect("fixture should render"),
+                render_svg_interactive(&doc, session.circuit_digest())
+                    .expect("interactive fixture should render"),
+            ] {
+                assert!(
+                    controlled_target_positions(&svg, gate).is_empty(),
+                    "classical feedback must not connect the quantum targets to each other: {svg}"
+                );
+                assert!(
+                    !svg.contains("<circle class=\"control\""),
+                    "classical feedback must not become a quantum control dot: {svg}"
+                );
+                assert_eq!(
+                    text_positions(&svg, gate).len(),
+                    1,
+                    "classical feedback should retain its generic gate label: {svg}"
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -1253,7 +1424,7 @@ fn surface_code_atom_loss_svg_layout_regression() {
     assert!(!rects.is_empty());
     assert_no_overlapping_rects(&rects, &svg);
 
-    let cx_positions = text_positions(&svg, "CX");
+    let cx_positions = controlled_target_positions(&svg, "CX");
     assert_eq!(
         cx_positions.len(),
         2,
@@ -1311,7 +1482,7 @@ fn svg_renderer_preserves_source_order_per_lane_within_a_tick_layer() {
     let doc = export_qp101(&instrs).expect("causal-order fixture should export");
     let svg = render_svg(&doc).expect("causal-order fixture should render");
 
-    let cx_positions = text_positions(&svg, "CX");
+    let cx_positions = controlled_target_positions(&svg, "CX");
     assert_eq!(
         cx_positions.len(),
         2,
@@ -1993,6 +2164,19 @@ fn text_positions(svg: &str, content: &str) -> Vec<(i32, i32)> {
         search_start = text_end + needle.len();
     }
     positions
+}
+
+fn controlled_target_positions(svg: &str, gate: &str) -> Vec<(i32, i32)> {
+    let marker = format!("<circle class=\"target {gate}\"");
+    svg.lines()
+        .filter(|line| line.starts_with(&marker))
+        .map(|line| {
+            (
+                svg_attr_i32(line, "cx").expect("target x"),
+                svg_attr_i32(line, "cy").expect("target y"),
+            )
+        })
+        .collect()
 }
 
 fn repeat_group_label_bounds(svg: &str) -> Vec<(i32, i32, i32)> {
