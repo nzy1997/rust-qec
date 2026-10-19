@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Circuit simulation benchmarks — RustQEC{% endblock title %}
-{% block description %}Compare sampling, detector sampling and DEM sampling within each recorded workload.{% endblock description %}
-{% block hero %}<div class="hero compact-hero"><h1>Circuit simulation benchmarks</h1><p class="hero-copy">Compare sampling, detector sampling and DEM sampling within each recorded workload.</p></div>{% endblock hero %}
+{% block description %}Compare sampling, detector sampling, DEM sampling and near-Clifford postselected counts within each recorded workload.{% endblock description %}
+{% block hero %}<div class="hero compact-hero"><h1>Circuit simulation benchmarks</h1><p class="hero-copy">Compare sampling, detector sampling, DEM sampling and near-Clifford postselected counts within each recorded workload.</p></div>{% endblock hero %}
 {% block main %}
 <section class="task-section" aria-labelledby="simulation-results-title">
   <div class="section-heading">
@@ -36,6 +36,48 @@
   </div></details>
 </section>
 <p><a href="../../validation/#historical-results">Historical measurements and CI regression checks</a></p>
+
+<section class="task-section" aria-labelledby="near-clifford-results-title">
+  <div class="section-heading">
+    <h2 id="near-clifford-results-title">Near-Clifford postselected counts</h2>
+    <p class="section-copy">Frozen distillation and MSC-d5 comparisons, measured October 13–14, 2026; report published October 15.</p>
+  </div>
+  <p>The two original application circuits are <strong>distillation</strong> (magic-state distillation) and <strong>MSC-d5 injection/cultivation</strong> (distance 5, noise parameter <code>p = 10<sup>-3</sup></code>). Each call attempts 1, 64 or 1,024 shots. Acceptance requires every raw detector to be zero; logical errors use the XOR of raw observable 0, without reference normalization. These are <strong>postselected-counts</strong> results, not full-record throughput or a comparison with Stim.</p>
+  <p>Every cell below shows <strong>Strict / Fused</strong> rstim speedup: <strong>peer warm latency / rstim warm latency</strong>. Values above 1 favor rstim; values below 1 favor the peer. Strict uses the default arithmetic policy; Fused is an explicit alternative. Clifft's default and active-width-scheduled paths and SymFT's compiled CPU path were tuned separately, then frozen before evaluation.</p>
+  <div class="table-wrap result-table">
+    <table>
+      <caption>Independent fixed-policy repeat: paired geometric-mean speedup, Strict / Fused</caption>
+      <thead><tr><th scope="col">Original circuit</th><th scope="col">Attempted shots per call</th><th scope="col">vs Clifft default</th><th scope="col">vs Clifft scheduled</th><th scope="col">vs SymFT compiled CPU</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Distillation</th><td>1</td><td>1.82× / 1.83×</td><td>1.73× / 1.74×</td><td>1.13× / 1.14×</td></tr>
+        <tr><th scope="row">Distillation</th><td>64</td><td>1.02× / 1.03×</td><td>0.86× / 0.87×</td><td>0.39× / 0.39×</td></tr>
+        <tr><th scope="row">Distillation</th><td>1,024</td><td>0.70× / 0.68×</td><td>0.60× / 0.58×</td><td>0.33× / 0.32×</td></tr>
+        <tr><th scope="row">MSC-d5</th><td>1</td><td>1.18× / 1.16×</td><td>1.10× / 1.08×</td><td>3.97× / 3.91×</td></tr>
+        <tr><th scope="row">MSC-d5</th><td>64</td><td>0.65× / 0.66×</td><td>0.58× / 0.59×</td><td>0.34× / 0.34×</td></tr>
+        <tr><th scope="row">MSC-d5</th><td>1,024</td><td>0.63× / 0.61×</td><td>0.59× / 0.57×</td><td>0.32× / 0.31×</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>These are point estimates from 18 new process rounds, with seven warm observations of at least 50 ms per process. Each process contributes its median elapsed time per call; geometric means use matched round ratios. The repeat reuses all 18 peer tuning selections from the initial run without retuning. Compilation, preparation and first calls are separate. The linked CSV retains all 36 comparisons and their intervals; near-parity point estimates alone do not establish a win.</p>
+  <p><strong>Outcome:</strong> one-shot point estimates favor rstim, while 64/1,024-shot counts remain slower than compiled SymFT. At 1,024 shots, rstim latency is approximately 2.99–3.18 times SymFT latency. Neither of the two measured optimization candidates established broad or 1,024-shot gains. The transition-memo candidate was correctness-reviewed but has no performance result.</p>
+  <details class="tutorial-evidence">
+    <summary>Versions, host and test limits</summary>
+    <p>All results are historical and revision-bound, not measurements of current master or today's peers. The recorded revisions below remain unchanged by the repository's subsequent history rewrite.</p>
+    <ul>
+      <li>rstim: <code>9852a733afbde09bcfd668f0ddbc4675bbdaa753</code> (rewritten history: <code>5c8c7880a4e7fa1d6f11db0b76ede5e78a70f2c0</code>).</li>
+      <li>SymFT compiled CPU: <code>3f718e9e0c58b277a8fb506b4170863db5c3dbe6</code>.</li>
+      <li>Clifft, both paths: <code>847757e2bc8c4f7439b9e92011550fd61719eb85</code>. Later Clifft runtime batching changes at <code>1dc3551dad02f3b098d041d5bdf8067531eaa588</code> are not measured here.</li>
+    </ul>
+    <p>Host: OMEN Windows/Ubuntu WSL2; pinned CPU0; FP64; CPU execution without GPU; six threading environment variables set to one. The initial run retained 666 tuning, 30 functional and 648 evaluation workers; the independent repeat retained 648 evaluation workers in 18 new rounds. Initial and repeat results remain separate.</p>
+    <p>The bootstrap intervals are approximate; calibrated family-wise 95% coverage is not established. All failures and outliers remain retained. These two circuits do not cover the full workload suite, larger circuits or Tsim, and establish neither universal SOTA nor a memory advantage.</p>
+  </details>
+  <p class="content-links">
+    <a href="https://github.com/nzy1997/rust-qec-benchmarks/blob/ad1baf6328a2388d8fe42876c4833d8fe16e7cce/benchmarks/near_clifford/results/omen-two-workload-wrapup-2026-10-15/README.md">Read the complete campaign report</a>
+    <a href="https://github.com/nzy1997/rust-qec-benchmarks/blob/ad1baf6328a2388d8fe42876c4833d8fe16e7cce/benchmarks/near_clifford/results/omen-two-workload-wrapup-2026-10-15/fair-repeat.csv">All 36 repeat comparisons and intervals (CSV)</a>
+    <a href="https://github.com/nzy1997/rust-qec-benchmarks/blob/ad1baf6328a2388d8fe42876c4833d8fe16e7cce/benchmarks/near_clifford/results/omen-two-workload-wrapup-2026-10-15/fair-primary.csv">Initial comparison (CSV)</a>
+  </p>
+  <p class="section-copy">The pinned report preserves all 96 contrasts across four analyses, paired round ratios, 32 native counter populations and 96 CPU windows. It is a compact summary archive: full raw timing observations, command streams, binaries and correctness vectors remain in the local retained archive. The public report alone cannot replay the raw runs.</p>
+</section>
 
 <section class="task-section" aria-labelledby="dem-results-title">
   <div class="section-heading">
