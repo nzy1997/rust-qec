@@ -484,7 +484,7 @@ impl Builder<'_> {
             self.needs_near(&format!("R_{axis}"))?;
             self.push(
                 &format!("R_{axis}"),
-                vec![angle.half_turns()],
+                vec![angle.execution_half_turns()],
                 vec![StimTarget::Qubit(q)],
             )
         }

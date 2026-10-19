@@ -108,7 +108,9 @@ filesystem or network access. `parse_and_check` accepts an explicit
 The reserved bundled standard header wins over unrelated working-directory files.
 
 `QasmLimits` bounds source bytes, tokens, include files/depth, gate and expression
-depth, expanded operations, qubits, classical bits and output size. File reads
+depth, expanded operations, qubits and classical bits. `max_output_bytes` is
+reserved for document serialization and export; parsing/lowering do not consume
+that budget. File reads
 are bounded separately by `FileResolver::max_file_bytes`. Expressions use checked
 bounded rational arithmetic where possible, otherwise finite FP64 values.
 Invalid domains, non-finite results and excessive expansion fail explicitly.

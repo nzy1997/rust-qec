@@ -35,6 +35,31 @@ fn primitive_u_matches_its_full_matrix_for_all_input_columns() {
 }
 
 #[test]
+fn exact_large_angles_reduce_before_fp64_conversion() {
+    for (expression, reduced) in [
+        ("9007199254740993*pi/4", PI / 4.),
+        ("-9007199254740993*pi/4", -PI / 4.),
+        ("9223372036854775807*pi/3", 7. * PI / 3.),
+        ("-9223372036854775807*pi/3", -7. * PI / 3.),
+        (
+            "9007199254740993*pi/9007199254740995",
+            9007199254740993f64 / 9007199254740995f64 * PI,
+        ),
+    ] {
+        assert_unitary(
+            &[P::U(0, reduced, -FRAC_PI_2, FRAC_PI_2)],
+            &lower(1, "", &format!("rx({expression}) q[0];")),
+        );
+    }
+    // Floating radians also need argument reduction before dividing by pi.
+    let angle = 1e18f64;
+    assert_unitary(
+        &[P::U(0, angle, -FRAC_PI_2, FRAC_PI_2)],
+        &lower(1, "", "rx(1e18) q[0];"),
+    );
+}
+
+#[test]
 fn standard_single_qubit_shortcuts_match_literal_header_matrices() {
     for (gate, t, p, l) in [
         ("id", 0., 0., 0.),

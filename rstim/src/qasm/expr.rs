@@ -75,6 +75,29 @@ impl Angle {
             _ => self.value() / std::f64::consts::PI,
         }
     }
+    /// Reduce an executable rotation before conversion, retaining exact pi periods.
+    /// Raw `half_turns` remains available for inspecting the unwrapped parameter.
+    pub(super) fn execution_half_turns(&self) -> f64 {
+        match self {
+            Self::Rational {
+                numerator,
+                denominator,
+                pi: true,
+            } => {
+                // SU(2) rotations have period four half-turns. Converting the
+                // numerator first loses low bits above 2^53 and can erase a gate.
+                let period = 4i128 * *denominator as i128;
+                (*numerator as i128).rem_euclid(period) as f64 / *denominator as f64
+            }
+            _ => {
+                // libm performs argument reduction for large finite radians.
+                // Dividing by an approximate pi first can erase their remainder.
+                // The discarded 2*pi phase is global to this expanded rotation.
+                let (sin, cos) = self.value().sin_cos();
+                sin.atan2(cos) / std::f64::consts::PI
+            }
+        }
+    }
     pub fn clifford_quarters(&self) -> Option<i64> {
         match self {
             Self::Rational {

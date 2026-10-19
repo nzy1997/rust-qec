@@ -111,6 +111,7 @@ pub struct QasmLimits {
     pub max_operations: usize,
     pub max_qubits: usize,
     pub max_classical_bits: usize,
+    /// Reserved for serialized documents and QASM export, not import/lowering.
     pub max_output_bytes: usize,
 }
 
