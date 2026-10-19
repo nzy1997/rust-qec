@@ -2,13 +2,13 @@ import { expect, test } from '@playwright/test';
 
 const pages = [
   'get-started', 'css-codes', 'atom-loss', 'decoding', 'sampling-data', 'rust-api',
-  'reference', 'qec-code-cli', 'rsinter-cli', 'circuit-format', 'data-formats',
+  'reference', 'qec-code-cli', 'rsinter-cli', 'circuit-format', 'qasm2', 'data-formats',
   'qp101/protocol', 'rsmp-v1-showcase', 'rust-api-reference',
   'validation', 'benchmarks/simulation', 'benchmarks/decoders', 'atom-loss-evidence',
   'support', 'versions',
 ];
 for (const width of [390, 1280]) {
-  test(`twenty canonical pages have usable navigation and contained layouts at ${width}px`, async ({ page }) => {
+  test(`${pages.length} canonical pages have usable navigation and contained layouts at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     for (const path of pages) {
       const response = await page.goto(`/${path}/`);
@@ -18,7 +18,7 @@ for (const width of [390, 1280]) {
       expect(await nav.locator('p').allTextContents()).toEqual([
         'Tutorials', 'CLI & formats', 'Benchmarks', 'Support & versions',
       ]);
-      await expect(nav.locator('a')).toHaveCount(20);
+      await expect(nav.locator('a')).toHaveCount(pages.length);
       await expect(nav.locator('a[aria-current="page"]')).toHaveCount(1);
       for (const stack of await page.locator('.evidence-stack[data-evidence-items]').all()) {
         await expect(stack.locator('.result-card').first()).toBeAttached();

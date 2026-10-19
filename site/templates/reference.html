@@ -6,6 +6,7 @@
 {% set cli_reference = load_data(path="generated/cli-reference.json") %}
 <section class="task-section" aria-labelledby="reference-boundary"><h2 id="reference-boundary">Reference boundary</h2>
 <p>Use <code>rstim capabilities --format json</code> to inspect your installed commands and optional decoders. If your binary differs from this documentation, its command help and capabilities describe the available interfaces.</p>
+<p>The generated reference includes the optional <code>qasm</code> feature. Enable it in a development build for <code>circuit import-qasm</code>, <code>circuit export-qasm</code> and semantic-document sampling. See the <a href="../qasm2/">OpenQASM 2.0 guide</a> for examples and supported-profile limits.</p>
 <div class="content-links"><a href="#rust-apis">Rust API versions</a><a href="../support/#compatibility-and-deprecation-policy">Compatibility policy</a></div></section>
 
 {% set all_help = load_data(path="generated/cli-help.json") %}

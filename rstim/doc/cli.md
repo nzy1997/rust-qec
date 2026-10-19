@@ -10,7 +10,8 @@ Most commands follow the same I/O pattern:
 
 - `--in <path>` reads from a file; omit it to read from `stdin`
 - `--out <path>` writes to a file; omit it to write to `stdout`
-- circuits are provided in Stim-like text format
+- native circuits use Stim-like text; the optional QASM workflow below also
+  accepts OpenQASM 2.0 and checked semantic JSON
 - detector error models are provided in DEM text format where applicable
 
 The main command families are:
@@ -21,6 +22,31 @@ The main command families are:
 - analysis: `analyze_errors`, `explain_errors`
 - generation and export: `gen`, `render_svg`, `export_json`
 - interactive visualization: `shot_viewer`
+
+## Import and Export OpenQASM 2.0
+
+These development-checkout commands require `qasm` and `unified-cli`. Install with
+`cargo install --locked --path rstim --features qasm --force`, or build the minimal
+CLI with `cargo build --locked -p rstim --no-default-features --features qasm,unified-cli`.
+
+| Command | Input | Output |
+| --- | --- | --- |
+| `circuit import-qasm` | QASM 2.0 file or stdin | Semantic JSON by default; `--out-format stim` requests a native projection |
+| `circuit export-qasm` | Native Stim text by default; `--in-format qasm2-json` selects a document | Portable QASM 2.0 using primitive `U` and `CX` |
+| `circuit sample --in-format qasm2-json` | Semantic document | Measurement-record or final-classical shots, selected by `--result-view` |
+
+All three require an artifact path with `--out`. Status goes to stdout and
+errors to stderr. Select `--backend near-clifford` explicitly for T gates and
+general rotations; stabilizer is the default. Native export rejects unsupported
+quantum operations. `--omit-annotations` permits reported annotation removal and
+never permits dropping noise.
+
+The [QASM tutorial](qasm2.md#first-qasm-round-trip) provides a runnable import,
+sample and export sequence. Its [support matrix](qasm2.md#supported-profile)
+defines accepted conditions, includes and gate definitions; its
+[result-view explanation](qasm2.md#import-and-execute) distinguishes stored
+measurement history from mutable classical destinations. QASM source is first
+imported to a document before sampling.
 
 ## Open the Interactive Shot Viewer
 

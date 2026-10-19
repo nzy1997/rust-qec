@@ -5,6 +5,91 @@ parses a syntax tree, checks scopes and types, resolves gate definitions, and
 constructs ordered operations before choosing an execution target. It does not
 replace gate names in source strings.
 
+This feature is available in the development checkout with `qasm` enabled.
+Build from this repository as shown below; the published native release and
+crates.io package may expose a different feature set. Use
+`rstim capabilities --format json` to inspect an installed executable.
+
+## Choose a conversion path
+
+| Task | Command or API | What to keep |
+| --- | --- | --- |
+| Import QASM and export it again with the same register layout | `circuit import-qasm`, then `circuit export-qasm --in-format qasm2-json` | The semantic `program.qasm2.json` document |
+| Sample a QASM program | `circuit sample --in-format qasm2-json` with an explicit backend and result view | The document and the chosen result-view convention |
+| Export an existing native circuit | `circuit export-qasm --in native.stim` | The QASM output and any omission report |
+| Produce native instructions for another tool | `circuit import-qasm --out-format stim` | The original document too, if register names and classical destinations matter |
+
+Import checks declarations, operand types, indices, gate definitions, expressions
+and resource limits before lowering ordered operations to an execution backend.
+A successful conversion preserves quantum behavior, measurement positions and
+classical feedback within the supported profile. Source spelling and gate names
+are not a round-trip guarantee.
+
+## First QASM round trip
+
+Build a small CLI with QASM support from the repository root, then use a scratch
+directory for the example files:
+
+```sh
+cargo build --locked -p rstim --no-default-features --features qasm,unified-cli
+RSTIM="$(pwd)/target/debug/rstim"
+qasm_demo_dir="$(mktemp -d)"
+cd "$qasm_demo_dir"
+```
+
+This one-qubit program uses a T gate, measures before feedback, and writes the
+same classical bit twice:
+
+```sh
+cat > feedback.qasm <<'QASM'
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[1];
+creg c[1];
+h q[0];
+t q[0];
+h q[0];
+measure q[0] -> c[0];
+if(c==1) x q[0];
+measure q[0] -> c[0];
+QASM
+
+"$RSTIM" circuit import-qasm --in feedback.qasm --out program.qasm2.json \
+  --backend near-clifford
+"$RSTIM" circuit sample --in program.qasm2.json --in-format qasm2-json \
+  --backend near-clifford --result-view measurement-record \
+  --shots 64 --seed 7 --out records.01
+"$RSTIM" circuit sample --in program.qasm2.json --in-format qasm2-json \
+  --backend near-clifford --result-view classical \
+  --shots 64 --seed 7 --out classical.01
+"$RSTIM" circuit export-qasm --in program.qasm2.json --in-format qasm2-json \
+  --out roundtrip.qasm
+```
+
+Each row of `records.01` has two bits: `00` or `10`. Feedback maps the first
+measurement's state to zero before the second measurement. Each row of
+`classical.01` therefore has one bit, `0`: the final value of `c[0]`. The first
+measurement remains in the record even though its classical destination was
+overwritten. Export retains both measurements and the feedback between them.
+
+The T gate requires `--backend near-clifford`; the default stabilizer backend
+rejects this program. For a Clifford-only circuit, choose `--backend stabilizer`.
+The near-Clifford rank limit still applies; see [Supported profile](#supported-profile).
+
+To export a native circuit in the same directory:
+
+```sh
+printf 'H 0\nMX 0\nMR 1\n' > native.stim
+"$RSTIM" circuit export-qasm --in native.stim --out native.qasm
+```
+
+Native export creates classical registers in measurement-record order. It
+checks the supported instruction subset and rejects noise and loss. Annotation
+omission requires the explicit policy described under
+[Export checked and native circuits](#export-checked-and-native-circuits).
+
+## Rust feature setup
+
 ```toml
 [dependencies]
 rstim = { path = "../rstim/rstim", default-features = false, features = ["qasm"] }
@@ -14,28 +99,30 @@ rand = "0.8"
 ## Import and execute
 
 ```rust
-use rand::{SeedableRng, rngs::StdRng};
-use rstim::qasm::{Backend, QasmLimits, from_qasm};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use rand::{SeedableRng, rngs::StdRng};
+    use rstim::qasm::{Backend, QasmLimits, from_qasm};
 
-let program = from_qasm(r#"
-OPENQASM 2.0;
-include "qelib1.inc";
-qreg q[2];
-creg c[2];
-h q[0];
-cx q[0],q[1];
-measure q -> c;
-"#)?;
-let plan = program.lower(Backend::Stabilizer, &QasmLimits::default())?;
-let mut rng = StdRng::seed_from_u64(7);
-let shots = rstim::sampler::sample_batch(&plan.instructions, 16, &mut rng)?;
-for shot in 0..16 {
-    let record = (0..plan.measurement_events.len())
-        .map(|i| shots.measurements.get(i, shot)).collect::<Vec<_>>();
-    let classical = plan.project_classical(&record)?;
-    assert_eq!(classical[0], classical[1]);
+    let program = from_qasm(r#"
+    OPENQASM 2.0;
+    include "qelib1.inc";
+    qreg q[2];
+    creg c[2];
+    h q[0];
+    cx q[0],q[1];
+    measure q -> c;
+    "#)?;
+    let plan = program.lower(Backend::Stabilizer, &QasmLimits::default())?;
+    let mut rng = StdRng::seed_from_u64(7);
+    let shots = rstim::sampler::sample_batch(&plan.instructions, 16, &mut rng)?;
+    for shot in 0..16 {
+        let record = (0..plan.measurement_events.len())
+            .map(|i| shots.measurements.get(i, shot)).collect::<Vec<_>>();
+        let classical = plan.project_classical(&record)?;
+        assert_eq!(classical[0], classical[1]);
+    }
+    Ok(())
 }
-# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 Classical registers start at zero. A measurement executes at its original
@@ -102,18 +189,20 @@ see [Qiskit's phase convention notes](https://quantum.cloud.ibm.com/docs/en/api/
 ## Export checked and native circuits
 
 ```rust
-use rstim::qasm::{from_qasm, to_qasm, export_stim, ExportOptions, QasmLimits};
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use rstim::qasm::{from_qasm, to_qasm, export_stim, ExportOptions, QasmLimits};
 
-let limits = QasmLimits::default();
-let options = ExportOptions::default();
-let program = from_qasm("OPENQASM 2.0; qreg h[1]; creg c[1]; measure h -> c;")?;
-let output = to_qasm(&program, &options, &limits)?;
-assert!(output.text.contains("qreg h[1]"));
+    let limits = QasmLimits::default();
+    let options = ExportOptions::default();
+    let program = from_qasm("OPENQASM 2.0; qreg h[1]; creg c[1]; measure h -> c;")?;
+    let output = to_qasm(&program, &options, &limits)?;
+    assert!(output.text.contains("qreg h[1]"));
 
-let native = rstim::parser::parse_lines("H 0\nCX 0 1\nMX 0\nMR 1\n")?;
-let output = export_stim(&native, &options, &limits)?;
-assert_eq!(output.classical_registers.len(), 2);
-# Ok::<(), Box<dyn std::error::Error>>(())
+    let native = rstim::parser::parse_lines("H 0\nCX 0 1\nMX 0\nMR 1\n")?;
+    let output = export_stim(&native, &options, &limits)?;
+    assert_eq!(output.classical_registers.len(), 2);
+    Ok(())
+}
 ```
 
 Checked-document export preserves declared registers and each measurement's
@@ -204,10 +293,12 @@ Build conversion commands with both optional features:
 ```sh
 cargo build --locked -p rstim --no-default-features --features qasm,unified-cli
 RSTIM=target/debug/rstim
-$RSTIM circuit import-qasm --in input.qasm --out program.qasm2.json --backend near-clifford
-$RSTIM circuit export-qasm --in program.qasm2.json --in-format qasm2-json --out output.qasm
-$RSTIM circuit sample --in program.qasm2.json --in-format qasm2-json --backend near-clifford --result-view classical --shots 1024 --seed 7 --out shots.01
-$RSTIM circuit export-qasm --in native.stim --out native.qasm
+"$RSTIM" circuit import-qasm --in input.qasm --out program.qasm2.json --backend near-clifford
+"$RSTIM" circuit export-qasm --in program.qasm2.json --in-format qasm2-json --out output.qasm
+"$RSTIM" circuit sample --in program.qasm2.json --in-format qasm2-json \
+  --backend near-clifford --result-view classical \
+  --shots 1024 --seed 7 --out shots.01
+"$RSTIM" circuit export-qasm --in native.stim --out native.qasm
 ```
 
 For a Clifford-only program, choose `--backend stabilizer` (the default).
@@ -249,13 +340,14 @@ they check quantum state changes as well as final classical results. Focused
 CLI tests cover both backends, result views, file/stdin handling, atomic output,
 and disabled-feature behavior.
 
-The dedicated [QASM workflow](../../.github/workflows/qasm2.yml) runs an
+The dedicated [QASM workflow](https://github.com/nzy1997/rust-qec/blob/master/.github/workflows/qasm2.yml) runs an
 independent strict Qiskit parser and pinned upstream Stim differential checks.
 Run its external check locally with the exact pinned dependencies in that
 workflow and `python3 tools/qasm2_conformance.py --binary target/debug/rstim`.
 The same workflow smoke-tests the bounded `qasm2_parse` and `qasm2_document`
-fuzz targets. The general CI suite also exercises feature combinations and
-includes conversion code in coverage.
+fuzz targets. The general CI suite also exercises feature combinations. Repository coverage
+runs on master pushes, scheduled runs and manual runs include the optional
+conversion code; PRs run the workspace and focused QASM test gates.
 
 Stim's [exporter](https://github.com/quantumlib/Stim/blob/6f15adb47f54fbec6c5f68a673f453f3d5c0a9fd/src/stim/util_top/export_qasm.cc)
 informed basis/inverted-measurement decompositions and explicit failure behavior.

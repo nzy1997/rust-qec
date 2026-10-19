@@ -184,7 +184,7 @@ def normalize(document: object) -> dict:
 
 def capabilities(binary: Path | None, repo_root: Path) -> dict:
     command = ([str(binary), "capabilities", "--format", "json"] if binary else [
-        "cargo", "run", "--quiet", "--locked", "-p", "rstim", "--bin", "rstim", "--",
+        "cargo", "run", "--quiet", "--locked", "-p", "rstim", "--features", "qasm", "--bin", "rstim", "--",
         "capabilities", "--format", "json",
     ])
     result = subprocess.run(command, cwd=repo_root, text=True, capture_output=True)
@@ -245,7 +245,7 @@ def collect_help(name: str, executable: list[str], repo_root: Path) -> list[dict
 def write_help_reference(repo_root: Path, output: Path, binary: Path | None = None) -> None:
     commands = {
         "rstim": [str(binary)] if binary else ["cargo", "run", "--quiet", "--locked",
-                    "-p", "rstim", "--bin", "rstim", "--"],
+                    "-p", "rstim", "--features", "qasm", "--bin", "rstim", "--"],
         "qec_code": ["cargo", "run", "--quiet", "--locked", "-p", "qec-code",
                      "--features", "cli", "--bin", "qec-code", "--"],
         "rsinter": ["cargo", "run", "--quiet", "--locked", "-p", "rsinter",

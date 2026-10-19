@@ -31,7 +31,8 @@ class PrepareSiteDocsTests(unittest.TestCase):
                      ('docs/maintainer-reference.md', 'maintainer-reference.md'),
                      ('docs/specs/loss-visible-circuit-subset-v1.md', 'loss-visible-circuit-subset-v1.md'),
                      ('rstim/doc/decoder-dataset.md', 'decoder-dataset.md'),
-                     ('rstim/doc/rsmp-v1.md', 'rsmp-v1.md')]
+                     ('rstim/doc/rsmp-v1.md', 'rsmp-v1.md'),
+                     ('rstim/doc/qasm2.md', 'qasm2.md')]
             for source, _ in pairs:
                 path = root / source
                 path.parent.mkdir(parents=True, exist_ok=True)

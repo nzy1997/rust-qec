@@ -48,6 +48,28 @@ Optional features are intentionally additive:
   [QASM 2 guide](doc/qasm2.md). Add `unified-cli` to expose `circuit import-qasm`,
   `circuit export-qasm`, and document sampling with explicit result views.
 
+## OpenQASM 2.0 circuits
+
+The optional `qasm` feature adds a checked conversion pipeline: parse and validate
+the source, expand gate definitions into ordered typed operations, analyze backend
+support, then lower for stabilizer or near-Clifford execution. T gates and general
+rotations require an explicit near-Clifford backend. Mid-circuit measurement,
+reset and one-bit X/Y/Z feedback retain their execution order.
+
+Keep the versioned semantic JSON document for bidirectional conversion: it
+preserves declared registers and overwritten classical destinations. Native
+`.stim` output is an execution projection. Native-to-QASM export checks a
+specified instruction subset; noise and loss are rejected, and dropping QEC
+annotations requires an explicit reported policy.
+
+From the development checkout, install the optional commands with
+`cargo install --locked --path rstim --features qasm --force`. Follow the
+[runnable feedback example](doc/qasm2.md#first-qasm-round-trip) or the
+[Rust API example](doc/qasm2.md#import-and-execute). The guide includes the support
+matrix, resource limits, phase conventions and independent semantic tests.
+
+## CLI and further reading
+
 The development checkout combines all public commands in one executable.
 Install it with `cargo install --locked --path rstim --force`. This combined release
 has not yet been published to crates.io. A smaller simulator-only CLI can be

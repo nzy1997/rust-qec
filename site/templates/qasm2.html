@@ -1,0 +1,4 @@
+{% extends "guide.html" %}
+{% block main %}<article class="prose">
+{{ load_data(path="generated/qasm2.md",format="plain") | replace(from="# OpenQASM 2.0 conversion",to="") | markdown | safe }}
+</article>{% endblock main %}
