@@ -413,7 +413,7 @@ fn qp101_browser_resources_are_preserved() {
 #[test]
 fn task_oriented_content_pages_are_linked() {
     let navigation = read_repo_file("site/templates/partials/docs-navigation.html");
-    assert_eq!(navigation.matches("<a href=").count(), 20);
+    assert_eq!(navigation.matches("<a href=").count(), 21);
     assert_contains_all(
         &navigation,
         &[
@@ -425,12 +425,13 @@ fn task_oriented_content_pages_are_linked() {
             "/qec-code-cli/",
             "/rsinter-cli/",
             "/circuit-format/",
+            "/qasm2/",
             "/data-formats/",
             "/benchmarks/simulation/",
             "/benchmarks/decoders/",
             "/versions/",
         ],
-        "twenty primary pages in four groups",
+        "twenty-one primary pages in four groups",
     );
     for route in ["simulator", "detector-models", "atom-loss-concepts"] {
         let content = read_repo_file(&format!("site/content/{route}/_index.md"));
