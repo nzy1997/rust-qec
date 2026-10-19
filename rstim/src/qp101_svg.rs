@@ -2387,9 +2387,12 @@ fn render_controlled_pair(
             "<circle class=\"target {gate}\" cx=\"{x}\" cy=\"{target_y}\" r=\"{radius}\" stroke=\"#111827\" stroke-width=\"1.5\" fill=\"#ffffff\" />\n"
         ));
         out.push_str(&format!(
-            "<path class=\"target-plus\" d=\"M {} {target_y} H {} M {x} {} V {}\" stroke=\"#111827\" stroke-width=\"1.5\" fill=\"none\" />\n",
+            "<line class=\"target-plus\" x1=\"{}\" y1=\"{target_y}\" x2=\"{}\" y2=\"{target_y}\" stroke=\"#111827\" stroke-width=\"1.5\" />\n",
             x - radius,
-            x + radius,
+            x + radius
+        ));
+        out.push_str(&format!(
+            "<line class=\"target-plus\" x1=\"{x}\" y1=\"{}\" x2=\"{x}\" y2=\"{}\" stroke=\"#111827\" stroke-width=\"1.5\" />\n",
             target_y - radius,
             target_y + radius
         ));

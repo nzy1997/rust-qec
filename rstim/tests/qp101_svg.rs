@@ -272,16 +272,14 @@ fn svg_renderer_draws_standard_controlled_gate_symbols() {
                                 && line.contains("fill=\"#ffffff\""))
                     );
                     for (x, y) in targets {
-                        assert!(
-                            svg.contains(&format!(
-                                "<path class=\"target-plus\" d=\"M {} {y} H {} M {x} {} V {}\"",
-                                x - 12,
-                                x + 12,
-                                y - 12,
-                                y + 12
-                            )),
-                            "CNOT must draw a centered plus: {svg}"
-                        );
+                        for (x1, y1, x2, y2) in [(x - 12, y, x + 12, y), (x, y - 12, x, y + 12)] {
+                            assert!(
+                                svg.contains(&format!(
+                                    "<line class=\"target-plus\" x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\""
+                                )),
+                                "CNOT must draw a centered plus with crop-compatible lines: {svg}"
+                            );
+                        }
                     }
                 }
             }
