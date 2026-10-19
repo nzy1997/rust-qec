@@ -13,10 +13,14 @@
 //! # Ok::<(), rstim::qasm::QasmError>(())
 //! ```
 
+mod export;
 mod expr;
 mod frontend;
 mod lower;
 
+pub use export::{
+    ExportOptions, LiftedQasmCircuit, OmittedAnnotation, QasmExport, export_stim, lift, to_qasm,
+};
 pub use expr::Angle;
 pub use lower::{CapabilityReport, ClassicalBinding, LoweredQasmCircuit};
 use serde::{Deserialize, Serialize};
@@ -111,7 +115,7 @@ pub struct QasmLimits {
     pub max_operations: usize,
     pub max_qubits: usize,
     pub max_classical_bits: usize,
-    /// Reserved for serialized documents and QASM export, not import/lowering.
+    /// Byte budget for serialized documents and QASM export, not import/lowering.
     pub max_output_bytes: usize,
 }
 

@@ -130,10 +130,17 @@ impl Angle {
                 denominator,
                 pi,
             } => {
+                // '-' is an operator, so the magnitude of i64::MIN must
+                // never become an overflowing positive integer literal.
+                let numerator = if *numerator == i64::MIN {
+                    format!("(-{}-1)", i64::MAX)
+                } else {
+                    numerator.to_string()
+                };
                 let n = if *pi {
                     format!("{numerator}*pi")
                 } else {
-                    numerator.to_string()
+                    numerator
                 };
                 if *denominator == 1 {
                     n

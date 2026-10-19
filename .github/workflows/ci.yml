@@ -101,7 +101,7 @@ jobs:
         run: make test
       - name: Check semantic OpenQASM 2 conversion
         if: steps.scope.outputs.rust == 'true'
-        run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary
+        run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary --test qasm2_export --test qasm2_roundtrip
       - name: Check QASM semantic invariants
         if: steps.scope.outputs.rust == 'true'
         run: 'cargo test --locked -p rstim --no-default-features --features qasm --lib qasm::'
