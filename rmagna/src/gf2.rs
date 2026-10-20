@@ -1,0 +1,264 @@
+//! Packed binary vectors and reusable row reduction, with explicit dimensions.
+
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Gf2Error {
+    WidthMismatch { expected: usize, actual: usize },
+    IndexOutOfBounds { index: usize, width: usize },
+    InvalidWordCount,
+    NonzeroPadding,
+    AllocationFailed,
+}
+
+impl fmt::Display for Gf2Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::WidthMismatch { expected, actual } => {
+                write!(f, "binary vector width is {actual}; expected {expected}")
+            }
+            Self::IndexOutOfBounds { index, width } => {
+                write!(f, "binary vector index {index} is outside width {width}")
+            }
+            Self::InvalidWordCount => {
+                write!(f, "packed word count does not match binary vector width")
+            }
+            Self::NonzeroPadding => write!(
+                f,
+                "packed binary vector has nonzero bits beyond its declared width"
+            ),
+            Self::AllocationFailed => write!(f, "unable to allocate packed binary vector storage"),
+        }
+    }
+}
+
+impl std::error::Error for Gf2Error {}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct BitVector {
+    width: usize,
+    words: Vec<u64>,
+}
+
+impl BitVector {
+    pub fn zeros(width: usize) -> Result<Self, Gf2Error> {
+        let count = width.div_ceil(64);
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(count)
+            .map_err(|_| Gf2Error::AllocationFailed)?;
+        words.resize(count, 0);
+        Ok(Self { width, words })
+    }
+
+    pub fn from_words(width: usize, words: Vec<u64>) -> Result<Self, Gf2Error> {
+        if words.len() != width.div_ceil(64) {
+            return Err(Gf2Error::InvalidWordCount);
+        }
+        if !width.is_multiple_of(64) && words.last().is_some_and(|word| word >> (width % 64) != 0) {
+            return Err(Gf2Error::NonzeroPadding);
+        }
+        Ok(Self { width, words })
+    }
+
+    pub fn from_indices(
+        width: usize,
+        indices: impl IntoIterator<Item = usize>,
+    ) -> Result<Self, Gf2Error> {
+        let mut value = Self::zeros(width)?;
+        for index in indices {
+            value.set(index, true)?;
+        }
+        Ok(value)
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+    pub fn words(&self) -> &[u64] {
+        &self.words
+    }
+    pub fn is_zero(&self) -> bool {
+        self.words.iter().all(|&word| word == 0)
+    }
+    pub fn count_ones(&self) -> usize {
+        self.words
+            .iter()
+            .map(|word| word.count_ones() as usize)
+            .sum()
+    }
+
+    fn check_index(&self, index: usize) -> Result<(), Gf2Error> {
+        if index >= self.width {
+            return Err(Gf2Error::IndexOutOfBounds {
+                index,
+                width: self.width,
+            });
+        }
+        Ok(())
+    }
+
+    fn check_width(&self, expected: usize) -> Result<(), Gf2Error> {
+        if self.width != expected {
+            return Err(Gf2Error::WidthMismatch {
+                expected,
+                actual: self.width,
+            });
+        }
+        Ok(())
+    }
+
+    pub fn get(&self, index: usize) -> Result<bool, Gf2Error> {
+        self.check_index(index)?;
+        Ok((self.words[index / 64] >> (index % 64)) & 1 != 0)
+    }
+
+    pub fn set(&mut self, index: usize, bit: bool) -> Result<(), Gf2Error> {
+        self.check_index(index)?;
+        let mask = 1_u64 << (index % 64);
+        if bit {
+            self.words[index / 64] |= mask;
+        } else {
+            self.words[index / 64] &= !mask;
+        }
+        Ok(())
+    }
+
+    pub fn xor_assign(&mut self, other: &Self) -> Result<(), Gf2Error> {
+        other.check_width(self.width)?;
+        for (left, right) in self.words.iter_mut().zip(&other.words) {
+            *left ^= right;
+        }
+        Ok(())
+    }
+
+    pub fn dot(&self, other: &Self) -> Result<bool, Gf2Error> {
+        other.check_width(self.width)?;
+        let parity = self
+            .words
+            .iter()
+            .zip(&other.words)
+            .fold(0, |acc, (a, b)| acc ^ (a & b).count_ones());
+        Ok(parity & 1 != 0)
+    }
+
+    pub fn ones(&self) -> impl Iterator<Item = usize> + '_ {
+        self.words
+            .iter()
+            .enumerate()
+            .flat_map(|(word_index, &word)| {
+                let mut remaining = word;
+                std::iter::from_fn(move || {
+                    if remaining == 0 {
+                        return None;
+                    }
+                    let bit = remaining.trailing_zeros() as usize;
+                    remaining &= remaining - 1;
+                    Some(word_index * 64 + bit)
+                })
+            })
+    }
+}
+
+/// One immutable factorization reused for multiple right-hand sides.
+///
+/// Row provenance is retained so inconsistent dependent equations are checked.
+/// Free variables are zero in `solve`; `nullspace` supplies the independent
+/// homogeneous directions for callers that need the whole affine solution set.
+#[derive(Clone, Debug)]
+pub struct LinearFactorization {
+    width: usize,
+    rows: Vec<BitVector>,
+    provenance: Vec<BitVector>,
+    pivots: Vec<usize>,
+}
+
+impl LinearFactorization {
+    pub fn new(width: usize, rows: &[BitVector]) -> Result<Self, Gf2Error> {
+        for row in rows {
+            row.check_width(width)?;
+        }
+        let mut reduced = rows.to_vec();
+        let mut provenance = (0..rows.len())
+            .map(|i| BitVector::from_indices(rows.len(), [i]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut pivots = Vec::new();
+        for column in 0..width {
+            let rank = pivots.len();
+            if rank == rows.len() {
+                break;
+            }
+            let Some(found) =
+                (rank..rows.len()).find(|&i| reduced[i].get(column).expect("validated column"))
+            else {
+                continue;
+            };
+            reduced.swap(rank, found);
+            provenance.swap(rank, found);
+            let pivot_row = reduced[rank].clone();
+            let pivot_provenance = provenance[rank].clone();
+            for i in 0..rows.len() {
+                if i != rank && reduced[i].get(column)? {
+                    reduced[i].xor_assign(&pivot_row)?;
+                    provenance[i].xor_assign(&pivot_provenance)?;
+                }
+            }
+            pivots.push(column);
+        }
+        Ok(Self {
+            width,
+            rows: reduced,
+            provenance,
+            pivots,
+        })
+    }
+
+    pub fn num_variables(&self) -> usize {
+        self.width
+    }
+    pub fn num_equations(&self) -> usize {
+        self.rows.len()
+    }
+    pub fn pivot_columns(&self) -> &[usize] {
+        &self.pivots
+    }
+
+    pub fn rank(&self) -> usize {
+        self.pivots.len()
+    }
+    pub fn row_space_basis(&self) -> &[BitVector] {
+        &self.rows[..self.rank()]
+    }
+
+    pub fn solve(&self, rhs: &BitVector) -> Result<Option<BitVector>, Gf2Error> {
+        rhs.check_width(self.num_equations())?;
+        let transformed = self
+            .provenance
+            .iter()
+            .map(|row| row.dot(rhs))
+            .collect::<Result<Vec<_>, _>>()?;
+        if transformed[self.rank()..].iter().any(|&bit| bit) {
+            return Ok(None);
+        }
+        let mut solution = BitVector::zeros(self.width)?;
+        for (&pivot, &bit) in self.pivots.iter().zip(&transformed) {
+            solution.set(pivot, bit)?;
+        }
+        Ok(Some(solution))
+    }
+
+    pub fn nullspace(&self) -> Result<Vec<BitVector>, Gf2Error> {
+        let mut basis = Vec::new();
+        for free in 0..self.width {
+            if self.pivots.binary_search(&free).is_ok() {
+                continue;
+            }
+            let mut vector = BitVector::from_indices(self.width, [free])?;
+            for (row, &pivot) in self.rows.iter().zip(&self.pivots) {
+                vector.set(pivot, row.get(free)?)?;
+            }
+            basis.push(vector);
+        }
+        Ok(basis)
+    }
+}

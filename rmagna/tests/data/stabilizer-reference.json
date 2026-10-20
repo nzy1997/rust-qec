@@ -1,0 +1,3294 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.stabilizer-reference.v1",
+  "seed": 20261021,
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "0",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 6,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 0
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "0",
+      "columns": [
+        "0",
+        "0",
+        "0"
+      ],
+      "linear": [
+        0,
+        3,
+        3
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 3,
+      "sqrt2_power": -5,
+      "upper": [
+        "2",
+        "4",
+        "0"
+      ],
+      "width": 0
+    },
+    {
+      "amplitudes": [],
+      "base": "0",
+      "columns": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "linear": [
+        3,
+        3,
+        3,
+        0,
+        1,
+        0
+      ],
+      "norm": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "phase": 1,
+      "sqrt2_power": -8,
+      "upper": [
+        "2",
+        "40",
+        "32",
+        "32",
+        "32",
+        "0"
+      ],
+      "width": 0
+    },
+    {
+      "amplitudes": [],
+      "base": "0",
+      "columns": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0"
+      ],
+      "linear": [
+        3,
+        3,
+        0,
+        0,
+        2,
+        2,
+        1,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "phase": 0,
+      "sqrt2_power": -10,
+      "upper": [
+        "38",
+        "28",
+        "248",
+        "224",
+        "160",
+        "0",
+        "0",
+        "0"
+      ],
+      "width": 0
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "1",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "1",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 4,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 1
+    },
+    {
+      "amplitudes": [],
+      "base": "1",
+      "columns": [
+        "0",
+        "0",
+        "0"
+      ],
+      "linear": [
+        0,
+        2,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "phase": 1,
+      "sqrt2_power": -5,
+      "upper": [
+        "4",
+        "0",
+        "0"
+      ],
+      "width": 1
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "0",
+      "columns": [
+        "0",
+        "1",
+        "0",
+        "0",
+        "0",
+        "1"
+      ],
+      "linear": [
+        1,
+        3,
+        0,
+        3,
+        3,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 4,
+      "sqrt2_power": -8,
+      "upper": [
+        "40",
+        "0",
+        "8",
+        "16",
+        "32",
+        "0"
+      ],
+      "width": 1
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "1"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "1",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "1"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "1",
+      "columns": [
+        "1",
+        "1",
+        "1",
+        "1",
+        "1",
+        "0",
+        "0",
+        "0"
+      ],
+      "linear": [
+        2,
+        1,
+        2,
+        2,
+        2,
+        1,
+        0,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 3,
+      "sqrt2_power": -10,
+      "upper": [
+        "234",
+        "64",
+        "16",
+        "128",
+        "64",
+        "128",
+        "0",
+        "0"
+      ],
+      "width": 1
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "2",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "2",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 3,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 3
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "6",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "7",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "7",
+      "columns": [
+        "1",
+        "0",
+        "1"
+      ],
+      "linear": [
+        0,
+        3,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 7,
+      "sqrt2_power": -5,
+      "upper": [
+        "0",
+        "0",
+        "0"
+      ],
+      "width": 3
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "1",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "2",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "3",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "4",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "5",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "6",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "7",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        }
+      ],
+      "base": "6",
+      "columns": [
+        "4",
+        "2",
+        "1",
+        "4",
+        "0",
+        "6"
+      ],
+      "linear": [
+        3,
+        1,
+        3,
+        2,
+        3,
+        0
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 2,
+      "sqrt2_power": -8,
+      "upper": [
+        "8",
+        "24",
+        "8",
+        "48",
+        "0",
+        "0"
+      ],
+      "width": 3
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "0",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "1",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "2",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "3",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "4",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "5",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "6",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "7",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        }
+      ],
+      "base": "5",
+      "columns": [
+        "2",
+        "3",
+        "5",
+        "5",
+        "0",
+        "2",
+        "0",
+        "1"
+      ],
+      "linear": [
+        2,
+        1,
+        1,
+        2,
+        0,
+        1,
+        2,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 2,
+      "sqrt2_power": -10,
+      "upper": [
+        "132",
+        "200",
+        "0",
+        "192",
+        "224",
+        "128",
+        "128",
+        "0"
+      ],
+      "width": 3
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "24",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "24",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 3,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 5
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "16",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "19",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "24",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "27",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "16",
+      "columns": [
+        "3",
+        "0",
+        "11"
+      ],
+      "linear": [
+        0,
+        1,
+        0
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 6,
+      "sqrt2_power": -5,
+      "upper": [
+        "0",
+        "4",
+        "0"
+      ],
+      "width": 5
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "1",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "3",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "5",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "7",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "8",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "10",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "12",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "14",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "17",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "19",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "21",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "23",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "24",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "26",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "28",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "30",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -3
+          }
+        }
+      ],
+      "base": "17",
+      "columns": [
+        "18",
+        "27",
+        "25",
+        "29",
+        "0",
+        "9"
+      ],
+      "linear": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 0,
+      "sqrt2_power": -8,
+      "upper": [
+        "50",
+        "4",
+        "48",
+        "0",
+        "0",
+        "0"
+      ],
+      "width": 5
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "2",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "7",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "11",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "14",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "16",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "21",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "25",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "28",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "-1"
+            ],
+            "power": -3
+          }
+        }
+      ],
+      "base": "31",
+      "columns": [
+        "17",
+        "12",
+        "6",
+        "15",
+        "30",
+        "29",
+        "0",
+        "29"
+      ],
+      "linear": [
+        1,
+        0,
+        2,
+        3,
+        0,
+        0,
+        0,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 1,
+      "sqrt2_power": -10,
+      "upper": [
+        "30",
+        "0",
+        "200",
+        "32",
+        "224",
+        "128",
+        "128",
+        "0"
+      ],
+      "width": 5
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "14475991367427827158",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "14475991367427827158",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 6,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 65
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "461517160331111606",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "2853794768859383113",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "19232795397213177066",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "21551283126960647445",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "21551283126960647445",
+      "columns": [
+        "21721470937473450403",
+        "0",
+        "2449136113117506047"
+      ],
+      "linear": [
+        3,
+        3,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 3,
+      "sqrt2_power": -5,
+      "upper": [
+        "0",
+        "0",
+        "0"
+      ],
+      "width": 65
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "2586827676829283959",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "18180383066167221590",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "22936530189986243641",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "34724192033375080216",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "26395998477300556043",
+      "columns": [
+        "28903223527689506322",
+        "20583894229417841230",
+        "10355025061626588691",
+        "5989715030704060285",
+        "0",
+        "10138814525182090332"
+      ],
+      "linear": [
+        0,
+        1,
+        2,
+        3,
+        2,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 1,
+      "sqrt2_power": -8,
+      "upper": [
+        "40",
+        "40",
+        "48",
+        "32",
+        "0",
+        "0"
+      ],
+      "width": 65
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "53010656965861684",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "470060542641177378",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "1162328692919552261",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "1592236539771513619",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "3101270807097670058",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "3256177460514184124",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "4293287787646161307",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "4444343669492855693",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "4816308570400232125",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "4967292661794648235",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "5930053239626300044",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "6085033229551196314",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "7593999807995890211",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "8023980690690697269",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "8790588557351625234",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "9207566334760714244",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "9359251407914153951",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "9789441213470905801",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "10484242157353328622",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "10900448096474693112",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "12274283871294910273",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "12425059041034259799",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "13459635337343174512",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "13615387164617352550",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "14089544799529894998",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "14245368460055029312",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "15210100118521572455",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "15360801977404903025",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "16734716436365466824",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "17150849313723186910",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "17915487336431367417",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "18345749207187232495",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "19167868770131352755",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "19327297224692940453",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "20364376155626665090",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "20510911456065312404",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "20875392225709737005",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "21296928745371592251",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "21989235850982272028",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "22414658318011829770",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "23665097581937635130",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "24090591847859457324",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "24857178334160570123",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "25278641508605617437",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "25643189967266248612",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "25789652240302036402",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "26752461823731539861",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "26911962377850928515",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "28489518832709601880",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "28635772183050299470",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "29670318320077857385",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "29830590712653922431",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "30042004414549447366",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "30467707602225819856",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "31162548738424814327",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "31583240075622160609",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "32945442772517108177",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "33366062284901391303",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "34130677690332860896",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "34556454180158927862",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "34767789198047797583",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "34928134660825400153",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "35892914087905528190",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "36039095364340788072",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        }
+      ],
+      "base": "28635772183050299470",
+      "columns": [
+        "21270983943702660879",
+        "25608238788820162192",
+        "23695412599837134350",
+        "35930117881135343690",
+        "22458475053068267326",
+        "9756837503096206589",
+        "0",
+        "4923290580629197215"
+      ],
+      "linear": [
+        0,
+        0,
+        3,
+        1,
+        2,
+        0,
+        3,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 5,
+      "sqrt2_power": -10,
+      "upper": [
+        "30",
+        "148",
+        "112",
+        "224",
+        "160",
+        "192",
+        "128",
+        "0"
+      ],
+      "width": 65
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "37384499319301308290433688685983342829",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -1
+          }
+        }
+      ],
+      "base": "37384499319301308290433688685983342829",
+      "columns": [],
+      "linear": [],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 6,
+      "sqrt2_power": -2,
+      "upper": [],
+      "width": 129
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "452549162808361190062579767539149675706",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "471882409053409152790231870383191707986",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "542584346268139217132181840733712251250",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -2
+          }
+        },
+        {
+          "output": "573255591600466535754358727828055241882",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": -2
+          }
+        }
+      ],
+      "base": "573255591600466535754358727828055241882",
+      "columns": [
+        "271516840659891015405854902575058707912",
+        "0",
+        "333889649090580865227463398667137198112"
+      ],
+      "linear": [
+        2,
+        3,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 1,
+      "sqrt2_power": -5,
+      "upper": [
+        "2",
+        "4",
+        "0"
+      ],
+      "width": 129
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "12085045422707008496647102458172063308",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "18025876615662230740488517794510670097",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "130447533048200362152632064104697342964",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "136555157963641621929425852307361635497",
+          "value": {
+            "coefficients": [
+              "1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "546109290164981215602425600861672695853",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "550632781524040696587534088670815805296",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "-1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "661856472644534246906667348146371427733",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        },
+        {
+          "output": "666546777968875288410706190848553863880",
+          "value": {
+            "coefficients": [
+              "-1",
+              "0",
+              "1",
+              "0"
+            ],
+            "power": -3
+          }
+        }
+      ],
+      "base": "546109290164981215602425600861672695853",
+      "columns": [
+        "93141537374167298672156612182764212583",
+        "541450010791442089585444771140545667388",
+        "55487641556972190148223609267302593410",
+        "6110499956908990527424682984811575133",
+        "0",
+        "618449667895416230687231250726720974939"
+      ],
+      "linear": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        2
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 6,
+      "sqrt2_power": -8,
+      "upper": [
+        "60",
+        "36",
+        "24",
+        "32",
+        "32",
+        "0"
+      ],
+      "width": 129
+    },
+    {
+      "amplitudes": [
+        {
+          "output": "4206097187387042406759205462458042284",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "13351108963125341585572668202563365232",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "31629172825623989603520148327956233276",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "41095944117483991597127208903377048288",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "45597324189177666884099469300840374493",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "57722708607779132311602533050518588929",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "72672190706101728131130933722518428493",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "84475491098075518091284052703428670865",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "92912756449721392265619228255630084435",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "102055172078645407254609109407879735183",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "107707841551409727833218710037454549699",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "117172016693380221693927008231322295327",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "133597507748449449844076900582399405602",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "145720296020256276126360568723190415614",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "149374260920502587252811761444029388210",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "161174965162567224035461896880045996910",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "174488261448132029335410916399651883251",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "183955037807934876310548746676368598575",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "201568401491836475739592721256829104995",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "210713418341068845522377965546828029375",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "215514683326222059541326194876618551170",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "227317998927246772800813536758770483550",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "242931998701939328100115910016570987538",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "255057398335181646965158739822391196366",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "262571845108403623021782119166730585612",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "272036025318761846565608410549771708624",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "278353222569564180667368044130457451932",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "287495643271227896548930145475254227776",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "304304096029274435887907268327912825213",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "316104815480873566297777449980770291617",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "319094070021936097287499328876769041133",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "331216873507590721669624601888633893937",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "346726367719111564662785864255076564463",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "358851747071463531877124004413123171123",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "361843699113076874225600731893403141759",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "373646994431333300619281959536543967395",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "390454090782833348315014436324556888734",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "399599087351078350150070916975511024706",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "405908597666938675005422880754458321166",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "415375353743915508906867998249072725970",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "428122274209135175724166025883094725392",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "440245057412216302593762212499143777740",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "455866947102850962841018635758019577984",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "467667646273674437256728444988633048668",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "472472747188753775717152758095420920929",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "481615147607708896625843838234127465149",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "499226016455766100360264657804638302193",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "508690176385329022865361839041347469613",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "516686558255862344354457292554441650864",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "528489878929326265468163027600814546028",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "532146338466181199218608394366850550048",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "544271743169427052087640406487648937980",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "560693403403553533704139540777625736641",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "570160194977039368774550959543371053853",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "575804974651383643328860516179541061201",
+          "value": {
+            "coefficients": [
+              "0",
+              "1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "584950006711785370530861857700267098253",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "598788617097518134872713397515346426959",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "610589341624032674336253598571404251795",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "625546510854202318902891418423147595743",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "637669319407384276089545240311755565315",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "642172060915379658413332142104868690750",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "651636256341896466789044772595461551586",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "1"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "669911622583681874829107369369905602734",
+          "value": {
+            "coefficients": [
+              "0",
+              "-1",
+              "0",
+              "0"
+            ],
+            "power": -4
+          }
+        },
+        {
+          "output": "679054058494039351393263810127650705010",
+          "value": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "-1"
+            ],
+            "power": -4
+          }
+        }
+      ],
+      "base": "669911622583681874829107369369905602734",
+      "columns": [
+        "39548972261725772669069618856070436172",
+        "241800414380136362667664660460323378110",
+        "323196319686544073967363696881843887425",
+        "403700685756902170424948795350752703470",
+        "308073389634618087365055671522516133585",
+        "577020305042826941719304232690548763133",
+        "0",
+        "223527289314744381456048015545039963890"
+      ],
+      "linear": [
+        2,
+        0,
+        3,
+        0,
+        0,
+        0,
+        3,
+        1
+      ],
+      "norm": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "phase": 7,
+      "sqrt2_power": -10,
+      "upper": [
+        "6",
+        "172",
+        "96",
+        "208",
+        "32",
+        "192",
+        "0",
+        "0"
+      ],
+      "width": 129
+    }
+  ]
+}
