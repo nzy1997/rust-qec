@@ -1,6 +1,7 @@
 use super::*;
 use serde_json::value::RawValue;
-use serde_json::{Map, Value};
+
+type Object = BTreeMap<String, Box<RawValue>>;
 
 pub fn parse_task(
     text: &str,
@@ -10,24 +11,14 @@ pub fn parse_task(
     if text.len() > options.max_json_bytes {
         return Err(TaskError::new("<json>", "source exceeds max_json_bytes"));
     }
-    // Preserve only the exact mask tokens. Enabling serde_json's global
-    // arbitrary_precision feature changes tagged f64 deserialization in other
-    // workspace members; raw values keep the task parser's exactness local.
-    let mut raw: BTreeMap<String, Box<RawValue>> =
+    // Keep every value raw: Value's arbitrary-precision number visitor can
+    // reinterpret an object with serde_json's private number tag as a number.
+    // Typed primitives and containers preserve the actual JSON token shapes
+    // independently of additive dependency features; only masks need BigInt.
+    let object: Object =
         serde_json::from_str(text).map_err(|e| TaskError::new("<json>", e.to_string()))?;
-    let raw_observables = raw.remove("observables");
-    let data = Value::Object(
-        raw.into_iter()
-            .map(|(key, value)| {
-                serde_json::from_str(value.get())
-                    .map(|value| (key, value))
-                    .map_err(|e| TaskError::new("<json>", e.to_string()))
-            })
-            .collect::<Result<Map<String, Value>, TaskError>>()?,
-    );
-    let object = object(&data, "<root>")?;
     keys(
-        object,
+        &object,
         &[
             "schema_version",
             "outputs",
@@ -41,7 +32,7 @@ pub fn parse_task(
     )?;
     if object
         .get("schema_version")
-        .is_some_and(|v| v.as_u64() != Some(1))
+        .is_some_and(|v| integer(v) != Some(1))
     {
         return Err(TaskError::new("schema_version", "expected integer 1"));
     }
@@ -55,12 +46,12 @@ pub fn parse_task(
         .transpose()?;
     let ideal = object
         .get("ideal_state")
-        .filter(|v| !v.is_null())
+        .filter(|v| !is_null(v))
         .map(|v| target(v, base_directory, options))
         .transpose()?;
     let recovery = object
         .get("recovery")
-        .filter(|v| !v.is_null())
+        .filter(|v| !is_null(v))
         .map(|v| path(v, base_directory, "recovery"))
         .transpose()?;
     if recovery.is_some() && ideal.is_none() {
@@ -75,11 +66,8 @@ pub fn parse_task(
         .transpose()?
         .unwrap_or_default();
     let mut observables = Vec::new();
-    if let Some(value) = raw_observables {
-        for (j, value) in raw_array(&value, "observables", options)?
-            .iter()
-            .enumerate()
-        {
+    if let Some(value) = object.get("observables") {
+        for (j, value) in raw_array(value, "observables", options)?.iter().enumerate() {
             let field = format!("observables[{j}]");
             let pair = raw_array(value, &field, options)?;
             if pair.len() != 2 {
@@ -110,8 +98,8 @@ pub fn parse_task(
         observables,
     })
 }
-fn target(value: &Value, base: &Path, options: &TaskOptions) -> Result<TargetSpec, TaskError> {
-    if value.is_string() {
+fn target(value: &RawValue, base: &Path, options: &TaskOptions) -> Result<TargetSpec, TaskError> {
+    if value.get().starts_with('"') {
         return Ok(TargetSpec {
             circuit: path(value, base, "ideal_state")?,
             outputs: None,
@@ -121,7 +109,7 @@ fn target(value: &Value, base: &Path, options: &TaskOptions) -> Result<TargetSpe
     }
     let data = object(value, "ideal_state")?;
     keys(
-        data,
+        &data,
         &["circuit", "outputs", "postselection"],
         "ideal_state",
     )?;
@@ -158,7 +146,7 @@ fn target(value: &Value, base: &Path, options: &TaskOptions) -> Result<TargetSpe
                     "wire index exceeds platform range",
                 )
             })?;
-            let bit = match value.as_u64() {
+            let bit = match integer(&value) {
                 Some(0) => false,
                 Some(1) => true,
                 _ => {
@@ -183,12 +171,10 @@ fn target(value: &Value, base: &Path, options: &TaskOptions) -> Result<TargetSpe
         object_form: true,
     })
 }
-fn object<'a>(value: &'a Value, field: &str) -> Result<&'a Map<String, Value>, TaskError> {
-    value
-        .as_object()
-        .ok_or_else(|| TaskError::new(field, "expected an object"))
+fn object(value: &RawValue, field: &str) -> Result<Object, TaskError> {
+    serde_json::from_str(value.get()).map_err(|_| TaskError::new(field, "expected an object"))
 }
-fn keys(data: &Map<String, Value>, allowed: &[&str], field: &str) -> Result<(), TaskError> {
+fn keys(data: &Object, allowed: &[&str], field: &str) -> Result<(), TaskError> {
     for key in data.keys() {
         if !allowed.contains(&key.as_str()) {
             return Err(TaskError::new(field, format!("unknown field {key:?}")));
@@ -196,24 +182,17 @@ fn keys(data: &Map<String, Value>, allowed: &[&str], field: &str) -> Result<(), 
     }
     Ok(())
 }
-fn array<'a>(
-    value: &'a Value,
-    field: &str,
-    options: &TaskOptions,
-) -> Result<&'a [Value], TaskError> {
-    let values = value
-        .as_array()
-        .ok_or_else(|| TaskError::new(field, "expected a list"))?;
-    if values.len() > options.max_list_items {
-        return Err(TaskError::new(field, "list exceeds max_list_items"));
-    }
-    Ok(values)
+fn integer(value: &RawValue) -> Option<u64> {
+    serde_json::from_str::<u64>(value.get()).ok()
 }
-fn indices(value: &Value, field: &str, options: &TaskOptions) -> Result<Vec<usize>, TaskError> {
-    array(value, field, options)?
+fn is_null(value: &RawValue) -> bool {
+    value.get() == "null"
+}
+fn indices(value: &RawValue, field: &str, options: &TaskOptions) -> Result<Vec<usize>, TaskError> {
+    raw_array(value, field, options)?
         .iter()
         .map(|v| {
-            v.as_u64()
+            integer(v)
                 .and_then(|n| usize::try_from(n).ok())
                 .ok_or_else(|| {
                     TaskError::new(
@@ -224,9 +203,9 @@ fn indices(value: &Value, field: &str, options: &TaskOptions) -> Result<Vec<usiz
         })
         .collect()
 }
-fn path(value: &Value, base: &Path, field: &str) -> Result<PathBuf, TaskError> {
-    let path = value
-        .as_str()
+fn path(value: &RawValue, base: &Path, field: &str) -> Result<PathBuf, TaskError> {
+    let path = serde_json::from_str::<String>(value.get())
+        .ok()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| TaskError::new(field, "expected a nonempty circuit path"))?;
     Ok(base.join(path))

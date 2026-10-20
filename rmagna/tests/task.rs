@@ -331,3 +331,131 @@ fn module_reads_are_bounded_and_preserve_file_and_field_context() {
         assert!(error.message.contains(&path), "{error}");
     }
 }
+
+#[test]
+fn numeric_and_container_types_reject_private_tags_across_serde_features() {
+    let options = TaskOptions::default();
+    let base = Path::new(".");
+    for token in [
+        r#"{"$serde_json::private::Number":"1"}"#,
+        r#"{"$serde_json::private::RawValue":"1"}"#,
+        "1.0",
+        "1e0",
+        "true",
+        "\"1\"",
+        "null",
+        "[]",
+        "{}",
+        "18446744073709551616",
+    ] {
+        for (text, field) in [
+            (format!(r#"{{"schema_version":{token}}}"#), "schema_version"),
+            (format!(r#"{{"outputs":[{token}]}}"#), "outputs"),
+            (
+                format!(r#"{{"error_observables":[{token}]}}"#),
+                "error_observables",
+            ),
+            (
+                format!(r#"{{"sample_records":[{token}]}}"#),
+                "sample_records",
+            ),
+            (
+                format!(r#"{{"ideal_state":{{"circuit":"ideal.magna","outputs":[{token}]}}}}"#),
+                "ideal_state.outputs",
+            ),
+            (
+                format!(
+                    r#"{{"ideal_state":{{"circuit":"ideal.magna","postselection":{{"0":{token}}}}}}}"#
+                ),
+                "ideal_state.postselection",
+            ),
+        ] {
+            let parsed = parse_task(&text, base, &options);
+            assert!(parsed.is_err(), "accepted invalid JSON type: {text}");
+            let error = parsed.unwrap_err();
+            assert_eq!(error.field, field, "{text}: {error}");
+        }
+    }
+    for (text, field) in [
+        (
+            r#"{"outputs":{"$serde_json::private::Number":"1"}}"#,
+            "outputs",
+        ),
+        (
+            r#"{"ideal_state":{"circuit":{"$serde_json::private::Number":"1"}}}"#,
+            "ideal_state.circuit",
+        ),
+        (
+            r#"{"ideal_state":{"$serde_json::private::Number":"1"}}"#,
+            "ideal_state",
+        ),
+        (
+            r#"{"ideal_state":"ideal.magna","recovery":{"$serde_json::private::Number":"1"}}"#,
+            "recovery",
+        ),
+        (
+            r#"{"ideal_state":{"circuit":"ideal.magna","postselection":{"$serde_json::private::Number":"1"}}}"#,
+            "ideal_state.postselection",
+        ),
+    ] {
+        let error = parse_task(text, base, &options).unwrap_err();
+        assert_eq!(error.field, field, "{text}: {error}");
+    }
+    // Raw-value tags can otherwise substitute entire containers, paths or nulls.
+    for (text, field) in [
+        (
+            r#"{"outputs":{"$serde_json::private::RawValue":"[2]"}}"#,
+            "outputs",
+        ),
+        (
+            r#"{"sample_records":{"$serde_json::private::RawValue":"[0]"}}"#,
+            "sample_records",
+        ),
+        (
+            r#"{"error_observables":{"$serde_json::private::RawValue":"[0]"}}"#,
+            "error_observables",
+        ),
+        (
+            r#"{"ideal_state":{"$serde_json::private::RawValue":"\"ideal.magna\""}}"#,
+            "ideal_state",
+        ),
+        (
+            r#"{"ideal_state":{"$serde_json::private::RawValue":"null"}}"#,
+            "ideal_state",
+        ),
+        (
+            r#"{"recovery":{"$serde_json::private::RawValue":"null"}}"#,
+            "recovery",
+        ),
+        (
+            r#"{"ideal_state":"ideal.magna","recovery":{"$serde_json::private::RawValue":"\"r.magna\""}}"#,
+            "recovery",
+        ),
+        (
+            r#"{"ideal_state":{"circuit":{"$serde_json::private::RawValue":"\"ideal.magna\""}}}"#,
+            "ideal_state.circuit",
+        ),
+        (
+            r#"{"ideal_state":{"circuit":"ideal.magna","outputs":{"$serde_json::private::RawValue":"[0]"}}}"#,
+            "ideal_state.outputs",
+        ),
+        (
+            r#"{"ideal_state":{"circuit":"ideal.magna","postselection":{"$serde_json::private::RawValue":"{\"0\":1}"}}}"#,
+            "ideal_state.postselection",
+        ),
+    ] {
+        let parsed = parse_task(text, base, &options);
+        assert!(parsed.is_err(), "accepted substituted JSON shape: {text}");
+        assert_eq!(parsed.unwrap_err().field, field, "{text}");
+    }
+    let valid = parse_task(
+        "{\"schema_version\": 1, \"outputs\": [2, 0], \"sample_records\": [0, 0], \"ideal_state\": \n null, \"recovery\": null}",
+        base,
+        &options,
+    ).unwrap().validate(&physical("I 2\nM 0")).unwrap();
+    assert_eq!(valid.outputs(), [2, 0]);
+    assert_eq!(valid.sample_records(), [0, 0]);
+    let largest = format!(r#"{{"outputs":[{}]}}"#, usize::MAX);
+    let parsed = parse_task(&largest, base, &options).unwrap();
+    assert_eq!(parsed.outputs(), Some([usize::MAX].as_slice()));
+}

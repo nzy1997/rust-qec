@@ -738,6 +738,14 @@ byte budget, with file path and task-field context retained on errors. Unknown
 fields and invalid numeric types are rejected. `ideal_state: null` and
 `recovery: null` mean omitted modules; list-valued fields require lists.
 
+All task fields retain their raw JSON shapes until typed validation. Numeric
+objects using serde_json's private number/raw-value tags cannot become indices,
+schema versions or projection bits when another dependency enables
+`arbitrary_precision`. Wide masks remain exact without enabling that global
+feature. `make test-magna-task-json` runs the same eight adversarial task tests
+under default, arbitrary-precision and float-roundtrip feature configurations;
+CI runs this target alongside the ordinary workspace tests.
+
 Build `cargo build -p rmagna --example validate_task`, then run
 `validate_task PHYSICAL TASK [CONTROLLER...]` for static validation.
 `benchmarks/magna_reproduction/task_compare.py --upstream PINNED_SOURCE --rust-example BINARY --out NEW_JSON`
