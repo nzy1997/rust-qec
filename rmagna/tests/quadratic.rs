@@ -172,3 +172,84 @@ fn malformed_phases_triangles_and_dimensions_are_rejected() {
         Err(QuadraticError::DimensionMismatch)
     );
 }
+
+#[test]
+fn packed_affine_restrictions_match_literal_wide_phase_polynomials() {
+    // Evaluate the polynomial with integer sums, independently of packed polar
+    // images, affine restriction and QuadraticForm::evaluate.
+    let mut rng = 0x57a129fedbc_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        rng
+    };
+    for width in [0, 1, 63, 64, 65, 128, 129] {
+        let constant = (next() & 3) as u8;
+        let linear = (0..width).map(|_| (next() & 3) as u8).collect::<Vec<_>>();
+        let edges = (0..width)
+            .flat_map(|i| (i + 1..width).map(move |j| (i, j)))
+            .filter(|_| next() & 3 == 0)
+            .collect::<Vec<_>>();
+        let upper = (0..width)
+            .map(|i| {
+                BitVector::from_indices(
+                    width,
+                    edges.iter().filter_map(|&(a, b)| (a == i).then_some(b)),
+                )
+                .unwrap()
+            })
+            .collect();
+        let q = QuadraticForm::new(constant, linear.clone(), upper).unwrap();
+        for mode in 0..3 {
+            let shift =
+                BitVector::from_indices(width, (0..width).filter(|_| next() & 1 != 0)).unwrap();
+            let mut basis = (0..width)
+                .map(|j| {
+                    BitVector::from_indices(
+                        width,
+                        (0..width).filter(|&i| match mode {
+                            0 => i == j,
+                            1 => i == j || i == (j + 64) % width,
+                            _ => next() & 1 != 0,
+                        }),
+                    )
+                    .unwrap()
+                })
+                .collect::<Vec<_>>();
+            basis.push(BitVector::zeros(width).unwrap());
+            if width > 0 {
+                basis.push(basis[width / 2].clone());
+            }
+            let restricted = q.restrict(&shift, &basis).unwrap();
+            for trial in 0..40 {
+                let y = BitVector::from_indices(
+                    basis.len(),
+                    (0..basis.len()).filter(|_| trial == 0 || next() & 1 != 0),
+                )
+                .unwrap();
+                let mut x = (0..width)
+                    .map(|i| shift.get(i).unwrap())
+                    .collect::<Vec<_>>();
+                for j in y.ones() {
+                    for (i, bit) in x.iter_mut().enumerate() {
+                        *bit ^= basis[j].get(i).unwrap();
+                    }
+                }
+                let expected = (usize::from(constant)
+                    + linear
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &c)| usize::from(c) * usize::from(x[i]))
+                        .sum::<usize>()
+                    + 2 * edges.iter().filter(|&&(i, j)| x[i] && x[j]).count())
+                    % 4;
+                assert_eq!(
+                    restricted.evaluate(&y).unwrap(),
+                    expected as u8,
+                    "width={width}, mode={mode}, trial={trial}"
+                );
+            }
+        }
+    }
+}
