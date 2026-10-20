@@ -11,6 +11,7 @@ description = "Exact global-network algebra for near-Clifford quantum simulation
 
 [dependencies]
 num-bigint = "0.4.8"
+num-rational = "0.4"
 num-traits = "0.2"
 
 [dev-dependencies]
