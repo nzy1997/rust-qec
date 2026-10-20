@@ -298,3 +298,39 @@ reuse phase-resource preparation across queries yet. Tests exhaust all
 three-qubit Pauli masks under the Clifford gates, check ordered products and
 complex matrix identities, and compare prescribed multi-fault unitary networks
 to direct gate-by-gate insertion.
+
+## Exact rational probabilities
+
+`probability::Probability` stores a normalized arbitrary-precision rational
+between zero and one. Decimal, scientific and integer-fraction input is parsed
+exactly, without conversion through a float. Signed fraction denominators are
+normalized; underscores between digits are accepted. Zero denominators and
+out-of-range results are errors. Complement,
+checked sums and rational scaling retain the exact value.
+
+```rust
+use rmagna::probability::{OccurrenceThreshold, Probability};
+
+let decimal: Probability = "0.125".parse()?;
+assert_eq!(decimal, "1/8".parse()?);
+assert_eq!(decimal.complement().to_string(), "7/8");
+let tiny: Probability = "1e-30".parse()?;
+assert_ne!(tiny, Probability::zero());
+assert_eq!(tiny.threshold_64(), OccurrenceThreshold::Never);
+# Ok::<(), rmagna::probability::ProbabilityError>(())
+```
+
+`ProbabilityParser` limits token bytes and absolute decimal powers (both
+100,000 by default). Exceeding either limit fails without rounding; these are
+parsing resource limits, not process-memory caps or precision settings.
+`from_ratio` and `from_rational` accept already allocated integers and validate
+the denominator and interval independently of those text limits.
+
+`threshold_64` explicitly implements the upstream file interface's occurrence
+rule: floor the probability times `2^64`, with exact zero and one endpoints.
+`OccurrenceThreshold::accepts` compares a supplied uniform 64-bit word with
+that cutoff. A positive value below `2^-64` rounds to `Never`, while the stored
+exact rational remains nonzero. This method does not implement the separate
+exact-rational sampling path or generate random words. Tests cover rational
+identities, canonical equality and hashing, malformed and unnormalized raw
+ratios, resource limits, tiny probabilities and threshold endpoints.
