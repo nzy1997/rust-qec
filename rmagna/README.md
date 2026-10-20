@@ -1359,3 +1359,19 @@ update exact affine parity/product phases in place with packed upper-triangle
 operations. The caller's input stays immutable. Wide reverse-label/diagonal-phase
 oracles cover dense support coordinates through 129 bits, in addition to literal
 small-circuit tests. These changes do not establish a formal speedup.
+
+## Prepared affine contraction
+
+`PreparedAffineContraction::new(&reference)` prepares the support factorization,
+path basis, hidden Gaussian actions and output offset substitutions. Its
+`contract(&updated, &arithmetic)` accepts changed offsets, coefficients, quadratic
+constants and even linear phases. It rejects changed width, support columns,
+cross terms or linear parity before returning a zero result. Output is canonical
+and unnormalized; exact global phase is retained in its coefficient.
+
+Preparation records the full structure even for a zero reference coefficient or
+zero interference sum. Cold and prepared contraction share Gaussian actions and
+numeric updates. Literal path enumeration tests cover compatible updates,
+empty boundaries and dependent columns; analytical 129-bit examples cover wide
+hidden Gaussian sums. This prepares affine contraction only. Non-Clifford
+resource plans and complete prepared circuit queries remain separate work.
