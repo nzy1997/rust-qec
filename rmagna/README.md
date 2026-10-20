@@ -482,3 +482,46 @@ cmp /tmp/instrument-reference.json rmagna/tests/data/instrument-reference.json
 `cargo run -p rmagna --example affine_mass -- PHYSICAL TARGET OUTPUT_CSV [MAX_TERMS]`
 prints a no-fault exact-mass pilot and cold timing diagnostics. It is not a formal
 benchmark or a complete task-file runner.
+
+## Exact categorical noise draws
+
+`noise::NoiseModel::physical` captures an affine instrument's independent noise
+categories, including correlated-chain categories and report flips.
+`NoiseModel::new` accepts exact probability rows with identity first; every row
+must sum to one. `NoiseSampler::physical` samples the physical distribution.
+`NoiseSampler::importance` accepts a separate independent categorical proposal,
+checks every physical choice has proposal support, and returns exact physical
+and proposal probabilities and their likelihood ratio. A proposal-only event
+has weight zero. This interface does not implement correlated mixture proposals.
+
+```rust
+use rmagna::noise::{NoiseModel, NoiseOptions, NoiseSampler, SplitMix64};
+let options = NoiseOptions::default();
+let physical = NoiseModel::new(vec![vec!["9/10".parse()?, "1/10".parse()?]], &options)?;
+let proposal = NoiseModel::new(vec![vec!["1/2".parse()?, "1/2".parse()?]], &options)?;
+let sampler = NoiseSampler::importance(physical, proposal, options)?;
+let mut random = SplitMix64::new(20261024);
+let draw = sampler.draw(&mut random)?;
+assert_eq!(&draw.proposal_probability * &draw.likelihood_ratio, draw.physical_probability);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Sampling scales each category to a common integer denominator, draws a uniform
+integer below it using rejection, and locates its exact cumulative interval.
+There is no fixed-width probability cutoff: positive probabilities such as
+`1e-400` remain reachable. Zero-width intervals cannot be selected. Deterministic
+categories consume no entropy. Defaults bound categorical denominators to
+1,048,576 bits and each complete draw to 1,048,576 random words; exhausting a
+budget is an error, never a silently dropped draw. A failed draw may have consumed
+random words, so callers must retain failures and stream state when retrying.
+
+`RandomSource` permits caller-owned entropy. `SplitMix64` defines a stable seeded
+Monte Carlo stream; its `state()` can resume through `SplitMix64::new(state)`.
+Sequential draws have identical results across caller chunk boundaries. This is
+an independent Rust stream contract and does not match the upstream RNG stream.
+Exact distribution claims assume unbiased independent input words; a finite
+pseudorandom generator supplies a reproducible approximation to that entropy.
+Quantum masses remain exact conditional queries on the returned fault assignment.
+Tests enumerate exact categorical intervals and all two-site importance draws,
+verify weighted acceptance, exercise rare events and rejection limits, and check
+published SplitMix64 words plus chunk/resume identity.
