@@ -5,7 +5,8 @@ The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
 and affine instruments with prescribed Pauli and report faults, plus exact
-categorical physical and importance noise draws. Causal histories and complete
+categorical physical and importance noise draws and physical reported-record
+sampling. Causal histories and complete
 task execution are subsequent deliverables.
 
 `ExactScalar` represents
