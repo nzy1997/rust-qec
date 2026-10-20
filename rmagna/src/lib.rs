@@ -2,6 +2,7 @@
 
 pub mod clifford;
 pub mod gf2;
+pub mod pauli;
 pub mod phase;
 pub mod quadratic;
 pub mod scalar;

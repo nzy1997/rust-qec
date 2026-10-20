@@ -257,3 +257,44 @@ deliverables. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
 with quotient rank greater than one.
+
+## Prescribed Pauli insertions
+
+`pauli::PauliWord` represents `omega^phase X^x Z^z`, with Z acting first.
+A Hermitian single-qubit Y has both masks set and phase two. Ordered products
+and Clifford conjugation retain the eighth-root phase, including the minus
+sign from conjugating Y by H and the phase from conjugating XX by CZ.
+
+`unitary::PauliInsertion { before_gate, word }` inserts a physical Pauli at
+an original gate boundary. Position zero precedes the circuit, and position
+equal to the gate count follows it. Different positions are processed in time
+order; insertions sharing a position act in their supplied order.
+`CompiledUnitary::with_insertions` transports these words through the lowered
+Clifford program and updates its boundary. It shares the immutable original
+Clifford ket and program rather than evolving the circuit again. Each call
+replaces the complete assignment relative to that original, including when
+called on an already perturbed view. An empty assignment restores it.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::pauli::PauliWord;
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+use rmagna::unitary::{PauliInsertion, UnitaryCircuit};
+
+let arithmetic = ScalarArithmetic::default();
+let reference = UnitaryCircuit::new(1, [])?
+    .compile(&BitVector::zeros(1)?, &arithmetic)?;
+let changed = reference.with_insertions(&[PauliInsertion {
+    before_gate: 0,
+    word: PauliWord::new(BitVector::from_indices(1, [0])?, BitVector::zeros(1)?, 0)?,
+}], &arithmetic)?;
+assert_eq!(changed.amplitude(&BitVector::from_indices(1, [0])?, 1, &arithmetic)?.value,
+    ExactScalar::one());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+This is a deterministic insertion interface; it does not sample noise or
+reuse phase-resource preparation across queries yet. Tests exhaust all
+three-qubit Pauli masks under the Clifford gates, check ordered products and
+complex matrix identities, and compare prescribed multi-fault unitary networks
+to direct gate-by-gate insertion.

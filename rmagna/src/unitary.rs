@@ -2,10 +2,13 @@
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{BitVector, Gf2Error};
+use crate::pauli::{PauliError, PauliWord};
 use crate::phase::{ClosedPhaseSum, ParityPhase, PhaseError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
+use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UnitaryError {
@@ -13,11 +16,13 @@ pub enum UnitaryError {
     DimensionOverflow,
     InvalidTurns,
     RepeatedQubit,
+    InvalidInsertion { position: usize, gate_count: usize },
     Binary(Gf2Error),
     Clifford(CliffordError),
     Phase(PhaseError),
     Scalar(ScalarError),
     Stabilizer(StabilizerError),
+    Pauli(PauliError),
 }
 impl fmt::Display for UnitaryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -33,11 +38,19 @@ impl fmt::Display for UnitaryError {
                 "T turns must be below eight and controlled-S turns below four"
             ),
             Self::RepeatedQubit => write!(f, "multi-qubit diagonal gate repeats a qubit"),
+            Self::InvalidInsertion {
+                position,
+                gate_count,
+            } => write!(
+                f,
+                "Pauli insertion position {position} exceeds the circuit's {gate_count} gates"
+            ),
             Self::Binary(e) => e.fmt(f),
             Self::Clifford(e) => e.fmt(f),
             Self::Phase(e) => e.fmt(f),
             Self::Scalar(e) => e.fmt(f),
             Self::Stabilizer(e) => e.fmt(f),
+            Self::Pauli(e) => e.fmt(f),
         }
     }
 }
@@ -65,6 +78,11 @@ impl From<ScalarError> for UnitaryError {
 impl From<StabilizerError> for UnitaryError {
     fn from(e: StabilizerError) -> Self {
         Self::Stabilizer(e)
+    }
+}
+impl From<PauliError> for UnitaryError {
+    fn from(e: PauliError) -> Self {
+        Self::Pauli(e)
     }
 }
 
@@ -140,7 +158,9 @@ impl UnitaryCircuit {
         }
         let mut lowered = Vec::<CliffordGate>::new();
         let mut coefficients = Vec::new();
+        let mut positions = Vec::new();
         for &gate in &self.gates {
+            positions.push(lowered.len());
             match gate {
                 UnitaryGate::Clifford(c) => {
                     lowered.push(c);
@@ -174,19 +194,29 @@ impl UnitaryCircuit {
                 coefficients.push(coefficient);
             }
         }
+        positions.push(lowered.len());
         let width = self
             .width
             .checked_add(coefficients.len())
             .ok_or(UnitaryError::DimensionOverflow)?;
         let initial =
             CliffordCircuit::computational(BitVector::from_indices(width, input.ones())?)?;
-        let boundary = CliffordCircuit::new(width, lowered)?
-            .evolve(&initial, arithmetic)?
-            .expect("unitary Clifford gates preserve a nonzero basis input");
+        let circuit = CliffordCircuit::new(width, lowered)?;
+        let boundary = Arc::new(
+            circuit
+                .evolve(&initial, arithmetic)?
+                .expect("unitary Clifford gates preserve a nonzero basis input"),
+        );
+        let program = Arc::new(InsertionProgram {
+            reference: Arc::clone(&boundary),
+            circuit,
+            positions,
+        });
         Ok(CompiledUnitary {
             physical_width: self.width,
             boundary,
             coefficients,
+            program,
         })
     }
 }
@@ -226,8 +256,23 @@ pub struct NetworkValue {
 /// resource between distinct queries.
 pub struct CompiledUnitary {
     physical_width: usize,
-    boundary: AffineKet,
+    boundary: Arc<AffineKet>,
     coefficients: Vec<u8>,
+    program: Arc<InsertionProgram>,
+}
+struct InsertionProgram {
+    reference: Arc<AffineKet>,
+    circuit: CliffordCircuit,
+    positions: Vec<usize>,
+}
+
+/// Insert a physical Pauli before gate `before_gate`. Position equal to the
+/// gate count is the final circuit boundary. Equal-position insertions act in
+/// their supplied order; different positions are always processed in time order.
+#[derive(Clone, Debug)]
+pub struct PauliInsertion {
+    pub before_gate: usize,
+    pub word: PauliWord,
 }
 impl CompiledUnitary {
     pub fn width(&self) -> usize {
@@ -235,6 +280,62 @@ impl CompiledUnitary {
     }
     pub fn phase_legs(&self) -> usize {
         self.coefficients.len()
+    }
+
+    /// Replace the insertion assignment relative to the original compiled
+    /// circuit, even when called on a previously perturbed view. The reference
+    /// Clifford ket and program are immutable and shared; gates are not evolved
+    /// again. Queries still prepare their phase resource as documented above.
+    pub fn with_insertions(
+        &self,
+        insertions: &[PauliInsertion],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        let count = self.program.positions.len() - 1;
+        let mut grouped = BTreeMap::<usize, Vec<&PauliWord>>::new();
+        for insertion in insertions {
+            if insertion.before_gate > count {
+                return Err(UnitaryError::InvalidInsertion {
+                    position: insertion.before_gate,
+                    gate_count: count,
+                });
+            }
+            if insertion.word.width() != self.width() {
+                return Err(UnitaryError::DimensionMismatch);
+            }
+            grouped
+                .entry(insertion.before_gate)
+                .or_default()
+                .push(&insertion.word);
+        }
+        let total = self.boundary.width();
+        let mut frame = PauliWord::identity(total)?;
+        for position in 0..=count {
+            if let Some(words) = grouped.get(&position) {
+                for word in words {
+                    let extended = PauliWord::new(
+                        BitVector::from_indices(total, word.x().ones())?,
+                        BitVector::from_indices(total, word.z().ones())?,
+                        word.phase(),
+                    )?;
+                    frame = extended.multiply(&frame)?;
+                }
+            }
+            if position < count {
+                for &gate in &self.program.circuit.gates()
+                    [self.program.positions[position]..self.program.positions[position + 1]]
+                {
+                    frame = frame.conjugated(gate)?;
+                }
+            }
+        }
+        let boundary = Arc::new(frame.apply(&self.program.reference, arithmetic)?);
+        Ok(Self {
+            physical_width: self.physical_width,
+            boundary,
+            coefficients: self.coefficients.clone(),
+            program: Arc::clone(&self.program),
+        })
     }
 
     pub fn amplitude(
