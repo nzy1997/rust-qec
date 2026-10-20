@@ -638,3 +638,43 @@ backend's exact history, accepted, target-success and error masses, including
 irrational branch probabilities. Regenerate those witnesses with
 `benchmarks/magna_reproduction/history_vectors.py --upstream PINNED_SOURCE --out NEW_JSON`
 using the same isolated reference Python environment.
+
+## Exact normalized and weighted field values
+
+Network contractions remain dyadic `ExactScalar` values. Normalizing by an
+irrational history mass or multiplying by a rational importance weight can leave
+that ring. `field::ExactField` represents the resulting element of `Q(omega)` with
+four canonical arbitrary-precision rational coefficients. `FieldArithmetic`
+provides checked construction, scalar conversion, addition, subtraction,
+multiplication, division, rational scaling, and exact real comparison.
+
+```rust
+use num_rational::BigRational;
+use rmagna::field::{ExactField, FieldArithmetic};
+use rmagna::scalar::ScalarArithmetic;
+let scalars = ScalarArithmetic::default();
+let fields = FieldArithmetic::default();
+let history = scalars.scalar([2.into(), 1.into(), 0.into(), (-1).into()], -2)?;
+let weight = BigRational::new(7.into(), 13.into());
+assert_eq!(fields.contribution(&history, &history, &weight)?,
+    fields.from_rational(weight)?);
+assert_eq!(fields.divide(&ExactField::one(), &ExactField::one())?, ExactField::one());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`contribution` divides a joint exact mass by its physical history mass and applies
+the supplied rational likelihood ratio. Zero denominators and division by zero
+are errors. Raw rational inputs are normalized and validated before arithmetic.
+Division uses the other three field embeddings to form a rational norm; it does
+not approximate an inverse numerically.
+
+Defaults limit each canonical rational numerator and denominator to 1,048,576
+bits, including intermediate field multiplication results used for inversion.
+`FieldArithmetic::new(bits)` changes that budget. Conversion rejects impossible
+binary exponents before allocating a huge power of two. Arithmetic temporaries
+and exact real-sign comparisons can exceed the stored coefficient budget; this
+is not a total memory limit. A small final quotient can fail if an intermediate
+field norm exceeds the configured budget. Tests compare random rational complex
+operations against independent `Q(sqrt(2)) + i Q(sqrt(2))` arithmetic, retain
+`2^-1200` weighted errors, check normalized irrational histories, and exercise
+rational validity, exponent/resource bounds and Pell cancellation.
