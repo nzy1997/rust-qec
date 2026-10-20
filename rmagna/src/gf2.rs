@@ -132,6 +132,15 @@ impl BitVector {
         Ok(())
     }
 
+    pub(crate) fn xor_and_assign(&mut self, left: &Self, right: &Self) -> Result<(), Gf2Error> {
+        self.check_width(left.width)?;
+        self.check_width(right.width)?;
+        for ((output, left), right) in self.words.iter_mut().zip(&left.words).zip(&right.words) {
+            *output ^= left & right;
+        }
+        Ok(())
+    }
+
     pub fn dot(&self, other: &Self) -> Result<bool, Gf2Error> {
         other.check_width(self.width)?;
         let parity = self

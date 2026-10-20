@@ -227,6 +227,10 @@ coefficients; smaller term sets use direct dot products. This adds temporary
 matrix storage and does not cache phase decompositions across queries.
 An empty basis evaluates the shifted scalar directly, without a coordinate-sized
 transpose or mapped parity terms.
+For Clifford extraction above 64 coordinates, the signature check uses an
+injective pivot-coordinate restriction of the odd-axis span. Packed two-plane
+addition then extracts pair coefficients modulo four. The returned quadratic
+form retains all original coordinates; resource bases and budgets are unchanged.
 
 These primitives build exact Clifford boundaries. The compilers below add
 unitary near-Clifford circuit lowering and affine instruments with reset,

@@ -669,3 +669,105 @@ fn packed_phase_pullbacks_match_direct_wide_boolean_substitution() {
         }
     }
 }
+
+#[test]
+fn wide_clifford_extraction_preserves_odd_identities_and_packed_carries() {
+    let width = 129;
+    let mut state = 0x794b103a62_u64;
+    let mut random = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    for dense in [false, true] {
+        let basis = (0..12)
+            .map(|j| {
+                BitVector::from_indices(
+                    width,
+                    (0..width).filter(|&k| k == j || (dense && k >= 12 && random() & 1 != 0)),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let axis = |indices: &[usize]| {
+            let mut result = BitVector::zeros(width).unwrap();
+            for &j in indices {
+                result.xor_assign(&basis[j]).unwrap();
+            }
+            result
+        };
+        let mut terms = Vec::new();
+        for group in 0..6 {
+            let weight = (2 * group + 1) as u8 & 7;
+            // Inclusion-exclusion of all nonempty parities of four bits is
+            // 8*a*b*c*d, hence zero modulo eight despite odd coefficients.
+            for mask in 1..16_usize {
+                let indices = (0..4)
+                    .filter(|&j| mask >> j & 1 != 0)
+                    .map(|j| (2 * group + j) % 12)
+                    .collect::<Vec<_>>();
+                let coefficient = if mask.count_ones() & 1 != 0 {
+                    weight
+                } else {
+                    (8 - weight) & 7
+                };
+                terms.push((axis(&indices), coefficient));
+            }
+        }
+        for j in 0..12 {
+            terms.push((axis(&[j, (j + 3) % 12]), [2, 4, 6][j % 3]));
+        }
+        let phase = ParityPhase::new(width, 7, terms).unwrap();
+        assert!(phase.terms().iter().any(|(_, c)| c & 1 != 0));
+        let identity = (0..width)
+            .map(|j| BitVector::from_indices(width, [j]).unwrap())
+            .collect::<Vec<_>>();
+        let shifted = phase
+            .restrict(
+                &BitVector::from_indices(width, (0..width).filter(|_| random() & 1 != 0)).unwrap(),
+                &identity,
+            )
+            .unwrap();
+        for phase in [&phase, &shifted] {
+            let (global, quadratic) = phase.clifford().unwrap();
+            for _ in 0..256 {
+                let value =
+                    BitVector::from_indices(width, (0..width).filter(|_| random() & 1 != 0))
+                        .unwrap();
+                assert_eq!(
+                    phase.evaluate(&value).unwrap(),
+                    (global + 2 * quadratic.evaluate(&value).unwrap()) & 7,
+                    "dense={dense}"
+                );
+            }
+        }
+        let t = ParityPhase::new(width, 0, [(axis(&[0]), 1)]).unwrap();
+        let cs = ParityPhase::new(
+            width,
+            0,
+            [(axis(&[0]), 1), (axis(&[1]), 1), (axis(&[0, 1]), 7)],
+        )
+        .unwrap();
+        let ccz = ParityPhase::new(
+            width,
+            0,
+            (1..8_usize).map(|mask| {
+                let indices = (0..3).filter(|&j| mask >> j & 1 != 0).collect::<Vec<_>>();
+                (
+                    axis(&indices),
+                    if mask.count_ones() & 1 != 0 { 1 } else { 7 },
+                )
+            }),
+        )
+        .unwrap();
+        for rejected in [&t, &cs, &ccz] {
+            assert!(matches!(rejected.clifford(), Err(PhaseError::NotClifford)));
+        }
+        let u = BitVector::from_indices(width, [0]).unwrap();
+        let v = BitVector::from_indices(width, [1]).unwrap();
+        let w = BitVector::from_indices(width, [2]).unwrap();
+        assert!(!ccz.signature(&u, &u, &v).unwrap());
+        assert!(ccz.signature(&u, &v, &w).unwrap());
+    }
+}
