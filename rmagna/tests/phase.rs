@@ -771,3 +771,98 @@ fn wide_clifford_extraction_preserves_odd_identities_and_packed_carries() {
         assert!(ccz.signature(&u, &v, &w).unwrap());
     }
 }
+
+#[test]
+fn compressed_signature_quotients_match_full_wide_coordinate_equations() {
+    let width = 129;
+    let pivots = [0, 1, 64, 65, 128];
+    let mut rng = 0x3a791bcdef_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        rng
+    };
+    for scenario in 0..4 {
+        let dimension = if scenario == 0 { 4 } else { 5 };
+        let embedding = (0..dimension)
+            .map(|j| {
+                BitVector::from_indices(
+                    width,
+                    (0..width).filter(|i| {
+                        if let Some(k) = pivots[..dimension].iter().position(|p| p == i) {
+                            k == j
+                        } else {
+                            next() & 1 != 0
+                        }
+                    }),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let terms = (1_usize..1 << dimension)
+            .map(|mask| {
+                let mut axis = BitVector::zeros(width).unwrap();
+                for (j, row) in embedding.iter().enumerate() {
+                    if mask & (1 << j) != 0 {
+                        axis.xor_assign(row).unwrap();
+                    }
+                }
+                let coefficient = match scenario {
+                    0 => 1, // All 15 nonzero four-dimensional axes cancel cubically.
+                    1 => (next() & 7) as u8,
+                    2 => 2 * ((next() & 3) as u8),
+                    _ => {
+                        if mask.count_ones() < 3 {
+                            1
+                        } else {
+                            3
+                        }
+                    }
+                };
+                (axis, coefficient)
+            })
+            .collect::<Vec<_>>();
+        let phase = ParityPhase::new(width, 3, terms).unwrap();
+        let mut equations = Vec::new();
+        // Literal cubic coefficients over every ambient coordinate pair. This
+        // oracle never selects a spanning coordinate subset or an early stop.
+        for i in 0..width {
+            for j in i..width {
+                equations.push(
+                    BitVector::from_indices(
+                        width,
+                        (0..width).filter(|&k| {
+                            phase.terms().iter().fold(false, |value, (axis, c)| {
+                                value
+                                    ^ (c & 1 != 0
+                                        && axis.get(i).unwrap()
+                                        && axis.get(j).unwrap()
+                                        && axis.get(k).unwrap())
+                            })
+                        }),
+                    )
+                    .unwrap(),
+                );
+            }
+        }
+        let full = LinearFactorization::new(width, &equations).unwrap();
+        let actual = phase.quotient().unwrap();
+        assert_eq!(actual.rank(), full.rank(), "scenario={scenario}");
+        let mut expected = full
+            .pivot_columns()
+            .iter()
+            .map(|&j| BitVector::from_indices(width, [j]).unwrap())
+            .collect::<Vec<_>>();
+        expected.extend(full.nullspace().unwrap());
+        assert_eq!(actual.basis(), expected, "scenario={scenario}");
+        if scenario == 0 || scenario == 2 {
+            assert_eq!(actual.rank(), 0);
+        }
+        for direction in actual.radical() {
+            for row in &equations {
+                assert!(!row.dot(direction).unwrap());
+            }
+        }
+    }
+}
