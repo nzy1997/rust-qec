@@ -9,6 +9,7 @@ pub mod pauli;
 pub mod phase;
 pub mod probability;
 pub mod quadratic;
+pub mod records;
 pub mod scalar;
 pub mod stabilizer;
 pub mod unitary;
