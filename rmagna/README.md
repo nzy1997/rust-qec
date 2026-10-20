@@ -2,7 +2,8 @@
 
 Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
-quadratic phase sums and phase-preserving stabilizer contraction. Circuit
+quadratic phase sums, phase-preserving stabilizer contraction and third-level
+phase reduction. Circuit
 compilation and sampling are subsequent deliverables.
 
 `ExactScalar` represents
@@ -105,3 +106,66 @@ and compare 24 prescribed contractions with the pinned C++ reference. Boundary
 tests cross word boundaries through 4097 bits. Regenerate the numerical ket
 witnesses with `benchmarks/magna_reproduction/stabilizer_vectors.py`, using the
 same arguments and reference environment as the scalar generator above.
+
+## Clifford radical and quotient
+
+`phase::ParityPhase` stores a phase modulo eight as a weighted sum of binary
+parities. Duplicate axes combine modulo eight. Affine restriction preserves
+the constant phase and accepts dependent coordinate maps. T, controlled-S and
+CCZ phases can all be expressed by these terms.
+
+`signature(u, v, w)` is the phase's third discrete derivative divided by four.
+It includes repeated directions; a single T has a nonzero signature even in
+one dimension. `quotient` computes the radical that annihilates every signature
+slice. Its full basis consists of complementary quotient representatives,
+followed by radical directions. Zero signature is equivalent to a Clifford
+phase, which `clifford` separates into a global eighth-root phase and a
+quadratic form modulo four. Odd parity terms can cancel into a Clifford phase,
+so checking individual coefficients is insufficient.
+
+`PreparedPhaseSum::new(reference, max_terms, arithmetic)` caches the exact
+computational expansion on the quotient. Evaluation accepts any updated phase
+with the same signature, including affine shifts and Clifford corrections,
+and an additional quadratic boundary in the original coordinates. It retains
+the reference coordinates and resource coefficients across queries. Gaussian
+elimination sums the radical coordinates without physical-state enumeration.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::phase::{ParityPhase, PreparedPhaseSum};
+use rmagna::quadratic::QuadraticForm;
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+
+let arithmetic = ScalarArithmetic::default();
+let t = ParityPhase::new(1, 0, [(BitVector::from_indices(1, [0])?, 1)])?;
+let prepared = PreparedPhaseSum::new(&t, 2, &arithmetic)?;
+let boundary = QuadraticForm::new(0, vec![0], vec![BitVector::zeros(1)?])?;
+assert_eq!(prepared.quotient().rank(), 1);
+assert_eq!(prepared.evaluate(&t, &boundary, &ExactScalar::one(), &arithmetic)?,
+    arithmetic.add(&ExactScalar::one(), &arithmetic.omega(1, 0)?)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`ClosedPhaseSum` additionally sums the Clifford radical into its quadratic
+boundary before imposing the term budget. The resulting affine constraints
+can further reduce the non-Clifford support; it repeats this polynomial-time
+step until no radical remains. `reductions` records input dimensions, signature
+ranks and surviving support dimensions. No quotient assignments are enumerated
+during reduction. An inconsistent boundary returns exact zero with no terms.
+This cold closed-network plan has no update API; use `PreparedPhaseSum` for a
+fixed quotient with covariant phase updates.
+
+The term limit applies to `2^quotient_rank` and is checked before enumeration.
+This version provides the computational expansion only; choosing a smaller
+T-state catalog decomposition is a subsequent deliverable. The limit is not a
+process-memory cap, and these algebra types do not perform circuit compilation
+or choose a global commuting layer.
+
+Tests exhaust every signature up to three coordinates using explicit discrete
+differences, compare random prepared updates to literal sums, and retain wide
+low-rank examples. The 28 native numerical witnesses additionally compare the
+full complex scalar and quotient dimensions before/after absorption through 129 coordinates. Regenerate
+them with `benchmarks/magna_reproduction/phase_vectors.py` using the reference
+environment and arguments shown above. The generator checks its reconstructed
+closed amplitude against the native norm and verifies source and binary hashes
+before writing a new destination.
