@@ -543,3 +543,113 @@ fn full_ccz_truth_table_and_invalid_queries_have_explicit_outcomes() {
         ExactScalar::one()
     );
 }
+
+#[test]
+fn partial_targets_trace_entangled_environments_and_apply_events_on_both_copies() {
+    let arithmetic = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(2)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::T { qubit: 0, turns: 1 },
+        G::Cs {
+            a: 1,
+            b: 2,
+            turns: 1,
+        },
+        G::Clifford(C::Cx {
+            control: 2,
+            target: 3,
+        }),
+        G::Clifford(C::H(1)),
+    ];
+    let protocol = UnitaryCircuit::new(4, gates)
+        .unwrap()
+        .compile(&bits(4, 0), &arithmetic)
+        .unwrap();
+    let values = dense(&gates, 4, 0, &arithmetic);
+    for outputs in [vec![], vec![1], vec![3, 1], vec![3, 2, 1, 0]] {
+        let target_gates = (0..outputs.len())
+            .flat_map(|q| {
+                [
+                    G::Clifford(C::H(q)),
+                    G::T {
+                        qubit: q,
+                        turns: (2 * q + 1) as u8,
+                    },
+                ]
+            })
+            .collect::<Vec<_>>();
+        let target = UnitaryCircuit::new(outputs.len(), target_gates.clone())
+            .unwrap()
+            .compile(&bits(outputs.len(), 0), &arithmetic)
+            .unwrap();
+        let target_values = dense(&target_gates, outputs.len(), 0, &arithmetic);
+        let environment = (0..4).filter(|q| !outputs.contains(q)).collect::<Vec<_>>();
+        for row in [bits(4, 0), bits(4, 1), bits(4, 6), bits(4, 15)] {
+            for outcome in 0..2 {
+                let mut expected = ExactScalar::zero();
+                for env in 0..1 << environment.len() {
+                    let base = environment
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &q)| ((env >> i) & 1) << q)
+                        .sum::<usize>();
+                    let mut amplitude = ExactScalar::zero();
+                    for (out, target_value) in target_values.iter().enumerate() {
+                        let x = base
+                            | outputs
+                                .iter()
+                                .enumerate()
+                                .map(|(i, &q)| ((out >> i) & 1) << q)
+                                .sum::<usize>();
+                        if row.dot(&bits(4, x)).unwrap() != (outcome != 0) {
+                            continue;
+                        }
+                        amplitude = arithmetic
+                            .add(
+                                &amplitude,
+                                &arithmetic
+                                    .multiply(&values[x], &target_value.conjugate())
+                                    .unwrap(),
+                            )
+                            .unwrap();
+                    }
+                    expected = arithmetic
+                        .add(&expected, &arithmetic.norm_squared(&amplitude).unwrap())
+                        .unwrap();
+                }
+                let actual = protocol
+                    .target_weight(
+                        &outputs,
+                        &target,
+                        std::slice::from_ref(&row),
+                        &bits(1, outcome),
+                        256,
+                        &arithmetic,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    actual.value, expected,
+                    "outputs={outputs:?}, row={row:?}, outcome={outcome}"
+                );
+            }
+        }
+    }
+    let target = UnitaryCircuit::new(2, [])
+        .unwrap()
+        .compile(&bits(2, 0), &arithmetic)
+        .unwrap();
+    assert!(matches!(
+        protocol.target_weight(&[0, 0], &target, &[], &bits(0, 0), 256, &arithmetic),
+        Err(UnitaryError::RepeatedOutput)
+    ));
+    assert!(
+        protocol
+            .target_weight(&[0, 4], &target, &[], &bits(0, 0), 256, &arithmetic)
+            .is_err()
+    );
+}

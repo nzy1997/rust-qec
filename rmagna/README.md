@@ -3,8 +3,9 @@
 Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
-phase reduction, Clifford evolution and unitary near-Clifford circuit
-compilation. Instruments, noise and sampling are subsequent deliverables.
+phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
+and affine instruments with prescribed Pauli and report faults. Causal runtime
+and sampling are subsequent deliverables.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -204,9 +205,9 @@ indices in their given order. Repeated indices copy a label to several legs.
 This linear operation is distinct from tracing a density operator; a trace
 requires boundary equality between a ket and its conjugate first.
 
-These primitives build exact Clifford boundaries. The unitary compiler below
-adds near-Clifford circuit lowering; reset, records and noise are subsequent
-deliverables. Tests
+These primitives build exact Clifford boundaries. The compilers below add
+unitary near-Clifford circuit lowering and affine instruments with reset,
+reported records and prescribed noise. Tests
 compare random six-qubit circuits to explicit complex matrices, retain the
 global phase in `(SH)^3 = omega I`, invert the circuits exactly, and verify
 boundary sums, repeated indices and wide Bell projections.
@@ -252,8 +253,8 @@ Each query takes an explicit computational-term budget and returns its scalar,
 quotient dimension and term count. Inconsistent or zero boundaries return zero
 with no terms. This initial unitary compiler reuses the Clifford ket, but
 constructs a phase resource for each query; global commuting-layer selection,
-cross-fault resource reuse, instruments, controllers and noise remain later
-deliverables. It does not claim the paper's reduced representation ranks or
+cross-fault resource reuse and causal controllers remain later deliverables.
+The instrument layer below adds resets, measurements and prescribed noise. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
 with quotient rank greater than one.
@@ -397,5 +398,87 @@ files with the pinned parser using `benchmarks/magna_reproduction/frontend_compa
 The comparison checks format, qubit/record/instruction/detector counts, external
 call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
-format/static-semantics check, not an end-to-end sampling benchmark. Execution
-of parsed instruments, targets and recovery is a subsequent deliverable.
+format/static-semantics check, not an end-to-end sampling benchmark. The
+instrument layer below executes affine circuits and pure targets; full task
+models, recovery and sampling remain subsequent deliverables.
+
+## Affine instruments and conditional target masses
+
+`instrument::compile_affine` compiles parsed reset, measurement, affine feedback,
+and Pauli-noise operations into one coherent reference instrument. Resets move
+the live physical output to a fresh wire and retain the old wire as an environment.
+Measurements copy the declared Pauli parity into a fresh record wire. Report
+errors flip that record after the true projection; feedback and postselection
+read reported values. A reusable work wire computes and uncomputes affine controls.
+Discarded outputs and old reset wires are traced when querying probabilities.
+
+`compile_unitary` compiles a measurement-free pure target using the same standard
+gate matrices. `CompiledUnitary::target_weight` closes a chosen, ordered subset of
+physical outputs against that target and traces the remaining environment.
+Repeated output indices and incompatible target dimensions are errors.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::instrument::{compile_affine, compile_unitary, CompileOptions, FaultSelection};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+
+let arithmetic = ScalarArithmetic::default();
+let parse = ParseOptions::default();
+let options = CompileOptions::default();
+let source = parse_circuit("H 0\nM(1/3) 0\nCX rec[-1] 0", &parse)?;
+let instrument = compile_affine(&source, &options, &arithmetic)?;
+let target = compile_unitary(&parse_circuit("I 0", &parse)?, &options, &arithmetic)?;
+let clean = instrument.masses(&[0], &target, &[], 1, &arithmetic)?;
+assert_eq!(clean.target_success.value, ExactScalar::one());
+let faults = [FaultSelection { site: 0, alternative: 0 }];
+assert_eq!(instrument.fault_probability(&faults)?.to_string(), "1/3");
+assert_eq!(instrument.masses(&[0], &target, &faults, 1, &arithmetic)?.error,
+    ExactScalar::one());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`masses` returns acceptance, accepted target success, and their exact difference.
+These are conditional on the supplied noise choices; multiply by
+`fault_probability` when summing over the physical noise distribution. Omitted
+sites mean identity, including report-flip sites of probability zero. Alternatives
+at a site are mutually exclusive. Correlated `E` / `ELSE_CORRELATED_ERROR` chains
+form one category, with each later probability multiplied by the probability of
+all earlier alternatives failing. Two-qubit Pauli channels use the order
+IX, IY, IZ, XI, XX, XY, XZ, YI, YX, YY, YZ, ZI, ZX, ZY, ZZ.
+`noise_sites` retains source operation IDs and exact rational weights.
+
+`reported_probability` queries simultaneous affine parities of reported records
+under the physical instrument, without applying postselection. This separation
+is necessary for later causal controller sampling. External decisions and guarded
+noise return `NeedsHistory`; this interface does not execute callbacks, sample
+noise, choose nonlinear histories, or implement task schemas and recovery yet.
+
+`CompileOptions` bounds coherent instrument wires before diagonal phase-copy
+ancillas (65,536), lowered unitary gates (1,000,000), and noise sites (1,000,000).
+The underlying unitary compiler and exact arithmetic retain their own dimension
+and coefficient checks. These limits do not bound total process memory. The
+Clifford reference is shared across supplied faults, but final phase resources
+are currently prepared for each query; no paper throughput claim follows.
+
+Tests check every supported gate against literal matrix entries, including global
+phase; partial-output target contractions against dense density sums; resets,
+Pauli products, feedback, and exact channel categories; and 28 prescribed native
+mass witnesses including the unmodified pinned BH2-T input. The BH2 witnesses
+include no fault, rejected faults, report errors, and accepted failing triples.
+Both its acceptance and fidelity contractions fit a one-term budget without
+protocol-specific compiler code. The imported BH2 input files retain their own
+MPL-2.0 license in `tests/data/magna-bh2/`.
+
+Regenerate prescribed instrument witnesses with the isolated, verified reference:
+
+```sh
+/tmp/rstim-magna-reference-env/bin/python -I \
+  benchmarks/magna_reproduction/instrument_vectors.py \
+  --upstream /tmp/rstim-magna-261022315 \
+  --out /tmp/instrument-reference.json
+cmp /tmp/instrument-reference.json rmagna/tests/data/instrument-reference.json
+```
+
+`cargo run -p rmagna --example affine_mass -- PHYSICAL TARGET OUTPUT_CSV [MAX_TERMS]`
+prints a no-fault exact-mass pilot and cold timing diagnostics. It is not a formal
+benchmark or a complete task-file runner.
