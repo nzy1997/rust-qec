@@ -10,6 +10,7 @@
     "rsinter"
   ],
   "deferred": [
+    "rmagna",
     "renvelope",
     "rstim-shot-web",
     "surface_decoder_compare_bridge",
