@@ -3,7 +3,9 @@
 import hashlib
 import importlib.util
 import json
+import py_compile
 import subprocess
+import sys
 import tempfile
 import unittest
 from argparse import Namespace
@@ -57,15 +59,15 @@ class ReferenceTests(unittest.TestCase):
                     reference.relative_file(Path(temporary).resolve(), name)
 
     def test_partial_or_failed_draws_cannot_be_declared_complete(self):
-        valid = {"status": "complete", "requested": 8, "completed": 8, "failed": 0,
+        valid = {"schema_version": 2, "seed": 7, "status": "complete", "requested": 8, "completed": 8, "failed": 0,
                  "not_attempted": 0, "failures": [], "estimates": {"acceptance": 0.75, "error": 0.125}}
-        reference.check_case_result(valid, 8)
-        for patch in [{"status": "failed"}, {"completed": 7}, {"requested": 9}, {"failed": 1},
+        reference.check_case_result(valid, 8, 7)
+        for patch in [{"schema_version": 1}, {"seed": 8}, {"status": "failed"}, {"completed": 7}, {"requested": 9}, {"failed": 1},
                       {"not_attempted": 1}, {"failures": ["error"]}, {"estimates": {"acceptance": None}},
                       {"estimates": {"acceptance": 1, "error": float("nan")}},
                       {"estimates": {"acceptance": 1, "error": -0.1}}]:
             with self.subTest(patch=patch), self.assertRaises(reference.ReferenceError):
-                reference.check_case_result({**valid, **patch}, 8)
+                reference.check_case_result({**valid, **patch}, 8, 7)
 
     def test_capture_retains_failed_receipt_and_rejects_binary_changes(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -85,7 +87,7 @@ class ReferenceTests(unittest.TestCase):
             with self.assertRaisesRegex(reference.ReferenceError, "unlisted"):
                 reference.verify_source(root, manifest)
             extra.unlink()
-            result = {"status": "complete", "requested": 8, "completed": 8, "failed": 0,
+            result = {"schema_version": 2, "seed": 7, "status": "complete", "requested": 8, "completed": 8, "failed": 0,
                       "not_attempted": 0, "failures": [], "estimates": {"acceptance": 0.75, "error": 0.125}}
             runs = [Namespace(returncode=0, stderr="", stdout=json.dumps({"result": result, "native_sha256": sha * 64}))
                     for sha in ["a", "b"]]
@@ -104,8 +106,8 @@ class ReferenceTests(unittest.TestCase):
     def test_capture_preserves_venv_interpreter_and_checks_offline_receipts(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
-            manifest = {"upstream": {"commit": "c" * 40}, "tasks": ["a", "b"]}
-            result = {"status": "complete", "requested": 8, "completed": 8, "failed": 0,
+            manifest = {"upstream": {"commit": "c" * 40, "files": {}}, "tasks": ["a", "b"]}
+            result = {"schema_version": 2, "seed": 7, "status": "complete", "requested": 8, "completed": 8, "failed": 0,
                       "not_attempted": 0, "failures": [], "estimates": {"acceptance": 1, "error": 0}}
             completed = Namespace(returncode=0, stderr="", stdout=json.dumps(
                 {"result": result, "native_sha256": "a" * 64}))
@@ -113,7 +115,8 @@ class ReferenceTests(unittest.TestCase):
             interpreter.symlink_to(Path("/usr/bin/python3"))
             args = Namespace(case=None, upstream=root, out=root / "output", python=interpreter,
                              shots=8, seed=7, timeout=10)
-            with patch.object(reference, "verify_source", return_value={}), patch.object(
+            evidence = {"source_files": 0, "decoder_files": 0, "tasks": 2}
+            with patch.object(reference, "verify_source", return_value=evidence), patch.object(
                 reference.subprocess, "run", return_value=completed
             ) as run:
                 reference.capture(args, manifest)
@@ -123,7 +126,10 @@ class ReferenceTests(unittest.TestCase):
             receipt = json.loads(receipt_file.read_text())
             for change in [{"status": "failed"}, {"runs": receipt["runs"][:-1]},
                            {"cases": ["a"]}, {"manifest_sha256": "b" * 64},
-                           {"worker_sha256": "b" * 64}, {"shots": 9}]:
+                           {"worker_sha256": "b" * 64}, {"shots": 9}, {"shots": 0}, {"seed": 8},
+                           {"before": {}}, {"after": {}}, {"failure": "source mismatch"},
+                           {"before": {}, "after": {}},
+                           {"before": {**evidence, "source_files": 1}, "after": {**evidence, "source_files": 1}}]:
                 receipt_file.write_text(json.dumps({**receipt, **change}), encoding="utf-8")
                 with self.subTest(change=change), self.assertRaises(reference.ReferenceError):
                     reference.verify_capture(args.out, manifest, True)
@@ -147,6 +153,49 @@ class ReferenceTests(unittest.TestCase):
             self.assertEqual((args.out / "a.json").read_text(), "partial")
             self.assertEqual((args.out / "a.stderr.txt").read_text(), "diagnostic")
             self.assertEqual(json.loads((args.out / "receipt.json").read_text())["status"], "failed")
+
+    def test_real_child_ignores_unchecked_bytecode_and_rejects_shadow_modules(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for directory in ["core/magna", "scripts", "tests/core", "examples/a"]:
+                (root / directory).mkdir(parents=True, exist_ok=True)
+            result = {"schema_version": 2, "seed": 7, "status": "complete", "requested": 8, "completed": 8,
+                      "failed": 0, "not_attempted": 0, "failures": [], "estimates": {"acceptance": 1, "error": 0}}
+            module = root / "core/magna/__init__.py"
+            native = root / "core/magna/_native.test.so"
+            native.write_bytes(b"stand-in binary identity; not loaded as an extension")
+            code = ("from pathlib import Path\nfrom types import SimpleNamespace\n"
+                    "_native = SimpleNamespace(__file__=str(Path(__file__).parent / '_native.test.so'))\n"
+                    f"def run(*args, **kwargs): return {result!r}\n"
+                    "def load_controllers(*args): return {}\n")
+            module.write_text(code, encoding="utf-8")
+            config = root / "examples/a/run.json"
+            config.write_text(json.dumps({"circuit": "circuit.magna", "task": "task.json"}), encoding="utf-8")
+            malicious = root / "malicious.py"
+            malicious.write_text(code.replace("'acceptance': 1", "'acceptance': 0.5"), encoding="utf-8")
+            cache = Path(importlib.util.cache_from_source(str(module), optimization=""))
+            cache.parent.mkdir()
+            py_compile.compile(str(malicious), cfile=str(cache), doraise=True, optimize=0,
+                               invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+            # A normal import demonstrates that the planted cache is executable.
+            probe = subprocess.run([sys.executable, "-I", "-c",
+                f"import sys; sys.path.insert(0, {str(root / 'core')!r}); import magna; print(magna.run()['estimates']['acceptance'])"],
+                capture_output=True, text=True, check=True)
+            self.assertEqual(probe.stdout.strip(), "0.5")
+            files = {p.relative_to(root).as_posix(): reference.digest(p) for p in [module, config]}
+            manifest = {"upstream": {"commit": "c" * 40, "files": files}, "tasks": ["a"], "test_modules": []}
+            args = Namespace(case=None, upstream=root, out=root / "output", python=Path(sys.executable),
+                             shots=8, seed=7, timeout=10)
+            reference.capture(args, manifest)
+            captured = json.loads((args.out / "a.json").read_text())
+            self.assertEqual(captured["result"]["estimates"], {"acceptance": 1, "error": 0})
+            self.assertEqual(reference.verify_capture(args.out, manifest, True)["tasks"], 1)
+            for name in ["core/magna/noise.fake.so", "core/magna/noise.pyc", "core/decoder.pyd"]:
+                shadow = root / name
+                shadow.write_bytes(b"unlisted compiled module")
+                with self.subTest(name=name), self.assertRaisesRegex(reference.ReferenceError, "unlisted"):
+                    reference.verify_source(root, manifest)
+                shadow.unlink()
 
 
 if __name__ == "__main__":

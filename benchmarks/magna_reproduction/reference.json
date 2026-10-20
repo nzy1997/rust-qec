@@ -1039,6 +1039,23 @@
       "tests/support/quadratic.py": "dbbd38633cbc18ec69ec35638b7c9478a6c6286547a417df231e59f11258b6f8",
       "tests/support/readout_target.py": "66aaaa659852a2f496ad86614013848018cd16673eb348e6fa3198c84d757537"
     },
-    "repository": "https://github.com/itpyi/magna"
+    "repository": "https://github.com/itpyi/magna",
+    "decoder_files": {
+      "examples/tqd3/decoder/author_source/decoder.py": "15c38bd7b488ed7bf6b5a2b32273f73ed2dd98aaae90fb0bf1561cb7819d270d",
+      "examples/tqd3/decoder/author_source/geometry.py": "3ce975e23d305378c21722278be8def26b2d0d76bb39c703f539f4f7c40553cd",
+      "examples/tqd3/decoder/author_source/lattice.py": "9deafe09ddeb84a47edc1106fa8fd7138c903fc4445efe6c9ac1c839cb40fbea",
+      "examples/tqd3/decoder/author_source/runner.py": "50d2427691373306004ec5f001156148cc1190b5a052dfc2634ac69acde74a1e",
+      "examples/tqd3/decoder/author_source/twisted.py": "e6f1fd430e5f53a43687df23095fc1d5391399e51e369208944ab137cd8c4ebc",
+      "examples/tqd4/decoder/author_source/decoder.py": "15c38bd7b488ed7bf6b5a2b32273f73ed2dd98aaae90fb0bf1561cb7819d270d",
+      "examples/tqd4/decoder/author_source/geometry.py": "3ce975e23d305378c21722278be8def26b2d0d76bb39c703f539f4f7c40553cd",
+      "examples/tqd4/decoder/author_source/lattice.py": "9deafe09ddeb84a47edc1106fa8fd7138c903fc4445efe6c9ac1c839cb40fbea",
+      "examples/tqd4/decoder/author_source/runner.py": "50d2427691373306004ec5f001156148cc1190b5a052dfc2634ac69acde74a1e",
+      "examples/tqd4/decoder/author_source/twisted.py": "e6f1fd430e5f53a43687df23095fc1d5391399e51e369208944ab137cd8c4ebc",
+      "examples/tqd5/decoder/author_source/decoder.py": "15c38bd7b488ed7bf6b5a2b32273f73ed2dd98aaae90fb0bf1561cb7819d270d",
+      "examples/tqd5/decoder/author_source/geometry.py": "3ce975e23d305378c21722278be8def26b2d0d76bb39c703f539f4f7c40553cd",
+      "examples/tqd5/decoder/author_source/lattice.py": "9deafe09ddeb84a47edc1106fa8fd7138c903fc4445efe6c9ac1c839cb40fbea",
+      "examples/tqd5/decoder/author_source/runner.py": "50d2427691373306004ec5f001156148cc1190b5a052dfc2634ac69acde74a1e",
+      "examples/tqd5/decoder/author_source/twisted.py": "e6f1fd430e5f53a43687df23095fc1d5391399e51e369208944ab137cd8c4ebc"
+    }
   }
 }

@@ -28,8 +28,9 @@ python3 -I -O -m unittest discover -s benchmarks/magna_reproduction -p 'test_*.p
 ```
 
 Verification rejects missing, altered or symlinked inputs and unlisted source
-files in executable source directories. Generated Python caches, native build
-receipts and compiled extensions are allowed. Downloaded TQD decoder modules
+files in executable source directories. Standard `__pycache__` bytecode and
+the native extension/build receipts in `core/magna` are allowed; unlisted
+sourceless bytecode and other compiled modules are rejected. Downloaded TQD decoder modules
 must match the pinned author provenance, and all required modules must exist
 before capturing any TQD task.
 
@@ -57,11 +58,14 @@ The default captures all 31 tasks with 1024 draws and seed 20261008. Use repeate
 run and `--timeout` for the per-task process bound. Results remain marked
 `scope: smoke`; 1024 draws do not establish rare logical-error accuracy.
 
-Each task runs in a new isolated Python process and temporary working directory.
+Each task runs in a new isolated Python process and temporary working directory,
+with a fresh cache prefix so existing source-tree bytecode is never consumed.
 The child imports only the explicitly selected source and decoder paths, hashes
 the actual native extension before and after execution, and retains complete
 result JSON and stderr. Source files are checked before and after the capture.
-The offline `check` command binds result bytes and task coverage to the receipt
+The offline `check` command binds result bytes, seeds, source-verification
+evidence and task coverage to the receipt; completed receipts with failure
+metadata are rejected. It runs
 without importing the simulator. Omit `--all-tasks` only for a declared subset.
 The output directory must be new. Failures retain a failed receipt and completed
 task results rather than overwriting earlier evidence. Store output in ignored

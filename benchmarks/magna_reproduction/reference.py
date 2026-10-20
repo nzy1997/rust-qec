@@ -55,26 +55,20 @@ def verify_files(root: Path, files: dict[str, str]) -> int:
 
 
 def generated(path: Path) -> bool:
-    return "__pycache__" in path.parts or path.suffix in (".pyc", ".pyo", ".so", ".pyd") or path.name in (
-        "native-build.json", "native-reference-build.json",
-    )
+    if "__pycache__" in path.parts and path.suffix in (".pyc", ".pyo"):
+        return True
+    if path.parent == Path("core/magna"):
+        return (path.name.startswith("_native.") and path.suffix in (".so", ".pyd")) or path.name in (
+            "native-build.json", "native-reference-build.json",
+        )
+    return False
 
 
 def verify_source(root: Path, manifest: dict, require_decoders: bool = False) -> dict:
     count = verify_files(root, manifest["upstream"]["files"])
     expected = set(manifest["upstream"]["files"])
-    decoder_files = {}
-    for name in manifest["tasks"]:
-        provenance = root / "examples" / name / "decoder/author_source/provenance.json"
-        if not provenance.is_file():
-            continue
-        values = json.loads(provenance.read_text(encoding="utf-8"))["files"]
-        for filename, sha in values.items():
-            # The upstream fetcher installs top-level author modules only.
-            if "/" not in filename:
-                relative = f"examples/{name}/decoder/author_source/{filename}"
-                if require_decoders or (root / relative).exists():
-                    decoder_files[relative] = sha
+    decoder_files = {name: sha for name, sha in manifest["upstream"].get("decoder_files", {}).items()
+                     if require_decoders or (root / name).exists()}
     verify_files(root, decoder_files)
     expected.update(decoder_files)
     for directory in ("core", "scripts", "examples", "tests"):
@@ -106,11 +100,25 @@ def verify_capture(root: Path, manifest: dict, all_tasks: bool = False) -> dict:
         raise ReferenceError("baseline receipt does not match the pinned reference")
     if receipt.get("worker_sha256") != digest(HERE / "worker.py"):
         raise ReferenceError("baseline worker differs from the current capture implementation")
+    if "failure" in receipt or receipt.get("scope") != "smoke":
+        raise ReferenceError("completed baseline has failure metadata or an invalid scope")
+    if type(receipt.get("shots")) is not int or receipt["shots"] < 1 or type(receipt.get("seed")) is not int:
+        raise ReferenceError("baseline draw count and seed must be valid integers")
     cases = receipt.get("cases", [])
     if not cases or cases != sorted(set(cases)) or set(cases) - set(manifest["tasks"]):
         raise ReferenceError("baseline task inventory is invalid")
     if all_tasks and cases != manifest["tasks"]:
         raise ReferenceError("baseline does not cover every packaged task")
+    before, after = receipt.get("before"), receipt.get("after")
+    if not isinstance(before, dict) or before != after or set(before) != {"source_files", "decoder_files", "tasks"}:
+        raise ReferenceError("baseline source-verification evidence is missing or inconsistent")
+    decoder_count = len(manifest["upstream"].get("decoder_files", {}))
+    if (any(type(v) is not int for v in before.values())
+            or before["source_files"] != len(manifest["upstream"]["files"])
+            or before["tasks"] != len(manifest["tasks"])
+            or not 0 <= before["decoder_files"] <= decoder_count
+            or (any(c.startswith("tqd") for c in cases) and before["decoder_files"] != decoder_count)):
+        raise ReferenceError("baseline source-verification evidence differs from the pinned inventory")
     runs = receipt.get("runs", [])
     if [run["case"] for run in runs] != cases:
         raise ReferenceError("baseline task coverage is incomplete")
@@ -120,7 +128,7 @@ def verify_capture(root: Path, manifest: dict, all_tasks: bool = False) -> dict:
         if digest(path) != run["sha256"]:
             raise ReferenceError(f"baseline result SHA-256 mismatch: {run['case']}")
         data = json.loads(path.read_text(encoding="utf-8"))
-        check_case_result(data["result"], receipt["shots"])
+        check_case_result(data["result"], receipt["shots"], receipt["seed"])
         if data["native_sha256"] != run["native_sha256"]:
             raise ReferenceError("baseline native extension identity differs from receipt")
         binary_hashes.add(data["native_sha256"])
@@ -129,10 +137,14 @@ def verify_capture(root: Path, manifest: dict, all_tasks: bool = False) -> dict:
     return {"tasks": len(cases), "shots_per_task": receipt["shots"], "scope": "smoke"}
 
 
-def check_case_result(result: dict, shots: int) -> None:
+def check_case_result(result: dict, shots: int, seed: int) -> None:
+    if result.get("schema_version") != 2 or type(result.get("seed")) is not int or result["seed"] != seed:
+        raise ReferenceError("baseline result schema or seed differs from the capture request")
+    if any(type(result.get(key)) is not int for key in ("requested", "completed", "failed", "not_attempted")):
+        raise ReferenceError("baseline draw counts must be integers")
     if result.get("status") != "complete" or result.get("requested") != shots or result.get("completed") != shots:
         raise ReferenceError("baseline did not complete the requested draw count")
-    if result.get("failed") != 0 or result.get("not_attempted") != 0 or result.get("failures"):
+    if result.get("failed") != 0 or result.get("not_attempted") != 0 or result.get("failures") != []:
         raise ReferenceError("baseline reports failures or unattempted draws")
     estimates = result.get("estimates", {})
     for key in ("acceptance", "error"):
@@ -159,7 +171,8 @@ def capture(args: argparse.Namespace, manifest: dict) -> None:
         with tempfile.TemporaryDirectory(prefix="magna-reference-") as cwd:
             for case in cases:
                 # Resolve the location without following the venv interpreter symlink.
-                command = [str(args.python.absolute()), "-I", str(HERE / "worker.py"),
+                command = [str(args.python.absolute()), "-I", "-X", f"pycache_prefix={Path(cwd) / case / 'cache'}",
+                           str(HERE / "worker.py"),
                            "--upstream", str(source), "--case", case,
                            "--shots", str(args.shots), "--seed", str(args.seed)]
                 print(f"reference task {case}: {args.shots} draws", flush=True)
@@ -175,7 +188,7 @@ def capture(args: argparse.Namespace, manifest: dict) -> None:
                 if run.returncode:
                     raise ReferenceError(f"reference task {case} failed with exit {run.returncode}; see stderr receipt")
                 data = json.loads(run.stdout)
-                check_case_result(data["result"], args.shots)
+                check_case_result(data["result"], args.shots, args.seed)
                 if receipt["runs"] and data["native_sha256"] != receipt["runs"][0]["native_sha256"]:
                     raise ReferenceError("reference native extension changed between tasks")
                 receipt["runs"].append({"case": case, "sha256": digest(output / f"{case}.json"),
@@ -187,6 +200,8 @@ def capture(args: argparse.Namespace, manifest: dict) -> None:
     finally:
         try:
             receipt["after"] = verify_source(source, manifest, require_decoders=any(c.startswith("tqd") for c in cases))
+            if receipt["after"] != before:
+                raise ReferenceError("reference source-verification evidence changed during capture")
             if digest(HERE / "worker.py") != receipt["worker_sha256"]:
                 raise ReferenceError("reference worker changed during capture")
         except (OSError, ValueError) as error:
