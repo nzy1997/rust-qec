@@ -346,3 +346,11 @@ impl Circuit {
         }
     }
 }
+
+impl Circuit {
+    pub(crate) fn minimum_width(&self, width: usize) -> Self {
+        let mut circuit = self.clone();
+        circuit.num_qubits = circuit.num_qubits.max(width);
+        circuit
+    }
+}

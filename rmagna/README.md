@@ -698,3 +698,51 @@ Tests independently construct literal complex reduced density matrices, trace
 both environments, and compare all sixteen selected-output/event combinations,
 including empty and permuted outputs. Existing pure-target and partial-target
 checks remain unchanged. Task JSON loading is a later layer.
+
+## Task schema and module loading
+
+`task::parse_task(text, base_directory, &TaskOptions)` reads task schema 1 and
+resolves target/recovery paths relative to the supplied directory. Read-only
+`TaskSpec` accessors preserve optional output mappings, the choice of target or
+classical error observables, sampled records and exact integer Pauli masks.
+`validate(physical)` checks indices, unique ordered outputs, declared logical
+observables, and Pauli widths. Masks use arbitrary-precision JSON integers;
+no floating conversion truncates masks above 64 bits. Y phases follow Hermitian
+Pauli operators in output order.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::task::{parse_task, TaskOptions};
+let circuit = parse_circuit("M 0\nOBSERVABLE_INCLUDE(4) rec[-1]", &ParseOptions::default())?;
+let spec = parse_task(r#"{"schema_version":1,"error_observables":[4],"sample_records":[0]}"#,
+    std::path::Path::new("."), &TaskOptions::default())?;
+let task = spec.validate(&circuit)?;
+assert!(task.outputs().is_empty());
+assert_eq!(task.error_observables(), Some([4].as_slice()));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`load_modules` also parses the target and recovery files with the caller's circuit
+and controller-name options. Pure path targets use only the selected local output
+wires; an empty preparation means zero on those wires. Object targets can specify
+auxiliary wires, ordered outputs and disjoint projected auxiliaries. Target modules
+must be unitary and noiseless. Recovery modules require a target, can have their
+own local records and controllers, and forbid noise channels, nonzero report
+errors and postselection. Their outcomes will be averaged by the task evaluator.
+Loading modules never executes controllers or contracts a target normalization;
+zero-norm target rejection belongs to evaluation preparation.
+
+Defaults bound task JSON to 16 MiB, each list/object collection to 1,000,000 items,
+and Pauli masks to 65,536 bits. Circuit files are read through the circuit source
+byte budget, with file path and task-field context retained on errors. Unknown
+fields and invalid numeric types are rejected. `ideal_state: null` and
+`recovery: null` mean omitted modules; list-valued fields require lists.
+
+Build `cargo build -p rmagna --example validate_task`, then run
+`validate_task PHYSICAL TASK [CONTROLLER...]` for static validation.
+`benchmarks/magna_reproduction/task_compare.py --upstream PINNED_SOURCE --rust-example BINARY --out NEW_JSON`
+compares all 31 packaged task/module mappings against the pinned public native
+API, with controller callbacks that fail if invoked. It checks output order,
+target preparation width/mapping/projections and recovery width/records/route,
+records input and binary hashes, and works with Python `-O`. This is separate from
+complete task execution and statistical benchmark reproduction.

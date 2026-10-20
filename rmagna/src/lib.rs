@@ -14,5 +14,6 @@ pub mod records;
 pub mod runtime;
 pub mod scalar;
 pub mod stabilizer;
+pub mod task;
 pub mod unitary;
 pub use num_bigint::BigInt;
