@@ -1005,3 +1005,12 @@ real-decoder transcripts at two histories. Its acceptance/fidelity networks use
 2/4 Clifford terms at signature ranks 5/10, replacing the computational 32/1,024
 terms. This is finite correctness and resource evidence; it does not establish
 arbitrary-history coverage, complete TQD campaigns, or paper throughput.
+
+
+When a canonical ket has a fixed computational value on a Hadamard's wire, the
+new Fourier column is provably independent of the old support columns. Clifford
+evolution keeps that exact ket directly instead of factoring an empty hidden-path
+problem. Gates with a nonconstant input row still perform full contraction.
+Initial arbitrary affine inputs are contracted before this invariant is used.
+A wide exact Fourier-sign test checks complex coefficients, nonzero fixed bits,
+existing entangled support, four independent Hadamards and their adjoints.
