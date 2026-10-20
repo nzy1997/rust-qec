@@ -162,15 +162,26 @@ impl BitVector {
 
 /// One immutable factorization reused for multiple right-hand sides.
 ///
-/// Row provenance is retained so inconsistent dependent equations are checked.
+/// Dense row provenance is retained for ordinary systems. Tall systems instead
+/// solve a small independent subset and verify every original equation, avoiding
+/// a square provenance matrix in the number of boundary legs.
 /// Free variables are zero in `solve`; `nullspace` supplies the independent
 /// homogeneous directions for callers that need the whole affine solution set.
 #[derive(Clone, Debug)]
 pub struct LinearFactorization {
     width: usize,
     rows: Vec<BitVector>,
-    provenance: Vec<BitVector>,
+    rhs: RightHandSide,
     pivots: Vec<usize>,
+}
+#[derive(Clone, Debug)]
+enum RightHandSide {
+    Dense(Vec<BitVector>),
+    Independent {
+        original: Vec<BitVector>,
+        selected: Vec<usize>,
+        basis: Box<LinearFactorization>,
+    },
 }
 
 impl LinearFactorization {
@@ -179,9 +190,18 @@ impl LinearFactorization {
             row.check_width(width)?;
         }
         let mut reduced = rows.to_vec();
-        let mut provenance = (0..rows.len())
-            .map(|i| BitVector::from_indices(rows.len(), [i]))
-            .collect::<Result<Vec<_>, _>>()?;
+        let compressed = rows.len() > 64 && rows.len() > width.saturating_mul(2);
+        let mut provenance = if compressed {
+            None
+        } else {
+            Some(
+                (0..rows.len())
+                    .map(|i| BitVector::from_indices(rows.len(), [i]))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )
+        };
+        let mut origins = (0..rows.len()).collect::<Vec<_>>();
+        let mut selected = Vec::new();
         let mut pivots = Vec::new();
         for column in 0..width {
             let rank = pivots.len();
@@ -194,21 +214,42 @@ impl LinearFactorization {
                 continue;
             };
             reduced.swap(rank, found);
-            provenance.swap(rank, found);
+            origins.swap(rank, found);
+            selected.push(origins[rank]);
+            if let Some(provenance) = &mut provenance {
+                provenance.swap(rank, found);
+            }
             let pivot_row = reduced[rank].clone();
-            let pivot_provenance = provenance[rank].clone();
+            let pivot_provenance = provenance.as_ref().map(|p| p[rank].clone());
             for i in 0..rows.len() {
                 if i != rank && reduced[i].get(column)? {
                     reduced[i].xor_assign(&pivot_row)?;
-                    provenance[i].xor_assign(&pivot_provenance)?;
+                    if let (Some(provenance), Some(pivot)) = (&mut provenance, &pivot_provenance) {
+                        provenance[i].xor_assign(pivot)?;
+                    }
                 }
             }
             pivots.push(column);
         }
+        let rhs = if let Some(provenance) = provenance {
+            RightHandSide::Dense(provenance)
+        } else {
+            // Each selected original row is independent of all earlier selected
+            // originals: eliminating earlier pivots left a new nonzero pivot.
+            let independent = selected
+                .iter()
+                .map(|&i| rows[i].clone())
+                .collect::<Vec<_>>();
+            RightHandSide::Independent {
+                original: rows.to_vec(),
+                selected,
+                basis: Box::new(Self::new(width, &independent)?),
+            }
+        };
         Ok(Self {
             width,
             rows: reduced,
-            provenance,
+            rhs,
             pivots,
         })
     }
@@ -232,8 +273,32 @@ impl LinearFactorization {
 
     pub fn solve(&self, rhs: &BitVector) -> Result<Option<BitVector>, Gf2Error> {
         rhs.check_width(self.num_equations())?;
-        let transformed = self
-            .provenance
+        let provenance = match &self.rhs {
+            RightHandSide::Dense(provenance) => provenance,
+            RightHandSide::Independent {
+                original,
+                selected,
+                basis,
+            } => {
+                let subset = BitVector::from_indices(
+                    selected.len(),
+                    selected
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(j, &i)| rhs.get(i).expect("validated RHS").then_some(j)),
+                )?;
+                let Some(solution) = basis.solve(&subset)? else {
+                    return Ok(None);
+                };
+                for (i, row) in original.iter().enumerate() {
+                    if row.dot(&solution)? != rhs.get(i)? {
+                        return Ok(None);
+                    }
+                }
+                return Ok(Some(solution));
+            }
+        };
+        let transformed = provenance
             .iter()
             .map(|row| row.dot(rhs))
             .collect::<Result<Vec<_>, _>>()?;
