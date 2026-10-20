@@ -221,6 +221,10 @@ Unitary scalar queries retain constrained paths internally until the final
 physical-label sum. That closure contracts hidden paths once before phase
 reduction and resource budgeting; public `project_z` still returns a contracted
 ket. No intermediate projection renormalizes the state.
+`ParityPhase::restrict` likewise shares a packed basis transpose for at least 64
+merged parity terms. It retains exact affine-shift constants and reversed
+coefficients; smaller term sets use direct dot products. This adds temporary
+matrix storage and does not cache phase decompositions across queries.
 
 These primitives build exact Clifford boundaries. The compilers below add
 unitary near-Clifford circuit lowering and affine instruments with reset,

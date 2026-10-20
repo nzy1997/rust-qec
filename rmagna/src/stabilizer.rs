@@ -1,6 +1,6 @@
 //! Unnormalized affine quadratic kets with exact phase-preserving contraction.
 
-use crate::gf2::{BitVector, Gf2Error, LinearFactorization};
+use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{EliminationStep, QuadraticElimination, QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use std::fmt;
@@ -144,7 +144,7 @@ impl AffineKet {
     }
 
     pub fn prepare(&self) -> Result<PreparedKet, StabilizerError> {
-        let rows = transpose(self.width(), &self.columns)?;
+        let rows = transpose_columns(self.width(), &self.columns)?;
         let factor = LinearFactorization::new(self.columns.len(), &rows)?;
         let kernel = factor.nullspace()?;
         Ok(PreparedKet {
@@ -259,7 +259,7 @@ impl AffineKet {
         // instead of scanning every boundary word for every row/column pair.
         // Small event sets keep the direct path and avoid another matrix.
         let boundary_rows = if rows.len() >= 64 {
-            Some(transpose(self.width(), &self.columns)?)
+            Some(transpose_columns(self.width(), &self.columns)?)
         } else {
             None
         };
@@ -315,7 +315,8 @@ impl AffineKet {
         columns.extend_from_slice(&other.columns);
         let mut rhs = self.offset.clone();
         rhs.xor_assign(&other.offset)?;
-        let factor = LinearFactorization::new(columns.len(), &transpose(self.width(), &columns)?)?;
+        let factor =
+            LinearFactorization::new(columns.len(), &transpose_columns(self.width(), &columns)?)?;
         let Some(shift) = factor.solve(&rhs)? else {
             return Ok(ExactScalar::zero());
         };
@@ -396,18 +397,6 @@ impl PreparedKet {
             .gauss_sum(arithmetic)?;
         Ok(arithmetic.multiply(&self.ket.coefficient, &sum)?)
     }
-}
-
-fn transpose(width: usize, columns: &[BitVector]) -> Result<Vec<BitVector>, Gf2Error> {
-    let mut rows = (0..width)
-        .map(|_| BitVector::zeros(columns.len()))
-        .collect::<Result<Vec<_>, _>>()?;
-    for (j, column) in columns.iter().enumerate() {
-        for i in column.ones() {
-            rows[i].set(j, true)?;
-        }
-    }
-    Ok(rows)
 }
 
 fn image(width: usize, columns: &[BitVector], value: &BitVector) -> Result<BitVector, Gf2Error> {
