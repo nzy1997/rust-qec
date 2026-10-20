@@ -1,4 +1,5 @@
 //! Causal exact-marginal controller and guarded-noise execution.
+pub mod process;
 mod registry;
 mod resolve;
 use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};

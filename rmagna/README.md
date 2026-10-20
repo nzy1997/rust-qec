@@ -831,3 +831,59 @@ The current evaluator uses physical exact-marginal histories and independent
 physical noise. External Python decoder bindings, importance proposal selection,
 affine-support histories, prepared circuit queries, aggregate statistics and the
 public run/result interface are separate deliverables.
+
+## External decoder process bridge
+
+`runtime::process::ControllerProcess::spawn(command, options)` launches an
+explicitly supplied executable without a shell. It owns a persistent JSON-line
+session and registers its versioned bindings atomically into `ControllerRegistry`.
+Captured bindings share the process; the last owner kills and reaps the worker.
+Only declared input bits, the binding name and a request ID enter a callback
+request. The child does not receive fault assignments, ideal outcomes or network
+state. This is an execution interface for trusted decoders, not a sandbox.
+
+The protocol is `rmagna.controller.v1`. A worker first sends
+`{"protocol":"rmagna.controller.v1","bindings":{"name":"version"},"manifest":{}}`.
+Requests contain `id`, `name` and `bits`; responses contain the matching `id`
+and `outputs`, or an `error`. Output length is checked by the causal runtime
+against the circuit declaration. Bits must be booleans or integer zero/one.
+The default whole-exchange timeout is 60 seconds, including blocked writes;
+frames are limited to 16 MiB and bit lists/binding counts to 1,000,000.
+Malformed frames, wrong IDs, callback exceptions, EOF and timeout poison the
+session and kill the worker. An ambiguous callback is never retried. Stderr
+inherits the parent's diagnostics. Workers must not spawn descendants retaining
+protocol pipes; process-tree management belongs to the caller's execution host.
+
+`rmagna/python/decoder_worker.py` implements an observation-only Python host for
+schema-1 `controllers.json` bindings with `decode(bits, config)` functions.
+Imports are explicit; callbacks run with a fresh copy of the declared config.
+Python prints become stderr diagnostics. A verified-source loader bypasses local
+bytecode caches and rejects changed lazy-import sources. The source manifest
+covers at most 4,096 Python files under the explicit module root, each limited to
+16 MiB. Installed dependency identity remains the execution environment's
+responsibility. Config and module hashes are returned as worker-supplied
+provenance; benchmark callers must independently verify them. The host blocks
+imports of the Magna quantum package. Compilation, noise, quantum history
+probabilities and weighting continue to execute in Rust.
+
+Use the diagnostic task example with explicit bindings:
+
+```sh
+cargo build --release -p rmagna --example evaluate_task
+target/release/examples/evaluate_task PHYSICAL TASK 20261026 \
+  --controllers CONTROLLERS_JSON --python PYTHON --module-root DECODER_ROOT
+```
+
+The example returns controller transcripts and decoder provenance alongside exact
+masses. `--constant-word WORD` is a prescribed entropy diagnostic, not a Monte
+Carlo stream and not a contract for matching the native backend's history basis.
+The two implementations can sample different parities even with constant entropy.
+Common-history differential checks must explicitly fix observations.
+
+Integration tests run the Python host with native backend imports blocked, check
+majority histories against exact probabilities, preserve config isolation, and
+cover noisy decoder stdout, malformed protocols, exceptions, non-bit and wrong
+shaped outputs, process crashes, startup/exchange timeouts, oversized frames and
+bit lists, atomic registration, poisoned bytecode and changed lazy imports.
+This bridge supplies external bindings; full packaged decoder campaigns and
+prepared history reuse remain separate validation and performance work.
