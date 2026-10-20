@@ -1109,3 +1109,34 @@ let projected = plan.project(&reference, &BitVector::zeros(1)?)?.unwrap();
 assert_eq!(projected.norm_squared(&arithmetic)?, arithmetic.omega(0, -2)?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+## Prepared physical probability constraints
+
+`CompiledUnitary::prepare_probability(rows, arithmetic)` prepares physical trace
+and fixed event constraints for the original compiled reference. The returned
+`PreparedProbability::evaluate(state, outcomes, max_terms, arithmetic)` accepts
+any insertion view of that same program. Preparing a perturbed view still uses
+the original reference; a separately compiled program is rejected even if its
+gates and dimensions happen to match.
+
+The plan shares binary elimination, mapped support columns and the reference
+quadratic restriction across queries. It owns immutable preparation storage;
+callers can retain it explicitly. Ordinary `probability_z` remains available.
+Queries still construct their joint ket and perform final phase closure and
+non-Clifford resource preparation, so this is partial preparation and makes no
+warm-throughput or complete task-network reuse claim.
+
+```rust
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::unitary::{UnitaryCircuit, UnitaryGate};
+let arithmetic = ScalarArithmetic::default();
+let circuit = UnitaryCircuit::new(2, [UnitaryGate::Clifford(CliffordGate::H(0))])?
+    .compile(&BitVector::zeros(2)?, &arithmetic)?;
+let rows = [BitVector::from_indices(2, [0])?];
+let plan = circuit.prepare_probability(&rows, &arithmetic)?;
+assert_eq!(plan.evaluate(&circuit, &BitVector::zeros(1)?, 1, &arithmetic)?.value,
+    arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```

@@ -968,3 +968,117 @@ fn final_scalar_closure_cancels_hidden_paths_before_resource_budgeting() {
     assert_eq!(zero.value, ExactScalar::zero());
     assert_eq!(zero.terms, 0);
 }
+
+#[test]
+fn prepared_probability_plans_match_literal_faulted_noncommuting_circuits() {
+    let arithmetic = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(0)),
+        G::Cs {
+            a: 0,
+            b: 2,
+            turns: 3,
+        },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::Cx {
+            control: 2,
+            target: 1,
+        }),
+        G::Clifford(C::H(1)),
+        G::T { qubit: 2, turns: 5 },
+    ];
+    let base = UnitaryCircuit::new(3, gates)
+        .unwrap()
+        .compile(&bits(3, 1), &arithmetic)
+        .unwrap();
+    let rows = [bits(3, 3), bits(3, 6), bits(3, 5)];
+    let seed_view = base
+        .with_insertions(
+            &[PauliInsertion {
+                before_gate: 0,
+                word: PauliWord::new(bits(3, 1), bits(3, 4), 3).unwrap(),
+            }],
+            &arithmetic,
+        )
+        .unwrap();
+    let prepared = seed_view.prepare_probability(&rows, &arithmetic).unwrap();
+    let norm = base.prepare_probability(&[], &arithmetic).unwrap();
+    let mut rng = 0x85e1bad35;
+    for _ in 0..32 {
+        let faults = (0..4)
+            .map(|_| PauliInsertion {
+                before_gate: next(&mut rng) % (gates.len() + 1),
+                word: PauliWord::new(
+                    bits(3, next(&mut rng)),
+                    bits(3, next(&mut rng)),
+                    (next(&mut rng) & 7) as u8,
+                )
+                .unwrap(),
+            })
+            .collect::<Vec<_>>();
+        let state = seed_view.with_insertions(&faults, &arithmetic).unwrap();
+        let expected = dense_inserted(&gates, 3, 1, &faults, &arithmetic);
+        assert_eq!(
+            norm.evaluate(&state, &bits(0, 0), 256, &arithmetic)
+                .unwrap()
+                .value,
+            ExactScalar::one()
+        );
+        for outcome in 0..8 {
+            let mut mass = ExactScalar::zero();
+            for (x, value) in expected.iter().enumerate() {
+                if [3_usize, 6, 5]
+                    .iter()
+                    .enumerate()
+                    .all(|(j, &r)| ((x & r).count_ones() as usize & 1) == ((outcome >> j) & 1))
+                {
+                    mass = arithmetic
+                        .add(&mass, &arithmetic.norm_squared(value).unwrap())
+                        .unwrap();
+                }
+            }
+            let actual = prepared
+                .evaluate(&state, &bits(3, outcome), 256, &arithmetic)
+                .unwrap();
+            assert_eq!(actual.value, mass);
+            let ordinary = state
+                .probability_z(&rows, &bits(3, outcome), 256, &arithmetic)
+                .unwrap();
+            assert_eq!(actual.quotient_rank, ordinary.quotient_rank);
+            assert_eq!(actual.terms, ordinary.terms);
+            if actual.terms > 0 {
+                assert!(
+                    prepared
+                        .evaluate(&state, &bits(3, outcome), actual.terms - 1, &arithmetic)
+                        .is_err()
+                );
+            }
+        }
+    }
+    let unrelated = UnitaryCircuit::new(3, gates)
+        .unwrap()
+        .compile(&bits(3, 1), &arithmetic)
+        .unwrap();
+    assert!(matches!(
+        prepared.evaluate(&unrelated, &bits(3, 0), 256, &arithmetic),
+        Err(UnitaryError::IncompatibleProgram)
+    ));
+    assert!(matches!(
+        prepared.evaluate(&base, &bits(2, 0), 256, &arithmetic),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(matches!(
+        base.prepare_probability(&[bits(4, 0)], &arithmetic),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert_eq!(
+        prepared
+            .evaluate(&base, &bits(3, 1), 0, &arithmetic)
+            .unwrap()
+            .value,
+        ExactScalar::zero()
+    );
+}
