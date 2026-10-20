@@ -1325,3 +1325,30 @@ the same exact quadratic-elimination kernel used by general contraction; global
 phases and unnormalized scalars remain unchanged. Dependent input is still
 canonicalized once at circuit entry. This is a general linear-algebra optimization,
 with no circuit-family recognition or measured throughput claim.
+
+
+## Prepared quadratic sums
+
+`PreparedQuadraticSum` records a Gaussian elimination program once and executes
+only linear-phase and scalar updates for compatible queries. Constants and even
+linear coefficients may change; cross terms and linear parity must match.
+Incompatible forms return an explicit error before execution. A zero reference
+still records every structural step, so later nonzero updates remain valid.
+The cold and prepared reducers share the same numeric update rules.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::quadratic::{PreparedQuadraticSum, QuadraticForm};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+let row = BitVector::zeros(1)?;
+let zero = QuadraticForm::new(0, vec![2], vec![row.clone()])?;
+let plan = PreparedQuadraticSum::new(&zero)?;
+let updated = QuadraticForm::new(0, vec![0], vec![row])?;
+let arithmetic = ScalarArithmetic::default();
+assert_eq!(plan.evaluate(&zero, &arithmetic)?, ExactScalar::zero());
+assert_eq!(plan.evaluate(&updated, &arithmetic)?, arithmetic.integer(2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+This primitive prepares only a quadratic sum. Query-family Gaussian contraction,
+non-Clifford phase resources and runtime integration require separate plans.

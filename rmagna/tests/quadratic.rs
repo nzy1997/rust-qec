@@ -253,3 +253,100 @@ fn packed_affine_restrictions_match_literal_wide_phase_polynomials() {
         }
     }
 }
+
+#[test]
+fn prepared_gauss_sums_match_every_small_form_and_compatible_update() {
+    use rmagna::quadratic::PreparedQuadraticSum;
+    let a = ScalarArithmetic::default();
+    for width in 0_usize..=3 {
+        let edges = width * width.saturating_sub(1) / 2;
+        for constant in 0..4 {
+            for linear in 0..1 << (2 * width) {
+                for edge in 0..1 << edges {
+                    let reference = form(width, constant, linear, edge);
+                    let prepared = PreparedQuadraticSum::new(&reference).unwrap();
+                    for even in 0..1 << width {
+                        let mask = (0..width)
+                            .map(|j| ((even >> j) & 1) << (2 * j + 1))
+                            .sum::<u64>();
+                        for updated_constant in 0..4 {
+                            let updated = form(width, updated_constant, linear ^ mask, edge);
+                            assert_eq!(
+                                prepared.evaluate(&updated, &a).unwrap(),
+                                direct_sum(&updated, &a),
+                                "reference={reference:?}, updated={updated:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn prepared_gauss_sums_preserve_wide_phases_and_zero_reference_updates() {
+    use rmagna::quadratic::PreparedQuadraticSum;
+    let a = ScalarArithmetic::default();
+    let zero_reference = form(3, 3, 2, 4);
+    assert_eq!(direct_sum(&zero_reference, &a), ExactScalar::zero());
+    let prepared = PreparedQuadraticSum::new(&zero_reference).unwrap();
+    // The first variable is isolated and kills the reference. The remaining
+    // pair must still be recorded before a compatible update removes that zero.
+    let nonzero = form(3, 1, 0, 4);
+    assert_eq!(
+        prepared.evaluate(&nonzero, &a).unwrap(),
+        a.omega(2, 4).unwrap()
+    );
+    assert_eq!(
+        prepared.evaluate(&zero_reference, &a).unwrap(),
+        ExactScalar::zero()
+    );
+    let mut rng = 0x18234facbed_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        rng
+    };
+    for width in [65, 129] {
+        let mut upper = vec![BitVector::zeros(width).unwrap(); width];
+        for j in (0..width - 1).step_by(2) {
+            upper[j].set(j + 1, true).unwrap();
+        }
+        let mut linear = vec![0; width];
+        linear[width - 1] = 1;
+        let reference = QuadraticForm::new(3, linear, upper.clone()).unwrap();
+        let prepared = PreparedQuadraticSum::new(&reference).unwrap();
+        for _ in 0..64 {
+            let constant = (next() & 3) as u8;
+            let mut linear = (0..width)
+                .map(|_| 2 * (next() & 1) as u8)
+                .collect::<Vec<_>>();
+            linear[width - 1] += 1;
+            let mut phase = 2 * i64::from(constant) + if linear[width - 1] == 1 { 1 } else { -1 };
+            for j in (0..width - 1).step_by(2) {
+                phase += 4 * i64::from(linear[j] == 2 && linear[j + 1] == 2);
+            }
+            let updated = QuadraticForm::new(constant, linear, upper.clone()).unwrap();
+            assert_eq!(
+                prepared.evaluate(&updated, &a).unwrap(),
+                a.omega(phase, width as i64).unwrap()
+            );
+        }
+    }
+    let reference = form(3, 0, 0, 0);
+    let prepared = PreparedQuadraticSum::new(&reference).unwrap();
+    for incompatible in [form(2, 0, 0, 0), form(3, 0, 1, 0), form(3, 0, 0, 1)] {
+        assert_eq!(
+            prepared.evaluate(&incompatible, &a),
+            Err(QuadraticError::IncompatiblePreparation)
+        );
+    }
+    let tight = ScalarArithmetic::new(1).unwrap();
+    // Canonical Gaussian values require at most one coefficient bit here.
+    assert_eq!(
+        prepared.evaluate(&reference, &tight).unwrap(),
+        a.omega(0, 6).unwrap()
+    );
+}

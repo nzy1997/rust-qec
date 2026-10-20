@@ -1,5 +1,8 @@
 //! Quadratic phases modulo four, affine restriction, and exact Gauss sums.
 
+mod prepared;
+pub use prepared::PreparedQuadraticSum;
+
 use crate::gf2::{BitVector, Gf2Error};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use std::fmt;
@@ -9,6 +12,7 @@ pub enum QuadraticError {
     InvalidPhase,
     InvalidUpperTriangle,
     DimensionMismatch,
+    IncompatiblePreparation,
     Binary(Gf2Error),
     Scalar(ScalarError),
 }
@@ -27,6 +31,10 @@ impl fmt::Display for QuadraticError {
             Self::DimensionMismatch => write!(
                 f,
                 "quadratic form, shift, and basis dimensions do not agree"
+            ),
+            Self::IncompatiblePreparation => write!(
+                f,
+                "prepared quadratic sum requires unchanged cross terms and odd linear coefficients"
             ),
             Self::Binary(error) => error.fmt(f),
             Self::Scalar(error) => error.fmt(f),
@@ -186,7 +194,7 @@ impl QuadraticForm {
         let mut state = QuadraticElimination::new(self)?;
         loop {
             let next = (0..state.active.len())
-                .find(|&i| state.active[i] && state.linear[i] & 1 != 0)
+                .find(|&i| state.active[i] && state.values.linear[i] & 1 != 0)
                 .or_else(|| state.active.iter().position(|&bit| bit));
             let Some(x) = next else {
                 break;
@@ -209,109 +217,168 @@ pub(crate) enum EliminationStep {
     },
 }
 
-pub(crate) struct QuadraticElimination {
-    pub(crate) active: Vec<bool>,
+/// Numeric state shared by cold and prepared Gaussian elimination.
+struct QuadraticValues {
     linear: Vec<u8>,
-    adjacency: Vec<BitVector>,
     phase: i16,
     sqrt2_power: i64,
+}
+impl QuadraticValues {
+    fn new(form: &QuadraticForm) -> Self {
+        Self {
+            linear: form.linear.clone(),
+            phase: i16::from(form.constant) * 2,
+            sqrt2_power: 0,
+        }
+    }
+    fn scalar(&self, arithmetic: &ScalarArithmetic) -> Result<ExactScalar, QuadraticError> {
+        Ok(arithmetic.omega(i64::from(self.phase), self.sqrt2_power)?)
+    }
+}
+
+/// Structural actions depend on adjacency and linear parity, not even phases.
+/// The same value updates execute a cold step or a prepared query.
+enum QuadraticAction {
+    Odd {
+        x: usize,
+        neighbors: Vec<usize>,
+    },
+    Free {
+        x: usize,
+    },
+    Pair {
+        x: usize,
+        y: usize,
+        v: Vec<usize>,
+        w: Vec<(usize, bool)>,
+    },
+}
+impl QuadraticAction {
+    fn apply(&self, values: &mut QuadraticValues) -> Result<bool, QuadraticError> {
+        values.sqrt2_power = values
+            .sqrt2_power
+            .checked_add(if matches!(self, Self::Odd { .. }) {
+                1
+            } else {
+                2
+            })
+            .ok_or(ScalarError::ExponentOverflow)?;
+        match self {
+            Self::Odd { x, neighbors } => {
+                values.phase =
+                    (values.phase + if values.linear[*x] == 1 { 1 } else { -1 }).rem_euclid(8);
+                for &i in neighbors {
+                    values.linear[i] = (values.linear[i] + 4 - values.linear[*x]) & 3;
+                }
+                Ok(true)
+            }
+            Self::Free { x } => Ok(values.linear[*x] == 0),
+            Self::Pair { x, y, v, w } => {
+                let rhs = values.linear[*x] / 2;
+                values.phase =
+                    (values.phase + 2 * i16::from(values.linear[*y] * rhs)).rem_euclid(8);
+                let delta = if rhs == 0 {
+                    values.linear[*y]
+                } else {
+                    (4 - values.linear[*y]) & 3
+                };
+                for &i in v {
+                    values.linear[i] = (values.linear[i] + delta) & 3;
+                }
+                for &(i, adjacent) in w {
+                    values.linear[i] = (values.linear[i] + 2 * rhs + 2 * u8::from(adjacent)) & 3;
+                }
+                Ok(true)
+            }
+        }
+    }
+}
+
+pub(crate) struct QuadraticElimination {
+    pub(crate) active: Vec<bool>,
+    values: QuadraticValues,
+    adjacency: Vec<BitVector>,
 }
 
 impl QuadraticElimination {
     pub(crate) fn new(form: &QuadraticForm) -> Result<Self, QuadraticError> {
         Ok(Self {
             active: vec![true; form.num_variables()],
-            linear: form.linear.clone(),
+            values: QuadraticValues::new(form),
             adjacency: form.symmetric_matrix(false)?,
-            phase: i16::from(form.constant) * 2,
-            sqrt2_power: 0,
         })
     }
-
     pub(crate) fn scalar(
         &self,
         arithmetic: &ScalarArithmetic,
     ) -> Result<ExactScalar, QuadraticError> {
-        Ok(arithmetic.omega(i64::from(self.phase), self.sqrt2_power)?)
+        self.values.scalar(arithmetic)
     }
-
     pub(crate) fn eliminate(
         &mut self,
         x: usize,
         preferred: &[bool],
     ) -> Result<EliminationStep, QuadraticError> {
+        let (nonzero, action) = self.eliminate_recorded(x, preferred)?;
+        if !nonzero {
+            return Ok(EliminationStep::Zero);
+        }
+        Ok(match action {
+            QuadraticAction::Pair { x, y, v, .. } => EliminationStep::Parity {
+                pivot: y,
+                rhs: self.values.linear[x] != 0,
+                neighbors: v,
+            },
+            _ => EliminationStep::Unary,
+        })
+    }
+    fn eliminate_recorded(
+        &mut self,
+        x: usize,
+        preferred: &[bool],
+    ) -> Result<(bool, QuadraticAction), QuadraticError> {
         self.active[x] = false;
         let neighbors = self.adjacency[x]
             .ones()
             .filter(|&i| self.active[i])
             .collect::<Vec<_>>();
-        if self.linear[x] & 1 != 0 {
-            self.sqrt2_power = self
-                .sqrt2_power
-                .checked_add(1)
-                .ok_or(ScalarError::ExponentOverflow)?;
-            self.phase = (self.phase + if self.linear[x] == 1 { 1 } else { -1 }).rem_euclid(8);
-            for &i in &neighbors {
-                self.linear[i] = (self.linear[i] + 4 - self.linear[x]) & 3;
-            }
+        let action = if self.values.linear[x] & 1 != 0 {
             toggle_clique(&mut self.adjacency, &neighbors)?;
-            return Ok(EliminationStep::Unary);
-        }
-        self.sqrt2_power = self
-            .sqrt2_power
-            .checked_add(2)
-            .ok_or(ScalarError::ExponentOverflow)?;
-        let rhs = self.linear[x] / 2;
-        let chosen = neighbors
-            .iter()
-            .find(|&&i| preferred.get(i).copied().unwrap_or(false))
-            .or_else(|| neighbors.first());
-        let Some(&y) = chosen else {
-            return Ok(if rhs == 0 {
-                EliminationStep::Unary
-            } else {
-                EliminationStep::Zero
-            });
-        };
-        self.active[y] = false;
-        let v = neighbors
-            .into_iter()
-            .filter(|&i| self.active[i])
-            .collect::<Vec<_>>();
-        let w = self.adjacency[y]
-            .ones()
-            .filter(|&i| self.active[i])
-            .collect::<Vec<_>>();
-        self.phase = (self.phase + 2 * i16::from(self.linear[y] * rhs)).rem_euclid(8);
-        let delta = if rhs == 0 {
-            self.linear[y]
+            QuadraticAction::Odd { x, neighbors }
         } else {
-            (4 - self.linear[y]) & 3
-        };
-        for &i in &v {
-            self.linear[i] = (self.linear[i] + delta) & 3;
-        }
-        if self.linear[y] & 1 != 0 {
-            toggle_clique(&mut self.adjacency, &v)?;
-        }
-        for &i in &w {
-            self.linear[i] =
-                (self.linear[i] + 2 * rhs + 2 * u8::from(self.adjacency[x].get(i)?)) & 3;
-        }
-        for &i in &v {
-            for &j in &w {
-                if i != j {
-                    toggle_edge(&mut self.adjacency, i, j)?;
+            let chosen = neighbors
+                .iter()
+                .find(|&&i| preferred.get(i).copied().unwrap_or(false))
+                .or_else(|| neighbors.first());
+            if let Some(&y) = chosen {
+                self.active[y] = false;
+                let v = neighbors
+                    .into_iter()
+                    .filter(|&i| self.active[i])
+                    .collect::<Vec<_>>();
+                let w = self.adjacency[y]
+                    .ones()
+                    .filter(|&i| self.active[i])
+                    .map(|i| self.adjacency[x].get(i).map(|bit| (i, bit)))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if self.values.linear[y] & 1 != 0 {
+                    toggle_clique(&mut self.adjacency, &v)?;
                 }
+                for &i in &v {
+                    for &(j, _) in &w {
+                        if i != j {
+                            toggle_edge(&mut self.adjacency, i, j)?;
+                        }
+                    }
+                }
+                QuadraticAction::Pair { x, y, v, w }
+            } else {
+                QuadraticAction::Free { x }
             }
-        }
-        Ok(EliminationStep::Parity {
-            pivot: y,
-            rhs: rhs != 0,
-            neighbors: v,
-        })
+        };
+        let step = action.apply(&mut self.values)?;
+        Ok((step, action))
     }
-
     pub(crate) fn remaining(&self) -> Result<(QuadraticForm, Vec<usize>), QuadraticError> {
         let keep = self
             .active
@@ -319,7 +386,7 @@ impl QuadraticElimination {
             .enumerate()
             .filter_map(|(i, &active)| active.then_some(i))
             .collect::<Vec<_>>();
-        let linear = keep.iter().map(|&i| self.linear[i]).collect();
+        let linear = keep.iter().map(|&i| self.values.linear[i]).collect();
         let mut upper = Vec::new();
         for (i, &old) in keep.iter().enumerate() {
             let mut row = BitVector::zeros(keep.len())?;
