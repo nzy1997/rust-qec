@@ -1,0 +1,5 @@
+# Reference runtime used with CPython 3.12 on macOS arm64.
+numpy==2.4.6
+stim==1.15.0
+pymatching==2.3.1
+scipy==1.18.1
