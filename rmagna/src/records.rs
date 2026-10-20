@@ -11,6 +11,7 @@ use std::{cmp::Ordering, fmt};
 pub enum SamplingError {
     InvalidMass,
     ImpossibleCondition,
+    ImpossibleSupport,
     EntropyLimit { limit: usize },
     ExponentRange,
     Instrument(InstrumentError),
@@ -21,6 +22,9 @@ impl fmt::Display for SamplingError {
         match self {
             Self::ImpossibleCondition => {
                 write!(f, "reported history condition has zero physical mass")
+            }
+            Self::ImpossibleSupport => {
+                write!(f, "given records are outside the structural affine support")
             }
             Self::InvalidMass => write!(
                 f,
@@ -135,6 +139,86 @@ pub struct ReportedDraw {
 pub struct RecordQuery<'a> {
     pub given: &'a [(BitExpr, bool)],
     pub parities: &'a [BitExpr],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AffineProposalDraw {
+    pub values: Vec<bool>,
+    pub proposal_mass: ExactScalar,
+    pub entropy_words: usize,
+}
+
+/// Propose a group uniformly from conservative conditioned affine support.
+/// This does not evaluate physical mass: interference-zero proposals remain
+/// valid draws and must receive zero weight from the caller's exact evaluation.
+/// One random word supplies up to 64 independent support directions, low bit
+/// first; deterministic groups consume no entropy.
+pub fn propose_affine_reported(
+    instrument: &CompiledInstrument,
+    query: &RecordQuery<'_>,
+    faults: &[FaultSelection],
+    random: &mut impl RandomSource,
+    options: &SamplingOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<AffineProposalDraw, SamplingError> {
+    let parities = query
+        .given
+        .iter()
+        .map(|(p, _)| p.clone())
+        .chain(query.parities.iter().cloned())
+        .collect::<Vec<_>>();
+    let family = instrument.reported_support(&parities, faults, arithmetic)?;
+    let constraints = (0..query.given.len())
+        .map(|j| BitVector::from_indices(parities.len(), [j]))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(InstrumentError::from)?;
+    let outcomes = BitVector::from_indices(
+        query.given.len(),
+        query
+            .given
+            .iter()
+            .enumerate()
+            .filter_map(|(j, (_, value))| value.then_some(j)),
+    )
+    .map_err(InstrumentError::from)?;
+    let family = family
+        .condition(&constraints, &outcomes)
+        .map_err(InstrumentError::from)?
+        .ok_or(SamplingError::ImpossibleSupport)?;
+    let keep = (0..query.parities.len())
+        .map(|j| BitVector::from_indices(parities.len(), [query.given.len() + j]))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(InstrumentError::from)?;
+    let family = family.linear_image(&keep).map_err(InstrumentError::from)?;
+    let entropy_words = family.dimension().div_ceil(64);
+    if entropy_words > options.max_entropy_words {
+        return Err(SamplingError::EntropyLimit {
+            limit: options.max_entropy_words,
+        });
+    }
+    let power = i64::try_from(family.dimension())
+        .ok()
+        .and_then(|d| d.checked_mul(-2))
+        .ok_or(SamplingError::ExponentRange)?;
+    let proposal_mass = arithmetic.omega(0, power)?;
+    let mut sampled = family.offset().clone();
+    let mut word = 0;
+    for (j, column) in family.columns().iter().enumerate() {
+        if j % 64 == 0 {
+            word = random.next_u64();
+        }
+        if word & 1 != 0 {
+            sampled.xor_assign(column).map_err(InstrumentError::from)?;
+        }
+        word >>= 1;
+    }
+    Ok(AffineProposalDraw {
+        values: (0..sampled.width())
+            .map(|j| sampled.get(j).expect("validated coordinate"))
+            .collect(),
+        proposal_mass,
+        entropy_words,
+    })
 }
 /// Sample ordered affine parities using physical prefix marginals. The compiled
 /// instrument's postselection predicates are deliberately not included.

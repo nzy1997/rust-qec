@@ -1,7 +1,7 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
-use crate::gf2::{BitVector, Gf2Error};
+use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
 use crate::phase::{ClosedPhaseSum, ParityPhase, PhaseError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
@@ -337,6 +337,34 @@ impl CompiledUnitary {
     }
     pub fn phase_legs(&self) -> usize {
         self.coefficients.len()
+    }
+
+    /// A conservative computational support image, without non-Clifford phases.
+    /// Summing the frozen phase legs cannot create a physical label outside
+    /// this family, but interference can remove labels inside it.
+    pub fn structural_z_support(&self, rows: &[BitVector]) -> Result<AffineSupport, UnitaryError> {
+        if rows.iter().any(|row| row.width() != self.width()) {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let lifted = rows
+            .iter()
+            .map(|row| BitVector::from_indices(self.boundary.width(), row.ones()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let map = |value: &BitVector| -> Result<BitVector, Gf2Error> {
+            let mut result = BitVector::zeros(rows.len())?;
+            for (j, row) in lifted.iter().enumerate() {
+                result.set(j, row.dot(value)?)?;
+            }
+            Ok(result)
+        };
+        Ok(AffineSupport::new(
+            map(self.boundary.offset())?,
+            self.boundary
+                .columns()
+                .iter()
+                .map(map)
+                .collect::<Result<Vec<_>, _>>()?,
+        )?)
     }
 
     /// Prepare fixed physical trace and event rows against the original

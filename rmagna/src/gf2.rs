@@ -352,3 +352,106 @@ pub(crate) fn transpose_columns(
     }
     Ok(rows)
 }
+
+/// A nonempty affine binary family with independent support columns.
+/// This type represents a set, with no quantum phase or probability attached.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AffineSupport {
+    offset: BitVector,
+    columns: Vec<BitVector>,
+}
+impl AffineSupport {
+    pub fn new(offset: BitVector, columns: Vec<BitVector>) -> Result<Self, Gf2Error> {
+        for column in &columns {
+            column.check_width(offset.width())?;
+        }
+        let factor =
+            LinearFactorization::new(columns.len(), &transpose_columns(offset.width(), &columns)?)?;
+        let independent = factor
+            .pivot_columns()
+            .iter()
+            .map(|&j| columns[j].clone())
+            .collect();
+        Ok(Self {
+            offset,
+            columns: independent,
+        })
+    }
+    pub fn width(&self) -> usize {
+        self.offset.width()
+    }
+    pub fn dimension(&self) -> usize {
+        self.columns.len()
+    }
+    pub fn offset(&self) -> &BitVector {
+        &self.offset
+    }
+    pub fn columns(&self) -> &[BitVector] {
+        &self.columns
+    }
+    pub fn translated(&self, shift: &BitVector) -> Result<Self, Gf2Error> {
+        let mut result = self.clone();
+        result.offset.xor_assign(shift)?;
+        Ok(result)
+    }
+    pub fn linear_image(&self, rows: &[BitVector]) -> Result<Self, Gf2Error> {
+        for row in rows {
+            row.check_width(self.width())?;
+        }
+        let map = |value: &BitVector| -> Result<BitVector, Gf2Error> {
+            let mut result = BitVector::zeros(rows.len())?;
+            for (j, row) in rows.iter().enumerate() {
+                result.set(j, row.dot(value)?)?;
+            }
+            Ok(result)
+        };
+        Self::new(
+            map(&self.offset)?,
+            self.columns
+                .iter()
+                .map(map)
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+    }
+    /// Restrict the set by parity outcomes; `None` denotes an empty family.
+    pub fn condition(
+        &self,
+        rows: &[BitVector],
+        outcomes: &BitVector,
+    ) -> Result<Option<Self>, Gf2Error> {
+        outcomes.check_width(rows.len())?;
+        let mut matrix = Vec::with_capacity(rows.len());
+        let mut rhs = outcomes.clone();
+        for (j, row) in rows.iter().enumerate() {
+            row.check_width(self.width())?;
+            let mut equation = BitVector::zeros(self.dimension())?;
+            for (k, column) in self.columns.iter().enumerate() {
+                equation.set(k, row.dot(column)?)?;
+            }
+            matrix.push(equation);
+            rhs.set(j, rhs.get(j)? ^ row.dot(&self.offset)?)?;
+        }
+        let factor = LinearFactorization::new(self.dimension(), &matrix)?;
+        let Some(shift) = factor.solve(&rhs)? else {
+            return Ok(None);
+        };
+        let map = |value: &BitVector| -> Result<BitVector, Gf2Error> {
+            let mut result = BitVector::zeros(self.width())?;
+            for j in value.ones() {
+                result.xor_assign(&self.columns[j])?;
+            }
+            Ok(result)
+        };
+        let mut offset = self.offset.clone();
+        offset.xor_assign(&map(&shift)?)?;
+        // An independent source map remains injective on the nullspace basis.
+        Ok(Some(Self {
+            offset,
+            columns: factor
+                .nullspace()?
+                .iter()
+                .map(map)
+                .collect::<Result<Vec<_>, _>>()?,
+        }))
+    }
+}

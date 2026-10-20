@@ -289,3 +289,113 @@ fn tall_full_rank_cross_word_systems_handle_pivot_swaps_and_dense_rhs_updates() 
         }
     }
 }
+
+#[test]
+fn affine_support_images_and_conditions_match_boolean_set_enumeration() {
+    use rmagna::gf2::AffineSupport;
+    let mut state = 0x783ba20_u64;
+    let mut next = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let bits = |width: usize, mask: u64| {
+        BitVector::from_indices(width, (0..width).filter(|&j| mask >> j & 1 != 0)).unwrap()
+    };
+    let enumerate = |family: &AffineSupport| {
+        (0_usize..1 << family.dimension())
+            .map(|x| {
+                family
+                    .columns()
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| x >> j & 1 != 0)
+                    .fold(
+                        family.offset().words().first().copied().unwrap_or(0),
+                        |v, (_, c)| v ^ c.words().first().copied().unwrap_or(0),
+                    )
+            })
+            .collect::<BTreeSet<_>>()
+    };
+    for width in 0..=5 {
+        for paths in 0..=7 {
+            for _ in 0..8 {
+                let mask = (1 << width) - 1;
+                let offset = next() & mask;
+                let columns = (0..paths).map(|_| next() & mask).collect::<Vec<_>>();
+                let expected = (0..1 << paths)
+                    .map(|x| {
+                        columns
+                            .iter()
+                            .enumerate()
+                            .filter(|(j, _)| x >> j & 1 != 0)
+                            .fold(offset, |v, (_, c)| v ^ c)
+                    })
+                    .collect::<BTreeSet<_>>();
+                let family = AffineSupport::new(
+                    bits(width, offset),
+                    columns.iter().map(|&c| bits(width, c)).collect(),
+                )
+                .unwrap();
+                assert_eq!(enumerate(&family), expected);
+                assert_eq!(1 << family.dimension(), expected.len());
+                let rows = [next() & mask, next() & mask, next() & mask];
+                let binary_rows = rows.iter().map(|&r| bits(width, r)).collect::<Vec<_>>();
+                let image = family.linear_image(&binary_rows).unwrap();
+                let expected_image = expected
+                    .iter()
+                    .map(|&x| {
+                        rows.iter()
+                            .enumerate()
+                            .map(|(j, &r)| u64::from((x & r).count_ones() & 1 != 0) << j)
+                            .sum::<u64>()
+                    })
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(enumerate(&image), expected_image);
+                for outcome in 0..8 {
+                    let selected = expected
+                        .iter()
+                        .copied()
+                        .filter(|&x| {
+                            rows.iter().enumerate().all(|(j, &r)| {
+                                u64::from((x & r).count_ones() & 1 != 0) == (outcome >> j & 1)
+                            })
+                        })
+                        .collect::<BTreeSet<_>>();
+                    let conditioned = family.condition(&binary_rows, &bits(3, outcome)).unwrap();
+                    assert_eq!(
+                        conditioned.as_ref().map(enumerate).unwrap_or_default(),
+                        selected
+                    );
+                    assert_eq!(conditioned.is_none(), selected.is_empty());
+                }
+                let translation = next() & mask;
+                assert_eq!(
+                    enumerate(&family.translated(&bits(width, translation)).unwrap()),
+                    expected.iter().map(|&x| x ^ translation).collect()
+                );
+            }
+        }
+    }
+    let wide = AffineSupport::new(
+        BitVector::from_indices(129, [128]).unwrap(),
+        [vec![0], vec![63], vec![64], vec![128], vec![63, 64]]
+            .into_iter()
+            .map(|v| BitVector::from_indices(129, v).unwrap())
+            .collect(),
+    )
+    .unwrap();
+    assert_eq!(wide.dimension(), 4);
+    let projected = wide
+        .linear_image(&[
+            BitVector::from_indices(129, [0, 128]).unwrap(),
+            BitVector::from_indices(129, [63, 64]).unwrap(),
+        ])
+        .unwrap();
+    assert_eq!(enumerate(&projected), BTreeSet::from([0, 1, 2, 3]));
+    assert!(wide.linear_image(&[bits(3, 0)]).is_err());
+    assert!(wide.condition(&[], &bits(1, 0)).is_err());
+    assert!(wide.translated(&bits(3, 0)).is_err());
+    assert!(AffineSupport::new(bits(3, 0), vec![bits(2, 0)]).is_err());
+}
