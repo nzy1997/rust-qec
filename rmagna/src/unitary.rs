@@ -16,6 +16,7 @@ pub enum UnitaryError {
     DimensionOverflow,
     InvalidTurns,
     RepeatedQubit,
+    RepeatedOutput,
     InvalidInsertion { position: usize, gate_count: usize },
     Binary(Gf2Error),
     Clifford(CliffordError),
@@ -38,6 +39,7 @@ impl fmt::Display for UnitaryError {
                 "T turns must be below eight and controlled-S turns below four"
             ),
             Self::RepeatedQubit => write!(f, "multi-qubit diagonal gate repeats a qubit"),
+            Self::RepeatedOutput => write!(f, "target output list contains duplicate qubits"),
             Self::InvalidInsertion {
                 position,
                 gate_count,
@@ -434,6 +436,92 @@ impl CompiledUnitary {
             ket,
             &legs,
             &[negative, target.coefficients.clone()],
+            max_terms,
+            arithmetic,
+        )
+    }
+
+    /// Exact unnormalized mass after Z events and projection of selected
+    /// physical outputs onto a pure target. Every other physical wire is traced,
+    /// so outputs may remain entangled with records or discarded environments.
+    pub fn target_weight(
+        &self,
+        outputs: &[usize],
+        target: &Self,
+        event_rows: &[BitVector],
+        outcomes: &BitVector,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, UnitaryError> {
+        if outputs.len() != target.width()
+            || event_rows.len() != outcomes.width()
+            || event_rows.iter().any(|r| r.width() != self.width())
+        {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let positions = outputs
+            .iter()
+            .enumerate()
+            .map(|(i, &q)| (q, i))
+            .collect::<BTreeMap<_, _>>();
+        if positions.len() != outputs.len() {
+            return Err(UnitaryError::RepeatedOutput);
+        }
+        BitVector::from_indices(self.width(), outputs.iter().copied())?;
+        let n = self.boundary.width();
+        let m = target.boundary.width();
+        let joint = self
+            .boundary
+            .tensor(&self.boundary.conjugate(), arithmetic)?
+            .tensor(&target.boundary.conjugate(), arithmetic)?
+            .tensor(&target.boundary, arithmetic)?;
+        let total = joint.width();
+        let mut rows = Vec::new();
+        for qubit in 0..self.width() {
+            if let Some(&target_index) = positions.get(&qubit) {
+                rows.push(BitVector::from_indices(
+                    total,
+                    [qubit, 2 * n + target_index],
+                )?);
+                rows.push(BitVector::from_indices(
+                    total,
+                    [n + qubit, 2 * n + m + target_index],
+                )?);
+            } else {
+                rows.push(BitVector::from_indices(total, [qubit, n + qubit])?);
+            }
+        }
+        let mut bits = vec![false; rows.len()];
+        for (row_index, row) in event_rows.iter().enumerate() {
+            rows.push(BitVector::from_indices(total, row.ones())?);
+            bits.push(outcomes.get(row_index)?);
+            rows.push(BitVector::from_indices(total, row.ones().map(|j| n + j))?);
+            bits.push(outcomes.get(row_index)?);
+        }
+        let rhs = BitVector::from_indices(
+            bits.len(),
+            bits.iter()
+                .enumerate()
+                .filter_map(|(i, &bit)| bit.then_some(i)),
+        )?;
+        let ket = joint.project_z(&rows, &rhs, arithmetic)?;
+        let legs = [
+            (self.width()..n).collect::<Vec<_>>(),
+            (n + self.width()..2 * n).collect(),
+            (2 * n + target.width()..2 * n + m).collect(),
+            (2 * n + m + target.width()..total).collect(),
+        ];
+        let negative_self = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
+        let negative_target = target.coefficients.iter().map(|c| (8 - c) & 7).collect();
+        close(
+            ket,
+            &legs,
+            &[
+                self.coefficients.clone(),
+                negative_self,
+                negative_target,
+                target.coefficients.clone(),
+            ],
             max_terms,
             arithmetic,
         )

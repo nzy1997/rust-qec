@@ -3,6 +3,7 @@
 pub mod circuit;
 pub mod clifford;
 pub mod gf2;
+pub mod instrument;
 pub mod pauli;
 pub mod phase;
 pub mod probability;

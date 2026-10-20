@@ -1,0 +1,1679 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.instrument-reference.v1",
+  "seed": 20261023,
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "accepted": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "case": "interference",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [],
+      "source": "H 0\nT 0\nH 0\nM(1/30) 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "case": "interference",
+      "error": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "H 0\nT 0\nH 0\nM(1/30) 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "case": "interference",
+      "error": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "H 0\nT 0\nH 0\nM(1/30) 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "mixed-reset",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0\nT 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [],
+      "source": "H 0\nCX 0 1\nR 0\nH 0\nT 0\nY_ERROR(1/7) 1\nM(1/5) 1\nCY rec[-1] 0\n",
+      "target_success": {
+        "coefficients": [
+          "3",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "mixed-reset",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "faults": [
+        {
+          "line": 6,
+          "paulis": [
+            {
+              "basis": "Y",
+              "qubit": 1
+            }
+          ]
+        }
+      ],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0\nT 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [],
+      "source": "H 0\nCX 0 1\nR 0\nH 0\nT 0\nY_ERROR(1/7) 1\nM(1/5) 1\nCY rec[-1] 0\n",
+      "target_success": {
+        "coefficients": [
+          "3",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "mixed-reset",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0\nT 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "H 0\nCX 0 1\nR 0\nH 0\nT 0\nY_ERROR(1/7) 1\nM(1/5) 1\nCY rec[-1] 0\n",
+      "target_success": {
+        "coefficients": [
+          "3",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "mixed-reset",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "faults": [
+        {
+          "line": 6,
+          "paulis": [
+            {
+              "basis": "Y",
+              "qubit": 1
+            }
+          ]
+        }
+      ],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0\nT 0\n",
+      "outputs": [
+        0
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "H 0\nCX 0 1\nR 0\nH 0\nT 0\nY_ERROR(1/7) 1\nM(1/5) 1\nCY rec[-1] 0\n",
+      "target_success": {
+        "coefficients": [
+          "3",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "correlated",
+      "error": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0 1\nS 0\nT 1\n",
+      "outputs": [
+        0,
+        1
+      ],
+      "report_flips": [],
+      "source": "RY 0 1\nE(1/10) X0 Y1\nELSE_CORRELATED_ERROR(2/9) Z1\nMPP(1/11) Y0*Y1\nDETECTOR rec[-1]\nCS rec[-1] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "correlated",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 2,
+          "paulis": [
+            {
+              "basis": "X",
+              "qubit": 0
+            },
+            {
+              "basis": "Y",
+              "qubit": 1
+            }
+          ]
+        }
+      ],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0 1\nS 0\nT 1\n",
+      "outputs": [
+        0,
+        1
+      ],
+      "report_flips": [],
+      "source": "RY 0 1\nE(1/10) X0 Y1\nELSE_CORRELATED_ERROR(2/9) Z1\nMPP(1/11) Y0*Y1\nDETECTOR rec[-1]\nCS rec[-1] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "correlated",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 3,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 1
+            }
+          ]
+        }
+      ],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0 1\nS 0\nT 1\n",
+      "outputs": [
+        0,
+        1
+      ],
+      "report_flips": [],
+      "source": "RY 0 1\nE(1/10) X0 Y1\nELSE_CORRELATED_ERROR(2/9) Z1\nMPP(1/11) Y0*Y1\nDETECTOR rec[-1]\nCS rec[-1] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "correlated",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0 1\nS 0\nT 1\n",
+      "outputs": [
+        0,
+        1
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "RY 0 1\nE(1/10) X0 Y1\nELSE_CORRELATED_ERROR(2/9) Z1\nMPP(1/11) Y0*Y1\nDETECTOR rec[-1]\nCS rec[-1] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "correlated",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 2,
+          "paulis": [
+            {
+              "basis": "X",
+              "qubit": 0
+            },
+            {
+              "basis": "Y",
+              "qubit": 1
+            }
+          ]
+        }
+      ],
+      "fixture": null,
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": "H 0 1\nS 0\nT 1\n",
+      "outputs": [
+        0,
+        1
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": "RY 0 1\nE(1/10) X0 Y1\nELSE_CORRELATED_ERROR(2/9) Z1\nMPP(1/11) Y0*Y1\nDETECTOR rec[-1]\nCS rec[-1] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 128,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 17
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 236,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 29
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 128,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 17
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 137,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 18
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 236,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 29
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 155,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 20
+            }
+          ]
+        },
+        {
+          "line": 164,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 21
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 128,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 17
+            }
+          ]
+        },
+        {
+          "line": 137,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 18
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 164,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 21
+            }
+          ]
+        },
+        {
+          "line": 227,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 28
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 128,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 17
+            }
+          ]
+        },
+        {
+          "line": 191,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 24
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 128,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 17
+            }
+          ]
+        },
+        {
+          "line": 218,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 27
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        },
+        {
+          "line": 137,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 18
+            }
+          ]
+        },
+        {
+          "line": 200,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 25
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [
+        0
+      ],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [
+        27
+      ],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "accepted": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "bh2-T",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "line": 119,
+          "paulis": [
+            {
+              "basis": "Z",
+              "qubit": 16
+            }
+          ]
+        }
+      ],
+      "fixture": "magna-bh2",
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "outputs": [
+        14,
+        15
+      ],
+      "report_flips": [
+        0,
+        27
+      ],
+      "source": null,
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    }
+  ]
+}
