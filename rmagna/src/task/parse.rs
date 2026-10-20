@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::value::RawValue;
 use serde_json::{Map, Value};
 
 pub fn parse_task(
@@ -9,8 +10,21 @@ pub fn parse_task(
     if text.len() > options.max_json_bytes {
         return Err(TaskError::new("<json>", "source exceeds max_json_bytes"));
     }
-    let data: Value =
+    // Preserve only the exact mask tokens. Enabling serde_json's global
+    // arbitrary_precision feature changes tagged f64 deserialization in other
+    // workspace members; raw values keep the task parser's exactness local.
+    let mut raw: BTreeMap<String, Box<RawValue>> =
         serde_json::from_str(text).map_err(|e| TaskError::new("<json>", e.to_string()))?;
+    let raw_observables = raw.remove("observables");
+    let data = Value::Object(
+        raw.into_iter()
+            .map(|(key, value)| {
+                serde_json::from_str(value.get())
+                    .map(|value| (key, value))
+                    .map_err(|e| TaskError::new("<json>", e.to_string()))
+            })
+            .collect::<Result<Map<String, Value>, TaskError>>()?,
+    );
     let object = object(&data, "<root>")?;
     keys(
         object,
@@ -61,10 +75,13 @@ pub fn parse_task(
         .transpose()?
         .unwrap_or_default();
     let mut observables = Vec::new();
-    if let Some(value) = object.get("observables") {
-        for (j, value) in array(value, "observables", options)?.iter().enumerate() {
+    if let Some(value) = raw_observables {
+        for (j, value) in raw_array(&value, "observables", options)?
+            .iter()
+            .enumerate()
+        {
             let field = format!("observables[{j}]");
-            let pair = array(value, &field, options)?;
+            let pair = raw_array(value, &field, options)?;
             if pair.len() != 2 {
                 return Err(TaskError::new(field, "expected [x, z] masks"));
             }
@@ -214,11 +231,20 @@ fn path(value: &Value, base: &Path, field: &str) -> Result<PathBuf, TaskError> {
         .ok_or_else(|| TaskError::new(field, "expected a nonempty circuit path"))?;
     Ok(base.join(path))
 }
-fn mask(value: &Value, field: &str, options: &TaskOptions) -> Result<BigUint, TaskError> {
-    let value = value
-        .as_number()
-        .ok_or_else(|| TaskError::new(field, "Pauli masks must be nonnegative integers"))?
-        .to_string();
+fn raw_array(
+    value: &RawValue,
+    field: &str,
+    options: &TaskOptions,
+) -> Result<Vec<Box<RawValue>>, TaskError> {
+    let values: Vec<Box<RawValue>> =
+        serde_json::from_str(value.get()).map_err(|_| TaskError::new(field, "expected a list"))?;
+    if values.len() > options.max_list_items {
+        return Err(TaskError::new(field, "list exceeds max_list_items"));
+    }
+    Ok(values)
+}
+fn mask(value: &RawValue, field: &str, options: &TaskOptions) -> Result<BigUint, TaskError> {
+    let value = value.get();
     // A positive integer cannot have more decimal digits than binary bits.
     // Reject huge numeral tokens before expensive arbitrary-integer parsing.
     if value.len() as u128 > u128::from(options.max_mask_bits) + 1 {

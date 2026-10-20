@@ -55,6 +55,43 @@ fn task_defaults_ordered_outputs_and_arbitrary_precision_pauli_masks_are_exact()
     assert_eq!(ordered.outputs(), [2, 0]);
 }
 #[test]
+fn raw_mask_tokens_preserve_low_bits_and_reject_noninteger_json_shapes() {
+    let wide = (rmagna::BigInt::from(1) << 512) + 3;
+    let text = format!(r#"{{"observables":[[{wide},0]]}}"#);
+    let task = parse_task(&text, Path::new("."), &TaskOptions::default())
+        .unwrap()
+        .validate(&physical("I 512"))
+        .unwrap();
+    assert_eq!(
+        task.observables()[0].x().ones().collect::<Vec<_>>(),
+        [0, 1, 512]
+    );
+    for token in [
+        "\"123\"",
+        "true",
+        "null",
+        "[]",
+        "{}",
+        "1.0",
+        "1e2",
+        "1e10000000",
+        "-1",
+        r#"{"$serde_json::private::Number":"7"}"#,
+    ] {
+        let text = format!(r#"{{"observables":[[{token},0]]}}"#);
+        let error = parse_task(&text, Path::new("."), &TaskOptions::default()).unwrap_err();
+        assert_eq!(error.field, "observables[0]", "{token}: {error}");
+    }
+    for text in [
+        "null",
+        "[]",
+        r#"{"observables":null}"#,
+        r#"{"observables":[1]}"#,
+    ] {
+        assert!(parse_task(text, Path::new("."), &TaskOptions::default()).is_err());
+    }
+}
+#[test]
 fn classical_observables_and_records_validate_against_the_physical_contract() {
     let circuit = physical("M 0\nOBSERVABLE_INCLUDE(4) rec[-1]");
     let parsed = parse_task(
