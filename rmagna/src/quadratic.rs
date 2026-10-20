@@ -125,6 +125,14 @@ impl QuadraticForm {
 
     /// Substitute `x = shift XOR sum_j basis[j]*y[j]`. The basis may be dependent.
     pub fn restrict(&self, shift: &BitVector, basis: &[BitVector]) -> Result<Self, QuadraticError> {
+        Ok(self.restrict_with_images(shift, basis)?.0)
+    }
+
+    pub(crate) fn restrict_with_images(
+        &self,
+        shift: &BitVector,
+        basis: &[BitVector],
+    ) -> Result<(Self, Vec<BitVector>), QuadraticError> {
         self.check_vector(shift)?;
         for vector in basis {
             self.check_vector(vector)?;
@@ -150,7 +158,7 @@ impl QuadraticForm {
             }
             upper.push(row);
         }
-        Self::new(self.evaluate(shift)?, linear, upper)
+        Ok((Self::new(self.evaluate(shift)?, linear, upper)?, images))
     }
 
     /// Evaluate `sum_x i^q(x)` without enumerating the binary assignments.

@@ -531,3 +531,199 @@ fn packed_parity_pullbacks_match_wide_hidden_path_enumeration() {
         }
     }
 }
+
+#[test]
+fn prepared_z_projections_match_literal_paths_under_compatible_phase_updates() {
+    use rmagna::stabilizer::PreparedZProjection;
+    let arithmetic = ScalarArithmetic::default();
+    let mut next = rng();
+    let rows = [bits(3, 3), bits(3, 6), bits(3, 5)];
+    for _ in 0..24 {
+        let reference = random_ket(3, 6, &mut next, &arithmetic);
+        let prepared = PreparedZProjection::new(&reference, &rows).unwrap();
+        for update in 0..4 {
+            let phase = QuadraticForm::new(
+                (next() & 3) as u8,
+                reference
+                    .phase()
+                    .linear()
+                    .iter()
+                    .map(|&c| (c + 2 * (next() & 1) as u8) & 3)
+                    .collect(),
+                reference.phase().upper().to_vec(),
+            )
+            .unwrap();
+            let coefficient = if update == 3 {
+                ExactScalar::zero()
+            } else {
+                arithmetic
+                    .omega((next() & 7) as i64, (next() & 7) as i64 - 5)
+                    .unwrap()
+            };
+            let input = AffineKet::new(
+                bits(3, next()),
+                reference.columns().to_vec(),
+                phase,
+                coefficient,
+            )
+            .unwrap();
+            let amplitudes = literal(&input, &arithmetic);
+            for outcomes in 0..8 {
+                let expected =
+                    amplitudes
+                        .iter()
+                        .enumerate()
+                        .map(|(x, a)| {
+                            if [3_usize, 6, 5].iter().enumerate().all(|(j, &r)| {
+                                (x & r).count_ones() as usize & 1 == outcomes >> j & 1
+                            }) {
+                                a.clone()
+                            } else {
+                                ExactScalar::zero()
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                let projected = prepared
+                    .project(&input, &bits(3, outcomes as u64))
+                    .unwrap()
+                    .and_then(|k| k.contract(&arithmetic).unwrap());
+                assert_state(projected.as_ref(), 3, &expected, &arithmetic);
+            }
+        }
+        let mut odd = reference.phase().linear().to_vec();
+        odd[0] ^= 1;
+        let odd = AffineKet::new(
+            reference.offset().clone(),
+            reference.columns().to_vec(),
+            QuadraticForm::new(0, odd, reference.phase().upper().to_vec()).unwrap(),
+            ExactScalar::one(),
+        )
+        .unwrap();
+        assert!(matches!(
+            prepared.project(&odd, &bits(3, 0)),
+            Err(StabilizerError::IncompatibleProjection)
+        ));
+        let mut upper = reference.phase().upper().to_vec();
+        let bit = upper[0].get(1).unwrap();
+        upper[0].set(1, !bit).unwrap();
+        let cross = AffineKet::new(
+            reference.offset().clone(),
+            reference.columns().to_vec(),
+            QuadraticForm::new(0, reference.phase().linear().to_vec(), upper).unwrap(),
+            ExactScalar::one(),
+        )
+        .unwrap();
+        assert!(matches!(
+            prepared.project(&cross, &bits(3, 0)),
+            Err(StabilizerError::IncompatibleProjection)
+        ));
+        let mut columns = reference.columns().to_vec();
+        let bit = columns[0].get(0).unwrap();
+        columns[0].set(0, !bit).unwrap();
+        let changed = AffineKet::new(
+            reference.offset().clone(),
+            columns,
+            reference.phase().clone(),
+            ExactScalar::one(),
+        )
+        .unwrap();
+        assert!(matches!(
+            prepared.project(&changed, &bits(3, 0)),
+            Err(StabilizerError::IncompatibleProjection)
+        ));
+        assert!(matches!(
+            prepared.project(&reference, &bits(2, 0)),
+            Err(StabilizerError::DimensionMismatch)
+        ));
+    }
+}
+
+#[test]
+fn prepared_z_projections_preserve_wide_complex_amplitudes_and_empty_boundaries() {
+    use rmagna::stabilizer::PreparedZProjection;
+    let arithmetic = ScalarArithmetic::default();
+    let width = 129;
+    let positions = (0..64).chain([128]).collect::<Vec<_>>();
+    let columns = positions
+        .iter()
+        .map(|&j| BitVector::from_indices(width, [j]).unwrap())
+        .collect::<Vec<_>>();
+    let phase =
+        QuadraticForm::new(0, vec![0; 65], vec![BitVector::zeros(65).unwrap(); 65]).unwrap();
+    let reference = AffineKet::new(
+        BitVector::zeros(width).unwrap(),
+        columns.clone(),
+        phase,
+        arithmetic.omega(0, -65).unwrap(),
+    )
+    .unwrap();
+    let rows = vec![BitVector::from_indices(width, [0]).unwrap(); 65];
+    let prepared = PreparedZProjection::new(&reference, &rows).unwrap();
+    let input = AffineKet::new(
+        BitVector::from_indices(width, [0, 128]).unwrap(),
+        columns,
+        QuadraticForm::new(
+            3,
+            (0..65).map(|j| 2 * (j % 2) as u8).collect(),
+            vec![BitVector::zeros(65).unwrap(); 65],
+        )
+        .unwrap(),
+        arithmetic.omega(3, -65).unwrap(),
+    )
+    .unwrap();
+    let outcomes = BitVector::from_indices(65, 0..65).unwrap();
+    let projected = prepared.project(&input, &outcomes).unwrap().unwrap();
+    assert_eq!(
+        projected.norm_squared(&arithmetic).unwrap(),
+        arithmetic.omega(0, -2).unwrap()
+    );
+    let amplitudes = projected.prepare().unwrap();
+    for assignment in 0..128_u64 {
+        let mut output = input.offset().clone();
+        let mut power = 3;
+        for (j, &coordinate) in positions.iter().enumerate().skip(1) {
+            if assignment >> (j % 7) & 1 != 0 {
+                output
+                    .set(coordinate, !output.get(coordinate).unwrap())
+                    .unwrap();
+                power += input.phase().linear()[j] as i64;
+            }
+        }
+        let expected = arithmetic
+            .multiply(
+                input.coefficient(),
+                &arithmetic.omega(2 * power, 0).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            amplitudes.amplitude(&output, &arithmetic).unwrap(),
+            expected
+        );
+        output.set(0, false).unwrap();
+        assert_eq!(
+            amplitudes.amplitude(&output, &arithmetic).unwrap(),
+            ExactScalar::zero()
+        );
+    }
+    let mut impossible = outcomes.clone();
+    impossible.set(64, false).unwrap();
+    assert!(prepared.project(&input, &impossible).unwrap().is_none());
+    assert!(PreparedZProjection::new(&reference, &[bits(3, 1)]).is_err());
+    let empty = AffineKet::new(
+        bits(0, 0),
+        vec![],
+        QuadraticForm::new(2, vec![], vec![]).unwrap(),
+        ExactScalar::one(),
+    )
+    .unwrap();
+    let empty_plan = PreparedZProjection::new(&empty, &[]).unwrap();
+    let result = empty_plan.project(&empty, &bits(0, 0)).unwrap().unwrap();
+    assert_eq!(
+        result
+            .prepare()
+            .unwrap()
+            .amplitude(&bits(0, 0), &arithmetic)
+            .unwrap(),
+        ExactScalar::one().negated()
+    );
+}

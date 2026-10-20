@@ -9,6 +9,7 @@ use std::fmt;
 pub enum StabilizerError {
     DimensionMismatch,
     DimensionOverflow,
+    IncompatibleProjection,
     Binary(Gf2Error),
     Quadratic(QuadraticError),
     Scalar(ScalarError),
@@ -24,6 +25,10 @@ impl fmt::Display for StabilizerError {
             Self::DimensionOverflow => {
                 write!(f, "combined ket dimension exceeds the platform index range")
             }
+            Self::IncompatibleProjection => write!(
+                f,
+                "prepared projection requires unchanged support columns, quadratic cross terms and odd linear coefficients"
+            ),
             Self::Binary(error) => error.fmt(f),
             Self::Quadratic(error) => error.fmt(f),
             Self::Scalar(error) => error.fmt(f),
@@ -255,29 +260,10 @@ impl AffineKet {
         if rows.len() != outcomes.width() || rows.iter().any(|row| row.width() != self.width()) {
             return Err(StabilizerError::DimensionMismatch);
         }
-        // Trace boundaries have many sparse parity rows. Share the transpose
-        // instead of scanning every boundary word for every row/column pair.
-        // Small event sets keep the direct path and avoid another matrix.
-        let boundary_rows = if rows.len() >= 64 {
-            Some(transpose_columns(self.width(), &self.columns)?)
-        } else {
-            None
-        };
-        let mut equations = Vec::new();
+        let equations = self.constraint_matrix(rows)?;
         let mut rhs = outcomes.clone();
         for (i, row) in rows.iter().enumerate() {
-            let mut equation = BitVector::zeros(self.columns.len())?;
-            if let Some(boundary_rows) = &boundary_rows {
-                for boundary in row.ones() {
-                    equation.xor_assign(&boundary_rows[boundary])?;
-                }
-            } else {
-                for (j, column) in self.columns.iter().enumerate() {
-                    equation.set(j, row.dot(column)?)?;
-                }
-            }
             rhs.set(i, rhs.get(i)? ^ row.dot(&self.offset)?)?;
-            equations.push(equation);
         }
         let factor = LinearFactorization::new(self.columns.len(), &equations)?;
         let Some(shift) = factor.solve(&rhs)? else {
@@ -297,6 +283,35 @@ impl AffineKet {
             phase,
             self.coefficient.clone(),
         )?))
+    }
+
+    fn constraint_matrix(&self, rows: &[BitVector]) -> Result<Vec<BitVector>, StabilizerError> {
+        if rows.iter().any(|row| row.width() != self.width()) {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        // Trace boundaries have many sparse parity rows. Share the transpose
+        // instead of scanning every boundary word for every row/column pair.
+        // Small event sets keep the direct path and avoid another matrix.
+        let boundary_rows = if rows.len() >= 64 {
+            Some(transpose_columns(self.width(), &self.columns)?)
+        } else {
+            None
+        };
+        let mut equations = Vec::new();
+        for row in rows {
+            let mut equation = BitVector::zeros(self.columns.len())?;
+            if let Some(boundary_rows) = &boundary_rows {
+                for boundary in row.ones() {
+                    equation.xor_assign(&boundary_rows[boundary])?;
+                }
+            } else {
+                for (j, column) in self.columns.iter().enumerate() {
+                    equation.set(j, row.dot(column)?)?;
+                }
+            }
+            equations.push(equation);
+        }
+        Ok(equations)
     }
 
     /// Exact `<self|other>`; traced boundary equality is solved by elimination.
@@ -363,6 +378,109 @@ impl AffineKet {
         let phase = combined_phase(&self.phase, &other.phase, false)?;
         let coefficient = arithmetic.multiply(&self.coefficient, &other.coefficient)?;
         Self::new(offset, columns, phase, coefficient)
+    }
+}
+
+/// Immutable Z-constraint factorization for compatible affine quadratic kets.
+///
+/// Offsets, coefficients, quadratic constants and even linear phases may vary.
+/// Support columns, quadratic cross terms and odd linear phases must agree with
+/// the reference. Queries retain unnormalized, potentially dependent paths;
+/// call `contract` when a canonical ket is needed. No phase resource is prepared.
+pub struct PreparedZProjection {
+    reference: AffineKet,
+    rows: Vec<BitVector>,
+    factor: LinearFactorization,
+    kernel: Vec<BitVector>,
+    columns: Vec<BitVector>,
+    phase: QuadraticForm,
+    polar_images: Vec<BitVector>,
+}
+
+impl PreparedZProjection {
+    pub fn new(reference: &AffineKet, rows: &[BitVector]) -> Result<Self, StabilizerError> {
+        let equations = reference.constraint_matrix(rows)?;
+        let factor = LinearFactorization::new(reference.columns.len(), &equations)?;
+        let kernel = factor.nullspace()?;
+        let columns = kernel
+            .iter()
+            .map(|v| image(reference.width(), &reference.columns, v))
+            .collect::<Result<Vec<_>, _>>()?;
+        let (phase, polar_images) = reference
+            .phase
+            .restrict_with_images(&BitVector::zeros(reference.columns.len())?, &kernel)?;
+        Ok(Self {
+            reference: reference.clone(),
+            rows: rows.to_vec(),
+            factor,
+            kernel,
+            columns,
+            phase,
+            polar_images,
+        })
+    }
+
+    /// Apply the prepared constraints without refactoring or restricting their
+    /// quadratic form. An inconsistent right-hand side returns `None`.
+    pub fn project(
+        &self,
+        input: &AffineKet,
+        outcomes: &BitVector,
+    ) -> Result<Option<AffineKet>, StabilizerError> {
+        if input.width() != self.reference.width() || outcomes.width() != self.rows.len() {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        if input.columns != self.reference.columns
+            || input.phase.upper() != self.reference.phase.upper()
+            || input
+                .phase
+                .linear()
+                .iter()
+                .zip(self.reference.phase.linear())
+                .any(|(a, b)| (a ^ b) & 1 != 0)
+        {
+            return Err(StabilizerError::IncompatibleProjection);
+        }
+        let mut rhs = outcomes.clone();
+        for (i, row) in self.rows.iter().enumerate() {
+            rhs.set(i, rhs.get(i)? ^ row.dot(input.offset())?)?;
+        }
+        let Some(shift) = self.factor.solve(&rhs)? else {
+            return Ok(None);
+        };
+        let delta = BitVector::from_indices(
+            input.columns.len(),
+            input
+                .phase
+                .linear()
+                .iter()
+                .zip(self.reference.phase.linear())
+                .enumerate()
+                .filter_map(|(j, (a, b))| (a != b).then_some(j)),
+        )?;
+        let linear = self
+            .phase
+            .linear()
+            .iter()
+            .zip(&self.polar_images)
+            .zip(&self.kernel)
+            .map(|((&c, polar), direction)| {
+                Ok((c + 2 * u8::from(polar.dot(&shift)? ^ direction.dot(&delta)?)) & 3)
+            })
+            .collect::<Result<Vec<_>, Gf2Error>>()?;
+        let phase = QuadraticForm::new(
+            input.phase.evaluate(&shift)?,
+            linear,
+            self.phase.upper().to_vec(),
+        )?;
+        let mut offset = input.offset.clone();
+        offset.xor_assign(&image(input.width(), &input.columns, &shift)?)?;
+        Ok(Some(AffineKet::new(
+            offset,
+            self.columns.clone(),
+            phase,
+            input.coefficient.clone(),
+        )?))
     }
 }
 
