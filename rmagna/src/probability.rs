@@ -155,6 +155,9 @@ impl ProbabilityParser {
         })
     }
     pub fn parse(&self, text: &str) -> Result<Probability, ProbabilityError> {
+        Probability::from_rational(self.rational(text)?)
+    }
+    pub(crate) fn rational(&self, text: &str) -> Result<BigRational, ProbabilityError> {
         if text.len() > self.max_token_bytes {
             return Err(ProbabilityError::TokenLimit {
                 bytes: text.len(),
@@ -163,10 +166,7 @@ impl ProbabilityParser {
         }
         let text = text.trim();
         if let Some((numerator, denominator)) = text.split_once('/') {
-            return Probability::from_ratio(
-                integer(numerator.trim())?,
-                integer(denominator.trim())?,
-            );
+            return ratio(integer(numerator.trim())?, integer(denominator.trim())?);
         }
         let (mantissa, exponent) = if let Some(position) = text.find(['e', 'E']) {
             let exponent = integer(&text[position + 1..])?.to_i64().ok_or(
@@ -218,11 +218,18 @@ impl ProbabilityParser {
         }
         let scale = BigInt::from(10).pow(power.unsigned_abs() as u32);
         if power >= 0 {
-            Probability::from_ratio(numerator, scale)
+            ratio(numerator, scale)
         } else {
-            Probability::from_ratio(numerator * scale, BigInt::one())
+            ratio(numerator * scale, BigInt::one())
         }
     }
+}
+
+fn ratio(numerator: BigInt, denominator: BigInt) -> Result<BigRational, ProbabilityError> {
+    if denominator.is_zero() {
+        return Err(ProbabilityError::ZeroDenominator);
+    }
+    Ok(BigRational::new(numerator, denominator))
 }
 
 fn integer(text: &str) -> Result<BigInt, ProbabilityError> {

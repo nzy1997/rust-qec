@@ -334,3 +334,68 @@ exact rational remains nonzero. This method does not implement the separate
 exact-rational sampling path or generate random words. Tests cover rational
 identities, canonical equality and hashing, malformed and unnormalized raw
 ratios, resource limits, tiny probabilities and threshold endpoints.
+
+## Magna circuit frontend
+
+`circuit::parse_circuit(text, &ParseOptions)` parses the `magna-0.1` text format,
+including gate aliases, repeats, Pauli-product measurements, exact noise
+arguments, raw detectors, control registers, external decisions, postselection,
+observables and coordinate annotations. `Circuit::to_text` retains the original
+source. Expanded instructions and individual operations have distinct counts:
+one multi-target line may produce several operations. Locations retain the
+source line, column and each enclosing repeat iteration.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+
+let circuit = parse_circuit("H 0\nM(1/30) 0\nDETECTOR rec[-1]\nPOSTSELECT !det[0]\n",
+    &ParseOptions::default())?;
+assert_eq!(circuit.num_records(), 1);
+assert_eq!(circuit.detectors().len(), 1);
+assert_eq!(circuit.to_text().lines().count(), 4);
+# Ok::<(), rmagna::circuit::ParseError>(())
+```
+
+Classical expressions are canonical XORs over reported records and external
+decision bits. Every register read is resolved before any output of that
+instruction is installed, and writes carry monotonically increasing versions.
+Overwriting a register cannot change an earlier selection, gate or observable.
+Detectors retain raw parity rather than subtracting a noiseless reference.
+Report-flip probability is stored separately from the quantum measurement.
+
+Declare external function names in `ParseOptions::controllers`. Parsing captures
+their ordered inputs and output slots and never invokes a function. External
+functions can read detectors and earlier registers, while built-in XOR/NOT and
+conditional gates can also read earlier records. Actual versioned callback
+binding and execution remain runtime deliverables. Guarded noise requires a
+history route even for a constant guard; contiguous correlated alternatives
+retain their conditional probabilities and common guard.
+
+Default budgets permit 65,536 qubits, 1,000,000 expanded instructions,
+1,000,000 operations, repeat depth 128 and 64 MiB of source. All are configurable.
+Text probabilities retain the parsing limits described above. Coordinates are
+parsed as rational literals and converted to finite `f64` annotation values;
+noise probabilities remain exact rationals.
+
+Inspect a file without simulation or decoder execution:
+
+```sh
+cargo run --locked -p rmagna --example validate_circuit -- circuit.magna decoder_name
+```
+
+After building that example, compare the 31 packaged reference tasks' circuit
+files with the pinned parser using `benchmarks/magna_reproduction/frontend_compare.py`:
+
+```sh
+/absolute/path/to/reference-env/bin/python -I \
+  benchmarks/magna_reproduction/frontend_compare.py \
+  --upstream /absolute/path/to/magna \
+  --rust-example /absolute/path/to/target/debug/examples/validate_circuit \
+  --out /absolute/path/to/new-parser-comparison.json
+```
+
+The comparison checks format, qubit/record/instruction/detector counts, external
+call count and history routing. Its receipt hashes each input and the Rust
+binary and verifies the pinned source/native binary before and after. It is a
+format/static-semantics check, not an end-to-end sampling benchmark. Execution
+of parsed instruments, targets and recovery is a subsequent deliverable.
