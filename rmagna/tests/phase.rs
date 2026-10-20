@@ -471,6 +471,33 @@ fn prescribed_native_closed_networks_match_full_complex_scalars() {
             expected,
             "{vector}"
         );
+        let fibers = rmagna::fibers::PreparedCliffordFibers::new(
+            &phase,
+            8,
+            rmagna::fibers::FiberOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            fibers
+                .evaluate(&phase, &boundary, &coefficient, &arithmetic)
+                .unwrap(),
+            expected,
+            "native fiber {vector}"
+        );
+        let adaptive = ClosedPhaseSum::new_adaptive(
+            &phase,
+            &boundary,
+            &coefficient,
+            8,
+            &arithmetic,
+            rmagna::fibers::FiberOptions::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            adaptive.evaluate(&arithmetic).unwrap(),
+            expected,
+            "native adaptive {vector}"
+        );
         let absorbed =
             ClosedPhaseSum::new(&phase, &boundary, &coefficient, 8, &arithmetic).unwrap();
         assert!(absorbed.quotient_rank() <= prepared.quotient().rank());

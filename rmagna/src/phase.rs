@@ -12,7 +12,15 @@ pub enum PhaseError {
     InvalidPhase,
     DimensionMismatch,
     NotClifford,
-    TermLimit { rank: usize, limit: usize },
+    TermLimit {
+        rank: usize,
+        limit: usize,
+    },
+    FiberTermLimit {
+        coordinates: usize,
+        quotient_rank: usize,
+        limit: usize,
+    },
     Binary(Gf2Error),
     Quadratic(QuadraticError),
     Scalar(ScalarError),
@@ -28,6 +36,14 @@ impl fmt::Display for PhaseError {
             Self::TermLimit { rank, limit } => write!(
                 f,
                 "quotient rank {rank} exceeds the limit of {limit} computational terms"
+            ),
+            Self::FiberTermLimit {
+                coordinates,
+                quotient_rank,
+                limit,
+            } => write!(
+                f,
+                "Clifford-fiber enumeration needs 2^{coordinates} terms for signature rank {quotient_rank}; limit is {limit}"
             ),
             Self::Binary(e) => e.fmt(f),
             Self::Quadratic(e) => e.fmt(f),
@@ -425,8 +441,12 @@ pub struct ClosedPhaseSum {
     plan: Option<ClosedPlan>,
     reductions: Vec<RadicalReduction>,
 }
+enum ClosedDecomposition {
+    Computational(PreparedPhaseSum),
+    Fibers(crate::fibers::PreparedCliffordFibers),
+}
 struct ClosedPlan {
-    prepared: PreparedPhaseSum,
+    prepared: ClosedDecomposition,
     phase: ParityPhase,
     boundary: QuadraticForm,
     coefficient: ExactScalar,
@@ -438,6 +458,35 @@ impl ClosedPhaseSum {
         coefficient: &ExactScalar,
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, PhaseError> {
+        Self::construct(phase, boundary, coefficient, max_terms, arithmetic, None)
+    }
+    /// Select certified Clifford fibers after radical absorption. The original
+    /// `new` method retains its deterministic computational expansion contract.
+    pub fn new_adaptive(
+        phase: &ParityPhase,
+        boundary: &QuadraticForm,
+        coefficient: &ExactScalar,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+        options: crate::fibers::FiberOptions,
+    ) -> Result<Self, PhaseError> {
+        Self::construct(
+            phase,
+            boundary,
+            coefficient,
+            max_terms,
+            arithmetic,
+            Some(options),
+        )
+    }
+    fn construct(
+        phase: &ParityPhase,
+        boundary: &QuadraticForm,
+        coefficient: &ExactScalar,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+        options: Option<crate::fibers::FiberOptions>,
     ) -> Result<Self, PhaseError> {
         if phase.width != boundary.num_variables() {
             return Err(PhaseError::DimensionMismatch);
@@ -457,8 +506,15 @@ impl ClosedPhaseSum {
             let width = phase.width;
             let rank = quotient.rank;
             if rank == width {
-                let prepared =
-                    PreparedPhaseSum::from_quotient(&phase, quotient, max_terms, arithmetic)?;
+                let prepared = if let Some(options) = options {
+                    ClosedDecomposition::Fibers(crate::fibers::PreparedCliffordFibers::new(
+                        &phase, max_terms, options,
+                    )?)
+                } else {
+                    ClosedDecomposition::Computational(PreparedPhaseSum::from_quotient(
+                        &phase, quotient, max_terms, arithmetic,
+                    )?)
+                };
                 output.plan = Some(ClosedPlan {
                     prepared,
                     phase,
@@ -516,23 +572,36 @@ impl ClosedPhaseSum {
         &self.reductions
     }
     pub fn quotient_rank(&self) -> usize {
-        self.plan
-            .as_ref()
-            .map_or(0, |p| p.prepared.quotient().rank())
+        self.plan.as_ref().map_or(0, |p| match &p.prepared {
+            ClosedDecomposition::Computational(plan) => plan.quotient().rank(),
+            ClosedDecomposition::Fibers(plan) => plan.quotient_rank(),
+        })
     }
     pub fn num_terms(&self) -> usize {
-        self.plan.as_ref().map_or(0, |p| p.prepared.num_terms())
+        self.plan.as_ref().map_or(0, |p| match &p.prepared {
+            ClosedDecomposition::Computational(plan) => plan.num_terms(),
+            ClosedDecomposition::Fibers(plan) => plan.num_terms(),
+        })
     }
     pub fn evaluate(&self, arithmetic: &ScalarArithmetic) -> Result<ExactScalar, PhaseError> {
         let Some(plan) = &self.plan else {
             return Ok(ExactScalar::zero());
         };
-        plan.prepared
-            .evaluate(&plan.phase, &plan.boundary, &plan.coefficient, arithmetic)
+        match &plan.prepared {
+            ClosedDecomposition::Computational(prepared) => {
+                prepared.evaluate(&plan.phase, &plan.boundary, &plan.coefficient, arithmetic)
+            }
+            ClosedDecomposition::Fibers(prepared) => {
+                prepared.evaluate(&plan.phase, &plan.boundary, &plan.coefficient, arithmetic)
+            }
+        }
     }
 }
 
-fn add_quadratic(left: &QuadraticForm, right: &QuadraticForm) -> Result<QuadraticForm, PhaseError> {
+pub(crate) fn add_quadratic(
+    left: &QuadraticForm,
+    right: &QuadraticForm,
+) -> Result<QuadraticForm, PhaseError> {
     let linear = left
         .linear()
         .iter()
