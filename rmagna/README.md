@@ -529,3 +529,44 @@ Quantum masses remain exact conditional queries on the returned fault assignment
 Tests enumerate exact categorical intervals and all two-site importance draws,
 verify weighted acceptance, exercise rare events and rejection limits, and check
 published SplitMix64 words plus chunk/resume identity.
+
+## Physical reported-record sampling
+
+`records::sample_reported` draws ordered affine reported parities from exact
+physical prefix marginals under supplied faults. Correlated and duplicate queries
+remain correlated. `sample_reported_conditioned` accepts a `RecordQuery` containing
+previously sampled parity values and new inputs; it retains the earlier values
+and rejects a zero-mass condition before reading random words. A returned
+`ReportedDraw` includes the original condition mass, the final joint mass, and
+entropy usage. It does not apply the circuit's postselection predicates.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions, BitAtom, BitExpr};
+use rmagna::instrument::{compile_affine, CompileOptions};
+use rmagna::noise::SplitMix64;
+use rmagna::records::{sample_reported, SamplingOptions};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nM 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]", &ParseOptions::default())?;
+let instrument = compile_affine(&source, &CompileOptions::default(), &arithmetic)?;
+let draw = sample_reported(&instrument, &[BitExpr::atom(BitAtom::Record(0))], &[],
+    &mut SplitMix64::new(7), &SamplingOptions::default(), &arithmetic)?;
+assert_eq!(draw.mass, arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`bernoulli_ratio` samples a ratio of nonnegative exact masses without dividing
+or converting to floating point. It refines a uniform binary interval until exact
+real comparisons place the entire interval above or below the threshold. Rational,
+irrational and very small nonzero probabilities use the same route. Deterministic
+endpoints need no entropy. The default complete-query entropy budget is 1,048,576
+words and the per-contraction term budget is 256. Budget exhaustion fails explicitly;
+a failed query can have consumed entropy. Scalar coefficient limits also apply.
+As with categorical sampling, exact probability statements assume independent
+unbiased entropy words.
+
+This is the cold exact-marginal route for affine instruments. External callbacks,
+guarded noise, the affine-support proposal and cached query preparation remain
+separate deliverables. Tests check exact binary boundaries and refinement,
+`2^-1200`, Bell-record and report-flip correlations, conditioned histories,
+stream/resume identity, and a physically possible record that postselection rejects.

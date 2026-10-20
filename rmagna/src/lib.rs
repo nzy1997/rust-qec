@@ -8,6 +8,7 @@ pub mod noise;
 pub mod pauli;
 pub mod phase;
 pub mod probability;
+pub mod records;
 pub mod quadratic;
 pub mod scalar;
 pub mod stabilizer;
