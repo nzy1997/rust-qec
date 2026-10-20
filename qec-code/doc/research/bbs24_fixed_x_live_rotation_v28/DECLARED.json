@@ -1,0 +1,93 @@
+{
+  "schema": "BBS24_FIXED_X_LITERAL_DECLARATION_V28",
+  "status": "MANUALLY_DECLARED_NOT_EXECUTED_OR_COMPUTATIONALLY_VALIDATED",
+  "purpose": "Authoritative algebra data for an independently implemented necessary native-circuit coupon screen; not a general BBS constructor or decoder search.",
+  "point_sha256": "760097cbf643c14e6446a109fdd04643d694df25a7749f1fa92b5d9332b53d5a",
+  "physical_data_qubits": 24,
+  "logical_qubits": 3,
+  "positive_hermitian_convention": "P(x,z)=i^popcount(x&z) X^x Z^z; phase sign is an additional +/-1",
+  "row_labels_binary": ["001", "010", "011", "100", "101", "110", "111"],
+  "sites": [
+    [0,"001","001"],[1,"001","011"],[2,"001","101"],
+    [3,"010","010"],[4,"010","011"],[5,"010","110"],
+    [6,"011","001"],[7,"011","010"],[8,"011","101"],[9,"011","110"],
+    [10,"100","100"],[11,"100","101"],[12,"100","110"],
+    [13,"101","001"],[14,"101","011"],[15,"101","100"],[16,"101","110"],
+    [17,"110","010"],[18,"110","011"],[19,"110","100"],[20,"110","101"],
+    [21,"111","001"],[22,"111","010"],[23,"111","100"]
+  ],
+  "stabilizers": [
+    {"name":"h001a","sign":1,"x":[0,1],"z":[]},
+    {"name":"h001b","sign":1,"x":[1,2],"z":[]},
+    {"name":"h010a","sign":1,"x":[3,4],"z":[]},
+    {"name":"h010b","sign":1,"x":[4,5],"z":[]},
+    {"name":"h011a","sign":1,"x":[6,7],"z":[]},
+    {"name":"h011b","sign":1,"x":[7,8],"z":[]},
+    {"name":"h011c","sign":1,"x":[8,9],"z":[]},
+    {"name":"h100a","sign":1,"x":[10,11],"z":[]},
+    {"name":"h100b","sign":1,"x":[11,12],"z":[]},
+    {"name":"h101a","sign":1,"x":[13,14],"z":[]},
+    {"name":"h101b","sign":1,"x":[14,15],"z":[]},
+    {"name":"h101c","sign":1,"x":[15,16],"z":[]},
+    {"name":"h110a","sign":1,"x":[17,18],"z":[]},
+    {"name":"h110b","sign":1,"x":[18,19],"z":[]},
+    {"name":"h110c","sign":1,"x":[19,20],"z":[]},
+    {"name":"h111a","sign":1,"x":[21,22],"z":[]},
+    {"name":"h111b","sign":1,"x":[22,23],"z":[]},
+    {"name":"z_all","sign":1,"x":[],"z":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]},
+    {"name":"z_bit0","sign":1,"x":[],"z":[0,1,2,6,7,8,9,13,14,15,16,21,22,23]},
+    {"name":"z_bit1","sign":1,"x":[],"z":[3,4,5,6,7,8,9,17,18,19,20,21,22,23]},
+    {"name":"z_bit2","sign":1,"x":[],"z":[10,11,12,13,14,15,16,17,18,19,20,21,22,23]}
+  ],
+  "logical_x": [
+    {"name":"X1_R100","sign":1,"x":[],"z":[10,11,12]},
+    {"name":"X2_R011","sign":1,"x":[],"z":[6,7,8,9]},
+    {"name":"X3_R001","sign":1,"x":[],"z":[0,1,2]}
+  ],
+  "logical_z": [
+    {"name":"Z1_C100","sign":1,"x":[10,15,19,23],"z":[]},
+    {"name":"Z2_C010","sign":1,"x":[3,7,17,22],"z":[]},
+    {"name":"Z3_C011","sign":1,"x":[1,4,14,18],"z":[]}
+  ],
+  "logical_base4_digits": {"0":"I","1":"X","2":"Y","3":"Z"},
+  "target_word_labels": [1,4,16,5,17,21,20,10,26],
+  "physical_target_bodies": [
+    {"word":0,"sign":1,"x":[],"z":[10,11,12]},
+    {"word":1,"sign":1,"x":[],"z":[6,7,8,9]},
+    {"word":2,"sign":1,"x":[],"z":[0,1,2]},
+    {"word":3,"sign":1,"x":[],"z":[21,22,23]},
+    {"word":4,"sign":1,"x":[],"z":[13,14,15,16]},
+    {"word":5,"sign":1,"x":[],"z":[17,18,19,20]},
+    {"word":6,"sign":1,"x":[],"z":[3,4,5]},
+    {"word":7,"sign":-1,"x":[5,9,12,16],"z":[21,22,23]},
+    {"word":8,"sign":-1,"x":[5,9,12,16],"z":[17,18,19,20]}
+  ],
+  "isometry": "|000>_L is unique simultaneous +1 eigenvector of the 21 signed stabilizers and all three logical_z, with first nonzero computational amplitude positive; V|v1v2v3>=logical_x[0]^v1 logical_x[1]^v2 logical_x[2]^v3 |000>_L.",
+  "total_decoder": {
+    "selected": "lex_minimum_row_X_then_row_Z",
+    "x_syndrome": "t=(row parity, XOR of occupied nonzero row labels), in z_all,z_bit0,z_bit1,z_bit2 order",
+    "x_section": "minimum row count, ties by lexicographic sorted row-label tuple in order001,010,011,100,101,110,111; put X on first site of each selected row",
+    "z_section": "independent minimum-weight Z pattern for each row's consecutive-XX syndrome; ties by lexicographic sorted physical-site tuple",
+    "operator_order": "D_Z D_X, positive Hermitian representative; global correction phase is irrelevant to the decoded channel",
+    "variant_not_selected_by_results": "Only with all17 horizontal XX syndromes zero: t=(0,kappa) uses kappa2 rows4,6; kappa3 rows4,7; kappa4 rows2,6; kappa5 rows2,7. All other t use lex. This optional point must be separately preregistered before results."
+  },
+  "pure_X_coupon_quotient": {
+    "input": "seven-bit row parity e, row001 is bit0 through row111 bit6",
+    "syndrome": "t=(parity(e),xor occupied row labels)",
+    "raw_q": "(e100 XOR e011,e001)",
+    "logical_algebra": "span Pauli <X1,X2,X3,Z1Z2>",
+    "scope": "Within each fixed syndrome, a common Pauli D only translates the four raw_q classes. This is not a full decoder table or a full noisy-channel result."
+  },
+  "manual_claims_requiring_independent_SOURCE_qualification": [
+    "21 independent commuting signed stabilizers and canonical three logical pairs",
+    "fixed-horizontal-X CSS code has dX4,dZ3",
+    "physical_target_bodies have the declared nine signed logical labels",
+    "all128 pure-X row masks have the declared syndrome and four-quotient boundary",
+    "complete chosen D and isometry agree with this declared frame"
+  ],
+  "scientific_execution": false,
+  "enumeration": false,
+  "compiler_or_probe": false,
+  "SCI_access": false,
+  "GO_or_eligibility_claim": false
+}
