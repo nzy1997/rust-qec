@@ -1,5 +1,6 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod observations;
 mod shared;
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
@@ -110,6 +111,8 @@ pub struct CompilationDiagnostics {
     pub phase_ancillas: usize,
     pub shared_phase_coordinates: usize,
     pub coherent_width: usize,
+    pub reference_coherent_width: usize,
+    pub shared_observations_before_reduction: usize,
     pub clifford_gates: usize,
     pub path_variables: usize,
 }
@@ -264,11 +267,15 @@ impl UnitaryCircuit {
             phase_ancillas: phase.num_variables(),
             shared_phase_coordinates: 0,
             coherent_width: width,
+            reference_coherent_width: width,
+            shared_observations_before_reduction: 0,
             clifford_gates: circuit.gates().len(),
             path_variables: boundary.columns().len(),
         });
         let program = Arc::new(InsertionProgram {
             reference: Arc::clone(&boundary),
+            query_reference: Arc::clone(&boundary),
+            observation_reduction: None,
             reference_phase: Arc::clone(&phase),
             shared: None,
             circuit,
@@ -326,6 +333,8 @@ pub struct CompiledUnitary {
 }
 struct InsertionProgram {
     reference: Arc<AffineKet>,
+    query_reference: Arc<AffineKet>,
+    observation_reduction: Option<observations::ObservationReduction>,
     reference_phase: Arc<ParityPhase>,
     shared: Option<shared::PhaseUpdates>,
     circuit: CliffordCircuit,
@@ -441,7 +450,7 @@ impl CompiledUnitary {
         self.width()
             .checked_add(rows.len())
             .ok_or(UnitaryError::DimensionOverflow)?;
-        let reference = &self.program.reference;
+        let reference = &self.program.query_reference;
         let half = reference.width();
         let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
         let total = joint.width();
@@ -491,7 +500,7 @@ impl CompiledUnitary {
                 .or_default()
                 .push(&insertion.word);
         }
-        let total = self.boundary.width();
+        let total = self.program.reference.width();
         let mut frame = PauliWord::identity(total)?;
         for position in 0..=count {
             if let Some(words) = grouped.get(&position) {
@@ -517,6 +526,11 @@ impl CompiledUnitary {
             Arc::new(updates.phase(&grouped)?)
         } else {
             Arc::clone(&self.program.reference_phase)
+        };
+        let (boundary, phase) = if let Some(reduction) = &self.program.observation_reduction {
+            reduction.apply(&boundary, &phase)?
+        } else {
+            (boundary, phase)
         };
         Ok(Self {
             physical_width: self.physical_width,
