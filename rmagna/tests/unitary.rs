@@ -653,3 +653,146 @@ fn partial_targets_trace_entangled_environments_and_apply_events_on_both_copies(
             .is_err()
     );
 }
+
+#[test]
+fn reduced_projected_density_overlaps_match_literal_density_matrices() {
+    use rmagna::gf2::BitVector;
+    use rmagna::unitary::DensityBoundary;
+    let a = ScalarArithmetic::default();
+    let pg = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Cs {
+            a: 1,
+            b: 2,
+            turns: 1,
+        },
+        G::Clifford(C::H(1)),
+        G::Clifford(C::Cx {
+            control: 2,
+            target: 3,
+        }),
+        G::T { qubit: 3, turns: 3 },
+    ];
+    let tg = [
+        G::Clifford(C::H(1)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 1, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 0,
+        }),
+        G::Cs {
+            a: 0,
+            b: 2,
+            turns: 3,
+        },
+        G::Clifford(C::H(0)),
+    ];
+    let p = UnitaryCircuit::new(4, pg)
+        .unwrap()
+        .compile(&bits(4, 0), &a)
+        .unwrap();
+    let t = UnitaryCircuit::new(3, tg)
+        .unwrap()
+        .compile(&bits(3, 0), &a)
+        .unwrap();
+    let pv = dense(&pg, 4, 0, &a);
+    let tv = dense(&tg, 3, 0, &a);
+    // Form the full density entries and trace equal environment indices. This
+    // oracle uses no boundary ket, phase quotient or Gaussian elimination.
+    let reduced =
+        |state: &[ExactScalar], width: usize, outputs: &[usize], row: &BitVector, outcome: bool| {
+            let mut rho = vec![vec![ExactScalar::zero(); 1 << outputs.len()]; 1 << outputs.len()];
+            let selected = |x: usize| {
+                outputs
+                    .iter()
+                    .enumerate()
+                    .fold(0, |out, (j, &q)| out | (((x >> q) & 1) << j))
+            };
+            for (x, vx) in state.iter().enumerate() {
+                for (y, vy) in state.iter().enumerate() {
+                    if row.dot(&bits(width, x)).unwrap() != outcome
+                        || row.dot(&bits(width, y)).unwrap() != outcome
+                    {
+                        continue;
+                    }
+                    if (0..width).any(|q| !outputs.contains(&q) && ((x >> q) & 1) != ((y >> q) & 1))
+                    {
+                        continue;
+                    }
+                    let term = a.multiply(vx, &vy.conjugate()).unwrap();
+                    let entry = &mut rho[selected(x)][selected(y)];
+                    *entry = a.add(entry, &term).unwrap();
+                }
+            }
+            rho
+        };
+    let pr = bits(4, 9);
+    let tr = bits(3, 3);
+    for (po, to) in [
+        (vec![0], vec![2]),
+        (vec![3, 1], vec![0, 2]),
+        (vec![], vec![]),
+        (vec![2, 0, 1], vec![1, 0, 2]),
+    ] {
+        for flags in 0..4 {
+            let pbit = flags & 1 != 0;
+            let tbit = flags & 2 != 0;
+            let rho = reduced(&pv, 4, &po, &pr, pbit);
+            let tau = reduced(&tv, 3, &to, &tr, tbit);
+            let mut expected = ExactScalar::zero();
+            for (x, row) in rho.iter().enumerate() {
+                for (y, value) in row.iter().enumerate() {
+                    expected = a
+                        .add(&expected, &a.multiply(value, &tau[y][x]).unwrap())
+                        .unwrap();
+                }
+            }
+            let actual = p
+                .density_overlap(
+                    DensityBoundary {
+                        outputs: &po,
+                        event_rows: std::slice::from_ref(&pr),
+                        outcomes: &bits(1, pbit as usize),
+                    },
+                    &t,
+                    DensityBoundary {
+                        outputs: &to,
+                        event_rows: std::slice::from_ref(&tr),
+                        outcomes: &bits(1, tbit as usize),
+                    },
+                    256,
+                    &a,
+                )
+                .unwrap();
+            assert_eq!(
+                actual.value, expected,
+                "outputs {po:?}/{to:?} flags {flags}"
+            );
+        }
+    }
+    let empty = bits(0, 0);
+    let plain = |outputs| DensityBoundary {
+        outputs,
+        event_rows: &[],
+        outcomes: &empty,
+    };
+    assert!(matches!(
+        p.density_overlap(plain(&[0]), &t, plain(&[0, 1]), 256, &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(matches!(
+        p.density_overlap(plain(&[0, 0]), &t, plain(&[0, 1]), 256, &a),
+        Err(UnitaryError::RepeatedOutput)
+    ));
+    assert!(
+        p.density_overlap(plain(&[0]), &t, plain(&[3]), 256, &a)
+            .is_err()
+    );
+}
