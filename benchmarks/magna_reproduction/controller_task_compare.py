@@ -19,11 +19,15 @@ def main():
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--rust-example", type=Path, required=True)
     parser.add_argument("--compiler", choices=["shared", "parity_copies"])
+    parser.add_argument("--probability-preparation", choices=["cold", "trace", "fixed"])
+    parser.add_argument("--fiber-search-rank", type=int, default=16)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=TASKS)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--one", choices=TASKS, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.fiber_search_rank < 0 or (args.probability_preparation != "fixed" and args.fiber_search_rank != 16):
+        parser.error("a custom nonnegative fiber search rank requires fixed preparation")
     if args.timeout <= 0:
         parser.error("timeout must be positive")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,7 +42,8 @@ def main():
     rows = []
     document = dict(schema="rmagna.controller-task-comparison.v1", status="running",
         scope="prescribed no-fault observations from two native entropy endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
-        rust_binary_sha256=before, compiler=args.compiler, tasks=args.tasks, cases=rows)
+        rust_binary_sha256=before, compiler=args.compiler, probability_preparation=args.probability_preparation,
+        fiber_search_rank=args.fiber_search_rank if args.probability_preparation=="fixed" else None, tasks=args.tasks, cases=rows)
     with args.out.open("x", encoding="utf-8") as output:
         output.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
     def checkpoint():
@@ -51,6 +56,9 @@ def main():
                    "--rust-example", str(binary), "--one", name, "--timeout", str(args.timeout)]
         if args.compiler:
             command += ["--compiler", args.compiler]
+        if args.probability_preparation:
+            command += ["--probability-preparation", args.probability_preparation,
+                        "--fiber-search-rank", str(args.fiber_search_rank)]
         process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    start_new_session=os.name == "posix")
         try:
@@ -85,7 +93,8 @@ def main():
         raise SystemExit(1)
 
 
-def compare_result(result, expected, word, max_terms, classical, compiler=None):
+def compare_result(result, expected, word, max_terms, classical, compiler=None,
+                   probability_preparation=None, fiber_search_rank=16):
     """Retain one history's raw output even when a successful child is malformed."""
     try:
         actual = json.loads(result.stdout)
@@ -95,6 +104,14 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None):
         if (not isinstance(config, dict) or type(config.get("max_terms")) is not int
                 or config["max_terms"] != max_terms):
             raise ValueError("Rust example did not apply the declared term budget")
+        if probability_preparation:
+            if config.get("probability_preparation") != probability_preparation:
+                raise ValueError("Rust example did not apply the declared probability preparation")
+            rank = config.get("fiber_search_rank")
+            if ((probability_preparation == "fixed" and
+                 (type(rank) is not int or rank != fiber_search_rank))
+                    or (probability_preparation != "fixed" and rank is not None)):
+                raise ValueError("Rust example did not apply the declared fiber search rank")
         if compiler:
             strategy = {"shared": "SharedCommutingLayer", "parity_copies": "ParityCopies"}[compiler]
             compilation = actual.get("compilation")
@@ -190,6 +207,10 @@ def one(args, binary):
                        "--module-root", str(root)]
             if args.compiler:
                 command += ["--compiler", args.compiler]
+            if args.probability_preparation:
+                command += ["--probability-preparation", args.probability_preparation]
+                if args.probability_preparation == "fixed":
+                    command += ["--fiber-search-rank", str(args.fiber_search_rank)]
             try:
                 with tempfile.TemporaryDirectory(prefix="rmagna-prescribed-decoder-") as directory:
                     history = Path(directory) / "history.json"
@@ -203,13 +224,16 @@ def one(args, binary):
                                   stdout=result.stdout, stderr=result.stderr, reference=expected))
                 continue
             cases.append(compare_result(result, expected, word, options["max_terms"],
-                                        "error_observables" in compiled.task["raw"], compiler=args.compiler))
+                                        "error_observables" in compiled.task["raw"], compiler=args.compiler,
+                                        probability_preparation=args.probability_preparation,
+                                        fiber_search_rank=args.fiber_search_rank))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
                     upstream_commit=captured.manifest["upstream"]["commit"], native_sha256=captured.native_sha256,
                     reference_manifest_sha256=captured.manifest_sha256, rust_binary_sha256=binary_hash,
-                    compiler=args.compiler, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
+                    compiler=args.compiler, probability_preparation=args.probability_preparation,
+        fiber_search_rank=args.fiber_search_rank if args.probability_preparation=="fixed" else None, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                             for p in (config_path, root / "run.json", root / run["circuit"], root / run["task"])}, cases=cases)
 
 

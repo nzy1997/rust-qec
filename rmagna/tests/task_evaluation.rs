@@ -767,119 +767,128 @@ fn affine_causal_feedback_and_guarded_noise_are_unbiased_over_all_histories() {
             rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
         ),
     ] {
-        let mut options = EvaluationOptions::default();
-        options.runtime.history_sampler = HistorySampler::AffineSupport;
-        options.runtime.strategy = strategy;
-        options.runtime.compile.compiler_strategy = compiler_strategy;
-        let program = evaluator_options(
-            &files,
-            source,
-            r#"{"outputs":[2],"ideal_state":"ideal.magna","sample_records":[0,1,2]}"#,
-            &registry,
-            options,
-        );
-        let mut accepted = ExactField::zero();
-        let mut error = ExactField::zero();
-        let mut success = ExactField::zero();
-        let mut combined_proposal = ExactField::zero();
-        for fault in [false, true] {
-            let faults = if fault {
-                vec![FaultSelection {
-                    site: 2,
-                    alternative: 0,
-                }]
-            } else {
-                vec![]
-            };
-            let mut histories = BTreeMap::new();
-            for words in 0..8_u64 {
-                let draw = program
-                    .sample_prescribed(
-                        &faults,
-                        &mut Words::new((0..3).map(|j| words >> j & 1).collect()),
-                    )
-                    .unwrap();
-                let key = draw.sampled_records.clone();
-                if let Some(previous) = histories.insert(key, draw) {
-                    let current = histories.get(&previous.sampled_records).unwrap();
-                    assert_eq!(
-                        current.history_proposal_mass,
-                        previous.history_proposal_mass
-                    );
-                    assert_eq!(current.raw_acceptance, previous.raw_acceptance);
+        for preparation in [
+            rmagna::instrument::ProbabilityPreparation::Cold,
+            rmagna::instrument::ProbabilityPreparation::Trace,
+            rmagna::instrument::ProbabilityPreparation::FixedFibers(
+                rmagna::fibers::FiberOptions::default(),
+            ),
+        ] {
+            let mut options = EvaluationOptions::default();
+            options.runtime.compile.probability_preparation = preparation;
+            options.runtime.history_sampler = HistorySampler::AffineSupport;
+            options.runtime.strategy = strategy;
+            options.runtime.compile.compiler_strategy = compiler_strategy;
+            let program = evaluator_options(
+                &files,
+                source,
+                r#"{"outputs":[2],"ideal_state":"ideal.magna","sample_records":[0,1,2]}"#,
+                &registry,
+                options,
+            );
+            let mut accepted = ExactField::zero();
+            let mut error = ExactField::zero();
+            let mut success = ExactField::zero();
+            let mut combined_proposal = ExactField::zero();
+            for fault in [false, true] {
+                let faults = if fault {
+                    vec![FaultSelection {
+                        site: 2,
+                        alternative: 0,
+                    }]
+                } else {
+                    vec![]
+                };
+                let mut histories = BTreeMap::new();
+                for words in 0..8_u64 {
+                    let draw = program
+                        .sample_prescribed(
+                            &faults,
+                            &mut Words::new((0..3).map(|j| words >> j & 1).collect()),
+                        )
+                        .unwrap();
+                    let key = draw.sampled_records.clone();
+                    if let Some(previous) = histories.insert(key, draw) {
+                        let current = histories.get(&previous.sampled_records).unwrap();
+                        assert_eq!(
+                            current.history_proposal_mass,
+                            previous.history_proposal_mass
+                        );
+                        assert_eq!(current.raw_acceptance, previous.raw_acceptance);
+                    }
                 }
-            }
-            let mut proposal_sum = ExactField::zero();
-            for (bits, draw) in histories {
-                let q = f
-                    .from_scalar(draw.history_proposal_mass.as_ref().unwrap())
-                    .unwrap();
-                proposal_sum = f.add(&proposal_sum, &q).unwrap();
-                let (b0, b1, b2) = (bits[0], bits[1], bits[2]);
-                assert_eq!(b2, b0 ^ b1 ^ (b0 && fault));
-                assert_eq!(draw.controller_calls.len(), 2);
-                assert_eq!(draw.controller_calls[0].inputs, [b0]);
-                assert_eq!(draw.controller_calls[1].inputs, [b1, b0]);
-                assert_eq!(draw.controller_calls[1].outputs, [b0 ^ b1]);
-                let physical = if b0 {
-                    a.multiply(&p1, &a.omega(0, -2).unwrap()).unwrap()
-                } else if b1 {
-                    ExactScalar::zero()
-                } else {
-                    p0.clone()
-                };
-                assert_eq!(draw.history_mass, physical);
-                let conditional = f.divide(&f.from_scalar(&physical).unwrap(), &q).unwrap();
-                assert_eq!(
-                    draw.accepted,
-                    if b1 {
-                        ExactField::zero()
+                let mut proposal_sum = ExactField::zero();
+                for (bits, draw) in histories {
+                    let q = f
+                        .from_scalar(draw.history_proposal_mass.as_ref().unwrap())
+                        .unwrap();
+                    proposal_sum = f.add(&proposal_sum, &q).unwrap();
+                    let (b0, b1, b2) = (bits[0], bits[1], bits[2]);
+                    assert_eq!(b2, b0 ^ b1 ^ (b0 && fault));
+                    assert_eq!(draw.controller_calls.len(), 2);
+                    assert_eq!(draw.controller_calls[0].inputs, [b0]);
+                    assert_eq!(draw.controller_calls[1].inputs, [b1, b0]);
+                    assert_eq!(draw.controller_calls[1].outputs, [b0 ^ b1]);
+                    let physical = if b0 {
+                        a.multiply(&p1, &a.omega(0, -2).unwrap()).unwrap()
+                    } else if b1 {
+                        ExactScalar::zero()
                     } else {
-                        conditional.clone()
-                    }
-                );
-                assert_eq!(
-                    draw.error,
-                    if !b1 && b2 {
-                        conditional
+                        p0.clone()
+                    };
+                    assert_eq!(draw.history_mass, physical);
+                    let conditional = f.divide(&f.from_scalar(&physical).unwrap(), &q).unwrap();
+                    assert_eq!(
+                        draw.accepted,
+                        if b1 {
+                            ExactField::zero()
+                        } else {
+                            conditional.clone()
+                        }
+                    );
+                    assert_eq!(
+                        draw.error,
+                        if !b1 && b2 {
+                            conditional
+                        } else {
+                            ExactField::zero()
+                        }
+                    );
+                    let noise = if b0 {
+                        BigRational::new(if fault { 1.into() } else { 2.into() }, 3.into())
                     } else {
-                        ExactField::zero()
-                    }
-                );
-                let noise = if b0 {
-                    BigRational::new(if fault { 1.into() } else { 2.into() }, 3.into())
-                } else {
-                    BigRational::from_integer(1.into())
-                };
-                assert_eq!(draw.noise_probability, noise);
-                if fault && !b0 {
-                    continue;
-                } // The inactive channel has one physical identity path.
-                let probability = f.multiply(&q, &f.from_rational(noise).unwrap()).unwrap();
-                combined_proposal = f.add(&combined_proposal, &probability).unwrap();
-                accepted = f
-                    .add(
-                        &accepted,
-                        &f.multiply(&probability, &draw.accepted).unwrap(),
-                    )
-                    .unwrap();
-                error = f
-                    .add(&error, &f.multiply(&probability, &draw.error).unwrap())
-                    .unwrap();
-                success = f
-                    .add(
-                        &success,
-                        &f.multiply(&probability, draw.target_success.as_ref().unwrap())
-                            .unwrap(),
-                    )
-                    .unwrap();
+                        BigRational::from_integer(1.into())
+                    };
+                    assert_eq!(draw.noise_probability, noise);
+                    if fault && !b0 {
+                        continue;
+                    } // The inactive channel has one physical identity path.
+                    let probability = f.multiply(&q, &f.from_rational(noise).unwrap()).unwrap();
+                    combined_proposal = f.add(&combined_proposal, &probability).unwrap();
+                    accepted = f
+                        .add(
+                            &accepted,
+                            &f.multiply(&probability, &draw.accepted).unwrap(),
+                        )
+                        .unwrap();
+                    error = f
+                        .add(&error, &f.multiply(&probability, &draw.error).unwrap())
+                        .unwrap();
+                    success = f
+                        .add(
+                            &success,
+                            &f.multiply(&probability, draw.target_success.as_ref().unwrap())
+                                .unwrap(),
+                        )
+                        .unwrap();
+                }
+                assert_eq!(proposal_sum, ExactField::one());
             }
-            assert_eq!(proposal_sum, ExactField::one());
+            assert_eq!(combined_proposal, ExactField::one());
+            assert_eq!(accepted, expected_accepted);
+            assert_eq!(error, expected_error);
+            assert_eq!(success, f.subtract(&accepted, &error).unwrap());
         }
-        assert_eq!(combined_proposal, ExactField::one());
-        assert_eq!(accepted, expected_accepted);
-        assert_eq!(error, expected_error);
-        assert_eq!(success, f.subtract(&accepted, &error).unwrap());
     }
 }
 

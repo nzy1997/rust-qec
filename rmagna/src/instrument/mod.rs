@@ -2,6 +2,7 @@
 
 mod gates;
 mod lower;
+mod probabilities;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
@@ -10,6 +11,7 @@ use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::unitary::{CompiledUnitary, NetworkValue, PauliInsertion, UnitaryError};
 use num_rational::BigRational;
 use num_traits::One;
+pub use probabilities::{PreparedProbabilityStatistics, ProbabilityPreparation};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -22,6 +24,7 @@ pub enum InstrumentError {
         operation: usize,
     },
     NonAffineQuery,
+    PreparedQueryCacheUnavailable,
     UnknownDecision {
         call: usize,
         bit: usize,
@@ -65,6 +68,10 @@ impl fmt::Display for InstrumentError {
             Self::UnknownDecision { call, bit } => write!(
                 f,
                 "decision slot {bit} of controller call {call} is absent from the template"
+            ),
+            Self::PreparedQueryCacheUnavailable => write!(
+                f,
+                "prepared probability cache is unavailable after an interrupted preparation"
             ),
             Self::NonAffineQuery => write!(
                 f,
@@ -126,6 +133,8 @@ impl From<UnitaryError> for InstrumentError {
 #[derive(Clone, Copy, Debug)]
 pub struct CompileOptions {
     pub compiler_strategy: crate::unitary::CompilerStrategy,
+    pub probability_preparation: ProbabilityPreparation,
+    pub max_prepared_probabilities: usize,
     pub max_coherent_qubits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
@@ -134,6 +143,8 @@ impl Default for CompileOptions {
     fn default() -> Self {
         Self {
             compiler_strategy: crate::unitary::CompilerStrategy::ParityCopies,
+            probability_preparation: ProbabilityPreparation::Cold,
+            max_prepared_probabilities: 64,
             max_coherent_qubits: 65536,
             max_gates: 1_000_000,
             max_noise_sites: 1_000_000,
@@ -180,6 +191,7 @@ pub struct FaultSelection {
 #[derive(Clone)]
 pub struct CompiledInstrument {
     unitary: Arc<CompiledUnitary>,
+    probability_queries: Arc<probabilities::ProbabilityQueries>,
     live_wires: Arc<Vec<usize>>,
     record_wires: Arc<Vec<usize>>,
     event_rows: Arc<Vec<BitVector>>,
@@ -222,6 +234,24 @@ impl CompiledInstrument {
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         self.unitary.compilation()
     }
+    pub fn prepared_probability_statistics(
+        &self,
+    ) -> Result<PreparedProbabilityStatistics, InstrumentError> {
+        self.probability_queries.statistics()
+    }
+    fn probability(
+        &self,
+        rows: &[BitVector],
+        outcomes: &BitVector,
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, InstrumentError> {
+        let state = self.inserted(faults, arithmetic)?;
+        self.probability_queries
+            .evaluate(&state, rows, outcomes, max_terms, arithmetic)
+    }
+
     pub fn num_qubits(&self) -> usize {
         self.live_wires.len()
     }
@@ -356,12 +386,13 @@ impl CompiledInstrument {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
-        Ok(self.inserted(faults, arithmetic)?.probability_z(
+        self.probability(
             &self.event_rows,
             &self.outcomes,
+            faults,
             max_terms,
             arithmetic,
-        )?)
+        )
     }
     fn output_wires(&self, outputs: &[usize]) -> Result<Vec<usize>, InstrumentError> {
         let mut seen = BTreeSet::new();
@@ -410,9 +441,7 @@ impl CompiledInstrument {
                 outcomes.get(j)? ^ parity.constant,
             )?;
         }
-        Ok(self
-            .inserted(faults, arithmetic)?
-            .probability_z(&rows, &rhs, max_terms, arithmetic)?)
+        self.probability(&rows, &rhs, faults, max_terms, arithmetic)
     }
     pub fn target_density_weight(
         &self,
@@ -470,8 +499,13 @@ impl CompiledInstrument {
     ) -> Result<ExactMasses, InstrumentError> {
         let physical = self.output_wires(outputs)?;
         let unitary = self.inserted(faults, arithmetic)?;
-        let accepted =
-            unitary.probability_z(&self.event_rows, &self.outcomes, max_terms, arithmetic)?;
+        let accepted = self.probability_queries.evaluate(
+            &unitary,
+            &self.event_rows,
+            &self.outcomes,
+            max_terms,
+            arithmetic,
+        )?;
         let target_success = unitary.target_weight(
             &physical,
             target,
@@ -532,9 +566,7 @@ impl CompiledInstrument {
             rows.push(self.parity_row(parity)?);
             rhs.set(i, rhs.get(i)? ^ parity.constant)?;
         }
-        Ok(self
-            .inserted(faults, arithmetic)?
-            .probability_z(&rows, &rhs, max_terms, arithmetic)?)
+        self.probability(&rows, &rhs, faults, max_terms, arithmetic)
     }
     fn parity_row(&self, expression: &BitExpr) -> Result<BitVector, InstrumentError> {
         record_row(expression, &self.record_wires, self.unitary.width())

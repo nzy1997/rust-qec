@@ -78,6 +78,31 @@ class ControllerComparisonTests(unittest.TestCase):
                         self.assertEqual(row["reference"], expected())
                         self.assertIn("compiler strategy", row["error"])
 
+    def test_prepared_configuration_requires_actual_mode_and_exact_integer_search_rank(self):
+        for mode in ["cold", "trace", "fixed"]:
+            for rank in [0, 16]:
+                required_rank = rank if mode == "fixed" else None
+                configurations = [dict(probability_preparation=mode, fiber_search_rank=required_rank),
+                                  dict(probability_preparation="wrong", fiber_search_rank=required_rank),
+                                  dict(probability_preparation=mode, fiber_search_rank=False),
+                                  dict(probability_preparation=mode, fiber_search_rank="0")]
+                for index, config in enumerate(configurations):
+                    with self.subTest(mode=mode, rank=rank, config=config):
+                        actual = valid()
+                        actual["configuration"].update(config)
+                        payload = json.dumps(actual)
+                        row = driver.compare_result(subprocess.CompletedProcess([], 0, payload, "prepared-stderr"),
+                                                    expected(), 0, 16, False,
+                                                    probability_preparation=mode, fiber_search_rank=rank)
+                        self.assertEqual(row["reference"], expected())
+                        if index == 0:
+                            self.assertEqual(row["status"], "matched")
+                            self.assertEqual(row["rust"], actual)
+                        else:
+                            self.assertEqual(row["status"], "failed")
+                            self.assertEqual(row["stdout"], payload)
+                            self.assertEqual(row["stderr"], "prepared-stderr")
+
     def test_malformed_first_or_second_history_keeps_both_cases_and_task_provenance(self):
         # Stub only the native boundary to keep this failure-control test offline.
         # The real native differential pilot separately verifies quantum values.
@@ -113,7 +138,8 @@ class ControllerComparisonTests(unittest.TestCase):
             (task / "task").write_text("{}")
             binary = root / "binary"
             binary.write_text("unchanged offline identity")
-            args = Namespace(upstream=root, one="dk", timeout=1, compiler=None)
+            args = Namespace(upstream=root, one="dk", timeout=1, compiler=None,
+                             probability_preparation=None, fiber_search_rank=16)
             for broken in [0, 1]:
                 calls = []
                 def rust(command, **kwargs):

@@ -1407,3 +1407,57 @@ such; a smaller evaluation budget rejects the fixed resource. Structural zero
 queries still return zero without enumeration. The default `prepare_probability`
 retains adaptive query-specific closure. Final Gaussian elimination remains
 query-specific in the fixed-resource mode; whole-runtime caching is separate.
+
+## Bounded instrument probability preparation
+
+`CompileOptions::probability_preparation` selects `Cold` (the default), `Trace`
+(shared trace/contraction plans), or `FixedFibers(options)` (also shared certified
+phase resources). Reported and accepted probability interfaces use the selected
+mode. Conditioned and decision branches share immutable plans keyed by ordered
+physical event rows; outcomes, expression constants and faults may change.
+Preparation from a perturbed branch uses its original program. Target-density
+and Pauli-moment closures retain their documented preparation paths.
+
+`max_prepared_probabilities` bounds retained query families (default 64). Exceeding
+that bound or a term budget returns an error; there is no strategy fallback.
+Fixed-resource preparation that fails its term budget remains retryable. One lock
+serializes preparation across threads, and evaluation releases the lock first.
+Plans own their programs; programs do not own the cache. `prepared_probability_statistics()`
+reports retained query and fixed-resource counts. A task evaluator reports `None`
+when cold-prefix execution has no persistent instrument cache.
+
+```rust
+use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+use rmagna::gf2::BitVector;
+use rmagna::instrument::{CompileOptions, ProbabilityPreparation, compile_affine};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nM 0", &ParseOptions::default())?;
+let options = CompileOptions {
+    probability_preparation: ProbabilityPreparation::Trace,
+    max_prepared_probabilities: 1,
+    ..Default::default()
+};
+let program = compile_affine(&source, &options, &arithmetic)?;
+let row = BitExpr::atom(BitAtom::Record(0));
+for outcome in [BitVector::zeros(1)?, BitVector::from_indices(1, [0])?] {
+    assert_eq!(program.reported_probability(&[row.clone()], &outcome, &[], 1, &arithmetic)?.value,
+        arithmetic.omega(0, -2)?);
+}
+assert_eq!(program.prepared_probability_statistics()?.cached_queries, 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`evaluate_task --probability-preparation cold|trace|fixed` records the actual mode,
+cache limit and retained counts. Fixed mode accepts `--fiber-search-rank N`;
+`--max-prepared-probabilities N` adjusts the family bound. Both differential task
+drivers accept `--probability-preparation` and `--fiber-search-rank`, verify the
+Rust configuration, and retain these settings in their receipts. Per-bit exact
+marginals can create many distinct families; grouped affine-history proposals
+usually use fewer. These options make no whole-runtime or formal throughput claim.
+
+Bounded fixed-resource diagnostics with search rank 64 match all 26 affine
+packaged tasks and both prescribed TQD3 histories against the pinned native
+implementation. TQD3 retains 20 query/resource families, with two acceptance
+terms and four target terms. These are exact no-fault correctness witnesses,
+not the 31-task draw matrix or paper precision/performance results.

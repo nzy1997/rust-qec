@@ -319,6 +319,15 @@ impl CausalProgram {
             options,
         })
     }
+    pub fn prepared_probability_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedProbabilityStatistics>, RuntimeError> {
+        Ok(self
+            .reference
+            .as_ref()
+            .map(CompiledInstrument::prepared_probability_statistics)
+            .transpose()?)
+    }
     /// Initial reference diagnostics: the shared template in `FixedTemplate`,
     /// or the potential instrument with unresolved decisions false in `ColdPrefix`.
     /// A resolved cold branch can have different layers, width and path counts.

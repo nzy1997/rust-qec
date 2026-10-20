@@ -276,123 +276,146 @@ fn prescribed_faults_match_native_instrument_masses_including_bh2() {
         rmagna::unitary::CompilerStrategy::ParityCopies,
         rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
     ] {
-        let options = CompileOptions {
-            compiler_strategy,
-            ..Default::default()
-        };
-        let mut cache = std::collections::BTreeMap::new();
-        for (index, vector) in vectors.iter().enumerate() {
-            let name = vector["case"].as_str().unwrap();
-            let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
-                let (source, ideal) = if name == "bh2-T" {
-                    (
-                        include_str!("data/magna-bh2/physical.magna"),
-                        include_str!("data/magna-bh2/ideal.magna"),
-                    )
-                } else {
-                    (
-                        vector["source"].as_str().unwrap(),
-                        vector["ideal"].as_str().unwrap(),
-                    )
-                };
-                let parsed = circuit(source);
-                let protocol = compile_affine(&parsed, &options, &arithmetic).unwrap();
-                (
-                    parsed,
-                    protocol,
-                    compile_unitary(&circuit(ideal), &options, &arithmetic).unwrap(),
-                )
-            });
-            let parsed = &*parsed;
-            let mut faults = Vec::new();
-            for fault in vector["faults"].as_array().unwrap() {
-                let line = fault["line"].as_u64().unwrap() as usize;
-                let candidates = protocol
-                    .noise_sites()
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(site, noise)| {
-                        noise.source_operations().iter().enumerate().filter_map(
-                            move |(alternative, &op)| {
-                                (parsed.operations()[op].location.line == line
-                                    && matches!(
-                                        parsed.operations()[op].operation,
-                                        Operation::Noise { .. }
-                                    ))
-                                .then_some(FaultSelection { site, alternative })
-                            },
+        for probability_preparation in [
+            rmagna::instrument::ProbabilityPreparation::Cold,
+            rmagna::instrument::ProbabilityPreparation::Trace,
+            rmagna::instrument::ProbabilityPreparation::FixedFibers(
+                rmagna::fibers::FiberOptions::default(),
+            ),
+        ] {
+            let options = CompileOptions {
+                probability_preparation,
+                compiler_strategy,
+                ..Default::default()
+            };
+            let mut cache = std::collections::BTreeMap::new();
+            for (index, vector) in vectors.iter().enumerate() {
+                let name = vector["case"].as_str().unwrap();
+                let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
+                    let (source, ideal) = if name == "bh2-T" {
+                        (
+                            include_str!("data/magna-bh2/physical.magna"),
+                            include_str!("data/magna-bh2/ideal.magna"),
                         )
-                    })
-                    .collect::<Vec<_>>();
-                assert_eq!(
-                    candidates.len(),
-                    1,
-                    "unambiguous source noise at line {line}"
-                );
-                faults.push(candidates[0]);
-            }
-            for record in vector["report_flips"].as_array().unwrap() {
-                let record = record.as_u64().unwrap() as usize;
-                let candidates = protocol
-                    .noise_sites()
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(site, noise)| {
-                        noise
-                            .source_operations()
-                            .iter()
-                            .any(|&op| {
-                                matches!(parsed.operations()[op].operation,
-                    Operation::Measure { record: r, .. } if r == record)
-                            })
-                            .then_some(FaultSelection {
-                                site,
-                                alternative: 0,
-                            })
-                    })
-                    .collect::<Vec<_>>();
-                assert_eq!(candidates.len(), 1);
-                faults.push(candidates[0]);
-            }
-            let outputs = vector["outputs"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| v.as_u64().unwrap() as usize)
-                .collect::<Vec<_>>();
-            let masses = protocol
-                .masses(
-                    &outputs,
-                    ideal,
-                    &faults,
-                    if name == "bh2-T" { 1 } else { 256 },
-                    &arithmetic,
-                )
-                .unwrap();
-            for (actual, key) in [
-                (&masses.accepted.value, "accepted"),
-                (&masses.target_success.value, "target_success"),
-                (&masses.error, "error"),
-            ] {
-                let expected = &vector[key];
-                let coefficients = std::array::from_fn(|i| {
-                    expected["coefficients"][i]
-                        .as_str()
-                        .unwrap()
-                        .parse()
-                        .unwrap()
+                    } else {
+                        (
+                            vector["source"].as_str().unwrap(),
+                            vector["ideal"].as_str().unwrap(),
+                        )
+                    };
+                    let parsed = circuit(source);
+                    let protocol = compile_affine(&parsed, &options, &arithmetic).unwrap();
+                    (
+                        parsed,
+                        protocol,
+                        compile_unitary(&circuit(ideal), &options, &arithmetic).unwrap(),
+                    )
                 });
-                assert_eq!(
-                    actual,
-                    &arithmetic
-                        .scalar(coefficients, expected["power"].as_i64().unwrap())
-                        .unwrap(),
-                    "{name} vector {index} {key}"
-                );
-            }
-            if name == "bh2-T" && faults.is_empty() {
-                assert_eq!(masses.accepted.terms, 1);
-                assert_eq!(masses.target_success.terms, 1);
+                let parsed = &*parsed;
+                let mut faults = Vec::new();
+                for fault in vector["faults"].as_array().unwrap() {
+                    let line = fault["line"].as_u64().unwrap() as usize;
+                    let candidates = protocol
+                        .noise_sites()
+                        .iter()
+                        .enumerate()
+                        .flat_map(|(site, noise)| {
+                            noise.source_operations().iter().enumerate().filter_map(
+                                move |(alternative, &op)| {
+                                    (parsed.operations()[op].location.line == line
+                                        && matches!(
+                                            parsed.operations()[op].operation,
+                                            Operation::Noise { .. }
+                                        ))
+                                    .then_some(FaultSelection { site, alternative })
+                                },
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(
+                        candidates.len(),
+                        1,
+                        "unambiguous source noise at line {line}"
+                    );
+                    faults.push(candidates[0]);
+                }
+                for record in vector["report_flips"].as_array().unwrap() {
+                    let record = record.as_u64().unwrap() as usize;
+                    let candidates = protocol
+                        .noise_sites()
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(site, noise)| {
+                            noise
+                                .source_operations()
+                                .iter()
+                                .any(|&op| {
+                                    matches!(parsed.operations()[op].operation,
+                    Operation::Measure { record: r, .. } if r == record)
+                                })
+                                .then_some(FaultSelection {
+                                    site,
+                                    alternative: 0,
+                                })
+                        })
+                        .collect::<Vec<_>>();
+                    assert_eq!(candidates.len(), 1);
+                    faults.push(candidates[0]);
+                }
+                let outputs = vector["outputs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_u64().unwrap() as usize)
+                    .collect::<Vec<_>>();
+                let masses = protocol
+                    .masses(
+                        &outputs,
+                        ideal,
+                        &faults,
+                        if name == "bh2-T"
+                            && !matches!(
+                                probability_preparation,
+                                rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
+                            )
+                        {
+                            1
+                        } else {
+                            256
+                        },
+                        &arithmetic,
+                    )
+                    .unwrap();
+                for (actual, key) in [
+                    (&masses.accepted.value, "accepted"),
+                    (&masses.target_success.value, "target_success"),
+                    (&masses.error, "error"),
+                ] {
+                    let expected = &vector[key];
+                    let coefficients = std::array::from_fn(|i| {
+                        expected["coefficients"][i]
+                            .as_str()
+                            .unwrap()
+                            .parse()
+                            .unwrap()
+                    });
+                    assert_eq!(
+                        actual,
+                        &arithmetic
+                            .scalar(coefficients, expected["power"].as_i64().unwrap())
+                            .unwrap(),
+                        "{name} vector {index} {key}"
+                    );
+                }
+                if name == "bh2-T" && faults.is_empty() {
+                    if !matches!(
+                        probability_preparation,
+                        rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
+                    ) {
+                        assert_eq!(masses.accepted.terms, 1);
+                    }
+                    assert_eq!(masses.target_success.terms, 1);
+                }
             }
         }
     }
@@ -646,5 +669,221 @@ fn categorical_channels_keep_stim_order_and_exact_mutually_exclusive_weights() {
             );
         }
         assert_eq!(total, num_rational::BigRational::from_integer(1.into()));
+    }
+}
+
+#[test]
+fn prepared_instrument_probabilities_reuse_fault_and_outcome_families() {
+    use rmagna::instrument::ProbabilityPreparation as P;
+    let a = ScalarArithmetic::default();
+    let source = circuit(
+        "H 0\nT 0\nZ_ERROR(1/7) 0\nH 0\nM(1/5) !0\nCX rec[-1] 1\nM 1\nDETECTOR rec[-1]\nPOSTSELECT det[0]",
+    );
+    let cold = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+    let r0 = BitExpr::atom(BitAtom::Record(0));
+    let r1 = BitExpr::atom(BitAtom::Record(1));
+    for compiler in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for preparation in [
+            P::Cold,
+            P::Trace,
+            P::FixedFibers(rmagna::fibers::FiberOptions::default()),
+        ] {
+            let options = CompileOptions {
+                compiler_strategy: compiler,
+                probability_preparation: preparation,
+                max_prepared_probabilities: 8,
+                ..Default::default()
+            };
+            let protocol = compile_affine(&source, &options, &a).unwrap();
+            for fault_mask in 0..4 {
+                let faults = (0..2)
+                    .filter(|&site| fault_mask & (1 << site) != 0)
+                    .map(|site| FaultSelection {
+                        site,
+                        alternative: 0,
+                    })
+                    .collect::<Vec<_>>();
+                for outcome in 0..4 {
+                    let bits =
+                        BitVector::from_indices(2, (0..2).filter(|&j| outcome & (1 << j) != 0))
+                            .unwrap();
+                    let rows = [r0.clone(), r1.clone()];
+                    assert_eq!(
+                        protocol
+                            .reported_probability(&rows, &bits, &faults, 256, &a)
+                            .unwrap()
+                            .value,
+                        cold.reported_probability(&rows, &bits, &faults, 256, &a)
+                            .unwrap()
+                            .value
+                    );
+                }
+                for outcome in 0..2 {
+                    let bits = BitVector::from_indices(1, (outcome != 0).then_some(0)).unwrap();
+                    assert_eq!(
+                        protocol
+                            .accepted_probability(
+                                std::slice::from_ref(&r0),
+                                &bits,
+                                &faults,
+                                256,
+                                &a
+                            )
+                            .unwrap()
+                            .value,
+                        cold.accepted_probability(
+                            std::slice::from_ref(&r0),
+                            &bits,
+                            &faults,
+                            256,
+                            &a
+                        )
+                        .unwrap()
+                        .value
+                    );
+                    let mut inverted = r0.clone();
+                    inverted.constant = true;
+                    assert_eq!(
+                        protocol
+                            .reported_probability(&[inverted], &bits, &faults, 256, &a)
+                            .unwrap()
+                            .value,
+                        cold.reported_probability(
+                            std::slice::from_ref(&r0),
+                            &BitVector::from_indices(1, (outcome == 0).then_some(0)).unwrap(),
+                            &faults,
+                            256,
+                            &a
+                        )
+                        .unwrap()
+                        .value
+                    );
+                }
+                assert_eq!(
+                    protocol.acceptance(&faults, 256, &a).unwrap().value,
+                    cold.acceptance(&faults, 256, &a).unwrap().value
+                );
+                let stats = protocol.prepared_probability_statistics().unwrap();
+                assert_eq!(
+                    stats.cached_queries,
+                    if matches!(preparation, P::Cold) { 0 } else { 4 }
+                );
+                assert_eq!(
+                    stats.fixed_resources,
+                    if matches!(preparation, P::FixedFibers(_)) {
+                        4
+                    } else {
+                        0
+                    }
+                );
+            }
+            // Clones retain one bounded cache, including concurrent first use.
+            let clone = protocol.clone();
+            assert_eq!(
+                clone.prepared_probability_statistics().unwrap(),
+                protocol.prepared_probability_statistics().unwrap()
+            );
+        }
+    }
+}
+
+#[test]
+fn probability_cache_limits_and_concurrent_preparation_remain_explicit() {
+    use rmagna::instrument::ProbabilityPreparation as P;
+    let a = ScalarArithmetic::default();
+    let source = circuit("H 0\nT 0\nH 0\nM 0");
+    let row = BitExpr::atom(BitAtom::Record(0));
+    for preparation in [
+        P::Trace,
+        P::FixedFibers(rmagna::fibers::FiberOptions::default()),
+    ] {
+        let options = CompileOptions {
+            probability_preparation: preparation,
+            max_prepared_probabilities: 1,
+            ..Default::default()
+        };
+        let protocol = compile_affine(&source, &options, &a).unwrap();
+        let cold = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+        std::thread::scope(|scope| {
+            for bit in 0..8 {
+                let protocol = &protocol;
+                let row = &row;
+                let cold = &cold;
+                let a = &a;
+                scope.spawn(move || {
+                    let outcome = BitVector::from_indices(1, (bit & 1 != 0).then_some(0)).unwrap();
+                    assert_eq!(
+                        protocol
+                            .reported_probability(std::slice::from_ref(row), &outcome, &[], 256, a)
+                            .unwrap()
+                            .value,
+                        cold.reported_probability(std::slice::from_ref(row), &outcome, &[], 256, a)
+                            .unwrap()
+                            .value
+                    );
+                });
+            }
+        });
+        assert_eq!(
+            protocol
+                .prepared_probability_statistics()
+                .unwrap()
+                .cached_queries,
+            1
+        );
+        assert!(matches!(
+            protocol.acceptance(&[], 256, &a),
+            Err(InstrumentError::ResourceLimit {
+                option: "max_prepared_probabilities",
+                limit: 1,
+                required: 2
+            })
+        ));
+        let zero = CompileOptions {
+            max_prepared_probabilities: 0,
+            ..options
+        };
+        assert!(matches!(
+            compile_affine(&source, &zero, &a),
+            Err(InstrumentError::ResourceLimit {
+                option: "max_prepared_probabilities",
+                ..
+            })
+        ));
+        let empty = compile_affine(&source, &options, &a).unwrap();
+        assert!(
+            empty
+                .reported_probability(
+                    std::slice::from_ref(&row),
+                    &BitVector::zeros(1).unwrap(),
+                    &[],
+                    0,
+                    &a
+                )
+                .is_err()
+        );
+        if matches!(preparation, P::FixedFibers(_)) {
+            assert_eq!(
+                empty
+                    .prepared_probability_statistics()
+                    .unwrap()
+                    .cached_queries,
+                0
+            );
+        }
+        // A failed preparation remains retryable with a sufficient term budget.
+        let outcome = BitVector::zeros(1).unwrap();
+        assert_eq!(
+            empty
+                .reported_probability(std::slice::from_ref(&row), &outcome, &[], 256, &a)
+                .unwrap()
+                .value,
+            cold.reported_probability(std::slice::from_ref(&row), &outcome, &[], 256, &a)
+                .unwrap()
+                .value
+        );
     }
 }

@@ -432,6 +432,10 @@ pub(super) fn compile(
     }
     Ok(CompiledInstrument {
         unitary: Arc::new(unitary),
+        probability_queries: Arc::new(probabilities::ProbabilityQueries::new(
+            options.probability_preparation,
+            options.max_prepared_probabilities,
+        )?),
         live_wires: Arc::new(state.live),
         record_wires: Arc::new(state.records),
         event_rows: Arc::new(rows),

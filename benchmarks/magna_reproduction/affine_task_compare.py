@@ -8,10 +8,12 @@ import subprocess
 import sys
 
 
-def compare_affine_result(result, expected, max_terms, compiler):
+def compare_affine_result(result, expected, max_terms, compiler,
+                          probability_preparation=None, fiber_search_rank=16):
     """Share history-output admission and retain raw evidence on failure."""
     from controller_task_compare import compare_result
-    case = compare_result(result, expected, None, max_terms, False, compiler=compiler)
+    case = compare_result(result, expected, None, max_terms, False, compiler=compiler,
+                          probability_preparation=probability_preparation, fiber_search_rank=fiber_search_rank)
     case.pop("constant_word")
     if case["status"] == "failed":
         case["message"] = case["error"]
@@ -23,8 +25,12 @@ def main():
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--rust-example", type=Path, required=True)
     parser.add_argument("--compiler", choices=["shared", "parity_copies"])
+    parser.add_argument("--probability-preparation", choices=["cold", "trace", "fixed"])
+    parser.add_argument("--fiber-search-rank", type=int, default=16)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    if args.fiber_search_rank < 0 or (args.probability_preparation != "fixed" and args.fiber_search_rank != 16):
+        parser.error("a custom nonnegative fiber search rank requires fixed preparation")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import reference
     from witness_environment import native_reference
@@ -57,12 +63,17 @@ def main():
                     command += ["--compiler", args.compiler]
                 inputs = {p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                           for p in (physical, task, root / "run.json")}
+                if args.probability_preparation:
+                    command += ["--probability-preparation", args.probability_preparation]
+                    if args.probability_preparation == "fixed":
+                        command += ["--fiber-search-rank", str(args.fiber_search_rank)]
                 rust = subprocess.run(command, text=True, capture_output=True, timeout=40)
                 if rust.returncode:
                     rows.append(dict(task=name, status="failed", returncode=rust.returncode,
                                      stdout=rust.stdout, stderr=rust.stderr, reference=expected, inputs=inputs))
                     continue
-                case = compare_affine_result(rust, expected, max_terms, args.compiler)
+                case = compare_affine_result(rust, expected, max_terms, args.compiler,
+                                             args.probability_preparation, args.fiber_search_rank)
                 rows.append(dict(task=name, **case, inputs=inputs))
             except subprocess.TimeoutExpired:
                 rows.append(dict(task=name, status="timeout", limit_seconds=40))
@@ -74,7 +85,8 @@ def main():
                         scope="prescribed no-fault exact masses; no paper precision or performance claim",
                         upstream_commit=captured.manifest["upstream"]["commit"], reference_manifest_sha256=captured.manifest_sha256,
                         native_sha256=captured.native_sha256, rust_binary_sha256=binary_hash,
-                        compiler=args.compiler, tasks=captured.manifest["tasks"], cases=rows, affine_subset_complete=not failures)
+                        compiler=args.compiler, probability_preparation=args.probability_preparation,
+        fiber_search_rank=args.fiber_search_rank if args.probability_preparation=="fixed" else None, tasks=captured.manifest["tasks"], cases=rows, affine_subset_complete=not failures)
     if reference.digest(binary) != binary_hash:
         raise RuntimeError("Rust task evaluator binary changed during comparison")
     with args.out.open("x", encoding="utf-8") as output:
