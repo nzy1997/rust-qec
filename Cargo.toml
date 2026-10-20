@@ -3,6 +3,7 @@ members = [
     "qec-ilp-core",
     "qec-code",
     "renvelope",
+    "rmagna",
     "rstim",
     "rstim-shot-web",
     "rsinter",

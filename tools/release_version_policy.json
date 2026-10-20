@@ -23,6 +23,10 @@
   ],
   "independent": [
     {
+      "name": "rmagna",
+      "path": "rmagna"
+    },
+    {
       "name": "qec-ilp-core",
       "path": "qec-ilp-core"
     },

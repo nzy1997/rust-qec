@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a Cargo workspace with eleven Rust packages and one local Typst package. `rstim/` contains the simulator, CLI, code generators, QP101 export, and most circuit logic; key submodules live under `rstim/src/codegen/` and `rstim/src/sim/`. `rsinter/` builds analysis and reporting tools on top of `rstim`, while the other packages provide QEC code, decoder, solver, envelope, CLI, WebAssembly, and benchmark-bridge components. Integration tests are organized by feature within the owning workspace member, including `rstim/tests/` and `rsinter/tests/`, with file names such as `cli_export_json.rs` or `dem_ir.rs`. `qp101-viz/` is the local Typst package: `lib.typ` is the entrypoint, `examples/` holds committed demos, and `checks/` holds renderer fixtures. Scratch material belongs in ignored paths like root `drafts/`, `qp101-viz/drafts/`, and `qp101-viz/draft_figs/`.
+This repository is a Cargo workspace with twelve Rust packages and one local Typst package. `rstim/` contains the simulator, CLI, code generators, QP101 export, and most circuit logic; key submodules live under `rstim/src/codegen/` and `rstim/src/sim/`. `rsinter/` builds analysis and reporting tools on top of `rstim`. `rmagna/` provides independent exact algebra foundations for global-network near-Clifford simulation. The other packages provide QEC code, decoder, solver, envelope, CLI, WebAssembly, and benchmark-bridge components. Integration tests are organized by feature within the owning workspace member, including `rstim/tests/` and `rsinter/tests/`, with file names such as `cli_export_json.rs` or `dem_ir.rs`. `qp101-viz/` is the local Typst package: `lib.typ` is the entrypoint, `examples/` holds committed demos, and `checks/` holds renderer fixtures. Scratch material belongs in ignored paths like root `drafts/`, `qp101-viz/drafts/`, and `qp101-viz/draft_figs/`.
 
 ## Current Workspace Members
 The package-to-directory map below is checked against `cargo metadata --no-deps --format-version 1` by `python3 tools/check_agent_entry.py --repo-root .`.
@@ -9,6 +9,7 @@ The package-to-directory map below is checked against `cargo metadata --no-deps 
 - `qec-ilp-core` — `qec-ilp-core/`
 - `qec-code` — `qec-code/`
 - `renvelope` — `renvelope/`
+- `rmagna` — `rmagna/`
 - `rstim` — `rstim/`
 - `rstim-shot-web` — `rstim-shot-web/`
 - `rsinter` — `rsinter/`
