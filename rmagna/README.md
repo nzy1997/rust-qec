@@ -3,8 +3,8 @@
 Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
-phase reduction. Circuit
-compilation and sampling are subsequent deliverables.
+phase reduction, Clifford evolution and unitary near-Clifford circuit
+compilation. Instruments, noise and sampling are subsequent deliverables.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -204,8 +204,9 @@ indices in their given order. Repeated indices copy a label to several legs.
 This linear operation is distinct from tracing a density operator; a trace
 requires boundary equality between a ket and its conjugate first.
 
-These primitives currently build exact Clifford boundaries; reset, records,
-noise and near-Clifford circuit lowering are subsequent deliverables. Tests
+These primitives build exact Clifford boundaries. The unitary compiler below
+adds near-Clifford circuit lowering; reset, records and noise are subsequent
+deliverables. Tests
 compare random six-qubit circuits to explicit complex matrices, retain the
 global phase in `(SH)^3 = omega I`, invert the circuits exactly, and verify
 boundary sums, repeated indices and wide Bell projections.
