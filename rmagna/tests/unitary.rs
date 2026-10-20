@@ -1122,6 +1122,12 @@ fn shared_commuting_layers_preserve_internal_fault_signs_and_prepared_queries() 
     assert_eq!(diagnostics.coherent_width, 3 + base.phase_legs());
     let rows = [bits(3, 3)];
     let prepared = base.prepare_probability(&rows, &a).unwrap();
+    let frozen = base
+        .prepare_probability_with_fibers(&rows, 4096, rmagna::fibers::FiberOptions::default(), &a)
+        .unwrap();
+    assert!(prepared.fixed_phase_resource().is_none());
+    let resource = frozen.fixed_phase_resource().unwrap();
+    assert!(resource.num_terms() > 0);
     for position in 0..=gates.len() {
         for mask in 0..64 {
             let fault = PauliInsertion {
@@ -1153,6 +1159,13 @@ fn shared_commuting_layers_preserve_internal_fault_signs_and_prepared_queries() 
             assert_eq!(
                 prepared
                     .evaluate(&state, &bits(1, 0), 256, &a)
+                    .unwrap()
+                    .value,
+                event
+            );
+            assert_eq!(
+                frozen
+                    .evaluate(&state, &bits(1, 0), 4096, &a)
                     .unwrap()
                     .value,
                 event
@@ -1510,6 +1523,53 @@ fn prepared_probability_traces_accept_fault_flipped_zero_reference_events() {
             .unwrap();
         let reference_plan = base.prepare_probability(&rows, &a).unwrap();
         let perturbed_plan = perturbed.prepare_probability(&rows, &a).unwrap();
+        let fixed = base
+            .prepare_probability_with_fibers(
+                &rows,
+                4096,
+                rmagna::fibers::FiberOptions::default(),
+                &a,
+            )
+            .unwrap();
+        let fixed_from_fault = perturbed
+            .prepare_probability_with_fibers(
+                &rows,
+                4096,
+                rmagna::fibers::FiberOptions::default(),
+                &a,
+            )
+            .unwrap();
+        assert_eq!(
+            fixed.fixed_phase_resource().unwrap().num_terms(),
+            fixed_from_fault.fixed_phase_resource().unwrap().num_terms()
+        );
+        assert!(
+            base.prepare_probability_with_fibers(
+                &rows,
+                0,
+                rmagna::fibers::FiberOptions::default(),
+                &a
+            )
+            .is_err()
+        );
+        assert!(
+            fixed
+                .evaluate(
+                    &base,
+                    &bits(2, 1),
+                    fixed.fixed_phase_resource().unwrap().num_terms() - 1,
+                    &a
+                )
+                .is_err()
+        );
+        let unrelated = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        assert!(matches!(
+            fixed.evaluate(&unrelated, &bits(2, 1), 4096, &a),
+            Err(UnitaryError::IncompatibleProgram)
+        ));
         for (state, assignments) in [(&base, vec![]), (&perturbed, vec![fault.clone()])] {
             let values = dense_inserted(&gates, 3, 0, &assignments, &a);
             for outcome in 0..4 {
@@ -1522,7 +1582,7 @@ fn prepared_probability_traces_accept_fault_flipped_zero_reference_events() {
                             .unwrap();
                     }
                 }
-                for plan in [&reference_plan, &perturbed_plan] {
+                for plan in [&reference_plan, &perturbed_plan, &fixed, &fixed_from_fault] {
                     let actual = plan.evaluate(state, &bits(2, outcome), 4, &a).unwrap();
                     assert_eq!(
                         actual.value, expected,
@@ -1531,8 +1591,15 @@ fn prepared_probability_traces_accept_fault_flipped_zero_reference_events() {
                     let cold = state
                         .probability_z(&rows, &bits(2, outcome), 4, &a)
                         .unwrap();
-                    assert_eq!(actual.quotient_rank, cold.quotient_rank);
-                    assert_eq!(actual.terms, cold.terms);
+                    if plan.fixed_phase_resource().is_none() {
+                        assert_eq!(actual.quotient_rank, cold.quotient_rank);
+                        assert_eq!(actual.terms, cold.terms);
+                    } else if actual.terms > 0 {
+                        assert_eq!(
+                            actual.terms,
+                            plan.fixed_phase_resource().unwrap().num_terms()
+                        );
+                    }
                     if expected.is_zero() {
                         assert_eq!(
                             plan.evaluate(state, &bits(2, outcome), 0, &a)

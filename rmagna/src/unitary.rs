@@ -277,6 +277,7 @@ impl UnitaryCircuit {
             query_reference: Arc::clone(&boundary),
             observation_reduction: None,
             reference_phase: Arc::clone(&phase),
+            query_reference_phase: Arc::clone(&phase),
             shared: None,
             circuit,
             positions,
@@ -336,6 +337,7 @@ struct InsertionProgram {
     query_reference: Arc<AffineKet>,
     observation_reduction: Option<observations::ObservationReduction>,
     reference_phase: Arc<ParityPhase>,
+    query_reference_phase: Arc<ParityPhase>,
     shared: Option<shared::PhaseUpdates>,
     circuit: CliffordCircuit,
     positions: Vec<usize>,
@@ -358,8 +360,8 @@ pub struct DensityBoundary<'a> {
 }
 
 /// Fixed trace/event constraints and retained-boundary Gaussian contraction,
-/// shared across one reference program's Pauli assignments. Final non-Clifford
-/// phase closure is still query specific.
+/// shared across one reference program's Pauli assignments. Non-Clifford resource
+/// preparation is optional; exact Gaussian sums remain query specific.
 pub struct PreparedProbability {
     program: Arc<InsertionProgram>,
     physical_width: usize,
@@ -368,9 +370,16 @@ pub struct PreparedProbability {
     contraction: crate::stabilizer::PreparedAffineContraction,
     keep: Vec<usize>,
     phase_widths: [usize; 2],
+    resource: Option<crate::fibers::PreparedCliffordFibers>,
 }
 
 impl PreparedProbability {
+    /// Present only for explicit fixed-resource preparation. Its rank and
+    /// term count describe this resource, before adaptive radical absorption.
+    pub fn fixed_phase_resource(&self) -> Option<&crate::fibers::PreparedCliffordFibers> {
+        self.resource.as_ref()
+    }
+
     pub fn evaluate(
         &self,
         state: &CompiledUnitary,
@@ -400,6 +409,29 @@ impl PreparedProbability {
             Some(ket) => self.contraction.contract(&ket, arithmetic)?,
             None => None,
         };
+        if let Some(resource) = &self.resource {
+            let Some(ket) = contracted else {
+                return Ok(zero_network_value());
+            };
+            if resource.num_terms() > max_terms {
+                return Err(PhaseError::FiberTermLimit {
+                    coordinates: resource.enumerated_coordinates(),
+                    quotient_rank: resource.quotient_rank(),
+                    limit: max_terms,
+                }
+                .into());
+            }
+            let phase = compose_phases(
+                &self.phase_widths,
+                &[(&state.phase, false), (&state.phase, true)],
+            )?
+            .restrict(ket.offset(), ket.columns())?;
+            return Ok(NetworkValue {
+                value: resource.evaluate(&phase, ket.phase(), ket.coefficient(), arithmetic)?,
+                quotient_rank: resource.quotient_rank(),
+                terms: resource.num_terms(),
+            });
+        }
         close_retained(
             contracted,
             &self.phase_widths,
@@ -487,7 +519,35 @@ impl CompiledUnitary {
             contraction,
             keep,
             phase_widths: [half - self.width(); 2],
+            resource: None,
         })
+    }
+
+    /// Freeze a certified Clifford-fiber resource for this probability family.
+    /// Unlike adaptive closure, this retains the fixed structural phase domain
+    /// before radical absorption. Its rank/term counts can therefore be larger.
+    /// Preparation from a perturbed view still uses the original reference.
+    pub fn prepare_probability_with_fibers(
+        &self,
+        rows: &[BitVector],
+        max_terms: usize,
+        options: crate::fibers::FiberOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedProbability, UnitaryError> {
+        let mut prepared = self.prepare_probability(rows, arithmetic)?;
+        let reference = &self.program.query_reference_phase;
+        let phase = compose_phases(
+            &prepared.phase_widths,
+            &[(reference, false), (reference, true)],
+        )?;
+        let phase = phase.restrict(
+            &BitVector::zeros(phase.num_variables())?,
+            prepared.contraction.output_columns(),
+        )?;
+        prepared.resource = Some(crate::fibers::PreparedCliffordFibers::new(
+            &phase, max_terms, options,
+        )?);
+        Ok(prepared)
     }
 
     /// Replace the insertion assignment relative to the original compiled
@@ -863,6 +923,46 @@ impl CompiledUnitary {
         )
     }
 }
+fn zero_network_value() -> NetworkValue {
+    NetworkValue {
+        value: ExactScalar::zero(),
+        quotient_rank: 0,
+        terms: 0,
+    }
+}
+
+fn compose_phases(
+    widths: &[usize],
+    phases: &[(&ParityPhase, bool)],
+) -> Result<ParityPhase, UnitaryError> {
+    let width = widths
+        .iter()
+        .try_fold(0_usize, |a, &b| a.checked_add(b))
+        .ok_or(UnitaryError::DimensionOverflow)?;
+    if phases.len() != widths.len()
+        || phases
+            .iter()
+            .zip(widths)
+            .any(|((p, _), &n)| p.num_variables() != n)
+    {
+        return Err(UnitaryError::DimensionMismatch);
+    }
+    let mut constant = 0;
+    let mut terms = Vec::new();
+    let mut offset = 0;
+    for ((phase, conjugate), &length) in phases.iter().zip(widths) {
+        let sign = |c: u8| if *conjugate { (8 - c) & 7 } else { c };
+        constant = (constant + sign(phase.constant())) & 7;
+        for (axis, c) in phase.terms() {
+            terms.push((
+                BitVector::from_indices(width, axis.ones().map(|j| offset + j))?,
+                sign(*c),
+            ));
+        }
+        offset += length;
+    }
+    Ok(ParityPhase::new(width, constant, terms)?)
+}
 
 fn close(
     ket: Option<AffineKet>,
@@ -893,42 +993,17 @@ fn close_retained(
     max_terms: usize,
     arithmetic: &ScalarArithmetic,
 ) -> Result<NetworkValue, UnitaryError> {
-    let zero = || NetworkValue {
-        value: ExactScalar::zero(),
-        quotient_rank: 0,
-        terms: 0,
-    };
     let Some(ket) = ket else {
-        return Ok(zero());
+        return Ok(zero_network_value());
     };
     let width = widths
         .iter()
         .try_fold(0_usize, |a, &b| a.checked_add(b))
         .ok_or(UnitaryError::DimensionOverflow)?;
-    if ket.width() != width
-        || phases.len() != widths.len()
-        || phases
-            .iter()
-            .zip(widths)
-            .any(|((p, _), &n)| p.num_variables() != n)
-    {
+    if ket.width() != width {
         return Err(UnitaryError::DimensionMismatch);
     }
-    let mut constant = 0;
-    let mut terms = Vec::new();
-    let mut offset = 0;
-    for ((phase, conjugate), &length) in phases.iter().zip(widths) {
-        let sign = |c: u8| if *conjugate { (8 - c) & 7 } else { c };
-        constant = (constant + sign(phase.constant())) & 7;
-        for (axis, c) in phase.terms() {
-            terms.push((
-                BitVector::from_indices(width, axis.ones().map(|j| offset + j))?,
-                sign(*c),
-            ));
-        }
-        offset += length;
-    }
-    let phase = ParityPhase::new(width, constant, terms)?;
+    let phase = compose_phases(widths, phases)?;
     let restricted = phase.restrict(ket.offset(), ket.columns())?;
     let prepared = ClosedPhaseSum::new_adaptive(
         &restricted,

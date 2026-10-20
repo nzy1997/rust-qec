@@ -1390,3 +1390,20 @@ Prepared probability tests include deterministic impossible outcomes made
 possible by a fault, immutable preparation from a perturbed view, both compiler
 strategies and direct literal event masses. Final non-Clifford phase closure
 remains query-specific.
+
+
+## Fixed phase resources for probability families
+
+`prepare_probability_with_fibers(rows, max_terms, options, arithmetic)` adds a
+certified immutable Clifford-fiber resource to the prepared probability plan.
+`fixed_phase_resource()` exposes its quotient rank, enumerated coordinates and
+term count. Preparation uses the original program's structural output even if
+the zero reference event has no support; faults and outcomes update exact
+Clifford corrections and Gaussian sums while reusing that resource.
+
+This explicit mode freezes the resource before adaptive radical absorption.
+Its term count and rank may exceed ordinary adaptive closure and are reported as
+such; a smaller evaluation budget rejects the fixed resource. Structural zero
+queries still return zero without enumeration. The default `prepare_probability`
+retains adaptive query-specific closure. Final Gaussian elimination remains
+query-specific in the fixed-resource mode; whole-runtime caching is separate.
