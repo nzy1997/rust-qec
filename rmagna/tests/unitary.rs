@@ -1,6 +1,7 @@
 use rmagna::clifford::CliffordGate as C;
+use rmagna::pauli::PauliWord;
 use rmagna::scalar::{ExactScalar, ScalarArithmetic};
-use rmagna::unitary::{UnitaryCircuit, UnitaryError, UnitaryGate as G};
+use rmagna::unitary::{PauliInsertion, UnitaryCircuit, UnitaryError, UnitaryGate as G};
 mod common;
 use common::{bits, dense_gate, next};
 
@@ -10,9 +11,39 @@ fn dense(
     input: usize,
     arithmetic: &ScalarArithmetic,
 ) -> Vec<ExactScalar> {
+    dense_inserted(gates, width, input, &[], arithmetic)
+}
+
+fn dense_inserted(
+    gates: &[G],
+    width: usize,
+    input: usize,
+    insertions: &[PauliInsertion],
+    arithmetic: &ScalarArithmetic,
+) -> Vec<ExactScalar> {
     let mut values = vec![ExactScalar::zero(); 1 << width];
     values[input] = ExactScalar::one();
-    for &gate in gates {
+    for (position, gate) in gates.iter().copied().map(Some).chain([None]).enumerate() {
+        for insertion in insertions.iter().filter(|p| p.before_gate == position) {
+            let word = &insertion.word;
+            let flip = word.x().ones().map(|j| 1 << j).sum::<usize>();
+            let mut output = vec![ExactScalar::zero(); values.len()];
+            for (x, value) in values.iter().enumerate() {
+                let sign = word.z().dot(&bits(width, x)).unwrap();
+                output[x ^ flip] = arithmetic
+                    .multiply(
+                        value,
+                        &arithmetic
+                            .omega(i64::from(word.phase()) + 4 * i64::from(sign), 0)
+                            .unwrap(),
+                    )
+                    .unwrap();
+            }
+            values = output;
+        }
+        let Some(gate) = gate else {
+            break;
+        };
         if let G::Clifford(gate) = gate {
             dense_gate(gate, &mut values, arithmetic);
             continue;
@@ -32,6 +63,139 @@ fn dense(
         }
     }
     values
+}
+
+#[test]
+fn prescribed_pauli_insertions_reuse_the_reference_boundary_and_match_dense_faults() {
+    let arithmetic = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Clifford(C::H(2)),
+        G::Cs {
+            a: 1,
+            b: 2,
+            turns: 3,
+        },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::H(1)),
+        G::T { qubit: 1, turns: 0 },
+        G::Clifford(C::S { qubit: 2, turns: 3 }),
+    ];
+    let base = UnitaryCircuit::new(3, gates)
+        .unwrap()
+        .compile(&bits(3, 0), &arithmetic)
+        .unwrap();
+    let mut rng = 0x781234abcde;
+    for trial in 0..64 {
+        let insertions = (0..3)
+            .map(|_| PauliInsertion {
+                before_gate: next(&mut rng) % (gates.len() + 1),
+                word: PauliWord::new(
+                    bits(3, next(&mut rng)),
+                    bits(3, next(&mut rng)),
+                    (next(&mut rng) % 8) as u8,
+                )
+                .unwrap(),
+            })
+            .collect::<Vec<_>>();
+        let actual = base.with_insertions(&insertions, &arithmetic).unwrap();
+        assert_eq!(actual.phase_legs(), base.phase_legs());
+        let expected = dense_inserted(&gates, 3, 0, &insertions, &arithmetic);
+        for (x, value) in expected.iter().enumerate() {
+            assert_eq!(
+                &actual
+                    .amplitude(&bits(3, x), 256, &arithmetic)
+                    .unwrap()
+                    .value,
+                value,
+                "trial={trial}, x={x}"
+            );
+        }
+        let row = bits(3, next(&mut rng));
+        for y in 0..2 {
+            let mut mass = ExactScalar::zero();
+            for (x, value) in expected.iter().enumerate() {
+                if row.dot(&bits(3, x)).unwrap() == (y != 0) {
+                    mass = arithmetic
+                        .add(&mass, &arithmetic.norm_squared(value).unwrap())
+                        .unwrap();
+                }
+            }
+            assert_eq!(
+                actual
+                    .probability_z(std::slice::from_ref(&row), &bits(1, y), 256, &arithmetic)
+                    .unwrap()
+                    .value,
+                mass
+            );
+        }
+        let restored = actual.with_insertions(&[], &arithmetic).unwrap();
+        assert_eq!(
+            restored.overlap(&base, 256, &arithmetic).unwrap().value,
+            ExactScalar::one()
+        );
+    }
+    let x = PauliWord::new(bits(3, 1), bits(3, 0), 0).unwrap();
+    let z = PauliWord::new(bits(3, 0), bits(3, 1), 0).unwrap();
+    for insertions in [
+        vec![
+            PauliInsertion {
+                before_gate: 1,
+                word: x.clone(),
+            },
+            PauliInsertion {
+                before_gate: 1,
+                word: z.clone(),
+            },
+        ],
+        vec![
+            PauliInsertion {
+                before_gate: 1,
+                word: z,
+            },
+            PauliInsertion {
+                before_gate: 1,
+                word: x,
+            },
+        ],
+    ] {
+        let actual = base.with_insertions(&insertions, &arithmetic).unwrap();
+        let expected = dense_inserted(&gates, 3, 0, &insertions, &arithmetic);
+        for (x, value) in expected.iter().enumerate() {
+            assert_eq!(
+                &actual
+                    .amplitude(&bits(3, x), 256, &arithmetic)
+                    .unwrap()
+                    .value,
+                value
+            );
+        }
+    }
+    assert!(matches!(
+        base.with_insertions(
+            &[PauliInsertion {
+                before_gate: gates.len() + 1,
+                word: PauliWord::identity(3).unwrap()
+            }],
+            &arithmetic
+        ),
+        Err(UnitaryError::InvalidInsertion { .. })
+    ));
+    assert!(matches!(
+        base.with_insertions(
+            &[PauliInsertion {
+                before_gate: 0,
+                word: PauliWord::identity(2).unwrap()
+            }],
+            &arithmetic
+        ),
+        Err(UnitaryError::DimensionMismatch)
+    ));
 }
 
 #[test]
