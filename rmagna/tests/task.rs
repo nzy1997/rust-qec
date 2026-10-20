@@ -137,8 +137,8 @@ fn schema_unknown_fields_nulls_numbers_and_resource_limits_fail_explicitly() {
         r#"{"error_observables":null}"#,
         r#"{"recovery":"r.magna"}"#,
         r#"{"ideal_state":"i.magna","error_observables":[]}"#,
-        r#"{"ideal_state":{"circuit":"i","postselection":{"0":true}}}"#,
-        r#"{"ideal_state":{"circuit":"i","postselection":{"0":0,"00":1}}}"#,
+        r#"{"ideal_state":{"circuit":"i","outputs":[],"postselection":{"0":true}}}"#,
+        r#"{"ideal_state":{"circuit":"i","outputs":[],"postselection":{"0":0,"00":1}}}"#,
     ] {
         assert!(
             parse_task(text, Path::new("/tmp"), &TaskOptions::default()).is_err(),
@@ -365,7 +365,7 @@ fn numeric_and_container_types_reject_private_tags_across_serde_features() {
             ),
             (
                 format!(
-                    r#"{{"ideal_state":{{"circuit":"ideal.magna","postselection":{{"0":{token}}}}}}}"#
+                    r#"{{"ideal_state":{{"circuit":"ideal.magna","outputs":[],"postselection":{{"0":{token}}}}}}}"#
                 ),
                 "ideal_state.postselection",
             ),
@@ -394,7 +394,7 @@ fn numeric_and_container_types_reject_private_tags_across_serde_features() {
             "recovery",
         ),
         (
-            r#"{"ideal_state":{"circuit":"ideal.magna","postselection":{"$serde_json::private::Number":"1"}}}"#,
+            r#"{"ideal_state":{"circuit":"ideal.magna","outputs":[],"postselection":{"$serde_json::private::Number":"1"}}}"#,
             "ideal_state.postselection",
         ),
     ] {
@@ -440,7 +440,7 @@ fn numeric_and_container_types_reject_private_tags_across_serde_features() {
             "ideal_state.outputs",
         ),
         (
-            r#"{"ideal_state":{"circuit":"ideal.magna","postselection":{"$serde_json::private::RawValue":"{\"0\":1}"}}}"#,
+            r#"{"ideal_state":{"circuit":"ideal.magna","outputs":[],"postselection":{"$serde_json::private::RawValue":"{\"0\":1}"}}}"#,
             "ideal_state.postselection",
         ),
     ] {
@@ -458,4 +458,122 @@ fn numeric_and_container_types_reject_private_tags_across_serde_features() {
     let largest = format!(r#"{{"outputs":[{}]}}"#, usize::MAX);
     let parsed = parse_task(&largest, base, &options).unwrap();
     assert_eq!(parsed.outputs(), Some([usize::MAX].as_slice()));
+}
+
+#[test]
+fn object_targets_require_explicit_outputs_within_declared_preparation() {
+    let files = Files::new();
+    let error = parse_task(
+        r#"{"ideal_state":{"circuit":"ideal.magna"}}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap_err();
+    assert_eq!(error.field, "ideal_state.outputs");
+    assert!(error.message.contains("explicit outputs list"), "{error}");
+    for (preparation, mapping, source, index, width) in
+        [("H 0", "[1,0]", "I 1", 1, 1), ("", "[0]", "I 0", 0, 0)]
+    {
+        files.put("ideal.magna", preparation);
+        let text = format!(r#"{{"ideal_state":{{"circuit":"ideal.magna","outputs":{mapping}}}}}"#);
+        let spec = parse_task(&text, &files.0, &TaskOptions::default()).unwrap();
+        let error = spec
+            .load_modules(&physical(source), &ParseOptions::default())
+            .unwrap_err();
+        assert_eq!(error.field, "ideal_state.outputs");
+        assert_eq!(
+            error.message,
+            format!("index {index} is outside width {width}")
+        );
+    }
+    files.put("ideal.magna", "H 0");
+    let path = parse_task(
+        r#"{"ideal_state":"ideal.magna"}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = path
+        .load_modules(&physical("I 1"), &ParseOptions::default())
+        .unwrap();
+    assert_eq!(modules.ideal_state().unwrap().circuit().num_qubits(), 2);
+    assert_eq!(modules.ideal_state().unwrap().outputs(), [0, 1]);
+    files.put("ideal.magna", "H 0\nI 1");
+    let object = parse_task(
+        r#"{"ideal_state":{"circuit":"ideal.magna","outputs":[1,0]}}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = object
+        .load_modules(&physical("I 1"), &ParseOptions::default())
+        .unwrap();
+    assert_eq!(modules.ideal_state().unwrap().circuit().num_qubits(), 2);
+    assert_eq!(modules.ideal_state().unwrap().outputs(), [1, 0]);
+    files.put("ideal.magna", "");
+    let empty = parse_task(
+        r#"{"outputs":[],"ideal_state":{"circuit":"ideal.magna","outputs":[]}}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = empty
+        .load_modules(&physical(""), &ParseOptions::default())
+        .unwrap();
+    assert_eq!(modules.ideal_state().unwrap().circuit().num_qubits(), 0);
+    assert!(modules.ideal_state().unwrap().outputs().is_empty());
+}
+
+#[test]
+fn semantic_module_errors_identify_the_file_and_offending_source_location() {
+    let files = Files::new();
+    files.put("valid.magna", "I 0");
+    for (field, name, task, operation, reason) in [
+        (
+            "ideal_state",
+            "ideal.magna",
+            r#"{"ideal_state":"ideal.magna"}"#,
+            "M 0",
+            "noiseless unitary",
+        ),
+        (
+            "recovery",
+            "recovery.magna",
+            r#"{"ideal_state":"valid.magna","recovery":"recovery.magna"}"#,
+            "X_ERROR(0) 0",
+            "noise channels",
+        ),
+        (
+            "recovery",
+            "recovery.magna",
+            r#"{"ideal_state":"valid.magna","recovery":"recovery.magna"}"#,
+            "M(1/2) 0",
+            "report-flip",
+        ),
+        (
+            "recovery",
+            "recovery.magna",
+            r#"{"ideal_state":"valid.magna","recovery":"recovery.magna"}"#,
+            "POSTSELECT det[0]",
+            "preserve trace",
+        ),
+    ] {
+        files.put(name, &format!("M 0\nDETECTOR rec[-1]\n  {operation}"));
+        // Targets must reach their first semantic violation on the same line.
+        if field == "ideal_state" {
+            files.put(name, &format!("I 0\n# comment\n  {operation}"));
+        }
+        let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
+        let error = spec
+            .load_modules(&physical("I 0"), &ParseOptions::default())
+            .unwrap_err();
+        assert_eq!(error.field, field);
+        assert!(
+            error
+                .message
+                .contains(&format!("{}:3:3:", files.0.join(name).display())),
+            "{error}"
+        );
+        assert!(error.message.contains(reason), "{error}");
+    }
 }

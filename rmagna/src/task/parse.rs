@@ -120,10 +120,16 @@ fn target(value: &RawValue, base: &Path, options: &TaskOptions) -> Result<Target
         base,
         "ideal_state.circuit",
     )?;
-    let outputs = data
-        .get("outputs")
-        .map(|v| indices(v, "ideal_state.outputs", options))
-        .transpose()?;
+    let outputs = Some(indices(
+        data.get("outputs").ok_or_else(|| {
+            TaskError::new(
+                "ideal_state.outputs",
+                "object targets require an explicit outputs list",
+            )
+        })?,
+        "ideal_state.outputs",
+        options,
+    )?);
     let mut postselection = BTreeMap::new();
     if let Some(value) = data.get("postselection") {
         let items = object(value, "ideal_state.postselection")?;

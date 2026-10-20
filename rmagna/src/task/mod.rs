@@ -1,6 +1,6 @@
 //! Task schema 1, exact output masks, and relative module identities.
 mod parse;
-use crate::circuit::{Circuit, Operation, ParseOptions, parse_circuit};
+use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};
 use crate::gf2::BitVector;
 use crate::pauli::PauliWord;
 use num_bigint::BigUint;
@@ -157,14 +157,16 @@ impl TaskSpec {
         let task = self.validate(physical)?;
         let ideal = if let Some(spec) = &self.ideal {
             let mut circuit = read_circuit(&spec.circuit, "ideal_state", options)?;
-            if circuit.operations().iter().any(|op| {
+            if let Some(op) = circuit.operations().iter().find(|op| {
                 !matches!(
                     op.operation,
                     Operation::Unitary { control: None, .. } | Operation::Annotation { .. }
                 )
             }) {
-                return Err(TaskError::new(
+                return Err(module_operation_error(
                     "ideal_state",
+                    &spec.circuit,
+                    &op.location,
                     "target preparation must contain only noiseless unitary gates and annotations",
                 ));
             }
@@ -174,7 +176,9 @@ impl TaskSpec {
                     "a path target must use only the selected local output wires; auxiliary wires require the object form",
                 ));
             }
-            circuit = circuit.minimum_width(task.outputs.len());
+            if !spec.object_form {
+                circuit = circuit.minimum_width(task.outputs.len());
+            }
             if circuit.num_qubits() > options.max_qubits {
                 return Err(TaskError::new(
                     "ideal_state",
@@ -228,28 +232,29 @@ impl TaskSpec {
                 ));
             }
             for op in circuit.operations() {
-                match &op.operation {
+                let restriction = match &op.operation {
                     Operation::Noise { .. } => {
-                        return Err(TaskError::new(
-                            "recovery",
-                            "terminal recovery must not declare noise channels",
-                        ));
+                        Some("terminal recovery must not declare noise channels")
                     }
                     Operation::Measure { report_flip, .. }
                         if report_flip != &crate::probability::Probability::zero() =>
                     {
-                        return Err(TaskError::new(
-                            "recovery",
+                        Some(
                             "terminal recovery measurements must have zero report-flip probability",
-                        ));
+                        )
                     }
                     Operation::Postselect { .. } => {
-                        return Err(TaskError::new(
-                            "recovery",
-                            "terminal recovery must preserve trace and cannot postselect",
-                        ));
+                        Some("terminal recovery must preserve trace and cannot postselect")
                     }
-                    _ => {}
+                    _ => None,
+                };
+                if let Some(message) = restriction {
+                    return Err(module_operation_error(
+                        "recovery",
+                        path,
+                        &op.location,
+                        message,
+                    ));
                 }
             }
             Some(circuit)
@@ -337,6 +342,18 @@ fn validate_indices(
         }
     }
     Ok(())
+}
+fn module_operation_error(
+    field: &str,
+    path: &Path,
+    location: &SourceLocation,
+    message: &str,
+) -> TaskError {
+    let mut context = format!("{}:{}:{}", path.display(), location.line, location.column);
+    if !location.repeat.is_empty() {
+        context.push_str(&format!(" (repeat {:?})", location.repeat));
+    }
+    TaskError::new(field, format!("{context}: {message}"))
 }
 fn read_circuit(path: &Path, field: &str, options: &ParseOptions) -> Result<Circuit, TaskError> {
     use std::io::Read;
