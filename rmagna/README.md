@@ -4,8 +4,9 @@ Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
-and affine instruments with prescribed Pauli and report faults. Causal runtime
-and sampling are subsequent deliverables.
+and affine instruments with prescribed Pauli and report faults, plus exact
+categorical physical and importance noise draws. Causal histories and complete
+task execution are subsequent deliverables.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -400,7 +401,7 @@ call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
 format/static-semantics check, not an end-to-end sampling benchmark. The
 instrument layer below executes affine circuits and pure targets; full task
-models, recovery and sampling remain subsequent deliverables.
+models, recovery and causal record sampling remain subsequent deliverables.
 
 ## Affine instruments and conditional target masses
 
@@ -512,7 +513,10 @@ There is no fixed-width probability cutoff: positive probabilities such as
 `1e-400` remain reachable. Zero-width intervals cannot be selected. Deterministic
 categories consume no entropy. Defaults bound categorical denominators to
 1,048,576 bits and each complete draw to 1,048,576 random words; exhausting a
-budget is an error, never a silently dropped draw. A failed draw may have consumed
+budget is an error, never a silently dropped draw. Sampler limits also apply
+when models were prepared under more permissive options: importance construction
+rejects excessive denominators, and physical draws check them before entropy.
+A failed draw may have consumed
 random words, so callers must retain failures and stream state when retrying.
 
 `RandomSource` permits caller-owned entropy. `SplitMix64` defines a stable seeded

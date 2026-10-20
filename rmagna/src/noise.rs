@@ -190,6 +190,13 @@ impl NoiseModel {
             .get(site)
             .map(|category| category.probabilities.as_slice())
     }
+    fn denominator_bits(&self) -> u64 {
+        self.categories
+            .iter()
+            .map(|c| c.denominator.bits())
+            .max()
+            .unwrap_or(0)
+    }
     fn choices(&self, faults: &[FaultSelection]) -> Result<BTreeMap<usize, usize>, NoiseError> {
         let mut choices = BTreeMap::new();
         for fault in faults {
@@ -229,6 +236,7 @@ pub struct NoiseSampler {
     physical: NoiseModel,
     proposal: NoiseModel,
     options: NoiseOptions,
+    denominator_bits: u64,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NoiseDraw {
@@ -240,10 +248,12 @@ pub struct NoiseDraw {
 }
 impl NoiseSampler {
     pub fn physical(model: NoiseModel, options: NoiseOptions) -> Self {
+        let denominator_bits = model.denominator_bits();
         Self {
             proposal: model.clone(),
             physical: model,
             options,
+            denominator_bits,
         }
     }
     pub fn importance(
@@ -269,13 +279,27 @@ impl NoiseSampler {
                 }
             }
         }
+        let denominator_bits = physical.denominator_bits().max(proposal.denominator_bits());
+        if denominator_bits > options.max_denominator_bits {
+            return Err(NoiseError::DenominatorLimit {
+                limit: options.max_denominator_bits,
+                required: denominator_bits,
+            });
+        }
         Ok(Self {
             physical,
             proposal,
             options,
+            denominator_bits,
         })
     }
     pub fn draw(&self, random: &mut impl RandomSource) -> Result<NoiseDraw, NoiseError> {
+        if self.denominator_bits > self.options.max_denominator_bits {
+            return Err(NoiseError::DenominatorLimit {
+                limit: self.options.max_denominator_bits,
+                required: self.denominator_bits,
+            });
+        }
         let mut entropy_words = 0;
         let mut faults = Vec::new();
         let mut p = BigRational::one();

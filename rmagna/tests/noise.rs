@@ -60,6 +60,57 @@ fn categorical_intervals_match_exact_rational_mass_and_zero_choices_are_impossib
     );
     assert_eq!(draw.entropy_words, 2);
 }
+
+#[test]
+fn stricter_sampler_limits_revalidate_models_before_consuming_entropy() {
+    let p = model(&[&["1/3", "2/3"]]);
+    let q = model(&[&["1/2", "1/2"]]);
+    let strict = NoiseOptions {
+        max_denominator_bits: 1,
+        ..Default::default()
+    };
+    let sampler = NoiseSampler::physical(p.clone(), strict);
+    assert_eq!(
+        sampler.draw(&mut Words::new(vec![])),
+        Err(NoiseError::DenominatorLimit {
+            limit: 1,
+            required: 2
+        })
+    );
+    assert!(matches!(
+        NoiseSampler::importance(p.clone(), q.clone(), strict),
+        Err(NoiseError::DenominatorLimit {
+            limit: 1,
+            required: 2
+        })
+    ));
+    let exact = NoiseOptions {
+        max_denominator_bits: 2,
+        ..strict
+    };
+    let draw = NoiseSampler::importance(p, q, exact)
+        .unwrap()
+        .draw(&mut Words::new(vec![1]))
+        .unwrap();
+    assert_eq!(
+        draw.physical_probability,
+        BigRational::new(2.into(), 3.into())
+    );
+    assert_eq!(draw.likelihood_ratio, BigRational::new(4.into(), 3.into()));
+    let empty = NoiseModel::new(vec![], &strict).unwrap();
+    let draw = NoiseSampler::physical(
+        empty,
+        NoiseOptions {
+            max_denominator_bits: 0,
+            max_entropy_words: 0,
+        },
+    )
+    .draw(&mut Words::new(vec![]))
+    .unwrap();
+    assert!(draw.faults.is_empty());
+    assert_eq!(draw.likelihood_ratio, BigRational::from_integer(1.into()));
+    assert_eq!(draw.entropy_words, 0);
+}
 #[test]
 fn physical_instrument_sampling_and_importance_weights_match_complete_enumeration() {
     let a = ScalarArithmetic::default();
