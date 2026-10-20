@@ -274,34 +274,60 @@ fn target_and_recovery_validation_rejects_nonunitary_or_noisy_modules() {
 #[test]
 fn module_reads_are_bounded_and_preserve_file_and_field_context() {
     let files = Files::new();
-    files.put("ideal.magna", "I 0");
-    let spec = parse_task(
-        r#"{"ideal_state":"ideal.magna"}"#,
-        &files.0,
-        &TaskOptions::default(),
-    )
-    .unwrap();
-    let error = spec
-        .load_modules(
-            &physical("I 0"),
-            &ParseOptions {
-                max_source_bytes: 2,
-                ..Default::default()
-            },
-        )
-        .unwrap_err();
-    assert_eq!(error.field, "ideal_state");
-    assert!(error.message.contains("max_source_bytes"));
-    std::fs::write(files.0.join("ideal.magna"), [0xff]).unwrap();
-    assert!(
-        spec.load_modules(&physical("I 0"), &ParseOptions::default())
-            .unwrap_err()
-            .message
-            .contains("UTF-8")
-    );
-    std::fs::remove_file(files.0.join("ideal.magna")).unwrap();
-    let error = spec
-        .load_modules(&physical("I 0"), &ParseOptions::default())
-        .unwrap_err();
-    assert!(error.message.contains("ideal.magna"));
+    files.put("valid-target.magna", "");
+    for (field, name, task) in [
+        (
+            "ideal_state",
+            "ideal.magna",
+            r#"{"ideal_state":"ideal.magna"}"#,
+        ),
+        (
+            "recovery",
+            "recovery.magna",
+            r#"{"ideal_state":"valid-target.magna","recovery":"recovery.magna"}"#,
+        ),
+    ] {
+        files.put(name, "I 0");
+        let path = files.0.join(name).display().to_string();
+        let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
+        let error = spec
+            .load_modules(
+                &physical("I 0"),
+                &ParseOptions {
+                    max_source_bytes: 2,
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+        assert_eq!(error.field, field);
+        assert!(error.message.contains(&path), "{error}");
+        assert!(error.message.contains("max_source_bytes = 2"), "{error}");
+        let loaded = spec
+            .load_modules(
+                &physical("I 0"),
+                &ParseOptions {
+                    max_source_bytes: 3,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        if field == "ideal_state" {
+            assert_eq!(loaded.ideal_state().unwrap().circuit().num_qubits(), 1);
+        } else {
+            assert_eq!(loaded.recovery().unwrap().num_qubits(), 1);
+        }
+        std::fs::write(files.0.join(name), [0xff]).unwrap();
+        let error = spec
+            .load_modules(&physical("I 0"), &ParseOptions::default())
+            .unwrap_err();
+        assert_eq!(error.field, field);
+        assert!(error.message.contains(&path), "{error}");
+        assert!(error.message.contains("UTF-8"), "{error}");
+        std::fs::remove_file(files.0.join(name)).unwrap();
+        let error = spec
+            .load_modules(&physical("I 0"), &ParseOptions::default())
+            .unwrap_err();
+        assert_eq!(error.field, field);
+        assert!(error.message.contains(&path), "{error}");
+    }
 }

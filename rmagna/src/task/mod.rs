@@ -347,10 +347,21 @@ fn read_circuit(path: &Path, field: &str, options: &ParseOptions) -> Result<Circ
         .read_to_end(&mut bytes)
         .map_err(|e| TaskError::new(field, format!("{}: {e}", path.display())))?;
     if bytes.len() > options.max_source_bytes {
-        return Err(TaskError::new(field, "module exceeds max_source_bytes"));
+        return Err(TaskError::new(
+            field,
+            format!(
+                "{}: module exceeds max_source_bytes = {}",
+                path.display(),
+                options.max_source_bytes
+            ),
+        ));
     }
-    let text = String::from_utf8(bytes)
-        .map_err(|_| TaskError::new(field, "circuit module is not UTF-8"))?;
+    let text = String::from_utf8(bytes).map_err(|_| {
+        TaskError::new(
+            field,
+            format!("{}: circuit module is not UTF-8", path.display()),
+        )
+    })?;
     let mut options = options.clone();
     options.source = Some(path.display().to_string());
     parse_circuit(&text, &options).map_err(|e| TaskError::new(field, e.to_string()))
