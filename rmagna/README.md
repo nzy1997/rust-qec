@@ -1,8 +1,9 @@
 # rmagna
 
 Independent Rust foundations for global-network near-Clifford simulation.
-The current package provides exact scalar algebra only. Circuit compilation,
-contraction and sampling are subsequent deliverables.
+The current package provides exact scalars, packed binary linear algebra,
+quadratic phase sums and phase-preserving stabilizer contraction. Circuit
+compilation and sampling are subsequent deliverables.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -55,3 +56,52 @@ it with the reference environment, leaving the existing file untouched:
 
 The generator refuses to overwrite an existing destination and verifies the
 pinned source before and after evaluating the fixed 300-bit operand set.
+
+## Binary and stabilizer algebra
+
+`gf2::BitVector` has an explicit width and packed 64-bit words. It rejects
+out-of-range indices, inconsistent widths and nonzero padding. A
+`LinearFactorization` preserves row provenance, solves repeated right-hand
+sides, detects contradictory dependent equations and supplies a nullspace
+basis. There is no fixed physical-qubit or path-bit cap in these types.
+
+`quadratic::QuadraticForm` represents phases modulo four with strictly upper
+triangular cross terms. Affine restriction allows dependent basis vectors.
+Its exact Gauss sum eliminates variables instead of enumerating assignments.
+
+`stabilizer::AffineKet` represents an unnormalized affine quadratic sum. Its
+constructor accepts dependent path columns; `contract` eliminates hidden paths
+and produces independent support columns, returning `None` for a zero ket.
+Projection preserves the original scalar. `pauli(x, z)` applies `X^x Z^z`,
+including its global phase, and tensor ordering puts the first ket on low
+boundary indices. `prepare` retains the matrix factorization and kernel for
+repeated exact amplitude queries. Overlap and norm include all interference.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::quadratic::QuadraticForm;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::stabilizer::AffineKet;
+
+let arithmetic = ScalarArithmetic::default();
+let plus = AffineKet::new(
+    BitVector::zeros(1)?,
+    vec![BitVector::from_indices(1, [0])?],
+    QuadraticForm::new(0, vec![0], vec![BitVector::zeros(1)?])?,
+    arithmetic.omega(0, -1)?,
+)?;
+let branch = plus.project_z(
+    &[BitVector::from_indices(1, [0])?],
+    &BitVector::zeros(1)?,
+    &arithmetic,
+)?.unwrap();
+assert_eq!(branch.norm_squared(&arithmetic)?, arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The additional tests exhaust small binary systems and all quadratic forms up
+to three variables, compare random contractions against literal complex sums,
+and compare 24 prescribed contractions with the pinned C++ reference. Boundary
+tests cross word boundaries through 4097 bits. Regenerate the numerical ket
+witnesses with `benchmarks/magna_reproduction/stabilizer_vectors.py`, using the
+same arguments and reference environment as the scalar generator above.
