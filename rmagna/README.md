@@ -6,8 +6,8 @@ quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
 and affine instruments with prescribed Pauli and report faults, plus exact
 categorical physical and importance noise draws and physical reported-record
-sampling. Causal histories and complete
-task execution are subsequent deliverables.
+sampling, plus causal controller histories and guarded physical noise. Complete
+task execution is a subsequent deliverable.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -254,8 +254,9 @@ assert_eq!(probability.value, arithmetic.norm_squared(&amplitude.value)?);
 Each query takes an explicit computational-term budget and returns its scalar,
 quotient dimension and term count. Inconsistent or zero boundaries return zero
 with no terms. This initial unitary compiler reuses the Clifford ket, but
-constructs a phase resource for each query; global commuting-layer selection,
-cross-fault resource reuse and causal controllers remain later deliverables.
+constructs a phase resource for each query; global commuting-layer selection
+and cross-fault resource reuse remain later deliverables. The runtime below
+adds a separate causal controller route.
 The instrument layer below adds resets, measurements and prescribed noise. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
@@ -369,8 +370,8 @@ Report-flip probability is stored separately from the quantum measurement.
 Declare external function names in `ParseOptions::controllers`. Parsing captures
 their ordered inputs and output slots and never invokes a function. External
 functions can read detectors and earlier registers, while built-in XOR/NOT and
-conditional gates can also read earlier records. Actual versioned callback
-binding and execution remain runtime deliverables. Guarded noise requires a
+conditional gates can also read earlier records. The runtime below binds
+versioned callbacks and executes them over sampled physical inputs. Guarded noise requires a
 history route even for a constant guard; contiguous correlated alternatives
 retain their conditional probabilities and common guard.
 
@@ -402,7 +403,8 @@ call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
 format/static-semantics check, not an end-to-end sampling benchmark. The
 instrument layer below executes affine circuits and pure targets; full task
-models, recovery and causal record sampling remain subsequent deliverables.
+models and recovery remain subsequent deliverables; the runtime below adds
+causal record sampling.
 
 ## Affine instruments and conditional target masses
 
@@ -566,9 +568,9 @@ a failed query can have consumed entropy. Scalar coefficient limits also apply.
 As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
-This is the cold exact-marginal route for affine instruments. External callbacks,
-guarded noise, the affine-support proposal and cached query preparation remain
-separate deliverables. Tests check exact binary boundaries and refinement,
+This is the cold exact-marginal route for affine instruments. The runtime below
+adds external callbacks and guarded noise; the affine-support proposal and
+cached query preparation remain separate deliverables. Tests check exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
 
