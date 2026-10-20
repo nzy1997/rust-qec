@@ -1,4 +1,7 @@
 //! Task schema 1, exact output masks, and relative module identities.
+mod compose;
+mod evaluate;
+pub use evaluate::{ContractionResources, EvaluationOptions, TaskEvaluation, TaskEvaluator};
 mod parse;
 use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};
 use crate::gf2::BitVector;

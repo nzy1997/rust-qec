@@ -1,0 +1,676 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.task-reference.v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "mixed",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": [
+          1
+        ],
+        "postselection": {},
+        "source": "H 0\nCX 0 1"
+      },
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "I 0",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "task": {}
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "projected-I",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": [
+          0
+        ],
+        "postselection": {
+          "1": 0
+        },
+        "source": "H 1\nT 1\nH 1\nCX 1 0"
+      },
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "I 0",
+      "target_normalization": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "target_success": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "task": {}
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "projected-X",
+      "error": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": [
+          0
+        ],
+        "postselection": {
+          "1": 0
+        },
+        "source": "H 1\nT 1\nH 1\nCX 1 0"
+      },
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "X 0",
+      "target_normalization": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {}
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "projected-H",
+      "error": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -3
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": [
+          0
+        ],
+        "postselection": {
+          "1": 0
+        },
+        "source": "H 1\nT 1\nH 1\nCX 1 0"
+      },
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "H 0",
+      "target_normalization": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "target_success": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -3
+      },
+      "task": {}
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "recovery-local",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": null,
+        "postselection": {},
+        "source": "H 0\nT 0"
+      },
+      "moments": [],
+      "recovery": "M 1\nCX rec[-1] 0\nZ 0",
+      "report_flips": [],
+      "source": "H 2\nT 2\nZ 2\nH 0\nM 0",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {
+        "outputs": [
+          2
+        ]
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "moments",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": {
+        "outputs": null,
+        "postselection": {},
+        "source": "I 0"
+      },
+      "moments": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "1",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        }
+      ],
+      "recovery": "S 0",
+      "report_flips": [],
+      "source": "H 2",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "task": {
+        "observables": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "outputs": [
+          2
+        ]
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "logical",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "X_ERROR(1/5) 0\nM(1/7) 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {
+        "error_observables": [
+          0
+        ]
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "logical",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "alternative": 0,
+          "line": 1
+        }
+      ],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "moments": [],
+      "recovery": null,
+      "report_flips": [],
+      "source": "X_ERROR(1/5) 0\nM(1/7) 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {
+        "error_observables": [
+          0
+        ]
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "logical",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "moments": [],
+      "recovery": null,
+      "report_flips": [
+        0
+      ],
+      "source": "X_ERROR(1/5) 0\nM(1/7) 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {
+        "error_observables": [
+          0
+        ]
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "case": "logical",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "alternative": 0,
+          "line": 1
+        }
+      ],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "ideal": null,
+      "moments": [],
+      "recovery": null,
+      "report_flips": [
+        0
+      ],
+      "source": "X_ERROR(1/5) 0\nM(1/7) 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+      "target_normalization": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "task": {
+        "error_observables": [
+          0
+        ]
+      }
+    }
+  ]
+}

@@ -3,11 +3,8 @@
 Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
-phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
-and affine instruments with prescribed Pauli and report faults, plus exact
-categorical physical and importance noise draws and physical reported-record
-sampling, plus causal controller histories and guarded physical noise. Complete
-task execution is a subsequent deliverable.
+phase reduction, circuit compilation, exact physical sampling, and task evaluation.
+Prepared query reuse and the full experiment runner remain subsequent deliverables.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -761,3 +758,75 @@ API, with controller callbacks that fail if invoked. It checks output order,
 target preparation width/mapping/projections and recovery width/records/route,
 records input and binary hashes, and works with Python `-O`. This is separate from
 complete task execution and statistical benchmark reproduction.
+
+## Exact task evaluation
+
+`task::TaskEvaluator::new` prepares loaded schema-1 modules, validates selected
+outputs and records, and rejects a zero-norm projected target before entropy is
+consumed or any controller runs. `sample` draws physical categorical faults;
+`sample_prescribed` fixes potential fault choices for exact differential checks.
+Both return accepted/error estimator contributions as `ExactField` values.
+A physical Monte Carlo draw already samples the noise distribution: its
+`noise_probability` is enumeration metadata, not an additional estimator factor.
+
+Terminal recovery maps its local data wires onto the task's ordered physical
+outputs and allocates fresh auxiliary wires. Its record and external-call indices
+occupy distinct namespaces from the physical module. All recovery outcomes are
+averaged, including resets and affine feedback; external recovery controllers use
+the same causal physical-prefix semantics as physical-module controllers.
+
+Targets may be pure, reduced mixed states, or projected auxiliary preparations.
+The density overlap is divided by the exact target normalization. For a quantum
+target, the native-compatible `raw_error` is
+`raw_acceptance * target_normalization - raw_target_success`; normalized `error`
+also divides by the history mass. For classical error definitions, success means
+all selected logical observables are zero, and `raw_error` is accepted mass minus
+that joint success mass. The optional `target_success` fields refer only to a
+quantum target. Requested Pauli moments are accepted, unnormalized moments after
+recovery and before any ideal-target projection; they divide by history mass but
+not by target normalization. Raw scalar numerators remain available for audits.
+
+Requested record samples are physical observations without postselection. They
+remain correlated with controller inputs and each other. `ResolvedHistory`
+separates causal history resolution from final metrics and provides read-only
+branch instruments, faults, conditions, resolved expressions, and sampled records. The
+runtime's existing pure-target sampling methods remain convenience wrappers.
+
+`acceptance_resources` and `target_resources` expose the actual final quotient
+ranks and enumerated term counts for the corresponding draw. These describe cold
+contractions, not prepared-query throughput. Compilation and target normalization
+have separate resource checks; per-query term, scalar, field, and history budgets
+remain explicit errors.
+
+Build `cargo build --release -p rmagna --example evaluate_task`, then run
+`evaluate_task PHYSICAL TASK [SEED]` for one prescribed no-fault draw. This diagnostic
+example has no external controller bindings. Use
+`benchmarks/magna_reproduction/affine_task_compare.py --upstream PINNED_SOURCE --rust-example BINARY --out NEW_JSON`
+to compare exact no-fault native numerators on all controller-free packaged tasks.
+The pilot matches 26 tasks and records the five tasks requiring external decoders
+as unsupported. It retains input and binary provenance and query resource counts.
+It is neither a statistical experiment nor evidence for paper throughput.
+
+Tests cover mixed and irrationally normalized projected targets, zero-norm
+rejection, local recovery records and controller namespaces, exact full physical
+noise enumeration for classical errors, reported samples rejected by selection,
+and Pauli moments before target projection. Target coordinate declarations and
+empty detector/logical declarations are ignored during target compilation;
+syntactic classical references remain forbidden even when they cancel.
+All sixteen prescribed BH2 fault
+witnesses also pass through task evaluation with a one-term budget. A separate
+literal matrix oracle checks 768 projected Pauli-moment queries. Ten general-task
+native witnesses cover target normalization, recovery, moments, and classical
+error conventions. Regenerate them in the verified isolated Python environment:
+
+```sh
+/tmp/rstim-magna-reference-env/bin/python -I \
+  benchmarks/magna_reproduction/task_vectors.py \
+  --upstream /tmp/rstim-magna-261022315 --out /tmp/task-reference.json
+cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
+```
+
+The current evaluator uses physical exact-marginal histories and independent
+physical noise. External Python decoder bindings, importance proposal selection,
+affine-support histories, prepared circuit queries, aggregate statistics and the
+public run/result interface are separate deliverables.

@@ -338,6 +338,13 @@ impl Circuit {
                     .xor_assign(expression);
             }
         }
+        let external_calls = operations
+            .iter()
+            .filter(|op| matches!(op.operation, Operation::Control { call: Some(_), .. }))
+            .count();
+        let has_guarded_noise = operations
+            .iter()
+            .any(|op| matches!(op.operation, Operation::Noise { guard: Some(_), .. }));
         Self {
             num_instructions: operations.len(),
             operations,
@@ -345,8 +352,8 @@ impl Circuit {
             num_records,
             detectors,
             observables,
-            external_calls: 0,
-            has_guarded_noise: false,
+            external_calls,
+            has_guarded_noise,
             declarations_with_targets: self.declarations_with_targets.clone(),
             source_text: self.source_text.clone(),
         }
