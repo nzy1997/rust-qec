@@ -595,8 +595,8 @@ As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
 This is the cold exact-marginal route for affine instruments. The runtime below
-adds external callbacks and guarded noise. Runtime integration of affine-support
-proposals and cached query preparation remains subsequent work. Tests check
+adds external callbacks, guarded noise and affine-support histories. Runtime
+integration of cached query preparation remains subsequent work. Tests check
 exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
@@ -654,8 +654,8 @@ Defaults additionally cap sampled history inputs at 1,000,000 and history querie
 at 100,000 per draw, with separate noise and history entropy budgets. The explicit
 `CausalStrategy::ColdPrefix` baseline also caps prefix compiles at 100,000. The
 default fixed-template route below reuses its Clifford circuit across histories;
-final scalar query closures are still prepared per query. Affine-support histories,
-causal importance proposals and complete paper-performance validation remain
+final scalar query closures are still prepared per query. Affine-support histories
+are described below; causal importance proposals and complete paper-performance validation remain
 subsequent work. Terminal recovery and task evaluation are described below.
 
 Tests enumerate majority histories, preserve repeated observations and atomic
@@ -857,9 +857,10 @@ error conventions. Regenerate them in the verified isolated Python environment:
 cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
 ```
 
-The current evaluator uses physical exact-marginal histories and independent
+The evaluator uses the explicitly selected history sampler and independent
 physical noise. Python decoder bindings are available through the bridge below.
-Importance proposal selection, affine-support histories, prepared circuit queries, aggregate statistics and the
+Causal importance proposal selection, runtime integration of prepared query
+families, aggregate statistics and the
 public run/result interface are separate deliverables.
 
 ## External decoder process bridge
@@ -1161,7 +1162,7 @@ exact dyadic mass and entropy count, without querying physical probabilities.
 A physical interference zero is a valid proposal; its eventual weighted
 contribution is zero. The family can be larger than the physical support or a
 more tightly reduced proposal, so its variance must be measured separately.
-This primitive does not yet select the causal runtime's history sampler.
+The causal runtime selects this proposal explicitly as described below.
 
 Each random word supplies up to 64 independent directions, low bit first.
 Deterministic groups use no entropy. Invalid records, faults, structural
@@ -1185,3 +1186,41 @@ let draw = propose_affine_reported(&instrument,
 assert_eq!(draw.proposal_mass, arithmetic.omega(0, -2)?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+
+## Affine-proposed causal histories
+
+Set `RuntimeOptions::history_sampler` to `HistorySampler::AffineSupport` to
+propose each controller/guard/requested-record group uniformly from its
+conditioned conservative support. `ExactMarginal` remains the current Rust
+default. Both choices retain causal reported inputs and atomic controller
+decisions; neither includes selection predicates or silently changes methods.
+
+The runtime multiplies the exact group proposal masses, then evaluates the
+physical history mass at the end. `history_proposal_mass` is present only for
+actual affine proposals. Interference-zero histories are retained and may invoke
+controllers on structurally valid inputs; their task contributions and history
+weights are zero. Controllers must accept every correctly shaped bit input.
+Inactive guarded channels still contribute no noise action or probability.
+
+`TaskEvaluation` reports `history_mass`, optional `history_proposal_mass` and
+`history_weight = physical_mass / proposal_mass`. Acceptance, error, target
+success and moments already include history reweighting: their joint masses are
+divided by proposal mass, and target quantities also use the target norm. They
+can exceed one on a single draw. Do not multiply the history weight again.
+Exact-marginal and explicitly prescribed diagnostics retain their physical
+conditional normalization and report no affine proposal mass. Zero proposed
+physical mass never leads to division by zero.
+
+`evaluate_task --history-sampler affine_support` selects this path;
+`--history-sampler exact_marginal` selects the existing path. `--history`
+continues to request positive-physical-mass prescribed diagnostics regardless of
+the sampler option. The example reports the selected method and both masses.
+
+Tests enumerate proposed irrational and interference-zero histories and a
+three-qubit circuit with sequential nonlinear controllers, conditional Hadamard,
+guarded noise and postselection. Proposal/noise-weighted acceptance, error and
+target overlap agree with analytical physical enumeration for both fixed-template
+and cold-prefix strategies. The family can contain additional zero histories;
+these tests do not establish the same proposal variance as another compiler or
+complete prepared-decomposition reuse.

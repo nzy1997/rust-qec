@@ -49,6 +49,21 @@ fn evaluator(
     task: &str,
     registry: &ControllerRegistry,
 ) -> TaskEvaluator {
+    evaluator_options(
+        files,
+        physical,
+        task,
+        registry,
+        EvaluationOptions::default(),
+    )
+}
+fn evaluator_options(
+    files: &Files,
+    physical: &str,
+    task: &str,
+    registry: &ControllerRegistry,
+    options: EvaluationOptions,
+) -> TaskEvaluator {
     let parse = ParseOptions {
         controllers: registry.names(),
         ..Default::default()
@@ -56,7 +71,7 @@ fn evaluator(
     let physical = parse_circuit(physical, &parse).unwrap();
     let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
     let modules = spec.load_modules(&physical, &parse).unwrap();
-    TaskEvaluator::new(&physical, &modules, registry, EvaluationOptions::default()).unwrap()
+    TaskEvaluator::new(&physical, &modules, registry, options).unwrap()
 }
 fn rational(n: i64, d: i64) -> ExactField {
     FieldArithmetic::default()
@@ -568,4 +583,284 @@ fn task_prescribed_histories_are_conditional_queries_with_physical_enumeration_w
             .accepted,
         ExactField::one()
     );
+}
+
+#[test]
+fn affine_history_tasks_use_proposal_mass_and_keep_zero_weight_draws() {
+    use rmagna::runtime::HistorySampler;
+    use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let registry = ControllerRegistry::default();
+    let a = ScalarArithmetic::default();
+    let f = FieldArithmetic::default();
+    let mut options = EvaluationOptions::default();
+    options.runtime.history_sampler = HistorySampler::AffineSupport;
+    for cancel in [false, true] {
+        let source = if cancel {
+            "H 0\nT 0\nT_DAG 0\nH 0\nM 0"
+        } else {
+            "H 0\nT 0\nH 0\nM 0"
+        };
+        let program = evaluator_options(
+            &files,
+            source,
+            r#"{"outputs":[0],"ideal_state":"ideal.magna","sample_records":[0],"observables":[[0,1]]}"#,
+            &registry,
+            options,
+        );
+        let mut accepted = ExactField::zero();
+        let mut error = ExactField::zero();
+        let mut success = ExactField::zero();
+        let mut moment = ExactField::zero();
+        for bit in [false, true] {
+            let draw = program
+                .sample_prescribed(&[], &mut Words::new(vec![u64::from(bit)]))
+                .unwrap();
+            assert_eq!(draw.sampled_records, [bit]);
+            assert_eq!(draw.history_proposal_mass, Some(a.omega(0, -2).unwrap()));
+            let p = if cancel {
+                if bit {
+                    ExactScalar::zero()
+                } else {
+                    ExactScalar::one()
+                }
+            } else if bit {
+                a.scalar([2.into(), (-1).into(), 0.into(), 1.into()], -2)
+                    .unwrap()
+            } else {
+                a.scalar([2.into(), 1.into(), 0.into(), (-1).into()], -2)
+                    .unwrap()
+            };
+            assert_eq!(draw.history_mass, p);
+            let weight = f
+                .multiply(&f.from_scalar(&p).unwrap(), &rational(2, 1))
+                .unwrap();
+            assert_eq!(draw.history_weight, weight);
+            assert_eq!(draw.accepted, weight);
+            assert_eq!(
+                draw.error,
+                if bit {
+                    weight.clone()
+                } else {
+                    ExactField::zero()
+                }
+            );
+            assert_eq!(
+                draw.target_success,
+                Some(if bit {
+                    ExactField::zero()
+                } else {
+                    weight.clone()
+                })
+            );
+            assert_eq!(
+                draw.moments,
+                [if bit {
+                    f.multiply(&weight, &rational(-1, 1)).unwrap()
+                } else {
+                    weight
+                }]
+            );
+            accepted = f
+                .add(
+                    &accepted,
+                    &f.multiply(&draw.accepted, &rational(1, 2)).unwrap(),
+                )
+                .unwrap();
+            error = f
+                .add(&error, &f.multiply(&draw.error, &rational(1, 2)).unwrap())
+                .unwrap();
+            success = f
+                .add(
+                    &success,
+                    &f.multiply(draw.target_success.as_ref().unwrap(), &rational(1, 2))
+                        .unwrap(),
+                )
+                .unwrap();
+            moment = f
+                .add(
+                    &moment,
+                    &f.multiply(&draw.moments[0], &rational(1, 2)).unwrap(),
+                )
+                .unwrap();
+        }
+        let physical_error = if cancel {
+            ExactScalar::zero()
+        } else {
+            a.scalar([2.into(), (-1).into(), 0.into(), 1.into()], -2)
+                .unwrap()
+        };
+        assert_eq!(accepted, ExactField::one());
+        assert_eq!(error, f.from_scalar(&physical_error).unwrap());
+        assert_eq!(success, f.subtract(&ExactField::one(), &error).unwrap());
+        assert_eq!(
+            moment,
+            f.subtract(
+                &ExactField::one(),
+                &f.multiply(&rational(2, 1), &error).unwrap()
+            )
+            .unwrap()
+        );
+        let prescribed = program
+            .evaluate_prescribed_history(&[], &[vec![false]])
+            .unwrap();
+        assert!(prescribed.history_proposal_mass.is_none());
+        assert_eq!(prescribed.history_weight, ExactField::one());
+        assert_eq!(prescribed.accepted, ExactField::one());
+        if cancel {
+            assert!(
+                program
+                    .evaluate_prescribed_history(&[], &[vec![true]])
+                    .is_err()
+            );
+        }
+    }
+}
+
+#[test]
+fn affine_causal_feedback_and_guarded_noise_are_unbiased_over_all_histories() {
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+    use std::collections::BTreeMap;
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("copy", "1", |bits: &[bool]| Ok(vec![bits[0]]))
+        .unwrap();
+    registry
+        .register("xor", "1", |bits: &[bool]| Ok(vec![bits[0] ^ bits[1]]))
+        .unwrap();
+    let source = "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCH ctrl[0] 1\nM 1\nDETECTOR rec[-1]\nCONTROL[xor] det[1] ctrl[0] -> ctrl[1]\nCX ctrl[1] 2\nX_ERROR(1/3) ctrl[0] 2\nM 2\nPOSTSELECT det[1]";
+    let a = ScalarArithmetic::default();
+    let f = FieldArithmetic::default();
+    let p1 = a
+        .scalar([2.into(), (-1).into(), 0.into(), 1.into()], -2)
+        .unwrap();
+    let p0 = a.subtract(&ExactScalar::one(), &p1).unwrap();
+    let expected_accepted = f
+        .add(
+            &f.from_scalar(&p0).unwrap(),
+            &f.multiply(&f.from_scalar(&p1).unwrap(), &rational(1, 2))
+                .unwrap(),
+        )
+        .unwrap();
+    let expected_error = f
+        .multiply(&f.from_scalar(&p1).unwrap(), &rational(1, 3))
+        .unwrap();
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        let mut options = EvaluationOptions::default();
+        options.runtime.history_sampler = HistorySampler::AffineSupport;
+        options.runtime.strategy = strategy;
+        let program = evaluator_options(
+            &files,
+            source,
+            r#"{"outputs":[2],"ideal_state":"ideal.magna","sample_records":[0,1,2]}"#,
+            &registry,
+            options,
+        );
+        let mut accepted = ExactField::zero();
+        let mut error = ExactField::zero();
+        let mut success = ExactField::zero();
+        let mut combined_proposal = ExactField::zero();
+        for fault in [false, true] {
+            let faults = if fault {
+                vec![FaultSelection {
+                    site: 2,
+                    alternative: 0,
+                }]
+            } else {
+                vec![]
+            };
+            let mut histories = BTreeMap::new();
+            for words in 0..8_u64 {
+                let draw = program
+                    .sample_prescribed(
+                        &faults,
+                        &mut Words::new((0..3).map(|j| words >> j & 1).collect()),
+                    )
+                    .unwrap();
+                let key = draw.sampled_records.clone();
+                if let Some(previous) = histories.insert(key, draw) {
+                    let current = histories.get(&previous.sampled_records).unwrap();
+                    assert_eq!(
+                        current.history_proposal_mass,
+                        previous.history_proposal_mass
+                    );
+                    assert_eq!(current.raw_acceptance, previous.raw_acceptance);
+                }
+            }
+            let mut proposal_sum = ExactField::zero();
+            for (bits, draw) in histories {
+                let q = f
+                    .from_scalar(draw.history_proposal_mass.as_ref().unwrap())
+                    .unwrap();
+                proposal_sum = f.add(&proposal_sum, &q).unwrap();
+                let (b0, b1, b2) = (bits[0], bits[1], bits[2]);
+                assert_eq!(b2, b0 ^ b1 ^ (b0 && fault));
+                assert_eq!(draw.controller_calls.len(), 2);
+                assert_eq!(draw.controller_calls[0].inputs, [b0]);
+                assert_eq!(draw.controller_calls[1].inputs, [b1, b0]);
+                assert_eq!(draw.controller_calls[1].outputs, [b0 ^ b1]);
+                let physical = if b0 {
+                    a.multiply(&p1, &a.omega(0, -2).unwrap()).unwrap()
+                } else if b1 {
+                    ExactScalar::zero()
+                } else {
+                    p0.clone()
+                };
+                assert_eq!(draw.history_mass, physical);
+                let conditional = f.divide(&f.from_scalar(&physical).unwrap(), &q).unwrap();
+                assert_eq!(
+                    draw.accepted,
+                    if b1 {
+                        ExactField::zero()
+                    } else {
+                        conditional.clone()
+                    }
+                );
+                assert_eq!(
+                    draw.error,
+                    if !b1 && b2 {
+                        conditional
+                    } else {
+                        ExactField::zero()
+                    }
+                );
+                let noise = if b0 {
+                    BigRational::new(if fault { 1.into() } else { 2.into() }, 3.into())
+                } else {
+                    BigRational::from_integer(1.into())
+                };
+                assert_eq!(draw.noise_probability, noise);
+                if fault && !b0 {
+                    continue;
+                } // The inactive channel has one physical identity path.
+                let probability = f.multiply(&q, &f.from_rational(noise).unwrap()).unwrap();
+                combined_proposal = f.add(&combined_proposal, &probability).unwrap();
+                accepted = f
+                    .add(
+                        &accepted,
+                        &f.multiply(&probability, &draw.accepted).unwrap(),
+                    )
+                    .unwrap();
+                error = f
+                    .add(&error, &f.multiply(&probability, &draw.error).unwrap())
+                    .unwrap();
+                success = f
+                    .add(
+                        &success,
+                        &f.multiply(&probability, draw.target_success.as_ref().unwrap())
+                            .unwrap(),
+                    )
+                    .unwrap();
+            }
+            assert_eq!(proposal_sum, ExactField::one());
+        }
+        assert_eq!(combined_proposal, ExactField::one());
+        assert_eq!(accepted, expected_accepted);
+        assert_eq!(error, expected_error);
+        assert_eq!(success, f.subtract(&accepted, &error).unwrap());
+    }
 }
