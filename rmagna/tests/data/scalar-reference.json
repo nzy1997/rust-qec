@@ -1,6 +1,6 @@
 {
   "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
-  "reference_manifest_sha256": "5a8097d3ea86fedef7abe4d0bfa5cf399230e447346ecc1f9504ab82a7e1fdf1",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
   "schema": "rmagna.scalar-reference.v1",
   "seed": 20261020,
   "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
