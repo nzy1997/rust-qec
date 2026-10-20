@@ -209,3 +209,50 @@ noise and near-Clifford circuit lowering are subsequent deliverables. Tests
 compare random six-qubit circuits to explicit complex matrices, retain the
 global phase in `(SH)^3 = omega I`, invert the circuits exactly, and verify
 boundary sums, repeated indices and wide Bell projections.
+
+## Unitary near-Clifford networks
+
+`unitary::UnitaryCircuit` adds T (zero through seven turns), controlled-S
+(zero through three turns), and CCZ to the Clifford gate set. `compile` takes
+a computational-basis input and builds a Clifford ket with auxiliary parity
+legs. Clifford cases of T and controlled-S are lowered directly. Other diagonal
+phases are copied to fresh zero ancillas by CNOTs and evaluated at the final
+boundary, preserving the order of intervening noncommuting gates.
+
+`CompiledUnitary::amplitude` computes a complex output amplitude;
+`probability_z` computes the exact mass of simultaneous Z-parity conditions;
+`overlap(target)` computes `<self|target>`. Probabilities trace output indices
+by enforcing ket/conjugate equality before summing them. Overlap closes all
+physical outputs against the target. The phase is restricted to the resulting
+affine support before contracting its Clifford radical and preparing the final
+quotient. Resource constraints apply after this exact reduction.
+
+```rust
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::unitary::{UnitaryCircuit, UnitaryGate};
+
+let arithmetic = ScalarArithmetic::default();
+let circuit = UnitaryCircuit::new(1, [
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+    UnitaryGate::T { qubit: 0, turns: 1 },
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+])?.compile(&BitVector::zeros(1)?, &arithmetic)?;
+let amplitude = circuit.amplitude(&BitVector::zeros(1)?, 2, &arithmetic)?;
+let probability = circuit.probability_z(
+    &[BitVector::from_indices(1, [0])?], &BitVector::zeros(1)?, 4, &arithmetic,
+)?;
+assert_eq!(probability.value, arithmetic.norm_squared(&amplitude.value)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Each query takes an explicit computational-term budget and returns its scalar,
+quotient dimension and term count. Inconsistent or zero boundaries return zero
+with no terms. This initial unitary compiler reuses the Clifford ket, but
+constructs a phase resource for each query; global commuting-layer selection,
+cross-fault resource reuse, instruments, controllers and noise remain later
+deliverables. It does not claim the paper's reduced representation ranks or
+sampling performance. Tests compare noncommuting circuits, exact events and
+target overlaps against literal matrices, including an eight-qubit example
+with quotient rank greater than one.

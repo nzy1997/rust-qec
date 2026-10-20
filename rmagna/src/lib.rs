@@ -6,4 +6,5 @@ pub mod phase;
 pub mod quadratic;
 pub mod scalar;
 pub mod stabilizer;
+pub mod unitary;
 pub use num_bigint::BigInt;
