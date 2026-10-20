@@ -6,8 +6,8 @@ quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, Clifford evolution, unitary near-Clifford circuit compilation,
 and affine instruments with prescribed Pauli and report faults, plus exact
 categorical physical and importance noise draws and physical reported-record
-sampling. Causal histories and complete
-task execution are subsequent deliverables.
+sampling, plus causal controller histories and guarded physical noise. Complete
+task execution is a subsequent deliverable.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -254,8 +254,9 @@ assert_eq!(probability.value, arithmetic.norm_squared(&amplitude.value)?);
 Each query takes an explicit computational-term budget and returns its scalar,
 quotient dimension and term count. Inconsistent or zero boundaries return zero
 with no terms. This initial unitary compiler reuses the Clifford ket, but
-constructs a phase resource for each query; global commuting-layer selection,
-cross-fault resource reuse and causal controllers remain later deliverables.
+constructs a phase resource for each query; global commuting-layer selection
+and cross-fault resource reuse remain later deliverables. The runtime below
+adds a separate causal controller route.
 The instrument layer below adds resets, measurements and prescribed noise. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
@@ -369,8 +370,8 @@ Report-flip probability is stored separately from the quantum measurement.
 Declare external function names in `ParseOptions::controllers`. Parsing captures
 their ordered inputs and output slots and never invokes a function. External
 functions can read detectors and earlier registers, while built-in XOR/NOT and
-conditional gates can also read earlier records. Actual versioned callback
-binding and execution remain runtime deliverables. Guarded noise requires a
+conditional gates can also read earlier records. The runtime below binds
+versioned callbacks and executes them over sampled physical inputs. Guarded noise requires a
 history route even for a constant guard; contiguous correlated alternatives
 retain their conditional probabilities and common guard.
 
@@ -402,7 +403,8 @@ call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
 format/static-semantics check, not an end-to-end sampling benchmark. The
 instrument layer below executes affine circuits and pure targets; full task
-models, recovery and causal record sampling remain subsequent deliverables.
+models and recovery remain subsequent deliverables; the runtime below adds
+causal record sampling.
 
 ## Affine instruments and conditional target masses
 
@@ -566,8 +568,73 @@ a failed query can have consumed entropy. Scalar coefficient limits also apply.
 As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
-This is the cold exact-marginal route for affine instruments. External callbacks,
-guarded noise, the affine-support proposal and cached query preparation remain
-separate deliverables. Tests check exact binary boundaries and refinement,
+This is the cold exact-marginal route for affine instruments. The runtime below
+adds external callbacks and guarded noise; the affine-support proposal and
+cached query preparation remain separate deliverables. Tests check exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
+
+## Causal controllers and guarded physical noise
+
+`runtime::ControllerRegistry` binds a name and nonempty version to a deterministic,
+stateless Rust function over declared reported observations. A controller returns
+one `bool` per declared output; errors and wrong output lengths fail the draw.
+Bindings are captured when constructing `CausalProgram`, so replacing a registry
+later cannot change the prepared program. `controller_versions` exposes the
+captured identity contract. Caller-supplied version strings must identify the
+actual decoder and configuration; the runtime cannot infer function identity.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::instrument::{compile_unitary, CompileOptions};
+use rmagna::noise::SplitMix64;
+use rmagna::runtime::{ControllerRegistry, CausalProgram, RuntimeOptions};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+let arithmetic = ScalarArithmetic::default();
+let mut registry = ControllerRegistry::default();
+registry.register("parity", "1", |bits: &[bool]| Ok(vec![bits.iter().fold(false, |p, b| p ^ b)]))?;
+let source = parse_circuit("H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[parity] det[0] -> ctrl[0]\nCX ctrl[0] 0",
+    &ParseOptions { controllers: registry.names(), ..Default::default() })?;
+let program = CausalProgram::new(&source, &registry, RuntimeOptions::default(), &arithmetic)?;
+let target = compile_unitary(&parse_circuit("I 0", &ParseOptions::default())?,
+    &CompileOptions::default(), &arithmetic)?;
+let draw = program.sample(&[0], &target, &mut SplitMix64::new(11), &arithmetic)?;
+assert_eq!(draw.masses.error, ExactScalar::zero());
+assert_eq!(draw.masses.target_success.value, draw.history_mass);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Before each controller call or guarded category, the exact-marginal route queries
+only the already executed physical prefix, conditioned on earlier sampled inputs.
+Postselection never enters those queries. Built-in affine feedback remains coherent.
+Controller outputs are installed atomically in their parsed decision slots.
+A correlated chain evaluates its common guard once. Inactive channels have no
+action and contribute no factor to `noise_probability`. The runtime draws all
+potential independent category choices up front and discards inactive ones;
+this consumes entropy for some inactive categories without changing the physical
+path distribution.
+
+`sample_prescribed` accepts potential-category fault selections for differential
+checks; `potential_site(original_operation_id)` supplies the stable mapping.
+The returned exact masses are joint with the sampled history, and `history_mass`
+is the corresponding physical history mass. An exact-marginal Monte Carlo
+contribution divides the joint accepted/error mass by this history mass.
+`noise_probability` describes the active noise choices and is useful for complete
+enumeration; multiplying it into a physical Monte Carlo contribution would count
+the sampled noise distribution twice.
+
+Defaults additionally cap sampled history inputs at 1,000,000 and prefix compiles
+at 100,000 per draw, with separate noise and history entropy budgets. This first
+causal implementation recompiles resolved prefixes and the final branch; it does
+not yet reuse prepared decision networks or implement the affine-support history
+proposal, causal importance proposals, terminal recovery, or task-file execution.
+It is a correctness baseline, not a paper-performance implementation.
+
+Tests enumerate majority histories, preserve repeated observations and atomic
+register updates, distinguish active and inactive guarded paths, verify correlated
+chain weights, and reject missing bindings, callback failures, wrong output shapes
+and resource limits. Eighteen prescribed histories match the pinned public native
+backend's exact history, accepted, target-success and error masses, including
+irrational branch probabilities. Regenerate those witnesses with
+`benchmarks/magna_reproduction/history_vectors.py --upstream PINNED_SOURCE --out NEW_JSON`
+using the same isolated reference Python environment.
