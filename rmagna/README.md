@@ -1315,3 +1315,11 @@ prepared projections continue to reuse the same polar images.
 Coordinate lists are cached only for those sparse products; dense directions
 stay packed. A thread-local allocation counter checks sparse and dense pullbacks
 through 1,025 variables against a budget scaled to packed matrix storage.
+
+Hadamard evolution uses the independent-support invariant to find zero or one
+hidden direction after clearing its boundary row. A streaming row basis avoids
+general equation provenance. The known independent-column/nullspace basis feeds
+the same exact quadratic-elimination kernel used by general contraction; global
+phases and unnormalized scalars remain unchanged. Dependent input is still
+canonicalized once at circuit entry. This is a general linear-algebra optimization,
+with no circuit-family recognition or measured throughput claim.

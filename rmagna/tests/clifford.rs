@@ -354,3 +354,225 @@ fn hadamards_on_fixed_wide_coordinates_preserve_fourier_signs_and_global_scale()
     }
     assert_eq!(recovered.columns().len(), 1);
 }
+
+#[test]
+fn every_random_clifford_prefix_matches_literal_amplitudes() {
+    let a = ScalarArithmetic::default();
+    let mut rng = 0x97121facbd;
+    for width in [3, 4] {
+        for trial in 0..8 {
+            let input = next(&mut rng) % (1 << width);
+            let mut ket = CliffordCircuit::computational(bits(width, input)).unwrap();
+            let mut expected = vec![ExactScalar::zero(); 1 << width];
+            expected[input] = ExactScalar::one();
+            for step in 0..32 {
+                let q = next(&mut rng) % width;
+                let r = (q + 1 + next(&mut rng) % (width - 1)) % width;
+                let gate = match next(&mut rng) % 7 {
+                    0 | 1 => Gate::H(q),
+                    2 => Gate::S {
+                        qubit: q,
+                        turns: (next(&mut rng) & 3) as u8,
+                    },
+                    3 => Gate::Cx {
+                        control: q,
+                        target: r,
+                    },
+                    4 => Gate::Cz { a: q, b: r },
+                    5 => Gate::X(q),
+                    _ => Gate::Swap { a: q, b: r },
+                };
+                ket = CliffordCircuit::new(width, [gate])
+                    .unwrap()
+                    .evolve(&ket, &a)
+                    .unwrap()
+                    .unwrap();
+                dense_gate(gate, &mut expected, &a);
+                let prepared = ket.prepare().unwrap();
+                for (output, value) in expected.iter().enumerate() {
+                    assert_eq!(
+                        &prepared.amplitude(&bits(width, output), &a).unwrap(),
+                        value,
+                        "width={width}, trial={trial}, step={step}, output={output}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn wide_hadamards_contract_a_dense_hidden_direction_and_keep_complex_fourier_values() {
+    let a = ScalarArithmetic::default();
+    let width = 129;
+    let q = 64;
+    let offset = BitVector::from_indices(width, [1, 64, 65, 128]).unwrap();
+    // Replacing column 64 of the identity by all ones makes the unique
+    // preimage of e64 dense across three packed words.
+    let columns = (0..width)
+        .map(|j| BitVector::from_indices(width, (0..width).filter(|&i| i == j || j == q)).unwrap())
+        .collect();
+    let linear = (0..width).map(|j| ((3 * j + 1) & 3) as u8).collect();
+    let upper = (0..width)
+        .map(|i| {
+            BitVector::from_indices(width, (i + 1..width).filter(|&j| (i * 17 + j * 3) % 13 < 3))
+                .unwrap()
+        })
+        .collect();
+    let phase = QuadraticForm::new(3, linear, upper).unwrap();
+    let coefficient = a.omega(3, -(width as i64)).unwrap();
+    let input =
+        AffineKet::new(offset.clone(), columns, phase.clone(), coefficient.clone()).unwrap();
+    let circuit = CliffordCircuit::new(width, [Gate::H(q)]).unwrap();
+    let actual = circuit.evolve(&input, &a).unwrap().unwrap();
+    assert!(actual.columns().len() <= width);
+    let prepared = actual.prepare().unwrap();
+    let mut rng = 0x61359fdab;
+    for trial in 0..40 {
+        let output = BitVector::from_indices(
+            width,
+            (0..width).filter(|_| trial == 0 || next(&mut rng) & 1 != 0),
+        )
+        .unwrap();
+        let mut expected = ExactScalar::zero();
+        for bit in [false, true] {
+            let x64 = bit ^ offset.get(q).unwrap();
+            let x = BitVector::from_indices(
+                width,
+                (0..width).filter(|&j| {
+                    if j == q {
+                        x64
+                    } else {
+                        output.get(j).unwrap() ^ offset.get(j).unwrap() ^ x64
+                    }
+                }),
+            )
+            .unwrap();
+            let exponent = 2 * i64::from(phase.evaluate(&x).unwrap())
+                + 4 * i64::from(bit && output.get(q).unwrap());
+            expected = a
+                .add(
+                    &expected,
+                    &a.multiply(&coefficient, &a.omega(exponent, -1).unwrap())
+                        .unwrap(),
+                )
+                .unwrap();
+        }
+        assert_eq!(
+            prepared.amplitude(&output, &a).unwrap(),
+            expected,
+            "trial={trial}"
+        );
+    }
+    let recovered = circuit
+        .evolve(&actual, &a)
+        .unwrap()
+        .unwrap()
+        .prepare()
+        .unwrap();
+    let original = input.prepare().unwrap();
+    for indices in [vec![], vec![0, 64, 128], (0..width).collect()] {
+        let value = BitVector::from_indices(width, indices).unwrap();
+        assert_eq!(
+            recovered.amplitude(&value, &a).unwrap(),
+            original.amplitude(&value, &a).unwrap()
+        );
+    }
+    // Removing one GHZ row loses no rank: the transformed state has two paths.
+    let ghz = AffineKet::new(
+        BitVector::zeros(width).unwrap(),
+        vec![BitVector::from_indices(width, 0..width).unwrap()],
+        QuadraticForm::new(1, vec![1], vec![bits(1, 0)]).unwrap(),
+        a.omega(5, -1).unwrap(),
+    )
+    .unwrap();
+    let state = circuit.evolve(&ghz, &a).unwrap().unwrap();
+    assert_eq!(state.columns().len(), 2);
+    let prepared = state.prepare().unwrap();
+    for b in [false, true] {
+        for y in [false, true] {
+            let output =
+                BitVector::from_indices(width, (0..width).filter(|&j| if j == q { y } else { b }))
+                    .unwrap();
+            assert_eq!(
+                prepared.amplitude(&output, &a).unwrap(),
+                a.omega(7 + 2 * i64::from(b) + 4 * i64::from(b && y), -2)
+                    .unwrap()
+            );
+        }
+    }
+}
+
+#[test]
+fn hadamards_canonicalize_dependent_nonzero_input_before_using_support_rank() {
+    let a = ScalarArithmetic::default();
+    let input = AffineKet::new(
+        bits(3, 2),
+        vec![bits(3, 3), bits(3, 3), bits(3, 0)],
+        QuadraticForm::new(3, vec![1, 2, 1], vec![bits(3, 6), bits(3, 4), bits(3, 0)]).unwrap(),
+        a.omega(5, -3).unwrap(),
+    )
+    .unwrap();
+    let mut expected = vec![ExactScalar::zero(); 8];
+    for mask in 0..8 {
+        let label = 2 ^ if (mask & 1 != 0) ^ (mask & 2 != 0) {
+            3
+        } else {
+            0
+        };
+        let term = a
+            .multiply(
+                input.coefficient(),
+                &a.omega(
+                    2 * i64::from(input.phase().evaluate(&bits(3, mask)).unwrap()),
+                    0,
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        expected[label] = a.add(&expected[label], &term).unwrap();
+    }
+    let gates = [
+        Gate::H(0),
+        Gate::H(1),
+        Gate::S { qubit: 2, turns: 1 },
+        Gate::H(2),
+        Gate::H(0),
+    ];
+    for gate in gates {
+        dense_gate(gate, &mut expected, &a);
+    }
+    let state = CliffordCircuit::new(3, gates)
+        .unwrap()
+        .evolve(&input, &a)
+        .unwrap()
+        .unwrap()
+        .prepare()
+        .unwrap();
+    for (output, value) in expected.iter().enumerate() {
+        assert_eq!(&state.amplitude(&bits(3, output), &a).unwrap(), value);
+    }
+}
+
+#[test]
+fn independent_support_contraction_still_enforces_scalar_budgets() {
+    let wide = ScalarArithmetic::default();
+    let tight = ScalarArithmetic::new(1).unwrap();
+    let input = AffineKet::new(
+        bits(3, 0),
+        vec![bits(3, 1), bits(3, 2)],
+        QuadraticForm::new(3, vec![1, 3], vec![bits(2, 2), bits(2, 0)]).unwrap(),
+        wide.integer(3).unwrap(),
+    )
+    .unwrap();
+    assert!(input.contract(&tight).is_err());
+    for gates in [vec![], vec![Gate::H(0)], vec![Gate::H(2)]] {
+        assert!(
+            CliffordCircuit::new(3, gates)
+                .unwrap()
+                .evolve(&input, &tight)
+                .is_err()
+        );
+    }
+    assert_eq!(input.contract(&wide).unwrap().unwrap(), input);
+}

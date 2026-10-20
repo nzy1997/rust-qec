@@ -1,9 +1,10 @@
 //! Exact Clifford circuits on affine quadratic kets.
 
-use crate::gf2::{BitVector, Gf2Error};
+use crate::gf2::{BitVector, Gf2Error, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
+use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,6 +14,7 @@ pub enum CliffordError {
     InvalidTurns,
     DimensionMismatch,
     DimensionOverflow,
+    InvalidCanonicalSupport,
     Binary(Gf2Error),
     Quadratic(QuadraticError),
     Scalar(ScalarError),
@@ -32,6 +34,10 @@ impl fmt::Display for CliffordError {
             Self::DimensionOverflow => {
                 write!(f, "Clifford path count exceeds the platform index range")
             }
+            Self::InvalidCanonicalSupport => write!(
+                f,
+                "Hadamard requires independent input support columns; deleting one row must lose at most one rank"
+            ),
             Self::Binary(e) => e.fmt(f),
             Self::Quadratic(e) => e.fmt(f),
             Self::Scalar(e) => e.fmt(f),
@@ -277,6 +283,11 @@ fn apply(
             let deterministic = columns
                 .iter()
                 .all(|column| !column.get(qubit).expect("validated qubit"));
+            let kernel = if deterministic {
+                None
+            } else {
+                deleted_row_kernel(&columns, qubit)?
+            };
             let n = columns.len();
             let paths = n.checked_add(1).ok_or(CliffordError::DimensionOverflow)?;
             let mut upper = phase
@@ -296,12 +307,68 @@ fn apply(
             phase = QuadraticForm::new(phase.constant(), linear, upper)?;
             coefficient = arithmetic.multiply(&coefficient, &arithmetic.omega(0, -1)?)?;
             let next = AffineKet::new(offset, columns, phase, coefficient)?;
-            return if deterministic {
-                Ok(Some(next))
+            return if let Some(kernel) = kernel {
+                // A*v = e_qubit before clearing the row. In the new matrix,
+                // (v,0) is its unique hidden direction. Removing any original
+                // column in v leaves an independent image basis; the new unit
+                // column cannot belong to the cleared old-column span.
+                let removed = kernel
+                    .ones()
+                    .next()
+                    .ok_or(CliffordError::InvalidCanonicalSupport)?;
+                let direction = BitVector::from_indices(paths, kernel.ones())?;
+                let pivots = (0..paths).filter(|&j| j != removed).collect::<Vec<_>>();
+                Ok(next.contract_with_basis(&pivots, &[direction], arithmetic)?)
             } else {
-                Ok(next.contract(arithmetic)?)
+                Ok(Some(next))
             };
         }
     }
     Ok(Some(AffineKet::new(offset, columns, phase, coefficient)?))
+}
+
+/// Nullspace of canonical support after removing one boundary row. Streaming
+/// packed row reduction needs no equation provenance and stops at full rank.
+fn deleted_row_kernel(
+    columns: &[BitVector],
+    qubit: usize,
+) -> Result<Option<BitVector>, CliffordError> {
+    let count = columns.len();
+    let Some(first) = columns.first() else {
+        return Ok(None);
+    };
+    let mut echelon = BTreeMap::<usize, BitVector>::new();
+    for (index, mut row) in transpose_columns(first.width(), columns)?
+        .into_iter()
+        .enumerate()
+    {
+        if index == qubit {
+            continue;
+        }
+        loop {
+            let Some(pivot) = row.ones().next() else {
+                break;
+            };
+            if let Some(previous) = echelon.get(&pivot) {
+                row.xor_assign(previous)?;
+            } else {
+                echelon.insert(pivot, row);
+                break;
+            }
+        }
+        if echelon.len() == count {
+            return Ok(None);
+        }
+    }
+    if echelon.len().checked_add(1) != Some(count) {
+        return Err(CliffordError::InvalidCanonicalSupport);
+    }
+    let free = (0..count)
+        .find(|j| !echelon.contains_key(j))
+        .ok_or(CliffordError::InvalidCanonicalSupport)?;
+    let mut kernel = BitVector::from_indices(count, [free])?;
+    for (&pivot, row) in echelon.iter().rev() {
+        kernel.set(pivot, row.dot(&kernel)?)?;
+    }
+    Ok(Some(kernel))
 }
