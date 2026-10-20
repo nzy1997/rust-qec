@@ -97,6 +97,52 @@ impl AffineKet {
         &self.coefficient
     }
 
+    /// Complex conjugation in the computational basis, including global phase.
+    pub fn conjugate(&self) -> Self {
+        Self {
+            offset: self.offset.clone(),
+            columns: self.columns.clone(),
+            phase: QuadraticForm::new(
+                (4 - self.phase.constant()) & 3,
+                self.phase.linear().iter().map(|&c| (4 - c) & 3).collect(),
+                self.phase.upper().to_vec(),
+            )
+            .expect("negation preserves a valid quadratic form"),
+            coefficient: self.coefficient.conjugate(),
+        }
+    }
+
+    /// Sum every discarded boundary index against the unnormalized bra
+    /// `(<0| + <1|)`, retaining the ordered indices in `keep`. This is a linear
+    /// tensor contraction, not a partial trace of a density operator. Repeating
+    /// an index copies its computational label to multiple retained legs.
+    pub fn sum_boundary(
+        &self,
+        keep: &[usize],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<Self>, StabilizerError> {
+        let map = |value: &BitVector| -> Result<BitVector, Gf2Error> {
+            let mut mapped = BitVector::zeros(keep.len())?;
+            for (i, &j) in keep.iter().enumerate() {
+                mapped.set(i, value.get(j)?)?;
+            }
+            Ok(mapped)
+        };
+        let offset = map(&self.offset)?;
+        let columns = self
+            .columns
+            .iter()
+            .map(map)
+            .collect::<Result<Vec<_>, _>>()?;
+        Self::new(
+            offset,
+            columns,
+            self.phase.clone(),
+            self.coefficient.clone(),
+        )?
+        .contract(arithmetic)
+    }
+
     pub fn prepare(&self) -> Result<PreparedKet, StabilizerError> {
         let rows = transpose(self.width(), &self.columns)?;
         let factor = LinearFactorization::new(self.columns.len(), &rows)?;

@@ -169,3 +169,43 @@ them with `benchmarks/magna_reproduction/phase_vectors.py` using the reference
 environment and arguments shown above. The generator checks its reconstructed
 closed amplitude against the native norm and verifies source and binary hashes
 before writing a new destination.
+
+## Clifford circuit boundaries
+
+`clifford::CliffordCircuit` validates a fixed width and a sequence of H, S
+(zero through three turns), X, Z, CX, CZ and SWAP gates. Two-qubit gates require
+distinct endpoints. `computational` prepares a basis ket; `evolve` accepts an
+arbitrary unnormalized affine ket and retains its scalar and global phase.
+Each H introduces one path variable and contracts it immediately, keeping the
+number of independent paths bounded by the boundary width. `adjoint` reverses
+the circuit and inverts every S phase.
+
+```rust
+use rmagna::clifford::{CliffordCircuit, CliffordGate};
+use rmagna::gf2::BitVector;
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+
+let arithmetic = ScalarArithmetic::default();
+let input = CliffordCircuit::computational(BitVector::zeros(2)?)?;
+let circuit = CliffordCircuit::new(2, [
+    CliffordGate::H(0), CliffordGate::Cx { control: 0, target: 1 },
+])?;
+let bell = circuit.evolve(&input, &arithmetic)?.unwrap();
+assert_eq!(bell.norm_squared(&arithmetic)?, ExactScalar::one());
+assert_eq!(bell.prepare()?.amplitude(&BitVector::zeros(2)?, &arithmetic)?,
+    arithmetic.omega(0, -1)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+For tensor-network construction, `AffineKet::conjugate` conjugates all complex
+phases. `sum_boundary(keep, arithmetic)` sums every discarded computational
+label against the unnormalized bra `<0| + <1|`, and retains the requested
+indices in their given order. Repeated indices copy a label to several legs.
+This linear operation is distinct from tracing a density operator; a trace
+requires boundary equality between a ket and its conjugate first.
+
+These primitives currently build exact Clifford boundaries; reset, records,
+noise and near-Clifford circuit lowering are subsequent deliverables. Tests
+compare random six-qubit circuits to explicit complex matrices, retain the
+global phase in `(SH)^3 = omega I`, invert the circuits exactly, and verify
+boundary sums, repeated indices and wide Bell projections.
