@@ -304,3 +304,45 @@ impl Circuit {
         self.external_calls != 0 || self.has_guarded_noise
     }
 }
+
+impl Circuit {
+    // Only the causal runtime constructs these views from validated parsed
+    // operations. Original operation IDs and physical wire labels stay stable.
+    pub(crate) fn runtime_view(&self, operations: Vec<LocatedOperation>) -> Self {
+        let num_records = operations
+            .iter()
+            .filter_map(|op| match op.operation {
+                Operation::Measure { record, .. } => Some(record + 1),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        let detectors = operations
+            .iter()
+            .filter_map(|op| match &op.operation {
+                Operation::Detector { expression, .. } => Some(expression.clone()),
+                _ => None,
+            })
+            .collect();
+        let mut observables = BTreeMap::<usize, BitExpr>::new();
+        for op in &operations {
+            if let Operation::Observable { index, expression } = &op.operation {
+                observables
+                    .entry(*index)
+                    .or_default()
+                    .xor_assign(expression);
+            }
+        }
+        Self {
+            num_instructions: operations.len(),
+            operations,
+            num_qubits: self.num_qubits,
+            num_records,
+            detectors,
+            observables,
+            external_calls: 0,
+            has_guarded_noise: false,
+            source_text: self.source_text.clone(),
+        }
+    }
+}

@@ -1,0 +1,1082 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.history-reference.v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1,
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 0,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1,
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 1,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1,
+            1,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 2,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "calls": [
+        {
+          "inputs": [
+            0,
+            1,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 4,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1,
+            0,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 5,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "calls": [
+        {
+          "inputs": [
+            0,
+            0,
+            1
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 7,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "calls": [
+        {
+          "inputs": [
+            0,
+            1,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 10,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "calls": [
+        {
+          "inputs": [
+            0,
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "majority",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        3
+      ],
+      "report_flips": [],
+      "seed": 14,
+      "source": "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[decision] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -3
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "sequential",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        2
+      ],
+      "report_flips": [],
+      "seed": 0,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nM 1\nDETECTOR rec[-1]\nCONTROL[decision] det[1] ctrl[0] -> ctrl[0]\nCX ctrl[0] 2\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "sequential",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        2
+      ],
+      "report_flips": [],
+      "seed": 4,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nM 1\nDETECTOR rec[-1]\nCONTROL[decision] det[1] ctrl[0] -> ctrl[0]\nCX ctrl[0] 2\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "guarded",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 0,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nX_ERROR(1/3) ctrl[0] 1\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "guarded",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 4,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nX_ERROR(1/3) ctrl[0] 1\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "guarded",
+      "error": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "faults": [
+        {
+          "alternative": 0,
+          "line": 5
+        }
+      ],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 0,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nX_ERROR(1/3) ctrl[0] 1\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "calls": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "guarded",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [
+        {
+          "alternative": 0,
+          "line": 5
+        }
+      ],
+      "history_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 4,
+      "source": "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nX_ERROR(1/3) ctrl[0] 1\n",
+      "target_success": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -1
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "calls": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "irrational",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 0,
+      "source": "H 0\nT 0\nH 0\nM(1/5) 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "irrational",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [],
+      "seed": 2,
+      "source": "H 0\nT 0\nH 0\nM(1/5) 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "calls": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ],
+      "case": "irrational",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "2",
+          "1",
+          "0",
+          "-1"
+        ],
+        "power": -2
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [
+        0
+      ],
+      "seed": 0,
+      "source": "H 0\nT 0\nH 0\nM(1/5) 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      }
+    },
+    {
+      "acceptance": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "calls": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ],
+      "case": "irrational",
+      "error": {
+        "coefficients": [
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "faults": [],
+      "history_mass": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      },
+      "ideal": "I 0\n",
+      "outputs": [
+        1
+      ],
+      "report_flips": [
+        0
+      ],
+      "seed": 11,
+      "source": "H 0\nT 0\nH 0\nM(1/5) 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]\nCX ctrl[0] 1\nPOSTSELECT det[0]\n",
+      "target_success": {
+        "coefficients": [
+          "2",
+          "-1",
+          "0",
+          "1"
+        ],
+        "power": -2
+      }
+    }
+  ]
+}

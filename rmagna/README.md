@@ -571,3 +571,68 @@ guarded noise, the affine-support proposal and cached query preparation remain
 separate deliverables. Tests check exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
+
+## Causal controllers and guarded physical noise
+
+`runtime::ControllerRegistry` binds a name and nonempty version to a deterministic,
+stateless Rust function over declared reported observations. A controller returns
+one `bool` per declared output; errors and wrong output lengths fail the draw.
+Bindings are captured when constructing `CausalProgram`, so replacing a registry
+later cannot change the prepared program. `controller_versions` exposes the
+captured identity contract. Caller-supplied version strings must identify the
+actual decoder and configuration; the runtime cannot infer function identity.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::instrument::{compile_unitary, CompileOptions};
+use rmagna::noise::SplitMix64;
+use rmagna::runtime::{ControllerRegistry, CausalProgram, RuntimeOptions};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+let arithmetic = ScalarArithmetic::default();
+let mut registry = ControllerRegistry::default();
+registry.register("parity", "1", |bits: &[bool]| Ok(vec![bits.iter().fold(false, |p, b| p ^ b)]))?;
+let source = parse_circuit("H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[parity] det[0] -> ctrl[0]\nCX ctrl[0] 0",
+    &ParseOptions { controllers: registry.names(), ..Default::default() })?;
+let program = CausalProgram::new(&source, &registry, RuntimeOptions::default(), &arithmetic)?;
+let target = compile_unitary(&parse_circuit("I 0", &ParseOptions::default())?,
+    &CompileOptions::default(), &arithmetic)?;
+let draw = program.sample(&[0], &target, &mut SplitMix64::new(11), &arithmetic)?;
+assert_eq!(draw.masses.error, ExactScalar::zero());
+assert_eq!(draw.masses.target_success.value, draw.history_mass);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Before each controller call or guarded category, the exact-marginal route queries
+only the already executed physical prefix, conditioned on earlier sampled inputs.
+Postselection never enters those queries. Built-in affine feedback remains coherent.
+Controller outputs are installed atomically in their parsed decision slots.
+A correlated chain evaluates its common guard once. Inactive channels have no
+action and contribute no factor to `noise_probability`. The runtime draws all
+potential independent category choices up front and discards inactive ones;
+this consumes entropy for some inactive categories without changing the physical
+path distribution.
+
+`sample_prescribed` accepts potential-category fault selections for differential
+checks; `potential_site(original_operation_id)` supplies the stable mapping.
+The returned exact masses are joint with the sampled history, and `history_mass`
+is the corresponding physical history mass. An exact-marginal Monte Carlo
+contribution divides the joint accepted/error mass by this history mass.
+`noise_probability` describes the active noise choices and is useful for complete
+enumeration; multiplying it into a physical Monte Carlo contribution would count
+the sampled noise distribution twice.
+
+Defaults additionally cap sampled history inputs at 1,000,000 and prefix compiles
+at 100,000 per draw, with separate noise and history entropy budgets. This first
+causal implementation recompiles resolved prefixes and the final branch; it does
+not yet reuse prepared decision networks or implement the affine-support history
+proposal, causal importance proposals, terminal recovery, or task-file execution.
+It is a correctness baseline, not a paper-performance implementation.
+
+Tests enumerate majority histories, preserve repeated observations and atomic
+register updates, distinguish active and inactive guarded paths, verify correlated
+chain weights, and reject missing bindings, callback failures, wrong output shapes
+and resource limits. Eighteen prescribed histories match the pinned public native
+backend's exact history, accepted, target-success and error masses, including
+irrational branch probabilities. Regenerate those witnesses with
+`benchmarks/magna_reproduction/history_vectors.py --upstream PINNED_SOURCE --out NEW_JSON`
+using the same isolated reference Python environment.
