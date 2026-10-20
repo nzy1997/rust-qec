@@ -244,6 +244,36 @@ impl TaskEvaluator {
             }
         }
     }
+    /// Query one explicitly chosen causal observation history. Returned values
+    /// are conditional contributions; enumeration must include its physical mass.
+    pub fn evaluate_prescribed_history(
+        &self,
+        faults: &[FaultSelection],
+        groups: &[Vec<bool>],
+    ) -> Result<TaskEvaluation, TaskError> {
+        match &self.execution {
+            Execution::Causal(program) => {
+                let history = program
+                    .resolve_prescribed_history(
+                        &self.requested,
+                        faults,
+                        groups,
+                        &self.options.scalars,
+                    )
+                    .map_err(|e| error("runtime", e))?;
+                self.evaluate(EvaluationInput::history(&history))
+            }
+            Execution::Linear { .. } => {
+                if !groups.is_empty() {
+                    return Err(TaskError::new(
+                        "runtime",
+                        "linear tasks require an empty prescribed history",
+                    ));
+                }
+                self.sample_prescribed(faults, &mut crate::noise::SplitMix64::new(0))
+            }
+        }
+    }
     fn evaluate(&self, input: EvaluationInput<'_>) -> Result<TaskEvaluation, TaskError> {
         let a = &self.options.scalars;
         let f = &self.options.fields;

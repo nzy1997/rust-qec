@@ -906,3 +906,39 @@ Symlink/cache controls and malformed wire/metadata regressions also run through
 float-roundtrip and combined serde features; CI runs the same matrix.
 This bridge supplies external bindings; full packaged decoder campaigns and
 prepared history reuse remain separate validation and performance work.
+
+## Explicit physical-history queries
+
+`CausalProgram::resolve_prescribed_history(requested, faults, groups, arithmetic)`
+fixes observations without reading entropy. Groups follow circuit order: one
+input list per external callback (including empty lists), one singleton for the
+first guarded category in a correlated chain, and one final requested-record
+list when nonempty. Group counts and lengths are checked before callbacks run.
+Every group must have positive joint physical prefix mass given all earlier
+observations; impossible or contradictory groups fail before their callback.
+Final postselection and target fidelity never condition this validation.
+The returned history retains its exact physical mass and active noise weight.
+
+`TaskEvaluator::evaluate_prescribed_history(faults, groups)` evaluates the same
+normalized conditional metrics as a physical draw on that history. This is a
+conditional query, not an unbiased sampling proposal by itself. Complete physical
+enumeration multiplies a conditional metric by its history mass and physical
+noise probability. Linear tasks require an empty group list. The diagnostic
+example accepts `--history JSON_FILE` containing boolean group lists and
+`--max-terms COUNT` to apply the task's explicit contraction budget.
+
+`benchmarks/magna_reproduction/controller_task_compare.py` takes the usual
+`--upstream`, `--rust-example` and `--out` arguments, with optional `--tasks` and
+`--timeout`. Each native task runs in a separate process to avoid decoder module
+name collisions. Two native no-fault histories are explicitly replayed in Rust;
+raw exact masses, norms, and complete callback inputs/outputs must agree.
+Decoder and binary provenance, timeouts, unsupported paths and mismatches are
+retained. The receipt distinguishes a selected subset from complete five-task
+coverage. These finite histories establish neither Monte Carlo precision nor
+paper performance.
+
+Runtime tests replay all eighteen pinned native histories directly, verify shape
+errors and impossible histories before callbacks, preserve guarded-chain weights,
+and reject inconsistent duplicate observations. Requested records remain physical
+even when selection rejects them. Task tests explicitly integrate conditional
+contributions against history mass to recover the physical accepted probability.

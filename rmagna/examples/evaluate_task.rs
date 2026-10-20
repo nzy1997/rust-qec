@@ -28,12 +28,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: evaluate_task PHYSICAL TASK [SEED]")?;
     let task_path = args.next().ok_or("missing task JSON path")?;
     let mut seed = 0;
+    let mut history = None;
+    let mut options = EvaluationOptions::default();
     let mut fixed = None;
     let mut controllers = None;
     let mut python = "python3".to_owned();
     let mut module_root = None;
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--history" => history = Some(args.next().ok_or("missing history JSON")?),
+            "--max-terms" => {
+                options.runtime.sampling.max_terms =
+                    args.next().ok_or("missing term budget")?.parse::<usize>()?
+            }
             "--constant-word" => {
                 fixed = Some(
                     args.next()
@@ -90,20 +97,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let modules = spec.load_modules(&physical, &parse)?;
     let start = std::time::Instant::now();
-    let evaluator =
-        TaskEvaluator::new(&physical, &modules, &registry, EvaluationOptions::default())?;
+    let evaluator = TaskEvaluator::new(&physical, &modules, &registry, options)?;
     let compile_ms = start.elapsed().as_secs_f64() * 1000.;
     let query = std::time::Instant::now();
-    let draw = evaluator.sample_prescribed(
-        &[],
-        &mut Entropy {
-            random: SplitMix64::new(seed),
-            fixed,
-        },
-    )?;
+    let draw = if let Some(path) = history {
+        let groups: Vec<Vec<bool>> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+        evaluator.evaluate_prescribed_history(&[], &groups)?
+    } else {
+        evaluator.sample_prescribed(
+            &[],
+            &mut Entropy {
+                random: SplitMix64::new(seed),
+                fixed,
+            },
+        )?
+    };
     println!(
         "{}",
-        serde_json::json!({"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"configuration":{"max_terms":options.runtime.sampling.max_terms},"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
     );
     Ok(())
 }
