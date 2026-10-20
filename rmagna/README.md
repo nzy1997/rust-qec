@@ -678,3 +678,23 @@ field norm exceeds the configured budget. Tests compare random rational complex
 operations against independent `Q(sqrt(2)) + i Q(sqrt(2))` arithmetic, retain
 `2^-1200` weighted errors, check normalized irrational histories, and exercise
 rational validity, exponent/resource bounds and Pell cancellation.
+
+## Projected and mixed target density networks
+
+`CompiledUnitary::density_overlap` takes a `DensityBoundary` for each preparation:
+ordered selected outputs, physical Z-parity event rows, and their required bits.
+It returns the unnormalized Hilbert-Schmidt overlap of the two reduced density
+operators. Each preparation traces its own discarded environment, and events act
+on both ket copies before contraction. Output order may differ between the two
+preparations. `target_weight` uses the same implementation for a pure target with
+all target wires kept and no target-side events.
+
+This primitive supports target auxiliary wires, postselection and mixed reductions
+without a dense state or density matrix in production. The target normalization
+is a separate `target.probability_z(...)` query; normalization belongs to the field
+arithmetic layer above. A zero projected target has zero overlap at this level;
+the task layer must reject it before using it as an ideal state.
+Tests independently construct literal complex reduced density matrices, trace
+both environments, and compare all sixteen selected-output/event combinations,
+including empty and permuted outputs. Existing pure-target and partial-target
+checks remain unchanged. Task JSON loading is a later layer.

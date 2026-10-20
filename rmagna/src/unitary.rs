@@ -276,6 +276,14 @@ pub struct PauliInsertion {
     pub before_gate: usize,
     pub word: PauliWord,
 }
+/// Selected density outputs and simultaneous physical Z-parity events.
+#[derive(Clone, Copy, Debug)]
+pub struct DensityBoundary<'a> {
+    pub outputs: &'a [usize],
+    pub event_rows: &'a [BitVector],
+    pub outcomes: &'a BitVector,
+}
+
 impl CompiledUnitary {
     pub fn width(&self) -> usize {
         self.physical_width
@@ -453,21 +461,66 @@ impl CompiledUnitary {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, UnitaryError> {
-        if outputs.len() != target.width()
-            || event_rows.len() != outcomes.width()
-            || event_rows.iter().any(|r| r.width() != self.width())
-        {
+        let target_outputs = (0..target.width()).collect::<Vec<_>>();
+        let target_outcomes = BitVector::zeros(0)?;
+        self.density_overlap(
+            DensityBoundary {
+                outputs,
+                event_rows,
+                outcomes,
+            },
+            target,
+            DensityBoundary {
+                outputs: &target_outputs,
+                event_rows: &[],
+                outcomes: &target_outcomes,
+            },
+            max_terms,
+            arithmetic,
+        )
+    }
+
+    /// Unnormalized Hilbert-Schmidt overlap of reduced, projected density
+    /// operators. Outputs are paired in the supplied order; all other physical
+    /// indices are traced independently in each preparation.
+    pub fn density_overlap(
+        &self,
+        boundary: DensityBoundary<'_>,
+        target: &Self,
+        target_boundary: DensityBoundary<'_>,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, UnitaryError> {
+        if boundary.outputs.len() != target_boundary.outputs.len() {
             return Err(UnitaryError::DimensionMismatch);
         }
-        let positions = outputs
+        for (width, boundary) in [
+            (self.width(), &boundary),
+            (target.width(), &target_boundary),
+        ] {
+            if boundary.event_rows.len() != boundary.outcomes.width()
+                || boundary.event_rows.iter().any(|row| row.width() != width)
+            {
+                return Err(UnitaryError::DimensionMismatch);
+            }
+            if boundary
+                .outputs
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+                != boundary.outputs.len()
+            {
+                return Err(UnitaryError::RepeatedOutput);
+            }
+            BitVector::from_indices(width, boundary.outputs.iter().copied())?;
+        }
+        let positions = boundary
+            .outputs
             .iter()
             .enumerate()
-            .map(|(i, &q)| (q, i))
+            .map(|(i, &q)| (q, target_boundary.outputs[i]))
             .collect::<BTreeMap<_, _>>();
-        if positions.len() != outputs.len() {
-            return Err(UnitaryError::RepeatedOutput);
-        }
-        BitVector::from_indices(self.width(), outputs.iter().copied())?;
         let n = self.boundary.width();
         let m = target.boundary.width();
         let joint = self
@@ -491,12 +544,37 @@ impl CompiledUnitary {
                 rows.push(BitVector::from_indices(total, [qubit, n + qubit])?);
             }
         }
+        let target_kept = target_boundary
+            .outputs
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        for qubit in 0..target.width() {
+            if !target_kept.contains(&qubit) {
+                rows.push(BitVector::from_indices(
+                    total,
+                    [2 * n + qubit, 2 * n + m + qubit],
+                )?);
+            }
+        }
         let mut bits = vec![false; rows.len()];
-        for (row_index, row) in event_rows.iter().enumerate() {
+        for (row_index, row) in boundary.event_rows.iter().enumerate() {
             rows.push(BitVector::from_indices(total, row.ones())?);
-            bits.push(outcomes.get(row_index)?);
+            bits.push(boundary.outcomes.get(row_index)?);
             rows.push(BitVector::from_indices(total, row.ones().map(|j| n + j))?);
-            bits.push(outcomes.get(row_index)?);
+            bits.push(boundary.outcomes.get(row_index)?);
+        }
+        for (row_index, row) in target_boundary.event_rows.iter().enumerate() {
+            rows.push(BitVector::from_indices(
+                total,
+                row.ones().map(|j| 2 * n + j),
+            )?);
+            bits.push(target_boundary.outcomes.get(row_index)?);
+            rows.push(BitVector::from_indices(
+                total,
+                row.ones().map(|j| 2 * n + m + j),
+            )?);
+            bits.push(target_boundary.outcomes.get(row_index)?);
         }
         let rhs = BitVector::from_indices(
             bits.len(),
