@@ -1,0 +1,50 @@
+/* Independent R literal code algebra. SOURCE TEXT ONLY; no authoring run.
+ * Primary2610.06730v1 B/Table4; no C generator or header is an input. */
+#ifndef Q37_R_CODE_V32_H
+#define Q37_R_CODE_V32_H
+#include <stdint.h>
+#define R32_SITE(i) (UINT64_C(1)<<((i)-1))
+static uint64_t r32_code_x(unsigned i){switch(i){
+case 0:return R32_SITE(19)|R32_SITE(18);
+case 1:return R32_SITE(33)|R32_SITE(11);
+case 2:return R32_SITE(34)|R32_SITE(12);
+case 3:return R32_SITE(13)|R32_SITE(35);
+case 4:return R32_SITE(37)|R32_SITE(15);
+case 5:return R32_SITE(3)|R32_SITE(21)|R32_SITE(18)|R32_SITE(2);
+case 6:return R32_SITE(22)|R32_SITE(4)|R32_SITE(1)|R32_SITE(16);
+case 7:return R32_SITE(17)|R32_SITE(26)|R32_SITE(6)|R32_SITE(1);
+case 8:return R32_SITE(27)|R32_SITE(26)|R32_SITE(25)|R32_SITE(5);
+case 9:return R32_SITE(7)|R32_SITE(28)|R32_SITE(5)|R32_SITE(24);
+case 10:return R32_SITE(9)|R32_SITE(31)|R32_SITE(32)|R32_SITE(10);
+case 11:return R32_SITE(30)|R32_SITE(8)|R32_SITE(14)|R32_SITE(36);
+case 12:return R32_SITE(7)|R32_SITE(23)|R32_SITE(21)|R32_SITE(20)|R32_SITE(22)|R32_SITE(29);
+case 13:return R32_SITE(9)|R32_SITE(31)|R32_SITE(25)|R32_SITE(24)|R32_SITE(36)|R32_SITE(14);
+case 14:return R32_SITE(34)|R32_SITE(15)|R32_SITE(5)|R32_SITE(6)|R32_SITE(8)|R32_SITE(33)|R32_SITE(19)|R32_SITE(17);
+case 15:return R32_SITE(3)|R32_SITE(22)|R32_SITE(12)|R32_SITE(10)|R32_SITE(2)|R32_SITE(24)|R32_SITE(33)|R32_SITE(35);
+case 16:return R32_SITE(32)|R32_SITE(7)|R32_SITE(27)|R32_SITE(18)|R32_SITE(14)|R32_SITE(15)|R32_SITE(21)|R32_SITE(11);
+case 17:return R32_SITE(13)|R32_SITE(9)|R32_SITE(19)|R32_SITE(26)|R32_SITE(12)|R32_SITE(21)|R32_SITE(30)|R32_SITE(28);
+default:q_fail("R code X row");return 0;}}
+static uint64_t r32_code_z(unsigned i){switch(i){
+case 0:return R32_SITE(3)|R32_SITE(2);
+case 1:return R32_SITE(16)|R32_SITE(4);
+case 2:return R32_SITE(6)|R32_SITE(17);
+case 3:return R32_SITE(23)|R32_SITE(20);
+case 4:return R32_SITE(20)|R32_SITE(29);
+case 5:return R32_SITE(9)|R32_SITE(28)|R32_SITE(24)|R32_SITE(10);
+case 6:return R32_SITE(26)|R32_SITE(5)|R32_SITE(6)|R32_SITE(28);
+case 7:return R32_SITE(9)|R32_SITE(32)|R32_SITE(30)|R32_SITE(14);
+case 8:return R32_SITE(27)|R32_SITE(25)|R32_SITE(31)|R32_SITE(32);
+case 9:return R32_SITE(7)|R32_SITE(25)|R32_SITE(14)|R32_SITE(23)|R32_SITE(5)|R32_SITE(8);
+case 10:return R32_SITE(27)|R32_SITE(19)|R32_SITE(5)|R32_SITE(21)|R32_SITE(7)|R32_SITE(18);
+case 11:return R32_SITE(7)|R32_SITE(16)|R32_SITE(25)|R32_SITE(24)|R32_SITE(27)|R32_SITE(22);
+case 12:return R32_SITE(27)|R32_SITE(22)|R32_SITE(26)|R32_SITE(21)|R32_SITE(1)|R32_SITE(2);
+case 13:return R32_SITE(31)|R32_SITE(11)|R32_SITE(14)|R32_SITE(8)|R32_SITE(33)|R32_SITE(10);
+case 14:return R32_SITE(26)|R32_SITE(30)|R32_SITE(1)|R32_SITE(25)|R32_SITE(36)|R32_SITE(16);
+case 15:return R32_SITE(34)|R32_SITE(9)|R32_SITE(10)|R32_SITE(12)|R32_SITE(8)|R32_SITE(36);
+case 16:return R32_SITE(10)|R32_SITE(13)|R32_SITE(31)|R32_SITE(36)|R32_SITE(35)|R32_SITE(30);
+case 17:return R32_SITE(32)|R32_SITE(37)|R32_SITE(31)|R32_SITE(8)|R32_SITE(15)|R32_SITE(36);
+default:q_fail("R code Z row");return 0;}}
+static uint64_t r32_code_lx(void){return R32_SITE(2)|R32_SITE(3)|R32_SITE(5)|R32_SITE(6)|R32_SITE(7)|R32_SITE(17)|R32_SITE(22);}
+static uint64_t r32_code_lz(void){return R32_SITE(1)|R32_SITE(8)|R32_SITE(9)|R32_SITE(16)|R32_SITE(17)|R32_SITE(30)|R32_SITE(31);}
+#undef R32_SITE
+#endif
