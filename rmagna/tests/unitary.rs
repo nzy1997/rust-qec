@@ -656,8 +656,8 @@ fn partial_targets_trace_entangled_environments_and_apply_events_on_both_copies(
 
 #[test]
 fn reduced_projected_density_overlaps_match_literal_density_matrices() {
-    use rmagna::unitary::DensityBoundary;
     use rmagna::gf2::BitVector;
+    use rmagna::unitary::DensityBoundary;
     let a = ScalarArithmetic::default();
     let pg = [
         G::Clifford(C::H(0)),
