@@ -125,6 +125,7 @@ impl From<UnitaryError> for InstrumentError {
 
 #[derive(Clone, Copy, Debug)]
 pub struct CompileOptions {
+    pub compiler_strategy: crate::unitary::CompilerStrategy,
     pub max_coherent_qubits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
@@ -132,6 +133,7 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
+            compiler_strategy: crate::unitary::CompilerStrategy::ParityCopies,
             max_coherent_qubits: 65536,
             max_gates: 1_000_000,
             max_noise_sites: 1_000_000,
@@ -217,6 +219,9 @@ pub fn compile_unitary(
 }
 
 impl CompiledInstrument {
+    pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
+        self.unitary.compilation()
+    }
     pub fn num_qubits(&self) -> usize {
         self.live_wires.len()
     }

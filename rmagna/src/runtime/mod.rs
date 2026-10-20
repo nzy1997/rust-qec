@@ -263,6 +263,7 @@ pub struct CausalProgram {
     source_sites: BTreeMap<usize, usize>,
     options: RuntimeOptions,
     reference: Option<CompiledInstrument>,
+    compilation: crate::unitary::CompilationDiagnostics,
     guarded_sites: std::collections::BTreeSet<usize>,
 }
 impl CausalProgram {
@@ -307,6 +308,7 @@ impl CausalProgram {
             .map(|op| source_sites[&op.id])
             .collect();
         Ok(Self {
+            compilation: reference.compilation().clone(),
             reference: (options.strategy == CausalStrategy::FixedTemplate).then_some(reference),
             guarded_sites,
             circuit: circuit.clone(),
@@ -316,6 +318,9 @@ impl CausalProgram {
             source_sites,
             options,
         })
+    }
+    pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
+        &self.compilation
     }
     pub fn strategy(&self) -> CausalStrategy {
         self.options.strategy

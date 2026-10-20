@@ -36,6 +36,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut module_root = None;
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--compiler" => {
+                options.runtime.compile.compiler_strategy =
+                    match args.next().ok_or("missing compiler strategy")?.as_str() {
+                        "shared" => rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+                        "parity_copies" => rmagna::unitary::CompilerStrategy::ParityCopies,
+                        _ => return Err("compiler must be shared or parity_copies".into()),
+                    };
+            }
             "--history-sampler" => {
                 options.runtime.history_sampler =
                     match args.next().ok_or("missing history sampler")?.as_str() {
@@ -132,9 +140,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?
     };
+    let d = evaluator.compilation();
+    let compilation = serde_json::json!({"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,
+        "reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,
+        "phase_ancillas":d.phase_ancillas,"shared_phase_coordinates":d.shared_phase_coordinates,
+        "coherent_width":d.coherent_width,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables});
     println!(
         "{}",
-        serde_json::json!({"configuration":{"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"compilation":compilation,"configuration":{"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
     );
     Ok(())
 }

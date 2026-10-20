@@ -18,6 +18,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--rust-example", type=Path, required=True)
+    parser.add_argument("--compiler", choices=["shared", "parity_copies"])
     parser.add_argument("--out", type=Path)
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=TASKS)
     parser.add_argument("--timeout", type=int, default=180)
@@ -37,7 +38,7 @@ def main():
     rows = []
     document = dict(schema="rmagna.controller-task-comparison.v1", status="running",
         scope="prescribed no-fault observations from two native entropy endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
-        rust_binary_sha256=before, tasks=args.tasks, cases=rows)
+        rust_binary_sha256=before, compiler=args.compiler, tasks=args.tasks, cases=rows)
     with args.out.open("x", encoding="utf-8") as output:
         output.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
     def checkpoint():
@@ -48,6 +49,8 @@ def main():
     for name in args.tasks:
         command = [sys.executable, "-I", __file__, "--upstream", str(args.upstream),
                    "--rust-example", str(binary), "--one", name, "--timeout", str(args.timeout)]
+        if args.compiler:
+            command += ["--compiler", args.compiler]
         process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    start_new_session=os.name == "posix")
         try:
@@ -82,7 +85,7 @@ def main():
         raise SystemExit(1)
 
 
-def compare_result(result, expected, word, max_terms, classical):
+def compare_result(result, expected, word, max_terms, classical, compiler=None):
     """Retain one history's raw output even when a successful child is malformed."""
     try:
         actual = json.loads(result.stdout)
@@ -92,6 +95,11 @@ def compare_result(result, expected, word, max_terms, classical):
         if (not isinstance(config, dict) or type(config.get("max_terms")) is not int
                 or config["max_terms"] != max_terms):
             raise ValueError("Rust example did not apply the declared term budget")
+        if compiler:
+            strategy = {"shared": "SharedCommutingLayer", "parity_copies": "ParityCopies"}[compiler]
+            compilation = actual.get("compilation")
+            if not isinstance(compilation, dict) or compilation.get("strategy") != strategy:
+                raise ValueError("Rust example did not apply the declared compiler strategy")
         compared = {key: actual[key] for key in expected}
         for key, value in compared.items():
             if key == "controller_calls":
@@ -180,6 +188,8 @@ def one(args, binary):
             command = [str(binary), str(root / run["circuit"]), str(root / run["task"]),
                        "--max-terms", str(options["max_terms"]), "--controllers", str(config_path), "--python", sys.executable,
                        "--module-root", str(root)]
+            if args.compiler:
+                command += ["--compiler", args.compiler]
             try:
                 with tempfile.TemporaryDirectory(prefix="rmagna-prescribed-decoder-") as directory:
                     history = Path(directory) / "history.json"
@@ -193,13 +203,13 @@ def one(args, binary):
                                   stdout=result.stdout, stderr=result.stderr, reference=expected))
                 continue
             cases.append(compare_result(result, expected, word, options["max_terms"],
-                                        "error_observables" in compiled.task["raw"]))
+                                        "error_observables" in compiled.task["raw"], compiler=args.compiler))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
                     upstream_commit=captured.manifest["upstream"]["commit"], native_sha256=captured.native_sha256,
                     reference_manifest_sha256=captured.manifest_sha256, rust_binary_sha256=binary_hash,
-                    inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
+                    compiler=args.compiler, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                             for p in (config_path, root / "run.json", root / run["circuit"], root / run["task"])}, cases=cases)
 
 
