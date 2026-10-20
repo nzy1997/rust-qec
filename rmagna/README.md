@@ -1352,3 +1352,10 @@ assert_eq!(plan.evaluate(&updated, &arithmetic)?, arithmetic.integer(2)?);
 
 This primitive prepares only a quadratic sum. Query-family Gaussian contraction,
 non-Clifford phase resources and runtime integration require separate plans.
+
+The evolving Clifford ket is owned inside the gate loop. Label permutations
+update its support without copying the unchanged quadratic matrix. Z, S and CZ
+update exact affine parity/product phases in place with packed upper-triangle
+operations. The caller's input stays immutable. Wide reverse-label/diagonal-phase
+oracles cover dense support coordinates through 129 bits, in addition to literal
+small-circuit tests. These changes do not establish a formal speedup.

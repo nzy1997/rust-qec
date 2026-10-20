@@ -185,6 +185,55 @@ impl QuadraticForm {
         Ok((Self::new(self.evaluate(shift)?, linear, upper)?, images))
     }
 
+    /// Add a diagonal Clifford phase on one affine binary label, modulo four.
+    pub(crate) fn add_affine_parity(
+        &mut self,
+        axis: &BitVector,
+        offset: bool,
+        turns: u8,
+    ) -> Result<(), QuadraticError> {
+        self.check_vector(axis)?;
+        if turns > 3 {
+            return Err(QuadraticError::InvalidPhase);
+        }
+        if offset {
+            self.constant = (self.constant + turns) & 3;
+        }
+        let signed = if offset { (4 - turns) & 3 } else { turns };
+        for i in axis.ones() {
+            self.linear[i] = (self.linear[i] + signed) & 3;
+            if turns & 1 != 0 {
+                self.upper[i].xor_tail_assign(axis, i + 1)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Add twice the product of two affine binary labels, modulo four.
+    pub(crate) fn add_affine_product(
+        &mut self,
+        a: &BitVector,
+        a0: bool,
+        b: &BitVector,
+        b0: bool,
+    ) -> Result<(), QuadraticError> {
+        self.check_vector(a)?;
+        self.check_vector(b)?;
+        self.constant ^= 2 * u8::from(a0 && b0);
+        for i in 0..self.num_variables() {
+            let ai = a.get(i)?;
+            let bi = b.get(i)?;
+            self.linear[i] ^= 2 * u8::from((a0 && bi) ^ (b0 && ai) ^ (ai && bi));
+        }
+        for i in a.ones() {
+            self.upper[i].xor_tail_assign(b, i + 1)?;
+        }
+        for i in b.ones() {
+            self.upper[i].xor_tail_assign(a, i + 1)?;
+        }
+        Ok(())
+    }
+
     /// Evaluate `sum_x i^q(x)` without enumerating the binary assignments.
     ///
     /// An odd linear term eliminates one variable through `1 +/- i`. An even

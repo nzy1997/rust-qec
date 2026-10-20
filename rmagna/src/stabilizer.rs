@@ -102,6 +102,10 @@ impl AffineKet {
         &self.coefficient
     }
 
+    pub(crate) fn into_parts(self) -> (BitVector, Vec<BitVector>, QuadraticForm, ExactScalar) {
+        (self.offset, self.columns, self.phase, self.coefficient)
+    }
+
     /// Complex conjugation in the computational basis, including global phase.
     pub fn conjugate(&self) -> Self {
         Self {
