@@ -2,6 +2,7 @@
 
 pub mod circuit;
 pub mod clifford;
+pub mod field;
 pub mod gf2;
 pub mod instrument;
 pub mod noise;
