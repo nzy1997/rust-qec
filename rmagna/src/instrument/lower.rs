@@ -20,6 +20,7 @@ struct Lowering<'a> {
     sites: Vec<PendingSite>,
     chains: BTreeMap<usize, usize>,
     selections: Vec<BitExpr>,
+    decisions: BTreeMap<(usize, usize), usize>,
 }
 impl Lowering<'_> {
     fn fresh(&mut self) -> Result<usize, InstrumentError> {
@@ -75,7 +76,7 @@ impl Lowering<'_> {
         let Some(control) = control else {
             return self.extend(gates::lower(gate, &targets));
         };
-        if !control.is_affine() {
+        if !control.is_affine() && self.decisions.is_empty() {
             return Err(InstrumentError::NeedsHistory { operation: source });
         }
         if control.terms.is_empty() {
@@ -94,9 +95,18 @@ impl Lowering<'_> {
         };
         let mut controls = Vec::new();
         for atom in &control.terms {
-            if let BitAtom::Record(record) = atom {
-                controls.push(self.records[*record]);
-            }
+            controls.push(match atom {
+                BitAtom::Record(record) => self.records[*record],
+                BitAtom::Decision { call, bit } => {
+                    *self
+                        .decisions
+                        .get(&(*call, *bit))
+                        .ok_or(InstrumentError::UnknownDecision {
+                            call: *call,
+                            bit: *bit,
+                        })?
+                }
+            });
         }
         for &record in &controls {
             self.extend([U::Clifford(C::Cx {
@@ -276,6 +286,7 @@ pub(super) fn compile(
     circuit: &Circuit,
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
+    causal: bool,
 ) -> Result<CompiledInstrument, InstrumentError> {
     if circuit.num_qubits() > options.max_coherent_qubits {
         return Err(InstrumentError::ResourceLimit {
@@ -294,7 +305,23 @@ pub(super) fn compile(
         sites: Vec::new(),
         chains: BTreeMap::new(),
         selections: Vec::new(),
+        decisions: BTreeMap::new(),
     };
+    if causal {
+        for op in circuit.operations() {
+            if let Operation::Control {
+                call: Some(call),
+                outputs,
+                ..
+            } = &op.operation
+            {
+                for bit in 0..outputs.len() {
+                    let wire = state.fresh()?;
+                    state.decisions.insert((*call, bit), wire);
+                }
+            }
+        }
+    }
     for op in circuit.operations() {
         match &op.operation {
             Operation::Unitary {
@@ -316,16 +343,18 @@ pub(super) fn compile(
                 product,
                 guard,
             } => {
-                if guard.is_some() {
+                if guard.is_some() && !causal {
                     return Err(InstrumentError::NeedsHistory { operation: op.id });
                 }
                 state.noise(kind, probabilities, qubits, product, op.id)?;
             }
             Operation::Control { call: Some(_), .. } => {
-                return Err(InstrumentError::NeedsHistory { operation: op.id });
+                if !causal {
+                    return Err(InstrumentError::NeedsHistory { operation: op.id });
+                }
             }
             Operation::Postselect { expression } => {
-                if !expression.is_affine() {
+                if !expression.is_affine() && !causal {
                     return Err(InstrumentError::NeedsHistory { operation: op.id });
                 }
                 state.selections.push(expression.clone());
@@ -341,7 +370,31 @@ pub(super) fn compile(
     let mut rows = Vec::new();
     let mut outcomes = BitVector::zeros(state.selections.len())?;
     for (j, expression) in state.selections.iter().enumerate() {
-        rows.push(record_row(expression, &state.records, state.width)?);
+        let mut row = record_row(
+            &BitExpr {
+                constant: expression.constant,
+                terms: expression
+                    .terms
+                    .iter()
+                    .filter(|a| matches!(a, BitAtom::Record(_)))
+                    .cloned()
+                    .collect(),
+            },
+            &state.records,
+            state.width,
+        )?;
+        for atom in &expression.terms {
+            if let BitAtom::Decision { call, bit } = atom {
+                let &wire = state.decisions.get(&(*call, *bit)).ok_or(
+                    InstrumentError::UnknownDecision {
+                        call: *call,
+                        bit: *bit,
+                    },
+                )?;
+                row.set(wire, !row.get(wire)?)?;
+            }
+        }
+        rows.push(row);
         outcomes.set(j, expression.constant)?;
     }
     let mut sites = Vec::new();
@@ -370,17 +423,19 @@ pub(super) fn compile(
         sites.push(NoiseSite {
             source_operations: site.source_operations,
             before_gate: site.before_gate,
-            alternatives,
+            alternatives: Arc::new(alternatives),
             identity: site.identity,
         });
     }
     Ok(CompiledInstrument {
-        unitary,
-        live_wires: state.live,
-        record_wires: state.records,
-        event_rows: rows,
+        unitary: Arc::new(unitary),
+        live_wires: Arc::new(state.live),
+        record_wires: Arc::new(state.records),
+        event_rows: Arc::new(rows),
         outcomes,
-        sites,
+        sites: Arc::new(sites),
+        decision_wires: Arc::new(state.decisions),
+        initial_insertions: vec![],
     })
 }
 

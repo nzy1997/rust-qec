@@ -629,13 +629,13 @@ contribution divides the joint accepted/error mass by this history mass.
 enumeration; multiplying it into a physical Monte Carlo contribution would count
 the sampled noise distribution twice.
 
-Defaults additionally cap sampled history inputs at 1,000,000 and prefix compiles
-at 100,000 per draw, with separate noise and history entropy budgets. This first
-causal implementation recompiles resolved prefixes and the final branch; it does
-not yet reuse prepared decision networks or implement the affine-support history
-proposal or causal importance proposals. The [task evaluation layer](#exact-task-evaluation)
-composes terminal recovery and executes loaded schema-1 tasks using these histories.
-The current runtime is a correctness baseline without paper-performance claims.
+Defaults additionally cap sampled history inputs at 1,000,000 and history queries
+at 100,000 per draw, with separate noise and history entropy budgets. The explicit
+`CausalStrategy::ColdPrefix` baseline also caps prefix compiles at 100,000. The
+default fixed-template route below reuses its Clifford circuit across histories;
+final scalar query closures are still prepared per query. Affine-support histories,
+causal importance proposals and complete paper-performance validation remain
+subsequent work. Terminal recovery and task evaluation are described below.
 
 Tests enumerate majority histories, preserve repeated observations and atomic
 register updates, distinguish active and inactive guarded paths, verify correlated
@@ -1014,3 +1014,47 @@ problem. Gates with a nonconstant input row still perform full contraction.
 Initial arbitrary affine inputs are contracted before this invariant is used.
 A wide exact Fourier-sign test checks complex coefficients, nonzero fixed bits,
 existing entangled support, four independent Hadamards and their adjoints.
+
+
+## Fixed coherent causal templates
+
+`CausalProgram` defaults to `CausalStrategy::FixedTemplate`. It prepares one
+coherent instrument with a separate initial-zero virtual wire for every external
+decision slot. Fixed coherently controlled Clifford gates read these wires.
+A known true decision becomes a Pauli X insertion on its virtual input; unknown
+future decisions remain zero. Controller functions still execute only when their
+reported observations have been sampled in causal order. Preparation invokes no
+controller and draws no entropy.
+
+History queries close the whole fixed instrument while selecting only already
+available reported parities. All later quantum operations are trace preserving,
+so they cannot change these physical prefix probabilities. Postselection is
+excluded from reported-record queries. Inactive or unresolved guarded channels
+contribute no insertion; final branch metadata contains only active categories,
+so its exact noise probability retains the conditional guard semantics. Correlated
+chains resolve their common guard once. Final history conditions become additional
+event rows on a shared immutable instrument view.
+
+Instrument clones share the Clifford circuit, live/record mappings, selection
+rows, decision layout and noise alternatives. A view replaces its complete decision
+assignment and active-site list, preventing state from leaking between draws.
+`compile_affine` keeps its strict rejection of unresolved history operations;
+the causal compiler is internal to the runtime.
+
+Select `CausalStrategy::ColdPrefix` explicitly to retain the previous prefix
+compiler as a correctness oracle. There is no automatic fallback. The diagnostic
+example accepts `--causal-strategy fixed|cold`. `max_prefix_compiles` limits actual
+prefix constructions only on that cold route; `max_history_queries` limits the
+observation groups on both routes. `ResolvedHistory`, pure draws and task draws
+report actual post-preparation Clifford `network_compilations` and history query
+counts. These counts exclude final scalar-network closure and phase preparation,
+which are still cold; zero circuit recompiles do not establish full prepared-query
+throughput.
+
+All eighteen pinned native histories also compare the fixed and cold routes,
+including exact complex masses, active noise weights and callback transcripts.
+Analytical irrational-probability tests cover future controlled-H/S operations,
+guarded faults, rejected selections and requested records. Seeded physical draws
+retain identical entropy states and histories across routes. Fixed histories use
+one initial reference construction and zero subsequent Clifford constructions;
+these tests also check the cold route's actual constructions.
