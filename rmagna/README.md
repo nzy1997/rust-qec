@@ -933,7 +933,10 @@ example accepts `--history JSON_FILE` containing boolean group lists and
 name collisions. Two native no-fault histories are explicitly replayed in Rust;
 raw exact masses, norms, and complete callback inputs/outputs must agree.
 Decoder and binary provenance, timeouts, unsupported paths and mismatches are
-retained. The receipt distinguishes a selected subset from complete five-task
+retained. Malformed successful Rust output is a failed history with its raw
+stdout/stderr, error and native reference preserved; earlier and later histories
+and task provenance remain available. Failed cases keep the receipt partial and
+the command exits nonzero. The receipt distinguishes a selected subset from complete five-task
 coverage. These finite histories establish neither Monte Carlo precision nor
 paper performance.
 

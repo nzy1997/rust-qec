@@ -82,6 +82,57 @@ def main():
         raise SystemExit(1)
 
 
+def compare_result(result, expected, word, max_terms, classical):
+    """Retain one history's raw output even when a successful child is malformed."""
+    try:
+        actual = json.loads(result.stdout)
+        if not isinstance(actual, dict):
+            raise ValueError("Rust result must be a JSON object")
+        config = actual.get("configuration")
+        if (not isinstance(config, dict) or type(config.get("max_terms")) is not int
+                or config["max_terms"] != max_terms):
+            raise ValueError("Rust example did not apply the declared term budget")
+        compared = {key: actual[key] for key in expected}
+        for key, value in compared.items():
+            if key == "controller_calls":
+                if not isinstance(value, list) or any(
+                    not isinstance(call, dict) or not isinstance(call.get("name"), str)
+                    or any(not isinstance(call.get(field), list)
+                           or any(type(bit) is not bool for bit in call[field])
+                           for field in ["inputs", "outputs"])
+                    for call in value
+                ):
+                    raise ValueError("Rust controller_calls must contain named Boolean inputs/outputs")
+                continue
+            if value is None and key in ["raw_target_success", "target_normalization"]:
+                continue
+            if (not isinstance(value, dict) or type(value.get("power")) is not int
+                    or not isinstance(value.get("coefficients"), list)
+                    or len(value["coefficients"]) != 4
+                    or any(not isinstance(c, str) for c in value["coefficients"])):
+                raise ValueError(f"Rust {key} must be an exact scalar")
+            for coefficient in value["coefficients"]:
+                int(coefficient)
+        if actual["raw_target_success"] is None and classical:
+            # Native classical tasks name logical success target_success; Rust
+            # reserves its optional field for quantum targets.
+            from magna import ExactScalar
+            def exact_scalar(v):
+                return ExactScalar(tuple(map(int, v["coefficients"])), v["power"])
+            difference = exact_scalar(actual["raw_acceptance"]) - exact_scalar(actual["raw_error"])
+            compared["raw_target_success"] = dict(coefficients=list(map(str, difference.coefficients)), power=difference.power)
+        if compared["target_normalization"] is None:
+            compared["target_normalization"] = dict(coefficients=["1", "0", "0", "0"], power=0)
+        return dict(constant_word=word, status="matched" if compared == expected else "mismatch",
+                    reference=expected, compared=compared, rust=actual)
+    except Exception as error:
+        # Processing external output is part of the comparison. Fail this case
+        # explicitly and continue so previous/later evidence and provenance survive.
+        return dict(constant_word=word, status="failed", returncode=result.returncode,
+                    error_type=type(error).__name__, error=str(error),
+                    stdout=result.stdout, stderr=result.stderr, reference=expected)
+
+
 def one(args, binary):
     import reference
     from witness_environment import native_reference
@@ -141,22 +192,8 @@ def one(args, binary):
                 cases.append(dict(constant_word=word, status="failed", returncode=result.returncode,
                                   stdout=result.stdout, stderr=result.stderr, reference=expected))
                 continue
-            actual = json.loads(result.stdout)
-            if actual.get("configuration", {}).get("max_terms") != options["max_terms"]:
-                raise RuntimeError("Rust example did not apply the declared term budget")
-            compared = {key: actual[key] for key in expected}
-            if actual["raw_target_success"] is None and "error_observables" in compiled.task["raw"]:
-                # Public native classical tasks call their accepted logical-success
-                # mass target_success; Rust reserves that optional field for targets.
-                from magna import ExactScalar
-                def exact_scalar(v):
-                    return ExactScalar(tuple(map(int, v["coefficients"])), v["power"])
-                difference = exact_scalar(actual["raw_acceptance"]) - exact_scalar(actual["raw_error"])
-                compared["raw_target_success"] = dict(coefficients=list(map(str, difference.coefficients)), power=difference.power)
-            if compared["target_normalization"] is None:
-                compared["target_normalization"] = dict(coefficients=["1", "0", "0", "0"], power=0)
-            cases.append(dict(constant_word=word, status="matched" if compared == expected else "mismatch",
-                              reference=expected, compared=compared, rust=actual))
+            cases.append(compare_result(result, expected, word, options["max_terms"],
+                                        "error_observables" in compiled.task["raw"]))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
