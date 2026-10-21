@@ -146,6 +146,67 @@ pub struct CausalDraw {
     pub noise_entropy_words: usize,
     pub history_entropy_words: usize,
 }
+pub struct ResolvedHistory {
+    instrument: CompiledInstrument,
+    faults: Vec<FaultSelection>,
+    history_mass: ExactScalar,
+    noise_probability: BigRational,
+    conditions: Vec<(BitExpr, bool)>,
+    controller_calls: Vec<ControllerCall>,
+    requested_values: Vec<bool>,
+    decisions: BTreeMap<(usize, usize), bool>,
+    noise_entropy_words: usize,
+    history_entropy_words: usize,
+}
+impl ResolvedHistory {
+    pub fn instrument(&self) -> &CompiledInstrument {
+        &self.instrument
+    }
+    pub fn faults(&self) -> &[FaultSelection] {
+        &self.faults
+    }
+    pub fn history_mass(&self) -> &ExactScalar {
+        &self.history_mass
+    }
+    pub fn noise_probability(&self) -> &BigRational {
+        &self.noise_probability
+    }
+    pub fn conditions(&self) -> &[(BitExpr, bool)] {
+        &self.conditions
+    }
+    pub fn controller_calls(&self) -> &[ControllerCall] {
+        &self.controller_calls
+    }
+    pub fn requested_values(&self) -> &[bool] {
+        &self.requested_values
+    }
+    pub fn entropy_words(&self) -> (usize, usize) {
+        (self.noise_entropy_words, self.history_entropy_words)
+    }
+    pub fn resolve_expression(&self, expression: &BitExpr) -> Result<BitExpr, RuntimeError> {
+        resolve::expression(expression, &self.decisions, false)
+    }
+    fn pure_draw(
+        self,
+        outputs: &[usize],
+        target: &CompiledUnitary,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<CausalDraw, RuntimeError> {
+        let masses =
+            self.instrument
+                .masses(outputs, target, &self.faults, max_terms, arithmetic)?;
+        Ok(CausalDraw {
+            masses,
+            history_mass: self.history_mass,
+            noise_probability: self.noise_probability,
+            conditions: self.conditions,
+            controller_calls: self.controller_calls,
+            noise_entropy_words: self.noise_entropy_words,
+            history_entropy_words: self.history_entropy_words,
+        })
+    }
+}
 pub struct CausalProgram {
     circuit: Circuit,
     model: NoiseModel,
@@ -202,8 +263,12 @@ impl CausalProgram {
         arithmetic: &ScalarArithmetic,
     ) -> Result<CausalDraw, RuntimeError> {
         self.validate_target(outputs, target)?;
-        let draw = self.sampler.draw(random)?;
-        self.execute(outputs, target, draw, random, arithmetic)
+        self.resolve(&[], random, arithmetic)?.pure_draw(
+            outputs,
+            target,
+            self.options.sampling.max_terms,
+            arithmetic,
+        )
     }
     pub fn potential_site(&self, operation: usize) -> Option<usize> {
         self.source_sites.get(&operation).copied()
@@ -220,10 +285,32 @@ impl CausalProgram {
         arithmetic: &ScalarArithmetic,
     ) -> Result<CausalDraw, RuntimeError> {
         self.validate_target(outputs, target)?;
+        self.resolve_prescribed(&[], faults, random, arithmetic)?
+            .pure_draw(outputs, target, self.options.sampling.max_terms, arithmetic)
+    }
+    /// Resolve physical histories independently of the final error metric.
+    /// Requested reported parities are diagnostics sampled after controller calls.
+    pub fn resolve(
+        &self,
+        requested: &[BitExpr],
+        random: &mut impl RandomSource,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ResolvedHistory, RuntimeError> {
+        self.validate_requested(requested)?;
+        let draw = self.sampler.draw(random)?;
+        self.execute(requested, draw, random, arithmetic)
+    }
+    pub fn resolve_prescribed(
+        &self,
+        requested: &[BitExpr],
+        faults: &[FaultSelection],
+        random: &mut impl RandomSource,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ResolvedHistory, RuntimeError> {
+        self.validate_requested(requested)?;
         let probability = self.model.probability(faults)?;
         self.execute(
-            outputs,
-            target,
+            requested,
             NoiseDraw {
                 faults: faults.to_vec(),
                 physical_probability: probability.clone(),
@@ -234,6 +321,24 @@ impl CausalProgram {
             random,
             arithmetic,
         )
+    }
+    fn validate_requested(&self, requested: &[BitExpr]) -> Result<(), RuntimeError> {
+        for parity in requested {
+            for atom in &parity.terms {
+                match atom {
+                    BitAtom::Record(record) if *record < self.circuit.num_records() => {}
+                    BitAtom::Record(record) => {
+                        return Err(InstrumentError::RecordOutOfBounds {
+                            record: *record,
+                            count: self.circuit.num_records(),
+                        }
+                        .into());
+                    }
+                    _ => return Err(InstrumentError::NonAffineQuery.into()),
+                }
+            }
+        }
+        Ok(())
     }
     fn validate_target(
         &self,
@@ -264,12 +369,11 @@ impl CausalProgram {
     }
     fn execute(
         &self,
-        outputs: &[usize],
-        target: &CompiledUnitary,
+        requested: &[BitExpr],
         draw: NoiseDraw,
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
-    ) -> Result<CausalDraw, RuntimeError> {
+    ) -> Result<ResolvedHistory, RuntimeError> {
         // Choices for inactive guarded categories are discarded, including their
         // probabilities; they have no physical action or path weight.
         let chosen = draw
@@ -333,6 +437,16 @@ impl CausalProgram {
                 _ => {}
             }
         }
+        let requested_values = if requested.is_empty() {
+            vec![]
+        } else {
+            state.sample_inputs(
+                self.circuit.operations().len(),
+                requested,
+                random,
+                arithmetic,
+            )?
+        };
         let mut resolved = state.resolved(self.circuit.operations().len())?;
         for (expression, value) in &state.conditions {
             let mut expression = expression.clone();
@@ -379,13 +493,6 @@ impl CausalProgram {
                 arithmetic,
             )?
             .value;
-        let masses = instrument.masses(
-            outputs,
-            target,
-            &faults,
-            self.options.sampling.max_terms,
-            arithmetic,
-        )?;
         let mut noise_probability = BigRational::one();
         for category in instrument.noise_sites() {
             let original = self.source_sites[&category.source_operations()[0]];
@@ -393,8 +500,11 @@ impl CausalProgram {
                 [state.chosen.get(&original).map_or(0, |a| a + 1)]
             .value();
         }
-        Ok(CausalDraw {
-            masses,
+        Ok(ResolvedHistory {
+            instrument,
+            faults,
+            requested_values,
+            decisions: state.decisions,
             history_mass,
             noise_probability,
             conditions: state.conditions,

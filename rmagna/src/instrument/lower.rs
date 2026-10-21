@@ -405,6 +405,8 @@ pub(super) fn unitary(
                 control: None,
             } => gates.extend(gates::lower(*gate, qubits)),
             Operation::Annotation { .. } => {}
+            Operation::Detector { .. } | Operation::Observable { .. }
+                if !circuit.declaration_has_targets(op.id) => {}
             _ => {
                 return Err(InstrumentError::Unsupported {
                     operation: op.id,

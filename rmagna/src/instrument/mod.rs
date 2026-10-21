@@ -283,17 +283,14 @@ impl CompiledInstrument {
             arithmetic,
         )?)
     }
-    pub fn masses(
-        &self,
-        outputs: &[usize],
-        target: &CompiledUnitary,
-        faults: &[FaultSelection],
-        max_terms: usize,
-        arithmetic: &ScalarArithmetic,
-    ) -> Result<ExactMasses, InstrumentError> {
-        let physical = outputs
+    fn output_wires(&self, outputs: &[usize]) -> Result<Vec<usize>, InstrumentError> {
+        let mut seen = BTreeSet::new();
+        outputs
             .iter()
             .map(|&qubit| {
+                if !seen.insert(qubit) {
+                    return Err(InstrumentError::Unitary(UnitaryError::RepeatedOutput));
+                }
                 self.live_wires
                     .get(qubit)
                     .copied()
@@ -302,7 +299,96 @@ impl CompiledInstrument {
                         width: self.num_qubits(),
                     })
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect()
+    }
+    /// Accepted mass with additional affine reported conditions, unlike physical
+    /// reported_probability which deliberately excludes the selection predicates.
+    pub fn accepted_probability(
+        &self,
+        parities: &[BitExpr],
+        outcomes: &BitVector,
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, InstrumentError> {
+        if parities.len() != outcomes.width() {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        let mut rows = self.event_rows.clone();
+        let count = rows
+            .len()
+            .checked_add(parities.len())
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        let mut rhs = BitVector::zeros(count)?;
+        for j in 0..self.event_rows.len() {
+            rhs.set(j, self.outcomes.get(j)?)?;
+        }
+        for (j, parity) in parities.iter().enumerate() {
+            rows.push(self.parity_row(parity)?);
+            rhs.set(
+                self.event_rows.len() + j,
+                outcomes.get(j)? ^ parity.constant,
+            )?;
+        }
+        Ok(self
+            .inserted(faults, arithmetic)?
+            .probability_z(&rows, &rhs, max_terms, arithmetic)?)
+    }
+    pub fn target_density_weight(
+        &self,
+        outputs: &[usize],
+        target: &CompiledUnitary,
+        target_boundary: crate::unitary::DensityBoundary<'_>,
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, InstrumentError> {
+        let physical = self.output_wires(outputs)?;
+        Ok(self.inserted(faults, arithmetic)?.density_overlap(
+            crate::unitary::DensityBoundary {
+                outputs: &physical,
+                event_rows: &self.event_rows,
+                outcomes: &self.outcomes,
+            },
+            target,
+            target_boundary,
+            max_terms,
+            arithmetic,
+        )?)
+    }
+    pub fn pauli_moment(
+        &self,
+        outputs: &[usize],
+        word: &PauliWord,
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, InstrumentError> {
+        if word.width() != outputs.len() {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        let physical = self.output_wires(outputs)?;
+        let map = |mask: &BitVector| {
+            BitVector::from_indices(self.unitary.width(), mask.ones().map(|j| physical[j]))
+        };
+        let word = PauliWord::new(map(word.x())?, map(word.z())?, word.phase())?;
+        Ok(self.inserted(faults, arithmetic)?.pauli_moment(
+            &word,
+            &self.event_rows,
+            &self.outcomes,
+            max_terms,
+            arithmetic,
+        )?)
+    }
+    pub fn masses(
+        &self,
+        outputs: &[usize],
+        target: &CompiledUnitary,
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ExactMasses, InstrumentError> {
+        let physical = self.output_wires(outputs)?;
         let unitary = self.inserted(faults, arithmetic)?;
         let accepted =
             unitary.probability_z(&self.event_rows, &self.outcomes, max_terms, arithmetic)?;

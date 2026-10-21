@@ -415,6 +415,63 @@ impl CompiledUnitary {
         )
     }
 
+    /// Exact <psi|Pi P Pi|psi>, retaining complex phase for a general Pauli word.
+    pub fn pauli_moment(
+        &self,
+        word: &PauliWord,
+        rows: &[BitVector],
+        outcomes: &BitVector,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, UnitaryError> {
+        if word.width() != self.width()
+            || rows.len() != outcomes.width()
+            || rows.iter().any(|row| row.width() != self.width())
+        {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let half = self.boundary.width();
+        let lifted = rows
+            .iter()
+            .map(|row| BitVector::from_indices(half, row.ones()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let left = self
+            .boundary
+            .conjugate()
+            .project_z(&lifted, outcomes, arithmetic)?;
+        let right = self.boundary.project_z(&lifted, outcomes, arithmetic)?;
+        let (Some(left), Some(right)) = (left, right) else {
+            return Ok(NetworkValue {
+                value: ExactScalar::zero(),
+                quotient_rank: 0,
+                terms: 0,
+            });
+        };
+        let word = PauliWord::new(
+            BitVector::from_indices(half, word.x().ones())?,
+            BitVector::from_indices(half, word.z().ones())?,
+            word.phase(),
+        )?;
+        let joint = left.tensor(&word.apply(&right, arithmetic)?, arithmetic)?;
+        let total = joint.width();
+        let equality = (0..self.width())
+            .map(|q| BitVector::from_indices(total, [q, half + q]))
+            .collect::<Result<Vec<_>, _>>()?;
+        let ket = joint.project_z(&equality, &BitVector::zeros(self.width())?, arithmetic)?;
+        let legs = [
+            (self.width()..half).collect(),
+            (half + self.width()..total).collect(),
+        ];
+        let negative = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
+        close(
+            ket,
+            &legs,
+            &[negative, self.coefficients.clone()],
+            max_terms,
+            arithmetic,
+        )
+    }
+
     /// Exact `<self|target>` for fixed pure unitary preparations.
     pub fn overlap(
         &self,

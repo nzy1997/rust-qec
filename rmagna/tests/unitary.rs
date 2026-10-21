@@ -796,3 +796,76 @@ fn reduced_projected_density_overlaps_match_literal_density_matrices() {
             .is_err()
     );
 }
+
+#[test]
+fn pauli_moments_match_literal_matrices_under_projected_events() {
+    use rmagna::pauli::PauliWord;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::T { qubit: 0, turns: 1 },
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 1,
+        },
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 2, turns: 3 },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::H(1)),
+    ];
+    let compiled = UnitaryCircuit::new(3, gates)
+        .unwrap()
+        .compile(&bits(3, 0), &a)
+        .unwrap();
+    let values = dense(&gates, 3, 0, &a);
+    for xmask in 0_usize..8 {
+        for zmask in 0_usize..8 {
+            for extra in 0..2 {
+                let phase = ((2 * (xmask & zmask).count_ones()) as u8 + extra) & 7;
+                let word = PauliWord::new(bits(3, xmask), bits(3, zmask), phase).unwrap();
+                for mask in [0_usize, 1, 3] {
+                    for outcome in 0..2 {
+                        let mut expected = ExactScalar::zero();
+                        for input in 0_usize..8 {
+                            let output = input ^ xmask;
+                            if (input & mask).count_ones() % 2 != outcome
+                                || (output & mask).count_ones() % 2 != outcome
+                            {
+                                continue;
+                            }
+                            let phase =
+                                i64::from(phase) + 4 * i64::from((input & zmask).count_ones() % 2);
+                            let term = a
+                                .multiply(
+                                    &a.multiply(&values[output].conjugate(), &values[input])
+                                        .unwrap(),
+                                    &a.omega(phase, 0).unwrap(),
+                                )
+                                .unwrap();
+                            expected = a.add(&expected, &term).unwrap();
+                        }
+                        let actual = compiled
+                            .pauli_moment(
+                                &word,
+                                &[bits(3, mask)],
+                                &bits(1, outcome as usize),
+                                256,
+                                &a,
+                            )
+                            .unwrap();
+                        assert_eq!(
+                            actual.value, expected,
+                            "X{xmask} Z{zmask} phase{phase} mask{mask} outcome{outcome}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
