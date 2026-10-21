@@ -1,4 +1,4 @@
-//! Causal exact-marginal controller and guarded-noise execution.
+//! Causal reported-history proposals, controllers and guarded-noise execution.
 pub mod process;
 mod registry;
 mod resolve;
@@ -9,7 +9,10 @@ use crate::instrument::{
     compile_affine, compile_causal,
 };
 use crate::noise::{NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, RandomSource};
-use crate::records::{RecordQuery, SamplingError, SamplingOptions, sample_reported_conditioned};
+use crate::records::{
+    RecordQuery, SamplingError, SamplingOptions, propose_affine_reported,
+    sample_reported_conditioned,
+};
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::unitary::CompiledUnitary;
 use num_rational::BigRational;
@@ -123,8 +126,14 @@ pub enum CausalStrategy {
     FixedTemplate,
     ColdPrefix,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HistorySampler {
+    ExactMarginal,
+    AffineSupport,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct RuntimeOptions {
+    pub history_sampler: HistorySampler,
     pub strategy: CausalStrategy,
     pub max_history_queries: usize,
     pub compile: CompileOptions,
@@ -137,6 +146,7 @@ impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
             strategy: CausalStrategy::FixedTemplate,
+            history_sampler: HistorySampler::ExactMarginal,
             max_history_queries: 100_000,
             compile: CompileOptions::default(),
             noise: NoiseOptions::default(),
@@ -156,6 +166,7 @@ pub struct ControllerCall {
 pub struct CausalDraw {
     pub masses: ExactMasses,
     pub history_mass: ExactScalar,
+    pub history_proposal_mass: Option<ExactScalar>,
     /// Probability of the active physical noise choices along this history.
     pub noise_probability: BigRational,
     pub conditions: Vec<(BitExpr, bool)>,
@@ -169,6 +180,7 @@ pub struct ResolvedHistory {
     instrument: CompiledInstrument,
     faults: Vec<FaultSelection>,
     history_mass: ExactScalar,
+    history_proposal_mass: Option<ExactScalar>,
     noise_probability: BigRational,
     conditions: Vec<(BitExpr, bool)>,
     controller_calls: Vec<ControllerCall>,
@@ -188,6 +200,11 @@ impl ResolvedHistory {
     }
     pub fn history_mass(&self) -> &ExactScalar {
         &self.history_mass
+    }
+    /// Present only for actual affine-support proposals; prescribed diagnostic
+    /// histories retain physical conditional normalization.
+    pub fn history_proposal_mass(&self) -> Option<&ExactScalar> {
+        self.history_proposal_mass.as_ref()
     }
     pub fn noise_probability(&self) -> &BigRational {
         &self.noise_probability
@@ -227,6 +244,7 @@ impl ResolvedHistory {
         Ok(CausalDraw {
             masses,
             history_mass: self.history_mass,
+            history_proposal_mass: self.history_proposal_mass,
             noise_probability: self.noise_probability,
             conditions: self.conditions,
             controller_calls: self.controller_calls,
@@ -338,7 +356,7 @@ impl CausalProgram {
         self.resolve_prescribed(&[], faults, random, arithmetic)?
             .pure_draw(outputs, target, self.options.sampling.max_terms, arithmetic)
     }
-    /// Resolve physical histories independently of the final error metric.
+    /// Resolve histories with the selected sampler, independently of the final error metric.
     /// Requested reported parities are diagnostics sampled after controller calls.
     pub fn resolve(
         &self,
@@ -516,6 +534,9 @@ impl CausalProgram {
             history_queries: 0,
             prescribed,
             next_group: 0,
+            proposal_mass: (self.options.history_sampler == HistorySampler::AffineSupport
+                && prescribed.is_none())
+            .then_some(ExactScalar::one()),
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
             match &located.operation {
@@ -613,6 +634,7 @@ impl CausalProgram {
             requested_values,
             decisions: state.decisions,
             history_mass,
+            history_proposal_mass: state.proposal_mass,
             noise_probability,
             conditions: state.conditions,
             controller_calls: state.calls,
@@ -636,6 +658,7 @@ struct PathState<'a> {
     history_queries: usize,
     prescribed: Option<&'a [Vec<bool>]>,
     next_group: usize,
+    proposal_mass: Option<ExactScalar>,
 }
 impl PathState<'_> {
     fn resolved(&self, end: usize) -> Result<Vec<LocatedOperation>, RuntimeError> {
@@ -767,20 +790,43 @@ impl PathState<'_> {
         }
         let mut options = self.program.options.sampling;
         options.max_entropy_words = options.max_entropy_words.saturating_sub(self.entropy_words);
-        let draw = sample_reported_conditioned(
-            &instrument,
-            &RecordQuery {
-                given: &self.conditions,
-                parities: inputs,
-            },
-            &faults,
-            random,
-            &options,
-            arithmetic,
-        )?;
-        self.entropy_words += draw.entropy_words;
+        let query = RecordQuery {
+            given: &self.conditions,
+            parities: inputs,
+        };
+        let (values, entropy_words) = match self.program.options.history_sampler {
+            HistorySampler::ExactMarginal => {
+                let draw = sample_reported_conditioned(
+                    &instrument,
+                    &query,
+                    &faults,
+                    random,
+                    &options,
+                    arithmetic,
+                )?;
+                (draw.values, draw.entropy_words)
+            }
+            HistorySampler::AffineSupport => {
+                let draw = propose_affine_reported(
+                    &instrument,
+                    &query,
+                    &faults,
+                    random,
+                    &options,
+                    arithmetic,
+                )?;
+                let previous = self.proposal_mass.as_ref().expect("actual affine proposal");
+                self.proposal_mass = Some(
+                    arithmetic
+                        .multiply(previous, &draw.proposal_mass)
+                        .map_err(InstrumentError::from)?,
+                );
+                (draw.values, draw.entropy_words)
+            }
+        };
+        self.entropy_words += entropy_words;
         self.conditions
-            .extend(inputs.iter().cloned().zip(draw.values.iter().copied()));
-        Ok(draw.values)
+            .extend(inputs.iter().cloned().zip(values.iter().copied()));
+        Ok(values)
     }
 }

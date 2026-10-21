@@ -59,7 +59,7 @@ pub struct TaskEvaluation {
     pub history_queries: usize,
     pub acceptance_resources: ContractionResources,
     pub target_resources: Option<ContractionResources>,
-    /// Per-draw acceptance contribution, normalized by history mass.
+    /// Per-draw acceptance contribution, with the selected history weighting.
     pub accepted: ExactField,
     pub error: ExactField,
     pub target_success: Option<ExactField>,
@@ -71,6 +71,8 @@ pub struct TaskEvaluation {
     pub raw_target_success: Option<ExactScalar>,
     pub target_normalization: Option<ExactScalar>,
     pub history_mass: ExactScalar,
+    pub history_proposal_mass: Option<ExactScalar>,
+    pub history_weight: ExactField,
     pub noise_probability: BigRational,
     pub noise_likelihood_ratio: BigRational,
     pub sampled_records: Vec<bool>,
@@ -288,7 +290,11 @@ impl TaskEvaluator {
         let acceptance_resources = ContractionResources::from(&acceptance_query);
         let raw_acceptance = acceptance_query.value;
         let accepted = f
-            .contribution(&raw_acceptance, input.history_mass, input.likelihood)
+            .contribution(
+                &raw_acceptance,
+                input.normalization_mass(),
+                input.likelihood,
+            )
             .map_err(|e| error("acceptance", e))?;
         let target_query = if let Some(target) = &self.target {
             Some(
@@ -316,7 +322,7 @@ impl TaskEvaluator {
         let target_success =
             if let (Some(target), Some(success)) = (&self.target, &raw_target_success) {
                 let value = f
-                    .contribution(success, input.history_mass, input.likelihood)
+                    .contribution(success, input.normalization_mass(), input.likelihood)
                     .map_err(|e| error("target_success", e))?;
                 Some(
                     f.divide(
@@ -362,7 +368,7 @@ impl TaskEvaluator {
             ExactScalar::zero()
         };
         let mut error_value = f
-            .contribution(&raw_error, input.history_mass, input.likelihood)
+            .contribution(&raw_error, input.normalization_mass(), input.likelihood)
             .map_err(|e| error("error", e))?;
         if let Some(target) = &self.target {
             error_value = f
@@ -381,7 +387,7 @@ impl TaskEvaluator {
                 .map_err(|e| error("observables", e))?
                 .value;
             moments.push(
-                f.contribution(&raw, input.history_mass, input.likelihood)
+                f.contribution(&raw, input.normalization_mass(), input.likelihood)
                     .map_err(|e| error("observables", e))?,
             );
             raw_moments.push(raw);
@@ -401,6 +407,23 @@ impl TaskEvaluator {
             raw_target_success,
             target_normalization: self.target.as_ref().map(|t| t.norm.clone()),
             history_mass: input.history_mass.clone(),
+            history_proposal_mass: input
+                .history
+                .and_then(|h| h.history_proposal_mass().cloned()),
+            history_weight: if let Some(proposal) = input
+                .history
+                .and_then(ResolvedHistory::history_proposal_mass)
+            {
+                f.divide(
+                    &f.from_scalar(input.history_mass)
+                        .map_err(|e| error("history_weight", e))?,
+                    &f.from_scalar(proposal)
+                        .map_err(|e| error("history_weight", e))?,
+                )
+                .map_err(|e| error("history_weight", e))?
+            } else {
+                ExactField::one()
+            },
             noise_probability: input.noise_probability.clone(),
             noise_likelihood_ratio: input.likelihood.clone(),
             sampled_records: input
@@ -421,8 +444,13 @@ struct EvaluationInput<'a> {
     history: Option<&'a ResolvedHistory>,
 }
 impl<'a> EvaluationInput<'a> {
+    fn normalization_mass(&self) -> &ExactScalar {
+        self.history
+            .and_then(ResolvedHistory::history_proposal_mass)
+            .unwrap_or(self.history_mass)
+    }
     fn history(history: &'a ResolvedHistory) -> Self {
-        // Physical exact-marginal histories have unit importance likelihood.
+        // Noise likelihood is unity; the selected history denominator is applied separately.
         static ONE: std::sync::LazyLock<BigRational> = std::sync::LazyLock::new(BigRational::one);
         Self {
             instrument: history.instrument(),
