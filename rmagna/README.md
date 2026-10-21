@@ -1218,8 +1218,9 @@ continues to request positive-physical-mass prescribed diagnostics regardless of
 the sampler option. The example reports the selected method and both masses.
 
 Tests enumerate proposed irrational and interference-zero histories and a
-three-qubit circuit with sequential nonlinear controllers, conditional Hadamard,
-guarded noise and postselection. Proposal/noise-weighted acceptance, error and
+three-qubit circuit with sequential copy/XOR controllers, conditional Hadamard,
+guarded noise and postselection. A separate four-qubit majority truth table checks
+nonlinear callbacks, repeated observations, one-word entropy and selection independence. Proposal/noise-weighted acceptance, error and
 target overlap agree with analytical physical enumeration for both fixed-template
 and cold-prefix strategies. The family can contain additional zero histories;
 these tests do not establish the same proposal variance as another compiler or

@@ -864,3 +864,104 @@ fn affine_causal_feedback_and_guarded_noise_are_unbiased_over_all_histories() {
         assert_eq!(success, f.subtract(&accepted, &error).unwrap());
     }
 }
+
+#[test]
+fn affine_majority_inputs_and_repeated_diagnostics_use_one_entropy_word_without_selection() {
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    use rmagna::scalar::ScalarArithmetic;
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("majority", "1", |bits: &[bool]| {
+            if bits.len() != 4 || bits[0] != bits[3] {
+                return Err("expected three inputs and a repeated first observation".into());
+            }
+            Ok(vec![bits[..3].iter().filter(|b| **b).count() >= 2])
+        })
+        .unwrap();
+    let source = "H 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[majority] det[0] det[1] det[2] det[0] -> ctrl[0]\nCX ctrl[0] 3\nM 3\nPOSTSELECT det[0]";
+    let f = FieldArithmetic::default();
+    let a = ScalarArithmetic::default();
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        let mut options = EvaluationOptions::default();
+        options.runtime.history_sampler = HistorySampler::AffineSupport;
+        options.runtime.strategy = strategy;
+        options.runtime.sampling.max_entropy_words = 1;
+        let program = evaluator_options(
+            &files,
+            source,
+            r#"{"outputs":[3],"ideal_state":"ideal.magna","sample_records":[0,1,2,3,0],"observables":[[0,1]]}"#,
+            &registry,
+            options,
+        );
+        let mut accepted = ExactField::zero();
+        let mut error = ExactField::zero();
+        let mut success = ExactField::zero();
+        let mut moment = ExactField::zero();
+        for word in 0..8 {
+            let mut entropy = Words::new(vec![word]);
+            let draw = program.sample_prescribed(&[], &mut entropy).unwrap();
+            assert_eq!(entropy.at, 1);
+            let bits = [word & 1 != 0, word & 2 != 0, word & 4 != 0];
+            let majority = bits.iter().filter(|b| **b).count() >= 2;
+            assert_eq!(
+                draw.sampled_records,
+                [bits[0], bits[1], bits[2], majority, bits[0]]
+            );
+            assert_eq!(draw.controller_calls.len(), 1);
+            assert_eq!(
+                draw.controller_calls[0].inputs,
+                [bits[0], bits[1], bits[2], bits[0]]
+            );
+            assert_eq!(draw.controller_calls[0].outputs, [majority]);
+            assert_eq!(draw.history_proposal_mass, Some(a.omega(0, -6).unwrap()));
+            assert_eq!(draw.history_mass, a.omega(0, -6).unwrap());
+            assert_eq!(draw.history_weight, ExactField::one());
+            assert_eq!(draw.noise_probability, BigRational::from_integer(1.into()));
+            assert_eq!(
+                draw.accepted,
+                if bits[0] {
+                    ExactField::zero()
+                } else {
+                    ExactField::one()
+                }
+            );
+            assert_eq!(
+                draw.error,
+                if !bits[0] && majority {
+                    ExactField::one()
+                } else {
+                    ExactField::zero()
+                }
+            );
+            let probability = rational(1, 8);
+            accepted = f
+                .add(
+                    &accepted,
+                    &f.multiply(&probability, &draw.accepted).unwrap(),
+                )
+                .unwrap();
+            error = f
+                .add(&error, &f.multiply(&probability, &draw.error).unwrap())
+                .unwrap();
+            success = f
+                .add(
+                    &success,
+                    &f.multiply(&probability, draw.target_success.as_ref().unwrap())
+                        .unwrap(),
+                )
+                .unwrap();
+            moment = f
+                .add(
+                    &moment,
+                    &f.multiply(&probability, &draw.moments[0]).unwrap(),
+                )
+                .unwrap();
+        }
+        assert_eq!(accepted, rational(1, 2));
+        assert_eq!(error, rational(1, 8));
+        assert_eq!(success, rational(3, 8));
+        assert_eq!(moment, rational(1, 4));
+    }
+}
