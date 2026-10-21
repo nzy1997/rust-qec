@@ -39,7 +39,13 @@ impl Directory {
         self.host_existing()
     }
     fn host_existing(&self) -> ControllerProcess {
+        self.bindings();
+        ControllerProcess::spawn(self.host_command(), ProcessOptions::default()).unwrap()
+    }
+    fn bindings(&self) {
         self.write("controllers.json", &json!({"schema_version":1,"bindings":{"majority":{"import":"plugin:decode","version":"toy-v1","config":{"threshold":2}}}}).to_string());
+    }
+    fn host_command(&self) -> Command {
         let mut command = Command::new("python3");
         command.args(["-I", "-B", "-u"]);
         command.arg(concat!(
@@ -50,7 +56,7 @@ impl Directory {
             .arg("--controllers")
             .arg(self.0.join("controllers.json"));
         command.arg("--module-root").arg(&self.0);
-        ControllerProcess::spawn(command, ProcessOptions::default()).unwrap()
+        command
     }
 }
 impl Drop for Directory {
@@ -134,7 +140,7 @@ fn protocol_failures_and_callback_errors_poison_the_session_without_retry() {
         ),
         (
             "print(json.dumps({'id':0,'outputs':[0.0]}),flush=True)",
-            "non-bit",
+            "integer zero/one bit",
         ),
         (
             "print(json.dumps({'id':0,'error':'toy failure'}),flush=True)",
@@ -142,7 +148,7 @@ fn protocol_failures_and_callback_errors_poison_the_session_without_retry() {
         ),
         (
             "print(json.dumps({'id':0,'outputs':[],'extra':1}),flush=True)",
-            "only id and outputs",
+            "unknown field",
         ),
         ("sys.exit(3)", "closed stdout"),
     ] {
@@ -315,5 +321,160 @@ fn malformed_startup_and_excessive_output_counts_are_rejected() {
             .unwrap_err()
             .to_string()
             .contains("output bit budget")
+    );
+}
+
+#[test]
+fn wire_tokens_duplicates_and_nulls_reject_and_poison_independently_of_serde_features() {
+    for response in [
+        r#"{"id":{"$serde_json::private::Number":"0"},"outputs":[1]}"#,
+        r#"{"id":0,"outputs":[{"$serde_json::private::Number":"1"}]}"#,
+        r#"{"id":999,"id":0,"outputs":[1]}"#,
+        r#"{"id":0,"outputs":[2],"outputs":[0]}"#,
+        r#"{"id":0,"\u0069d":0,"outputs":[1]}"#,
+        r#"{"id":0,"outputs":[1],"error":null}"#,
+        r#"{"id":0,"outputs":null}"#,
+        r#"{"id":0,"error":"first","error":"second"}"#,
+        r#"{"id":true,"outputs":[1]}"#,
+        r#"{"id":0.0,"outputs":[1]}"#,
+        r#"{"id":0e0,"outputs":[1]}"#,
+        r#"{"id":-0,"outputs":[1]}"#,
+        r#"{"id":0,"outputs":[1.0]}"#,
+        r#"{"id":0,"outputs":["1"]}"#,
+        r#"{"id":0,"outputs":[-1]}"#,
+    ] {
+        let worker = fake(
+            &format!("sys.stdin.readline()\nprint({response:?},flush=True)"),
+            ProcessOptions::default(),
+        );
+        assert!(worker.evaluate("toy", &[]).is_err(), "{response}");
+        assert!(
+            worker
+                .evaluate("toy", &[])
+                .unwrap_err()
+                .to_string()
+                .contains("previously failed")
+        );
+    }
+    let worker = fake(
+        "sys.stdin.readline()\nprint('{\"id\":0,\"outputs\":[true,false,0,1]}',flush=True)",
+        ProcessOptions::default(),
+    );
+    assert_eq!(
+        worker.evaluate("toy", &[]).unwrap(),
+        [true, false, false, true]
+    );
+}
+
+#[test]
+fn greeting_duplicates_binding_types_and_metadata_shapes_are_checked_before_registration() {
+    let directory = Directory::new();
+    for greeting in [
+        r#"{"protocol":"wrong","protocol":"rmagna.controller.v1","bindings":{"toy":"1"}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{"toy":"1","toy":"2"}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{"toy":"1","\u0074oy":"2"}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{"toy":{"$serde_json::private::Number":"1"}}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{},"manifest":null,"manifest":{}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{},"manifest":{"source":"a","source":"b"}}"#,
+        r#"{"protocol":"rmagna.controller.v1","bindings":{},"manifest":{"nested":[{"a":1,"a":2}]}}"#,
+    ] {
+        let command = directory.python(&format!("print({greeting:?},flush=True)"));
+        assert!(
+            ControllerProcess::spawn(command, ProcessOptions::default()).is_err(),
+            "{greeting}"
+        );
+    }
+    let greeting = r#"{"protocol":"rmagna.controller.v1","bindings":{"toy":"1"},"manifest":{"tagged":{"$serde_json::private::Number":"7"},"nested":[{"$serde_json::private::Number":"0"}],"maximum":18446744073709551615}}"#;
+    let command = directory.python(&format!(
+        "import time\nprint({greeting:?},flush=True)\ntime.sleep(5)"
+    ));
+    let worker = ControllerProcess::spawn(command, ProcessOptions::default()).unwrap();
+    assert!(worker.manifest()["tagged"].is_object());
+    assert_eq!(
+        worker.manifest()["tagged"]["$serde_json::private::Number"],
+        "7"
+    );
+    assert!(worker.manifest()["nested"][0].is_object());
+    assert_eq!(worker.manifest()["maximum"], json!(u64::MAX));
+    let nested = format!(
+        "{{\"protocol\":\"rmagna.controller.v1\",\"bindings\":{{}},\"manifest\":{}null{}}}",
+        "[".repeat(129),
+        "]".repeat(129)
+    );
+    let command = directory.python(&format!("print({nested:?},flush=True)"));
+    let error = ControllerProcess::spawn(command, ProcessOptions::default())
+        .err()
+        .unwrap()
+        .to_string();
+    assert!(error.contains("limit"), "{error}");
+}
+
+#[cfg(unix)]
+#[test]
+fn inventoried_source_symlinks_cannot_execute_matching_poisoned_bytecode() {
+    use std::os::unix::fs::symlink;
+    let directory = Directory::new();
+    let external = Directory::new();
+    external.write("source.py", "def decode(bits,config):\n return (0,)\n");
+    symlink(external.0.join("source.py"), directory.0.join("plugin.py")).unwrap();
+    let poison = "import py_compile,pathlib,os\np=pathlib.Path('plugin.py'); stat=p.stat(); original=p.read_bytes()\np.write_bytes(original.replace(b'(0,)',b'(1,)'));os.utime(p,ns=(stat.st_atime_ns,stat.st_mtime_ns))\npy_compile.compile(str(p),doraise=True)\np.write_bytes(original);os.utime(p,ns=(stat.st_atime_ns,stat.st_mtime_ns))\n";
+    assert!(directory.python(poison).status().unwrap().success());
+    // Negative control: ordinary Python executes the stale matching cache.
+    assert!(directory.python("import sys,os;sys.path.insert(0,os.getcwd());import plugin;assert plugin.decode((),{})==(1,)").status().unwrap().success());
+    directory.bindings();
+    let out = directory.host_command().output().unwrap();
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("source symbolic links are unsupported"));
+}
+
+#[cfg(unix)]
+#[test]
+fn symlinked_package_components_and_new_lazy_source_links_fail_before_execution() {
+    use std::os::unix::fs::symlink;
+    for outside in [false, true] {
+        let directory = Directory::new();
+        let external = Directory::new();
+        let target = if outside {
+            external.0.join("actual")
+        } else {
+            directory.0.join("actual")
+        };
+        std::fs::create_dir(&target).unwrap();
+        std::fs::write(
+            target.join("__init__.py"),
+            "def decode(bits,config): return [1]\n",
+        )
+        .unwrap();
+        symlink(&target, directory.0.join("linked")).unwrap();
+        directory.write("plugin.py", "from linked import decode\n");
+        directory.bindings();
+        let out = directory.host_command().output().unwrap();
+        assert!(!out.status.success());
+        assert!(out.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("source symbolic links are unsupported")
+        );
+    }
+    let directory = Directory::new();
+    let external = Directory::new();
+    directory.write("helper.py", "VALUE=0\n");
+    external.write("helper.py", "VALUE=0\n");
+    let worker =
+        directory.host("def decode(bits,config):\n import helper\n return (helper.VALUE,)\n");
+    std::fs::remove_file(directory.0.join("helper.py")).unwrap();
+    symlink(external.0.join("helper.py"), directory.0.join("helper.py")).unwrap();
+    external.write("helper.py", "VALUE=1\n");
+    let failure = worker.evaluate("majority", &[]).unwrap_err().to_string();
+    assert!(
+        failure.contains("source symbolic links are unsupported"),
+        "{failure}"
+    );
+    assert!(
+        worker
+            .evaluate("majority", &[])
+            .unwrap_err()
+            .to_string()
+            .contains("previously failed")
     );
 }

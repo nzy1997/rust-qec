@@ -1237,6 +1237,7 @@ dependencies = [
  "num-bigint",
  "num-rational",
  "num-traits",
+ "serde",
  "serde_json",
 ]
 

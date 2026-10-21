@@ -1,12 +1,14 @@
 //! Persistent, explicitly launched decoder processes. No shell or circuit code is executed.
+mod wire;
 use super::{ControllerRegistry, RuntimeError};
+use serde_json::value::RawValue;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, mpsc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const PROTOCOL: &str = "rmagna.controller.v1";
 #[derive(Clone, Copy, Debug)]
@@ -40,7 +42,7 @@ fn error(message: impl Into<String>) -> ProcessError {
 struct Session {
     child: Child,
     requests: mpsc::SyncSender<Vec<u8>>,
-    responses: mpsc::Receiver<Result<Value, String>>,
+    responses: mpsc::Receiver<Result<Box<RawValue>, String>>,
     options: ProcessOptions,
     next_id: u64,
     failed: Option<String>,
@@ -53,7 +55,7 @@ impl Session {
         let _ = self.child.wait();
         error(message)
     }
-    fn receive(&mut self) -> Result<Value, ProcessError> {
+    fn receive(&mut self) -> Result<Box<RawValue>, ProcessError> {
         match self.responses.recv_timeout(self.options.timeout) {
             Ok(Ok(value)) => Ok(value),
             Ok(Err(message)) => Err(self.fail(message)),
@@ -80,38 +82,29 @@ impl Session {
                 "request frame budget exceeded before sending request",
             ));
         }
+        let started = Instant::now();
         if let Err(e) = self.requests.try_send(bytes) {
             return Err(self.fail(format!("cannot send request: {e}")));
         }
         let response = self.receive()?;
-        let Some(object) = response.as_object() else {
-            return Err(self.fail("response must be an object"));
-        };
-        if object.get("id").and_then(Value::as_u64) != Some(id) {
+        let response: wire::Response = serde_json::from_str(response.get())
+            .map_err(|e| self.fail(format!("invalid controller response: {e}")))?;
+        if response.id != id {
             return Err(self.fail("response ID does not match request"));
         }
-        if let Some(message) = object.get("error") {
+        if let Some(message) = response.error {
             return Err(self.fail(format!("decoder {name:?} failed: {message}")));
         }
-        if object.len() != 2 {
-            return Err(self.fail("response must contain only id and outputs"));
-        }
-        let Some(outputs) = object.get("outputs").and_then(Value::as_array) else {
+        let Some(outputs) = response.outputs else {
             return Err(self.fail("response outputs must be a bit list"));
         };
         if outputs.len() > self.options.max_bits {
             return Err(self.fail("output bit budget exceeded"));
         }
-        let result = outputs
-            .iter()
-            .map(|v| match v {
-                Value::Bool(b) => Some(*b),
-                Value::Number(n) if n.as_u64() == Some(0) => Some(false),
-                Value::Number(n) if n.as_u64() == Some(1) => Some(true),
-                _ => None,
-            })
-            .collect::<Option<Vec<_>>>();
-        result.ok_or_else(|| self.fail("decoder output contains a non-bit value"))
+        if started.elapsed() > self.options.timeout {
+            return Err(self.fail("response validation exceeded the exchange timeout"));
+        }
+        Ok(outputs.into_iter().map(|bit| bit.0).collect())
     }
 }
 impl Drop for Session {
@@ -120,7 +113,7 @@ impl Drop for Session {
         let _ = self.child.wait();
     }
 }
-fn read_frame(reader: &mut impl BufRead, limit: usize) -> Result<Value, String> {
+fn read_frame(reader: &mut impl BufRead, limit: usize) -> Result<Box<RawValue>, String> {
     let mut bytes = Vec::new();
     reader
         .take(limit as u64 + 1)
@@ -200,39 +193,34 @@ impl ControllerProcess {
             next_id: 0,
             failed: None,
         };
-        let hello = session.receive()?;
-        let object = hello
-            .as_object()
-            .ok_or_else(|| error("worker greeting must be an object"))?;
-        if object.get("protocol").and_then(Value::as_str) != Some(PROTOCOL)
-            || object
-                .keys()
-                .any(|k| !matches!(k.as_str(), "protocol" | "bindings" | "manifest"))
-        {
+        let started = Instant::now();
+        let hello: wire::Hello = serde_json::from_str(session.receive()?.get())
+            .map_err(|e| error(format!("invalid worker greeting: {e}")))?;
+        if hello.protocol != PROTOCOL {
             return Err(error("unsupported worker greeting protocol or fields"));
         }
-        let bindings = object
-            .get("bindings")
-            .and_then(Value::as_object)
-            .ok_or_else(|| error("worker greeting needs binding versions"))?;
+        let bindings = hello.bindings;
         if bindings.len() > options.max_bindings {
             return Err(error("worker binding budget exceeded"));
         }
         let mut versions = BTreeMap::new();
-        for (name, value) in bindings {
-            let version = value
-                .as_str()
-                .filter(|s| !s.is_empty())
-                .ok_or_else(|| error("worker binding version must be nonempty"))?;
+        for (name, version) in bindings {
+            if version.is_empty() {
+                return Err(error("worker binding version must be nonempty"));
+            }
             if name.is_empty() || matches!(name.as_str(), "XOR" | "NOT") {
                 return Err(error("worker binding name must be a non-built-in name"));
             }
-            versions.insert(name.clone(), version.to_owned());
+            versions.insert(name, version);
+        }
+        let manifest = wire::metadata(hello.manifest.as_deref()).map_err(error)?;
+        if started.elapsed() > options.timeout {
+            return Err(error("greeting validation exceeded the startup timeout"));
         }
         Ok(Self {
             session: Arc::new(Mutex::new(session)),
             versions,
-            manifest: object.get("manifest").cloned().unwrap_or(Value::Null),
+            manifest,
         })
     }
     pub fn versions(&self) -> &BTreeMap<String, String> {

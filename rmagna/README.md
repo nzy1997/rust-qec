@@ -855,6 +855,15 @@ session and kill the worker. An ambiguous callback is never retried. Stderr
 inherits the parent's diagnostics. Workers must not spawn descendants retaining
 protocol pipes; process-tree management belongs to the caller's execution host.
 
+Wire frames retain raw JSON token types before typed validation. Duplicate
+greeting/response fields and binding names are rejected, including escaped
+duplicate names. IDs must be actual unsigned integer tokens; bits must be actual
+booleans or integer zero/one tokens. Objects containing serde_json's internal
+number marker cannot masquerade as numeric protocol fields under feature
+unification. Arbitrary manifest objects preserve their actual container shapes,
+reject duplicate keys and have a nesting limit of 128. They retain the
+worker-supplied, unverified provenance status.
+
 `rmagna/python/decoder_worker.py` implements an observation-only Python host for
 schema-1 `controllers.json` bindings with `decode(bits, config)` functions.
 Imports are explicit; callbacks run with a fresh copy of the declared config.
@@ -866,6 +875,12 @@ responsibility. Config and module hashes are returned as worker-supplied
 provenance; benchmark callers must independently verify them. The host blocks
 imports of the Magna quantum package. Compilation, noise, quantum history
 probabilities and weighting continue to execute in Rust.
+
+Source files and their path components under the resolved module root must not
+be symbolic links. Such paths reject during inventory or import, including
+links introduced before a lazy import and package-directory links. This policy
+keeps the advertised source inventory and verified loading consistent. Installed
+dependencies outside that root retain the separate environment-identity scope.
 
 Use the diagnostic task example with explicit bindings:
 
@@ -886,5 +901,8 @@ majority histories against exact probabilities, preserve config isolation, and
 cover noisy decoder stdout, malformed protocols, exceptions, non-bit and wrong
 shaped outputs, process crashes, startup/exchange timeouts, oversized frames and
 bit lists, atomic registration, poisoned bytecode and changed lazy imports.
+Symlink/cache controls and malformed wire/metadata regressions also run through
+`make test-magna-controller-json` under default, arbitrary-precision,
+float-roundtrip and combined serde features; CI runs the same matrix.
 This bridge supplies external bindings; full packaged decoder campaigns and
 prepared history reuse remain separate validation and performance work.

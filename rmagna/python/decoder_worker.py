@@ -10,6 +10,7 @@ import importlib.machinery
 import importlib.util
 import json
 import operator
+import os
 from pathlib import Path
 import sys
 
@@ -32,13 +33,30 @@ def digest(path):
     return hashlib.sha256(content).hexdigest()
 
 
+def source_path(root, path):
+    """Classify lexical module-root paths before following any source links."""
+    source = Path(os.path.abspath(path))
+    if source.is_relative_to(root):
+        current = root
+        for component in source.relative_to(root).parts:
+            current = current / component
+            if current.is_symlink():
+                raise ImportError(f"decoder source symbolic links are unsupported: {current}")
+        return source
+    if source.resolve().is_relative_to(root):
+        raise ImportError(f"decoder source symbolic links are unsupported: {source}")
+    return None
+
+
 class VerifiedSourceLoader(importlib.machinery.SourceFileLoader):
-    def __init__(self, fullname, path, expected):
+    def __init__(self, fullname, path, expected, root):
         super().__init__(fullname, str(path))
         self.expected = expected
+        self.root = root
 
     def get_code(self, fullname):
         path = Path(self.path)
+        source_path(self.root, path)
         with path.open("rb") as source:
             content = source.read(MAX_BYTES + 1)
         if len(content) > MAX_BYTES or hashlib.sha256(content).hexdigest() != self.expected:
@@ -55,13 +73,13 @@ class DecoderSources(importlib.abc.MetaPathFinder):
         spec = importlib.machinery.PathFinder.find_spec(fullname, path)
         if spec is None or spec.origin is None:
             return None
-        source = Path(spec.origin).resolve()
-        if not source.is_relative_to(self.root):
+        source = source_path(self.root, spec.origin)
+        if source is None:
             return None
         key = source.relative_to(self.root).as_posix()
         if key not in self.hashes:
             raise ImportError(f"decoder module has no pinned Python source: {source}")
-        spec.loader = VerifiedSourceLoader(fullname, source, self.hashes[key])
+        spec.loader = VerifiedSourceLoader(fullname, source, self.hashes[key], self.root)
         return spec
 
 
@@ -98,6 +116,7 @@ def main():
     files = {}
     for path in root.rglob("*.py"):
         if path.is_file():
+            source_path(root, path)
             if len(files) >= 4096:
                 raise ValueError("decoder source file budget exceeded")
             files[path.relative_to(root).as_posix()] = digest(path)
