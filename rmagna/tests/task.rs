@@ -219,6 +219,61 @@ fn relative_target_and_recovery_modules_preserve_local_maps_and_empty_zero_wires
     assert_eq!(ideal.postselection().get(&0), Some(&false));
 }
 #[test]
+fn target_metadata_preserves_declarations_but_rejects_classical_execution() {
+    let files = Files::new();
+    let source = physical("I 0");
+    for task in [
+        r#"{"ideal_state":"ideal.magna"}"#,
+        r#"{"ideal_state":{"circuit":"ideal.magna","outputs":[0]}}"#,
+    ] {
+        let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
+        for text in [
+            "DETECTOR\nI 0",
+            "DETECTOR(1,2)\nI 0",
+            "OBSERVABLE_INCLUDE(4)\nOBSERVABLE_INCLUDE(4)\nI 0",
+            "REPEAT 2 {\nDETECTOR(1,2)\nOBSERVABLE_INCLUDE(4)\n}\nI 0",
+        ] {
+            files.put("ideal.magna", text);
+            let loaded = spec
+                .load_modules(&source, &ParseOptions::default())
+                .unwrap();
+            let target = loaded.ideal_state().unwrap();
+            assert_eq!(target.outputs(), [0]);
+            assert_eq!(target.circuit().num_records(), 0);
+            assert_eq!(target.circuit().to_text(), text);
+            for expression in target
+                .circuit()
+                .detectors()
+                .iter()
+                .chain(target.circuit().observables().values())
+            {
+                assert!(!expression.constant);
+                assert!(expression.terms.is_empty());
+            }
+        }
+        for text in [
+            "M 0\nDETECTOR rec[-1]",
+            "M 0\nOBSERVABLE_INCLUDE(4) rec[-1] rec[-1]",
+            "DETECTOR\nOBSERVABLE_INCLUDE(4) det[0]\nI 0",
+            "DETECTOR\nOBSERVABLE_INCLUDE(4) !det[0] !det[0]\nI 0",
+            "REPEAT 2 {\nDETECTOR\nOBSERVABLE_INCLUDE(4) det[-1]\n}\nI 0",
+            "DETECTOR\nPOSTSELECT det[0]\nI 0",
+            "CONTROL[XOR](0) -> ctrl[0]\nDETECTOR\nI 0",
+        ] {
+            files.put("ideal.magna", text);
+            let error = spec
+                .load_modules(&source, &ParseOptions::default())
+                .unwrap_err();
+            assert_eq!(error.field, "ideal_state", "{text}: {error}");
+            assert!(error.message.contains("ideal.magna:"), "{text}: {error}");
+            assert!(
+                error.message.contains("noiseless unitary"),
+                "{text}: {error}"
+            );
+        }
+    }
+}
+#[test]
 fn target_and_recovery_validation_rejects_nonunitary_or_noisy_modules() {
     let files = Files::new();
     files.put("ideal.magna", "I 0");

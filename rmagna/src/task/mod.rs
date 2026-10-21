@@ -157,17 +157,18 @@ impl TaskSpec {
         let task = self.validate(physical)?;
         let ideal = if let Some(spec) = &self.ideal {
             let mut circuit = read_circuit(&spec.circuit, "ideal_state", options)?;
-            if let Some(op) = circuit.operations().iter().find(|op| {
-                !matches!(
-                    op.operation,
-                    Operation::Unitary { control: None, .. } | Operation::Annotation { .. }
-                )
+            if let Some(op) = circuit.operations().iter().find(|op| match op.operation {
+                Operation::Unitary { control: None, .. } | Operation::Annotation { .. } => false,
+                Operation::Detector { .. } | Operation::Observable { .. } => {
+                    circuit.declaration_has_targets(op.id)
+                }
+                _ => true,
             }) {
                 return Err(module_operation_error(
                     "ideal_state",
                     &spec.circuit,
                     &op.location,
-                    "target preparation must contain only noiseless unitary gates and annotations",
+                    "target preparation must contain only noiseless unitary gates, annotations and detector/observable declarations without targets",
                 ));
             }
             if !spec.object_form && circuit.num_qubits() > task.outputs.len() {

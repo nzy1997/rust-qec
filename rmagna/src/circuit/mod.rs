@@ -270,6 +270,8 @@ pub struct Circuit {
     observables: BTreeMap<usize, BitExpr>,
     external_calls: usize,
     has_guarded_noise: bool,
+    // Retain syntax lost when classical expressions cancel or resolve to zero.
+    declarations_with_targets: BTreeSet<usize>,
     source_text: String,
 }
 impl Circuit {
@@ -302,6 +304,9 @@ impl Circuit {
     }
     pub fn needs_history_sampling(&self) -> bool {
         self.external_calls != 0 || self.has_guarded_noise
+    }
+    pub(crate) fn declaration_has_targets(&self, operation_id: usize) -> bool {
+        self.declarations_with_targets.contains(&operation_id)
     }
 }
 
@@ -342,6 +347,7 @@ impl Circuit {
             observables,
             external_calls: 0,
             has_guarded_noise: false,
+            declarations_with_targets: self.declarations_with_targets.clone(),
             source_text: self.source_text.clone(),
         }
     }

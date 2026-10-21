@@ -729,7 +729,10 @@ wires; an empty preparation means zero on those wires. Object targets require
 an explicit ordered outputs list within the preparation's declared width, and can
 specify auxiliary wires and disjoint projected auxiliaries. Only path targets
 receive implicit zero-wire padding. Target modules
-must be unitary and noiseless. Recovery modules require a target, can have their
+must be unitary and noiseless. Target modules may retain detector and observable
+declarations without classical targets; declarations with references remain
+forbidden even when their expressions cancel to zero. Recovery modules require a
+target, can have their
 own local records and controllers, and forbid noise channels, nonzero report
 errors and postselection. Their outcomes will be averaged by the task evaluator.
 Loading modules never executes controllers or contracts a target normalization;
