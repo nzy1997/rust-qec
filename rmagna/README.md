@@ -402,9 +402,10 @@ The comparison checks format, qubit/record/instruction/detector counts, external
 call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
 format/static-semantics check, not an end-to-end sampling benchmark. The
-instrument layer below executes affine circuits and pure targets; full task
-models and recovery remain subsequent deliverables; the runtime below adds
-causal record sampling.
+instrument layer below executes affine circuits and pure targets; the task
+section documents schema models and module validation. Terminal recovery execution
+and complete task evaluation remain subsequent deliverables. The runtime below
+adds causal record sampling.
 
 ## Affine instruments and conditional target masses
 
@@ -697,4 +698,66 @@ the task layer must reject it before using it as an ideal state.
 Tests independently construct literal complex reduced density matrices, trace
 both environments, and compare all sixteen selected-output/event combinations,
 including empty and permuted outputs. Existing pure-target and partial-target
-checks remain unchanged. Task JSON loading is a later layer.
+checks remain unchanged. Task JSON loading is described in the following section.
+
+## Task schema and module loading
+
+`task::parse_task(text, base_directory, &TaskOptions)` reads task schema 1 and
+resolves target/recovery paths relative to the supplied directory. Read-only
+`TaskSpec` accessors preserve optional output mappings, the choice of target or
+classical error observables, sampled records and exact integer Pauli masks.
+`validate(physical)` checks indices, unique ordered outputs, declared logical
+observables, and Pauli widths. Masks use arbitrary-precision JSON integers;
+no floating conversion truncates masks above 64 bits. Y phases follow Hermitian
+Pauli operators in output order.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::task::{parse_task, TaskOptions};
+let circuit = parse_circuit("M 0\nOBSERVABLE_INCLUDE(4) rec[-1]", &ParseOptions::default())?;
+let spec = parse_task(r#"{"schema_version":1,"error_observables":[4],"sample_records":[0]}"#,
+    std::path::Path::new("."), &TaskOptions::default())?;
+let task = spec.validate(&circuit)?;
+assert!(task.outputs().is_empty());
+assert_eq!(task.error_observables(), Some([4].as_slice()));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`load_modules` also parses the target and recovery files with the caller's circuit
+and controller-name options. Pure path targets use only the selected local output
+wires; an empty preparation means zero on those wires. Object targets require
+an explicit ordered outputs list within the preparation's declared width, and can
+specify auxiliary wires and disjoint projected auxiliaries. Only path targets
+receive implicit zero-wire padding. Target modules
+must be unitary and noiseless. Target modules may retain detector and observable
+declarations without classical targets; declarations with references remain
+forbidden even when their expressions cancel to zero. Recovery modules require a
+target, can have their
+own local records and controllers, and forbid noise channels, nonzero report
+errors and postselection. Their outcomes will be averaged by the task evaluator.
+Loading modules never executes controllers or contracts a target normalization;
+zero-norm target rejection belongs to evaluation preparation.
+
+Defaults bound task JSON to 16 MiB, each list/object collection to 1,000,000 items,
+and Pauli masks to 65,536 bits. Circuit files are read through the circuit source
+byte budget, with file path and task-field context retained on errors. Semantic
+operation restrictions also identify the offending source line and column. Unknown
+fields and invalid numeric types are rejected. `ideal_state: null` and
+`recovery: null` mean omitted modules; list-valued fields require lists.
+
+All task fields retain their raw JSON shapes until typed validation. Numeric
+objects using serde_json's private number/raw-value tags cannot become indices,
+schema versions or projection bits when another dependency enables
+`arbitrary_precision`. Wide masks remain exact without enabling that global
+feature. `make test-magna-task-json` runs the same ten adversarial task tests
+under default, arbitrary-precision and float-roundtrip feature configurations;
+CI runs this target alongside the ordinary workspace tests.
+
+Build `cargo build -p rmagna --example validate_task`, then run
+`validate_task PHYSICAL TASK [CONTROLLER...]` for static validation.
+`benchmarks/magna_reproduction/task_compare.py --upstream PINNED_SOURCE --rust-example BINARY --out NEW_JSON`
+compares all 31 packaged task/module mappings against the pinned public native
+API, with controller callbacks that fail if invoked. It checks output order,
+target preparation width/mapping/projections and recovery width/records/route,
+records input and binary hashes, and works with Python `-O`. This is separate from
+complete task execution and statistical benchmark reproduction.

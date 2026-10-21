@@ -99,6 +99,7 @@ pub fn parse_circuit(source: &str, options: &ParseOptions) -> Result<Circuit, Pa
             observables: BTreeMap::new(),
             external_calls: 0,
             has_guarded_noise: false,
+            declarations_with_targets: BTreeSet::new(),
             source_text: source.to_owned(),
         },
         registers: BTreeMap::new(),
@@ -586,6 +587,11 @@ impl Builder<'_> {
         }
         let targets = tail.split_whitespace().collect::<Vec<_>>();
         let name = head.to_ascii_uppercase();
+        if matches!(name.as_str(), "DETECTOR" | "OBSERVABLE_INCLUDE") && !targets.is_empty() {
+            self.circuit
+                .declarations_with_targets
+                .insert(self.circuit.operations.len());
+        }
         let continuing = name == "ELSE_CORRELATED_ERROR";
         if !continuing && name != "CORRELATED_ERROR" && name != "E" {
             self.chain = None;
