@@ -1074,3 +1074,34 @@ guarded faults, rejected selections and requested records. Seeded physical draws
 retain identical entropy states and histories across routes. Fixed histories use
 one initial reference construction and zero subsequent Clifford constructions;
 these tests also check the cold route's actual constructions.
+
+## Prepared compatible Z projections
+
+`stabilizer::PreparedZProjection::new(reference, rows)` factors the pulled-back
+constraints and prepares the reference quadratic restriction once. `project`
+accepts a ket with the same support columns, quadratic cross terms and odd linear
+coefficients; offsets, global coefficients, phase constants and even linear
+coefficients may vary. Incompatible structure and dimensions are explicit errors.
+
+Queries solve only the new right-hand side and apply exact affine and even-linear
+phase corrections. They return unnormalized constrained paths, which can still
+be dependent or have zero coefficient; call `contract` for a canonical ket.
+An inconsistent constraint system returns `None`. The plan owns immutable matrix
+storage and prepares no non-Clifford decomposition. It is an explicit library
+primitive; task-level query-plan reuse is a subsequent layer.
+
+```rust
+use rmagna::clifford::{CliffordCircuit, CliffordGate};
+use rmagna::gf2::BitVector;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::stabilizer::PreparedZProjection;
+let arithmetic = ScalarArithmetic::default();
+let input = CliffordCircuit::computational(BitVector::zeros(2)?)?;
+let reference = CliffordCircuit::new(2, [CliffordGate::H(0)])?
+    .evolve(&input, &arithmetic)?.unwrap();
+let rows = [BitVector::from_indices(2, [0])?];
+let plan = PreparedZProjection::new(&reference, &rows)?;
+let projected = plan.project(&reference, &BitVector::zeros(1)?)?.unwrap();
+assert_eq!(projected.norm_squared(&arithmetic)?, arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
