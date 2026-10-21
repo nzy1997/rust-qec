@@ -525,3 +525,47 @@ fn target_metadata_without_classical_references_preserves_actual_contributions()
         assert!(spec.load_modules(&physical, &parse).is_err());
     }
 }
+
+#[test]
+fn task_prescribed_histories_are_conditional_queries_with_physical_enumeration_weights() {
+    let files = Files::new();
+    let task = evaluator(
+        &files,
+        "H 0\nM 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]",
+        r#"{"sample_records":[0]}"#,
+        &ControllerRegistry::default(),
+    );
+    let fields = FieldArithmetic::default();
+    let mut total = ExactField::zero();
+    for value in [false, true] {
+        let draw = task
+            .evaluate_prescribed_history(&[], &[vec![value]])
+            .unwrap();
+        assert_eq!(draw.sampled_records, [value]);
+        assert_eq!(
+            draw.accepted,
+            if value {
+                ExactField::zero()
+            } else {
+                ExactField::one()
+            }
+        );
+        let weighted = fields
+            .multiply(
+                &draw.accepted,
+                &fields.from_scalar(&draw.history_mass).unwrap(),
+            )
+            .unwrap();
+        total = fields.add(&total, &weighted).unwrap();
+    }
+    assert_eq!(total, rational(1, 2));
+    let linear = evaluator(&files, "I 0", "{}", &ControllerRegistry::default());
+    assert!(linear.evaluate_prescribed_history(&[], &[vec![]]).is_err());
+    assert_eq!(
+        linear
+            .evaluate_prescribed_history(&[], &[])
+            .unwrap()
+            .accepted,
+        ExactField::one()
+    );
+}

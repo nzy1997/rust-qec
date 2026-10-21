@@ -46,6 +46,10 @@ pub enum RuntimeError {
         option: &'static str,
         limit: usize,
     },
+    InvalidHistory {
+        group: usize,
+        message: String,
+    },
     InternalSite {
         operation: usize,
     },
@@ -84,6 +88,9 @@ impl fmt::Display for RuntimeError {
             ),
             Self::ResourceLimit { option, limit } => {
                 write!(f, "causal runtime exhausted {option} = {limit}")
+            }
+            Self::InvalidHistory { group, message } => {
+                write!(f, "prescribed history group {group}: {message}")
             }
             Self::InternalSite { operation } => write!(
                 f,
@@ -299,7 +306,7 @@ impl CausalProgram {
     ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
         let draw = self.sampler.draw(random)?;
-        self.execute(requested, draw, random, arithmetic)
+        self.execute(requested, draw, random, arithmetic, None)
     }
     pub fn resolve_prescribed(
         &self,
@@ -321,6 +328,77 @@ impl CausalProgram {
             },
             random,
             arithmetic,
+            None,
+        )
+    }
+    /// Evaluate explicit physical observations, grouped by each external call,
+    /// first guarded category, and final requested-record query, in causal order.
+    /// This is a conditional query, not a Monte Carlo history proposal.
+    pub fn resolve_prescribed_history(
+        &self,
+        requested: &[BitExpr],
+        faults: &[FaultSelection],
+        groups: &[Vec<bool>],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ResolvedHistory, RuntimeError> {
+        self.validate_requested(requested)?;
+        let mut shapes = Vec::new();
+        let mut guarded = std::collections::BTreeSet::new();
+        for located in self.circuit.operations() {
+            match &located.operation {
+                Operation::Control {
+                    call: Some(_),
+                    inputs,
+                    ..
+                } => shapes.push(inputs.len()),
+                Operation::Noise { guard: Some(_), .. } => {
+                    let site =
+                        self.source_sites
+                            .get(&located.id)
+                            .ok_or(RuntimeError::InternalSite {
+                                operation: located.id,
+                            })?;
+                    if guarded.insert(site) {
+                        shapes.push(1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        if !requested.is_empty() {
+            shapes.push(requested.len());
+        }
+        if groups.len() != shapes.len() {
+            return Err(RuntimeError::InvalidHistory {
+                group: groups.len().min(shapes.len()),
+                message: format!(
+                    "received {} groups; expected {}",
+                    groups.len(),
+                    shapes.len()
+                ),
+            });
+        }
+        for (group, (values, &count)) in groups.iter().zip(&shapes).enumerate() {
+            if values.len() != count {
+                return Err(RuntimeError::InvalidHistory {
+                    group,
+                    message: format!("received {} bits; expected {count}", values.len()),
+                });
+            }
+        }
+        let probability = self.model.probability(faults)?;
+        self.execute(
+            requested,
+            NoiseDraw {
+                faults: faults.to_vec(),
+                physical_probability: probability.clone(),
+                proposal_probability: probability,
+                likelihood_ratio: BigRational::one(),
+                entropy_words: 0,
+            },
+            &mut crate::noise::SplitMix64::new(0),
+            arithmetic,
+            Some(groups),
         )
     }
     fn validate_requested(&self, requested: &[BitExpr]) -> Result<(), RuntimeError> {
@@ -374,6 +452,7 @@ impl CausalProgram {
         draw: NoiseDraw,
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
+        prescribed: Option<&[Vec<bool>]>,
     ) -> Result<ResolvedHistory, RuntimeError> {
         // Choices for inactive guarded categories are discarded, including their
         // probabilities; they have no physical action or path weight.
@@ -391,6 +470,8 @@ impl CausalProgram {
             calls: Vec::new(),
             entropy_words: 0,
             prefix_compiles: 0,
+            prescribed,
+            next_group: 0,
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
             match &located.operation {
@@ -524,6 +605,8 @@ struct PathState<'a> {
     calls: Vec<ControllerCall>,
     entropy_words: usize,
     prefix_compiles: usize,
+    prescribed: Option<&'a [Vec<bool>]>,
+    next_group: usize,
 }
 impl PathState<'_> {
     fn resolved(&self, end: usize) -> Result<Vec<LocatedOperation>, RuntimeError> {
@@ -579,6 +662,46 @@ impl PathState<'_> {
         let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
         let instrument = compile_affine(&prefix, &self.program.options.compile, arithmetic)?;
         let faults = self.faults(&instrument)?;
+        if let Some(groups) = self.prescribed {
+            let group = self.next_group;
+            self.next_group += 1;
+            let values = &groups[group]; // Shapes were checked before execution.
+            let mut parities = self
+                .conditions
+                .iter()
+                .map(|(p, _)| p.clone())
+                .collect::<Vec<_>>();
+            parities.extend_from_slice(inputs);
+            let mut outcomes = self.conditions.iter().map(|(_, v)| *v).collect::<Vec<_>>();
+            outcomes.extend_from_slice(values);
+            let bits = BitVector::from_indices(
+                outcomes.len(),
+                outcomes
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &v)| v.then_some(i)),
+            )
+            .map_err(InstrumentError::from)?;
+            if instrument
+                .reported_probability(
+                    &parities,
+                    &bits,
+                    &faults,
+                    self.program.options.sampling.max_terms,
+                    arithmetic,
+                )?
+                .value
+                .is_zero()
+            {
+                return Err(RuntimeError::InvalidHistory {
+                    group,
+                    message: "observations have zero physical prefix mass".to_owned(),
+                });
+            }
+            self.conditions
+                .extend(inputs.iter().cloned().zip(values.iter().copied()));
+            return Ok(values.clone());
+        }
         let mut options = self.program.options.sampling;
         options.max_entropy_words = options.max_entropy_words.saturating_sub(self.entropy_words);
         let draw = sample_reported_conditioned(

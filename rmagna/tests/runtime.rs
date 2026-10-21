@@ -294,6 +294,36 @@ fn prescribed_causal_histories_match_pinned_native_joint_masses() {
         let draw = program
             .sample_prescribed(&outputs, &zero(&a), &faults, &mut Words::bits(&bits), &a)
             .unwrap();
+        let mut groups = expected_calls
+            .iter()
+            .map(|call| {
+                call["inputs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_u64().unwrap() != 0)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        if name == "guarded" {
+            groups.push(vec![expected_calls[0]["outputs"][0].as_u64().unwrap() != 0]);
+        }
+        let fixed = program
+            .resolve_prescribed_history(&[], &faults, &groups, &a)
+            .unwrap();
+        assert_eq!(fixed.entropy_words(), (0, 0));
+        assert_eq!(fixed.history_mass(), &draw.history_mass);
+        assert_eq!(fixed.controller_calls(), draw.controller_calls);
+        let fixed_masses = fixed
+            .instrument()
+            .masses(&outputs, &zero(&a), fixed.faults(), 256, &a)
+            .unwrap();
+        assert_eq!(fixed_masses.accepted.value, draw.masses.accepted.value);
+        assert_eq!(
+            fixed_masses.target_success.value,
+            draw.masses.target_success.value
+        );
+        assert_eq!(fixed_masses.error, draw.masses.error);
         assert_eq!(draw.controller_calls.len(), expected_calls.len());
         for (actual, expected) in draw.controller_calls.iter().zip(expected_calls) {
             assert_eq!(
@@ -412,4 +442,126 @@ fn causal_resource_limits_and_target_validation_fail_without_silent_draws() {
     let mut random = Words::bits(&[]);
     assert!(program.sample(&[100], &zero(&a), &mut random, &a).is_err());
     assert_eq!(random.at, 0);
+}
+
+#[test]
+fn prescribed_history_shape_errors_and_impossible_prefixes_do_not_invoke_callbacks() {
+    let a = ScalarArithmetic::default();
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = calls.clone();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("decision", "1", move |bits: &[bool]| {
+            count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(vec![bits[0]])
+        })
+        .unwrap();
+    let source = parse(
+        "M 0\nDETECTOR rec[-1]\nCONTROL[decision] det[0] -> ctrl[0]",
+        &registry,
+    );
+    let program = CausalProgram::new(&source, &registry, RuntimeOptions::default(), &a).unwrap();
+    for groups in [
+        vec![],
+        vec![vec![]],
+        vec![vec![false], vec![]],
+        vec![vec![true]],
+    ] {
+        assert!(matches!(
+            program.resolve_prescribed_history(&[], &[], &groups, &a),
+            Err(RuntimeError::InvalidHistory { .. })
+        ));
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+    let history = program
+        .resolve_prescribed_history(&[], &[], &[vec![false]], &a)
+        .unwrap();
+    assert_eq!(history.history_mass(), &ExactScalar::one());
+    assert_eq!(history.entropy_words(), (0, 0));
+    assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+#[test]
+fn prescribed_guard_groups_are_shared_by_correlated_chains_and_keep_physical_weights() {
+    let a = ScalarArithmetic::default();
+    let source = parse(
+        "H 0\nM 0\nE(1/10) rec[-1] X1\nELSE_CORRELATED_ERROR(2/9) rec[-1] Z1",
+        &ControllerRegistry::default(),
+    );
+    let program = CausalProgram::new(
+        &source,
+        &ControllerRegistry::default(),
+        RuntimeOptions::default(),
+        &a,
+    )
+    .unwrap();
+    let site = program
+        .potential_site(
+            source
+                .operations()
+                .iter()
+                .find(|op| matches!(op.operation, Operation::Noise { .. }))
+                .unwrap()
+                .id,
+        )
+        .unwrap();
+    for active in [false, true] {
+        let fixed = program
+            .resolve_prescribed_history(
+                &[],
+                &[FaultSelection {
+                    site,
+                    alternative: 1,
+                }],
+                &[vec![active]],
+                &a,
+            )
+            .unwrap();
+        assert_eq!(fixed.conditions().len(), 1);
+        assert_eq!(fixed.history_mass(), &a.omega(0, -2).unwrap());
+        assert_eq!(
+            fixed.noise_probability().to_string(),
+            if active { "1/5" } else { "1" }
+        );
+        assert_eq!(fixed.entropy_words(), (0, 0));
+    }
+}
+#[test]
+fn prescribed_requested_records_preserve_correlations_and_ignore_final_postselection() {
+    let a = ScalarArithmetic::default();
+    let source = parse(
+        "H 0\nM 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]",
+        &ControllerRegistry::default(),
+    );
+    let program = CausalProgram::new(
+        &source,
+        &ControllerRegistry::default(),
+        RuntimeOptions::default(),
+        &a,
+    )
+    .unwrap();
+    let query = vec![rmagna::circuit::BitExpr::atom(rmagna::circuit::BitAtom::Record(0)); 2];
+    for value in [false, true] {
+        let history = program
+            .resolve_prescribed_history(&query, &[], &[vec![value, value]], &a)
+            .unwrap();
+        assert_eq!(history.requested_values(), [value, value]);
+        assert_eq!(history.history_mass(), &a.omega(0, -2).unwrap());
+        let accepted = history
+            .instrument()
+            .acceptance(history.faults(), 256, &a)
+            .unwrap()
+            .value;
+        assert_eq!(
+            accepted,
+            if value {
+                ExactScalar::zero()
+            } else {
+                a.omega(0, -2).unwrap()
+            }
+        );
+    }
+    assert!(matches!(
+        program.resolve_prescribed_history(&query, &[], &[vec![false, true]], &a),
+        Err(RuntimeError::InvalidHistory { .. })
+    ));
 }
