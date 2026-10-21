@@ -1,4 +1,4 @@
-//! Scalar pullbacks must not allocate coordinate-sized transpose rows.
+//! Phase pullbacks must keep scalar and dense-basis allocations bounded.
 use rmagna::gf2::BitVector;
 use rmagna::phase::ParityPhase;
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -74,6 +74,64 @@ fn empty_basis_scalar_pullbacks_keep_query_allocation_bounded_across_term_thresh
                 assert_eq!(
                     result.evaluate(&BitVector::zeros(0).unwrap()).unwrap(),
                     expected as u8
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn quadratic_pullbacks_do_not_materialize_dense_coordinate_lists() {
+    use rmagna::quadratic::QuadraticForm;
+    for width in [257, 513, 1025] {
+        let mut linear = vec![0; width];
+        linear[0] = 1;
+        let phase = QuadraticForm::new(
+            3,
+            linear,
+            (0..width)
+                .map(|_| BitVector::zeros(width).unwrap())
+                .collect(),
+        )
+        .unwrap();
+        let shift = BitVector::zeros(width).unwrap();
+        for mode in 0..3 {
+            let basis = (0..64)
+                .map(|j| {
+                    BitVector::from_indices(
+                        width,
+                        (0..width).filter(|&i| match mode {
+                            0 => i == j,
+                            1 => i % 2 == 0,
+                            _ => true,
+                        }),
+                    )
+                    .unwrap()
+                })
+                .collect::<Vec<_>>();
+            REQUESTED.with(|counter| assert_eq!(counter.replace(Some(0)), None));
+            let result = phase.restrict(&shift, &basis);
+            let requested = REQUESTED.with(|counter| counter.replace(None).unwrap());
+            // Includes every allocation/reallocation in the query. The budget
+            // scales with packed polar storage, rather than one usize per set bit.
+            let budget = 32 * width * width.div_ceil(64) + 65536;
+            assert!(
+                requested <= budget,
+                "width={width},mode={mode}: requested {requested} bytes, budget {budget}"
+            );
+            let result = result.unwrap();
+            for selected in [vec![], vec![0], vec![1], vec![0, 1], (0..64).collect()] {
+                let first = if mode == 0 {
+                    selected.contains(&0)
+                } else {
+                    selected.len() % 2 != 0
+                };
+                let expected = (3 + u8::from(first)) & 3;
+                assert_eq!(
+                    result
+                        .evaluate(&BitVector::from_indices(64, selected).unwrap())
+                        .unwrap(),
+                    expected
                 );
             }
         }

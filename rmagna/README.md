@@ -1312,3 +1312,6 @@ sparse coordinate products when shorter than a packed dot product. Arbitrary
 shifts and dependent directions retain exact phases. Independent literal
 polynomial tests cover dense and sparse maps through 129 variables; existing
 prepared projections continue to reuse the same polar images.
+Coordinate lists are cached only for those sparse products; dense directions
+stay packed. A thread-local allocation counter checks sparse and dense pullbacks
+through 1,025 variables against a budget scaled to packed matrix storage.
