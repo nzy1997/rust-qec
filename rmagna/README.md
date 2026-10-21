@@ -212,6 +212,12 @@ indices in their given order. Repeated indices copy a label to several legs.
 This linear operation is distinct from tracing a density operator; a trace
 requires boundary equality between a ket and its conjugate first.
 
+`project_z` pulls back sets of at least 64 parity rows through a shared packed
+transpose of the support matrix. Sparse trace equalities then combine selected
+rows by XOR rather than scanning the entire boundary for each column. Smaller
+event sets use direct dot products. The transpose adds temporary matrix storage;
+projection still contracts dependent paths and preserves unnormalized mass.
+
 These primitives build exact Clifford boundaries. The compilers below add
 unitary near-Clifford circuit lowering and affine instruments with reset,
 reported records and prescribed noise. Tests

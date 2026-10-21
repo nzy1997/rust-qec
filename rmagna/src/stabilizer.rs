@@ -241,12 +241,26 @@ impl AffineKet {
         if rows.len() != outcomes.width() || rows.iter().any(|row| row.width() != self.width()) {
             return Err(StabilizerError::DimensionMismatch);
         }
+        // Trace boundaries have many sparse parity rows. Share the transpose
+        // instead of scanning every boundary word for every row/column pair.
+        // Small event sets keep the direct path and avoid another matrix.
+        let boundary_rows = if rows.len() >= 64 {
+            Some(transpose(self.width(), &self.columns)?)
+        } else {
+            None
+        };
         let mut equations = Vec::new();
         let mut rhs = outcomes.clone();
         for (i, row) in rows.iter().enumerate() {
             let mut equation = BitVector::zeros(self.columns.len())?;
-            for (j, column) in self.columns.iter().enumerate() {
-                equation.set(j, row.dot(column)?)?;
+            if let Some(boundary_rows) = &boundary_rows {
+                for boundary in row.ones() {
+                    equation.xor_assign(&boundary_rows[boundary])?;
+                }
+            } else {
+                for (j, column) in self.columns.iter().enumerate() {
+                    equation.set(j, row.dot(column)?)?;
+                }
             }
             rhs.set(i, rhs.get(i)? ^ row.dot(&self.offset)?)?;
             equations.push(equation);

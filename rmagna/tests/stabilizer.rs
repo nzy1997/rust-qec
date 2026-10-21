@@ -403,3 +403,131 @@ fn malformed_boundary_and_phase_dimensions_are_rejected() {
             .is_err()
     );
 }
+
+#[test]
+fn packed_parity_pullbacks_match_wide_hidden_path_enumeration() {
+    use std::collections::HashMap;
+    let arithmetic = ScalarArithmetic::default();
+    let mut next = rng();
+    for paths in [7, 65] {
+        let width = 129;
+        let offset =
+            BitVector::from_indices(width, (0..width).filter(|_| next() & 1 != 0)).unwrap();
+        let mut columns = (0..6)
+            .map(|_| {
+                BitVector::from_indices(width, (0..width).filter(|_| next() & 1 != 0)).unwrap()
+            })
+            .collect::<Vec<_>>();
+        let mut dependent = columns[0].clone();
+        dependent.xor_assign(&columns[2]).unwrap();
+        columns.push(dependent);
+        columns.resize(paths, BitVector::zeros(width).unwrap());
+        let mut linear = vec![0; paths];
+        for value in &mut linear[..7] {
+            *value = (next() % 4) as u8;
+        }
+        let upper = (0..paths)
+            .map(|i| {
+                BitVector::from_indices(paths, (i + 1..7).filter(|_| next() & 1 != 0)).unwrap()
+            })
+            .collect::<Vec<_>>();
+        let phase = QuadraticForm::new(3, linear, upper).unwrap();
+        let coefficient = arithmetic.omega(3, -5).unwrap();
+        let ket = AffineKet::new(
+            offset.clone(),
+            columns.clone(),
+            phase.clone(),
+            coefficient.clone(),
+        )
+        .unwrap();
+        let mut amplitudes: HashMap<BitVector, ExactScalar> = HashMap::new();
+        for assignment in 0_u64..128 {
+            let mut output = offset.clone();
+            let mut power = 3_u64;
+            for (j, column) in columns.iter().enumerate().take(7) {
+                if assignment >> j & 1 != 0 {
+                    output.xor_assign(column).unwrap();
+                    power += u64::from(phase.linear()[j]);
+                    for k in j + 1..7 {
+                        if assignment >> k & 1 != 0 && phase.upper()[j].get(k).unwrap() {
+                            power += 2;
+                        }
+                    }
+                }
+            }
+            let term = arithmetic
+                .multiply(
+                    &coefficient,
+                    &arithmetic
+                        .omega((2 * (power % 4)) as i64, 2 * (paths as i64 - 7))
+                        .unwrap(),
+                )
+                .unwrap();
+            let entry = amplitudes.entry(output).or_insert_with(ExactScalar::zero);
+            *entry = arithmetic.add(entry, &term).unwrap();
+        }
+        let witness = amplitudes.iter().find(|(_, a)| !a.is_zero()).unwrap().0;
+        for dense in [false, true] {
+            let pool = if dense {
+                (0..4)
+                    .map(|_| {
+                        BitVector::from_indices(width, (0..width).filter(|_| next() & 1 != 0))
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                [(0, 64), (63, 128), (1, 127), (62, 65)]
+                    .into_iter()
+                    .map(|(a, b)| BitVector::from_indices(width, [a, b]).unwrap())
+                    .collect()
+            };
+            let parity = |row: &BitVector, output: &BitVector| {
+                row.ones().fold(false, |p, j| p ^ output.get(j).unwrap())
+            };
+            for count in [63, 64, 65, 129] {
+                let rows = (0..count).map(|j| pool[j % 4].clone()).collect::<Vec<_>>();
+                let outcomes = BitVector::from_indices(
+                    count,
+                    rows.iter()
+                        .enumerate()
+                        .filter(|(_, row)| parity(row, witness))
+                        .map(|(j, _)| j),
+                )
+                .unwrap();
+                let projected = ket
+                    .project_z(&rows, &outcomes, &arithmetic)
+                    .unwrap()
+                    .unwrap();
+                let prepared = projected.prepare().unwrap();
+                let mut expected_norm = ExactScalar::zero();
+                for (output, amplitude) in &amplitudes {
+                    let accepted = rows
+                        .iter()
+                        .enumerate()
+                        .all(|(j, row)| parity(row, output) == outcomes.get(j).unwrap());
+                    let expected = if accepted {
+                        amplitude.clone()
+                    } else {
+                        ExactScalar::zero()
+                    };
+                    assert_eq!(
+                        prepared.amplitude(output, &arithmetic).unwrap(),
+                        expected,
+                        "paths={paths}, rows={count}, dense={dense}"
+                    );
+                    expected_norm = arithmetic
+                        .add(&expected_norm, &arithmetic.norm_squared(&expected).unwrap())
+                        .unwrap();
+                }
+                assert_eq!(projected.norm_squared(&arithmetic).unwrap(), expected_norm);
+                let mut impossible = outcomes.clone();
+                impossible.set(4, !impossible.get(0).unwrap()).unwrap();
+                assert!(
+                    ket.project_z(&rows, &impossible, &arithmetic)
+                        .unwrap()
+                        .is_none()
+                );
+            }
+        }
+    }
+}
