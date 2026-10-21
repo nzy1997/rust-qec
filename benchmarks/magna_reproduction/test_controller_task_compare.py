@@ -113,7 +113,7 @@ class ControllerComparisonTests(unittest.TestCase):
             (task / "task").write_text("{}")
             binary = root / "binary"
             binary.write_text("unchanged offline identity")
-            args = Namespace(upstream=root, one="dk", timeout=1)
+            args = Namespace(upstream=root, one="dk", timeout=1, compiler=None)
             for broken in [0, 1]:
                 calls = []
                 def rust(command, **kwargs):
