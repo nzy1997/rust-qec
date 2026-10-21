@@ -1,4 +1,5 @@
 use rmagna::clifford::CliffordGate as C;
+use rmagna::gf2::BitVector;
 use rmagna::pauli::PauliWord;
 use rmagna::scalar::{ExactScalar, ScalarArithmetic};
 use rmagna::unitary::{PauliInsertion, UnitaryCircuit, UnitaryError, UnitaryGate as G};
@@ -656,7 +657,6 @@ fn partial_targets_trace_entangled_environments_and_apply_events_on_both_copies(
 
 #[test]
 fn reduced_projected_density_overlaps_match_literal_density_matrices() {
-    use rmagna::gf2::BitVector;
     use rmagna::unitary::DensityBoundary;
     let a = ScalarArithmetic::default();
     let pg = [
@@ -890,4 +890,81 @@ fn closed_unitary_queries_use_certified_clifford_fibers_before_the_term_budget()
         assert_eq!(query.terms, 4);
     }
     assert!(circuit.amplitude(&bits(4, 0), 3, &a).is_err());
+}
+
+#[test]
+fn final_scalar_closure_cancels_hidden_paths_before_resource_budgeting() {
+    let arithmetic = ScalarArithmetic::default();
+    let mut gates = (0..3).map(|q| G::Clifford(C::H(q))).collect::<Vec<_>>();
+    gates.extend([
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::T { qubit: 1, turns: 1 },
+        G::T { qubit: 1, turns: 7 },
+    ]);
+    gates.extend((0..3).map(|q| G::Clifford(C::H(q))));
+    gates.push(G::Clifford(C::X(2)));
+    gates.extend(
+        [
+            G::Clifford(C::H(1)),
+            G::Clifford(C::S { qubit: 1, turns: 1 }),
+        ]
+        .repeat(3),
+    );
+    let circuit = UnitaryCircuit::new(3, gates.clone())
+        .unwrap()
+        .compile(&bits(3, 0), &arithmetic)
+        .unwrap();
+    let literal = dense(&gates, 3, 0, &arithmetic);
+    assert_eq!(literal[4], arithmetic.omega(1, 0).unwrap());
+    assert!(
+        literal
+            .iter()
+            .enumerate()
+            .all(|(x, a)| x == 4 || a.is_zero())
+    );
+    for (x, expected) in literal.iter().enumerate() {
+        let actual = circuit.amplitude(&bits(3, x), 1, &arithmetic).unwrap();
+        assert_eq!(&actual.value, expected);
+        assert!(actual.terms <= 1);
+    }
+    let target = UnitaryCircuit::new(3, [])
+        .unwrap()
+        .compile(&bits(3, 4), &arithmetic)
+        .unwrap();
+    assert_eq!(
+        circuit.overlap(&target, 1, &arithmetic).unwrap().value,
+        arithmetic.omega(7, 0).unwrap()
+    );
+    let rows = vec![bits(3, 4); 65];
+    let one = BitVector::from_indices(65, 0..65).unwrap();
+    assert_eq!(
+        circuit
+            .probability_z(&rows, &one, 1, &arithmetic)
+            .unwrap()
+            .value,
+        ExactScalar::one()
+    );
+    assert_eq!(
+        circuit
+            .target_weight(&[0, 1, 2], &target, &rows, &one, 1, &arithmetic)
+            .unwrap()
+            .value,
+        ExactScalar::one()
+    );
+    let z = PauliWord::new(bits(3, 0), bits(3, 4), 0).unwrap();
+    assert_eq!(
+        circuit
+            .pauli_moment(&z, &rows, &one, 1, &arithmetic)
+            .unwrap()
+            .value,
+        ExactScalar::one().negated()
+    );
+    let mut impossible = one.clone();
+    impossible.set(64, false).unwrap();
+    let zero = circuit
+        .probability_z(&rows, &impossible, 0, &arithmetic)
+        .unwrap();
+    assert_eq!(zero.value, ExactScalar::zero());
+    assert_eq!(zero.terms, 0);
 }

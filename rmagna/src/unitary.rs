@@ -361,7 +361,7 @@ impl CompiledUnitary {
         let rows = (0..self.width())
             .map(|j| BitVector::from_indices(total, [j]))
             .collect::<Result<Vec<_>, _>>()?;
-        let ket = self.boundary.project_z(&rows, output, arithmetic)?;
+        let ket = self.boundary.constrain_z(&rows, output)?;
         close(
             ket,
             &[(self.width()..total).collect::<Vec<_>>()],
@@ -400,7 +400,7 @@ impl CompiledUnitary {
             constraints.push(BitVector::from_indices(total, row.ones())?);
             rhs.set(self.width() + j, outcomes.get(j)?)?;
         }
-        let ket = joint.project_z(&constraints, &rhs, arithmetic)?;
+        let ket = joint.constrain_z(&constraints, &rhs)?;
         let legs = [
             (self.width()..half).collect::<Vec<_>>(),
             (half + self.width()..total).collect::<Vec<_>>(),
@@ -435,11 +435,8 @@ impl CompiledUnitary {
             .iter()
             .map(|row| BitVector::from_indices(half, row.ones()))
             .collect::<Result<Vec<_>, _>>()?;
-        let left = self
-            .boundary
-            .conjugate()
-            .project_z(&lifted, outcomes, arithmetic)?;
-        let right = self.boundary.project_z(&lifted, outcomes, arithmetic)?;
+        let left = self.boundary.conjugate().constrain_z(&lifted, outcomes)?;
+        let right = self.boundary.constrain_z(&lifted, outcomes)?;
         let (Some(left), Some(right)) = (left, right) else {
             return Ok(NetworkValue {
                 value: ExactScalar::zero(),
@@ -457,7 +454,7 @@ impl CompiledUnitary {
         let equality = (0..self.width())
             .map(|q| BitVector::from_indices(total, [q, half + q]))
             .collect::<Result<Vec<_>, _>>()?;
-        let ket = joint.project_z(&equality, &BitVector::zeros(self.width())?, arithmetic)?;
+        let ket = joint.constrain_z(&equality, &BitVector::zeros(self.width())?)?;
         let legs = [
             (self.width()..half).collect(),
             (half + self.width()..total).collect(),
@@ -491,7 +488,7 @@ impl CompiledUnitary {
         let rows = (0..self.width())
             .map(|j| BitVector::from_indices(total, [j, half + j]))
             .collect::<Result<Vec<_>, _>>()?;
-        let ket = joint.project_z(&rows, &BitVector::zeros(self.width())?, arithmetic)?;
+        let ket = joint.constrain_z(&rows, &BitVector::zeros(self.width())?)?;
         let legs = [
             (self.width()..half).collect::<Vec<_>>(),
             (half + target.width()..total).collect::<Vec<_>>(),
@@ -639,7 +636,7 @@ impl CompiledUnitary {
                 .enumerate()
                 .filter_map(|(i, &bit)| bit.then_some(i)),
         )?;
-        let ket = joint.project_z(&rows, &rhs, arithmetic)?;
+        let ket = joint.constrain_z(&rows, &rhs)?;
         let legs = [
             (self.width()..n).collect::<Vec<_>>(),
             (n + self.width()..2 * n).collect(),

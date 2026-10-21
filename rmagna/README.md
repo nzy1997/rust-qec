@@ -217,6 +217,10 @@ transpose of the support matrix. Sparse trace equalities then combine selected
 rows by XOR rather than scanning the entire boundary for each column. Smaller
 event sets use direct dot products. The transpose adds temporary matrix storage;
 projection still contracts dependent paths and preserves unnormalized mass.
+Unitary scalar queries retain constrained paths internally until the final
+physical-label sum. That closure contracts hidden paths once before phase
+reduction and resource budgeting; public `project_z` still returns a contracted
+ket. No intermediate projection renormalizes the state.
 
 These primitives build exact Clifford boundaries. The compilers below add
 unitary near-Clifford circuit lowering and affine instruments with reset,
