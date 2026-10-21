@@ -1,8 +1,18 @@
-//! Evaluate one prescribed no-fault task draw without external controller bindings.
+//! Evaluate one prescribed no-fault task draw with optional explicit decoder bindings.
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::field::ExactField;
-use rmagna::noise::SplitMix64;
+use rmagna::noise::{RandomSource, SplitMix64};
+struct Entropy {
+    random: SplitMix64,
+    fixed: Option<u64>,
+}
+impl RandomSource for Entropy {
+    fn next_u64(&mut self) -> u64 {
+        self.fixed.unwrap_or_else(|| self.random.next_u64())
+    }
+}
 use rmagna::runtime::ControllerRegistry;
+use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
 use rmagna::scalar::ExactScalar;
 use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
 fn scalar(value: &ExactScalar) -> serde_json::Value {
@@ -17,16 +27,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .next()
         .ok_or("usage: evaluate_task PHYSICAL TASK [SEED]")?;
     let task_path = args.next().ok_or("missing task JSON path")?;
-    let seed = args
-        .next()
-        .map(|s| s.parse::<u64>())
-        .transpose()?
-        .unwrap_or(0);
-    if args.next().is_some() {
-        return Err("too many arguments".into());
+    let mut seed = 0;
+    let mut fixed = None;
+    let mut controllers = None;
+    let mut python = "python3".to_owned();
+    let mut module_root = None;
+    while let Some(argument) = args.next() {
+        match argument.as_str() {
+            "--constant-word" => {
+                fixed = Some(
+                    args.next()
+                        .ok_or("missing constant entropy word")?
+                        .parse::<u64>()?,
+                )
+            }
+            "--controllers" => controllers = Some(args.next().ok_or("missing controller file")?),
+            "--python" => python = args.next().ok_or("missing Python executable")?,
+            "--module-root" => {
+                module_root = Some(args.next().ok_or("missing decoder module root")?)
+            }
+            _ => seed = argument.parse::<u64>()?,
+        }
     }
+    let mut registry = ControllerRegistry::default();
+    let worker = if let Some(config) = controllers {
+        let root = module_root
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::Path::new(&config)
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."))
+                    .to_path_buf()
+            });
+        let mut command = std::process::Command::new(python);
+        command.args(["-I", "-B", "-u"]);
+        command.arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/python/decoder_worker.py"
+        ));
+        command
+            .arg("--controllers")
+            .arg(config)
+            .arg("--module-root")
+            .arg(root);
+        let worker = ControllerProcess::spawn(command, ProcessOptions::default())?;
+        worker.register_all(&mut registry)?;
+        Some(worker)
+    } else {
+        None
+    };
     let parse = ParseOptions {
         source: Some(physical_path.clone()),
+        controllers: registry.names(),
         ..Default::default()
     };
     let physical = parse_circuit(&std::fs::read_to_string(physical_path)?, &parse)?;
@@ -38,18 +90,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let modules = spec.load_modules(&physical, &parse)?;
     let start = std::time::Instant::now();
-    let evaluator = TaskEvaluator::new(
-        &physical,
-        &modules,
-        &ControllerRegistry::default(),
-        EvaluationOptions::default(),
-    )?;
+    let evaluator =
+        TaskEvaluator::new(&physical, &modules, &registry, EvaluationOptions::default())?;
     let compile_ms = start.elapsed().as_secs_f64() * 1000.;
     let query = std::time::Instant::now();
-    let draw = evaluator.sample_prescribed(&[], &mut SplitMix64::new(seed))?;
+    let draw = evaluator.sample_prescribed(
+        &[],
+        &mut Entropy {
+            random: SplitMix64::new(seed),
+            fixed,
+        },
+    )?;
     println!(
         "{}",
-        serde_json::json!({"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
     );
     Ok(())
 }
