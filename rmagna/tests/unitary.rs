@@ -1082,3 +1082,244 @@ fn prepared_probability_plans_match_literal_faulted_noncommuting_circuits() {
         ExactScalar::zero()
     );
 }
+
+#[test]
+fn shared_commuting_layers_preserve_internal_fault_signs_and_prepared_queries() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::S { qubit: 1, turns: 1 }),
+        G::Clifford(C::H(1)),
+        G::T { qubit: 1, turns: 3 },
+        G::Clifford(C::X(0)),
+        G::T { qubit: 0, turns: 5 },
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 1,
+        },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::T { qubit: 2, turns: 7 },
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(2)),
+        G::T { qubit: 2, turns: 3 },
+    ];
+    let circuit = UnitaryCircuit::new(3, gates).unwrap();
+    let base = circuit
+        .compile_with_strategy(&bits(3, 1), &a, CompilerStrategy::SharedCommutingLayer)
+        .unwrap();
+    let old = circuit.compile(&bits(3, 1), &a).unwrap();
+    let diagnostics = base.compilation();
+    assert_eq!(diagnostics.strategy, CompilerStrategy::SharedCommutingLayer);
+    assert_eq!(diagnostics.reference_layer, Some(0));
+    assert_eq!(diagnostics.shared_phase_coordinates, 3);
+    assert!(base.phase_legs() < old.phase_legs());
+    assert_eq!(diagnostics.coherent_width, 3 + base.phase_legs());
+    let rows = [bits(3, 3)];
+    let prepared = base.prepare_probability(&rows, &a).unwrap();
+    for position in 0..=gates.len() {
+        for mask in 0..64 {
+            let fault = PauliInsertion {
+                before_gate: position,
+                word: PauliWord::new(
+                    bits(3, mask & 7),
+                    bits(3, mask >> 3),
+                    ((mask + position) & 7) as u8,
+                )
+                .unwrap(),
+            };
+            let state = base
+                .with_insertions(std::slice::from_ref(&fault), &a)
+                .unwrap();
+            let expected = dense_inserted(&gates, 3, 1, std::slice::from_ref(&fault), &a);
+            for (x, amplitude) in expected.iter().enumerate() {
+                assert_eq!(
+                    &state.amplitude(&bits(3, x), 256, &a).unwrap().value,
+                    amplitude,
+                    "position={position}, mask={mask}, output={x}"
+                );
+            }
+            let mut event = ExactScalar::zero();
+            for (x, amplitude) in expected.iter().enumerate() {
+                if (x & 3).count_ones() & 1 == 0 {
+                    event = a.add(&event, &a.norm_squared(amplitude).unwrap()).unwrap();
+                }
+            }
+            assert_eq!(
+                prepared
+                    .evaluate(&state, &bits(1, 0), 256, &a)
+                    .unwrap()
+                    .value,
+                event
+            );
+            if mask == 17 {
+                let restored = state.with_insertions(&[], &a).unwrap();
+                assert_eq!(
+                    restored.overlap(&base, 256, &a).unwrap().value,
+                    ExactScalar::one()
+                );
+            }
+        }
+    }
+    let mut rng = 0x518ebfe;
+    for _ in 0..48 {
+        let faults = (0..4)
+            .map(|_| PauliInsertion {
+                before_gate: next(&mut rng) % (gates.len() + 1),
+                word: PauliWord::new(
+                    bits(3, next(&mut rng)),
+                    bits(3, next(&mut rng)),
+                    (next(&mut rng) & 7) as u8,
+                )
+                .unwrap(),
+            })
+            .collect::<Vec<_>>();
+        let state = base.with_insertions(&faults, &a).unwrap();
+        let expected = dense_inserted(&gates, 3, 1, &faults, &a);
+        for (x, expected) in expected.iter().enumerate() {
+            assert_eq!(
+                &state.amplitude(&bits(3, x), 256, &a).unwrap().value,
+                expected
+            );
+        }
+        let alternate = state.prepare_probability(&rows, &a).unwrap();
+        assert_eq!(
+            alternate
+                .evaluate(&base, &bits(1, 0), 256, &a)
+                .unwrap()
+                .value,
+            prepared
+                .evaluate(&base, &bits(1, 0), 256, &a)
+                .unwrap()
+                .value
+        );
+    }
+}
+
+#[test]
+fn shared_layer_ties_and_noncommuting_random_circuits_match_literal_matrices() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let tied = UnitaryCircuit::new(
+        1,
+        [
+            G::T { qubit: 0, turns: 1 },
+            G::Clifford(C::H(0)),
+            G::T { qubit: 0, turns: 1 },
+            G::Clifford(C::H(0)),
+            G::T { qubit: 0, turns: 1 },
+        ],
+    )
+    .unwrap()
+    .compile_with_strategy(&bits(1, 0), &a, CompilerStrategy::SharedCommutingLayer)
+    .unwrap();
+    assert_eq!(tied.compilation().layer_slots, [1, 1, 1]);
+    assert_eq!(tied.compilation().reference_layer, Some(0));
+    let mut rng = 0x72ab184ed;
+    for width in 1..=4 {
+        for _ in 0..24 {
+            let mut gates = Vec::new();
+            for layer in 0..4 {
+                let q = next(&mut rng) % width;
+                gates.push(G::Clifford(C::H(q)));
+                gates.push(G::Clifford(C::S {
+                    qubit: q,
+                    turns: (next(&mut rng) & 3) as u8,
+                }));
+                gates.push(G::T {
+                    qubit: q,
+                    turns: (next(&mut rng) & 7) as u8,
+                });
+                if width > 1 {
+                    let r = (q + 1 + next(&mut rng) % (width - 1)) % width;
+                    gates.push(G::Cs {
+                        a: q,
+                        b: r,
+                        turns: (next(&mut rng) & 3) as u8,
+                    });
+                    gates.push(G::Clifford(match layer % 3 {
+                        0 => C::Cx {
+                            control: q,
+                            target: r,
+                        },
+                        1 => C::Cz { a: q, b: r },
+                        _ => C::Swap { a: q, b: r },
+                    }));
+                }
+                if width > 2 && layer == 1 {
+                    gates.push(G::Ccz { a: 0, b: 1, c: 2 });
+                }
+            }
+            let input = next(&mut rng) % (1 << width);
+            let circuit = UnitaryCircuit::new(width, gates.clone()).unwrap();
+            let compiled = circuit
+                .compile_with_strategy(
+                    &bits(width, input),
+                    &a,
+                    CompilerStrategy::SharedCommutingLayer,
+                )
+                .unwrap();
+            let expected = dense(&gates, width, input, &a);
+            for (x, value) in expected.iter().enumerate() {
+                assert_eq!(
+                    &compiled.amplitude(&bits(width, x), 4096, &a).unwrap().value,
+                    value
+                );
+            }
+            assert_eq!(
+                compiled
+                    .probability_z(&[], &bits(0, 0), 4096, &a)
+                    .unwrap()
+                    .value,
+                ExactScalar::one()
+            );
+        }
+    }
+    let split_gates = [
+        G::T { qubit: 2, turns: 1 },
+        G::Clifford(C::H(2)),
+        G::Ccz { a: 0, b: 1, c: 2 },
+    ];
+    let split = UnitaryCircuit::new(3, split_gates).unwrap();
+    for input in 0..8 {
+        let compiled = split
+            .compile_with_strategy(&bits(3, input), &a, CompilerStrategy::SharedCommutingLayer)
+            .unwrap();
+        assert_eq!(compiled.compilation().layer_slots, [3, 5]);
+        assert_eq!(compiled.compilation().reference_layer, Some(1));
+        for position in 0..=split_gates.len() {
+            let fault = PauliInsertion {
+                before_gate: position,
+                word: PauliWord::new(bits(3, 7), bits(3, 3), 2).unwrap(),
+            };
+            let state = compiled
+                .with_insertions(std::slice::from_ref(&fault), &a)
+                .unwrap();
+            let expected = dense_inserted(&split_gates, 3, input, std::slice::from_ref(&fault), &a);
+            for (x, expected) in expected.iter().enumerate() {
+                assert_eq!(
+                    &state.amplitude(&bits(3, x), 256, &a).unwrap().value,
+                    expected
+                );
+            }
+        }
+    }
+    let empty = UnitaryCircuit::new(0, [])
+        .unwrap()
+        .compile_with_strategy(&bits(0, 0), &a, CompilerStrategy::SharedCommutingLayer)
+        .unwrap();
+    assert_eq!(empty.compilation().reference_layer, None);
+    assert_eq!(
+        empty.compilation().strategy,
+        CompilerStrategy::SharedCommutingLayer
+    );
+    assert_eq!(
+        empty.amplitude(&bits(0, 0), 1, &a).unwrap().value,
+        ExactScalar::one()
+    );
+}

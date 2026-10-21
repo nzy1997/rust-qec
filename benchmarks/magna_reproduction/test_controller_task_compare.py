@@ -59,6 +59,25 @@ class ControllerComparisonTests(unittest.TestCase):
         self.assertEqual(row["status"], "mismatch")
         self.assertEqual(row["rust"], wrong)
 
+    def test_compiler_strategy_is_verified_without_losing_malformed_history_evidence(self):
+        for compiler, strategy in [("shared", "SharedCommutingLayer"), ("parity_copies", "ParityCopies")]:
+            for compilation in [None, [], {}, {"strategy": "wrong"}, {"strategy": strategy}]:
+                with self.subTest(compiler=compiler, compilation=compilation):
+                    actual = valid()
+                    actual["compilation"] = compilation
+                    payload = json.dumps(actual)
+                    row = driver.compare_result(subprocess.CompletedProcess([], 0, payload, "diagnostic"),
+                                                expected(), 0, 16, False, compiler=compiler)
+                    if compilation == {"strategy": strategy}:
+                        self.assertEqual(row["status"], "matched")
+                        self.assertEqual(row["rust"], actual)
+                    else:
+                        self.assertEqual(row["status"], "failed")
+                        self.assertEqual(row["stdout"], payload)
+                        self.assertEqual(row["stderr"], "diagnostic")
+                        self.assertEqual(row["reference"], expected())
+                        self.assertIn("compiler strategy", row["error"])
+
     def test_malformed_first_or_second_history_keeps_both_cases_and_task_provenance(self):
         # Stub only the native boundary to keep this failure-control test offline.
         # The real native differential pilot separately verifies quantum values.
@@ -94,7 +113,7 @@ class ControllerComparisonTests(unittest.TestCase):
             (task / "task").write_text("{}")
             binary = root / "binary"
             binary.write_text("unchanged offline identity")
-            args = Namespace(upstream=root, one="dk", timeout=1)
+            args = Namespace(upstream=root, one="dk", timeout=1, compiler=None)
             for broken in [0, 1]:
                 calls = []
                 def rust(command, **kwargs):

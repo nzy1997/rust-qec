@@ -278,10 +278,11 @@ assert_eq!(probability.value, arithmetic.norm_squared(&amplitude.value)?);
 
 Each query takes an explicit computational-term budget and returns its scalar,
 quotient dimension and term count. Inconsistent or zero boundaries return zero
-with no terms. This initial unitary compiler reuses the Clifford ket, but
-constructs a phase resource for each query; global commuting-layer selection
-and cross-fault resource reuse remain later deliverables. The runtime below
-adds a separate causal controller route.
+with no terms. The default `ParityCopies` route reuses the Clifford ket and
+constructs a phase resource for each query. The explicit
+[shared commuting-layer strategy](#explicit-shared-commuting-layer-compilation)
+selects shared observations; cross-fault resource reuse remains separate work.
+The runtime below adds a separate causal controller route.
 The instrument layer below adds resets, measurements and prescribed noise. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
@@ -1238,5 +1239,50 @@ The unitary compiler stores its frozen observations as an immutable general
 linear parity observations in leg order and conjugate both constants and
 coefficients for bra copies. Existing compilation still creates individual
 copies; the representation can now express shared observations without changing
-amplitude, probability, overlap, density or Pauli-moment semantics. Layer
-selection and its fault-dependent phase corrections are separate compiler work.
+amplitude, probability, overlap, density or Pauli-moment semantics. The explicit layer
+compiler below supplies layer selection and fault-dependent phase corrections.
+
+
+## Explicit shared commuting-layer compilation
+
+`UnitaryCircuit::compile_with_strategy(..., CompilerStrategy::SharedCommutingLayer)`
+transports rotation axes through Clifford prefixes with their exact Pauli signs,
+partitions consecutive mutually commuting slots, and keeps the largest group
+(the earliest wins a tie). T contributes one slot, controlled-S three, and CCZ
+seven; Clifford special cases are lowered directly. The selected group copies
+an independent commuting Pauli basis once, while other slots use individual
+parity-copy observations. General Pauli observations are copied coherently.
+
+Original gate boundaries and same-position fault ordering remain available.
+Faults after the shared snapshot also update the later selected rotation signs
+and constant phases. Each insertion assignment starts from immutable reference
+metadata, including when replacing a perturbed view. Prepared probability plans
+use the queried view's current phase rather than freezing its original signs.
+
+`CompileOptions::compiler_strategy` selects this compiler for instruments and
+targets; the Rust default remains `ParityCopies` during validation.
+`evaluate_task --compiler shared` selects it explicitly. `compilation()` reports
+slot groups, the selected group, outside-group `phase_ancillas`, shared coordinate
+storage, actual coherent width, Clifford gate count and path variables. Shared
+coordinates use real frozen wires in this representation, so the reported width
+includes them. `CausalProgram::compilation()` and `TaskEvaluator::compilation()`
+return initialization metadata. Diagnostic JSON labels its `compilation.scope`
+as `linear_instrument`, `initial_fixed_template` or `initial_potential`. In
+`ColdPrefix`, the initial potential network substitutes false for unresolved
+controller decisions; later resolved instruments can have different slot groups,
+widths and path counts. Those initial counts do not describe final draw geometry.
+This first version chooses an independent Pauli basis on the full
+space; fixed-input relations can reduce the shared coordinates further.
+It still prepares final scalar closures per query and claims no timing parity.
+
+The differential task drivers accept `--compiler shared` or `--compiler parity_copies`,
+verify the selected strategy and term budget in the Rust response, and retain the
+choice in their receipt. Controller tasks use explicit native histories. The
+affine driver leaves those tasks to the controller driver rather than treating
+missing history execution as an affine success.
+
+Tests compare random noncommuting circuits and every single-Pauli mask at every
+original gate boundary with direct literal matrices, plus multi-fault replacement,
+negative/dependent axes, complex phases, prepared queries and a CCZ split across
+two groups. Both compilers match all 28 prescribed native instrument witnesses,
+and both causal strategies retain unbiased affine-history estimates.

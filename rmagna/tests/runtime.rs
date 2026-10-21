@@ -762,3 +762,45 @@ fn seeded_fixed_and_cold_histories_preserve_entropy_and_full_physical_draws() {
         assert!(second.network_compilations() > 0);
     }
 }
+
+#[test]
+fn cold_compilation_metadata_describes_the_initial_potential_instrument() {
+    use rmagna::runtime::CausalStrategy;
+    use rmagna::unitary::CompilerStrategy;
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("one", "1", |_: &[bool]| Ok(vec![true]))
+        .unwrap();
+    let circuit = parse_circuit(
+        "T 0\nCONTROL[one] -> ctrl[0]\nCH ctrl[0] 0\nT 0",
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let arithmetic = ScalarArithmetic::default();
+    let program = CausalProgram::new(
+        &circuit,
+        &registry,
+        RuntimeOptions {
+            strategy: CausalStrategy::ColdPrefix,
+            compile: CompileOptions {
+                compiler_strategy: CompilerStrategy::SharedCommutingLayer,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        &arithmetic,
+    )
+    .unwrap();
+    let history = program
+        .resolve_prescribed_history(&[], &[], &[vec![]], &arithmetic)
+        .unwrap();
+    assert_eq!(program.compilation().coherent_width, 2);
+    assert_eq!(program.compilation().layer_slots, [2]);
+    assert_eq!(program.compilation().path_variables, 0);
+    assert_eq!(history.instrument().compilation().coherent_width, 3);
+    assert_eq!(history.instrument().compilation().layer_slots, [1, 1]);
+    assert_eq!(history.instrument().compilation().path_variables, 1);
+}

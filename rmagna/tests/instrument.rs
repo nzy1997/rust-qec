@@ -272,116 +272,128 @@ fn prescribed_faults_match_native_instrument_masses_including_bh2() {
     );
     let vectors = data["vectors"].as_array().unwrap();
     assert_eq!(vectors.len(), 28);
-    let mut cache = std::collections::BTreeMap::new();
-    for (index, vector) in vectors.iter().enumerate() {
-        let name = vector["case"].as_str().unwrap();
-        let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
-            let (source, ideal) = if name == "bh2-T" {
-                (
-                    include_str!("data/magna-bh2/physical.magna"),
-                    include_str!("data/magna-bh2/ideal.magna"),
-                )
-            } else {
-                (
-                    vector["source"].as_str().unwrap(),
-                    vector["ideal"].as_str().unwrap(),
-                )
-            };
-            let parsed = circuit(source);
-            let protocol =
-                compile_affine(&parsed, &CompileOptions::default(), &arithmetic).unwrap();
-            (parsed, protocol, target(ideal, &arithmetic))
-        });
-        let parsed = &*parsed;
-        let mut faults = Vec::new();
-        for fault in vector["faults"].as_array().unwrap() {
-            let line = fault["line"].as_u64().unwrap() as usize;
-            let candidates = protocol
-                .noise_sites()
-                .iter()
-                .enumerate()
-                .flat_map(|(site, noise)| {
-                    noise.source_operations().iter().enumerate().filter_map(
-                        move |(alternative, &op)| {
-                            (parsed.operations()[op].location.line == line
-                                && matches!(
-                                    parsed.operations()[op].operation,
-                                    Operation::Noise { .. }
-                                ))
-                            .then_some(FaultSelection { site, alternative })
-                        },
+    for compiler_strategy in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let options = CompileOptions {
+            compiler_strategy,
+            ..Default::default()
+        };
+        let mut cache = std::collections::BTreeMap::new();
+        for (index, vector) in vectors.iter().enumerate() {
+            let name = vector["case"].as_str().unwrap();
+            let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
+                let (source, ideal) = if name == "bh2-T" {
+                    (
+                        include_str!("data/magna-bh2/physical.magna"),
+                        include_str!("data/magna-bh2/ideal.magna"),
                     )
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(
-                candidates.len(),
-                1,
-                "unambiguous source noise at line {line}"
-            );
-            faults.push(candidates[0]);
-        }
-        for record in vector["report_flips"].as_array().unwrap() {
-            let record = record.as_u64().unwrap() as usize;
-            let candidates = protocol
-                .noise_sites()
-                .iter()
-                .enumerate()
-                .filter_map(|(site, noise)| {
-                    noise
-                        .source_operations()
-                        .iter()
-                        .any(|&op| {
-                            matches!(parsed.operations()[op].operation,
-                    Operation::Measure { record: r, .. } if r == record)
-                        })
-                        .then_some(FaultSelection {
-                            site,
-                            alternative: 0,
-                        })
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(candidates.len(), 1);
-            faults.push(candidates[0]);
-        }
-        let outputs = vector["outputs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_u64().unwrap() as usize)
-            .collect::<Vec<_>>();
-        let masses = protocol
-            .masses(
-                &outputs,
-                ideal,
-                &faults,
-                if name == "bh2-T" { 1 } else { 256 },
-                &arithmetic,
-            )
-            .unwrap();
-        for (actual, key) in [
-            (&masses.accepted.value, "accepted"),
-            (&masses.target_success.value, "target_success"),
-            (&masses.error, "error"),
-        ] {
-            let expected = &vector[key];
-            let coefficients = std::array::from_fn(|i| {
-                expected["coefficients"][i]
-                    .as_str()
-                    .unwrap()
-                    .parse()
-                    .unwrap()
+                } else {
+                    (
+                        vector["source"].as_str().unwrap(),
+                        vector["ideal"].as_str().unwrap(),
+                    )
+                };
+                let parsed = circuit(source);
+                let protocol = compile_affine(&parsed, &options, &arithmetic).unwrap();
+                (
+                    parsed,
+                    protocol,
+                    compile_unitary(&circuit(ideal), &options, &arithmetic).unwrap(),
+                )
             });
-            assert_eq!(
-                actual,
-                &arithmetic
-                    .scalar(coefficients, expected["power"].as_i64().unwrap())
-                    .unwrap(),
-                "{name} vector {index} {key}"
-            );
-        }
-        if name == "bh2-T" && faults.is_empty() {
-            assert_eq!(masses.accepted.terms, 1);
-            assert_eq!(masses.target_success.terms, 1);
+            let parsed = &*parsed;
+            let mut faults = Vec::new();
+            for fault in vector["faults"].as_array().unwrap() {
+                let line = fault["line"].as_u64().unwrap() as usize;
+                let candidates = protocol
+                    .noise_sites()
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(site, noise)| {
+                        noise.source_operations().iter().enumerate().filter_map(
+                            move |(alternative, &op)| {
+                                (parsed.operations()[op].location.line == line
+                                    && matches!(
+                                        parsed.operations()[op].operation,
+                                        Operation::Noise { .. }
+                                    ))
+                                .then_some(FaultSelection { site, alternative })
+                            },
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    candidates.len(),
+                    1,
+                    "unambiguous source noise at line {line}"
+                );
+                faults.push(candidates[0]);
+            }
+            for record in vector["report_flips"].as_array().unwrap() {
+                let record = record.as_u64().unwrap() as usize;
+                let candidates = protocol
+                    .noise_sites()
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(site, noise)| {
+                        noise
+                            .source_operations()
+                            .iter()
+                            .any(|&op| {
+                                matches!(parsed.operations()[op].operation,
+                    Operation::Measure { record: r, .. } if r == record)
+                            })
+                            .then_some(FaultSelection {
+                                site,
+                                alternative: 0,
+                            })
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(candidates.len(), 1);
+                faults.push(candidates[0]);
+            }
+            let outputs = vector["outputs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect::<Vec<_>>();
+            let masses = protocol
+                .masses(
+                    &outputs,
+                    ideal,
+                    &faults,
+                    if name == "bh2-T" { 1 } else { 256 },
+                    &arithmetic,
+                )
+                .unwrap();
+            for (actual, key) in [
+                (&masses.accepted.value, "accepted"),
+                (&masses.target_success.value, "target_success"),
+                (&masses.error, "error"),
+            ] {
+                let expected = &vector[key];
+                let coefficients = std::array::from_fn(|i| {
+                    expected["coefficients"][i]
+                        .as_str()
+                        .unwrap()
+                        .parse()
+                        .unwrap()
+                });
+                assert_eq!(
+                    actual,
+                    &arithmetic
+                        .scalar(coefficients, expected["power"].as_i64().unwrap())
+                        .unwrap(),
+                    "{name} vector {index} {key}"
+                );
+            }
+            if name == "bh2-T" && faults.is_empty() {
+                assert_eq!(masses.accepted.terms, 1);
+                assert_eq!(masses.target_success.terms, 1);
+            }
         }
     }
 }

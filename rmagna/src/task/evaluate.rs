@@ -185,6 +185,15 @@ impl TaskEvaluator {
             options,
         })
     }
+    /// Initial compilation diagnostics. Linear tasks expose their single
+    /// instrument; causal tasks expose the initial template or potential network
+    /// described by `CausalProgram::compilation`, not final cold-branch geometry.
+    pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
+        match &self.execution {
+            Execution::Linear { instrument, .. } => instrument.compilation(),
+            Execution::Causal(program) => program.compilation(),
+        }
+    }
     pub fn sampled_history(&self) -> bool {
         matches!(self.execution, Execution::Causal(_))
     }

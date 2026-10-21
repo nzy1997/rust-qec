@@ -749,10 +749,28 @@ fn affine_causal_feedback_and_guarded_noise_are_unbiased_over_all_histories() {
     let expected_error = f
         .multiply(&f.from_scalar(&p1).unwrap(), &rational(1, 3))
         .unwrap();
-    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+    for (strategy, compiler_strategy) in [
+        (
+            CausalStrategy::FixedTemplate,
+            rmagna::unitary::CompilerStrategy::ParityCopies,
+        ),
+        (
+            CausalStrategy::ColdPrefix,
+            rmagna::unitary::CompilerStrategy::ParityCopies,
+        ),
+        (
+            CausalStrategy::FixedTemplate,
+            rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+        ),
+        (
+            CausalStrategy::ColdPrefix,
+            rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+        ),
+    ] {
         let mut options = EvaluationOptions::default();
         options.runtime.history_sampler = HistorySampler::AffineSupport;
         options.runtime.strategy = strategy;
+        options.runtime.compile.compiler_strategy = compiler_strategy;
         let program = evaluator_options(
             &files,
             source,

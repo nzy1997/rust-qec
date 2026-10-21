@@ -1,5 +1,7 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod shared;
+
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
@@ -93,6 +95,25 @@ impl From<PauliError> for UnitaryError {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CompilerStrategy {
+    #[default]
+    ParityCopies,
+    SharedCommutingLayer,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompilationDiagnostics {
+    pub strategy: CompilerStrategy,
+    pub layer_slots: Vec<usize>,
+    pub reference_layer: Option<usize>,
+    pub reference_layer_slots: usize,
+    pub phase_ancillas: usize,
+    pub shared_phase_coordinates: usize,
+    pub coherent_width: usize,
+    pub clifford_gates: usize,
+    pub path_variables: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnitaryGate {
     Clifford(CliffordGate),
@@ -149,6 +170,18 @@ impl UnitaryCircuit {
     }
     pub fn gates(&self) -> &[UnitaryGate] {
         &self.gates
+    }
+
+    pub fn compile_with_strategy(
+        &self,
+        input: &BitVector,
+        arithmetic: &ScalarArithmetic,
+        strategy: CompilerStrategy,
+    ) -> Result<CompiledUnitary, UnitaryError> {
+        match strategy {
+            CompilerStrategy::ParityCopies => self.compile(input, arithmetic),
+            CompilerStrategy::SharedCommutingLayer => shared::compile(self, input, arithmetic),
+        }
     }
 
     /// Copy each diagonal parity to a fresh |0> ancilla using CNOTs. Its phase
@@ -214,24 +247,39 @@ impl UnitaryCircuit {
                 .evolve(&initial, arithmetic)?
                 .expect("unitary Clifford gates preserve a nonzero basis input"),
         );
+        let phase = Arc::new(ParityPhase::new(
+            coefficients.len(),
+            0,
+            coefficients
+                .into_iter()
+                .enumerate()
+                .map(|(j, c)| Ok((BitVector::from_indices(width - self.width, [j])?, c)))
+                .collect::<Result<Vec<_>, Gf2Error>>()?,
+        )?);
+        let compilation = Arc::new(CompilationDiagnostics {
+            strategy: CompilerStrategy::ParityCopies,
+            layer_slots: vec![],
+            reference_layer: None,
+            reference_layer_slots: 0,
+            phase_ancillas: phase.num_variables(),
+            shared_phase_coordinates: 0,
+            coherent_width: width,
+            clifford_gates: circuit.gates().len(),
+            path_variables: boundary.columns().len(),
+        });
         let program = Arc::new(InsertionProgram {
             reference: Arc::clone(&boundary),
+            reference_phase: Arc::clone(&phase),
+            shared: None,
             circuit,
             positions,
         });
         Ok(CompiledUnitary {
             physical_width: self.width,
             boundary,
-            phase: Arc::new(ParityPhase::new(
-                coefficients.len(),
-                0,
-                coefficients
-                    .into_iter()
-                    .enumerate()
-                    .map(|(j, c)| Ok((BitVector::from_indices(width - self.width, [j])?, c)))
-                    .collect::<Result<Vec<_>, Gf2Error>>()?,
-            )?),
+            phase,
             program,
+            compilation,
         })
     }
 }
@@ -267,16 +315,19 @@ pub struct NetworkValue {
 
 /// The Clifford circuit is built once. Queries close the requested boundaries
 /// before restricting the phase and constructing its computational quotient.
-/// This initial compiler does not select commuting layers or reuse a prepared
-/// resource between distinct queries.
+/// The selected compiler strategy determines the frozen observations. Final
+/// phase resources are still prepared separately for distinct queries.
 pub struct CompiledUnitary {
     physical_width: usize,
     boundary: Arc<AffineKet>,
     phase: Arc<ParityPhase>,
     program: Arc<InsertionProgram>,
+    compilation: Arc<CompilationDiagnostics>,
 }
 struct InsertionProgram {
     reference: Arc<AffineKet>,
+    reference_phase: Arc<ParityPhase>,
+    shared: Option<shared::PhaseUpdates>,
     circuit: CliffordCircuit,
     positions: Vec<usize>,
 }
@@ -305,7 +356,6 @@ pub struct PreparedProbability {
     event_count: usize,
     projection: PreparedZProjection,
     legs: [Vec<usize>; 2],
-    phase: Arc<ParityPhase>,
 }
 
 impl PreparedProbability {
@@ -332,7 +382,7 @@ impl PreparedProbability {
         close(
             self.projection.project(&joint, &rhs)?,
             &self.legs,
-            &[(&self.phase, false), (&self.phase, true)],
+            &[(&state.phase, false), (&state.phase, true)],
             max_terms,
             arithmetic,
         )
@@ -342,6 +392,9 @@ impl PreparedProbability {
 impl CompiledUnitary {
     pub fn width(&self) -> usize {
         self.physical_width
+    }
+    pub fn compilation(&self) -> &CompilationDiagnostics {
+        &self.compilation
     }
     pub fn phase_legs(&self) -> usize {
         self.phase.num_variables()
@@ -409,7 +462,6 @@ impl CompiledUnitary {
                 (self.width()..half).collect(),
                 (half + self.width()..total).collect(),
             ],
-            phase: Arc::clone(&self.phase),
         })
     }
 
@@ -461,10 +513,16 @@ impl CompiledUnitary {
             }
         }
         let boundary = Arc::new(frame.apply(&self.program.reference, arithmetic)?);
+        let phase = if let Some(updates) = &self.program.shared {
+            Arc::new(updates.phase(&grouped)?)
+        } else {
+            Arc::clone(&self.program.reference_phase)
+        };
         Ok(Self {
             physical_width: self.physical_width,
             boundary,
-            phase: Arc::clone(&self.phase),
+            phase,
+            compilation: Arc::clone(&self.compilation),
             program: Arc::clone(&self.program),
         })
     }
