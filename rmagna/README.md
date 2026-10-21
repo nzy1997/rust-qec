@@ -595,8 +595,9 @@ As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
 This is the cold exact-marginal route for affine instruments. The runtime below
-adds external callbacks and guarded noise; the affine-support proposal and
-cached query preparation remain separate deliverables. Tests check exact binary boundaries and refinement,
+adds external callbacks and guarded noise. Runtime integration of affine-support
+proposals and cached query preparation remains subsequent work. Tests check
+exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
 
@@ -1138,5 +1139,49 @@ let rows = [BitVector::from_indices(2, [0])?];
 let plan = circuit.prepare_probability(&rows, &arithmetic)?;
 assert_eq!(plan.evaluate(&circuit, &BitVector::zeros(1)?, 1, &arithmetic)?.value,
     arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## Conservative affine record proposals
+
+`gf2::AffineSupport` represents a nonempty affine binary set with independent
+columns. `linear_image`, `condition` and `translated` preserve the exact set;
+conditioning returns `None` for an empty intersection. It carries no quantum
+phase or physical probability.
+
+`CompiledUnitary::structural_z_support` projects the coherent Clifford boundary's
+computational support. Deferred phases can remove labels through interference,
+but cannot create labels outside this family. `CompiledInstrument::reported_support`
+includes prescribed faults, report flips, duplicate parities and inversions, and
+excludes postselection.
+
+`records::propose_affine_reported` conditions that family on the given reported
+values and proposes the requested group uniformly. It returns the proposal's
+exact dyadic mass and entropy count, without querying physical probabilities.
+A physical interference zero is a valid proposal; its eventual weighted
+contribution is zero. The family can be larger than the physical support or a
+more tightly reduced proposal, so its variance must be measured separately.
+This primitive does not yet select the causal runtime's history sampler.
+
+Each random word supplies up to 64 independent directions, low bit first.
+Deterministic groups use no entropy. Invalid records, faults, structural
+conditions and entropy budgets fail before drawing. `max_terms` does not apply
+to this algebraic proposal; the caller's later physical contractions still use
+their explicit phase-resource budgets.
+
+```rust
+use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+use rmagna::instrument::{CompileOptions, compile_affine};
+use rmagna::noise::SplitMix64;
+use rmagna::records::{RecordQuery, SamplingOptions, propose_affine_reported};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let circuit = parse_circuit("H 0\nT 0\nH 0\nM 0", &ParseOptions::default())?;
+let instrument = compile_affine(&circuit, &CompileOptions::default(), &arithmetic)?;
+let parities = [BitExpr::atom(BitAtom::Record(0))];
+let draw = propose_affine_reported(&instrument,
+    &RecordQuery { given: &[], parities: &parities }, &[],
+    &mut SplitMix64::new(7), &SamplingOptions::default(), &arithmetic)?;
+assert_eq!(draw.proposal_mass, arithmetic.omega(0, -2)?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```

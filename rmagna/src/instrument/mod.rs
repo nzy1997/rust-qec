@@ -3,7 +3,7 @@
 mod gates;
 mod lower;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
-use crate::gf2::{BitVector, Gf2Error};
+use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
 use crate::probability::{Probability, ProbabilityError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
@@ -481,6 +481,31 @@ impl CompiledInstrument {
             target_success,
             error,
         })
+    }
+
+    /// Conservative support for reported parities, including their inversions
+    /// and declared faults, and excluding every postselection predicate.
+    pub fn reported_support(
+        &self,
+        parities: &[BitExpr],
+        faults: &[FaultSelection],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<AffineSupport, InstrumentError> {
+        let rows = parities
+            .iter()
+            .map(|p| self.parity_row(p))
+            .collect::<Result<Vec<_>, _>>()?;
+        let constants = BitVector::from_indices(
+            parities.len(),
+            parities
+                .iter()
+                .enumerate()
+                .filter_map(|(j, p)| p.constant.then_some(j)),
+        )?;
+        Ok(self
+            .inserted(faults, arithmetic)?
+            .structural_z_support(&rows)?
+            .translated(&constants)?)
     }
 
     /// Query physical reported-record marginals, without applying postselection.

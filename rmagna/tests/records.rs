@@ -305,3 +305,249 @@ fn conditioned_sampling_keeps_prior_inputs_and_rejects_impossible_histories() {
         Err(SamplingError::ImpossibleCondition)
     );
 }
+
+#[test]
+fn affine_group_proposals_preserve_report_correlations_and_ignore_selection() {
+    use rmagna::records::{RecordQuery, propose_affine_reported};
+    let a = ScalarArithmetic::default();
+    let source = parse_circuit(
+        "H 0\nCX 0 1\nM 0\nM(1/3) 1\nDETECTOR rec[-1]\nPOSTSELECT det[0]",
+        &ParseOptions::default(),
+    )
+    .unwrap();
+    let protocol = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+    let r0 = BitExpr::atom(BitAtom::Record(0));
+    let r1 = BitExpr::atom(BitAtom::Record(1));
+    let mut xor = r0.clone();
+    xor.xor_assign(&r1);
+    let mut inverted = r0.clone();
+    inverted.constant = true;
+    let parities = [r0.clone(), r1, xor, r0.clone(), inverted];
+    for flipped in [false, true] {
+        let faults = if flipped {
+            vec![FaultSelection {
+                site: 1,
+                alternative: 0,
+            }]
+        } else {
+            vec![]
+        };
+        for (word, bit) in [(0, false), (1, true)] {
+            let mut random = Words::new(vec![word]);
+            let draw = propose_affine_reported(
+                &protocol,
+                &RecordQuery {
+                    given: &[],
+                    parities: &parities,
+                },
+                &faults,
+                &mut random,
+                &SamplingOptions {
+                    max_terms: 0,
+                    ..Default::default()
+                },
+                &a,
+            )
+            .unwrap();
+            assert_eq!(draw.values, [bit, bit ^ flipped, flipped, bit, !bit]);
+            assert_eq!(draw.proposal_mass, a.omega(0, -2).unwrap());
+            assert_eq!(draw.entropy_words, 1);
+            assert_eq!(random.at, 1);
+            let given = [(r0.clone(), bit)];
+            let conditional = propose_affine_reported(
+                &protocol,
+                &RecordQuery {
+                    given: &given,
+                    parities: &parities,
+                },
+                &faults,
+                &mut Words::new(vec![]),
+                &SamplingOptions::default(),
+                &a,
+            )
+            .unwrap();
+            assert_eq!(conditional.values, draw.values);
+            assert_eq!(conditional.proposal_mass, ExactScalar::one());
+            assert_eq!(conditional.entropy_words, 0);
+        }
+    }
+    let impossible = [(r0.clone(), false), (r0, true)];
+    assert!(matches!(
+        propose_affine_reported(
+            &protocol,
+            &RecordQuery {
+                given: &impossible,
+                parities: &parities
+            },
+            &[],
+            &mut Words::new(vec![]),
+            &SamplingOptions::default(),
+            &a
+        ),
+        Err(SamplingError::ImpossibleSupport)
+    ));
+}
+
+#[test]
+fn affine_proposals_reweight_irrational_histories_and_retain_interference_zeros() {
+    use rmagna::records::{RecordQuery, propose_affine_reported};
+    let a = ScalarArithmetic::default();
+    let parity = [BitExpr::atom(BitAtom::Record(0))];
+    for cancel in [false, true] {
+        let text = if cancel {
+            "H 0\nT 0\nT_DAG 0\nH 0\nM 0"
+        } else {
+            "H 0\nT 0\nH 0\nM 0"
+        };
+        let source = parse_circuit(text, &ParseOptions::default()).unwrap();
+        let protocol = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+        let mut weighted_mean = ExactScalar::zero();
+        let mut weights = ExactScalar::zero();
+        for word in 0..2 {
+            let draw = propose_affine_reported(
+                &protocol,
+                &RecordQuery {
+                    given: &[],
+                    parities: &parity,
+                },
+                &[],
+                &mut Words::new(vec![word]),
+                &SamplingOptions {
+                    max_terms: 0,
+                    ..Default::default()
+                },
+                &a,
+            )
+            .unwrap();
+            assert_eq!(draw.values, [word != 0]);
+            assert_eq!(draw.proposal_mass, a.omega(0, -2).unwrap());
+            let outcome = BitVector::from_indices(1, (word != 0).then_some(0)).unwrap();
+            let physical = protocol
+                .reported_probability(&parity, &outcome, &[], 256, &a)
+                .unwrap()
+                .value;
+            let expected = if cancel {
+                if word == 0 {
+                    ExactScalar::one()
+                } else {
+                    ExactScalar::zero()
+                }
+            } else if word == 0 {
+                a.scalar([2.into(), 1.into(), 0.into(), (-1).into()], -2)
+                    .unwrap()
+            } else {
+                a.scalar([2.into(), (-1).into(), 0.into(), 1.into()], -2)
+                    .unwrap()
+            };
+            assert_eq!(physical, expected);
+            let weight = a.multiply(&physical, &a.omega(0, 2).unwrap()).unwrap();
+            weights = a
+                .add(&weights, &a.multiply(&draw.proposal_mass, &weight).unwrap())
+                .unwrap();
+            if draw.values[0] {
+                weighted_mean = a
+                    .add(
+                        &weighted_mean,
+                        &a.multiply(&draw.proposal_mass, &weight).unwrap(),
+                    )
+                    .unwrap();
+            }
+        }
+        assert_eq!(weights, ExactScalar::one());
+        assert_eq!(
+            weighted_mean,
+            if cancel {
+                ExactScalar::zero()
+            } else {
+                a.scalar([2.into(), (-1).into(), 0.into(), 1.into()], -2)
+                    .unwrap()
+            }
+        );
+    }
+}
+
+#[test]
+fn affine_proposals_pack_wide_entropy_and_validate_before_drawing() {
+    use rmagna::records::{RecordQuery, propose_affine_reported};
+    let a = ScalarArithmetic::default();
+    let targets = (0..65).map(|j| j.to_string()).collect::<Vec<_>>().join(" ");
+    let source = parse_circuit(
+        &format!("H {targets}\nM {targets}"),
+        &ParseOptions::default(),
+    )
+    .unwrap();
+    let protocol = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+    let parities = (0..65)
+        .map(|j| BitExpr::atom(BitAtom::Record(j)))
+        .collect::<Vec<_>>();
+    let query = RecordQuery {
+        given: &[],
+        parities: &parities,
+    };
+    let draw = propose_affine_reported(
+        &protocol,
+        &query,
+        &[],
+        &mut Words::new(vec![1, 1]),
+        &SamplingOptions::default(),
+        &a,
+    )
+    .unwrap();
+    assert_eq!(
+        draw.values
+            .iter()
+            .enumerate()
+            .filter_map(|(j, &v)| v.then_some(j))
+            .collect::<Vec<_>>(),
+        [0, 64]
+    );
+    assert_eq!(draw.proposal_mass, a.omega(0, -130).unwrap());
+    assert_eq!(draw.entropy_words, 2);
+    assert!(matches!(
+        propose_affine_reported(
+            &protocol,
+            &query,
+            &[],
+            &mut Words::new(vec![]),
+            &SamplingOptions {
+                max_entropy_words: 1,
+                ..Default::default()
+            },
+            &a
+        ),
+        Err(SamplingError::EntropyLimit { limit: 1 })
+    ));
+    for invalid in [
+        BitExpr::atom(BitAtom::Record(65)),
+        BitExpr::atom(BitAtom::Decision { call: 0, bit: 0 }),
+    ] {
+        assert!(
+            propose_affine_reported(
+                &protocol,
+                &RecordQuery {
+                    given: &[],
+                    parities: &[invalid]
+                },
+                &[],
+                &mut Words::new(vec![]),
+                &SamplingOptions::default(),
+                &a
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        propose_affine_reported(
+            &protocol,
+            &query,
+            &[FaultSelection {
+                site: 0,
+                alternative: 999
+            }],
+            &mut Words::new(vec![]),
+            &SamplingOptions::default(),
+            &a
+        )
+        .is_err()
+    );
+}
