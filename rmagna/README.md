@@ -399,10 +399,10 @@ The comparison checks format, qubit/record/instruction/detector counts, external
 call count and history routing. Its receipt hashes each input and the Rust
 binary and verifies the pinned source/native binary before and after. It is a
 format/static-semantics check, not an end-to-end sampling benchmark. The
-instrument layer below executes affine circuits and pure targets; the task
-section documents schema models and module validation. Terminal recovery execution
-and complete task evaluation remain subsequent deliverables. The runtime below
-adds causal record sampling.
+instrument layer below executes affine circuits and pure targets. The task schema
+section documents models and module validation; [exact task evaluation](#exact-task-evaluation)
+executes loaded tasks with terminal recovery, normalized targets and output moments.
+The runtime section describes causal record sampling used by that task layer.
 
 ## Affine instruments and conditional target masses
 
@@ -625,8 +625,9 @@ Defaults additionally cap sampled history inputs at 1,000,000 and prefix compile
 at 100,000 per draw, with separate noise and history entropy budgets. This first
 causal implementation recompiles resolved prefixes and the final branch; it does
 not yet reuse prepared decision networks or implement the affine-support history
-proposal, causal importance proposals, terminal recovery, or task-file execution.
-It is a correctness baseline, not a paper-performance implementation.
+proposal or causal importance proposals. The [task evaluation layer](#exact-task-evaluation)
+composes terminal recovery and executes loaded schema-1 tasks using these histories.
+The current runtime is a correctness baseline without paper-performance claims.
 
 Tests enumerate majority histories, preserve repeated observations and atomic
 register updates, distinguish active and inactive guarded paths, verify correlated
@@ -691,7 +692,7 @@ This primitive supports target auxiliary wires, postselection and mixed reductio
 without a dense state or density matrix in production. The target normalization
 is a separate `target.probability_z(...)` query; normalization belongs to the field
 arithmetic layer above. A zero projected target has zero overlap at this level;
-the task layer must reject it before using it as an ideal state.
+`TaskEvaluator::new` rejects it before using it as an ideal state.
 Tests independently construct literal complex reduced density matrices, trace
 both environments, and compare all sixteen selected-output/event combinations,
 including empty and permuted outputs. Existing pure-target and partial-target
@@ -731,7 +732,7 @@ declarations without classical targets; declarations with references remain
 forbidden even when their expressions cancel to zero. Recovery modules require a
 target, can have their
 own local records and controllers, and forbid noise channels, nonzero report
-errors and postselection. Their outcomes will be averaged by the task evaluator.
+errors and postselection. Their outcomes are averaged during task evaluation.
 Loading modules never executes controllers or contracts a target normalization;
 zero-norm target rejection belongs to evaluation preparation.
 
@@ -746,7 +747,7 @@ All task fields retain their raw JSON shapes until typed validation. Numeric
 objects using serde_json's private number/raw-value tags cannot become indices,
 schema versions or projection bits when another dependency enables
 `arbitrary_precision`. Wide masks remain exact without enabling that global
-feature. `make test-magna-task-json` runs the same ten adversarial task tests
+feature. `make test-magna-task-json` runs the same eleven adversarial task tests
 under default, arbitrary-precision and float-roundtrip feature configurations;
 CI runs this target alongside the ordinary workspace tests.
 
