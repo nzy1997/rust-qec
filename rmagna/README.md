@@ -1040,8 +1040,10 @@ arbitrary-history coverage, complete TQD campaigns, or paper throughput.
 When a canonical ket has a fixed computational value on a Hadamard's wire, the
 new Fourier column is provably independent of the old support columns. Clifford
 evolution keeps that exact ket directly instead of factoring an empty hidden-path
-problem. Gates with a nonconstant input row still perform full contraction.
-Initial arbitrary affine inputs are contracted before this invariant is used.
+problem. For a nonconstant input row, packed row reduction identifies zero or
+one hidden direction, and the exact contraction kernel uses that proved basis
+without general equation provenance. Initial arbitrary affine inputs are
+contracted before this invariant is used.
 A wide exact Fourier-sign test checks complex coefficients, nonzero fixed bits,
 existing entangled support, four independent Hadamards and their adjoints.
 
@@ -1315,3 +1317,11 @@ prepared projections continue to reuse the same polar images.
 Coordinate lists are cached only for those sparse products; dense directions
 stay packed. A thread-local allocation counter checks sparse and dense pullbacks
 through 1,025 variables against a budget scaled to packed matrix storage.
+
+Hadamard evolution uses the independent-support invariant to find zero or one
+hidden direction after clearing its boundary row. A streaming row basis avoids
+general equation provenance. The known independent-column/nullspace basis feeds
+the same exact quadratic-elimination kernel used by general contraction; global
+phases and unnormalized scalars remain unchanged. Dependent input is still
+canonicalized once at circuit entry. This is a general linear-algebra optimization,
+with no circuit-family recognition or measured throughput claim.

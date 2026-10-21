@@ -164,19 +164,42 @@ impl AffineKet {
         if self.coefficient.is_zero() {
             return Ok(None);
         }
-        let prepared = self.prepare()?;
+        let rows = transpose_columns(self.width(), &self.columns)?;
+        let factor = LinearFactorization::new(self.columns.len(), &rows)?;
+        self.contract_with_basis(factor.pivot_columns(), &factor.nullspace()?, arithmetic)
+    }
+
+    /// Internal exact contraction when the caller has proved that `pivots`
+    /// select independent columns spanning the image and `kernel` spans the
+    /// nullspace. The combined unit/kernel basis must be invertible.
+    pub(crate) fn contract_with_basis(
+        &self,
+        pivots: &[usize],
+        kernel: &[BitVector],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<Self>, StabilizerError> {
+        if self.coefficient.is_zero() {
+            return Ok(None);
+        }
         let count = self.columns.len();
-        let mut basis = prepared
-            .factor
-            .pivot_columns()
+        if pivots.len().checked_add(kernel.len()) != Some(count)
+            || pivots.iter().any(|&j| j >= count)
+            || kernel.iter().any(|v| v.width() != count)
+        {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        if kernel.is_empty() {
+            let mut ket = self.clone();
+            ket.coefficient = arithmetic.multiply(&self.coefficient, &ExactScalar::one())?;
+            return Ok(Some(ket));
+        }
+        let mut basis = pivots
             .iter()
             .map(|&j| BitVector::from_indices(count, [j]))
             .collect::<Result<Vec<_>, _>>()?;
-        basis.extend(prepared.kernel);
+        basis.extend_from_slice(kernel);
         let phase = self.phase.restrict(&BitVector::zeros(count)?, &basis)?;
-        let mut columns = prepared
-            .factor
-            .pivot_columns()
+        let mut columns = pivots
             .iter()
             .map(|&j| self.columns[j].clone())
             .collect::<Vec<_>>();
