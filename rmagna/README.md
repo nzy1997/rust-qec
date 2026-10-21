@@ -62,9 +62,16 @@ pinned source before and after evaluating the fixed 300-bit operand set.
 
 `gf2::BitVector` has an explicit width and packed 64-bit words. It rejects
 out-of-range indices, inconsistent widths and nonzero padding. A
-`LinearFactorization` preserves row provenance, solves repeated right-hand
-sides, detects contradictory dependent equations and supplies a nullspace
-basis. There is no fixed physical-qubit or path-bit cap in these types.
+`LinearFactorization` solves repeated right-hand sides, detects contradictory
+dependent equations and supplies a nullspace basis. Ordinary systems retain
+dense row provenance. Tall systems (over 64 equations and over twice as many
+equations as variables) instead factor an independent subset of original rows
+and verify the solution against every original equation. This avoids a square
+provenance matrix in the number of boundary legs, while preserving the same
+zero-free-variable solution and nullspace. It adds no probability approximation
+or alternate quantum algorithm. There is no fixed physical-qubit or path-bit
+cap in these types. Stored matrices and arithmetic temporaries still require
+memory; this representation choice is not a process-memory cap.
 
 `quadratic::QuadraticForm` represents phases modulo four with strictly upper
 triangular cross terms. Affine restriction allows dependent basis vectors.
