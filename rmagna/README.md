@@ -800,12 +800,13 @@ have separate resource checks; per-query term, scalar, field, and history budget
 remain explicit errors.
 
 Build `cargo build --release -p rmagna --example evaluate_task`, then run
-`evaluate_task PHYSICAL TASK [SEED]` for one prescribed no-fault draw. This diagnostic
-example has no external controller bindings. Use
+`evaluate_task PHYSICAL TASK [SEED]` for one prescribed no-fault draw. The optional
+external bindings are described in the process-bridge section below. Use
 `benchmarks/magna_reproduction/affine_task_compare.py --upstream PINNED_SOURCE --rust-example BINARY --out NEW_JSON`
 to compare exact no-fault native numerators on all controller-free packaged tasks.
 The pilot matches 26 tasks and records the five tasks requiring external decoders
-as unsupported. It retains input and binary provenance and query resource counts.
+as unsupported by this controller-free comparison script. It retains input and
+binary provenance and query resource counts.
 It is neither a statistical experiment nor evidence for paper throughput.
 
 Tests cover mixed and irrationally normalized projected targets, zero-norm
@@ -828,8 +829,8 @@ cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
 ```
 
 The current evaluator uses physical exact-marginal histories and independent
-physical noise. External Python decoder bindings, importance proposal selection,
-affine-support histories, prepared circuit queries, aggregate statistics and the
+physical noise. Python decoder bindings are available through the bridge below.
+Importance proposal selection, affine-support histories, prepared circuit queries, aggregate statistics and the
 public run/result interface are separate deliverables.
 
 ## External decoder process bridge
