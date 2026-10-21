@@ -225,6 +225,8 @@ ket. No intermediate projection renormalizes the state.
 merged parity terms. It retains exact affine-shift constants and reversed
 coefficients; smaller term sets use direct dot products. This adds temporary
 matrix storage and does not cache phase decompositions across queries.
+An empty basis evaluates the shifted scalar directly, without a coordinate-sized
+transpose or mapped parity terms.
 
 These primitives build exact Clifford boundaries. The compilers below add
 unitary near-Clifford circuit lowering and affine instruments with reset,

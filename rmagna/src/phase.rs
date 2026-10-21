@@ -143,6 +143,9 @@ impl ParityPhase {
     /// Substitute `x = shift XOR sum_j basis[j]*y[j]`; dependence is allowed.
     pub fn restrict(&self, shift: &BitVector, basis: &[BitVector]) -> Result<Self, PhaseError> {
         self.check_vector(shift)?;
+        if basis.is_empty() {
+            return Self::new(0, self.evaluate(shift)?, []);
+        }
         for vector in basis {
             self.check_vector(vector)?;
         }
