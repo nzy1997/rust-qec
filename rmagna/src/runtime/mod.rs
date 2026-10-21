@@ -319,6 +319,9 @@ impl CausalProgram {
             options,
         })
     }
+    /// Initial reference diagnostics: the shared template in `FixedTemplate`,
+    /// or the potential instrument with unresolved decisions false in `ColdPrefix`.
+    /// A resolved cold branch can have different layers, width and path counts.
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         &self.compilation
     }

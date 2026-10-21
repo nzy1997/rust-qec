@@ -278,10 +278,11 @@ assert_eq!(probability.value, arithmetic.norm_squared(&amplitude.value)?);
 
 Each query takes an explicit computational-term budget and returns its scalar,
 quotient dimension and term count. Inconsistent or zero boundaries return zero
-with no terms. This initial unitary compiler reuses the Clifford ket, but
-constructs a phase resource for each query; global commuting-layer selection
-and cross-fault resource reuse remain later deliverables. The runtime below
-adds a separate causal controller route.
+with no terms. The default `ParityCopies` route reuses the Clifford ket and
+constructs a phase resource for each query. The explicit
+[shared commuting-layer strategy](#explicit-shared-commuting-layer-compilation)
+selects shared observations; cross-fault resource reuse remains separate work.
+The runtime below adds a separate causal controller route.
 The instrument layer below adds resets, measurements and prescribed noise. It does not claim the paper's reduced representation ranks or
 sampling performance. Tests compare noncommuting circuits, exact events and
 target overlaps against literal matrices, including an eight-qubit example
@@ -1264,7 +1265,13 @@ targets; the Rust default remains `ParityCopies` during validation.
 slot groups, the selected group, outside-group `phase_ancillas`, shared coordinate
 storage, actual coherent width, Clifford gate count and path variables. Shared
 coordinates use real frozen wires in this representation, so the reported width
-includes them. This first version chooses an independent Pauli basis on the full
+includes them. `CausalProgram::compilation()` and `TaskEvaluator::compilation()`
+return initialization metadata. Diagnostic JSON labels its `compilation.scope`
+as `linear_instrument`, `initial_fixed_template` or `initial_potential`. In
+`ColdPrefix`, the initial potential network substitutes false for unresolved
+controller decisions; later resolved instruments can have different slot groups,
+widths and path counts. Those initial counts do not describe final draw geometry.
+This first version chooses an independent Pauli basis on the full
 space; fixed-input relations can reduce the shared coordinates further.
 It still prepares final scalar closures per query and claims no timing parity.
 

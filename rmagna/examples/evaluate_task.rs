@@ -140,8 +140,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?
     };
+    let compilation_scope = if evaluator.sampled_history() {
+        match options.runtime.strategy {
+            rmagna::runtime::CausalStrategy::FixedTemplate => "initial_fixed_template",
+            rmagna::runtime::CausalStrategy::ColdPrefix => "initial_potential",
+        }
+    } else {
+        "linear_instrument"
+    };
     let d = evaluator.compilation();
-    let compilation = serde_json::json!({"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,
+    let compilation = serde_json::json!({"scope":compilation_scope,"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,
         "reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,
         "phase_ancillas":d.phase_ancillas,"shared_phase_coordinates":d.shared_phase_coordinates,
         "coherent_width":d.coherent_width,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables});

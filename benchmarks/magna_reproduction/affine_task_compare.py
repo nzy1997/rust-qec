@@ -8,6 +8,16 @@ import subprocess
 import sys
 
 
+def compare_affine_result(result, expected, max_terms, compiler):
+    """Share history-output admission and retain raw evidence on failure."""
+    from controller_task_compare import compare_result
+    case = compare_result(result, expected, None, max_terms, False, compiler=compiler)
+    case.pop("constant_word")
+    if case["status"] == "failed":
+        case["message"] = case["error"]
+    return case
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
@@ -45,22 +55,15 @@ def main():
                 command = [str(binary), str(physical), str(task), "--max-terms", str(max_terms)]
                 if args.compiler:
                     command += ["--compiler", args.compiler]
+                inputs = {p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
+                          for p in (physical, task, root / "run.json")}
                 rust = subprocess.run(command, text=True, capture_output=True, timeout=40)
                 if rust.returncode:
-                    rows.append(dict(task=name, status="failed", returncode=rust.returncode, stdout=rust.stdout, stderr=rust.stderr))
+                    rows.append(dict(task=name, status="failed", returncode=rust.returncode,
+                                     stdout=rust.stdout, stderr=rust.stderr, reference=expected, inputs=inputs))
                     continue
-                actual = json.loads(rust.stdout)
-                if actual.get("configuration", {}).get("max_terms") != max_terms:
-                    raise RuntimeError("Rust example did not apply the declared term budget")
-                if args.compiler:
-                    strategy = {"shared": "SharedCommutingLayer", "parity_copies": "ParityCopies"}[args.compiler]
-                    if actual.get("compilation", {}).get("strategy") != strategy:
-                        raise RuntimeError("Rust example did not apply the declared compiler strategy")
-                if {key: actual[key] for key in expected} != expected:
-                    rows.append(dict(task=name, status="mismatch", reference=expected, rust=actual))
-                    continue
-                rows.append(dict(task=name, status="matched", reference=expected, rust=actual,
-                                 inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p) for p in (physical, task, root / "run.json")}))
+                case = compare_affine_result(rust, expected, max_terms, args.compiler)
+                rows.append(dict(task=name, **case, inputs=inputs))
             except subprocess.TimeoutExpired:
                 rows.append(dict(task=name, status="timeout", limit_seconds=40))
             except Exception as error:
