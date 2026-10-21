@@ -1265,14 +1265,22 @@ targets; the Rust default remains `ParityCopies` during validation.
 slot groups, the selected group, outside-group `phase_ancillas`, shared coordinate
 storage, actual coherent width, Clifford gate count and path variables. Shared
 coordinates use real frozen wires in this representation, so the reported width
-includes them. `CausalProgram::compilation()` and `TaskEvaluator::compilation()`
+includes them. After the reference Clifford evolution, fixed-input affine relations reduce
+the shared observations to independent support coordinates. Fault-dependent
+offsets restrict both parity observations and their constant phases. The original
+full-width reference remains available for Pauli transport;
+`reference_coherent_width` and `shared_observations_before_reduction` report its
+storage separately from the compact query width. Dropping determined labels is
+injective on the support and preserves every path amplitude. Prepared probability
+plans use the compact immutable reference, including when created from a perturbed
+view. Outside-group observations remain unchanged.
+
+`CausalProgram::compilation()` and `TaskEvaluator::compilation()`
 return initialization metadata. Diagnostic JSON labels its `compilation.scope`
 as `linear_instrument`, `initial_fixed_template` or `initial_potential`. In
 `ColdPrefix`, the initial potential network substitutes false for unresolved
 controller decisions; later resolved instruments can have different slot groups,
 widths and path counts. Those initial counts do not describe final draw geometry.
-This first version chooses an independent Pauli basis on the full
-space; fixed-input relations can reduce the shared coordinates further.
 It still prepares final scalar closures per query and claims no timing parity.
 
 The differential task drivers accept `--compiler shared` or `--compiler parity_copies`,
@@ -1286,3 +1294,15 @@ original gate boundary with direct literal matrices, plus multi-fault replacemen
 negative/dependent axes, complex phases, prepared queries and a CCZ split across
 two groups. Both compilers match all 28 prescribed native instrument witnesses,
 and both causal strategies retain unbiased affine-history estimates.
+
+Fixed-input tests cover rank-zero CCZ observations on every three-qubit input,
+all Pauli masks before and after the shared snapshot, and 129 correlated shared
+observations with a single independent coordinate across packed-word boundaries.
+Exact amplitudes, fault-dependent global phases, prepared queries and restoration
+are checked against literal matrices or analytical GHZ amplitudes.
+
+A bounded TQD3 prescribed-history comparison reduces 504 full-space shared
+observations to 191 fixed-input coordinates, matching the pinned native count.
+Both histories preserve exact masses and controller transcripts, with two
+acceptance terms and four target terms. This is a correctness diagnostic, not a
+Monte Carlo precision or performance result.

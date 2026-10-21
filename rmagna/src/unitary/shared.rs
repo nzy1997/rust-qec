@@ -342,19 +342,33 @@ pub(super) fn compile(
             .evolve(&initial, arithmetic)?
             .expect("Clifford observation circuit is unitary"),
     );
+    let observation_reduction =
+        observations::ObservationReduction::new(&boundary, source.width, rank)?;
+    let reduced_rank = observation_reduction
+        .as_ref()
+        .map_or(rank, observations::ObservationReduction::rank);
+    let (query_reference, query_phase) = if let Some(reduction) = &observation_reduction {
+        reduction.apply(&boundary, &phase)?
+    } else {
+        (Arc::clone(&boundary), Arc::clone(&phase))
+    };
     let compilation = Arc::new(CompilationDiagnostics {
         strategy: CompilerStrategy::SharedCommutingLayer,
         layer_slots: groups.iter().map(|(a, b)| b - a).collect(),
         reference_layer: Some(reference_layer),
         reference_layer_slots: end - start,
         phase_ancillas: outside_count,
-        shared_phase_coordinates: rank,
-        coherent_width,
+        shared_phase_coordinates: reduced_rank,
+        coherent_width: query_reference.width(),
+        reference_coherent_width: coherent_width,
+        shared_observations_before_reduction: rank,
         clifford_gates: circuit.gates().len(),
         path_variables: boundary.columns().len(),
     });
     let program = Arc::new(InsertionProgram {
         reference: Arc::clone(&boundary),
+        query_reference: Arc::clone(&query_reference),
+        observation_reduction,
         reference_phase: Arc::clone(&phase),
         shared: Some(updates),
         circuit,
@@ -362,8 +376,8 @@ pub(super) fn compile(
     });
     Ok(CompiledUnitary {
         physical_width: source.width,
-        boundary,
-        phase,
+        boundary: query_reference,
+        phase: query_phase,
         program,
         compilation,
     })

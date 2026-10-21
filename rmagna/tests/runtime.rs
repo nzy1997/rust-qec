@@ -797,10 +797,15 @@ fn cold_compilation_metadata_describes_the_initial_potential_instrument() {
     let history = program
         .resolve_prescribed_history(&[], &[], &[vec![]], &arithmetic)
         .unwrap();
-    assert_eq!(program.compilation().coherent_width, 2);
+    assert_eq!(program.compilation().reference_coherent_width, 2);
+    assert_eq!(program.compilation().coherent_width, 1);
     assert_eq!(program.compilation().layer_slots, [2]);
     assert_eq!(program.compilation().path_variables, 0);
-    assert_eq!(history.instrument().compilation().coherent_width, 3);
+    assert_eq!(
+        history.instrument().compilation().reference_coherent_width,
+        3
+    );
+    assert_eq!(history.instrument().compilation().coherent_width, 2);
     assert_eq!(history.instrument().compilation().layer_slots, [1, 1]);
     assert_eq!(history.instrument().compilation().path_variables, 1);
 }

@@ -1323,3 +1323,157 @@ fn shared_layer_ties_and_noncommuting_random_circuits_match_literal_matrices() {
         ExactScalar::one()
     );
 }
+
+#[test]
+fn fixed_input_observation_relations_keep_fault_dependent_constants() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [G::Ccz { a: 0, b: 1, c: 2 }];
+    let circuit = UnitaryCircuit::new(3, gates).unwrap();
+    for input in 0..8 {
+        let base = circuit
+            .compile_with_strategy(&bits(3, input), &a, CompilerStrategy::SharedCommutingLayer)
+            .unwrap();
+        let d = base.compilation();
+        assert_eq!(d.shared_observations_before_reduction, 3);
+        assert_eq!(d.shared_phase_coordinates, 0);
+        assert_eq!(d.coherent_width, 3);
+        assert_eq!(d.reference_coherent_width, 6);
+        assert_eq!(base.phase_legs(), 0);
+        let rows = [bits(3, 3), bits(3, 5)];
+        let prepared = base.prepare_probability(&rows, &a).unwrap();
+        for position in 0..=1 {
+            for mask in 0..64 {
+                let fault = PauliInsertion {
+                    before_gate: position,
+                    word: PauliWord::new(
+                        bits(3, mask & 7),
+                        bits(3, mask >> 3),
+                        ((input + mask + position) & 7) as u8,
+                    )
+                    .unwrap(),
+                };
+                let state = base
+                    .with_insertions(std::slice::from_ref(&fault), &a)
+                    .unwrap();
+                let expected = dense_inserted(&gates, 3, input, std::slice::from_ref(&fault), &a);
+                for (x, value) in expected.iter().enumerate() {
+                    assert_eq!(
+                        &state.amplitude(&bits(3, x), 1, &a).unwrap().value,
+                        value,
+                        "input={input}, position={position}, mask={mask}, output={x}"
+                    );
+                }
+                let output = input ^ (mask & 7);
+                let outcome = usize::from((output & 3).count_ones() & 1 != 0)
+                    | (usize::from((output & 5).count_ones() & 1 != 0) << 1);
+                for observed in 0..4 {
+                    assert_eq!(
+                        prepared
+                            .evaluate(&state, &bits(2, observed), 1, &a)
+                            .unwrap()
+                            .value,
+                        if observed == outcome {
+                            ExactScalar::one()
+                        } else {
+                            ExactScalar::zero()
+                        }
+                    );
+                }
+                // Preparation from a perturbed view still describes the original program.
+                if mask == 17 {
+                    let from_fault = state.prepare_probability(&rows, &a).unwrap();
+                    assert_eq!(
+                        from_fault
+                            .evaluate(
+                                &base,
+                                &bits(
+                                    2,
+                                    usize::from((input & 3).count_ones() & 1 != 0)
+                                        | (usize::from((input & 5).count_ones() & 1 != 0) << 1)
+                                ),
+                                1,
+                                &a
+                            )
+                            .unwrap()
+                            .value,
+                        ExactScalar::one()
+                    );
+                    for (x, value) in dense(&gates, 3, input, &a).iter().enumerate() {
+                        assert_eq!(
+                            &state
+                                .with_insertions(&[], &a)
+                                .unwrap()
+                                .amplitude(&bits(3, x), 1, &a)
+                                .unwrap()
+                                .value,
+                            value
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn fixed_input_observation_relations_cross_packed_words_without_losing_paths() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let width = 129;
+    let mut gates = vec![G::Clifford(C::H(0))];
+    gates.extend((1..width).map(|target| G::Clifford(C::Cx { control: 0, target })));
+    gates.extend((0..width).map(|qubit| G::T { qubit, turns: 1 }));
+    let base = UnitaryCircuit::new(width, gates)
+        .unwrap()
+        .compile_with_strategy(
+            &BitVector::zeros(width).unwrap(),
+            &a,
+            CompilerStrategy::SharedCommutingLayer,
+        )
+        .unwrap();
+    let d = base.compilation();
+    assert_eq!(d.shared_observations_before_reduction, width);
+    assert_eq!(d.shared_phase_coordinates, 1);
+    assert_eq!(d.coherent_width, width + 1);
+    assert_eq!(d.reference_coherent_width, 2 * width);
+    assert_eq!(d.path_variables, 1);
+    let rows = [BitVector::from_indices(width, [0, 64, 128]).unwrap()];
+    let prepared = base.prepare_probability(&rows, &a).unwrap();
+    for position in [width, width + 65, 2 * width] {
+        let fault = PauliInsertion {
+            before_gate: position,
+            word: PauliWord::new(
+                BitVector::from_indices(width, [64]).unwrap(),
+                BitVector::from_indices(width, [128]).unwrap(),
+                3,
+            )
+            .unwrap(),
+        };
+        let state = base.with_insertions(&[fault], &a).unwrap();
+        for all in [false, true] {
+            let mut output = BitVector::from_indices(width, (0..width).filter(|_| all)).unwrap();
+            output.set(64, !all).unwrap();
+            // Z128 contributes its pre-flip bit. T64 sees the flipped bit only
+            // when the fault precedes that rotation; all other T gates see `all`.
+            let t64_after_fault = position <= width + 64;
+            let ones = 128 * i64::from(all) + i64::from(all ^ t64_after_fault);
+            let expected = a.omega(3 + 4 * i64::from(all) + ones, -1).unwrap();
+            assert_eq!(state.amplitude(&output, 2, &a).unwrap().value, expected);
+        }
+        let impossible = BitVector::from_indices(width, [63, 64]).unwrap();
+        assert_eq!(
+            state.amplitude(&impossible, 2, &a).unwrap().value,
+            ExactScalar::zero()
+        );
+        for outcome in 0..2 {
+            assert_eq!(
+                prepared
+                    .evaluate(&state, &bits(1, outcome), 4, &a)
+                    .unwrap()
+                    .value,
+                a.omega(0, -2).unwrap()
+            );
+        }
+    }
+}
