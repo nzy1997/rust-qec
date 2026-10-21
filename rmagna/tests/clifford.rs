@@ -307,3 +307,50 @@ fn invalid_gates_dimensions_and_zero_input_fail_without_approximation() {
         &ExactScalar::one()
     );
 }
+
+#[test]
+fn hadamards_on_fixed_wide_coordinates_preserve_fourier_signs_and_global_scale() {
+    let a = ScalarArithmetic::default();
+    let width = 129;
+    let initial = AffineKet::new(
+        BitVector::from_indices(width, [63, 128]).unwrap(),
+        vec![BitVector::from_indices(width, [1, 65]).unwrap()],
+        QuadraticForm::new(1, vec![3], vec![BitVector::zeros(1).unwrap()]).unwrap(),
+        a.scalar([2.into(), (-3).into(), 5.into(), 7.into()], -5)
+            .unwrap(),
+    )
+    .unwrap();
+    let observed = [0, 63, 64, 128];
+    let circuit = CliffordCircuit::new(width, observed.into_iter().map(Gate::H)).unwrap();
+    let evolved = circuit.evolve(&initial, &a).unwrap().unwrap();
+    assert_eq!(evolved.columns().len(), 5);
+    let prepared = evolved.prepare().unwrap();
+    for support in [false, true] {
+        for assignment in 0..16usize {
+            let mut value = BitVector::zeros(width).unwrap();
+            value.set(1, support).unwrap();
+            value.set(65, support).unwrap();
+            for (i, &q) in observed.iter().enumerate() {
+                value.set(q, assignment >> i & 1 != 0).unwrap();
+            }
+            let sign = (assignment >> 1 & 1) ^ (assignment >> 3 & 1);
+            let factor = a
+                .omega(2 + 6 * i64::from(support) + 4 * sign as i64, -4)
+                .unwrap();
+            let expected = a.multiply(initial.coefficient(), &factor).unwrap();
+            assert_eq!(prepared.amplitude(&value, &a).unwrap(), expected);
+        }
+    }
+    let recovered = circuit.adjoint().evolve(&evolved, &a).unwrap().unwrap();
+    for support in [false, true] {
+        let mut value = initial.offset().clone();
+        if support {
+            value.xor_assign(&initial.columns()[0]).unwrap();
+        }
+        assert_eq!(
+            recovered.prepare().unwrap().amplitude(&value, &a).unwrap(),
+            initial.prepare().unwrap().amplitude(&value, &a).unwrap()
+        );
+    }
+    assert_eq!(recovered.columns().len(), 1);
+}

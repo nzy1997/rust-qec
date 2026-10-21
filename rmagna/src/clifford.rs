@@ -270,6 +270,13 @@ fn apply(
             )?;
         }
         CliffordGate::H(qubit) => {
+            // evolve canonicalizes the input, and invertible Clifford label
+            // maps preserve independence. If this row is fixed, clearing it
+            // changes no column; the new unit column is independent of all old
+            // columns. There are no hidden paths to eliminate in this case.
+            let deterministic = columns
+                .iter()
+                .all(|column| !column.get(qubit).expect("validated qubit"));
             let n = columns.len();
             let paths = n.checked_add(1).ok_or(CliffordError::DimensionOverflow)?;
             let mut upper = phase
@@ -288,7 +295,12 @@ fn apply(
             columns.push(BitVector::from_indices(ket.width(), [qubit])?);
             phase = QuadraticForm::new(phase.constant(), linear, upper)?;
             coefficient = arithmetic.multiply(&coefficient, &arithmetic.omega(0, -1)?)?;
-            return Ok(AffineKet::new(offset, columns, phase, coefficient)?.contract(arithmetic)?);
+            let next = AffineKet::new(offset, columns, phase, coefficient)?;
+            return if deterministic {
+                Ok(Some(next))
+            } else {
+                Ok(next.contract(arithmetic)?)
+            };
         }
     }
     Ok(Some(AffineKet::new(offset, columns, phase, coefficient)?))
