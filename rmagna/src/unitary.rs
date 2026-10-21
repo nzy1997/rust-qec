@@ -5,7 +5,7 @@ use crate::gf2::{BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
 use crate::phase::{ClosedPhaseSum, ParityPhase, PhaseError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
-use crate::stabilizer::{AffineKet, StabilizerError};
+use crate::stabilizer::{AffineKet, PreparedZProjection, StabilizerError};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
@@ -17,6 +17,7 @@ pub enum UnitaryError {
     InvalidTurns,
     RepeatedQubit,
     RepeatedOutput,
+    IncompatibleProgram,
     InvalidInsertion { position: usize, gate_count: usize },
     Binary(Gf2Error),
     Clifford(CliffordError),
@@ -40,6 +41,10 @@ impl fmt::Display for UnitaryError {
             ),
             Self::RepeatedQubit => write!(f, "multi-qubit diagonal gate repeats a qubit"),
             Self::RepeatedOutput => write!(f, "target output list contains duplicate qubits"),
+            Self::IncompatibleProgram => write!(
+                f,
+                "prepared query requires a view of its original compiled program"
+            ),
             Self::InvalidInsertion {
                 position,
                 gate_count,
@@ -284,12 +289,95 @@ pub struct DensityBoundary<'a> {
     pub outcomes: &'a BitVector,
 }
 
+/// Fixed trace/event constraint elimination, shared across one reference
+/// program's Pauli assignments. Final phase closure is still query specific.
+pub struct PreparedProbability {
+    program: Arc<InsertionProgram>,
+    physical_width: usize,
+    event_count: usize,
+    projection: PreparedZProjection,
+    legs: [Vec<usize>; 2],
+    coefficients: [Vec<u8>; 2],
+}
+
+impl PreparedProbability {
+    pub fn evaluate(
+        &self,
+        state: &CompiledUnitary,
+        outcomes: &BitVector,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, UnitaryError> {
+        if !Arc::ptr_eq(&self.program, &state.program) {
+            return Err(UnitaryError::IncompatibleProgram);
+        }
+        if outcomes.width() != self.event_count {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let rhs = BitVector::from_indices(
+            self.physical_width + self.event_count,
+            outcomes.ones().map(|j| self.physical_width + j),
+        )?;
+        let joint = state
+            .boundary
+            .tensor(&state.boundary.conjugate(), arithmetic)?;
+        close(
+            self.projection.project(&joint, &rhs)?,
+            &self.legs,
+            &self.coefficients,
+            max_terms,
+            arithmetic,
+        )
+    }
+}
+
 impl CompiledUnitary {
     pub fn width(&self) -> usize {
         self.physical_width
     }
     pub fn phase_legs(&self) -> usize {
         self.coefficients.len()
+    }
+
+    /// Prepare fixed physical trace and event rows against the original
+    /// reference, including when called on a perturbed insertion view.
+    pub fn prepare_probability(
+        &self,
+        rows: &[BitVector],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedProbability, UnitaryError> {
+        if rows.iter().any(|row| row.width() != self.width()) {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        self.width()
+            .checked_add(rows.len())
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        let reference = &self.program.reference;
+        let half = reference.width();
+        let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
+        let total = joint.width();
+        let mut constraints = (0..self.width())
+            .map(|j| BitVector::from_indices(total, [j, half + j]))
+            .collect::<Result<Vec<_>, _>>()?;
+        constraints.extend(
+            rows.iter()
+                .map(|row| BitVector::from_indices(total, row.ones()))
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        Ok(PreparedProbability {
+            program: Arc::clone(&self.program),
+            physical_width: self.width(),
+            event_count: rows.len(),
+            projection: PreparedZProjection::new(&joint, &constraints)?,
+            legs: [
+                (self.width()..half).collect(),
+                (half + self.width()..total).collect(),
+            ],
+            coefficients: [
+                self.coefficients.clone(),
+                self.coefficients.iter().map(|c| (8 - c) & 7).collect(),
+            ],
+        })
     }
 
     /// Replace the insertion assignment relative to the original compiled
