@@ -138,12 +138,21 @@ impl QuadraticForm {
             self.check_vector(vector)?;
         }
         let polar = self.symmetric_matrix(true)?;
+        let words = self.num_variables().div_ceil(64);
+        // Only sparse products need cached indices. Dense lists would retain
+        // one usize per set bit instead of the existing packed representation.
+        let coordinates = basis
+            .iter()
+            .map(|v| (v.count_ones() < words).then(|| v.ones().collect::<Vec<_>>()))
+            .collect::<Vec<_>>();
         let mut images = Vec::new();
         let mut linear = Vec::new();
         for vector in basis {
+            // The polar matrix is symmetric, so B*v is the XOR of selected
+            // packed rows. Unit directions avoid scanning every matrix row.
             let mut image = BitVector::zeros(self.num_variables())?;
-            for (i, row) in polar.iter().enumerate() {
-                image.set(i, row.dot(vector)?)?;
+            for j in vector.ones() {
+                image.xor_assign(&polar[j])?;
             }
             linear.push(
                 (self.evaluate(vector)? + 4 - self.constant + 2 * u8::from(image.dot(shift)?)) & 3,
@@ -154,7 +163,14 @@ impl QuadraticForm {
         for (i, image) in images.iter().enumerate() {
             let mut row = BitVector::zeros(basis.len())?;
             for (j, vector) in basis.iter().enumerate().skip(i + 1) {
-                row.set(j, image.dot(vector)?)?;
+                let value = if let Some(selected) = &coordinates[j] {
+                    selected
+                        .iter()
+                        .try_fold(false, |parity, &k| image.get(k).map(|bit| parity ^ bit))?
+                } else {
+                    image.dot(vector)?
+                };
+                row.set(j, value)?;
             }
             upper.push(row);
         }

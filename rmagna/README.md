@@ -1306,3 +1306,12 @@ observations to 191 fixed-input coordinates, matching the pinned native count.
 Both histories preserve exact masses and controller transcripts, with two
 acceptance terms and four target terms. This is a correctness diagnostic, not a
 Monte Carlo precision or performance result.
+
+Quadratic affine restrictions accumulate packed symmetric polar rows and use
+sparse coordinate products when shorter than a packed dot product. Arbitrary
+shifts and dependent directions retain exact phases. Independent literal
+polynomial tests cover dense and sparse maps through 129 variables; existing
+prepared projections continue to reuse the same polar images.
+Coordinate lists are cached only for those sparse products; dense directions
+stay packed. A thread-local allocation counter checks sparse and dense pullbacks
+through 1,025 variables against a budget scaled to packed matrix storage.
