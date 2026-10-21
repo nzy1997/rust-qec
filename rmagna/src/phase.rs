@@ -269,40 +269,83 @@ impl ParityPhase {
 
     /// Return `omega^global * i^quadratic`. Non-Clifford phases are rejected.
     pub fn clifford(&self) -> Result<(u8, QuadraticForm), PhaseError> {
-        // Validate the signature without constructing or factoring another
-        // quotient. Prepared evaluations retain their original resource basis.
-        if self.terms.iter().any(|(_, c)| c & 1 != 0) {
-            for i in 0..self.width {
-                for j in i..self.width {
-                    if !self.signature_slice(i, j)?.is_zero() {
+        // Pivot coordinates restrict the odd-axis span injectively. Thus a
+        // zero trilinear signature on this smaller coordinate space is zero
+        // on the full space; no quotient basis or decomposition is changed.
+        let odd = self
+            .terms
+            .iter()
+            .filter(|(_, c)| c & 1 != 0)
+            .map(|(axis, _)| axis.clone())
+            .collect::<Vec<_>>();
+        if !odd.is_empty() {
+            let compressed;
+            let signature = if self.width > 64 {
+                let pivots = LinearFactorization::new(self.width, &odd)?
+                    .pivot_columns()
+                    .to_vec();
+                if pivots.len() < self.width {
+                    compressed = Self::new(
+                        pivots.len(),
+                        0,
+                        odd.iter()
+                            .map(|axis| {
+                                Ok((
+                                    BitVector::from_indices(
+                                        pivots.len(),
+                                        pivots.iter().enumerate().filter_map(|(j, &k)| {
+                                            axis.get(k).expect("validated coordinate").then_some(j)
+                                        }),
+                                    )?,
+                                    1,
+                                ))
+                            })
+                            .collect::<Result<Vec<_>, Gf2Error>>()?,
+                    )?;
+                    &compressed
+                } else {
+                    self
+                }
+            } else {
+                self
+            };
+            for i in 0..signature.width {
+                for j in i..signature.width {
+                    if !signature.signature_slice(i, j)?.is_zero() {
                         return Err(PhaseError::NotClifford);
                     }
                 }
             }
         }
         let mut linear = vec![0_u8; self.width];
-        let mut pair = (0..self.width)
-            .map(|_| BitVector::zeros(self.width))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut pair = Vec::with_capacity(self.width);
         for (axis, coefficient) in &self.terms {
             for i in axis.ones() {
                 linear[i] = (linear[i] + coefficient) & 7;
             }
         }
-        // Signature zero ensures linear coefficients are even and the pair
-        // coefficient is divisible by four. Compute the latter modulo eight
-        // directly; contributions from odd coefficients cannot be halved alone.
-        for (i, row) in pair.iter_mut().enumerate() {
-            for j in i + 1..self.width {
-                let mut sum = 0_u8;
-                for (axis, c) in &self.terms {
-                    if axis.get(i)? && axis.get(j)? {
-                        sum = (sum + c) & 3;
+        // Sum each pair coefficient modulo four with two packed bit planes.
+        // The low plane's carry updates the high plane before the low XOR.
+        // Signature zero makes the final low plane zero and linear terms even.
+        for i in 0..self.width {
+            let mut low = BitVector::zeros(self.width)?;
+            let mut high = BitVector::zeros(self.width)?;
+            for (axis, coefficient) in &self.terms {
+                if axis.get(i)? {
+                    if coefficient & 1 != 0 {
+                        high.xor_and_assign(&low, axis)?;
+                        low.xor_assign(axis)?;
+                    }
+                    if coefficient & 2 != 0 {
+                        high.xor_assign(axis)?;
                     }
                 }
-                debug_assert_eq!(sum & 1, 0);
-                row.set(j, sum & 2 != 0)?;
             }
+            debug_assert!(low.is_zero());
+            pair.push(BitVector::from_indices(
+                self.width,
+                high.ones().filter(|&j| j > i),
+            )?);
         }
         debug_assert!(linear.iter().all(|c| c & 1 == 0));
         Ok((
