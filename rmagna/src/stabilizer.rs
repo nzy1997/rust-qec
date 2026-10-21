@@ -238,6 +238,20 @@ impl AffineKet {
         outcomes: &BitVector,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Option<Self>, StabilizerError> {
+        match self.constrain_z(rows, outcomes)? {
+            Some(ket) => ket.contract(arithmetic),
+            None => Ok(None),
+        }
+    }
+
+    /// Keep dependent hidden paths until the caller's final boundary closure.
+    /// This is not a canonical ket; the scalar compiler contracts it only after
+    /// summing physical labels, before reducing or budgeting the phase resource.
+    pub(crate) fn constrain_z(
+        &self,
+        rows: &[BitVector],
+        outcomes: &BitVector,
+    ) -> Result<Option<Self>, StabilizerError> {
         if rows.len() != outcomes.width() || rows.iter().any(|row| row.width() != self.width()) {
             return Err(StabilizerError::DimensionMismatch);
         }
@@ -277,7 +291,12 @@ impl AffineKet {
             .map(|v| image(self.width(), &self.columns, v))
             .collect::<Result<Vec<_>, _>>()?;
         let phase = self.phase.restrict(&shift, &kernel)?;
-        Self::new(offset, columns, phase, self.coefficient.clone())?.contract(arithmetic)
+        Ok(Some(Self::new(
+            offset,
+            columns,
+            phase,
+            self.coefficient.clone(),
+        )?))
     }
 
     /// Exact `<self|other>`; traced boundary equality is solved by elimination.
@@ -420,4 +439,149 @@ fn combined_phase(
         upper.push(BitVector::from_indices(width, row.ones().map(|i| n + i))?);
     }
     Ok(QuadraticForm::new(constant, linear, upper)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deferred_constraints_and_public_projection_match_literal_hidden_paths_and_scalar_sums() {
+        let a = ScalarArithmetic::default();
+        let coefficient = a.scalar([3, -2, 5, 1].map(Into::into), -3).unwrap();
+        for width in [0, 1, 65, 129, 257] {
+            let mut positions = if width == 0 {
+                Vec::new()
+            } else {
+                vec![0, width / 2, width - 1]
+            };
+            positions.sort_unstable();
+            positions.dedup();
+            let labels = 1usize << positions.len();
+            let packed = |mask: usize| {
+                BitVector::from_indices(
+                    width,
+                    positions
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(j, &q)| (mask >> j & 1 != 0).then_some(q)),
+                )
+                .unwrap()
+            };
+            let masks = (0..7).map(|j| (j * 3 + 1) % labels).collect::<Vec<_>>();
+            for mode in 0..4 {
+                let linear = (0..7).map(|j| ((j + mode) % 4) as u8).collect::<Vec<_>>();
+                let upper = (0..7)
+                    .map(|j| {
+                        BitVector::from_indices(
+                            7,
+                            (j + 1..7).filter(|&k| (j + 2 * k + mode) % 3 == 0),
+                        )
+                        .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+                let phase = QuadraticForm::new(3, linear, upper).unwrap();
+                let offset = (mode + 1) % labels;
+                let ket = AffineKet::new(
+                    packed(offset),
+                    masks.iter().map(|&m| packed(m)).collect(),
+                    phase,
+                    coefficient.clone(),
+                )
+                .unwrap();
+                for count in [0, 1, 63, 64, 65, 129] {
+                    let row_masks = (0..count).map(|j| (5 * j + 3) % labels).collect::<Vec<_>>();
+                    let rows = row_masks.iter().map(|&r| packed(r)).collect::<Vec<_>>();
+                    let outcomes = BitVector::from_indices(
+                        count,
+                        row_masks.iter().enumerate().filter_map(|(j, &r)| {
+                            (!(r & offset).count_ones().is_multiple_of(2)).then_some(j)
+                        }),
+                    )
+                    .unwrap();
+                    // Enumerate all 128 raw paths using integer labels and literal
+                    // polynomial coefficients, without restriction, dot or Gauss code.
+                    let mut sums = vec![[0i64; 4]; labels];
+                    for x in 0usize..128 {
+                        let mut y = offset;
+                        let mut q = 3;
+                        for (j, &mask) in masks.iter().enumerate() {
+                            if x >> j & 1 == 0 {
+                                continue;
+                            }
+                            y ^= mask;
+                            q += (j + mode) % 4;
+                            for k in j + 1..7 {
+                                if x >> k & 1 != 0 && (j + 2 * k + mode) % 3 == 0 {
+                                    q += 2;
+                                }
+                            }
+                        }
+                        if row_masks
+                            .iter()
+                            .any(|&r| (r & y).count_ones() % 2 != (r & offset).count_ones() % 2)
+                        {
+                            continue;
+                        }
+                        sums[y][if q % 2 == 0 { 0 } else { 2 }] += if q % 4 < 2 { 1 } else { -1 };
+                    }
+                    let expected = sums
+                        .into_iter()
+                        .map(|s| {
+                            a.multiply(&coefficient, &a.scalar(s.map(Into::into), 0).unwrap())
+                                .unwrap()
+                        })
+                        .collect::<Vec<_>>();
+                    let deferred = ket.constrain_z(&rows, &outcomes).unwrap();
+                    let canonical = ket.project_z(&rows, &outcomes, &a).unwrap();
+                    assert_eq!(
+                        canonical.is_none(),
+                        expected.iter().all(ExactScalar::is_zero)
+                    );
+                    for result in [&deferred, &canonical] {
+                        let prepared = result.as_ref().map(|k| k.prepare().unwrap());
+                        for (y, wanted) in expected.iter().enumerate() {
+                            let actual = prepared.as_ref().map_or(ExactScalar::zero(), |p| {
+                                p.amplitude(&packed(y), &a).unwrap()
+                            });
+                            assert_eq!(
+                                &actual, wanted,
+                                "width={width} mode={mode} rows={count} output={y}"
+                            );
+                        }
+                        let scalar = result
+                            .as_ref()
+                            .and_then(|k| k.sum_boundary(&[], &a).unwrap());
+                        let actual = scalar.map_or(ExactScalar::zero(), |k| {
+                            k.prepare()
+                                .unwrap()
+                                .amplitude(&BitVector::zeros(0).unwrap(), &a)
+                                .unwrap()
+                        });
+                        let wanted = expected
+                            .iter()
+                            .try_fold(ExactScalar::zero(), |s, v| a.add(&s, v))
+                            .unwrap();
+                        assert_eq!(actual, wanted);
+                    }
+                    let mut impossible_rows = rows.clone();
+                    impossible_rows.push(BitVector::zeros(width).unwrap());
+                    let impossible =
+                        BitVector::from_indices(count + 1, outcomes.ones().chain([count])).unwrap();
+                    assert!(
+                        ket.constrain_z(&impossible_rows, &impossible)
+                            .unwrap()
+                            .is_none()
+                    );
+                }
+                assert_eq!(
+                    ket.constrain_z(
+                        &[BitVector::zeros(width + 1).unwrap()],
+                        &BitVector::zeros(1).unwrap()
+                    ),
+                    Err(StabilizerError::DimensionMismatch)
+                );
+            }
+        }
+    }
 }
