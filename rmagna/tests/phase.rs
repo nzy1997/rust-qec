@@ -597,3 +597,75 @@ fn radical_absorption_matches_literal_sums_and_explicit_zero_cases() {
         Err(PhaseError::DimensionMismatch)
     ));
 }
+
+#[test]
+fn packed_phase_pullbacks_match_direct_wide_boolean_substitution() {
+    let mut state = 0x6adf02b189e34_u64;
+    let mut random = || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+    let width = 129;
+    let mut basis = (0..64)
+        .map(|_| BitVector::from_indices(width, (0..width).filter(|_| random() & 1 != 0)).unwrap())
+        .collect::<Vec<_>>();
+    let mut dependent = basis[0].clone();
+    dependent.xor_assign(&basis[63]).unwrap();
+    basis.push(dependent);
+    for dense in [false, true] {
+        for count in [63, 64, 65, 129] {
+            let mut terms = (0..count)
+                .map(|j| {
+                    let indices = (0..width).filter(|&k| if dense { k != j } else { k == j });
+                    (
+                        BitVector::from_indices(width, indices).unwrap(),
+                        (j % 7 + 1) as u8,
+                    )
+                })
+                .collect::<Vec<_>>();
+            // Duplicate axes cancel without changing the threshold case.
+            terms.push((terms[0].0.clone(), 3));
+            terms.push((terms[0].0.clone(), 5));
+            terms.push((BitVector::zeros(width).unwrap(), 7));
+            let phase = ParityPhase::new(width, 5, terms.clone()).unwrap();
+            assert_eq!(phase.terms().len(), count);
+            for offset_case in 0..2 {
+                let shift =
+                    BitVector::from_indices(width, (0..width).filter(|_| random() & 1 != 0))
+                        .unwrap();
+                for active_basis in [&basis[..], &[][..]] {
+                    let restricted = phase.restrict(&shift, active_basis).unwrap();
+                    assert_eq!(restricted.num_variables(), active_basis.len());
+                    for _ in 0..64 {
+                        let assignment = BitVector::from_indices(
+                            active_basis.len(),
+                            (0..active_basis.len()).filter(|_| random() & 1 != 0),
+                        )
+                        .unwrap();
+                        let mut substituted = (0..width)
+                            .map(|k| shift.get(k).unwrap())
+                            .collect::<Vec<_>>();
+                        for direction in assignment.ones() {
+                            for k in active_basis[direction].ones() {
+                                substituted[k] ^= true;
+                            }
+                        }
+                        let mut expected = 5_u64;
+                        for (axis, coefficient) in &terms {
+                            if axis.ones().fold(false, |p, k| p ^ substituted[k]) {
+                                expected += u64::from(*coefficient);
+                            }
+                        }
+                        assert_eq!(
+                            restricted.evaluate(&assignment).unwrap(),
+                            (expected % 8) as u8,
+                            "dense={dense}, count={count}, offset={offset_case}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

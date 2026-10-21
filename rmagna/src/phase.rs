@@ -1,6 +1,6 @@
 //! Third-hierarchy parity phases, the Clifford radical, and prepared exact sums.
 
-use crate::gf2::{BitVector, Gf2Error, LinearFactorization};
+use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
@@ -143,15 +143,29 @@ impl ParityPhase {
     /// Substitute `x = shift XOR sum_j basis[j]*y[j]`; dependence is allowed.
     pub fn restrict(&self, shift: &BitVector, basis: &[BitVector]) -> Result<Self, PhaseError> {
         self.check_vector(shift)?;
+        if basis.is_empty() {
+            return Self::new(0, self.evaluate(shift)?, []);
+        }
         for vector in basis {
             self.check_vector(vector)?;
         }
+        let basis_rows = if self.terms.len() >= 64 {
+            Some(transpose_columns(self.width, basis)?)
+        } else {
+            None
+        };
         let mut constant = self.constant;
         let mut terms = Vec::new();
         for (axis, coefficient) in &self.terms {
             let mut mapped = BitVector::zeros(basis.len())?;
-            for (j, vector) in basis.iter().enumerate() {
-                mapped.set(j, axis.dot(vector)?)?;
+            if let Some(basis_rows) = &basis_rows {
+                for coordinate in axis.ones() {
+                    mapped.xor_assign(&basis_rows[coordinate])?;
+                }
+            } else {
+                for (j, vector) in basis.iter().enumerate() {
+                    mapped.set(j, axis.dot(vector)?)?;
+                }
             }
             let coefficient = if axis.dot(shift)? {
                 constant = (constant + coefficient) & 7;

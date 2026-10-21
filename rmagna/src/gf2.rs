@@ -327,3 +327,19 @@ impl LinearFactorization {
         Ok(basis)
     }
 }
+
+/// Transpose validated equal-width columns into packed rows.
+pub(crate) fn transpose_columns(
+    width: usize,
+    columns: &[BitVector],
+) -> Result<Vec<BitVector>, Gf2Error> {
+    let mut rows = (0..width)
+        .map(|_| BitVector::zeros(columns.len()))
+        .collect::<Result<Vec<_>, _>>()?;
+    for (j, column) in columns.iter().enumerate() {
+        for i in column.ones() {
+            rows[i].set(j, true)?;
+        }
+    }
+    Ok(rows)
+}
