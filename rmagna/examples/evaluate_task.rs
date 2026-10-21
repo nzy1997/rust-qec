@@ -36,6 +36,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut module_root = None;
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--causal-strategy" => {
+                options.runtime.strategy =
+                    match args.next().ok_or("missing causal strategy")?.as_str() {
+                        "fixed" => rmagna::runtime::CausalStrategy::FixedTemplate,
+                        "cold" => rmagna::runtime::CausalStrategy::ColdPrefix,
+                        _ => return Err("causal strategy must be fixed or cold".into()),
+                    }
+            }
             "--history" => history = Some(args.next().ok_or("missing history JSON")?),
             "--max-terms" => {
                 options.runtime.sampling.max_terms =
@@ -114,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     println!(
         "{}",
-        serde_json::json!({"configuration":{"max_terms":options.runtime.sampling.max_terms},"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"configuration":{"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
     );
     Ok(())
 }

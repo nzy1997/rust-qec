@@ -30,7 +30,7 @@ enum Execution {
         model: NoiseModel,
         sampler: NoiseSampler,
     },
-    Causal(CausalProgram),
+    Causal(Box<CausalProgram>),
 }
 pub struct TaskEvaluator {
     task: ValidatedTask,
@@ -54,6 +54,9 @@ impl From<&crate::unitary::NetworkValue> for ContractionResources {
     }
 }
 pub struct TaskEvaluation {
+    /// Post-preparation Clifford circuit constructions, excluding scalar queries.
+    pub network_compilations: usize,
+    pub history_queries: usize,
     pub acceptance_resources: ContractionResources,
     pub target_resources: Option<ContractionResources>,
     /// Per-draw acceptance contribution, normalized by history mass.
@@ -155,10 +158,10 @@ impl TaskEvaluator {
             .map(|&record| BitExpr::atom(BitAtom::Record(record)))
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
-            Execution::Causal(
+            Execution::Causal(Box::new(
                 CausalProgram::new(&composed, registry, options.runtime, a)
                     .map_err(|e| error("runtime", e))?,
-            )
+            ))
         } else {
             let instrument = compile_affine(&composed, &options.runtime.compile, a)
                 .map_err(|e| error("circuit", e))?;
@@ -384,6 +387,8 @@ impl TaskEvaluator {
             raw_moments.push(raw);
         }
         Ok(TaskEvaluation {
+            network_compilations: input.history.map_or(0, |h| h.network_compilations()),
+            history_queries: input.history.map_or(0, |h| h.history_queries()),
             acceptance_resources,
             target_resources,
             raw_error,

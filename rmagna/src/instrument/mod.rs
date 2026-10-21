@@ -10,7 +10,11 @@ use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::unitary::{CompiledUnitary, NetworkValue, PauliInsertion, UnitaryError};
 use num_rational::BigRational;
 use num_traits::One;
-use std::{collections::BTreeSet, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    sync::Arc,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstrumentError {
@@ -18,6 +22,10 @@ pub enum InstrumentError {
         operation: usize,
     },
     NonAffineQuery,
+    UnknownDecision {
+        call: usize,
+        bit: usize,
+    },
     Unsupported {
         operation: usize,
         reason: &'static str,
@@ -54,6 +62,10 @@ impl fmt::Display for InstrumentError {
             Self::NeedsHistory { operation } => {
                 write!(f, "operation {operation} requires a causal history runtime")
             }
+            Self::UnknownDecision { call, bit } => write!(
+                f,
+                "decision slot {bit} of controller call {call} is absent from the template"
+            ),
             Self::NonAffineQuery => write!(
                 f,
                 "reported marginals require expressions over records; external decisions require the causal history runtime"
@@ -143,7 +155,7 @@ impl FaultAlternative {
 pub struct NoiseSite {
     source_operations: Vec<usize>,
     before_gate: usize,
-    alternatives: Vec<FaultAlternative>,
+    alternatives: Arc<Vec<FaultAlternative>>,
     identity: Probability,
 }
 impl NoiseSite {
@@ -163,13 +175,16 @@ pub struct FaultSelection {
     pub alternative: usize,
 }
 
+#[derive(Clone)]
 pub struct CompiledInstrument {
-    unitary: CompiledUnitary,
-    live_wires: Vec<usize>,
-    record_wires: Vec<usize>,
-    event_rows: Vec<BitVector>,
+    unitary: Arc<CompiledUnitary>,
+    live_wires: Arc<Vec<usize>>,
+    record_wires: Arc<Vec<usize>>,
+    event_rows: Arc<Vec<BitVector>>,
     outcomes: BitVector,
-    sites: Vec<NoiseSite>,
+    sites: Arc<Vec<NoiseSite>>,
+    decision_wires: Arc<BTreeMap<(usize, usize), usize>>,
+    initial_insertions: Vec<PauliInsertion>,
 }
 pub struct ExactMasses {
     pub accepted: NetworkValue,
@@ -182,7 +197,14 @@ pub fn compile_affine(
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    lower::compile(circuit, options, arithmetic)
+    lower::compile(circuit, options, arithmetic, false)
+}
+pub(crate) fn compile_causal(
+    circuit: &Circuit,
+    options: &CompileOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<CompiledInstrument, InstrumentError> {
+    lower::compile(circuit, options, arithmetic, true)
 }
 /// Compile a measurement-free pure target from its text frontend. Gate phases
 /// follow the standard matrices. Instrument operations are rejected explicitly.
@@ -208,13 +230,66 @@ impl CompiledInstrument {
         &self.sites
     }
 
+    pub(crate) fn branch(
+        &self,
+        decisions: &BTreeMap<(usize, usize), bool>,
+        active_sites: &BTreeSet<usize>,
+    ) -> Result<Self, InstrumentError> {
+        let mut branch = self.clone();
+        let mut x = BitVector::zeros(self.coherent_qubits())?;
+        for (&(call, bit), &value) in decisions {
+            let &wire = self
+                .decision_wires
+                .get(&(call, bit))
+                .ok_or(InstrumentError::UnknownDecision { call, bit })?;
+            x.set(wire, value)?;
+        }
+        branch.initial_insertions = if x.is_zero() {
+            vec![]
+        } else {
+            vec![PauliInsertion {
+                before_gate: 0,
+                word: PauliWord::new(x, BitVector::zeros(self.coherent_qubits())?, 0)?,
+            }]
+        };
+        let mut sites = Vec::with_capacity(active_sites.len());
+        for &site in active_sites {
+            sites.push(
+                self.sites
+                    .get(site)
+                    .ok_or(InstrumentError::InvalidFault {
+                        site,
+                        alternative: 0,
+                    })?
+                    .clone(),
+            );
+        }
+        branch.sites = Arc::new(sites);
+        Ok(branch)
+    }
+    pub(crate) fn conditioned(
+        &self,
+        conditions: &[(BitExpr, bool)],
+    ) -> Result<Self, InstrumentError> {
+        let mut result = self.clone();
+        let mut rows = self.event_rows.as_ref().clone();
+        let mut outcomes =
+            BitVector::from_indices(rows.len() + conditions.len(), self.outcomes.ones())?;
+        for (j, (expression, value)) in conditions.iter().enumerate() {
+            rows.push(self.parity_row(expression)?);
+            outcomes.set(self.event_rows.len() + j, expression.constant ^ value)?;
+        }
+        result.event_rows = Arc::new(rows);
+        result.outcomes = outcomes;
+        Ok(result)
+    }
     fn inserted(
         &self,
         faults: &[FaultSelection],
         arithmetic: &ScalarArithmetic,
     ) -> Result<CompiledUnitary, InstrumentError> {
         let mut seen = BTreeSet::new();
-        let mut insertions = Vec::new();
+        let mut insertions = self.initial_insertions.clone();
         for fault in faults {
             if !seen.insert(fault.site) {
                 return Err(InstrumentError::RepeatedFault { site: fault.site });
@@ -314,7 +389,7 @@ impl CompiledInstrument {
         if parities.len() != outcomes.width() {
             return Err(UnitaryError::DimensionMismatch.into());
         }
-        let mut rows = self.event_rows.clone();
+        let mut rows = self.event_rows.as_ref().clone();
         let count = rows
             .len()
             .checked_add(parities.len())

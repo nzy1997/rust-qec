@@ -312,6 +312,35 @@ fn prescribed_causal_histories_match_pinned_native_joint_masses() {
             .resolve_prescribed_history(&[], &faults, &groups, &a)
             .unwrap();
         assert_eq!(fixed.entropy_words(), (0, 0));
+        assert_eq!(fixed.network_compilations(), 0);
+        assert_eq!(program.reference_compilations(), 1);
+        let cold_program = CausalProgram::new(
+            &source,
+            &registry,
+            RuntimeOptions {
+                strategy: rmagna::runtime::CausalStrategy::ColdPrefix,
+                ..Default::default()
+            },
+            &a,
+        )
+        .unwrap();
+        let cold = cold_program
+            .resolve_prescribed_history(&[], &faults, &groups, &a)
+            .unwrap();
+        assert_eq!(cold.history_mass(), fixed.history_mass());
+        assert_eq!(cold.controller_calls(), fixed.controller_calls());
+        assert_eq!(cold.noise_probability(), fixed.noise_probability());
+        assert_eq!(cold.network_compilations(), groups.len() + 1);
+        let cold_masses = cold
+            .instrument()
+            .masses(&outputs, &zero(&a), cold.faults(), 256, &a)
+            .unwrap();
+        assert_eq!(cold_masses.error, draw.masses.error);
+        assert_eq!(cold_masses.accepted.value, draw.masses.accepted.value);
+        assert_eq!(
+            cold_masses.target_success.value,
+            draw.masses.target_success.value
+        );
         assert_eq!(fixed.history_mass(), &draw.history_mass);
         assert_eq!(fixed.controller_calls(), draw.controller_calls);
         let fixed_masses = fixed
@@ -428,7 +457,12 @@ fn causal_resource_limits_and_target_validation_fail_without_silent_draws() {
             ..Default::default()
         },
         RuntimeOptions {
+            strategy: rmagna::runtime::CausalStrategy::ColdPrefix,
             max_prefix_compiles: 0,
+            ..Default::default()
+        },
+        RuntimeOptions {
+            max_history_queries: 0,
             ..Default::default()
         },
     ] {
@@ -564,4 +598,167 @@ fn prescribed_requested_records_preserve_correlations_and_ignore_final_postselec
         program.resolve_prescribed_history(&query, &[], &[vec![false, true]], &a),
         Err(RuntimeError::InvalidHistory { .. })
     ));
+}
+
+#[test]
+fn fixed_template_matches_cold_prefixes_and_analytic_histories_despite_future_faults_and_selection()
+{
+    use rmagna::circuit::{BitAtom, BitExpr};
+    use rmagna::runtime::CausalStrategy;
+    let a = ScalarArithmetic::default();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("copy", "1", |bits: &[bool]| Ok(vec![bits[0]]))
+        .unwrap();
+    registry
+        .register("parity", "1", |bits: &[bool]| Ok(vec![bits[0] ^ bits[1]]))
+        .unwrap();
+    let source = parse(
+        "H 0\nM 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCH ctrl[0] 1\nX_ERROR(1/3) ctrl[0] 1\nM 1\nDETECTOR rec[-1]\nCONTROL[parity] det[1] ctrl[0] -> ctrl[1]\nH 2\nCS ctrl[1] 2\nT 2\nH 2\nM 2\nDETECTOR rec[-1]\nPOSTSELECT ctrl[1] det[2]",
+        &registry,
+    );
+    let fixed = CausalProgram::new(
+        &source,
+        &registry,
+        RuntimeOptions {
+            max_prefix_compiles: 0,
+            ..Default::default()
+        },
+        &a,
+    )
+    .unwrap();
+    let cold = CausalProgram::new(
+        &source,
+        &registry,
+        RuntimeOptions {
+            strategy: CausalStrategy::ColdPrefix,
+            ..Default::default()
+        },
+        &a,
+    )
+    .unwrap();
+    let operation = source
+        .operations()
+        .iter()
+        .find(|op| matches!(op.operation, Operation::Noise { .. }))
+        .unwrap()
+        .id;
+    let site = fixed.potential_site(operation).unwrap();
+    let request = [BitExpr::atom(BitAtom::Record(2))];
+    for faulted in [false, true] {
+        let faults = if faulted {
+            vec![FaultSelection {
+                site,
+                alternative: 0,
+            }]
+        } else {
+            vec![]
+        };
+        for m0 in [false, true] {
+            for m1 in [false, true] {
+                for m2 in [false, true] {
+                    let groups = vec![vec![m0], vec![m0], vec![m1, m0], vec![m2]];
+                    let f = fixed.resolve_prescribed_history(&request, &faults, &groups, &a);
+                    let c = cold.resolve_prescribed_history(&request, &faults, &groups, &a);
+                    if !m0 && m1 {
+                        assert!(f.is_err() && c.is_err());
+                        continue;
+                    }
+                    let f = f.unwrap();
+                    let c = c.unwrap();
+                    assert_eq!(f.history_mass(), c.history_mass());
+                    assert_eq!(f.controller_calls(), c.controller_calls());
+                    assert_eq!(f.noise_probability(), c.noise_probability());
+                    assert_eq!(f.network_compilations(), 0);
+                    assert_eq!(c.network_compilations(), 5);
+                    assert_eq!(f.history_queries(), 4);
+                    let sign = if m0 ^ m1 { -1 } else { 1 };
+                    let zero_mass = a
+                        .scalar([2.into(), sign.into(), 0.into(), (-sign).into()], -2)
+                        .unwrap();
+                    let last = if m2 {
+                        a.subtract(&ExactScalar::one(), &zero_mass).unwrap()
+                    } else {
+                        zero_mass
+                    };
+                    let history = a
+                        .multiply(&last, &a.omega(0, if m0 { -4 } else { -2 }).unwrap())
+                        .unwrap();
+                    assert_eq!(f.history_mass(), &history);
+                    let accepted = f
+                        .instrument()
+                        .acceptance(f.faults(), 256, &a)
+                        .unwrap()
+                        .value;
+                    assert_eq!(
+                        accepted,
+                        if m0 == m1 && !m2 {
+                            history
+                        } else {
+                            ExactScalar::zero()
+                        }
+                    );
+                    assert_eq!(
+                        f.instrument().fault_probability(f.faults()).unwrap(),
+                        *f.noise_probability()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn seeded_fixed_and_cold_histories_preserve_entropy_and_full_physical_draws() {
+    use rmagna::circuit::{BitAtom, BitExpr};
+    use rmagna::noise::SplitMix64;
+    use rmagna::runtime::CausalStrategy;
+    let a = ScalarArithmetic::default();
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("copy", "1", |bits: &[bool]| Ok(vec![bits[0]]))
+        .unwrap();
+    let source = parse(
+        "H 0\nT 0\nH 0\nM(1/7) 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCH ctrl[0] 1\nX_ERROR(1/3) ctrl[0] 1\nM 1\nDETECTOR rec[-1]\nPOSTSELECT det[1]",
+        &registry,
+    );
+    let fixed = CausalProgram::new(&source, &registry, RuntimeOptions::default(), &a).unwrap();
+    let cold = CausalProgram::new(
+        &source,
+        &registry,
+        RuntimeOptions {
+            strategy: CausalStrategy::ColdPrefix,
+            ..Default::default()
+        },
+        &a,
+    )
+    .unwrap();
+    let requested = [BitExpr::atom(BitAtom::Record(1))];
+    for seed in 0..48 {
+        let mut f = SplitMix64::new(seed);
+        let mut c = SplitMix64::new(seed);
+        let first = fixed.resolve(&requested, &mut f, &a).unwrap();
+        let second = cold.resolve(&requested, &mut c, &a).unwrap();
+        assert_eq!(f.state(), c.state());
+        assert_eq!(first.entropy_words(), second.entropy_words());
+        assert_eq!(first.history_mass(), second.history_mass());
+        assert_eq!(first.noise_probability(), second.noise_probability());
+        assert_eq!(first.faults(), second.faults());
+        assert_eq!(first.controller_calls(), second.controller_calls());
+        assert_eq!(first.requested_values(), second.requested_values());
+        assert_eq!(
+            first
+                .instrument()
+                .acceptance(first.faults(), 256, &a)
+                .unwrap()
+                .value,
+            second
+                .instrument()
+                .acceptance(second.faults(), 256, &a)
+                .unwrap()
+                .value
+        );
+        assert_eq!(first.network_compilations(), 0);
+        assert!(second.network_compilations() > 0);
+    }
 }

@@ -6,7 +6,7 @@ use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};
 use crate::gf2::BitVector;
 use crate::instrument::{
     CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError,
-    compile_affine,
+    compile_affine, compile_causal,
 };
 use crate::noise::{NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, RandomSource};
 use crate::records::{RecordQuery, SamplingError, SamplingOptions, sample_reported_conditioned};
@@ -118,8 +118,15 @@ impl From<SamplingError> for RuntimeError {
         Self::Sampling(e)
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CausalStrategy {
+    FixedTemplate,
+    ColdPrefix,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct RuntimeOptions {
+    pub strategy: CausalStrategy,
+    pub max_history_queries: usize,
     pub compile: CompileOptions,
     pub noise: NoiseOptions,
     pub sampling: SamplingOptions,
@@ -129,6 +136,8 @@ pub struct RuntimeOptions {
 impl Default for RuntimeOptions {
     fn default() -> Self {
         Self {
+            strategy: CausalStrategy::FixedTemplate,
+            max_history_queries: 100_000,
             compile: CompileOptions::default(),
             noise: NoiseOptions::default(),
             sampling: SamplingOptions::default(),
@@ -153,6 +162,8 @@ pub struct CausalDraw {
     pub controller_calls: Vec<ControllerCall>,
     pub noise_entropy_words: usize,
     pub history_entropy_words: usize,
+    pub network_compilations: usize,
+    pub history_queries: usize,
 }
 pub struct ResolvedHistory {
     instrument: CompiledInstrument,
@@ -165,6 +176,8 @@ pub struct ResolvedHistory {
     decisions: BTreeMap<(usize, usize), bool>,
     noise_entropy_words: usize,
     history_entropy_words: usize,
+    network_compilations: usize,
+    history_queries: usize,
 }
 impl ResolvedHistory {
     pub fn instrument(&self) -> &CompiledInstrument {
@@ -191,6 +204,13 @@ impl ResolvedHistory {
     pub fn entropy_words(&self) -> (usize, usize) {
         (self.noise_entropy_words, self.history_entropy_words)
     }
+    /// Actual post-preparation Clifford network constructions for this history.
+    pub fn network_compilations(&self) -> usize {
+        self.network_compilations
+    }
+    pub fn history_queries(&self) -> usize {
+        self.history_queries
+    }
     pub fn resolve_expression(&self, expression: &BitExpr) -> Result<BitExpr, RuntimeError> {
         resolve::expression(expression, &self.decisions, false)
     }
@@ -212,6 +232,8 @@ impl ResolvedHistory {
             controller_calls: self.controller_calls,
             noise_entropy_words: self.noise_entropy_words,
             history_entropy_words: self.history_entropy_words,
+            network_compilations: self.network_compilations,
+            history_queries: self.history_queries,
         })
     }
 }
@@ -222,11 +244,13 @@ pub struct CausalProgram {
     registry: ControllerRegistry,
     source_sites: BTreeMap<usize, usize>,
     options: RuntimeOptions,
+    reference: Option<CompiledInstrument>,
+    guarded_sites: std::collections::BTreeSet<usize>,
 }
 impl CausalProgram {
-    /// Compile a structural reference for all potential noise categories. Sampling
-    /// later compiles resolved physical prefixes; unknown decisions never enter
-    /// a physical query. Controller names are checked before drawing entropy.
+    /// Compile one fixed coherent template, or the explicitly selected cold
+    /// prefix baseline. Controller names are checked before drawing entropy.
+    /// Future operations are trace preserving in physical history queries.
     pub fn new(
         circuit: &Circuit,
         registry: &ControllerRegistry,
@@ -245,8 +269,12 @@ impl CausalProgram {
                 return Err(RuntimeError::MissingBinding { name: name.clone() });
             }
         }
-        let structural = resolve::potential(circuit);
-        let reference = compile_affine(&structural, &options.compile, arithmetic)?;
+        let reference = match options.strategy {
+            CausalStrategy::FixedTemplate => compile_causal(circuit, &options.compile, arithmetic)?,
+            CausalStrategy::ColdPrefix => {
+                compile_affine(&resolve::potential(circuit), &options.compile, arithmetic)?
+            }
+        };
         let model = NoiseModel::physical(&reference, &options.noise)?;
         let mut source_sites = BTreeMap::new();
         for (site, category) in reference.noise_sites().iter().enumerate() {
@@ -254,7 +282,15 @@ impl CausalProgram {
                 source_sites.insert(operation, site);
             }
         }
+        let guarded_sites = circuit
+            .operations()
+            .iter()
+            .filter(|op| matches!(op.operation, Operation::Noise { guard: Some(_), .. }))
+            .map(|op| source_sites[&op.id])
+            .collect();
         Ok(Self {
+            reference: (options.strategy == CausalStrategy::FixedTemplate).then_some(reference),
+            guarded_sites,
             circuit: circuit.clone(),
             sampler: NoiseSampler::physical(model.clone(), options.noise),
             model,
@@ -262,6 +298,12 @@ impl CausalProgram {
             source_sites,
             options,
         })
+    }
+    pub fn strategy(&self) -> CausalStrategy {
+        self.options.strategy
+    }
+    pub fn reference_compilations(&self) -> usize {
+        1
     }
     pub fn sample(
         &self,
@@ -470,6 +512,8 @@ impl CausalProgram {
             calls: Vec::new(),
             entropy_words: 0,
             prefix_compiles: 0,
+            network_compilations: 0,
+            history_queries: 0,
             prescribed,
             next_group: 0,
         };
@@ -529,28 +573,9 @@ impl CausalProgram {
                 arithmetic,
             )?
         };
-        let mut resolved = state.resolved(self.circuit.operations().len())?;
-        for (expression, value) in &state.conditions {
-            let mut expression = expression.clone();
-            expression.constant ^= *value;
-            resolved.push(LocatedOperation {
-                id: self.circuit.operations().len() + resolved.len(),
-                location: self
-                    .circuit
-                    .operations()
-                    .last()
-                    .map(|op| op.location.clone())
-                    .unwrap_or(crate::circuit::SourceLocation {
-                        source: None,
-                        line: 1,
-                        column: 1,
-                        repeat: vec![],
-                    }),
-                operation: Operation::Postselect { expression },
-            });
-        }
-        let final_circuit = self.circuit.runtime_view(resolved);
-        let instrument = compile_affine(&final_circuit, &self.options.compile, arithmetic)?;
+        let instrument = state
+            .instrument(self.circuit.operations().len(), arithmetic)?
+            .conditioned(&state.conditions)?;
         let faults = state.faults(&instrument)?;
         let parities = state
             .conditions
@@ -593,6 +618,8 @@ impl CausalProgram {
             controller_calls: state.calls,
             noise_entropy_words: draw.entropy_words,
             history_entropy_words: state.entropy_words,
+            network_compilations: state.network_compilations,
+            history_queries: state.history_queries,
         })
     }
 }
@@ -605,6 +632,8 @@ struct PathState<'a> {
     calls: Vec<ControllerCall>,
     entropy_words: usize,
     prefix_compiles: usize,
+    network_compilations: usize,
+    history_queries: usize,
     prescribed: Option<&'a [Vec<bool>]>,
     next_group: usize,
 }
@@ -617,6 +646,30 @@ impl PathState<'_> {
             &self.guards,
             &self.program.source_sites,
         )
+    }
+    fn instrument(
+        &mut self,
+        end: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<CompiledInstrument, RuntimeError> {
+        if let Some(reference) = &self.program.reference {
+            let active = reference
+                .noise_sites()
+                .iter()
+                .enumerate()
+                .filter_map(|(site, _)| {
+                    (!self.program.guarded_sites.contains(&site)
+                        || self.guards.get(&site) == Some(&true))
+                    .then_some(site)
+                })
+                .collect();
+            Ok(reference.branch(&self.decisions, &active)?)
+        } else {
+            let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
+            let instrument = compile_affine(&prefix, &self.program.options.compile, arithmetic)?;
+            self.network_compilations += 1;
+            Ok(instrument)
+        }
     }
     fn faults(&self, instrument: &CompiledInstrument) -> Result<Vec<FaultSelection>, RuntimeError> {
         let mut faults = Vec::new();
@@ -652,15 +705,25 @@ impl PathState<'_> {
                 limit: self.program.options.max_history_inputs,
             });
         }
-        if self.prefix_compiles >= self.program.options.max_prefix_compiles {
+        if self.history_queries >= self.program.options.max_history_queries {
+            return Err(RuntimeError::ResourceLimit {
+                option: "max_history_queries",
+                limit: self.program.options.max_history_queries,
+            });
+        }
+        self.history_queries += 1;
+        if self.program.reference.is_none()
+            && self.prefix_compiles >= self.program.options.max_prefix_compiles
+        {
             return Err(RuntimeError::ResourceLimit {
                 option: "max_prefix_compiles",
                 limit: self.program.options.max_prefix_compiles,
             });
         }
-        self.prefix_compiles += 1;
-        let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
-        let instrument = compile_affine(&prefix, &self.program.options.compile, arithmetic)?;
+        if self.program.reference.is_none() {
+            self.prefix_compiles += 1;
+        }
+        let instrument = self.instrument(end, arithmetic)?;
         let faults = self.faults(&instrument)?;
         if let Some(groups) = self.prescribed {
             let group = self.next_group;
