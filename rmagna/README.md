@@ -162,9 +162,10 @@ during reduction. An inconsistent boundary returns exact zero with no terms.
 This cold closed-network plan has no update API; use `PreparedPhaseSum` for a
 fixed quotient with covariant phase updates.
 
-The term limit applies to `2^quotient_rank` and is checked before enumeration.
-This version provides the computational expansion only; choosing a smaller
-T-state catalog decomposition is a subsequent deliverable. The limit is not a
+For the original `ClosedPhaseSum::new` and `PreparedPhaseSum`, the term limit
+applies to `2^quotient_rank` and is checked before enumeration. The optional
+adaptive constructor below can choose a smaller certified Clifford-fiber
+expansion. Imported T-state catalog decompositions remain a separate deliverable. The limit is not a
 process-memory cap, and these algebra types do not perform circuit compilation
 or choose a global commuting layer.
 
@@ -952,3 +953,55 @@ errors and impossible histories before callbacks, preserve guarded-chain weights
 and reject inconsistent duplicate observations. Requested records remain physical
 even when selection rejects them. Task tests explicitly integrate conditional
 contributions against history mass to recover the physical accepted probability.
+
+
+## Certified Clifford-fiber decompositions
+
+`fibers::PreparedCliffordFibers` partitions the residual phase domain into affine
+fibers on each of which the phase is Clifford. It first computes the original
+signature quotient, then searches for a subspace on which the restricted
+trilinear signature vanishes. This condition differs from the radical condition:
+all three arguments belong to the chosen subspace. For example, fixing one bit
+of a CCZ phase leaves a quadratic phase on the other two bits, giving two
+Clifford terms rather than eight computational terms. A pair of T phases also
+has two Clifford fibers, distinguished by even or odd input parity.
+
+The search uses deterministic greedy orders and linear signature slices. Every
+candidate is independently certified with exact Clifford extraction. The associated
+bilinear signature bounds the possible subspace dimension and stops the search
+when that bound is reached. There is no universal optimal-rank claim. `FiberOptions` defaults to 256 orders for signature ranks
+at most 16; larger ranks or zero attempts retain computational fibers. This
+bounds the search policy, not total memory or time. Construction checks the
+selected term count before allocating fibers. Each reference fiber caches its
+affine shift, quadratic phase and exact eighth-root constant.
+
+`evaluate(updated, boundary, coefficient, arithmetic)` requires the update to
+differ by a Clifford phase and reuses that affine partition. It adds the exact
+update and boundary quadratics and evaluates one Gauss sum per fiber. All
+constants, complex coefficients and powers of square root of two are preserved.
+`quotient_rank` reports the original signature rank; `num_terms` reports actual
+Clifford terms and `enumerated_coordinates` reports their binary label count.
+These quantities must not be treated as interchangeable ranks.
+
+`ClosedPhaseSum::new_adaptive` applies this decomposition after recursively
+absorbing radical directions and their affine constraints. Unitary network
+queries use that adaptive route by default, so a four-term verified decomposition
+can fit a four-term budget even when its signature quotient has sixteen points.
+The original closed constructor retains its computational expansion contract.
+This change does not prepare whole circuit queries across faults or replace the
+cold causal prefix compiler.
+
+Tests exhaust all third-level signature classes through three variables with
+Clifford updates, compare dense four- through eight-variable phases against raw
+integer eighth-root sums, and check paired T, CCZ, two independent cubic blocks,
+wide 129-bit radicals, incompatible updates and budgets. All 28 pinned native
+phase witnesses also pass through both prepared fibers and adaptive closed sums.
+A literal four-qubit circuit matrix verifies every amplitude with a four-term
+budget that rejects three terms.
+
+
+A bounded TQD3 prescribed-history pilot matches the native raw masses and full
+real-decoder transcripts at two histories. Its acceptance/fidelity networks use
+2/4 Clifford terms at signature ranks 5/10, replacing the computational 32/1,024
+terms. This is finite correctness and resource evidence; it does not establish
+arbitrary-history coverage, complete TQD campaigns, or paper throughput.

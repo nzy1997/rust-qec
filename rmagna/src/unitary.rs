@@ -693,12 +693,13 @@ fn close(
             .collect::<Result<Vec<_>, Gf2Error>>()?,
     )?;
     let restricted = phase.restrict(ket.offset(), ket.columns())?;
-    let prepared = ClosedPhaseSum::new(
+    let prepared = ClosedPhaseSum::new_adaptive(
         &restricted,
         ket.phase(),
         ket.coefficient(),
         max_terms,
         arithmetic,
+        crate::fibers::FiberOptions::default(),
     )?;
     Ok(NetworkValue {
         value: prepared.evaluate(arithmetic)?,

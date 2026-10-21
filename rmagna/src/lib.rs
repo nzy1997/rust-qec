@@ -17,3 +17,5 @@ pub mod stabilizer;
 pub mod task;
 pub mod unitary;
 pub use num_bigint::BigInt;
+
+pub mod fibers;

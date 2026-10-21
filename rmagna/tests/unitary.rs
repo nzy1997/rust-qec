@@ -869,3 +869,25 @@ fn pauli_moments_match_literal_matrices_under_projected_events() {
         }
     }
 }
+
+#[test]
+fn closed_unitary_queries_use_certified_clifford_fibers_before_the_term_budget() {
+    let a = ScalarArithmetic::default();
+    let gates = (0..4)
+        .map(|qubit| G::Clifford(C::H(qubit)))
+        .chain((0..4).map(|qubit| G::T { qubit, turns: 1 }))
+        .chain((0..4).map(|qubit| G::Clifford(C::H(qubit))))
+        .collect::<Vec<_>>();
+    let circuit = UnitaryCircuit::new(4, gates.clone())
+        .unwrap()
+        .compile(&bits(4, 0), &a)
+        .unwrap();
+    let expected = dense(&gates, 4, 0, &a);
+    for (x, value) in expected.iter().enumerate() {
+        let query = circuit.amplitude(&bits(4, x), 4, &a).unwrap();
+        assert_eq!(&query.value, value);
+        assert_eq!(query.quotient_rank, 4);
+        assert_eq!(query.terms, 4);
+    }
+    assert!(circuit.amplitude(&bits(4, 0), 3, &a).is_err());
+}
