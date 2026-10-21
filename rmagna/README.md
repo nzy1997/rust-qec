@@ -1232,3 +1232,11 @@ target overlap agree with analytical physical enumeration for both fixed-templat
 and cold-prefix strategies. The family can contain additional zero histories;
 these tests do not establish the same proposal variance as another compiler or
 complete prepared-decomposition reuse.
+
+The unitary compiler stores its frozen observations as an immutable general
+`ParityPhase`, including its constant. Scalar closures compose each family's
+linear parity observations in leg order and conjugate both constants and
+coefficients for bra copies. Existing compilation still creates individual
+copies; the representation can now express shared observations without changing
+amplitude, probability, overlap, density or Pauli-moment semantics. Layer
+selection and its fault-dependent phase corrections are separate compiler work.

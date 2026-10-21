@@ -222,7 +222,15 @@ impl UnitaryCircuit {
         Ok(CompiledUnitary {
             physical_width: self.width,
             boundary,
-            coefficients,
+            phase: Arc::new(ParityPhase::new(
+                coefficients.len(),
+                0,
+                coefficients
+                    .into_iter()
+                    .enumerate()
+                    .map(|(j, c)| Ok((BitVector::from_indices(width - self.width, [j])?, c)))
+                    .collect::<Result<Vec<_>, Gf2Error>>()?,
+            )?),
             program,
         })
     }
@@ -264,7 +272,7 @@ pub struct NetworkValue {
 pub struct CompiledUnitary {
     physical_width: usize,
     boundary: Arc<AffineKet>,
-    coefficients: Vec<u8>,
+    phase: Arc<ParityPhase>,
     program: Arc<InsertionProgram>,
 }
 struct InsertionProgram {
@@ -297,7 +305,7 @@ pub struct PreparedProbability {
     event_count: usize,
     projection: PreparedZProjection,
     legs: [Vec<usize>; 2],
-    coefficients: [Vec<u8>; 2],
+    phase: Arc<ParityPhase>,
 }
 
 impl PreparedProbability {
@@ -324,7 +332,7 @@ impl PreparedProbability {
         close(
             self.projection.project(&joint, &rhs)?,
             &self.legs,
-            &self.coefficients,
+            &[(&self.phase, false), (&self.phase, true)],
             max_terms,
             arithmetic,
         )
@@ -336,7 +344,7 @@ impl CompiledUnitary {
         self.physical_width
     }
     pub fn phase_legs(&self) -> usize {
-        self.coefficients.len()
+        self.phase.num_variables()
     }
 
     /// A conservative computational support image, without non-Clifford phases.
@@ -401,10 +409,7 @@ impl CompiledUnitary {
                 (self.width()..half).collect(),
                 (half + self.width()..total).collect(),
             ],
-            coefficients: [
-                self.coefficients.clone(),
-                self.coefficients.iter().map(|c| (8 - c) & 7).collect(),
-            ],
+            phase: Arc::clone(&self.phase),
         })
     }
 
@@ -459,7 +464,7 @@ impl CompiledUnitary {
         Ok(Self {
             physical_width: self.physical_width,
             boundary,
-            coefficients: self.coefficients.clone(),
+            phase: Arc::clone(&self.phase),
             program: Arc::clone(&self.program),
         })
     }
@@ -481,7 +486,7 @@ impl CompiledUnitary {
         close(
             ket,
             &[(self.width()..total).collect::<Vec<_>>()],
-            std::slice::from_ref(&self.coefficients),
+            &[(&self.phase, false)],
             max_terms,
             arithmetic,
         )
@@ -521,11 +526,10 @@ impl CompiledUnitary {
             (self.width()..half).collect::<Vec<_>>(),
             (half + self.width()..total).collect::<Vec<_>>(),
         ];
-        let negative = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
         close(
             ket,
             &legs,
-            &[self.coefficients.clone(), negative],
+            &[(&self.phase, false), (&self.phase, true)],
             max_terms,
             arithmetic,
         )
@@ -575,11 +579,10 @@ impl CompiledUnitary {
             (self.width()..half).collect(),
             (half + self.width()..total).collect(),
         ];
-        let negative = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
         close(
             ket,
             &legs,
-            &[negative, self.coefficients.clone()],
+            &[(&self.phase, true), (&self.phase, false)],
             max_terms,
             arithmetic,
         )
@@ -609,11 +612,10 @@ impl CompiledUnitary {
             (self.width()..half).collect::<Vec<_>>(),
             (half + target.width()..total).collect::<Vec<_>>(),
         ];
-        let negative = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
         close(
             ket,
             &legs,
-            &[negative, target.coefficients.clone()],
+            &[(&self.phase, true), (&target.phase, false)],
             max_terms,
             arithmetic,
         )
@@ -759,16 +761,14 @@ impl CompiledUnitary {
             (2 * n + target.width()..2 * n + m).collect(),
             (2 * n + m + target.width()..total).collect(),
         ];
-        let negative_self = self.coefficients.iter().map(|c| (8 - c) & 7).collect();
-        let negative_target = target.coefficients.iter().map(|c| (8 - c) & 7).collect();
         close(
             ket,
             &legs,
             &[
-                self.coefficients.clone(),
-                negative_self,
-                negative_target,
-                target.coefficients.clone(),
+                (&self.phase, false),
+                (&self.phase, true),
+                (&target.phase, true),
+                (&target.phase, false),
             ],
             max_terms,
             arithmetic,
@@ -779,7 +779,7 @@ impl CompiledUnitary {
 fn close(
     ket: Option<AffineKet>,
     legs: &[Vec<usize>],
-    coefficients: &[Vec<u8>],
+    phases: &[(&ParityPhase, bool)],
     max_terms: usize,
     arithmetic: &ScalarArithmetic,
 ) -> Result<NetworkValue, UnitaryError> {
@@ -795,16 +795,29 @@ fn close(
     let Some(ket) = ket.sum_boundary(&keep, arithmetic)? else {
         return Ok(zero());
     };
-    let phase = ParityPhase::new(
-        keep.len(),
-        0,
-        coefficients
+    if phases.len() != legs.len()
+        || phases
             .iter()
-            .flatten()
-            .enumerate()
-            .map(|(j, &c)| Ok((BitVector::from_indices(keep.len(), [j])?, c)))
-            .collect::<Result<Vec<_>, Gf2Error>>()?,
-    )?;
+            .zip(legs)
+            .any(|((p, _), l)| p.num_variables() != l.len())
+    {
+        return Err(UnitaryError::DimensionMismatch);
+    }
+    let mut constant = 0;
+    let mut terms = Vec::new();
+    let mut offset = 0;
+    for ((phase, conjugate), indices) in phases.iter().zip(legs) {
+        let sign = |c: u8| if *conjugate { (8 - c) & 7 } else { c };
+        constant = (constant + sign(phase.constant())) & 7;
+        for (axis, c) in phase.terms() {
+            terms.push((
+                BitVector::from_indices(keep.len(), axis.ones().map(|j| offset + j))?,
+                sign(*c),
+            ));
+        }
+        offset += indices.len();
+    }
+    let phase = ParityPhase::new(keep.len(), constant, terms)?;
     let restricted = phase.restrict(ket.offset(), ket.columns())?;
     let prepared = ClosedPhaseSum::new_adaptive(
         &restricted,
@@ -819,4 +832,64 @@ fn close(
         quotient_rank: prepared.quotient_rank(),
         terms: prepared.num_terms(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quadratic::QuadraticForm;
+
+    #[test]
+    fn shared_phase_closure_matches_literal_complex_polynomials() {
+        let arithmetic = ScalarArithmetic::default();
+        let columns = (0..5)
+            .map(|j| BitVector::from_indices(5, [j]).unwrap())
+            .collect();
+        let mut upper = vec![BitVector::zeros(5).unwrap(); 5];
+        upper[1].set(4, true).unwrap();
+        let ket = AffineKet::new(
+            BitVector::zeros(5).unwrap(),
+            columns,
+            QuadraticForm::new(3, vec![1, 0, 0, 0, 0], upper).unwrap(),
+            arithmetic.omega(3, -2).unwrap(),
+        )
+        .unwrap();
+        let left = ParityPhase::new(
+            2,
+            2,
+            [(vec![0], 1), (vec![1], 3), (vec![0, 1], 7)]
+                .into_iter()
+                .map(|(indices, c)| (BitVector::from_indices(2, indices).unwrap(), c)),
+        )
+        .unwrap();
+        let right =
+            ParityPhase::new(1, 5, [(BitVector::from_indices(1, [0]).unwrap(), 5)]).unwrap();
+        for conjugate_left in [false, true] {
+            for conjugate_right in [false, true] {
+                let mut expected = ExactScalar::zero();
+                for x in 0_i64..32 {
+                    let bit = |j: u32| -> i64 { (x >> j) & 1 };
+                    let quadratic = 3 + bit(0) + 2 * bit(1) * bit(4);
+                    let a = 2 + bit(2) + 3 * bit(0) + 7 * (bit(2) ^ bit(0));
+                    let b = 5 + 5 * bit(4);
+                    let angle = 3
+                        + 2 * quadratic
+                        + if conjugate_left { -a } else { a }
+                        + if conjugate_right { -b } else { b };
+                    expected = arithmetic
+                        .add(&expected, &arithmetic.omega(angle, -2).unwrap())
+                        .unwrap();
+                }
+                let actual = close(
+                    Some(ket.clone()),
+                    &[vec![2, 0], vec![4]],
+                    &[(&left, conjugate_left), (&right, conjugate_right)],
+                    8,
+                    &arithmetic,
+                )
+                .unwrap();
+                assert_eq!(actual.value, expected);
+            }
+        }
+    }
 }
