@@ -483,8 +483,6 @@ impl CompiledInstrument {
         })
     }
 
-    /// Query physical reported-record marginals, without applying postselection.
-    /// This distinction is required by the later causal history sampler.
     /// Conservative support for reported parities, including their inversions
     /// and declared faults, and excluding every postselection predicate.
     pub fn reported_support(
@@ -510,6 +508,8 @@ impl CompiledInstrument {
             .translated(&constants)?)
     }
 
+    /// Query physical reported-record marginals, without applying postselection.
+    /// This distinction is required by the later causal history sampler.
     pub fn reported_probability(
         &self,
         parities: &[BitExpr],

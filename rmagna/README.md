@@ -595,8 +595,9 @@ As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
 This is the cold exact-marginal route for affine instruments. The runtime below
-adds external callbacks and guarded noise; the affine-support proposal and
-cached query preparation remain separate deliverables. Tests check exact binary boundaries and refinement,
+adds external callbacks and guarded noise. Runtime integration of affine-support
+proposals and cached query preparation remains subsequent work. Tests check
+exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
 
