@@ -809,3 +809,58 @@ fn cold_compilation_metadata_describes_the_initial_potential_instrument() {
     assert_eq!(history.instrument().compilation().layer_slots, [1, 1]);
     assert_eq!(history.instrument().compilation().path_variables, 1);
 }
+
+#[test]
+fn forced_and_zero_guarded_categories_keep_active_path_probabilities() {
+    use rmagna::runtime::CausalStrategy;
+    let a = ScalarArithmetic::default();
+    let registry = ControllerRegistry::default();
+    for rate in [0, 1] {
+        let source = parse(&format!("H 0\nM 0\nX_ERROR({rate}) rec[-1] 1"), &registry);
+        for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+            let program = CausalProgram::new(
+                &source,
+                &registry,
+                RuntimeOptions {
+                    strategy,
+                    ..Default::default()
+                },
+                &a,
+            )
+            .unwrap();
+            let operation = source
+                .operations()
+                .iter()
+                .find(|op| matches!(op.operation, Operation::Noise { .. }))
+                .unwrap()
+                .id;
+            let site = program.potential_site(operation).unwrap();
+            for active in [false, true] {
+                for fault in [false, true] {
+                    let faults = if fault {
+                        vec![FaultSelection {
+                            site,
+                            alternative: 0,
+                        }]
+                    } else {
+                        vec![]
+                    };
+                    let history = program
+                        .resolve_prescribed(&[], &faults, &mut Words::bits(&[active]), &a)
+                        .unwrap();
+                    let expected = if !active || fault == (rate == 1) {
+                        1
+                    } else {
+                        0
+                    };
+                    assert_eq!(
+                        history.noise_probability(),
+                        &num_rational::BigRational::from_integer(expected.into())
+                    );
+                    assert_eq!(history.history_mass(), &a.omega(0, -2).unwrap());
+                    assert_eq!(history.faults().len(), usize::from(active && fault));
+                }
+            }
+        }
+    }
+}

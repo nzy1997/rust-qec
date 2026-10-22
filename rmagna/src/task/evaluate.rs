@@ -28,7 +28,7 @@ enum Execution {
     Linear {
         instrument: Box<CompiledInstrument>,
         model: NoiseModel,
-        sampler: NoiseSampler,
+        sampler: Box<NoiseSampler>,
     },
     Causal(Box<CausalProgram>),
 }
@@ -174,7 +174,7 @@ impl TaskEvaluator {
             Execution::Linear {
                 instrument: Box::new(instrument),
                 model,
-                sampler,
+                sampler: Box::new(sampler),
             }
         };
         Ok(Self {

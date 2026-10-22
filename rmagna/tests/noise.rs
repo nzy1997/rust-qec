@@ -294,3 +294,172 @@ fn seeded_streams_are_stable_resumable_and_independent_of_draw_chunking() {
         BigRational::from_integer(1.into())
     );
 }
+
+#[test]
+fn prepared_identity_products_match_all_literal_categorical_assignments() {
+    let rows = [
+        vec!["1/2", "1/3", "1/6"],
+        vec!["0", "2/5", "3/5"],
+        vec!["1", "0", "0"],
+        vec!["1/7", "0", "6/7"],
+    ];
+    let probabilities = rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|p| p.parse::<rmagna::probability::Probability>().unwrap())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let p = NoiseModel::new(probabilities.clone(), &NoiseOptions::default()).unwrap();
+    for assignment in 0..81 {
+        let mut value = assignment;
+        let mut expected = BigRational::from_integer(1.into());
+        let mut faults = Vec::new();
+        for (site, row) in probabilities.iter().enumerate() {
+            let choice = value % 3;
+            value /= 3;
+            expected *= row[choice].value();
+            if choice != 0 {
+                faults.push(FaultSelection {
+                    site,
+                    alternative: choice - 1,
+                });
+            }
+        }
+        faults.reverse();
+        assert_eq!(
+            p.probability(&faults).unwrap(),
+            expected,
+            "assignment={assignment}"
+        );
+    }
+    assert_eq!(
+        p.probability(&[]).unwrap(),
+        BigRational::from_integer(0.into())
+    );
+    // Validation cannot be bypassed by an omitted forced category or a zero
+    // probability alternative elsewhere in the assignment.
+    assert!(matches!(
+        p.probability(&[FaultSelection {
+            site: usize::MAX,
+            alternative: 0
+        }]),
+        Err(NoiseError::InvalidFault { .. })
+    ));
+    assert!(matches!(
+        p.probability(
+            &[FaultSelection {
+                site: 2,
+                alternative: 0
+            }; 2]
+        ),
+        Err(NoiseError::RepeatedFault { site: 2 })
+    ));
+    assert_eq!(
+        model(&[]).probability(&[]).unwrap(),
+        BigRational::from_integer(1.into())
+    );
+}
+
+#[test]
+fn sparse_noise_products_preserve_large_powers_tiny_values_and_forced_choices() {
+    use num_bigint::BigInt;
+    use rmagna::probability::Probability;
+    let n = 257_u32;
+    let row = vec![
+        "999/1000".parse().unwrap(),
+        "1/3000".parse().unwrap(),
+        "1/1500".parse().unwrap(),
+    ];
+    let p = NoiseModel::new(vec![row; n as usize], &NoiseOptions::default()).unwrap();
+    let sites = [128, 1, 256, 64, 129];
+    for count in 0..=sites.len() {
+        let faults = sites[..count]
+            .iter()
+            .enumerate()
+            .map(|(j, &site)| FaultSelection {
+                site,
+                alternative: j % 2,
+            })
+            .collect::<Vec<_>>();
+        let k0 = count.div_ceil(2) as u32;
+        let k1 = count as u32 - k0;
+        let expected = BigRational::new(
+            BigInt::from(999).pow(n - count as u32),
+            BigInt::from(1000).pow(n - count as u32)
+                * BigInt::from(3000).pow(k0)
+                * BigInt::from(1500).pow(k1),
+        );
+        assert_eq!(p.probability(&faults).unwrap(), expected);
+    }
+    let tiny: Probability = "1e-400".parse().unwrap();
+    let identity = tiny.complement();
+    let p = NoiseModel::new(
+        vec![vec![identity.clone(), tiny.clone()]; 3],
+        &NoiseOptions::default(),
+    )
+    .unwrap();
+    let expected = identity.value() * tiny.value() * tiny.value();
+    assert!(expected > BigRational::from_integer(0.into()));
+    assert_eq!(
+        p.probability(&[
+            FaultSelection {
+                site: 1,
+                alternative: 0
+            },
+            FaultSelection {
+                site: 2,
+                alternative: 0
+            }
+        ])
+        .unwrap(),
+        expected
+    );
+    let p = model(&[&["0", "1/3", "2/3"], &["0", "1"], &["1/2", "1/2"]]);
+    assert_eq!(
+        p.probability(&[
+            FaultSelection {
+                site: 0,
+                alternative: 1
+            },
+            FaultSelection {
+                site: 1,
+                alternative: 0
+            }
+        ])
+        .unwrap(),
+        BigRational::new(1.into(), 3.into())
+    );
+    assert_eq!(
+        p.probability(&[FaultSelection {
+            site: 0,
+            alternative: 1
+        }])
+        .unwrap(),
+        BigRational::from_integer(0.into())
+    );
+}
+
+#[test]
+fn equivalent_proposals_preserve_exact_draws_and_entropy_including_forced_sites() {
+    let p = model(&[&["1/3", "1/6", "1/2"], &["0", "1/4", "3/4"], &["1", "0"]]);
+    let equivalent = model(&[
+        &["2/6", "2/12", "4/8"],
+        &["0/3", "2/8", "6/8"],
+        &["2/2", "0/2"],
+    ]);
+    let physical = NoiseSampler::physical(p.clone(), NoiseOptions::default());
+    let importance = NoiseSampler::importance(p, equivalent, NoiseOptions::default()).unwrap();
+    for seed in 0..32 {
+        let mut a = SplitMix64::new(seed);
+        let mut b = SplitMix64::new(seed);
+        for _ in 0..32 {
+            assert_eq!(
+                physical.draw(&mut a).unwrap(),
+                importance.draw(&mut b).unwrap()
+            );
+            assert_eq!(a.state(), b.state());
+        }
+    }
+}
