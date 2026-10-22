@@ -1116,3 +1116,153 @@ fn target_density_cache_distinguishes_programs_and_reuses_outcomes_and_faults() 
         );
     }
 }
+
+#[test]
+fn probability_preparation_compatibility_name_preserves_variant_imports() {
+    use rmagna::instrument::ProbabilityPreparation::{Cold, FixedFibers, Trace};
+
+    let arithmetic = ScalarArithmetic::default();
+    let source = circuit("H 0\nM 0");
+    let parity = BitExpr::atom(BitAtom::Record(0));
+    let zero = BitVector::zeros(1).unwrap();
+    for mode in [
+        Cold,
+        Trace,
+        FixedFibers(rmagna::fibers::FiberOptions::default()),
+    ] {
+        let options = CompileOptions {
+            probability_preparation: mode,
+            ..Default::default()
+        };
+        let protocol = compile_affine(&source, &options, &arithmetic).unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                protocol
+                    .reported_probability(
+                        std::slice::from_ref(&parity),
+                        &zero,
+                        &[],
+                        256,
+                        &arithmetic
+                    )
+                    .unwrap()
+                    .value,
+                arithmetic.omega(0, -2).unwrap()
+            );
+        }
+        let statistics = protocol.prepared_probability_statistics().unwrap();
+        assert_eq!(
+            statistics.cached_queries,
+            usize::from(!matches!(mode, Cold))
+        );
+        assert_eq!(
+            statistics.fixed_resources,
+            usize::from(matches!(mode, FixedFibers(_)))
+        );
+    }
+}
+
+#[test]
+fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() {
+    use rmagna::instrument::{PreparedQueryStatistics, QueryPreparation};
+    use rmagna::unitary::DensityBoundary;
+
+    let arithmetic = ScalarArithmetic::default();
+    // |1,+,0> has squared overlap 1/4 with |+,1,0>, and unit self-overlap.
+    let source = circuit("X 0\nH 1\nI 2");
+    let ideal = target("X 0\nH 1\nI 2", &arithmetic);
+    let layouts = [[0, 1, 2], [1, 0, 2]];
+    let empty = BitVector::zeros(0).unwrap();
+    for strategy in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let cold_options = CompileOptions {
+            compiler_strategy: strategy,
+            ..Default::default()
+        };
+        let cold = compile_affine(&source, &cold_options, &arithmetic).unwrap();
+        for mode in [
+            QueryPreparation::Trace,
+            QueryPreparation::FixedFibers(rmagna::fibers::FiberOptions::default()),
+        ] {
+            let options = CompileOptions {
+                density_preparation: mode,
+                max_prepared_densities: 4,
+                ..cold_options
+            };
+            let protocol = compile_affine(&source, &options, &arithmetic).unwrap();
+            // Four keys on the SAME instrument and target, then repeat in reverse.
+            for (query, (left, right)) in [
+                (0, 0),
+                (0, 1),
+                (1, 0),
+                (1, 1),
+                (1, 1),
+                (1, 0),
+                (0, 1),
+                (0, 0),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let boundary = DensityBoundary {
+                    outputs: &layouts[right],
+                    event_rows: &[],
+                    outcomes: &empty,
+                };
+                let expected = if left == right {
+                    ExactScalar::one()
+                } else {
+                    arithmetic.omega(0, -4).unwrap()
+                };
+                assert_eq!(
+                    protocol
+                        .target_density_weight(
+                            &layouts[left],
+                            &ideal,
+                            boundary,
+                            &[],
+                            256,
+                            &arithmetic
+                        )
+                        .unwrap()
+                        .value,
+                    expected
+                );
+                assert_eq!(
+                    cold.target_density_weight(
+                        &layouts[left],
+                        &ideal,
+                        boundary,
+                        &[],
+                        256,
+                        &arithmetic
+                    )
+                    .unwrap()
+                    .value,
+                    expected
+                );
+                let cached_queries = (query + 1).min(4);
+                assert_eq!(
+                    protocol.prepared_density_statistics().unwrap(),
+                    PreparedQueryStatistics {
+                        cached_queries,
+                        fixed_resources: if matches!(mode, QueryPreparation::FixedFibers(_)) {
+                            cached_queries
+                        } else {
+                            0
+                        },
+                    }
+                );
+            }
+            assert_eq!(
+                cold.prepared_density_statistics().unwrap(),
+                PreparedQueryStatistics {
+                    cached_queries: 0,
+                    fixed_resources: 0
+                }
+            );
+        }
+    }
+}

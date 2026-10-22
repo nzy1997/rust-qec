@@ -27,7 +27,7 @@ pub struct PreparedQueryStatistics {
     pub fixed_resources: usize,
 }
 /// Compatibility names for the probability-only preparation interface.
-pub type ProbabilityPreparation = QueryPreparation;
+pub use QueryPreparation as ProbabilityPreparation;
 pub type PreparedProbabilityStatistics = PreparedQueryStatistics;
 pub(super) struct ProbabilityQueries {
     mode: ProbabilityPreparation,
