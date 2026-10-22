@@ -4,7 +4,9 @@ Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, circuit compilation, exact physical sampling, and task evaluation.
-Prepared query reuse and the full experiment runner remain subsequent deliverables.
+Bounded [probability-query preparation](#bounded-instrument-probability-preparation)
+supports opt-in trace-plan and fixed-resource reuse. The full experiment runner
+remains a separate deliverable.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -488,8 +490,12 @@ noise, choose nonlinear histories, or implement task schemas and recovery yet.
 ancillas (65,536), lowered unitary gates (1,000,000), and noise sites (1,000,000).
 The underlying unitary compiler and exact arithmetic retain their own dimension
 and coefficient checks. These limits do not bound total process memory. The
-Clifford reference is shared across supplied faults, but final phase resources
-are currently prepared for each query; no paper throughput claim follows.
+Clifford reference is shared across supplied faults. In the default `Cold`
+probability mode, phase resources are prepared per query. `Trace` retains trace
+plans with adaptive phase closure; `FixedFibers` also retains fixed phase resources,
+as described in [bounded probability preparation](#bounded-instrument-probability-preparation).
+Target-density and Pauli-moment closures retain their separate paths. No paper
+throughput claim follows.
 
 Tests check every supported gate against literal matrix entries, including global
 phase; partial-output target contractions against dense density sums; resets,
@@ -1084,8 +1090,11 @@ example accepts `--causal-strategy fixed|cold`. `max_prefix_compiles` limits act
 prefix constructions only on that cold route; `max_history_queries` limits the
 observation groups on both routes. `ResolvedHistory`, pure draws and task draws
 report actual post-preparation Clifford `network_compilations` and history query
-counts. These counts exclude final scalar-network closure and phase preparation,
-which are still cold; zero circuit recompiles do not establish full prepared-query
+counts. These counts exclude final scalar-network closure and phase preparation.
+The default `Cold` probability mode prepares per query; the opt-in
+[bounded probability modes](#bounded-instrument-probability-preparation) reuse trace
+plans and optionally fixed phase resources. Gaussian evaluation remains
+query-specific, and zero circuit recompiles alone do not establish prepared-query
 throughput.
 
 All eighteen pinned native histories also compare the fixed and cold routes,
