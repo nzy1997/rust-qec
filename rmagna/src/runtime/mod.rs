@@ -1,5 +1,8 @@
 //! Causal reported-history proposals, controllers and guarded-noise execution.
+mod enumeration;
 pub mod process;
+pub use enumeration::{EnumeratedHistories, HistoryEnumerationOptions};
+use enumeration::{ExecutionError, HistoryMode};
 mod registry;
 mod resolve;
 use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};
@@ -24,6 +27,11 @@ pub use registry::{Controller, ControllerRegistry};
 use std::{collections::BTreeMap, fmt};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeError {
+    EnumerationLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
     MissingBinding {
         name: String,
     },
@@ -66,6 +74,14 @@ pub enum RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::EnumerationLimit {
+                option,
+                limit,
+                required,
+            } => write!(
+                f,
+                "history enumeration needs {option} >= {required}; configured limit is {limit}"
+            ),
             Self::MissingBinding { name } => write!(f, "controller {name:?} has no binding"),
             Self::InvalidBinding { name } => write!(
                 f,
@@ -426,7 +442,8 @@ impl CausalProgram {
     ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
         let draw = self.sampler.draw(random)?;
-        self.execute(requested, draw, random, arithmetic, None)
+        self.execute(requested, draw, random, arithmetic, HistoryMode::Sample)
+            .map_err(ExecutionError::runtime)
     }
     pub fn resolve_prescribed(
         &self,
@@ -448,8 +465,9 @@ impl CausalProgram {
             },
             random,
             arithmetic,
-            None,
+            HistoryMode::Sample,
         )
+        .map_err(ExecutionError::runtime)
     }
     /// Evaluate explicit physical observations, grouped by each external call,
     /// first guarded category, and final requested-record query, in causal order.
@@ -518,8 +536,9 @@ impl CausalProgram {
             },
             &mut crate::noise::SplitMix64::new(0),
             arithmetic,
-            Some(groups),
+            HistoryMode::Prescribed(groups),
         )
+        .map_err(ExecutionError::runtime)
     }
     fn validate_requested(&self, requested: &[BitExpr]) -> Result<(), RuntimeError> {
         for parity in requested {
@@ -572,8 +591,8 @@ impl CausalProgram {
         draw: NoiseDraw,
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
-        prescribed: Option<&[Vec<bool>]>,
-    ) -> Result<ResolvedHistory, RuntimeError> {
+        mode: HistoryMode<'_>,
+    ) -> Result<ResolvedHistory, ExecutionError> {
         // Choices for inactive guarded categories are discarded, including their
         // probabilities; they have no physical action or path weight.
         let chosen = draw
@@ -592,10 +611,10 @@ impl CausalProgram {
             prefix_compiles: 0,
             network_compilations: 0,
             history_queries: 0,
-            prescribed,
+            mode,
             next_group: 0,
             proposal_mass: (self.options.history_sampler == HistorySampler::AffineSupport
-                && prescribed.is_none())
+                && mode.groups().is_none())
             .then_some(ExactScalar::one()),
         };
         for (end, located) in self.circuit.operations().iter().enumerate() {
@@ -614,15 +633,17 @@ impl CausalProgram {
                     let result = self
                         .registry
                         .evaluate(name, *call, &values, outputs.len())?;
-                    for (bit, &value) in result.iter().enumerate() {
-                        state.decisions.insert((*call, bit), value);
-                    }
-                    state.calls.push(ControllerCall {
+                    let observed = ControllerCall {
                         name: name.clone(),
                         call: *call,
                         inputs: values,
                         outputs: result,
-                    });
+                    };
+                    state.mode.observe(&observed)?;
+                    for (bit, &value) in observed.outputs.iter().enumerate() {
+                        state.decisions.insert((*call, bit), value);
+                    }
+                    state.calls.push(observed);
                 }
                 Operation::Noise {
                     guard: Some(expression),
@@ -672,6 +693,7 @@ impl CausalProgram {
                 .filter_map(|(j, (_, v))| v.then_some(j)),
         )
         .map_err(InstrumentError::from)?;
+        state.mode.query()?;
         let history_mass = instrument
             .reported_probability(
                 &parities,
@@ -722,7 +744,7 @@ struct PathState<'a> {
     prefix_compiles: usize,
     network_compilations: usize,
     history_queries: usize,
-    prescribed: Option<&'a [Vec<bool>]>,
+    mode: HistoryMode<'a>,
     next_group: usize,
     proposal_mass: Option<ExactScalar>,
 }
@@ -755,6 +777,7 @@ impl PathState<'_> {
             Ok(reference.branch(&self.decisions, &active)?)
         } else {
             let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
+            self.mode.compilation()?;
             let instrument = compile_affine(&prefix, &self.program.options.compile, arithmetic)?;
             self.network_compilations += 1;
             Ok(instrument)
@@ -781,7 +804,7 @@ impl PathState<'_> {
         inputs: &[BitExpr],
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
-    ) -> Result<Vec<bool>, RuntimeError> {
+    ) -> Result<Vec<bool>, ExecutionError> {
         if inputs.len()
             > self
                 .program
@@ -792,13 +815,15 @@ impl PathState<'_> {
             return Err(RuntimeError::ResourceLimit {
                 option: "max_history_inputs",
                 limit: self.program.options.max_history_inputs,
-            });
+            }
+            .into());
         }
         if self.history_queries >= self.program.options.max_history_queries {
             return Err(RuntimeError::ResourceLimit {
                 option: "max_history_queries",
                 limit: self.program.options.max_history_queries,
-            });
+            }
+            .into());
         }
         self.history_queries += 1;
         if self.program.reference.is_none()
@@ -807,17 +832,44 @@ impl PathState<'_> {
             return Err(RuntimeError::ResourceLimit {
                 option: "max_prefix_compiles",
                 limit: self.program.options.max_prefix_compiles,
-            });
+            }
+            .into());
         }
         if self.program.reference.is_none() {
             self.prefix_compiles += 1;
         }
         let instrument = self.instrument(end, arithmetic)?;
         let faults = self.faults(&instrument)?;
-        if let Some(groups) = self.prescribed {
+        if let Some(groups) = self.mode.groups() {
             let group = self.next_group;
             self.next_group += 1;
-            let values = &groups[group]; // Shapes were checked before execution.
+            let Some(values) = groups.get(group) else {
+                let query = RecordQuery {
+                    given: &self.conditions,
+                    parities: inputs,
+                };
+                if let Some(outcomes) = self.mode.unresolved(
+                    &instrument,
+                    &query,
+                    &faults,
+                    self.program.options.sampling.max_terms,
+                    arithmetic,
+                )? {
+                    return Err(ExecutionError::Branch { group, outcomes });
+                }
+                return Err(RuntimeError::InvalidHistory {
+                    group,
+                    message: "missing prescribed observation group".to_owned(),
+                }
+                .into());
+            };
+            if values.len() != inputs.len() {
+                return Err(RuntimeError::InvalidHistory {
+                    group,
+                    message: format!("received {} bits; expected {}", values.len(), inputs.len()),
+                }
+                .into());
+            }
             let mut parities = self
                 .conditions
                 .iter()
@@ -834,6 +886,7 @@ impl PathState<'_> {
                     .filter_map(|(i, &v)| v.then_some(i)),
             )
             .map_err(InstrumentError::from)?;
+            self.mode.query()?;
             if instrument
                 .reported_probability(
                     &parities,
@@ -848,7 +901,8 @@ impl PathState<'_> {
                 return Err(RuntimeError::InvalidHistory {
                     group,
                     message: "observations have zero physical prefix mass".to_owned(),
-                });
+                }
+                .into());
             }
             self.conditions
                 .extend(inputs.iter().cloned().zip(values.iter().copied()));

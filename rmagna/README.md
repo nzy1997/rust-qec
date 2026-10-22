@@ -1865,3 +1865,69 @@ flips, both compilers and all probability preparation modes, and cover zero
 interference, postselection separation, 65 correlated records/129 labels,
 conditioned and empty groups, and exact limit boundaries. This group primitive
 does not invoke external decoders; causal history traversal is a separate layer.
+
+## Exact forward-causal history traversal
+
+`CausalProgram::enumerate_prescribed_histories` enumerates every positive
+physical history for one prescribed potential fault assignment. It expands
+external decoder inputs, guarded-noise observations and optional requested
+records in causal order using the exact reported-group primitive above.
+Controllers see reported bits, including selected report flips. Their outputs
+are applied before later observations. Final postselection never filters which
+histories are visited. The result contains resolved instruments, active faults,
+controller transcripts and exact joint history masses, with no entropy draws.
+
+```rust
+use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+use rmagna::runtime::{CausalProgram, ControllerRegistry, HistoryEnumerationOptions, RuntimeOptions};
+use rmagna::scalar::ScalarArithmetic;
+
+let a = ScalarArithmetic::default();
+let registry = ControllerRegistry::default();
+let circuit = parse_circuit("H 0\nM 0\nX_ERROR(1/3) rec[-1] 1", &ParseOptions::default())?;
+let program = CausalProgram::new(&circuit, &registry, RuntimeOptions::default(), &a)?;
+let result = program.enumerate_prescribed_histories(
+    &[BitExpr::atom(BitAtom::Record(0))], &[],
+    HistoryEnumerationOptions::default(), &a,
+)?;
+assert_eq!(result.histories.len(), 2);
+for history in &result.histories {
+    assert_eq!(history.history_mass(), &a.omega(0, -2)?);
+    assert_eq!(history.entropy_words(), (0, 0));
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Default traversal limits are 4,096 retained complete/pending histories, 64
+independent structural bits per unresolved observation group, 1,000,000 actual
+physical marginal queries and 1,000,000 replay attempts. Existing per-execution
+runtime, contraction-term and arithmetic limits also apply. Limits fail with
+errors rather than incomplete results. Deterministic and empty groups each
+have one outcome; interference zeros are pruned before positive branches count
+against the frontier budget. No-history circuits return one mass-one history.
+
+Traversal replays prefixes, so callbacks may execute repeatedly for identical
+inputs. They must obey the existing deterministic, stateless controller
+contract; an observed output change for the same call and inputs is an error.
+The audit detects observed inconsistencies, rather than proving callback purity.
+Returned query, replay and network-compilation counters include interrupted
+prefixes. Network counts exclude initial reference preparation; fixed templates
+need no additional circuit compilation, while the cold-prefix baseline records
+all actual post-preparation constructions.
+
+This low-level API is a conditional diagnostic: fault choices are validated even
+when their physical probability is zero, and configured sampling proposals have
+no effect. Noise likelihood is one and no history proposal mass is returned.
+History masses exclude noise weights and final postselection. For exact sums
+over potential noise patterns, multiply quantum response by each pattern's
+full physical probability, including inactive guarded categories. The returned
+`noise_probability` is an active-path diagnostic and must not replace that
+potential-pattern probability. Task response aggregation and sector bounds
+remain separate layers.
+
+Tests compare majority feedback and biased non-Clifford/report-flip/guarded
+histories against independent exact probabilities under both causal strategies.
+They check postselection separation, repeated/complemented inputs, zero/forced
+and inactive categories, original source mappings, empty histories, interference
+zeros, callback failures and observed nondeterminism, proposal independence and
+exact branch/rank/query/replay limit boundaries.
