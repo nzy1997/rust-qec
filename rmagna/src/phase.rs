@@ -231,13 +231,31 @@ impl ParityPhase {
             .filter(|(_, c)| c & 1 != 0)
             .map(|(a, _)| a)
             .collect::<Vec<_>>();
+        // Coordinate restrictions at these pivots form a basis on the odd
+        // axis span. Bilinearity expresses every ambient pair of restrictions
+        // using pairs from this set, so their full-width slices span the same
+        // signature row space. Its rank cannot exceed this coordinate count.
+        let coordinates = if odd.is_empty() {
+            Vec::new()
+        } else if self.width > 64 {
+            LinearFactorization::new(
+                self.width,
+                &odd.iter().map(|a| (*a).clone()).collect::<Vec<_>>(),
+            )?
+            .pivot_columns()
+            .to_vec()
+        } else {
+            (0..self.width).collect()
+        };
         let mut rows = BTreeMap::<usize, BitVector>::new();
-        'slices: for i in 0..self.width {
-            if odd.is_empty() {
-                break;
-            }
-            for j in i..self.width {
-                let mut row = self.signature_slice(i, j)?;
+        'slices: for (position, &i) in coordinates.iter().enumerate() {
+            for &j in &coordinates[position..] {
+                let mut row = BitVector::zeros(self.width)?;
+                for axis in &odd {
+                    if axis.get(i)? && axis.get(j)? {
+                        row.xor_assign(axis)?;
+                    }
+                }
                 for (&pivot, basis) in &rows {
                     if row.get(pivot)? {
                         row.xor_assign(basis)?;
@@ -247,7 +265,7 @@ impl ParityPhase {
                 if let Some(pivot) = pivot {
                     rows.insert(pivot, row);
                 }
-                if rows.len() == self.width {
+                if rows.len() == coordinates.len() {
                     break 'slices;
                 }
             }

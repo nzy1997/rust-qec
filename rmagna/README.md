@@ -1375,3 +1375,10 @@ numeric updates. Literal path enumeration tests cover compatible updates,
 empty boundaries and dependent columns; analytical 129-bit examples cover wide
 hidden Gaussian sums. This prepares affine contraction only. Non-Clifford
 resource plans and complete prepared circuit queries remain separate work.
+
+Signature quotients use coordinate restrictions spanning the odd-axis space for
+wide phases. Bilinearity makes the corresponding pair slices span the complete
+ambient signature row space; each slice remains full width. Even terms are skipped
+and the odd-span rank is a certified stopping bound. The full radical and quotient
+basis are unchanged. Wide dense embeddings are checked against every ambient
+coordinate-pair equation, including zero-signature cancellation with odd terms.
