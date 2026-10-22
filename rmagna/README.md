@@ -1771,3 +1771,48 @@ both causal strategies. Uniform and nonuniform history proposals, interference
 zeros, scaled report flips that change guard activation, unit-scale streams and
 invalid preparation controls are covered. File/result schemas and specialized
 paper proposals are separate interfaces.
+
+## Exact physical noise-sector enumeration
+
+`enumeration::enumerate_noise` returns every positive-probability physical
+assignment with at most `max_weight` selected nonidentity categories. A
+multi-Pauli correlated alternative and a report flip each count as one category.
+Potential guarded selections count before the higher-level runtime determines
+whether their actions are active. Zero alternatives are omitted; a category
+with zero identity mass must select a nonidentity alternative. This is noise
+sector enumeration, separate from quantum accepted/error masses and integrated
+decoder histories.
+
+```rust
+use rmagna::enumeration::{EnumerationOptions, enumerate_noise};
+use rmagna::noise::{NoiseModel, NoiseOptions};
+
+let model = NoiseModel::new(
+    vec![vec!["9/10".parse()?, "1/10".parse()?]; 2],
+    &NoiseOptions::default(),
+)?;
+let sector = enumerate_noise(&model, &EnumerationOptions::default())?;
+assert_eq!(sector.patterns().len(), 3);
+assert_eq!(sector.covered_probability().to_string(), "99/100");
+assert_eq!(sector.omitted_probability().to_string(), "1/100");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Patterns contain sorted original site/alternative selections and exact physical
+probabilities. Results also expose probabilities by weight, total covered mass
+and its exact complement. Weight entries extend through
+`min(max_weight, number of sites)`, including empty sectors. Ordering is stable:
+increasing weight, lexicographic optional-site combinations, then alternative
+choices in original site order. An empty model has one empty assignment of mass
+one; a cutoff below the number of mandatory sites has no supported assignments.
+
+The default limits are 100,000 patterns, 1,000,000 retained fault entries,
+100,000 sites, 10,000,000 site/weight counting pairs and 1,048,576 probability
+numerator/denominator bits. `max_weight` defaults to one. A positive pattern
+limit is required. Counting work is `sites * (min(max_weight, sites) + 1)`;
+pattern and fault-entry counts are checked with bounded dynamic counting before
+any patterns are generated. Generation uses mandatory sites, optional-site
+combinations and iterative alternative choices, avoiding circuit-depth recursion
+and repeated scans over all identity sites for each sparse pattern. Exact
+probability limits also apply during accumulation. Limit failures are errors;
+no assignments are silently truncated, sampled or rounded.
