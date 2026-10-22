@@ -1613,3 +1613,48 @@ distributions reuse the exact mass and have unit likelihood without a second
 product or rational division. No probability is rounded.
 Exhaustive assignment products, large powers, tiny nonzero values and forced/
 zero guarded-category endpoints are checked against independent exact formulas.
+
+
+## Exact streaming paired statistics
+
+`statistics::ExactStatistics` accepts a vector of already weighted real
+cyclotomic contributions per draw, for example accepted mass, joint error mass
+and signed joint Pauli moments. The separate diagnostic weight is the combined
+noise and history likelihood; it is used for weight mean and ESS and is never
+applied to the contributions again. Zero-weight draws remain in the count.
+
+```rust
+use rmagna::field::ExactField;
+use rmagna::statistics::{ExactStatistics, StatisticsOptions};
+
+let mut stats = ExactStatistics::new(2, StatisticsOptions::default())?;
+stats.push(&[ExactField::one(), ExactField::zero()], &ExactField::one())?;
+stats.push(&[ExactField::one(), ExactField::one()], &ExactField::one())?;
+let summary = stats.summarize()?.expect("two draws");
+assert_eq!(summary.count, 2);
+let conditional = stats.paired_ratio(1, 0)?.expect("positive accepted sum");
+assert!(conditional.variance.is_some());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Summaries contain exact means, covariance of the mean, mean weight and
+`effective_sample_size = (sum w)^2 / sum(w^2)`; ESS is zero when all weights are
+zero. ESS describes weights and does not itself guarantee the precision of an
+error estimate. `paired_ratio` divides aggregate means, rather than averaging
+individual ratios, and uses their paired covariance for delta-method variance.
+It supports any ordered numerator/denominator indices, including signed moments.
+No draws produce no summary; no draws or a zero aggregate denominator produce no
+ratio. With one draw, covariance and ratio variance are absent. Standard errors
+require a separately rounded square root of exact variances; no floating-point
+conversion, clipping or square-root approximation occurs in this module.
+
+`StatisticsOptions` bounds the quantity count (64 by default) and exact
+coefficient arithmetic. Accumulators store a triangular second-moment matrix,
+not individual draws: their number is quadratic in quantities and independent of
+draw count, while integer sizes remain subject to the arithmetic budget.
+`merge` combines disjoint partitions and applies the receiver's budget.
+Updates and merges are atomic on invalid shapes, complex contributions, negative
+weights, arithmetic limits and count overflow. Fully enumerated rational toys,
+real cyclotomic examples, `1e-400` errors, signed moments, partition merges and
+failure controls verify these contracts. Run/result serialization, kappa and
+sampler selection remain separate interfaces.
