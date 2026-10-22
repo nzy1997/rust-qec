@@ -1496,3 +1496,10 @@ draws and the formal multi-process performance protocol.
 Two warm replays match every exact field and retain the same cache counts on
 all 26 affine tasks and both prescribed TQD3 histories. A deliberately stateful
 decoder negative control changes its output on replay and is rejected.
+
+`cargo test --locked -p rmagna --test warm_replay_cli` runs the diagnostic's
+actual replay implementation with real Python decoder processes. It checks
+process identity and call counts, exact irrational masses, seed/history reuse,
+zero/maximum/invalid counts, both causal strategies and history samplers,
+all probability preparation modes, and rejection of a stateful decoder whose
+output changes on replay. The normal crate test command includes this test.

@@ -2,6 +2,7 @@
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::field::ExactField;
 use rmagna::noise::{RandomSource, SplitMix64};
+use std::io::Write;
 struct Entropy {
     random: SplitMix64,
     fixed: Option<u64>,
@@ -41,8 +42,12 @@ fn evaluate_once(
         )
     }
 }
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = std::env::args().skip(1);
+/// Execute the diagnostic with the same path used by the command-line entry.
+/// An injected argument stream and writer let integration tests exercise it.
+pub fn run(
+    mut args: impl Iterator<Item = String>,
+    output: &mut impl Write,
+) -> Result<(), Box<dyn std::error::Error>> {
     let physical_path = args
         .next()
         .ok_or("usage: evaluate_task PHYSICAL TASK [SEED]")?;
@@ -219,9 +224,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,
         "phase_ancillas":d.phase_ancillas,"shared_phase_coordinates":d.shared_phase_coordinates,
         "coherent_width":d.coherent_width,"reference_coherent_width":d.reference_coherent_width,"shared_observations_before_reduction":d.shared_observations_before_reduction,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables});
-    println!(
+    writeln!(
+        output,
         "{}",
         serde_json::json!({"compilation":compilation,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
-    );
+    )?;
     Ok(())
+}
+
+#[cfg(not(test))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    run(std::env::args().skip(1), &mut std::io::stdout().lock())
 }
