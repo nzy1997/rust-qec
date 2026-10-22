@@ -185,6 +185,20 @@ impl TaskEvaluator {
             options,
         })
     }
+    pub fn prepared_probability_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedProbabilityStatistics>, TaskError> {
+        Ok(match &self.execution {
+            Execution::Linear { instrument, .. } => Some(
+                instrument
+                    .prepared_probability_statistics()
+                    .map_err(|e| error("prepared_probabilities", e))?,
+            ),
+            Execution::Causal(program) => program
+                .prepared_probability_statistics()
+                .map_err(|e| error("prepared_probabilities", e))?,
+        })
+    }
     /// Initial compilation diagnostics. Linear tasks expose their single
     /// instrument; causal tasks expose the initial template or potential network
     /// described by `CausalProgram::compilation`, not final cold-branch geometry.

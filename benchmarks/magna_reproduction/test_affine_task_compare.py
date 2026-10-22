@@ -49,6 +49,24 @@ class AffineComparisonTests(unittest.TestCase):
                         self.assertIn("compiler strategy", row["message"])
                         self.assertEqual(row["message"], row["error"])
 
+    def test_explicit_prepared_configuration_is_validated_with_raw_failure_evidence(self):
+        for mode in ["cold", "trace", "fixed"]:
+            for actual_mode in [mode, "wrong"]:
+                with self.subTest(mode=mode, actual_mode=actual_mode):
+                    actual = valid("SharedCommutingLayer")
+                    actual["configuration"].update(probability_preparation=actual_mode,
+                        fiber_search_rank=0 if mode == "fixed" else None)
+                    payload = json.dumps(actual)
+                    row = driver.compare_affine_result(subprocess.CompletedProcess([], 0, payload, "prepared-affine-stderr"),
+                                                       expected(), 16, "shared", mode, 0)
+                    self.assertEqual(row["reference"], expected())
+                    self.assertNotIn("constant_word", row)
+                    self.assertEqual(row["status"], "matched" if mode == actual_mode else "failed")
+                    if mode != actual_mode:
+                        self.assertEqual(row["stdout"], payload)
+                        self.assertEqual(row["stderr"], "prepared-affine-stderr")
+                        self.assertIn("probability preparation", row["message"])
+
     def test_bad_first_or_second_task_keeps_later_cases_inputs_and_partial_nonzero_receipt(self):
         @contextlib.contextmanager
         def native_reference(root):

@@ -4,7 +4,9 @@ Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
 phase reduction, circuit compilation, exact physical sampling, and task evaluation.
-Prepared query reuse and the full experiment runner remain subsequent deliverables.
+Bounded [probability-query preparation](#bounded-instrument-probability-preparation)
+supports opt-in trace-plan and fixed-resource reuse. The full experiment runner
+remains a separate deliverable.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -488,8 +490,12 @@ noise, choose nonlinear histories, or implement task schemas and recovery yet.
 ancillas (65,536), lowered unitary gates (1,000,000), and noise sites (1,000,000).
 The underlying unitary compiler and exact arithmetic retain their own dimension
 and coefficient checks. These limits do not bound total process memory. The
-Clifford reference is shared across supplied faults, but final phase resources
-are currently prepared for each query; no paper throughput claim follows.
+Clifford reference is shared across supplied faults. In the default `Cold`
+probability mode, phase resources are prepared per query. `Trace` retains trace
+plans with adaptive phase closure; `FixedFibers` also retains fixed phase resources,
+as described in [bounded probability preparation](#bounded-instrument-probability-preparation).
+Target-density and Pauli-moment closures retain their separate paths. No paper
+throughput claim follows.
 
 Tests check every supported gate against literal matrix entries, including global
 phase; partial-output target contractions against dense density sums; resets,
@@ -595,10 +601,10 @@ a failed query can have consumed entropy. Scalar coefficient limits also apply.
 As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
-This is the cold exact-marginal route for affine instruments. The runtime below
-adds external callbacks, guarded noise and affine-support histories. Runtime
-integration of cached query preparation remains subsequent work. Tests check
-exact binary boundaries and refinement,
+Cold exact marginals remain the default route for affine instruments. The runtime
+below adds external callbacks, guarded noise and affine-support histories; the
+[bounded instrument probability preparation](#bounded-instrument-probability-preparation)
+options also apply to these probability queries. Tests check exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
 
@@ -830,11 +836,15 @@ separates causal history resolution from final metrics and provides read-only
 branch instruments, faults, conditions, resolved expressions, and sampled records. The
 runtime's existing pure-target sampling methods remain convenience wrappers.
 
-`acceptance_resources` and `target_resources` expose the actual final quotient
-ranks and enumerated term counts for the corresponding draw. These describe cold
-contractions, not prepared-query throughput. Compilation and target normalization
-have separate resource checks; per-query term, scalar, field, and history budgets
-remain explicit errors.
+`acceptance_resources` and `target_resources` expose quotient ranks and term
+counts for the corresponding draw. Acceptance counts follow the selected
+[probability-preparation mode](#bounded-instrument-probability-preparation): cold
+and trace modes report adaptive closure, while fixed mode reports its immutable
+resource before adaptive radical absorption. Fixed counts can exceed adaptive
+counts. Target counts retain their separate target-density closure. These are
+resource metrics, not prepared-query throughput. Compilation and target
+normalization have separate resource checks; per-query term, scalar, field, and
+history budgets remain explicit errors.
 
 Build `cargo build --release -p rmagna --example evaluate_task`, then run
 `evaluate_task PHYSICAL TASK [SEED]` for one prescribed no-fault draw. The optional
@@ -867,9 +877,10 @@ cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
 
 The evaluator uses the explicitly selected history sampler and independent
 physical noise. Python decoder bindings are available through the bridge below.
-Causal importance proposal selection, runtime integration of prepared query
-families, aggregate statistics and the
-public run/result interface are separate deliverables.
+Bounded prepared probability families are available through the opt-in modes
+[documented below](#bounded-instrument-probability-preparation). Causal importance
+proposal selection, aggregate statistics and the public run/result interface
+remain separate deliverables.
 
 ## External decoder process bridge
 
@@ -1079,8 +1090,11 @@ example accepts `--causal-strategy fixed|cold`. `max_prefix_compiles` limits act
 prefix constructions only on that cold route; `max_history_queries` limits the
 observation groups on both routes. `ResolvedHistory`, pure draws and task draws
 report actual post-preparation Clifford `network_compilations` and history query
-counts. These counts exclude final scalar-network closure and phase preparation,
-which are still cold; zero circuit recompiles do not establish full prepared-query
+counts. These counts exclude final scalar-network closure and phase preparation.
+The default `Cold` probability mode prepares per query; the opt-in
+[bounded probability modes](#bounded-instrument-probability-preparation) reuse trace
+plans and optionally fixed phase resources. Gaussian evaluation remains
+query-specific, and zero circuit recompiles alone do not establish prepared-query
 throughput.
 
 All eighteen pinned native histories also compare the fixed and cold routes,
@@ -1407,3 +1421,57 @@ such; a smaller evaluation budget rejects the fixed resource. Structural zero
 queries still return zero without enumeration. The default `prepare_probability`
 retains adaptive query-specific closure. Final Gaussian elimination remains
 query-specific in the fixed-resource mode; whole-runtime caching is separate.
+
+## Bounded instrument probability preparation
+
+`CompileOptions::probability_preparation` selects `Cold` (the default), `Trace`
+(shared trace/contraction plans), or `FixedFibers(options)` (also shared certified
+phase resources). Reported and accepted probability interfaces use the selected
+mode. Conditioned and decision branches share immutable plans keyed by ordered
+physical event rows; outcomes, expression constants and faults may change.
+Preparation from a perturbed branch uses its original program. Target-density
+and Pauli-moment closures retain their documented preparation paths.
+
+`max_prepared_probabilities` bounds retained query families (default 64). Exceeding
+that bound or a term budget returns an error; there is no strategy fallback.
+Fixed-resource preparation that fails its term budget remains retryable. One lock
+serializes preparation across threads, and evaluation releases the lock first.
+Plans own their programs; programs do not own the cache. `prepared_probability_statistics()`
+reports retained query and fixed-resource counts. A task evaluator reports `None`
+when cold-prefix execution has no persistent instrument cache.
+
+```rust
+use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+use rmagna::gf2::BitVector;
+use rmagna::instrument::{CompileOptions, ProbabilityPreparation, compile_affine};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nM 0", &ParseOptions::default())?;
+let options = CompileOptions {
+    probability_preparation: ProbabilityPreparation::Trace,
+    max_prepared_probabilities: 1,
+    ..Default::default()
+};
+let program = compile_affine(&source, &options, &arithmetic)?;
+let row = BitExpr::atom(BitAtom::Record(0));
+for outcome in [BitVector::zeros(1)?, BitVector::from_indices(1, [0])?] {
+    assert_eq!(program.reported_probability(&[row.clone()], &outcome, &[], 1, &arithmetic)?.value,
+        arithmetic.omega(0, -2)?);
+}
+assert_eq!(program.prepared_probability_statistics()?.cached_queries, 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`evaluate_task --probability-preparation cold|trace|fixed` records the actual mode,
+cache limit and retained counts. Fixed mode accepts `--fiber-search-rank N`;
+`--max-prepared-probabilities N` adjusts the family bound. Both differential task
+drivers accept `--probability-preparation` and `--fiber-search-rank`, verify the
+Rust configuration, and retain these settings in their receipts. Per-bit exact
+marginals can create many distinct families; grouped affine-history proposals
+usually use fewer. These options make no whole-runtime or formal throughput claim.
+
+Bounded fixed-resource diagnostics with search rank 64 match all 26 affine
+packaged tasks and both prescribed TQD3 histories against the pinned native
+implementation. TQD3 retains 20 query/resource families, with two acceptance
+terms and four target terms. These are exact no-fault correctness witnesses,
+not the 31-task draw matrix or paper precision/performance results.
