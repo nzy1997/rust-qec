@@ -878,8 +878,10 @@ cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
 The evaluator uses the explicitly selected history sampler and independent
 physical noise. Python decoder bindings are available through the bridge below.
 Bounded prepared probability families are available through the opt-in modes
-[documented below](#bounded-instrument-probability-preparation). Causal importance
-proposal selection, aggregate statistics and the public run/result interface
+[documented below](#bounded-instrument-probability-preparation). Standalone
+aggregation is available through
+[`statistics::ExactStatistics`](#exact-streaming-paired-statistics). Causal
+importance proposal selection and automatic public run/result integration
 remain separate deliverables.
 
 ## External decoder process bridge
@@ -1643,6 +1645,12 @@ zero. ESS describes weights and does not itself guarantee the precision of an
 error estimate. `paired_ratio` divides aggregate means, rather than averaging
 individual ratios, and uses their paired covariance for delta-method variance.
 It supports any ordered numerator/denominator indices, including signed moments.
+Interpreting covariance and ratio variance as uncertainty assumes independent
+draws from the same intended sampling law with finite second moments. Dependence
+and replicated rows are not checked, and no autocorrelation correction is
+applied. In particular, same-assignment warm replays are not fresh independent
+Monte Carlo observations. Exact arithmetic and weight ESS do not establish these
+sampling assumptions.
 No draws produce no summary; no draws or a zero aggregate denominator produce no
 ratio. With one draw, covariance and ratio variance are absent. Standard errors
 require a separately rounded square root of exact variances; no floating-point
@@ -1652,7 +1660,8 @@ conversion, clipping or square-root approximation occurs in this module.
 coefficient arithmetic. Accumulators store a triangular second-moment matrix,
 not individual draws: their number is quadratic in quantities and independent of
 draw count, while integer sizes remain subject to the arithmetic budget.
-`merge` combines disjoint partitions and applies the receiver's budget.
+`merge` combines nonoverlapping partitions of the same intended sampling law
+and applies the receiver's budget; it checks neither overlap nor independence.
 Updates and merges are atomic on invalid shapes, complex contributions, negative
 weights, arithmetic limits and count overflow. Fully enumerated rational toys,
 real cyclotomic examples, `1e-400` errors, signed moments, partition merges and

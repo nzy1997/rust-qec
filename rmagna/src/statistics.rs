@@ -1,4 +1,8 @@
 //! Exact streaming statistics for already weighted real contribution vectors.
+//!
+//! Uncertainty estimates assume independent draws from the same intended sampling
+//! law with finite second moments. Dependence and replication are not checked,
+//! and no autocorrelation correction is applied.
 use crate::field::{ExactField, FieldArithmetic, FieldError};
 use num_rational::BigRational;
 use std::{cmp::Ordering, fmt};
@@ -73,6 +77,8 @@ pub struct StatisticsSummary {
     pub count: u64,
     pub means: Vec<ExactField>,
     /// Unbiased sample covariance divided by the draw count. Absent for n=1.
+    /// Its uncertainty interpretation requires the module's independent-draw
+    /// assumptions; correlated or replicated rows receive no correction.
     pub covariance_of_mean: Option<Vec<Vec<ExactField>>>,
     pub mean_weight: ExactField,
     /// Weight-only diagnostic; zero when every weight is zero.
@@ -83,6 +89,7 @@ pub struct PairedRatio {
     pub ratio: ExactField,
     /// Paired delta-method variance, not an exact finite-sample variance or a
     /// confidence interval. Absent for fewer than two draws.
+    /// Requires the module's sampling assumptions; no autocorrelation correction.
     pub variance: Option<ExactField>,
 }
 fn position(i: usize, j: usize) -> usize {
@@ -168,8 +175,9 @@ impl ExactStatistics {
         self.weight_squared = weight_squared;
         Ok(())
     }
-    /// Merge disjoint draw partitions. The receiver's arithmetic budget applies;
-    /// incompatible shapes and failed arithmetic leave the receiver unchanged.
+    /// Merge nonoverlapping partitions of the same intended sampling law. Neither
+    /// overlap nor draw independence is checked. The receiver's arithmetic budget
+    /// applies; incompatible shapes and failed arithmetic leave it unchanged.
     pub fn merge(&mut self, other: &Self) -> Result<(), StatisticsError> {
         self.shape(other.dimensions)?;
         let count = self
