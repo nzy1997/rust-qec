@@ -7,6 +7,7 @@ pub mod field;
 pub mod gf2;
 pub mod instrument;
 pub mod noise;
+pub mod numeric;
 pub mod pauli;
 pub mod phase;
 pub mod probability;
