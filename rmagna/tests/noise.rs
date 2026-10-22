@@ -726,3 +726,46 @@ fn tiny_scaled_alternatives_remain_nonzero_and_total_error_endpoints_stay_unchan
         assert_eq!(q.model().probabilities(site), endpoints.probabilities(site));
     }
 }
+
+#[test]
+fn configured_sampler_reports_scaled_laws_and_validates_exclusions_in_physical_mode() {
+    use rmagna::noise::NoiseSampling;
+    use std::collections::BTreeSet;
+    let p = model(&[&["2/3", "1/3"]]);
+    assert!(matches!(
+        NoiseSampler::configured(
+            p.clone(),
+            &NoiseSampling::Physical,
+            &BTreeSet::from([1]),
+            NoiseOptions::default()
+        ),
+        Err(NoiseError::InvalidExcludedSite { site: 1 })
+    ));
+    let physical = NoiseSampler::configured(
+        p.clone(),
+        &NoiseSampling::Physical,
+        &BTreeSet::new(),
+        NoiseOptions::default(),
+    )
+    .unwrap();
+    assert!(physical.scaled_proposal_summary().is_none());
+    let scaled = NoiseSampler::configured(
+        p,
+        &NoiseSampling::Importance {
+            proposal_scale: BigRational::new(1.into(), 1.into()),
+        },
+        &BTreeSet::new(),
+        NoiseOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        scaled.scaled_proposal_summary().unwrap().scaled_categories,
+        0
+    );
+    let mut a = SplitMix64::new(7);
+    let mut b = a;
+    for _ in 0..64 {
+        assert_eq!(physical.draw(&mut a).unwrap(), scaled.draw(&mut b).unwrap());
+        assert_eq!(a.state(), b.state());
+    }
+}
