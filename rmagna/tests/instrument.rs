@@ -283,138 +283,156 @@ fn prescribed_faults_match_native_instrument_masses_including_bh2() {
                 rmagna::fibers::FiberOptions::default(),
             ),
         ] {
-            let options = CompileOptions {
-                probability_preparation,
-                compiler_strategy,
-                ..Default::default()
-            };
-            let mut cache = std::collections::BTreeMap::new();
-            for (index, vector) in vectors.iter().enumerate() {
-                let name = vector["case"].as_str().unwrap();
-                let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
-                    let (source, ideal) = if name == "bh2-T" {
-                        (
-                            include_str!("data/magna-bh2/physical.magna"),
-                            include_str!("data/magna-bh2/ideal.magna"),
-                        )
-                    } else {
-                        (
-                            vector["source"].as_str().unwrap(),
-                            vector["ideal"].as_str().unwrap(),
-                        )
-                    };
-                    let parsed = circuit(source);
-                    let protocol = compile_affine(&parsed, &options, &arithmetic).unwrap();
-                    (
-                        parsed,
-                        protocol,
-                        compile_unitary(&circuit(ideal), &options, &arithmetic).unwrap(),
-                    )
-                });
-                let parsed = &*parsed;
-                let mut faults = Vec::new();
-                for fault in vector["faults"].as_array().unwrap() {
-                    let line = fault["line"].as_u64().unwrap() as usize;
-                    let candidates = protocol
-                        .noise_sites()
-                        .iter()
-                        .enumerate()
-                        .flat_map(|(site, noise)| {
-                            noise.source_operations().iter().enumerate().filter_map(
-                                move |(alternative, &op)| {
-                                    (parsed.operations()[op].location.line == line
-                                        && matches!(
-                                            parsed.operations()[op].operation,
-                                            Operation::Noise { .. }
-                                        ))
-                                    .then_some(FaultSelection { site, alternative })
-                                },
+            for density_preparation in [
+                rmagna::instrument::QueryPreparation::Cold,
+                rmagna::instrument::QueryPreparation::Trace,
+                rmagna::instrument::QueryPreparation::FixedFibers(
+                    rmagna::fibers::FiberOptions::default(),
+                ),
+            ] {
+                let options = CompileOptions {
+                    density_preparation,
+                    probability_preparation,
+                    compiler_strategy,
+                    ..Default::default()
+                };
+                let mut cache = std::collections::BTreeMap::new();
+                for (index, vector) in vectors.iter().enumerate() {
+                    let name = vector["case"].as_str().unwrap();
+                    let (parsed, protocol, ideal) = cache.entry(name).or_insert_with(|| {
+                        let (source, ideal) = if name == "bh2-T" {
+                            (
+                                include_str!("data/magna-bh2/physical.magna"),
+                                include_str!("data/magna-bh2/ideal.magna"),
                             )
-                        })
-                        .collect::<Vec<_>>();
-                    assert_eq!(
-                        candidates.len(),
-                        1,
-                        "unambiguous source noise at line {line}"
-                    );
-                    faults.push(candidates[0]);
-                }
-                for record in vector["report_flips"].as_array().unwrap() {
-                    let record = record.as_u64().unwrap() as usize;
-                    let candidates = protocol
-                        .noise_sites()
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(site, noise)| {
-                            noise
-                                .source_operations()
-                                .iter()
-                                .any(|&op| {
-                                    matches!(parsed.operations()[op].operation,
-                    Operation::Measure { record: r, .. } if r == record)
-                                })
-                                .then_some(FaultSelection {
-                                    site,
-                                    alternative: 0,
-                                })
-                        })
-                        .collect::<Vec<_>>();
-                    assert_eq!(candidates.len(), 1);
-                    faults.push(candidates[0]);
-                }
-                let outputs = vector["outputs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.as_u64().unwrap() as usize)
-                    .collect::<Vec<_>>();
-                let masses = protocol
-                    .masses(
-                        &outputs,
-                        ideal,
-                        &faults,
-                        if name == "bh2-T"
-                            && !matches!(
-                                probability_preparation,
-                                rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
-                            )
-                        {
-                            1
                         } else {
-                            256
-                        },
-                        &arithmetic,
-                    )
-                    .unwrap();
-                for (actual, key) in [
-                    (&masses.accepted.value, "accepted"),
-                    (&masses.target_success.value, "target_success"),
-                    (&masses.error, "error"),
-                ] {
-                    let expected = &vector[key];
-                    let coefficients = std::array::from_fn(|i| {
-                        expected["coefficients"][i]
-                            .as_str()
-                            .unwrap()
-                            .parse()
-                            .unwrap()
+                            (
+                                vector["source"].as_str().unwrap(),
+                                vector["ideal"].as_str().unwrap(),
+                            )
+                        };
+                        let parsed = circuit(source);
+                        let protocol = compile_affine(&parsed, &options, &arithmetic).unwrap();
+                        (
+                            parsed,
+                            protocol,
+                            compile_unitary(&circuit(ideal), &options, &arithmetic).unwrap(),
+                        )
                     });
-                    assert_eq!(
-                        actual,
-                        &arithmetic
-                            .scalar(coefficients, expected["power"].as_i64().unwrap())
-                            .unwrap(),
-                        "{name} vector {index} {key}"
-                    );
-                }
-                if name == "bh2-T" && faults.is_empty() {
-                    if !matches!(
-                        probability_preparation,
-                        rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
-                    ) {
-                        assert_eq!(masses.accepted.terms, 1);
+                    let parsed = &*parsed;
+                    let mut faults = Vec::new();
+                    for fault in vector["faults"].as_array().unwrap() {
+                        let line = fault["line"].as_u64().unwrap() as usize;
+                        let candidates = protocol
+                            .noise_sites()
+                            .iter()
+                            .enumerate()
+                            .flat_map(|(site, noise)| {
+                                noise.source_operations().iter().enumerate().filter_map(
+                                    move |(alternative, &op)| {
+                                        (parsed.operations()[op].location.line == line
+                                            && matches!(
+                                                parsed.operations()[op].operation,
+                                                Operation::Noise { .. }
+                                            ))
+                                        .then_some(FaultSelection { site, alternative })
+                                    },
+                                )
+                            })
+                            .collect::<Vec<_>>();
+                        assert_eq!(
+                            candidates.len(),
+                            1,
+                            "unambiguous source noise at line {line}"
+                        );
+                        faults.push(candidates[0]);
                     }
-                    assert_eq!(masses.target_success.terms, 1);
+                    for record in vector["report_flips"].as_array().unwrap() {
+                        let record = record.as_u64().unwrap() as usize;
+                        let candidates = protocol
+                            .noise_sites()
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(site, noise)| {
+                                noise
+                                    .source_operations()
+                                    .iter()
+                                    .any(|&op| {
+                                        matches!(parsed.operations()[op].operation,
+                    Operation::Measure { record: r, .. } if r == record)
+                                    })
+                                    .then_some(FaultSelection {
+                                        site,
+                                        alternative: 0,
+                                    })
+                            })
+                            .collect::<Vec<_>>();
+                        assert_eq!(candidates.len(), 1);
+                        faults.push(candidates[0]);
+                    }
+                    let outputs = vector["outputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() as usize)
+                        .collect::<Vec<_>>();
+                    let masses = protocol
+                        .masses(
+                            &outputs,
+                            ideal,
+                            &faults,
+                            if name == "bh2-T"
+                                && !matches!(
+                                    probability_preparation,
+                                    rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
+                                )
+                                && !matches!(
+                                    density_preparation,
+                                    rmagna::instrument::QueryPreparation::FixedFibers(_)
+                                )
+                            {
+                                1
+                            } else {
+                                256
+                            },
+                            &arithmetic,
+                        )
+                        .unwrap();
+                    for (actual, key) in [
+                        (&masses.accepted.value, "accepted"),
+                        (&masses.target_success.value, "target_success"),
+                        (&masses.error, "error"),
+                    ] {
+                        let expected = &vector[key];
+                        let coefficients = std::array::from_fn(|i| {
+                            expected["coefficients"][i]
+                                .as_str()
+                                .unwrap()
+                                .parse()
+                                .unwrap()
+                        });
+                        assert_eq!(
+                            actual,
+                            &arithmetic
+                                .scalar(coefficients, expected["power"].as_i64().unwrap())
+                                .unwrap(),
+                            "{name} vector {index} {key}"
+                        );
+                    }
+                    if name == "bh2-T" && faults.is_empty() {
+                        if !matches!(
+                            probability_preparation,
+                            rmagna::instrument::ProbabilityPreparation::FixedFibers(_)
+                        ) {
+                            assert_eq!(masses.accepted.terms, 1);
+                        }
+                        if !matches!(
+                            density_preparation,
+                            rmagna::instrument::QueryPreparation::FixedFibers(_)
+                        ) {
+                            assert_eq!(masses.target_success.terms, 1);
+                        }
+                    }
                 }
             }
         }
@@ -885,5 +903,366 @@ fn probability_cache_limits_and_concurrent_preparation_remain_explicit() {
                 .unwrap()
                 .value
         );
+    }
+}
+
+#[test]
+fn target_density_cache_distinguishes_programs_and_reuses_outcomes_and_faults() {
+    use rmagna::instrument::QueryPreparation as Q;
+    use rmagna::unitary::DensityBoundary;
+    let a = ScalarArithmetic::default();
+    let source = circuit(
+        "H 0\nT 0\nZ_ERROR(1/7) 0\nH 0\nM 0\nDETECTOR rec[-1]\nPOSTSELECT det[0]\nCX rec[-1] 1",
+    );
+    let cold = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
+    let ideal = target("H 0\nT 0", &a);
+    let other = target("H 0\nT 0", &a);
+    let row = BitVector::from_indices(1, [0]).unwrap();
+    for mode in [
+        Q::Trace,
+        Q::FixedFibers(rmagna::fibers::FiberOptions::default()),
+    ] {
+        let options = CompileOptions {
+            density_preparation: mode,
+            max_prepared_densities: 2,
+            ..Default::default()
+        };
+        let protocol = compile_affine(&source, &options, &a).unwrap();
+        for faulted in [false, true] {
+            let faults = if faulted {
+                vec![FaultSelection {
+                    site: 0,
+                    alternative: 0,
+                }]
+            } else {
+                vec![]
+            };
+            for t in [&ideal, &other] {
+                for bit in 0..2 {
+                    let outcomes = BitVector::from_indices(1, (bit != 0).then_some(0)).unwrap();
+                    let boundary = DensityBoundary {
+                        outputs: &[0],
+                        event_rows: std::slice::from_ref(&row),
+                        outcomes: &outcomes,
+                    };
+                    assert_eq!(
+                        protocol
+                            .target_density_weight(&[1], t, boundary, &faults, 256, &a)
+                            .unwrap()
+                            .value,
+                        cold.target_density_weight(&[1], t, boundary, &faults, 256, &a)
+                            .unwrap()
+                            .value
+                    );
+                }
+            }
+            assert_eq!(
+                protocol
+                    .prepared_density_statistics()
+                    .unwrap()
+                    .cached_queries,
+                2
+            );
+            assert_eq!(
+                protocol
+                    .prepared_density_statistics()
+                    .unwrap()
+                    .fixed_resources,
+                if matches!(mode, Q::FixedFibers(_)) {
+                    2
+                } else {
+                    0
+                }
+            );
+        }
+        let changed = ideal
+            .with_insertions(
+                &[rmagna::unitary::PauliInsertion {
+                    before_gate: 0,
+                    word: rmagna::pauli::PauliWord::new(
+                        BitVector::from_indices(1, [0]).unwrap(),
+                        BitVector::zeros(1).unwrap(),
+                        3,
+                    )
+                    .unwrap(),
+                }],
+                &a,
+            )
+            .unwrap();
+        let zero = BitVector::zeros(1).unwrap();
+        assert_eq!(
+            protocol
+                .target_density_weight(
+                    &[1],
+                    &changed,
+                    DensityBoundary {
+                        outputs: &[0],
+                        event_rows: std::slice::from_ref(&row),
+                        outcomes: &zero
+                    },
+                    &[],
+                    256,
+                    &a
+                )
+                .unwrap()
+                .value,
+            cold.target_density_weight(
+                &[1],
+                &changed,
+                DensityBoundary {
+                    outputs: &[0],
+                    event_rows: std::slice::from_ref(&row),
+                    outcomes: &zero
+                },
+                &[],
+                256,
+                &a
+            )
+            .unwrap()
+            .value
+        );
+        assert_eq!(
+            protocol
+                .prepared_density_statistics()
+                .unwrap()
+                .cached_queries,
+            2
+        );
+        let empty = BitVector::zeros(0).unwrap();
+        assert!(matches!(
+            protocol.target_density_weight(
+                &[1],
+                &ideal,
+                DensityBoundary {
+                    outputs: &[0],
+                    event_rows: &[],
+                    outcomes: &empty
+                },
+                &[],
+                256,
+                &a
+            ),
+            Err(InstrumentError::ResourceLimit {
+                option: "max_prepared_densities",
+                limit: 2,
+                required: 3
+            })
+        ));
+        let invalid = CompileOptions {
+            max_prepared_densities: 0,
+            ..options
+        };
+        assert!(matches!(
+            compile_affine(&source, &invalid, &a),
+            Err(InstrumentError::ResourceLimit {
+                option: "max_prepared_densities",
+                ..
+            })
+        ));
+        let retry = compile_affine(&source, &options, &a).unwrap();
+        assert!(
+            retry
+                .target_density_weight(
+                    &[1],
+                    &ideal,
+                    DensityBoundary {
+                        outputs: &[0],
+                        event_rows: &[],
+                        outcomes: &empty
+                    },
+                    &[],
+                    0,
+                    &a
+                )
+                .is_err()
+        );
+        if matches!(mode, Q::FixedFibers(_)) {
+            assert_eq!(
+                retry.prepared_density_statistics().unwrap().cached_queries,
+                0
+            );
+        }
+        let value = retry
+            .target_density_weight(
+                &[1],
+                &ideal,
+                DensityBoundary {
+                    outputs: &[0],
+                    event_rows: &[],
+                    outcomes: &empty,
+                },
+                &[],
+                256,
+                &a,
+            )
+            .unwrap()
+            .value;
+        assert_eq!(
+            value,
+            cold.target_density_weight(
+                &[1],
+                &ideal,
+                DensityBoundary {
+                    outputs: &[0],
+                    event_rows: &[],
+                    outcomes: &empty
+                },
+                &[],
+                256,
+                &a
+            )
+            .unwrap()
+            .value
+        );
+    }
+}
+
+#[test]
+fn probability_preparation_compatibility_name_preserves_variant_imports() {
+    use rmagna::instrument::ProbabilityPreparation::{Cold, FixedFibers, Trace};
+
+    let arithmetic = ScalarArithmetic::default();
+    let source = circuit("H 0\nM 0");
+    let parity = BitExpr::atom(BitAtom::Record(0));
+    let zero = BitVector::zeros(1).unwrap();
+    for mode in [
+        Cold,
+        Trace,
+        FixedFibers(rmagna::fibers::FiberOptions::default()),
+    ] {
+        let options = CompileOptions {
+            probability_preparation: mode,
+            ..Default::default()
+        };
+        let protocol = compile_affine(&source, &options, &arithmetic).unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                protocol
+                    .reported_probability(
+                        std::slice::from_ref(&parity),
+                        &zero,
+                        &[],
+                        256,
+                        &arithmetic
+                    )
+                    .unwrap()
+                    .value,
+                arithmetic.omega(0, -2).unwrap()
+            );
+        }
+        let statistics = protocol.prepared_probability_statistics().unwrap();
+        assert_eq!(
+            statistics.cached_queries,
+            usize::from(!matches!(mode, Cold))
+        );
+        assert_eq!(
+            statistics.fixed_resources,
+            usize::from(matches!(mode, FixedFibers(_)))
+        );
+    }
+}
+
+#[test]
+fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() {
+    use rmagna::instrument::{PreparedQueryStatistics, QueryPreparation};
+    use rmagna::unitary::DensityBoundary;
+
+    let arithmetic = ScalarArithmetic::default();
+    // |1,+,0> has squared overlap 1/4 with |+,1,0>, and unit self-overlap.
+    let source = circuit("X 0\nH 1\nI 2");
+    let ideal = target("X 0\nH 1\nI 2", &arithmetic);
+    let layouts = [[0, 1, 2], [1, 0, 2]];
+    let empty = BitVector::zeros(0).unwrap();
+    for strategy in [
+        rmagna::unitary::CompilerStrategy::ParityCopies,
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let cold_options = CompileOptions {
+            compiler_strategy: strategy,
+            ..Default::default()
+        };
+        let cold = compile_affine(&source, &cold_options, &arithmetic).unwrap();
+        for mode in [
+            QueryPreparation::Trace,
+            QueryPreparation::FixedFibers(rmagna::fibers::FiberOptions::default()),
+        ] {
+            let options = CompileOptions {
+                density_preparation: mode,
+                max_prepared_densities: 4,
+                ..cold_options
+            };
+            let protocol = compile_affine(&source, &options, &arithmetic).unwrap();
+            // Four keys on the SAME instrument and target, then repeat in reverse.
+            for (query, (left, right)) in [
+                (0, 0),
+                (0, 1),
+                (1, 0),
+                (1, 1),
+                (1, 1),
+                (1, 0),
+                (0, 1),
+                (0, 0),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let boundary = DensityBoundary {
+                    outputs: &layouts[right],
+                    event_rows: &[],
+                    outcomes: &empty,
+                };
+                let expected = if left == right {
+                    ExactScalar::one()
+                } else {
+                    arithmetic.omega(0, -4).unwrap()
+                };
+                assert_eq!(
+                    protocol
+                        .target_density_weight(
+                            &layouts[left],
+                            &ideal,
+                            boundary,
+                            &[],
+                            256,
+                            &arithmetic
+                        )
+                        .unwrap()
+                        .value,
+                    expected
+                );
+                assert_eq!(
+                    cold.target_density_weight(
+                        &layouts[left],
+                        &ideal,
+                        boundary,
+                        &[],
+                        256,
+                        &arithmetic
+                    )
+                    .unwrap()
+                    .value,
+                    expected
+                );
+                let cached_queries = (query + 1).min(4);
+                assert_eq!(
+                    protocol.prepared_density_statistics().unwrap(),
+                    PreparedQueryStatistics {
+                        cached_queries,
+                        fixed_resources: if matches!(mode, QueryPreparation::FixedFibers(_)) {
+                            cached_queries
+                        } else {
+                            0
+                        },
+                    }
+                );
+            }
+            assert_eq!(
+                cold.prepared_density_statistics().unwrap(),
+                PreparedQueryStatistics {
+                    cached_queries: 0,
+                    fixed_resources: 0
+                }
+            );
+        }
     }
 }

@@ -121,5 +121,55 @@ class WarmComparisonTests(unittest.TestCase):
             self.assertEqual(row["stdout"], json.dumps(actual))
 
 
+    def test_density_and_probability_modes_share_strict_fixed_rank_admission(self):
+        for probability in [None, "cold", "trace", "fixed"]:
+            for density in ["cold", "trace", "fixed"]:
+                for kind in ["affine", "controller"]:
+                    actual = valid(2)
+                    rank = 0 if "fixed" in (probability, density) else None
+                    actual["configuration"].update(probability_preparation=probability or "cold",
+                        density_preparation=density, fiber_search_rank=rank)
+                    row = self.density_compare(actual, probability, density, kind)
+                    self.assertEqual(row["status"], "matched")
+                    self.assertEqual(row["compared"], expected())
+                    self.assertEqual(row["rust"], actual)
+
+    @staticmethod
+    def density_compare(actual, probability, density, kind):
+        result = subprocess.CompletedProcess([], 0, json.dumps(actual), "density-diagnostic-stderr")
+        if kind == "controller":
+            return controller.compare_result(result, expected(), 7, 16, False, "shared",
+                probability, 0, 2, density_preparation=density)
+        return affine.compare_affine_result(result, expected(), 16, "shared",
+            probability, 0, 2, density_preparation=density)
+
+    def test_density_mode_and_rank_corruption_retain_failed_payload_and_reference(self):
+        for probability, density in [("cold", "fixed"), ("fixed", "cold"), ("trace", "trace")]:
+            good = valid(2)
+            good["configuration"].update(probability_preparation=probability,
+                density_preparation=density,
+                fiber_search_rank=0 if "fixed" in (probability, density) else None)
+            changes = [("density_preparation", v) for v in [None, False, True, "wrong", {}]]
+            changes += [("fiber_search_rank", v) for v in (
+                [None, False, True, "0", 1, -1] if "fixed" in (probability, density)
+                else [False, True, 0, "0", 1])]
+            for field, value in changes:
+                for kind in ["affine", "controller"]:
+                    actual = copy.deepcopy(good)
+                    actual["configuration"][field] = value
+                    row = self.density_compare(actual, probability, density, kind)
+                    self.assertEqual(row["status"], "failed")
+                    self.assertEqual(row["stdout"], json.dumps(actual))
+                    self.assertEqual(row["stderr"], "density-diagnostic-stderr")
+                    self.assertEqual(row["reference"], expected())
+                    self.assertEqual(row["error_type"], "ValueError")
+            for kind in ["affine", "controller"]:
+                actual = copy.deepcopy(good)
+                del actual["configuration"]["density_preparation"]
+                row = self.density_compare(actual, probability, density, kind)
+                self.assertEqual(row["status"], "failed")
+                self.assertEqual(row["stdout"], json.dumps(actual))
+
+
 if __name__ == "__main__":
     unittest.main()

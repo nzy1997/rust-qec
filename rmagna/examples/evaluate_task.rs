@@ -58,6 +58,7 @@ pub fn run(
     let mut options = EvaluationOptions::default();
     let mut fixed = None;
     let mut probability_mode = "cold".to_owned();
+    let mut density_mode = "cold".to_owned();
     let mut fiber_options = rmagna::fibers::FiberOptions::default();
     let mut controllers = None;
     let mut python = "python3".to_owned();
@@ -66,6 +67,13 @@ pub fn run(
         match argument.as_str() {
             "--warm-replays" => {
                 warm_replays = args.next().ok_or("missing warm replay count")?.parse()?;
+            }
+            "--density-preparation" => {
+                density_mode = args.next().ok_or("missing density preparation mode")?;
+            }
+            "--max-prepared-densities" => {
+                options.runtime.compile.max_prepared_densities =
+                    args.next().ok_or("missing density query limit")?.parse()?;
             }
             "--probability-preparation" => {
                 probability_mode = args.next().ok_or("missing probability preparation mode")?;
@@ -135,10 +143,17 @@ pub fn run(
         "fixed" => rmagna::instrument::ProbabilityPreparation::FixedFibers(fiber_options),
         _ => return Err("probability preparation must be cold, trace or fixed".into()),
     };
+    options.runtime.compile.density_preparation = match density_mode.as_str() {
+        "cold" => rmagna::instrument::QueryPreparation::Cold,
+        "trace" => rmagna::instrument::QueryPreparation::Trace,
+        "fixed" => rmagna::instrument::QueryPreparation::FixedFibers(fiber_options),
+        _ => return Err("density preparation must be cold, trace or fixed".into()),
+    };
     if probability_mode != "fixed"
+        && density_mode != "fixed"
         && fiber_options.max_search_rank != rmagna::fibers::FiberOptions::default().max_search_rank
     {
-        return Err("fiber search rank requires fixed probability preparation".into());
+        return Err("fiber search rank requires fixed probability or density preparation".into());
     }
     let mut registry = ControllerRegistry::default();
     let worker = if let Some(config) = controllers {
@@ -191,7 +206,10 @@ pub fn run(
     let query = std::time::Instant::now();
     let draw = evaluate_once(&evaluator, history.as_deref(), seed, fixed)?;
     let query_ms = query.elapsed().as_secs_f64() * 1000.;
-    let first_cache = evaluator.prepared_probability_statistics()?;
+    let first_cache = (
+        evaluator.prepared_probability_statistics()?,
+        evaluator.prepared_density_statistics()?,
+    );
     let mut replay_ms = Vec::new();
     for _ in 0..warm_replays {
         let start = std::time::Instant::now();
@@ -202,14 +220,20 @@ pub fn run(
                 "warm replay changed an exact evaluation field or controller transcript".into(),
             );
         }
-        if evaluator.prepared_probability_statistics()? != first_cache {
-            return Err("warm replay changed retained probability cache counts".into());
+        if (
+            evaluator.prepared_probability_statistics()?,
+            evaluator.prepared_density_statistics()?,
+        ) != first_cache
+        {
+            return Err("warm replay changed retained probability or density cache counts".into());
         }
         replay_ms.push(elapsed);
     }
     let warm = (warm_replays > 0).then(|| serde_json::json!({"count":warm_replays,"query_ms":replay_ms,
         "cache_unchanged":true,"scope":"same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"}));
-    let probability_cache = first_cache.map(|s|
+    let probability_cache = first_cache.0.map(|s|
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources}));
+    let density_cache = first_cache.1.map(|s|
         serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources}));
     let compilation_scope = if evaluator.sampled_history() {
         match options.runtime.strategy {
@@ -227,7 +251,7 @@ pub fn run(
     writeln!(
         output,
         "{}",
-        serde_json::json!({"compilation":compilation,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
+        serde_json::json!({"compilation":compilation,"prepared_density_cache":density_cache,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"density_preparation":options.runtime.compile.density_preparation.name(),"max_prepared_densities":options.runtime.compile.max_prepared_densities,"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed" || density_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
     )?;
     Ok(())
 }

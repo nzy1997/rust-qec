@@ -195,14 +195,16 @@ fn check_masses(value: &Value, bit: bool) {
     }
 }
 fn check_cache(value: &Value) {
-    if value["configuration"]["causal_strategy"] == "ColdPrefix" {
-        assert!(value["prepared_probability_cache"].is_null());
-    } else {
-        let cache = &value["prepared_probability_cache"];
-        match value["configuration"]["probability_preparation"]
-            .as_str()
-            .unwrap()
-        {
+    for (mode_key, cache_key) in [
+        ("probability_preparation", "prepared_probability_cache"),
+        ("density_preparation", "prepared_density_cache"),
+    ] {
+        let cache = &value[cache_key];
+        if value["configuration"]["causal_strategy"] == "ColdPrefix" {
+            assert!(cache.is_null());
+            continue;
+        }
+        match value["configuration"][mode_key].as_str().unwrap() {
             "cold" => assert_eq!(cache, &json!({"cached_queries":0,"fixed_resources":0})),
             "trace" => {
                 assert!(cache["cached_queries"].as_u64().unwrap() > 0);
@@ -219,39 +221,57 @@ fn check_cache(value: &Value) {
 #[test]
 fn actual_warm_replays_preserve_irrational_masses_inputs_process_and_cache_modes() {
     for compiler in ["parity_copies", "shared"] {
-        for mode in ["cold", "trace", "fixed"] {
-            for causal in ["fixed", "cold"] {
-                for sampler in ["exact_marginal", "affine_support"] {
-                    let fixture = Fixture::new(false);
-                    let value = fixture.success(&[
-                        "--compiler",
-                        compiler,
-                        "--probability-preparation",
-                        mode,
-                        "--causal-strategy",
-                        causal,
-                        "--history-sampler",
-                        sampler,
-                        "--warm-replays",
-                        "2",
-                    ]);
-                    assert_eq!(
-                        value["compilation"]["strategy"],
-                        if compiler == "shared" {
-                            "SharedCommutingLayer"
-                        } else {
-                            "ParityCopies"
-                        }
-                    );
-                    assert_eq!(
-                        value["compilation"]["scope"],
-                        if causal == "fixed" {
-                            "initial_fixed_template"
-                        } else {
-                            "initial_potential"
-                        }
-                    );
-                    check_result(&fixture, &value, 2);
+        for probability in ["cold", "trace", "fixed"] {
+            for density in ["cold", "trace", "fixed"] {
+                for causal in ["fixed", "cold"] {
+                    for sampler in ["exact_marginal", "affine_support"] {
+                        let fixture = Fixture::new(false);
+                        let value = fixture.success(&[
+                            "--compiler",
+                            compiler,
+                            "--probability-preparation",
+                            probability,
+                            "--density-preparation",
+                            density,
+                            "--causal-strategy",
+                            causal,
+                            "--history-sampler",
+                            sampler,
+                            "--warm-replays",
+                            "2",
+                        ]);
+                        assert_eq!(
+                            value["configuration"]["probability_preparation"],
+                            probability
+                        );
+                        assert_eq!(value["configuration"]["density_preparation"], density);
+                        assert_eq!(value["configuration"]["max_prepared_densities"], 16);
+                        assert_eq!(
+                            value["configuration"]["fiber_search_rank"],
+                            if probability == "fixed" || density == "fixed" {
+                                json!(16)
+                            } else {
+                                Value::Null
+                            }
+                        );
+                        assert_eq!(
+                            value["compilation"]["strategy"],
+                            if compiler == "shared" {
+                                "SharedCommutingLayer"
+                            } else {
+                                "ParityCopies"
+                            }
+                        );
+                        assert_eq!(
+                            value["compilation"]["scope"],
+                            if causal == "fixed" {
+                                "initial_fixed_template"
+                            } else {
+                                "initial_potential"
+                            }
+                        );
+                        check_result(&fixture, &value, 2);
+                    }
                 }
             }
         }
@@ -325,6 +345,58 @@ fn actual_warm_replay_defaults_bounds_seeds_and_prescribed_histories_are_enforce
         assert!(
             !fixture.path("plugin.imported").exists(),
             "invalid limits must fail before importing the decoder"
+        );
+    }
+}
+
+#[test]
+fn actual_density_flags_share_fixed_rank_and_reject_invalid_modes_and_capacity() {
+    for (probability, density) in [("fixed", "cold"), ("cold", "fixed"), ("fixed", "fixed")] {
+        let fixture = Fixture::new(false);
+        let value = fixture.success(&[
+            "--probability-preparation",
+            probability,
+            "--density-preparation",
+            density,
+            "--fiber-search-rank",
+            "0",
+            "--max-prepared-densities",
+            "1",
+            "--warm-replays",
+            "2",
+        ]);
+        assert_eq!(value["configuration"]["fiber_search_rank"], 0);
+        assert_eq!(value["configuration"]["max_prepared_densities"], 1);
+        check_result(&fixture, &value, 2);
+    }
+    for flags in [
+        vec!["--density-preparation"],
+        vec!["--density-preparation", "invalid"],
+        vec!["--density-preparation", "cold", "--fiber-search-rank", "0"],
+        vec!["--density-preparation", "trace", "--fiber-search-rank", "0"],
+        vec![
+            "--density-preparation",
+            "trace",
+            "--max-prepared-densities",
+            "0",
+        ],
+        vec![
+            "--density-preparation",
+            "fixed",
+            "--max-prepared-densities",
+            "0",
+        ],
+    ] {
+        let fixture = Fixture::new(false);
+        let (result, output) = fixture.execute(&flags);
+        assert!(result.is_err(), "{flags:?}");
+        assert!(
+            output.is_empty(),
+            "invalid density settings must not emit success JSON"
+        );
+        assert!(
+            fixture.calls().is_empty(),
+            "invalid settings must not invoke the decoder"
         );
     }
 }

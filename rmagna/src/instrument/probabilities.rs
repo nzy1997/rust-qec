@@ -6,13 +6,13 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub enum ProbabilityPreparation {
+pub enum QueryPreparation {
     #[default]
     Cold,
     Trace,
     FixedFibers(FiberOptions),
 }
-impl ProbabilityPreparation {
+impl QueryPreparation {
     pub fn name(self) -> &'static str {
         match self {
             Self::Cold => "cold",
@@ -22,10 +22,13 @@ impl ProbabilityPreparation {
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PreparedProbabilityStatistics {
+pub struct PreparedQueryStatistics {
     pub cached_queries: usize,
     pub fixed_resources: usize,
 }
+/// Compatibility names for the probability-only preparation interface.
+pub use QueryPreparation as ProbabilityPreparation;
+pub type PreparedProbabilityStatistics = PreparedQueryStatistics;
 pub(super) struct ProbabilityQueries {
     mode: ProbabilityPreparation,
     limit: usize,

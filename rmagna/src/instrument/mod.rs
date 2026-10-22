@@ -1,5 +1,6 @@
 //! Coherent lowering and exact conditional masses for affine instruments.
 
+mod densities;
 mod gates;
 mod lower;
 mod probabilities;
@@ -11,7 +12,10 @@ use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::unitary::{CompiledUnitary, NetworkValue, PauliInsertion, UnitaryError};
 use num_rational::BigRational;
 use num_traits::One;
-pub use probabilities::{PreparedProbabilityStatistics, ProbabilityPreparation};
+pub use probabilities::{
+    PreparedProbabilityStatistics, PreparedQueryStatistics, ProbabilityPreparation,
+    QueryPreparation,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -71,7 +75,7 @@ impl fmt::Display for InstrumentError {
             ),
             Self::PreparedQueryCacheUnavailable => write!(
                 f,
-                "prepared probability cache is unavailable after an interrupted preparation"
+                "prepared query cache is unavailable after an interrupted preparation"
             ),
             Self::NonAffineQuery => write!(
                 f,
@@ -135,6 +139,8 @@ pub struct CompileOptions {
     pub compiler_strategy: crate::unitary::CompilerStrategy,
     pub probability_preparation: ProbabilityPreparation,
     pub max_prepared_probabilities: usize,
+    pub density_preparation: QueryPreparation,
+    pub max_prepared_densities: usize,
     pub max_coherent_qubits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
@@ -145,6 +151,8 @@ impl Default for CompileOptions {
             compiler_strategy: crate::unitary::CompilerStrategy::ParityCopies,
             probability_preparation: ProbabilityPreparation::Cold,
             max_prepared_probabilities: 64,
+            density_preparation: QueryPreparation::Cold,
+            max_prepared_densities: 16,
             max_coherent_qubits: 65536,
             max_gates: 1_000_000,
             max_noise_sites: 1_000_000,
@@ -192,6 +200,7 @@ pub struct FaultSelection {
 pub struct CompiledInstrument {
     unitary: Arc<CompiledUnitary>,
     probability_queries: Arc<probabilities::ProbabilityQueries>,
+    density_queries: Arc<densities::DensityQueries>,
     live_wires: Arc<Vec<usize>>,
     record_wires: Arc<Vec<usize>>,
     event_rows: Arc<Vec<BitVector>>,
@@ -238,6 +247,9 @@ impl CompiledInstrument {
         &self,
     ) -> Result<PreparedProbabilityStatistics, InstrumentError> {
         self.probability_queries.statistics()
+    }
+    pub fn prepared_density_statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
+        self.density_queries.statistics()
     }
     fn probability(
         &self,
@@ -453,7 +465,9 @@ impl CompiledInstrument {
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
         let physical = self.output_wires(outputs)?;
-        Ok(self.inserted(faults, arithmetic)?.density_overlap(
+        let state = self.inserted(faults, arithmetic)?;
+        self.density_queries.evaluate(
+            &state,
             crate::unitary::DensityBoundary {
                 outputs: &physical,
                 event_rows: &self.event_rows,
@@ -463,7 +477,7 @@ impl CompiledInstrument {
             target_boundary,
             max_terms,
             arithmetic,
-        )?)
+        )
     }
     pub fn pauli_moment(
         &self,
@@ -506,11 +520,21 @@ impl CompiledInstrument {
             max_terms,
             arithmetic,
         )?;
-        let target_success = unitary.target_weight(
-            &physical,
+        let target_outputs = (0..target.width()).collect::<Vec<_>>();
+        let empty = BitVector::zeros(0)?;
+        let target_success = self.density_queries.evaluate(
+            &unitary,
+            crate::unitary::DensityBoundary {
+                outputs: &physical,
+                event_rows: &self.event_rows,
+                outcomes: &self.outcomes,
+            },
             target,
-            &self.event_rows,
-            &self.outcomes,
+            crate::unitary::DensityBoundary {
+                outputs: &target_outputs,
+                event_rows: &[],
+                outcomes: &empty,
+            },
             max_terms,
             arithmetic,
         )?;

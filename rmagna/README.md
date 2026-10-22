@@ -1545,3 +1545,55 @@ widths, output permutations, empty outputs, both compiler strategies, independen
 faults, preparation from perturbed views and impossible reference events. The
 cold `density_overlap` interface remains available. Instrument/task target-cache
 integration is separate from this primitive.
+
+## Bounded target-density preparation
+
+`CompileOptions::density_preparation` independently selects `QueryPreparation::Cold`
+(the default), `Trace`, or `FixedFibers(options)`. Target-density queries and the
+target portion of `masses` share retained plans across compatible instrument
+branches, target insertion views and event outcomes. Keys include both original
+program identities, ordered output layouts and event rows. Different target
+programs remain distinct even when their gates and dimensions agree.
+
+`max_prepared_densities` bounds retained density families (default 16), and
+`prepared_density_statistics()` reports their query/resource counts. Task/runtime
+statistics return `None` for cold-prefix execution without a persistent reference.
+`QueryPreparation` and `PreparedQueryStatistics` are shared names; the existing
+`ProbabilityPreparation` and `PreparedProbabilityStatistics` remain aliases.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::fibers::FiberOptions;
+use rmagna::instrument::{CompileOptions, QueryPreparation, compile_affine, compile_unitary};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+let arithmetic = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nT 0", &ParseOptions::default())?;
+let options = CompileOptions {
+    density_preparation: QueryPreparation::FixedFibers(FiberOptions::default()),
+    max_prepared_densities: 1,
+    ..Default::default()
+};
+let program = compile_affine(&source, &options, &arithmetic)?;
+let ideal = compile_unitary(&source, &options, &arithmetic)?;
+for _ in 0..2 {
+    assert_eq!(program.masses(&[0], &ideal, &[], 16, &arithmetic)?.target_success.value,
+        ExactScalar::one());
+}
+assert_eq!(program.prepared_density_statistics()?.cached_queries, 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`evaluate_task --density-preparation cold|trace|fixed` and
+`--max-prepared-densities N` expose the separate density policy and bound. The
+shared fiber-search option applies whenever either preparation mode is fixed.
+Both differential drivers verify and retain the requested density setting. Warm
+replays compare retained density counts as well as probability counts and every
+exact evaluation field. Native instrument and weighted nonlinear-history tests
+cover all combinations of probability and density preparation; target identity,
+layout, fault/outcome reuse and explicit capacity errors have separate tests.
+
+Bounded fixed probability+density pilots match all 26 affine tasks and both
+prescribed TQD3 histories, including two same-evaluator warm replays. TQD3
+retains 20 probability families and one density family, with two acceptance
+terms and four target terms. These are correctness/reuse diagnostics, separate
+from the complete draw matrix and formal performance protocol.
