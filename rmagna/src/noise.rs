@@ -80,6 +80,15 @@ impl Default for NoiseOptions {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum NoiseSampling {
+    #[default]
+    Physical,
+    Importance {
+        proposal_scale: BigRational,
+    },
+}
+
 /// Supplies unbiased independent 64-bit words. Implementations may provide a
 /// deterministic pseudorandom stream; its statistical quality is their contract.
 pub trait RandomSource {
@@ -301,11 +310,7 @@ impl NoiseModel {
         if scale <= BigRational::zero() {
             return Err(NoiseError::InvalidProposalScale);
         }
-        for &site in excluded {
-            if site >= self.num_sites() {
-                return Err(NoiseError::InvalidExcludedSite { site });
-            }
-        }
+        self.validate_exclusions(excluded)?;
         let mut categories = Vec::with_capacity(self.num_sites());
         let mut scaled_categories = 0;
         let mut endpoint_categories = 0;
@@ -347,6 +352,14 @@ impl NoiseModel {
                 endpoint_categories,
             },
         })
+    }
+    fn validate_exclusions(&self, excluded: &BTreeSet<usize>) -> Result<(), NoiseError> {
+        for &site in excluded {
+            if site >= self.num_sites() {
+                return Err(NoiseError::InvalidExcludedSite { site });
+            }
+        }
+        Ok(())
     }
     pub fn probabilities(&self, site: usize) -> Option<&[Probability]> {
         self.categories
@@ -411,6 +424,7 @@ pub struct NoiseSampler {
     options: NoiseOptions,
     denominator_bits: u64,
     same_distribution: bool,
+    scaled_summary: Option<ScaledProposalSummary>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NoiseDraw {
@@ -421,6 +435,31 @@ pub struct NoiseDraw {
     pub entropy_words: usize,
 }
 impl NoiseSampler {
+    /// Prepare physical or exact common-scale importance noise. Excluded sites
+    /// must be valid in both modes; the causal runtime supplies guarded sites.
+    pub fn configured(
+        model: NoiseModel,
+        sampling: &NoiseSampling,
+        excluded: &BTreeSet<usize>,
+        options: NoiseOptions,
+    ) -> Result<Self, NoiseError> {
+        model.validate_exclusions(excluded)?;
+        match sampling {
+            NoiseSampling::Physical => Ok(Self::physical(model, options)),
+            NoiseSampling::Importance { proposal_scale } => {
+                let proposal = model.scaled_proposal(proposal_scale, excluded, &options)?;
+                let summary = proposal.summary().clone();
+                let mut sampler = Self::importance(model, proposal.into_model(), options)?;
+                sampler.scaled_summary = Some(summary);
+                Ok(sampler)
+            }
+        }
+    }
+    /// Present only for configured common-scale importance sampling, including
+    /// a unit scale. Arbitrary proposals and physical sampling return None.
+    pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
+        self.scaled_summary.as_ref()
+    }
     pub fn physical(model: NoiseModel, options: NoiseOptions) -> Self {
         let denominator_bits = model.denominator_bits();
         Self {
@@ -429,6 +468,7 @@ impl NoiseSampler {
             options,
             denominator_bits,
             same_distribution: true,
+            scaled_summary: None,
         }
     }
     pub fn importance(
@@ -472,6 +512,7 @@ impl NoiseSampler {
             options,
             denominator_bits,
             same_distribution,
+            scaled_summary: None,
         })
     }
     pub fn draw(&self, random: &mut impl RandomSource) -> Result<NoiseDraw, NoiseError> {

@@ -2,7 +2,7 @@ use super::*;
 use crate::circuit::{BitAtom, BitExpr};
 use crate::field::{ExactField, FieldArithmetic};
 use crate::instrument::{CompiledInstrument, FaultSelection, compile_affine, compile_unitary};
-use crate::noise::{NoiseModel, NoiseSampler, RandomSource};
+use crate::noise::{NoiseModel, NoiseSampler, NoiseSampling, RandomSource, ScaledProposalSummary};
 use crate::runtime::{
     CausalProgram, ControllerCall, ControllerRegistry, ResolvedHistory, RuntimeOptions,
 };
@@ -89,6 +89,23 @@ impl TaskEvaluator {
         registry: &ControllerRegistry,
         options: EvaluationOptions,
     ) -> Result<Self, TaskError> {
+        Self::new_with_sampling(
+            physical,
+            modules,
+            registry,
+            options,
+            &NoiseSampling::Physical,
+        )
+    }
+    /// Prepare a noise proposal separately from circuit, target and history
+    /// semantics. Returned contributions include its likelihood exactly once.
+    pub fn new_with_sampling(
+        physical: &Circuit,
+        modules: &LoadedModules,
+        registry: &ControllerRegistry,
+        options: EvaluationOptions,
+        sampling: &NoiseSampling,
+    ) -> Result<Self, TaskError> {
         let a = &options.scalars;
         let max_terms = options.runtime.sampling.max_terms;
         let task = modules.task.clone();
@@ -162,7 +179,7 @@ impl TaskEvaluator {
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
             Execution::Causal(Box::new(
-                CausalProgram::new(&composed, registry, options.runtime, a)
+                CausalProgram::new_with_sampling(&composed, registry, options.runtime, a, sampling)
                     .map_err(|e| error("runtime", e))?,
             ))
         } else {
@@ -170,7 +187,13 @@ impl TaskEvaluator {
                 .map_err(|e| error("circuit", e))?;
             let model = NoiseModel::physical(&instrument, &options.runtime.noise)
                 .map_err(|e| error("noise", e))?;
-            let sampler = NoiseSampler::physical(model.clone(), options.runtime.noise);
+            let sampler = NoiseSampler::configured(
+                model.clone(),
+                sampling,
+                &Default::default(),
+                options.runtime.noise,
+            )
+            .map_err(|e| error("sampling", e))?;
             Execution::Linear {
                 instrument: Box::new(instrument),
                 model,
@@ -185,6 +208,12 @@ impl TaskEvaluator {
             execution,
             options,
         })
+    }
+    pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
+        match &self.execution {
+            Execution::Linear { sampler, .. } => sampler.scaled_proposal_summary(),
+            Execution::Causal(program) => program.scaled_proposal_summary(),
+        }
     }
     pub fn prepared_density_statistics(
         &self,
@@ -488,14 +517,13 @@ impl<'a> EvaluationInput<'a> {
             .unwrap_or(self.history_mass)
     }
     fn history(history: &'a ResolvedHistory) -> Self {
-        // Noise likelihood is unity; the selected history denominator is applied separately.
-        static ONE: std::sync::LazyLock<BigRational> = std::sync::LazyLock::new(BigRational::one);
+        // Noise likelihood and the selected history denominator are independent.
         Self {
             instrument: history.instrument(),
             faults: history.faults(),
             history_mass: history.history_mass(),
             noise_probability: history.noise_probability(),
-            likelihood: &ONE,
+            likelihood: history.noise_likelihood_ratio(),
             history: Some(history),
         }
     }

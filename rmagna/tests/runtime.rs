@@ -864,3 +864,67 @@ fn forced_and_zero_guarded_categories_keep_active_path_probabilities() {
         }
     }
 }
+
+#[test]
+fn causal_draws_expose_noise_likelihood_separately_from_joint_quantum_masses() {
+    use num_rational::BigRational;
+    use rmagna::noise::NoiseSampling;
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    let a = ScalarArithmetic::default();
+    let registry = ControllerRegistry::default();
+    let source = parse(
+        "X_ERROR(1/10) 0\nH 1\nM 1\nX_ERROR(3/4) rec[-1] 2",
+        &registry,
+    );
+    let sampling = NoiseSampling::Importance {
+        proposal_scale: BigRational::from_integer(2.into()),
+    };
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        for history_sampler in [HistorySampler::ExactMarginal, HistorySampler::AffineSupport] {
+            let options = RuntimeOptions {
+                strategy,
+                history_sampler,
+                ..Default::default()
+            };
+            let program =
+                CausalProgram::new_with_sampling(&source, &registry, options, &a, &sampling)
+                    .unwrap();
+            assert_eq!(
+                program
+                    .scaled_proposal_summary()
+                    .unwrap()
+                    .excluded_categories,
+                1
+            );
+            let draw = program
+                .sample(
+                    &[2],
+                    &zero(&a),
+                    &mut Words {
+                        values: vec![4, 1, u64::MAX],
+                        at: 0,
+                    },
+                    &a,
+                )
+                .unwrap();
+            assert_eq!(
+                draw.noise_likelihood_ratio,
+                BigRational::new(1.into(), 2.into())
+            );
+            assert_eq!(
+                draw.noise_probability,
+                BigRational::new(3.into(), 40.into())
+            );
+            assert_eq!(draw.history_mass, a.omega(0, -2).unwrap());
+            assert_eq!(draw.masses.accepted.value, draw.history_mass);
+            assert_eq!(draw.masses.error, draw.history_mass);
+            let prescribed = program
+                .resolve_prescribed_history(&[], &[], &[vec![true]], &a)
+                .unwrap();
+            assert_eq!(
+                prescribed.noise_likelihood_ratio(),
+                &BigRational::from_integer(1.into())
+            );
+        }
+    }
+}

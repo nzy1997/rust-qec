@@ -8,7 +8,10 @@ use crate::instrument::{
     CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError,
     compile_affine, compile_causal,
 };
-use crate::noise::{NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, RandomSource};
+use crate::noise::{
+    NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, NoiseSampling, RandomSource,
+    ScaledProposalSummary,
+};
 use crate::records::{
     RecordQuery, SamplingError, SamplingOptions, propose_affine_reported,
     sample_reported_conditioned,
@@ -164,11 +167,15 @@ pub struct ControllerCall {
     pub outputs: Vec<bool>,
 }
 pub struct CausalDraw {
+    /// Joint quantum masses. Form contributions using the physical/proposal
+    /// history denominator and the separately exposed noise likelihood.
     pub masses: ExactMasses,
     pub history_mass: ExactScalar,
     pub history_proposal_mass: Option<ExactScalar>,
     /// Probability of the active physical noise choices along this history.
     pub noise_probability: BigRational,
+    /// Noise/proposal likelihood, independent of the history likelihood.
+    pub noise_likelihood_ratio: BigRational,
     pub conditions: Vec<(BitExpr, bool)>,
     pub controller_calls: Vec<ControllerCall>,
     pub noise_entropy_words: usize,
@@ -182,6 +189,7 @@ pub struct ResolvedHistory {
     history_mass: ExactScalar,
     history_proposal_mass: Option<ExactScalar>,
     noise_probability: BigRational,
+    noise_likelihood_ratio: BigRational,
     conditions: Vec<(BitExpr, bool)>,
     controller_calls: Vec<ControllerCall>,
     requested_values: Vec<bool>,
@@ -208,6 +216,9 @@ impl ResolvedHistory {
     }
     pub fn noise_probability(&self) -> &BigRational {
         &self.noise_probability
+    }
+    pub fn noise_likelihood_ratio(&self) -> &BigRational {
+        &self.noise_likelihood_ratio
     }
     pub fn conditions(&self) -> &[(BitExpr, bool)] {
         &self.conditions
@@ -246,6 +257,7 @@ impl ResolvedHistory {
             history_mass: self.history_mass,
             history_proposal_mass: self.history_proposal_mass,
             noise_probability: self.noise_probability,
+            noise_likelihood_ratio: self.noise_likelihood_ratio,
             conditions: self.conditions,
             controller_calls: self.controller_calls,
             noise_entropy_words: self.noise_entropy_words,
@@ -276,6 +288,23 @@ impl CausalProgram {
         options: RuntimeOptions,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, RuntimeError> {
+        Self::new_with_sampling(
+            circuit,
+            registry,
+            options,
+            arithmetic,
+            &NoiseSampling::Physical,
+        )
+    }
+    /// Prepare an explicit noise proposal once. Guarded potential categories
+    /// remain physical, so discarded inactive choices carry unit likelihood.
+    pub fn new_with_sampling(
+        circuit: &Circuit,
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+        sampling: &NoiseSampling,
+    ) -> Result<Self, RuntimeError> {
         let names = registry.names();
         for op in circuit.operations() {
             if let Operation::Control {
@@ -301,23 +330,28 @@ impl CausalProgram {
                 source_sites.insert(operation, site);
             }
         }
-        let guarded_sites = circuit
+        let guarded_sites: std::collections::BTreeSet<usize> = circuit
             .operations()
             .iter()
             .filter(|op| matches!(op.operation, Operation::Noise { guard: Some(_), .. }))
             .map(|op| source_sites[&op.id])
             .collect();
+        let sampler =
+            NoiseSampler::configured(model.clone(), sampling, &guarded_sites, options.noise)?;
         Ok(Self {
             compilation: reference.compilation().clone(),
             reference: (options.strategy == CausalStrategy::FixedTemplate).then_some(reference),
             guarded_sites,
             circuit: circuit.clone(),
-            sampler: NoiseSampler::physical(model.clone(), options.noise),
+            sampler,
             model,
             registry: registry.clone(),
             source_sites,
             options,
         })
+    }
+    pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
+        self.sampler.scaled_proposal_summary()
     }
     pub fn prepared_density_statistics(
         &self,
@@ -667,6 +701,7 @@ impl CausalProgram {
             history_mass,
             history_proposal_mass: state.proposal_mass,
             noise_probability,
+            noise_likelihood_ratio: draw.likelihood_ratio,
             conditions: state.conditions,
             controller_calls: state.calls,
             noise_entropy_words: draw.entropy_words,

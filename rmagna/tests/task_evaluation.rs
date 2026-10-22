@@ -2,7 +2,7 @@ use num_rational::BigRational;
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::field::{ExactField, FieldArithmetic};
 use rmagna::instrument::FaultSelection;
-use rmagna::noise::RandomSource;
+use rmagna::noise::{NoiseSampling, RandomSource, SplitMix64};
 use rmagna::runtime::ControllerRegistry;
 use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
 use std::path::PathBuf;
@@ -64,6 +64,23 @@ fn evaluator_options(
     registry: &ControllerRegistry,
     options: EvaluationOptions,
 ) -> TaskEvaluator {
+    evaluator_sampling(
+        files,
+        physical,
+        task,
+        registry,
+        options,
+        &NoiseSampling::Physical,
+    )
+}
+fn evaluator_sampling(
+    files: &Files,
+    physical: &str,
+    task: &str,
+    registry: &ControllerRegistry,
+    options: EvaluationOptions,
+    sampling: &NoiseSampling,
+) -> TaskEvaluator {
     let parse = ParseOptions {
         controllers: registry.names(),
         ..Default::default()
@@ -71,12 +88,344 @@ fn evaluator_options(
     let physical = parse_circuit(physical, &parse).unwrap();
     let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
     let modules = spec.load_modules(&physical, &parse).unwrap();
-    TaskEvaluator::new(&physical, &modules, registry, options).unwrap()
+    TaskEvaluator::new_with_sampling(&physical, &modules, registry, options, sampling).unwrap()
 }
 fn rational(n: i64, d: i64) -> ExactField {
     FieldArithmetic::default()
         .from_rational(BigRational::new(n.into(), d.into()))
         .unwrap()
+}
+
+#[test]
+fn linear_importance_draws_weight_acceptance_error_target_and_moments_exactly_once() {
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let registry = ControllerRegistry::default();
+    let f = FieldArithmetic::default();
+    let task = r#"{"outputs":[0],"ideal_state":"ideal.magna","observables":[[0,1]]}"#;
+    let sampling = NoiseSampling::Importance {
+        proposal_scale: BigRational::from_integer(2.into()),
+    };
+    let program = evaluator_sampling(
+        &files,
+        "X_ERROR(1/10) 0",
+        task,
+        &registry,
+        EvaluationOptions::default(),
+        &sampling,
+    );
+    assert_eq!(
+        program.scaled_proposal_summary().unwrap().scaled_categories,
+        1
+    );
+    let mut accepted = ExactField::zero();
+    let mut error = accepted.clone();
+    let mut moment = accepted.clone();
+    let mut success = accepted.clone();
+    for word in 0..5 {
+        let draw = program.sample(&mut Words::new(vec![word])).unwrap();
+        let fault = word == 4;
+        let weight = if fault {
+            rational(1, 2)
+        } else {
+            rational(9, 8)
+        };
+        assert_eq!(draw.accepted, weight);
+        assert_eq!(draw.history_weight, ExactField::one());
+        assert_eq!(
+            f.from_rational(draw.noise_likelihood_ratio.clone())
+                .unwrap(),
+            weight
+        );
+        assert_eq!(
+            draw.error,
+            if fault {
+                weight.clone()
+            } else {
+                ExactField::zero()
+            }
+        );
+        assert_eq!(
+            draw.moments,
+            [if fault {
+                weight.negated()
+            } else {
+                weight.clone()
+            }]
+        );
+        accepted = f.add(&accepted, &draw.accepted).unwrap();
+        error = f.add(&error, &draw.error).unwrap();
+        moment = f.add(&moment, &draw.moments[0]).unwrap();
+        success = f
+            .add(&success, draw.target_success.as_ref().unwrap())
+            .unwrap();
+    }
+    for (sum, expected) in [
+        (accepted, rational(1, 1)),
+        (error, rational(1, 10)),
+        (moment, rational(4, 5)),
+        (success, rational(9, 10)),
+    ] {
+        assert_eq!(
+            f.scale(&sum, &BigRational::new(1.into(), 5.into()))
+                .unwrap(),
+            expected
+        );
+    }
+    for fault in [false, true] {
+        let faults = if fault {
+            vec![FaultSelection {
+                site: 0,
+                alternative: 0,
+            }]
+        } else {
+            vec![]
+        };
+        let draw = program
+            .sample_prescribed(&faults, &mut Words::new(vec![]))
+            .unwrap();
+        assert_eq!(
+            draw.noise_likelihood_ratio,
+            BigRational::from_integer(1.into())
+        );
+        assert_eq!(draw.accepted, ExactField::one());
+        assert_eq!(
+            draw.error,
+            if fault {
+                ExactField::one()
+            } else {
+                ExactField::zero()
+            }
+        );
+    }
+    let parsed = parse_circuit("X_ERROR(1/10) 0", &ParseOptions::default()).unwrap();
+    let spec = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
+    let modules = spec
+        .load_modules(&parsed, &ParseOptions::default())
+        .unwrap();
+    let physical =
+        TaskEvaluator::new(&parsed, &modules, &registry, EvaluationOptions::default()).unwrap();
+    assert!(physical.scaled_proposal_summary().is_none());
+    let explicit = evaluator_sampling(
+        &files,
+        "X_ERROR(1/10) 0",
+        task,
+        &registry,
+        EvaluationOptions::default(),
+        &NoiseSampling::Physical,
+    );
+    let mut a = SplitMix64::new(20261020);
+    let mut b = a;
+    for _ in 0..32 {
+        assert!(physical.sample(&mut a).unwrap() == explicit.sample(&mut b).unwrap());
+        assert_eq!(a.state(), b.state());
+    }
+}
+
+#[test]
+fn causal_importance_skips_guarded_channels_and_retains_active_physical_path_probability() {
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let registry = ControllerRegistry::default();
+    let f = FieldArithmetic::default();
+    let source = "X_ERROR(1/10) 0\nH 1\nM 1\nX_ERROR(3/4) rec[-1] 2";
+    let task =
+        r#"{"outputs":[2],"ideal_state":"ideal.magna","sample_records":[0],"observables":[[0,1]]}"#;
+    let sampling = NoiseSampling::Importance {
+        proposal_scale: BigRational::from_integer(2.into()),
+    };
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        for sampler in [HistorySampler::ExactMarginal, HistorySampler::AffineSupport] {
+            let mut options = EvaluationOptions::default();
+            options.runtime.strategy = strategy;
+            options.runtime.history_sampler = sampler;
+            let program = evaluator_sampling(&files, source, task, &registry, options, &sampling);
+            let summary = program.scaled_proposal_summary().unwrap();
+            assert_eq!(
+                (
+                    summary.categories,
+                    summary.scaled_categories,
+                    summary.excluded_categories,
+                    summary.endpoint_categories
+                ),
+                (3, 1, 1, 1)
+            );
+            let mut accepted = ExactField::zero();
+            let mut error = accepted.clone();
+            let mut moment = accepted.clone();
+            for noise in 0..5 {
+                for guarded in 0..4 {
+                    for active in [false, true] {
+                        let mut words =
+                            Words::new(vec![noise, guarded, if active { u64::MAX } else { 0 }]);
+                        let draw = program.sample(&mut words).unwrap();
+                        assert_eq!(words.at, 3);
+                        assert_eq!(draw.sampled_records, [active]);
+                        let physical = if noise == 4 {
+                            BigRational::new(1.into(), 10.into())
+                        } else {
+                            BigRational::new(9.into(), 10.into())
+                        };
+                        let guard_mass = if !active {
+                            BigRational::from_integer(1.into())
+                        } else if guarded == 0 {
+                            BigRational::new(1.into(), 4.into())
+                        } else {
+                            BigRational::new(3.into(), 4.into())
+                        };
+                        assert_eq!(draw.noise_probability, physical * guard_mass);
+                        let weight = if noise == 4 {
+                            rational(1, 2)
+                        } else {
+                            rational(9, 8)
+                        };
+                        assert_eq!(draw.accepted, weight);
+                        assert_eq!(draw.history_weight, ExactField::one());
+                        assert_eq!(
+                            f.from_rational(draw.noise_likelihood_ratio.clone())
+                                .unwrap(),
+                            weight
+                        );
+                        assert_eq!(
+                            draw.error,
+                            if active && guarded != 0 {
+                                weight.clone()
+                            } else {
+                                ExactField::zero()
+                            }
+                        );
+                        accepted = f.add(&accepted, &draw.accepted).unwrap();
+                        error = f.add(&error, &draw.error).unwrap();
+                        moment = f.add(&moment, &draw.moments[0]).unwrap();
+                    }
+                }
+            }
+            for (sum, expected) in [
+                (accepted, rational(1, 1)),
+                (error, rational(3, 8)),
+                (moment, rational(1, 4)),
+            ] {
+                assert_eq!(
+                    f.scale(&sum, &BigRational::new(1.into(), 40.into()))
+                        .unwrap(),
+                    expected
+                );
+            }
+            let diagnostic = program
+                .evaluate_prescribed_history(&[], &[vec![true], vec![true]])
+                .unwrap();
+            assert_eq!(
+                diagnostic.noise_likelihood_ratio,
+                BigRational::from_integer(1.into())
+            );
+            assert_eq!(diagnostic.accepted, ExactField::one());
+        }
+    }
+}
+
+#[test]
+fn noise_and_nonuniform_history_likelihoods_combine_once_including_interference_zeros() {
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let registry = ControllerRegistry::default();
+    let f = FieldArithmetic::default();
+    let a = ScalarArithmetic::default();
+    let sampling = NoiseSampling::Importance {
+        proposal_scale: BigRational::from_integer(2.into()),
+    };
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        for cancel in [false, true] {
+            let source = if cancel {
+                "H 0\nT 0\nT_DAG 0\nH 0\nM 0\nX_ERROR(1/10) 1"
+            } else {
+                "H 0\nT 0\nH 0\nM 0\nX_ERROR(1/10) 1"
+            };
+            let mut options = EvaluationOptions::default();
+            options.runtime.strategy = strategy;
+            options.runtime.history_sampler = HistorySampler::AffineSupport;
+            options.runtime.compile.compiler_strategy =
+                rmagna::unitary::CompilerStrategy::SharedCommutingLayer;
+            options.runtime.compile.probability_preparation =
+                rmagna::instrument::QueryPreparation::FixedFibers(Default::default());
+            options.runtime.compile.density_preparation =
+                rmagna::instrument::QueryPreparation::FixedFibers(Default::default());
+            let program = evaluator_sampling(
+                &files,
+                source,
+                r#"{"outputs":[1],"ideal_state":"ideal.magna","sample_records":[0]}"#,
+                &registry,
+                options,
+                &sampling,
+            );
+            let mut accepted = ExactField::zero();
+            let mut error = accepted.clone();
+            for noise in 0..5 {
+                for bit in [false, true] {
+                    let draw = program
+                        .sample(&mut Words::new(vec![noise, u64::from(bit)]))
+                        .unwrap();
+                    let p = if cancel {
+                        if bit {
+                            ExactScalar::zero()
+                        } else {
+                            ExactScalar::one()
+                        }
+                    } else {
+                        a.scalar(
+                            [
+                                2.into(),
+                                if bit { (-1).into() } else { 1.into() },
+                                0.into(),
+                                if bit { 1.into() } else { (-1).into() },
+                            ],
+                            -2,
+                        )
+                        .unwrap()
+                    };
+                    assert_eq!(draw.history_mass, p);
+                    assert_eq!(draw.history_proposal_mass, Some(a.omega(0, -2).unwrap()));
+                    let history_weight = f
+                        .scale(
+                            &f.from_scalar(&p).unwrap(),
+                            &BigRational::from_integer(2.into()),
+                        )
+                        .unwrap();
+                    assert_eq!(draw.history_weight, history_weight);
+                    let noise_weight = if noise == 4 {
+                        BigRational::new(1.into(), 2.into())
+                    } else {
+                        BigRational::new(9.into(), 8.into())
+                    };
+                    assert_eq!(draw.noise_likelihood_ratio, noise_weight);
+                    let weight = f.scale(&history_weight, &noise_weight).unwrap();
+                    assert_eq!(draw.accepted, weight);
+                    assert_eq!(
+                        draw.error,
+                        if noise == 4 {
+                            weight
+                        } else {
+                            ExactField::zero()
+                        }
+                    );
+                    accepted = f.add(&accepted, &draw.accepted).unwrap();
+                    error = f.add(&error, &draw.error).unwrap();
+                }
+            }
+            assert_eq!(
+                f.scale(&accepted, &BigRational::new(1.into(), 10.into()))
+                    .unwrap(),
+                ExactField::one()
+            );
+            assert_eq!(
+                f.scale(&error, &BigRational::new(1.into(), 10.into()))
+                    .unwrap(),
+                rational(1, 10)
+            );
+        }
+    }
 }
 #[test]
 fn pure_mixed_and_projected_targets_normalize_exactly() {
@@ -999,5 +1348,149 @@ fn affine_majority_inputs_and_repeated_diagnostics_use_one_entropy_word_without_
         assert_eq!(error, rational(1, 8));
         assert_eq!(success, rational(3, 8));
         assert_eq!(moment, rational(1, 4));
+    }
+}
+
+#[test]
+fn invalid_task_proposals_fail_during_preparation_on_linear_and_causal_routes() {
+    let files = Files::new();
+    let registry = ControllerRegistry::default();
+    for source in [
+        "X_ERROR(1/2) 0",
+        "X_ERROR(1/2) 0\nH 1\nM 1\nX_ERROR(3/4) rec[-1] 2",
+    ] {
+        let parsed = parse_circuit(source, &ParseOptions::default()).unwrap();
+        let spec = parse_task("{}", &files.0, &TaskOptions::default()).unwrap();
+        let modules = spec
+            .load_modules(&parsed, &ParseOptions::default())
+            .unwrap();
+        for scale in [
+            BigRational::from_integer(0.into()),
+            BigRational::from_integer(2.into()),
+            BigRational::new_raw(1.into(), 0.into()),
+        ] {
+            let result = TaskEvaluator::new_with_sampling(
+                &parsed,
+                &modules,
+                &registry,
+                EvaluationOptions::default(),
+                &NoiseSampling::Importance {
+                    proposal_scale: scale,
+                },
+            );
+            let error = match result {
+                Ok(_) => panic!("invalid proposal prepared"),
+                Err(error) => error,
+            };
+            assert!(error.to_string().contains("proposal scale"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn importance_report_flips_change_biased_guard_histories_without_scaling_the_guard() {
+    use rmagna::runtime::{CausalStrategy, HistorySampler};
+    use rmagna::scalar::ScalarArithmetic;
+    let files = Files::new();
+    files.put("ideal.magna", "I 0");
+    let registry = ControllerRegistry::default();
+    let f = FieldArithmetic::default();
+    let a = ScalarArithmetic::default();
+    let source = "H 0\nT 0\nH 0\nM(1/10) 0\nX_ERROR(3/4) rec[-1] 1";
+    let sampling = NoiseSampling::Importance {
+        proposal_scale: BigRational::from_integer(2.into()),
+    };
+    for strategy in [CausalStrategy::FixedTemplate, CausalStrategy::ColdPrefix] {
+        let mut options = EvaluationOptions::default();
+        options.runtime.strategy = strategy;
+        options.runtime.history_sampler = HistorySampler::AffineSupport;
+        let program = evaluator_sampling(
+            &files,
+            source,
+            r#"{"outputs":[1],"ideal_state":"ideal.magna","sample_records":[0]}"#,
+            &registry,
+            options,
+            &sampling,
+        );
+        let summary = program.scaled_proposal_summary().unwrap();
+        assert_eq!(
+            (summary.scaled_categories, summary.excluded_categories),
+            (1, 1)
+        );
+        let mut accepted = ExactField::zero();
+        let mut error = accepted.clone();
+        for report in 0..5 {
+            for guarded in 0..4 {
+                let mut seen = std::collections::BTreeSet::new();
+                for bit in [false, true] {
+                    let flip = report == 4;
+                    let draw = program
+                        .sample(&mut Words::new(vec![report, guarded, u64::from(bit)]))
+                        .unwrap();
+                    let reported = draw.sampled_records[0];
+                    seen.insert(reported);
+                    let physical_bit = reported ^ flip;
+                    let p = a
+                        .scalar(
+                            [
+                                2.into(),
+                                if physical_bit { (-1).into() } else { 1.into() },
+                                0.into(),
+                                if physical_bit { 1.into() } else { (-1).into() },
+                            ],
+                            -2,
+                        )
+                        .unwrap();
+                    assert_eq!(draw.history_mass, p);
+                    let history = f
+                        .scale(
+                            &f.from_scalar(&p).unwrap(),
+                            &BigRational::from_integer(2.into()),
+                        )
+                        .unwrap();
+                    assert_eq!(draw.history_weight, history);
+                    let expected = f
+                        .scale(
+                            &history,
+                            &if flip {
+                                BigRational::new(1.into(), 2.into())
+                            } else {
+                                BigRational::new(9.into(), 8.into())
+                            },
+                        )
+                        .unwrap();
+                    assert_eq!(draw.accepted, expected);
+                    assert_eq!(
+                        draw.error,
+                        if reported && guarded != 0 {
+                            expected
+                        } else {
+                            ExactField::zero()
+                        }
+                    );
+                    accepted = f.add(&accepted, &draw.accepted).unwrap();
+                    error = f.add(&error, &draw.error).unwrap();
+                }
+                assert_eq!(seen, std::collections::BTreeSet::from([false, true]));
+            }
+        }
+        assert_eq!(
+            f.scale(&accepted, &BigRational::new(1.into(), 40.into()))
+                .unwrap(),
+            ExactField::one()
+        );
+        let expected = f
+            .value([
+                BigRational::new(3.into(), 8.into()),
+                BigRational::new((-3).into(), 20.into()),
+                BigRational::from_integer(0.into()),
+                BigRational::new(3.into(), 20.into()),
+            ])
+            .unwrap();
+        assert_eq!(
+            f.scale(&error, &BigRational::new(1.into(), 40.into()))
+                .unwrap(),
+            expected
+        );
     }
 }

@@ -662,8 +662,10 @@ at 100,000 per draw, with separate noise and history entropy budgets. The explic
 `CausalStrategy::ColdPrefix` baseline also caps prefix compiles at 100,000. The
 default fixed-template route below reuses its Clifford circuit across histories;
 final scalar query closures are still prepared per query. Affine-support histories
-are described below; causal importance proposals and complete paper-performance validation remain
-subsequent work. Terminal recovery and task evaluation are described below.
+are described below. [Task and causal importance sampling](#task-and-causal-importance-sampling)
+is available through `new_with_sampling`. File/run/result integration and complete
+paper-performance validation remain subsequent work. Terminal recovery and task
+evaluation are described below.
 
 Tests enumerate majority histories, preserve repeated observations and atomic
 register updates, distinguish active and inactive guarded paths, verify correlated
@@ -880,9 +882,10 @@ physical noise. Python decoder bindings are available through the bridge below.
 Bounded prepared probability families are available through the opt-in modes
 [documented below](#bounded-instrument-probability-preparation). Standalone
 aggregation is available through
-[`statistics::ExactStatistics`](#exact-streaming-paired-statistics). Causal
-importance proposal selection and automatic public run/result integration
-remain separate deliverables.
+[`statistics::ExactStatistics`](#exact-streaming-paired-statistics).
+[Task and causal importance proposals](#task-and-causal-importance-sampling)
+are available through `new_with_sampling`; automatic public run/result
+integration remains a separate deliverable.
 
 ## External decoder process bridge
 
@@ -1712,3 +1715,59 @@ and file/task sampling configuration are separate higher-level interfaces.
 Arbitrary proposal models remain supported by `NoiseSampler::importance`.
 The common-scale proposal does not implement experiment-specific mixtures or
 residual-class distributions.
+
+## Task and causal importance sampling
+
+`TaskEvaluator::new_with_sampling` and `CausalProgram::new_with_sampling` accept
+`noise::NoiseSampling::Physical` or `NoiseSampling::Importance { proposal_scale }`.
+The original `new` constructors retain physical sampling and their seeded stream.
+Noise proposals are separate from the copyable runtime options and history
+sampler. Causal preparation automatically excludes guarded potential categories
+from scaling; endpoint categories also remain unchanged. All scale, support and
+denominator checks complete before sampling entropy. `scaled_proposal_summary`
+returns the exact common-scale configuration and category counts, including unit
+scales, and returns `None` for physical sampling.
+
+```rust
+use std::path::Path;
+use num_rational::BigRational;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::{NoiseSampling, SplitMix64};
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
+
+let parse = ParseOptions::default();
+let physical = parse_circuit("X_ERROR(1/10) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]", &parse)?;
+let task = parse_task(r#"{"error_observables":[0]}"#, Path::new("."), &TaskOptions::default())?;
+let modules = task.load_modules(&physical, &parse)?;
+let evaluator = TaskEvaluator::new_with_sampling(
+    &physical, &modules, &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Importance { proposal_scale: BigRational::from_integer(2.into()) },
+)?;
+let draw = evaluator.sample(&mut SplitMix64::new(7))?;
+assert_eq!(evaluator.scaled_proposal_summary().unwrap().scaled_categories, 1);
+# let _ = draw;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Task accepted/error/target/moment contributions already include the noise
+likelihood exactly once and use the configured physical/history-proposal
+normalization. The complete diagnostic weight for ESS is
+`noise_likelihood_ratio * history_weight`. Weighted acceptance may exceed one on
+individual draws; it is not clipped. Inactive guarded choices have no physical
+action or active-path probability factor and carry unit noise likelihood because
+their proposal is unchanged.
+
+`ResolvedHistory::noise_likelihood_ratio` and `CausalDraw::noise_likelihood_ratio`
+expose the noise factor independently of history mass and history proposal mass.
+Low-level causal `masses` remain joint quantum masses, rather than already
+weighted task contributions. Prescribed fault assignments and explicit prescribed
+histories retain their conditional physical diagnostic semantics and unit noise
+likelihood even on an importance-configured evaluator.
+
+Exact finite entropy grids verify acceptance, error, target success, signed
+moments, guard-dependent path probabilities and biased reported histories under
+both causal strategies. Uniform and nonuniform history proposals, interference
+zeros, scaled report flips that change guard activation, unit-scale streams and
+invalid preparation controls are covered. File/result schemas and specialized
+paper proposals are separate interfaces.
