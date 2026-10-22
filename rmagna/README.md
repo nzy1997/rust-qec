@@ -2173,3 +2173,65 @@ strategies. They cover signed moments, paired ratios, repeated prepared calls,
 owned preparation, bounded record retention, callback/contraction/arithmetic
 failures, atomic statistics/efficiency alignment, zero/one completed draw,
 undefined metrics and finalization failure accounting.
+
+## Numerical batch-result payloads
+
+`task::export_batch_metrics` turns a typed batch result into JSON-compatible
+estimates, standard errors, scientific twins, weight/efficiency diagnostics and
+explicit count/failure/timing fields. It exports the numerical payload used by
+a file-result layer; it does not claim a complete versioned result document.
+Execution metadata, content fingerprints and detailed query instrumentation are
+separate responsibilities. No `schema_version` is attached to this payload.
+
+```rust
+use std::path::Path;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::NoiseSampling;
+use rmagna::numeric::NumericOptions;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, TaskOptions, TaskRunOptions, export_batch_metrics, parse_task, run_task_batch};
+
+let parse = ParseOptions::default();
+let physical = parse_circuit("I 0", &parse)?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?.load_modules(&physical, &parse)?;
+let result = run_task_batch(
+    &physical, &modules, &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Physical, &TaskRunOptions::default(),
+)?;
+let payload = export_batch_metrics(&result, NumericOptions::default())?;
+assert_eq!(payload["estimates"]["acceptance"], 1.0);
+assert!(payload["estimates"]["error"].is_null()); // No declared error metric.
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Numerical names follow native schema-2 conventions: `estimates`,
+`standard_errors`, `estimates_scientific`, `standard_errors_scientific`,
+`weights`, `efficiency` and `numerics`. Scientific objects are
+`{"mantissa": m, "exponent2": e}` with nonzero mantissa magnitude in `[0.5,1)`;
+zero has exponent zero. Ordinary values are rounded independently. Standard
+errors are correctly rounded square roots of exact mean variances, including
+the paired conditional ratio. Undefined fields are null without range flags.
+Exact zeros stay zero. A nonzero value rounded to zero or infinity has a null
+ordinary field, a retained scientific twin, and its full path listed in
+`numerics.underflow_fields` or `overflow_fields`.
+
+An estimable kappa outside binary64 range has
+`efficiency.status = "diagnostic_range_exceeded"` and retains
+`kappa_scientific`. The underlying exact efficiency summary is unchanged.
+Weights always describe complete noise/history likelihoods; they are diagnostic
+and are not applied to estimates again. Failed runs have null main estimate
+objects and a separate `partial_statistics` payload when summarization was
+possible. Range paths then identify the actual provisional location, such as
+`partial_statistics.estimates.acceptance`.
+
+The typed batch phases `accumulation` and `finalization` remain explicit in this
+payload alongside `preparation` and `sampling`. Counters under
+`completed_resources` describe committed rows, rather than claiming all work of
+failed attempts. Export validates count/shape/timing consistency and fails with
+a field-specific `BatchExportError` when a numeric budget or real square-root
+requirement is violated. It returns no partly exported object or NaN/infinity.
+
+Tests check literal binary statistics and standard errors, signed moments,
+`1e-400`/`1e400` values and variances, the direct-rounding subnormal control,
+undefined-versus-zero distinctions, extreme kappa, failed/provisional placement,
+finalization accounting, malformed public state and JSON round trips.

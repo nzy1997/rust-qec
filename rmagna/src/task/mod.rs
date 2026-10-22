@@ -1,5 +1,7 @@
 //! Task schema 1, exact output masks, and relative module identities.
 mod compose;
+mod export;
+pub use export::{BatchExportError, export_batch_metrics};
 mod evaluate;
 pub use evaluate::{
     ContractionResources, EvaluationOptions, ExactInterval, RunFailure, RunPhase, RunStatus,
