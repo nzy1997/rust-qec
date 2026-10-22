@@ -576,3 +576,110 @@ fn independent_support_contraction_still_enforces_scalar_budgets() {
     }
     assert_eq!(input.contract(&wide).unwrap().unwrap(), input);
 }
+
+#[test]
+fn owned_wide_clifford_updates_match_reverse_labels_and_diagonal_phases() {
+    let a = ScalarArithmetic::default();
+    let width = 129;
+    let mut gates = (1..width)
+        .map(|target| Gate::Cx { control: 0, target })
+        .collect::<Vec<_>>();
+    gates.extend(
+        (0..width)
+            .filter(|&control| control != 64)
+            .map(|control| Gate::Cx {
+                control,
+                target: 64,
+            }),
+    );
+    for q in 0..width {
+        gates.push(Gate::S {
+            qubit: q,
+            turns: (q & 3) as u8,
+        });
+        gates.push(Gate::Cz {
+            a: q,
+            b: (q + 65) % width,
+        });
+        if q % 3 == 0 {
+            gates.push(Gate::Z(q));
+        }
+        if q % 5 == 0 {
+            gates.push(Gate::X(q));
+        }
+        if q % 7 == 0 {
+            gates.push(Gate::Swap {
+                a: q,
+                b: (q + 64) % width,
+            });
+        }
+    }
+    let offset = BitVector::from_indices(width, [1, 64, 128]).unwrap();
+    let phase = QuadraticForm::new(
+        3,
+        (0..width).map(|i| (i & 3) as u8).collect(),
+        (0..width)
+            .map(|i| {
+                BitVector::from_indices(width, (i + 1..width).filter(|&j| (i + j) % 17 == 0))
+                    .unwrap()
+            })
+            .collect(),
+    )
+    .unwrap();
+    let input = AffineKet::new(
+        offset.clone(),
+        (0..width)
+            .map(|i| BitVector::from_indices(width, [i]).unwrap())
+            .collect(),
+        phase,
+        a.omega(5, -(width as i64)).unwrap(),
+    )
+    .unwrap();
+    let snapshot = input.clone();
+    let actual = CliffordCircuit::new(width, gates.clone())
+        .unwrap()
+        .evolve(&input, &a)
+        .unwrap()
+        .unwrap();
+    assert_eq!(input, snapshot);
+    let prepared = actual.prepare().unwrap();
+    let mut rng = 0x1773ab293;
+    for trial in 0..64 {
+        let output = BitVector::from_indices(
+            width,
+            (0..width).filter(|_| trial == 0 || next(&mut rng) & 1 != 0),
+        )
+        .unwrap();
+        let mut label = (0..width)
+            .map(|j| output.get(j).unwrap())
+            .collect::<Vec<_>>();
+        let mut exponent = 0_i64;
+        for gate in gates.iter().rev() {
+            match *gate {
+                Gate::X(q) => label[q] = !label[q],
+                Gate::Z(q) => exponent += 4 * i64::from(label[q]),
+                Gate::S { qubit, turns } => {
+                    exponent += 2 * i64::from(turns) * i64::from(label[qubit])
+                }
+                Gate::Cz { a, b } => exponent += 4 * i64::from(label[a] && label[b]),
+                Gate::Cx { control, target } => label[target] ^= label[control],
+                Gate::Swap { a, b } => label.swap(a, b),
+                Gate::H(_) => unreachable!(),
+            }
+        }
+        let x = BitVector::from_indices(
+            width,
+            (0..width).filter(|&j| label[j] ^ offset.get(j).unwrap()),
+        )
+        .unwrap();
+        exponent += 2 * i64::from(input.phase().evaluate(&x).unwrap());
+        let expected = a
+            .multiply(input.coefficient(), &a.omega(exponent, 0).unwrap())
+            .unwrap();
+        assert_eq!(
+            prepared.amplitude(&output, &a).unwrap(),
+            expected,
+            "trial={trial}"
+        );
+    }
+}

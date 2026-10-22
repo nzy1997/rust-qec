@@ -132,6 +132,21 @@ impl BitVector {
         Ok(())
     }
 
+    /// XOR indices at or above `start`, preserving lower indices and padding.
+    pub(crate) fn xor_tail_assign(&mut self, other: &Self, start: usize) -> Result<(), Gf2Error> {
+        other.check_width(self.width)?;
+        if start == self.width {
+            return Ok(());
+        }
+        self.check_index(start)?;
+        let word = start / 64;
+        self.words[word] ^= other.words[word] & (u64::MAX << (start % 64));
+        for (left, right) in self.words.iter_mut().zip(&other.words).skip(word + 1) {
+            *left ^= right;
+        }
+        Ok(())
+    }
+
     pub(crate) fn xor_and_assign(&mut self, left: &Self, right: &Self) -> Result<(), Gf2Error> {
         self.check_width(left.width)?;
         self.check_width(right.width)?;

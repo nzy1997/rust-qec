@@ -180,7 +180,7 @@ impl CliffordCircuit {
             return Ok(None);
         };
         for &gate in &self.gates {
-            let Some(next) = apply(gate, &ket, arithmetic)? else {
+            let Some(next) = apply(gate, ket, arithmetic)? else {
                 return Ok(None);
             };
             ket = next;
@@ -189,43 +189,30 @@ impl CliffordCircuit {
     }
 }
 
-fn add_phase(left: &QuadraticForm, right: &QuadraticForm) -> Result<QuadraticForm, CliffordError> {
-    let linear = left
-        .linear()
-        .iter()
-        .zip(right.linear())
-        .map(|(a, b)| (a + b) & 3)
-        .collect();
-    let mut upper = left.upper().to_vec();
-    for (a, b) in upper.iter_mut().zip(right.upper()) {
-        a.xor_assign(b)?;
-    }
-    Ok(QuadraticForm::new(
-        (left.constant() + right.constant()) & 3,
-        linear,
-        upper,
-    )?)
+fn support_row(columns: &[BitVector], qubit: usize) -> Result<BitVector, Gf2Error> {
+    BitVector::from_indices(
+        columns.len(),
+        columns
+            .iter()
+            .enumerate()
+            .filter_map(|(j, c)| c.get(qubit).expect("validated physical qubit").then_some(j)),
+    )
 }
 
 fn apply(
     gate: CliffordGate,
-    ket: &AffineKet,
+    ket: AffineKet,
     arithmetic: &ScalarArithmetic,
 ) -> Result<Option<AffineKet>, CliffordError> {
-    let mut offset = ket.offset().clone();
-    let mut columns = ket.columns().to_vec();
-    let mut phase = ket.phase().clone();
-    let mut coefficient = ket.coefficient().clone();
+    let width = ket.width();
+    let (mut offset, mut columns, mut phase, mut coefficient) = ket.into_parts();
     match gate {
         CliffordGate::X(qubit) => {
             let bit = offset.get(qubit)?;
             offset.set(qubit, !bit)?;
         }
         CliffordGate::Z(qubit) => {
-            return Ok(Some(ket.pauli(
-                &BitVector::zeros(ket.width())?,
-                &BitVector::from_indices(ket.width(), [qubit])?,
-            )?));
+            phase.add_affine_parity(&support_row(&columns, qubit)?, offset.get(qubit)?, 2)?;
         }
         CliffordGate::Cx { control, target } => {
             for vector in std::iter::once(&mut offset).chain(&mut columns) {
@@ -241,38 +228,14 @@ fn apply(
             }
         }
         CliffordGate::S { qubit, turns } => {
-            let one = QuadraticForm::new(0, vec![turns], vec![BitVector::zeros(1)?])?;
-            let shift = BitVector::from_indices(1, offset.get(qubit)?.then_some(0))?;
-            let basis = columns
-                .iter()
-                .map(|c| BitVector::from_indices(1, c.get(qubit)?.then_some(0)))
-                .collect::<Result<Vec<_>, Gf2Error>>()?;
-            phase = add_phase(&phase, &one.restrict(&shift, &basis)?)?;
+            phase.add_affine_parity(&support_row(&columns, qubit)?, offset.get(qubit)?, turns)?;
         }
         CliffordGate::Cz { a, b } => {
-            let n = columns.len();
-            let left = columns
-                .iter()
-                .map(|c| c.get(a))
-                .collect::<Result<Vec<_>, _>>()?;
-            let right = columns
-                .iter()
-                .map(|c| c.get(b))
-                .collect::<Result<Vec<_>, _>>()?;
-            let a0 = offset.get(a)?;
-            let b0 = offset.get(b)?;
-            let linear = (0..n)
-                .map(|i| 2 * u8::from((a0 && right[i]) ^ (b0 && left[i]) ^ (left[i] && right[i])))
-                .collect();
-            let mut upper = vec![BitVector::zeros(n)?; n];
-            for (i, row) in upper.iter_mut().enumerate() {
-                for j in i + 1..n {
-                    row.set(j, (left[i] && right[j]) ^ (left[j] && right[i]))?;
-                }
-            }
-            phase = add_phase(
-                &phase,
-                &QuadraticForm::new(2 * u8::from(a0 && b0), linear, upper)?,
+            phase.add_affine_product(
+                &support_row(&columns, a)?,
+                offset.get(a)?,
+                &support_row(&columns, b)?,
+                offset.get(b)?,
             )?;
         }
         CliffordGate::H(qubit) => {
@@ -303,7 +266,7 @@ fn apply(
             let mut linear = phase.linear().to_vec();
             linear.push(2 * u8::from(offset.get(qubit)?));
             offset.set(qubit, false)?;
-            columns.push(BitVector::from_indices(ket.width(), [qubit])?);
+            columns.push(BitVector::from_indices(width, [qubit])?);
             phase = QuadraticForm::new(phase.constant(), linear, upper)?;
             coefficient = arithmetic.multiply(&coefficient, &arithmetic.omega(0, -1)?)?;
             let next = AffineKet::new(offset, columns, phase, coefficient)?;
