@@ -1993,3 +1993,59 @@ recovery and projected or entangled partial targets. They also verify exact
 global resource boundaries and omitted-sector extremal/interior responses,
 empty sectors, undefined zero-acceptance rates and arithmetic failures. Run-file
 and result schemas and specialized paper proposals remain separate deliverables.
+
+## Correctly rounded numeric exports
+
+`numeric::approximate_real` and `approximate_sqrt` export exact real field values
+without converting their individual coefficients to floating point first.
+The latter rounds a nonnegative square root even when it is outside the exact
+field, as needed for uncertainty magnitudes. Negative square roots and nonreal
+inputs fail explicitly. These are export operations; exact simulation, sampling
+and statistics retain their existing arithmetic.
+
+```rust
+use num_bigint::BigInt;
+use num_rational::BigRational;
+use rmagna::field::FieldArithmetic;
+use rmagna::numeric::{Binary64, NumericOptions, approximate_real};
+
+let f = FieldArithmetic::default();
+let tiny = f.from_rational(BigRational::new(1.into(), BigInt::from(10).pow(400)))?;
+let exported = approximate_real(&tiny, NumericOptions::default())?;
+assert_eq!(exported.binary64, Binary64::Underflow { negative: false });
+assert_eq!(exported.scientific.exponent, -1329);
+assert!(exported.scientific.mantissa >= 1.0);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`RoundedReal::scientific` represents `mantissa * 2^exponent` with a signed,
+nearest-even binary64 mantissa whose magnitude is in `[1,2)`. Exact zero has
+mantissa zero and exponent zero. `binary64` is rounded independently, so
+subnormal output is not subject to double rounding through the scientific
+mantissa. `Binary64::Finite` includes exact zero; `Underflow` identifies a
+nonzero exact value rounded to signed zero, and `Overflow` identifies rounding
+to signed infinity. Both nonfinite classes retain the sign. Undefined
+statistical quantities remain optional at their owning layer.
+
+The implementation compares `A+B*sqrt(2)` with exact dyadic candidates, uses
+integer norm bounds to locate the exponent even under severe cancellation,
+and compares square-root candidates by squaring them. Exact midpoint tests
+implement ties to even at normal, subnormal and overflow boundaries. Defaults
+allow 16,777,216 bits per intermediate integer, including squares. Checks use
+conservative pre-operation bounds; insufficient budgets fail rather than
+returning an uncertified approximation. This is a bit budget for individual
+integers, not a total-memory or constant-time guarantee.
+
+Tests include literal IEEE witnesses for both signs and halfway transitions,
+direct-versus-scientific double-rounding controls, Pell cancellation, tiny and
+huge scales, square roots and explicit input/budget failures. Eighty independent
+Decimal witnesses agree at 1,200 and 2,400 decimal digits and cover both exported
+representations and square roots. Regenerate them with:
+
+```sh
+python3 benchmarks/magna_reproduction/numeric_vectors.py --out rmagna/tests/data/numeric-reference.json
+```
+
+The finite Decimal witnesses supplement the exact midpoint and boundary tests;
+they are reference calculations rather than a proof of all possible inputs.
+File/result serialization is a separate interface.
