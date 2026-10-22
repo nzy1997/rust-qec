@@ -1503,3 +1503,45 @@ process identity and call counts, exact irrational masses, seed/history reuse,
 zero/maximum/invalid counts, both causal strategies and history samplers,
 all probability preparation modes, and rejection of a stateful decoder whose
 output changes on replay. The normal crate test command includes this test.
+
+## Prepared reduced-density overlap
+
+`DensityLayout` describes ordered outputs and fixed Z-event rows, with outcome
+values supplied separately. `prepare_density_overlap` prepares projection and
+retained-boundary Gaussian contraction for both original programs.
+`prepare_density_overlap_with_fibers` also freezes a certified phase resource;
+`fixed_phase_resource()` reports its actual rank and terms.
+
+`PreparedDensityOverlap::evaluate(left, right, left_outcomes, right_outcomes,
+max_terms, arithmetic)` accepts independent insertion views and event outcomes
+on both sides. Preparing perturbed views still uses original references. An
+unrelated program, changed layout shape or exhausted term budget is rejected.
+Both environments are traced independently, output order is preserved, and
+masses remain unnormalized. Zero reference events do not disable later nonzero
+updates. The fixed resource precedes adaptive radical absorption and may be
+larger than the adaptive result; remaining Gaussian sums are query-specific.
+
+```rust
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::unitary::{DensityLayout, UnitaryCircuit, UnitaryGate};
+let arithmetic = ScalarArithmetic::default();
+let state = UnitaryCircuit::new(2, [
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+    UnitaryGate::Clifford(CliffordGate::Cx { control: 0, target: 1 }),
+])?.compile(&BitVector::zeros(2)?, &arithmetic)?;
+let layout = DensityLayout { outputs: &[0], event_rows: &[] };
+let plan = state.prepare_density_overlap(layout, &state, layout, &arithmetic)?;
+let empty = BitVector::zeros(0)?;
+assert_eq!(plan.evaluate(&state, &state, &empty, &empty, 1, &arithmetic)?.value,
+    arithmetic.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Probability and density families share one internal scalar-closure implementation.
+Literal reduced-density-matrix tests cover mixed and projected states, different
+widths, output permutations, empty outputs, both compiler strategies, independent
+faults, preparation from perturbed views and impossible reference events. The
+cold `density_overlap` interface remains available. Instrument/task target-cache
+integration is separate from this primitive.
