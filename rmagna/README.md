@@ -2049,3 +2049,55 @@ python3 benchmarks/magna_reproduction/numeric_vectors.py --out rmagna/tests/data
 The finite Decimal witnesses supplement the exact midpoint and boundary tests;
 they are reference calculations rather than a proof of all possible inputs.
 File/result serialization is a separate interface.
+
+## Exact history-sampler efficiency diagnostics
+
+`statistics::HistoryEfficiency` accumulates the finite-data history efficiency
+comparison separately from ordinary standard-error estimation. Supply already
+weighted acceptance `A`, error `E`, complete noise/history weight `W`, and
+noise-only likelihood `L` on each completed draw. The accumulator never applies
+these weights to contributions a second time. A missing error metric is `None`,
+not an invented zero error measurement.
+
+```rust
+use rmagna::field::{ExactField, FieldArithmetic};
+use rmagna::statistics::{EfficiencyStatus, HistoryEfficiency};
+
+let mut efficiency = HistoryEfficiency::new(FieldArithmetic::default())?;
+for error in [ExactField::zero(), ExactField::one()] {
+    efficiency.push(&ExactField::one(), Some(&error), &ExactField::one(), &ExactField::one())?;
+}
+let summary = efficiency.summarize()?;
+assert_eq!(summary.status, EfficiencyStatus::Available);
+assert_eq!(summary.kappa, Some(ExactField::one()));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+For `r = sum(E)/sum(A)`, the actual residual sum is
+`U = sum((E-r*A)^2)`. Its exact-marginal reference is
+`B = sum((L/W)*(E-r*A)^2)` over positive-weight draws. The summary exposes
+`kappa = U/B`, `variance_coefficient = n*U/sum(A)^2` and
+`exact_marginal_variance_coefficient = n*B/sum(A)^2`. These are finite-data
+variance diagnostics, without the unbiased sample correction used for standard
+errors. The comparison holds the noise proposal and terminal estimator fixed.
+For exact-marginal histories `W=L`, so any estimable kappa is exactly one.
+
+Weight ESS is `(sum(W))^2/sum(W^2)` and `rho` is `n/ESS`. All-zero weights give
+ESS zero and undefined rho; no draws give undefined mean weight. Zero-weight
+draws still increment the completed and zero-weight counters. Statuses distinguish
+`no_error_metric`, `insufficient_samples`, `zero_acceptance`,
+`zero_residual_variance` and `available`, in that precedence order. Unavailable
+comparisons have no kappa or variance coefficients. Unlike an intermediate
+floating-point diagnostic, this exact layer does not discard an estimable
+comparison because its coefficients have extreme magnitude; numeric export
+reports any ordinary binary64 range failure separately.
+
+Inputs must be real with `0 <= E <= A`, nonnegative likelihoods, and positive
+complete/noise likelihoods whenever acceptance is positive. Failed updates and
+disjoint merges are atomic under the receiver's arithmetic budget. The number
+of retained accumulators is independent of draw count; integer sizes can grow
+and remain bounded by that budget. Tests use independent centered full-list
+oracles with unequal noise and history weights, zero draws, irrational values,
+scale changes of 10,000 square-root-two powers, disjoint partitions and explicit
+unavailable, invalid, arithmetic and count-overflow cases. Run summaries and
+sampler-pilot decisions are separate interfaces.
