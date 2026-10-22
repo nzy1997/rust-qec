@@ -10,6 +10,10 @@ use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::unitary::{CompiledUnitary, DensityBoundary};
 use num_rational::BigRational;
 use num_traits::One;
+mod enumeration;
+pub use enumeration::{
+    ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses, TaskWeightSector,
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EvaluationOptions {
