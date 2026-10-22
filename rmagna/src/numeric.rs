@@ -112,7 +112,13 @@ impl Real {
     }
     fn from_field(value: &ExactField, options: NumericOptions) -> Result<Self, NumericError> {
         let [a, b, c, d] = value.coefficients();
-        if !c.is_zero() || *b != -d {
+        // ExactField coefficients are canonical. Compare borrowed magnitudes
+        // and signs so realness validation cannot clone an over-budget input.
+        if !c.is_zero()
+            || b.denom() != d.denom()
+            || b.numer().magnitude() != d.numer().magnitude()
+            || (!b.is_zero() && b.numer().sign() == d.numer().sign())
+        {
             return Err(NumericError::NonReal);
         }
         let mut result = Self {
