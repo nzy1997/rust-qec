@@ -6,6 +6,8 @@
 use crate::field::{ExactField, FieldArithmetic, FieldError};
 use num_rational::BigRational;
 use std::{cmp::Ordering, fmt};
+mod efficiency;
+pub use efficiency::{EfficiencyStatus, EfficiencySummary, HistoryEfficiency};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StatisticsError {
@@ -15,6 +17,9 @@ pub enum StatisticsError {
     SizeOverflow,
     CountOverflow,
     NegativeWeight,
+    NegativeNoiseLikelihood,
+    InvalidProbabilityContribution,
+    ZeroLikelihoodContribution,
     Field(FieldError),
 }
 impl fmt::Display for StatisticsError {
@@ -35,6 +40,15 @@ impl fmt::Display for StatisticsError {
             Self::SizeOverflow => write!(f, "statistics accumulator dimensions overflow"),
             Self::CountOverflow => write!(f, "statistics draw count exceeds u64"),
             Self::NegativeWeight => write!(f, "proposal diagnostic weight must be nonnegative"),
+            Self::NegativeNoiseLikelihood => write!(f, "noise-only likelihood must be nonnegative"),
+            Self::InvalidProbabilityContribution => write!(
+                f,
+                "efficiency contributions require 0 <= error <= acceptance"
+            ),
+            Self::ZeroLikelihoodContribution => write!(
+                f,
+                "positive acceptance requires positive complete and noise-only likelihoods"
+            ),
             Self::Field(error) => error.fmt(f),
         }
     }
