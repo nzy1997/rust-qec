@@ -97,10 +97,41 @@ struct Category {
     probabilities: Vec<Probability>,
     cumulative: Vec<BigUint>,
     denominator: BigUint,
+    identity_positive: bool,
+    replacement_weights: Vec<BigRational>,
 }
 #[derive(Clone, Debug)]
 pub struct NoiseModel {
     categories: Vec<Category>,
+    positive_identity_product: BigRational,
+    forced_sites: usize,
+}
+
+/// Balanced exact products avoid repeatedly reducing a growing left prefix.
+pub(crate) fn probability_product<'a>(
+    values: impl IntoIterator<Item = &'a BigRational>,
+) -> BigRational {
+    let mut level = values
+        .into_iter()
+        .filter(|p| !p.is_one())
+        .cloned()
+        .collect::<Vec<_>>();
+    if level.iter().any(Zero::is_zero) {
+        return BigRational::zero();
+    }
+    while level.len() > 1 {
+        level = level
+            .chunks(2)
+            .map(|pair| {
+                if pair.len() == 2 {
+                    &pair[0] * &pair[1]
+                } else {
+                    pair[0].clone()
+                }
+            })
+            .collect();
+    }
+    level.pop().unwrap_or_else(BigRational::one)
 }
 fn gcd(mut a: BigUint, mut b: BigUint) -> BigUint {
     while !b.is_zero() {
@@ -151,14 +182,37 @@ impl NoiseModel {
                     * (&denominator / p.value().denom().to_biguint().unwrap());
                 cumulative.push(running.clone());
             }
+            let identity = probabilities[0].value();
+            let identity_positive = !identity.is_zero();
+            let replacement_weights = probabilities
+                .iter()
+                .map(|p| {
+                    if identity_positive {
+                        p.value() / identity
+                    } else {
+                        p.value().clone()
+                    }
+                })
+                .collect();
             compiled.push(Category {
                 probabilities,
                 cumulative,
                 denominator,
+                identity_positive,
+                replacement_weights,
             });
         }
+        let forced_sites = compiled.iter().filter(|c| !c.identity_positive).count();
+        let positive_identity_product = probability_product(
+            compiled
+                .iter()
+                .filter(|c| c.identity_positive)
+                .map(|c| c.probabilities[0].value()),
+        );
         Ok(Self {
             categories: compiled,
+            positive_identity_product,
+            forced_sites,
         })
     }
     pub fn physical(
@@ -220,14 +274,24 @@ impl NoiseModel {
     }
     pub fn probability(&self, faults: &[FaultSelection]) -> Result<BigRational, NoiseError> {
         let choices = self.choices(faults)?;
-        Ok(self
-            .categories
-            .iter()
-            .enumerate()
-            .map(|(site, category)| {
-                category.probabilities[choices.get(&site).copied().unwrap_or(0)].value()
-            })
-            .product())
+        // Validate every supplied fault before returning a zero mass.
+        if choices
+            .keys()
+            .filter(|&&site| !self.categories[site].identity_positive)
+            .count()
+            != self.forced_sites
+        {
+            return Ok(BigRational::zero());
+        }
+        if choices.is_empty() {
+            return Ok(self.positive_identity_product.clone());
+        }
+        let corrections = probability_product(
+            choices
+                .iter()
+                .map(|(&site, &choice)| &self.categories[site].replacement_weights[choice]),
+        );
+        Ok(&self.positive_identity_product * corrections)
     }
 }
 
@@ -237,6 +301,7 @@ pub struct NoiseSampler {
     proposal: NoiseModel,
     options: NoiseOptions,
     denominator_bits: u64,
+    same_distribution: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NoiseDraw {
@@ -254,6 +319,7 @@ impl NoiseSampler {
             physical: model,
             options,
             denominator_bits,
+            same_distribution: true,
         }
     }
     pub fn importance(
@@ -286,11 +352,17 @@ impl NoiseSampler {
                 required: denominator_bits,
             });
         }
+        let same_distribution = physical
+            .categories
+            .iter()
+            .zip(&proposal.categories)
+            .all(|(p, q)| p.probabilities == q.probabilities);
         Ok(Self {
             physical,
             proposal,
             options,
             denominator_bits,
+            same_distribution,
         })
     }
     pub fn draw(&self, random: &mut impl RandomSource) -> Result<NoiseDraw, NoiseError> {
@@ -302,8 +374,6 @@ impl NoiseSampler {
         }
         let mut entropy_words = 0;
         let mut faults = Vec::new();
-        let mut p = BigRational::one();
-        let mut q = BigRational::one();
         for (site, category) in self.proposal.categories.iter().enumerate() {
             let value = uniform_below(
                 &category.denominator,
@@ -314,8 +384,6 @@ impl NoiseSampler {
             let choice = category
                 .cumulative
                 .partition_point(|boundary| boundary <= &value);
-            p *= self.physical.categories[site].probabilities[choice].value();
-            q *= category.probabilities[choice].value();
             if choice != 0 {
                 faults.push(FaultSelection {
                     site,
@@ -323,7 +391,17 @@ impl NoiseSampler {
                 });
             }
         }
-        let likelihood_ratio = &p / &q;
+        let p = self.physical.probability(&faults)?;
+        let q = if self.same_distribution {
+            p.clone()
+        } else {
+            self.proposal.probability(&faults)?
+        };
+        let likelihood_ratio = if self.same_distribution {
+            BigRational::one()
+        } else {
+            &p / &q
+        };
         Ok(NoiseDraw {
             faults,
             physical_probability: p,

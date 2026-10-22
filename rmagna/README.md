@@ -1597,3 +1597,19 @@ prescribed TQD3 histories, including two same-evaluator warm replays. TQD3
 retains 20 probability families and one density family, with two acceptance
 terms and four target terms. These are correctness/reuse diagnostics, separate
 from the complete draw matrix and formal performance protocol.
+
+Exact categorical models prepare the product of positive identity probabilities
+and each alternative's replacement ratio once. Prescribed sparse assignments
+multiply only their replacement factors. Zero-identity categories are tracked as
+forced choices and use their absolute alternative probabilities, so no division
+by zero occurs. All supplied faults are validated before a zero mass is returned.
+
+Noise sampling preserves its categorical choices, random-word order and stream
+state, then obtains physical/proposal masses from the prepared products. Causal
+resolution reuses the already validated physical draw mass when every potential
+category remains active; general active subsets and public instrument fault
+products use exact balanced multiplication. Identical physical and proposal
+distributions reuse the exact mass and have unit likelihood without a second
+product or rational division. No probability is rounded.
+Exhaustive assignment products, large powers, tiny nonzero values and forced/
+zero guarded-category endpoints are checked against independent exact formulas.

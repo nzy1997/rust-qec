@@ -647,13 +647,18 @@ impl CausalProgram {
                 arithmetic,
             )?
             .value;
-        let mut noise_probability = BigRational::one();
-        for category in instrument.noise_sites() {
-            let original = self.source_sites[&category.source_operations()[0]];
-            noise_probability *= self.model.probabilities(original).unwrap()
-                [state.chosen.get(&original).map_or(0, |a| a + 1)]
-            .value();
-        }
+        let noise_probability = if instrument.noise_sites().len() == self.model.num_sites() {
+            // Every potential category remains active, so the already validated
+            // physical draw product is also the final causal path probability.
+            draw.physical_probability.clone()
+        } else {
+            crate::noise::probability_product(instrument.noise_sites().iter().map(|category| {
+                let original = self.source_sites[&category.source_operations()[0]];
+                self.model.probabilities(original).unwrap()
+                    [state.chosen.get(&original).map_or(0, |a| a + 1)]
+                .value()
+            }))
+        };
         Ok(ResolvedHistory {
             instrument,
             faults,

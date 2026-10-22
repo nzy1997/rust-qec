@@ -11,7 +11,6 @@ use crate::probability::{Probability, ProbabilityError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::unitary::{CompiledUnitary, NetworkValue, PauliInsertion, UnitaryError};
 use num_rational::BigRational;
-use num_traits::One;
 pub use probabilities::{
     PreparedProbabilityStatistics, PreparedQueryStatistics, ProbabilityPreparation,
     QueryPreparation,
@@ -382,15 +381,15 @@ impl CompiledInstrument {
                     alternative: fault.alternative,
                 })?;
         }
-        let mut total = BigRational::one();
-        for (index, site) in self.sites.iter().enumerate() {
-            total *= if let Some(&alternative) = chosen.get(&index) {
-                site.alternatives[alternative].probability.value()
-            } else {
-                site.identity.value()
-            };
-        }
-        Ok(total)
+        Ok(crate::noise::probability_product(
+            self.sites.iter().enumerate().map(|(index, site)| {
+                if let Some(&alternative) = chosen.get(&index) {
+                    site.alternatives[alternative].probability.value()
+                } else {
+                    site.identity.value()
+                }
+            }),
+        ))
     }
     pub fn acceptance(
         &self,
