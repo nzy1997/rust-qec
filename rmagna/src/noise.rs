@@ -4,7 +4,10 @@ use crate::probability::Probability;
 use num_bigint::BigUint;
 use num_rational::BigRational;
 use num_traits::{One, Zero};
-use std::{collections::BTreeMap, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NoiseError {
@@ -12,6 +15,9 @@ pub enum NoiseError {
     InvalidFault { site: usize, alternative: usize },
     RepeatedFault { site: usize },
     ProposalShape,
+    InvalidProposalScale,
+    InvalidExcludedSite { site: usize },
+    ScaledProbability { site: usize },
     MissingSupport { site: usize, choice: usize },
     DenominatorLimit { limit: u64, required: u64 },
     EntropyLimit { limit: usize },
@@ -32,6 +38,17 @@ impl fmt::Display for NoiseError {
             Self::ProposalShape => write!(
                 f,
                 "proposal must have the same sites and alternatives as physical noise"
+            ),
+            Self::InvalidProposalScale => {
+                write!(f, "proposal scale must be a finite positive rational")
+            }
+            Self::InvalidExcludedSite { site } => write!(
+                f,
+                "excluded noise site {site} is outside the physical model"
+            ),
+            Self::ScaledProbability { site } => write!(
+                f,
+                "proposal scale makes noise site {site} total error probability reach or exceed one"
             ),
             Self::MissingSupport { site, choice } => write!(
                 f,
@@ -105,6 +122,34 @@ pub struct NoiseModel {
     categories: Vec<Category>,
     positive_identity_product: BigRational,
     forced_sites: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScaledProposalSummary {
+    pub proposal_scale: BigRational,
+    pub categories: usize,
+    pub scaled_categories: usize,
+    pub unchanged_categories: usize,
+    pub excluded_categories: usize,
+    /// Total error probability zero or one, regardless of exclusion. A total
+    /// of one can still have several stochastic nonidentity alternatives.
+    pub endpoint_categories: usize,
+}
+#[derive(Clone, Debug)]
+pub struct ScaledNoiseProposal {
+    model: NoiseModel,
+    summary: ScaledProposalSummary,
+}
+impl ScaledNoiseProposal {
+    pub fn model(&self) -> &NoiseModel {
+        &self.model
+    }
+    pub fn into_model(self) -> NoiseModel {
+        self.model
+    }
+    pub fn summary(&self) -> &ScaledProposalSummary {
+        &self.summary
+    }
 }
 
 /// Balanced exact products avoid repeatedly reducing a growing left prefix.
@@ -238,6 +283,70 @@ impl NoiseModel {
     }
     pub fn num_sites(&self) -> usize {
         self.categories.len()
+    }
+    /// Scale exclusive nonidentity masses of eligible categories. The caller
+    /// supplies excluded sites (for example causal guards); total-error zero
+    /// and one endpoints always remain unchanged. Every scaled total must be
+    /// strictly below one to preserve support for physical identity choices.
+    pub fn scaled_proposal(
+        &self,
+        scale: &BigRational,
+        excluded: &BTreeSet<usize>,
+        options: &NoiseOptions,
+    ) -> Result<ScaledNoiseProposal, NoiseError> {
+        if scale.denom().is_zero() {
+            return Err(NoiseError::InvalidProposalScale);
+        }
+        let scale = BigRational::new(scale.numer().clone(), scale.denom().clone());
+        if scale <= BigRational::zero() {
+            return Err(NoiseError::InvalidProposalScale);
+        }
+        for &site in excluded {
+            if site >= self.num_sites() {
+                return Err(NoiseError::InvalidExcludedSite { site });
+            }
+        }
+        let mut categories = Vec::with_capacity(self.num_sites());
+        let mut scaled_categories = 0;
+        let mut endpoint_categories = 0;
+        for (site, category) in self.categories.iter().enumerate() {
+            let identity = category.probabilities[0].value();
+            let endpoint = identity.is_zero() || identity.is_one();
+            endpoint_categories += usize::from(endpoint);
+            if endpoint || excluded.contains(&site) || scale.is_one() {
+                categories.push(category.probabilities.clone());
+                continue;
+            }
+            let error = BigRational::one() - identity;
+            let proposed = error * &scale;
+            if proposed >= BigRational::one() {
+                return Err(NoiseError::ScaledProbability { site });
+            }
+            let mut probabilities = Vec::with_capacity(category.probabilities.len());
+            probabilities.push(
+                Probability::from_rational(BigRational::one() - proposed)
+                    .map_err(|_| NoiseError::ScaledProbability { site })?,
+            );
+            for p in &category.probabilities[1..] {
+                probabilities.push(
+                    p.scaled(&scale)
+                        .map_err(|_| NoiseError::ScaledProbability { site })?,
+                );
+            }
+            categories.push(probabilities);
+            scaled_categories += 1;
+        }
+        Ok(ScaledNoiseProposal {
+            model: Self::new(categories, options)?,
+            summary: ScaledProposalSummary {
+                proposal_scale: scale,
+                categories: self.num_sites(),
+                scaled_categories,
+                unchanged_categories: self.num_sites() - scaled_categories,
+                excluded_categories: excluded.len(),
+                endpoint_categories,
+            },
+        })
     }
     pub fn probabilities(&self, site: usize) -> Option<&[Probability]> {
         self.categories
