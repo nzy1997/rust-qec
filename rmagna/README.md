@@ -1922,8 +1922,8 @@ History masses exclude noise weights and final postselection. For exact sums
 over potential noise patterns, multiply quantum response by each pattern's
 full physical probability, including inactive guarded categories. The returned
 `noise_probability` is an active-path diagnostic and must not replace that
-potential-pattern probability. Task response aggregation and sector bounds
-remain separate layers.
+potential-pattern probability. Task-level integration and rigorous sector
+bounds are described below.
 
 Tests compare majority feedback and biased non-Clifford/report-flip/guarded
 histories against independent exact probabilities under both causal strategies.
@@ -1931,3 +1931,65 @@ They check postselection separation, repeated/complemented inputs, zero/forced
 and inactive categories, original source mappings, empty histories, interference
 zeros, callback failures and observed nondeterminism, proposal independence and
 exact branch/rank/query/replay limit boundaries.
+
+## Exact physical task-sector integration
+
+`TaskEvaluator::enumerate_physical` combines categorical noise-sector enumeration
+with every positive causal history and the task's existing quantum queries.
+It returns exact unconditional covered acceptance, error, optional normalized
+target success and signed output moments, plus totals for each categorical
+weight. A correlated multi-Pauli alternative is one selected category. All
+potential noise pattern probabilities are applied once, including inactive
+guarded categories; conditional history normalization and sampling likelihoods
+are absent. Projected or mixed partial targets retain their exact target norm.
+
+```rust
+use std::path::Path;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::field::FieldArithmetic;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, TaskEnumerationOptions, TaskEvaluator, TaskOptions, parse_task};
+
+let parse = ParseOptions::default();
+let physical = parse_circuit(
+    "H 0\nM 0\nX_ERROR(1/3) rec[-1] 1\nM 1\nOBSERVABLE_INCLUDE(0) rec[-1]", &parse,
+)?;
+let task = parse_task(r#"{"error_observables":[0]}"#, Path::new("."), &TaskOptions::default())?;
+let modules = task.load_modules(&physical, &parse)?;
+let evaluator = TaskEvaluator::new(
+    &physical, &modules, &ControllerRegistry::default(), EvaluationOptions::default(),
+)?;
+let result = evaluator.enumerate_physical(&TaskEnumerationOptions::default())?;
+let f = FieldArithmetic::default();
+assert_eq!(result.masses.error, f.from_rational("1/6".parse()?)?);
+assert_eq!(result.covered_probability.to_string(), "1");
+assert_eq!(result.histories, 4);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`TaskEnumerationOptions::noise` sets the noise cutoff and storage/work budgets;
+its defaults are those of `EnumerationOptions`. `histories` sets traversal
+limits, with complete-history, marginal-query and replay budgets applied globally
+across all patterns. Its structural-bit cap applies to each unresolved group.
+Each linear pattern counts as one history with no marginal queries or replays.
+Counters include interrupted causal prefixes and exclude initial reference
+preparation. Existing per-execution and exact arithmetic limits also apply.
+No partial result is returned on failure. Importance-configured evaluators,
+including unit-scale proposals, and nonempty task `sample_records` are rejected.
+
+The covered responses are unconditional masses, never divided by covered noise
+probability or accepted mass. Let their acceptance and error be `A` and `E`,
+and omitted physical noise probability be `u`. The rigorous full-distribution
+intervals are `[A, A+u]` and `[E, E+u]`. The tight conditional-error interval is
+`[E/(A+u), (E+u)/(A+u)]`; it is undefined when `A+u` is zero. The bounds enforce
+`0 <= E <= A <= covered_probability` with exact comparisons. Full coverage gives
+point intervals whenever acceptance is positive. Returned signed moments are
+covered masses; they do not have a conditional-error interpretation.
+
+Tests compare every cutoff of an independent small categorical/Boolean oracle,
+biased non-Clifford decoder histories, correlated alternatives rescued by report
+flips, guard-dependent active/inactive/zero/forced choices, signed moments,
+recovery and projected or entangled partial targets. They also verify exact
+global resource boundaries and omitted-sector extremal/interior responses,
+empty sectors, undefined zero-acceptance rates and arithmetic failures. Run-file
+and result schemas and specialized paper proposals remain separate deliverables.

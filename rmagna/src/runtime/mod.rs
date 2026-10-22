@@ -417,6 +417,9 @@ impl CausalProgram {
     pub fn potential_site(&self, operation: usize) -> Option<usize> {
         self.source_sites.get(&operation).copied()
     }
+    pub(crate) fn potential_noise_model(&self) -> &NoiseModel {
+        &self.model
+    }
     pub fn controller_versions(&self) -> BTreeMap<String, String> {
         self.registry.versions()
     }
