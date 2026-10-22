@@ -595,10 +595,10 @@ a failed query can have consumed entropy. Scalar coefficient limits also apply.
 As with categorical sampling, exact probability statements assume independent
 unbiased entropy words.
 
-This is the cold exact-marginal route for affine instruments. The runtime below
-adds external callbacks, guarded noise and affine-support histories. Runtime
-integration of cached query preparation remains subsequent work. Tests check
-exact binary boundaries and refinement,
+Cold exact marginals remain the default route for affine instruments. The runtime
+below adds external callbacks, guarded noise and affine-support histories; the
+[bounded instrument probability preparation](#bounded-instrument-probability-preparation)
+options also apply to these probability queries. Tests check exact binary boundaries and refinement,
 `2^-1200`, Bell-record and report-flip correlations, conditioned histories,
 stream/resume identity, and a physically possible record that postselection rejects.
 
@@ -830,11 +830,15 @@ separates causal history resolution from final metrics and provides read-only
 branch instruments, faults, conditions, resolved expressions, and sampled records. The
 runtime's existing pure-target sampling methods remain convenience wrappers.
 
-`acceptance_resources` and `target_resources` expose the actual final quotient
-ranks and enumerated term counts for the corresponding draw. These describe cold
-contractions, not prepared-query throughput. Compilation and target normalization
-have separate resource checks; per-query term, scalar, field, and history budgets
-remain explicit errors.
+`acceptance_resources` and `target_resources` expose quotient ranks and term
+counts for the corresponding draw. Acceptance counts follow the selected
+[probability-preparation mode](#bounded-instrument-probability-preparation): cold
+and trace modes report adaptive closure, while fixed mode reports its immutable
+resource before adaptive radical absorption. Fixed counts can exceed adaptive
+counts. Target counts retain their separate target-density closure. These are
+resource metrics, not prepared-query throughput. Compilation and target
+normalization have separate resource checks; per-query term, scalar, field, and
+history budgets remain explicit errors.
 
 Build `cargo build --release -p rmagna --example evaluate_task`, then run
 `evaluate_task PHYSICAL TASK [SEED]` for one prescribed no-fault draw. The optional
@@ -867,9 +871,10 @@ cmp /tmp/task-reference.json rmagna/tests/data/task-reference.json
 
 The evaluator uses the explicitly selected history sampler and independent
 physical noise. Python decoder bindings are available through the bridge below.
-Causal importance proposal selection, runtime integration of prepared query
-families, aggregate statistics and the
-public run/result interface are separate deliverables.
+Bounded prepared probability families are available through the opt-in modes
+[documented below](#bounded-instrument-probability-preparation). Causal importance
+proposal selection, aggregate statistics and the public run/result interface
+remain separate deliverables.
 
 ## External decoder process bridge
 
