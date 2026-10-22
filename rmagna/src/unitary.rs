@@ -1,7 +1,9 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
 mod observations;
+mod prepared;
 mod shared;
+pub use prepared::{DensityLayout, PreparedDensityOverlap, PreparedProbability};
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -359,86 +361,12 @@ pub struct DensityBoundary<'a> {
     pub outcomes: &'a BitVector,
 }
 
-/// Fixed trace/event constraints and retained-boundary Gaussian contraction,
-/// shared across one reference program's Pauli assignments. Non-Clifford resource
-/// preparation is optional; exact Gaussian sums remain query specific.
-pub struct PreparedProbability {
-    program: Arc<InsertionProgram>,
-    physical_width: usize,
-    event_count: usize,
-    projection: PreparedZProjection,
-    contraction: crate::stabilizer::PreparedAffineContraction,
-    keep: Vec<usize>,
-    phase_widths: [usize; 2],
-    resource: Option<crate::fibers::PreparedCliffordFibers>,
-}
-
-impl PreparedProbability {
-    /// Present only for explicit fixed-resource preparation. Its rank and
-    /// term count describe this resource, before adaptive radical absorption.
-    pub fn fixed_phase_resource(&self) -> Option<&crate::fibers::PreparedCliffordFibers> {
-        self.resource.as_ref()
-    }
-
-    pub fn evaluate(
-        &self,
-        state: &CompiledUnitary,
-        outcomes: &BitVector,
-        max_terms: usize,
-        arithmetic: &ScalarArithmetic,
-    ) -> Result<NetworkValue, UnitaryError> {
-        if !Arc::ptr_eq(&self.program, &state.program) {
-            return Err(UnitaryError::IncompatibleProgram);
+impl<'a> DensityBoundary<'a> {
+    pub fn layout(&self) -> DensityLayout<'a> {
+        DensityLayout {
+            outputs: self.outputs,
+            event_rows: self.event_rows,
         }
-        if outcomes.width() != self.event_count {
-            return Err(UnitaryError::DimensionMismatch);
-        }
-        let rhs = BitVector::from_indices(
-            self.physical_width + self.event_count,
-            outcomes.ones().map(|j| self.physical_width + j),
-        )?;
-        let joint = state
-            .boundary
-            .tensor(&state.boundary.conjugate(), arithmetic)?;
-        let retained = self
-            .projection
-            .project(&joint, &rhs)?
-            .map(|ket| ket.retain_boundary(&self.keep))
-            .transpose()?;
-        let contracted = match retained {
-            Some(ket) => self.contraction.contract(&ket, arithmetic)?,
-            None => None,
-        };
-        if let Some(resource) = &self.resource {
-            let Some(ket) = contracted else {
-                return Ok(zero_network_value());
-            };
-            if resource.num_terms() > max_terms {
-                return Err(PhaseError::FiberTermLimit {
-                    coordinates: resource.enumerated_coordinates(),
-                    quotient_rank: resource.quotient_rank(),
-                    limit: max_terms,
-                }
-                .into());
-            }
-            let phase = compose_phases(
-                &self.phase_widths,
-                &[(&state.phase, false), (&state.phase, true)],
-            )?
-            .restrict(ket.offset(), ket.columns())?;
-            return Ok(NetworkValue {
-                value: resource.evaluate(&phase, ket.phase(), ket.coefficient(), arithmetic)?,
-                quotient_rank: resource.quotient_rank(),
-                terms: resource.num_terms(),
-            });
-        }
-        close_retained(
-            contracted,
-            &self.phase_widths,
-            &[(&state.phase, false), (&state.phase, true)],
-            max_terms,
-            arithmetic,
-        )
     }
 }
 
@@ -488,45 +416,11 @@ impl CompiledUnitary {
         rows: &[BitVector],
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbability, UnitaryError> {
-        if rows.iter().any(|row| row.width() != self.width()) {
-            return Err(UnitaryError::DimensionMismatch);
-        }
-        self.width()
-            .checked_add(rows.len())
-            .ok_or(UnitaryError::DimensionOverflow)?;
-        let reference = &self.program.query_reference;
-        let half = reference.width();
-        let joint = reference.tensor(&reference.conjugate(), arithmetic)?;
-        let total = joint.width();
-        let mut constraints = (0..self.width())
-            .map(|j| BitVector::from_indices(total, [j, half + j]))
-            .collect::<Result<Vec<_>, _>>()?;
-        constraints.extend(
-            rows.iter()
-                .map(|row| BitVector::from_indices(total, row.ones()))
-                .collect::<Result<Vec<_>, _>>()?,
-        );
-        let projection = PreparedZProjection::new(&joint, &constraints)?;
-        let keep = (self.width()..half)
-            .chain(half + self.width()..total)
-            .collect::<Vec<_>>();
-        let contraction = projection.prepare_sum(&keep)?;
-        Ok(PreparedProbability {
-            program: Arc::clone(&self.program),
-            physical_width: self.width(),
-            event_count: rows.len(),
-            projection,
-            contraction,
-            keep,
-            phase_widths: [half - self.width(); 2],
-            resource: None,
-        })
+        PreparedProbability::prepare(self, rows, arithmetic)
     }
 
-    /// Freeze a certified Clifford-fiber resource for this probability family.
-    /// Unlike adaptive closure, this retains the fixed structural phase domain
-    /// before radical absorption. Its rank/term counts can therefore be larger.
-    /// Preparation from a perturbed view still uses the original reference.
+    /// Freeze a certified Clifford-fiber resource before adaptive radical
+    /// absorption. The reported resource rank/term counts can be larger.
     pub fn prepare_probability_with_fibers(
         &self,
         rows: &[BitVector],
@@ -534,20 +428,34 @@ impl CompiledUnitary {
         options: crate::fibers::FiberOptions,
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbability, UnitaryError> {
-        let mut prepared = self.prepare_probability(rows, arithmetic)?;
-        let reference = &self.program.query_reference_phase;
-        let phase = compose_phases(
-            &prepared.phase_widths,
-            &[(reference, false), (reference, true)],
-        )?;
-        let phase = phase.restrict(
-            &BitVector::zeros(phase.num_variables())?,
-            prepared.contraction.output_columns(),
-        )?;
-        prepared.resource = Some(crate::fibers::PreparedCliffordFibers::new(
-            &phase, max_terms, options,
-        )?);
-        Ok(prepared)
+        self.prepare_probability(rows, arithmetic)?
+            .freeze(max_terms, options)
+    }
+
+    /// Prepare ordered output and event layouts for reduced density overlap.
+    /// Outcome values remain independent evaluation arguments on both sides.
+    pub fn prepare_density_overlap(
+        &self,
+        boundary: DensityLayout<'_>,
+        target: &Self,
+        target_boundary: DensityLayout<'_>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedDensityOverlap, UnitaryError> {
+        PreparedDensityOverlap::prepare(self, boundary, target, target_boundary, arithmetic)
+    }
+
+    /// Add one fixed certified phase resource to a density-overlap family.
+    pub fn prepare_density_overlap_with_fibers(
+        &self,
+        boundary: DensityLayout<'_>,
+        target: &Self,
+        target_boundary: DensityLayout<'_>,
+        max_terms: usize,
+        options: crate::fibers::FiberOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedDensityOverlap, UnitaryError> {
+        self.prepare_density_overlap(boundary, target, target_boundary, arithmetic)?
+            .freeze(max_terms, options)
     }
 
     /// Replace the insertion assignment relative to the original compiled
@@ -811,106 +719,27 @@ impl CompiledUnitary {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, UnitaryError> {
-        if boundary.outputs.len() != target_boundary.outputs.len() {
+        if boundary.event_rows.len() != boundary.outcomes.width()
+            || target_boundary.event_rows.len() != target_boundary.outcomes.width()
+        {
             return Err(UnitaryError::DimensionMismatch);
         }
-        for (width, boundary) in [
-            (self.width(), &boundary),
-            (target.width(), &target_boundary),
-        ] {
-            if boundary.event_rows.len() != boundary.outcomes.width()
-                || boundary.event_rows.iter().any(|row| row.width() != width)
-            {
-                return Err(UnitaryError::DimensionMismatch);
-            }
-            if boundary
-                .outputs
-                .iter()
-                .copied()
-                .collect::<std::collections::BTreeSet<_>>()
-                .len()
-                != boundary.outputs.len()
-            {
-                return Err(UnitaryError::RepeatedOutput);
-            }
-            BitVector::from_indices(width, boundary.outputs.iter().copied())?;
-        }
-        let positions = boundary
-            .outputs
-            .iter()
-            .enumerate()
-            .map(|(i, &q)| (q, target_boundary.outputs[i]))
-            .collect::<BTreeMap<_, _>>();
-        let n = self.boundary.width();
-        let m = target.boundary.width();
-        let joint = self
-            .boundary
-            .tensor(&self.boundary.conjugate(), arithmetic)?
-            .tensor(&target.boundary.conjugate(), arithmetic)?
-            .tensor(&target.boundary, arithmetic)?;
-        let total = joint.width();
-        let mut rows = Vec::new();
-        for qubit in 0..self.width() {
-            if let Some(&target_index) = positions.get(&qubit) {
-                rows.push(BitVector::from_indices(
-                    total,
-                    [qubit, 2 * n + target_index],
-                )?);
-                rows.push(BitVector::from_indices(
-                    total,
-                    [n + qubit, 2 * n + m + target_index],
-                )?);
-            } else {
-                rows.push(BitVector::from_indices(total, [qubit, n + qubit])?);
-            }
-        }
-        let target_kept = target_boundary
-            .outputs
-            .iter()
-            .copied()
-            .collect::<std::collections::BTreeSet<_>>();
-        for qubit in 0..target.width() {
-            if !target_kept.contains(&qubit) {
-                rows.push(BitVector::from_indices(
-                    total,
-                    [2 * n + qubit, 2 * n + m + qubit],
-                )?);
-            }
-        }
-        let mut bits = vec![false; rows.len()];
-        for (row_index, row) in boundary.event_rows.iter().enumerate() {
-            rows.push(BitVector::from_indices(total, row.ones())?);
-            bits.push(boundary.outcomes.get(row_index)?);
-            rows.push(BitVector::from_indices(total, row.ones().map(|j| n + j))?);
-            bits.push(boundary.outcomes.get(row_index)?);
-        }
-        for (row_index, row) in target_boundary.event_rows.iter().enumerate() {
-            rows.push(BitVector::from_indices(
-                total,
-                row.ones().map(|j| 2 * n + j),
-            )?);
-            bits.push(target_boundary.outcomes.get(row_index)?);
-            rows.push(BitVector::from_indices(
-                total,
-                row.ones().map(|j| 2 * n + m + j),
-            )?);
-            bits.push(target_boundary.outcomes.get(row_index)?);
-        }
-        let rhs = BitVector::from_indices(
-            bits.len(),
-            bits.iter()
-                .enumerate()
-                .filter_map(|(i, &bit)| bit.then_some(i)),
+        let prepared::DensityNetwork {
+            rows,
+            trace_count,
+            legs,
+        } = prepared::density_rows(
+            self.width(),
+            self.boundary.width(),
+            boundary.layout(),
+            target.width(),
+            target.boundary.width(),
+            target_boundary.layout(),
         )?;
-        let ket = joint.constrain_z(&rows, &rhs)?;
-        let legs = [
-            (self.width()..n).collect::<Vec<_>>(),
-            (n + self.width()..2 * n).collect(),
-            (2 * n + target.width()..2 * n + m).collect(),
-            (2 * n + m + target.width()..total).collect(),
-        ];
+        let joint = prepared::density_joint(&self.boundary, &target.boundary, arithmetic)?;
+        let rhs = prepared::density_rhs(trace_count, boundary.outcomes, target_boundary.outcomes)?;
         close(
-            ket,
+            joint.constrain_z(&rows, &rhs)?,
             &legs,
             &[
                 (&self.phase, false),

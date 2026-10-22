@@ -66,6 +66,54 @@ fn dense_inserted(
     values
 }
 
+fn reduced_density(
+    state: &[ExactScalar],
+    width: usize,
+    outputs: &[usize],
+    row: &BitVector,
+    outcome: bool,
+    a: &ScalarArithmetic,
+) -> Vec<Vec<ExactScalar>> {
+    let mut rho = vec![vec![ExactScalar::zero(); 1 << outputs.len()]; 1 << outputs.len()];
+    let selected = |x: usize| {
+        outputs
+            .iter()
+            .enumerate()
+            .fold(0, |out, (j, &q)| out | (((x >> q) & 1) << j))
+    };
+    for (x, vx) in state.iter().enumerate() {
+        for (y, vy) in state.iter().enumerate() {
+            if row.dot(&bits(width, x)).unwrap() != outcome
+                || row.dot(&bits(width, y)).unwrap() != outcome
+            {
+                continue;
+            }
+            if (0..width).any(|q| !outputs.contains(&q) && ((x >> q) & 1) != ((y >> q) & 1)) {
+                continue;
+            }
+            let term = a.multiply(vx, &vy.conjugate()).unwrap();
+            let entry = &mut rho[selected(x)][selected(y)];
+            *entry = a.add(entry, &term).unwrap();
+        }
+    }
+    rho
+}
+fn density_product(
+    rho: &[Vec<ExactScalar>],
+    tau: &[Vec<ExactScalar>],
+    a: &ScalarArithmetic,
+) -> ExactScalar {
+    let mut total = ExactScalar::zero();
+    for (x, row) in rho.iter().enumerate() {
+        for (y, value) in row.iter().enumerate() {
+            total = a
+                .add(&total, &a.multiply(value, &tau[y][x]).unwrap())
+                .unwrap();
+        }
+    }
+    total
+}
+
 #[test]
 fn prescribed_pauli_insertions_reuse_the_reference_boundary_and_match_dense_faults() {
     let arithmetic = ScalarArithmetic::default();
@@ -706,33 +754,6 @@ fn reduced_projected_density_overlaps_match_literal_density_matrices() {
     let tv = dense(&tg, 3, 0, &a);
     // Form the full density entries and trace equal environment indices. This
     // oracle uses no boundary ket, phase quotient or Gaussian elimination.
-    let reduced =
-        |state: &[ExactScalar], width: usize, outputs: &[usize], row: &BitVector, outcome: bool| {
-            let mut rho = vec![vec![ExactScalar::zero(); 1 << outputs.len()]; 1 << outputs.len()];
-            let selected = |x: usize| {
-                outputs
-                    .iter()
-                    .enumerate()
-                    .fold(0, |out, (j, &q)| out | (((x >> q) & 1) << j))
-            };
-            for (x, vx) in state.iter().enumerate() {
-                for (y, vy) in state.iter().enumerate() {
-                    if row.dot(&bits(width, x)).unwrap() != outcome
-                        || row.dot(&bits(width, y)).unwrap() != outcome
-                    {
-                        continue;
-                    }
-                    if (0..width).any(|q| !outputs.contains(&q) && ((x >> q) & 1) != ((y >> q) & 1))
-                    {
-                        continue;
-                    }
-                    let term = a.multiply(vx, &vy.conjugate()).unwrap();
-                    let entry = &mut rho[selected(x)][selected(y)];
-                    *entry = a.add(entry, &term).unwrap();
-                }
-            }
-            rho
-        };
     let pr = bits(4, 9);
     let tr = bits(3, 3);
     for (po, to) in [
@@ -741,19 +762,31 @@ fn reduced_projected_density_overlaps_match_literal_density_matrices() {
         (vec![], vec![]),
         (vec![2, 0, 1], vec![1, 0, 2]),
     ] {
+        let left = rmagna::unitary::DensityLayout {
+            outputs: &po,
+            event_rows: std::slice::from_ref(&pr),
+        };
+        let right = rmagna::unitary::DensityLayout {
+            outputs: &to,
+            event_rows: std::slice::from_ref(&tr),
+        };
+        let prepared = p.prepare_density_overlap(left, &t, right, &a).unwrap();
+        let fixed = p
+            .prepare_density_overlap_with_fibers(
+                left,
+                &t,
+                right,
+                4096,
+                rmagna::fibers::FiberOptions::default(),
+                &a,
+            )
+            .unwrap();
         for flags in 0..4 {
             let pbit = flags & 1 != 0;
             let tbit = flags & 2 != 0;
-            let rho = reduced(&pv, 4, &po, &pr, pbit);
-            let tau = reduced(&tv, 3, &to, &tr, tbit);
-            let mut expected = ExactScalar::zero();
-            for (x, row) in rho.iter().enumerate() {
-                for (y, value) in row.iter().enumerate() {
-                    expected = a
-                        .add(&expected, &a.multiply(value, &tau[y][x]).unwrap())
-                        .unwrap();
-                }
-            }
+            let rho = reduced_density(&pv, 4, &po, &pr, pbit, &a);
+            let tau = reduced_density(&tv, 3, &to, &tr, tbit, &a);
+            let expected = density_product(&rho, &tau, &a);
             let actual = p
                 .density_overlap(
                     DensityBoundary {
@@ -775,6 +808,21 @@ fn reduced_projected_density_overlaps_match_literal_density_matrices() {
                 actual.value, expected,
                 "outputs {po:?}/{to:?} flags {flags}"
             );
+            for plan in [&prepared, &fixed] {
+                assert_eq!(
+                    plan.evaluate(
+                        &p,
+                        &t,
+                        &bits(1, pbit as usize),
+                        &bits(1, tbit as usize),
+                        4096,
+                        &a
+                    )
+                    .unwrap()
+                    .value,
+                    expected
+                );
+            }
         }
     }
     let empty = bits(0, 0);
@@ -1626,4 +1674,298 @@ fn prepared_probability_traces_accept_fault_flipped_zero_reference_events() {
             ExactScalar::one()
         );
     }
+}
+
+#[test]
+fn prepared_density_families_match_faulted_literal_matrices_and_zero_events() {
+    use rmagna::unitary::{CompilerStrategy as S, DensityLayout};
+    let a = ScalarArithmetic::default();
+    let pg = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Cs {
+            a: 1,
+            b: 2,
+            turns: 1,
+        },
+        G::Clifford(C::H(1)),
+        G::Ccz { a: 0, b: 2, c: 3 },
+        G::T { qubit: 3, turns: 3 },
+        G::Clifford(C::X(3)),
+    ];
+    let tg = [
+        G::Clifford(C::H(1)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 1, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 0,
+        }),
+        G::Cs {
+            a: 0,
+            b: 2,
+            turns: 3,
+        },
+        G::Clifford(C::H(0)),
+    ];
+    let pr = bits(4, 8);
+    let tr = bits(3, 5);
+    let mut rng = 0x71823dabcf;
+    for left_strategy in [S::ParityCopies, S::SharedCommutingLayer] {
+        for right_strategy in [S::ParityCopies, S::SharedCommutingLayer] {
+            let p = UnitaryCircuit::new(4, pg)
+                .unwrap()
+                .compile_with_strategy(&bits(4, 0), &a, left_strategy)
+                .unwrap();
+            let t = UnitaryCircuit::new(3, tg)
+                .unwrap()
+                .compile_with_strategy(&bits(3, 0), &a, right_strategy)
+                .unwrap();
+            for (po, to) in [(vec![], vec![]), (vec![3, 1], vec![0, 2])] {
+                let left = DensityLayout {
+                    outputs: &po,
+                    event_rows: std::slice::from_ref(&pr),
+                };
+                let right = DensityLayout {
+                    outputs: &to,
+                    event_rows: std::slice::from_ref(&tr),
+                };
+                let prepared = p.prepare_density_overlap(left, &t, right, &a).unwrap();
+                let fixed = p
+                    .prepare_density_overlap_with_fibers(
+                        left,
+                        &t,
+                        right,
+                        4096,
+                        rmagna::fibers::FiberOptions::default(),
+                        &a,
+                    )
+                    .unwrap();
+                for trial in 0..12 {
+                    let pf = PauliInsertion {
+                        before_gate: trial % (pg.len() + 1),
+                        word: PauliWord::new(
+                            bits(4, next(&mut rng)),
+                            bits(4, next(&mut rng)),
+                            (next(&mut rng) & 7) as u8,
+                        )
+                        .unwrap(),
+                    };
+                    let tf = PauliInsertion {
+                        before_gate: trial % (tg.len() + 1),
+                        word: PauliWord::new(
+                            bits(3, next(&mut rng)),
+                            bits(3, next(&mut rng)),
+                            (next(&mut rng) & 7) as u8,
+                        )
+                        .unwrap(),
+                    };
+                    let ps = p.with_insertions(std::slice::from_ref(&pf), &a).unwrap();
+                    let ts = t.with_insertions(std::slice::from_ref(&tf), &a).unwrap();
+                    let pv = dense_inserted(&pg, 4, 0, &[pf], &a);
+                    let tv = dense_inserted(&tg, 3, 0, &[tf], &a);
+                    let from_fault = ps
+                        .prepare_density_overlap_with_fibers(
+                            left,
+                            &ts,
+                            right,
+                            4096,
+                            rmagna::fibers::FiberOptions::default(),
+                            &a,
+                        )
+                        .unwrap();
+                    assert_eq!(
+                        from_fault.fixed_phase_resource().unwrap().num_terms(),
+                        fixed.fixed_phase_resource().unwrap().num_terms()
+                    );
+                    for flags in 0..4 {
+                        let lb = flags & 1 != 0;
+                        let rb = flags & 2 != 0;
+                        let expected = density_product(
+                            &reduced_density(&pv, 4, &po, &pr, lb, &a),
+                            &reduced_density(&tv, 3, &to, &tr, rb, &a),
+                            &a,
+                        );
+                        for plan in [&prepared, &fixed, &from_fault] {
+                            assert_eq!(
+                                plan.evaluate(
+                                    &ps,
+                                    &ts,
+                                    &bits(1, lb as usize),
+                                    &bits(1, rb as usize),
+                                    4096,
+                                    &a
+                                )
+                                .unwrap()
+                                .value,
+                                expected,
+                                "left={left_strategy:?}, right={right_strategy:?}, trial={trial}, flags={flags}"
+                            );
+                        }
+                    }
+                }
+                // Reference bit 3 is deterministically one. The zero event is
+                // impossible on the reference but possible after a final X3.
+                assert_eq!(
+                    fixed
+                        .evaluate(&p, &t, &bits(1, 0), &bits(1, 0), 0, &a)
+                        .unwrap()
+                        .value,
+                    ExactScalar::zero()
+                );
+                let flipped = p
+                    .with_insertions(
+                        &[PauliInsertion {
+                            before_gate: pg.len(),
+                            word: PauliWord::new(bits(4, 8), bits(4, 0), 0).unwrap(),
+                        }],
+                        &a,
+                    )
+                    .unwrap();
+                if po.is_empty() {
+                    let value = fixed
+                        .evaluate(&flipped, &t, &bits(1, 0), &bits(1, 0), 4096, &a)
+                        .unwrap()
+                        .value;
+                    assert!(!value.is_zero());
+                    assert!(
+                        fixed
+                            .evaluate(
+                                &flipped,
+                                &t,
+                                &bits(1, 0),
+                                &bits(1, 0),
+                                fixed.fixed_phase_resource().unwrap().num_terms() - 1,
+                                &a
+                            )
+                            .is_err()
+                    );
+                }
+                let unrelated = UnitaryCircuit::new(4, pg)
+                    .unwrap()
+                    .compile_with_strategy(&bits(4, 0), &a, left_strategy)
+                    .unwrap();
+                assert!(matches!(
+                    fixed.evaluate(&unrelated, &t, &bits(1, 1), &bits(1, 0), 4096, &a),
+                    Err(UnitaryError::IncompatibleProgram)
+                ));
+                let unrelated = UnitaryCircuit::new(3, tg)
+                    .unwrap()
+                    .compile_with_strategy(&bits(3, 0), &a, right_strategy)
+                    .unwrap();
+                assert!(matches!(
+                    fixed.evaluate(&p, &unrelated, &bits(1, 1), &bits(1, 0), 4096, &a),
+                    Err(UnitaryError::IncompatibleProgram)
+                ));
+                assert!(matches!(
+                    fixed.evaluate(&p, &t, &bits(0, 0), &bits(1, 0), 4096, &a),
+                    Err(UnitaryError::DimensionMismatch)
+                ));
+                assert!(
+                    p.prepare_density_overlap_with_fibers(
+                        left,
+                        &t,
+                        right,
+                        0,
+                        rmagna::fibers::FiberOptions::default(),
+                        &a
+                    )
+                    .is_err()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn prepared_density_layouts_reject_invalid_shapes_and_preserve_the_vacuum() {
+    use rmagna::unitary::DensityLayout as L;
+    let a = ScalarArithmetic::default();
+    let p = UnitaryCircuit::new(3, [])
+        .unwrap()
+        .compile(&bits(3, 0), &a)
+        .unwrap();
+    let empty = L {
+        outputs: &[],
+        event_rows: &[],
+    };
+    assert!(matches!(
+        p.prepare_density_overlap(
+            L {
+                outputs: &[0, 0],
+                event_rows: &[]
+            },
+            &p,
+            L {
+                outputs: &[1, 2],
+                event_rows: &[]
+            },
+            &a
+        ),
+        Err(UnitaryError::RepeatedOutput)
+    ));
+    assert!(matches!(
+        p.prepare_density_overlap(
+            L {
+                outputs: &[0],
+                event_rows: &[]
+            },
+            &p,
+            empty,
+            &a
+        ),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(
+        p.prepare_density_overlap(
+            L {
+                outputs: &[3],
+                event_rows: &[]
+            },
+            &p,
+            L {
+                outputs: &[0],
+                event_rows: &[]
+            },
+            &a
+        )
+        .is_err()
+    );
+    assert!(matches!(
+        p.prepare_density_overlap(
+            L {
+                outputs: &[],
+                event_rows: &[bits(2, 0)]
+            },
+            &p,
+            empty,
+            &a
+        ),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    let vacuum = UnitaryCircuit::new(0, [])
+        .unwrap()
+        .compile(&bits(0, 0), &a)
+        .unwrap();
+    let plan = vacuum
+        .prepare_density_overlap_with_fibers(
+            empty,
+            &vacuum,
+            empty,
+            1,
+            rmagna::fibers::FiberOptions::default(),
+            &a,
+        )
+        .unwrap();
+    assert_eq!(
+        plan.evaluate(&vacuum, &vacuum, &bits(0, 0), &bits(0, 0), 1, &a)
+            .unwrap()
+            .value,
+        ExactScalar::one()
+    );
 }
