@@ -1667,3 +1667,48 @@ weights, arithmetic limits and count overflow. Fully enumerated rational toys,
 real cyclotomic examples, `1e-400` errors, signed moments, partition merges and
 failure controls verify these contracts. Run/result serialization, kappa and
 sampler selection remain separate interfaces.
+
+## Exact common-scale noise proposals
+
+`NoiseModel::scaled_proposal` multiplies every exclusive nonidentity alternative
+by a common positive rational scale when the category's total error probability
+lies strictly between zero and one. It preserves channel proportions, including
+already expanded exclusive alternatives of correlated chains. It leaves total
+error endpoints and explicitly excluded sites unchanged. A total error of one
+can still have stochastic alternatives; those proportions also remain unchanged.
+Every scaled total must stay strictly below one, preserving physical identity
+support as well as nonidentity support.
+
+```rust
+use std::collections::BTreeSet;
+use num_rational::BigRational;
+use rmagna::noise::{NoiseModel, NoiseOptions, NoiseSampler};
+
+let options = NoiseOptions::default();
+let physical = NoiseModel::new(
+    vec![vec!["9/10".parse()?, "1/15".parse()?, "1/30".parse()?]],
+    &options,
+)?;
+let proposal = physical.scaled_proposal(
+    &BigRational::from_integer(2.into()), &BTreeSet::new(), &options,
+)?;
+assert_eq!(proposal.summary().scaled_categories, 1);
+let sampler = NoiseSampler::importance(physical, proposal.into_model(), options)?;
+# let _ = sampler;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`ScaledNoiseProposal` exposes the immutable model and exact configuration/count
+summary. Counts of endpoint and excluded categories can overlap; scaled and
+unchanged counts partition all categories. A scale of one keeps every category
+unchanged and preserves the physical sampler's seeded draws and random-word
+consumption. Malformed/raw nonfinite scales, nonpositive scales, invalid excluded
+indices, support-destroying scaled totals and denominator limits fail during
+preparation, before any entropy is drawn. Tiny nonzero alternatives stay exact.
+
+This low-level constructor takes explicit exclusions; callers representing
+causal guarded noise must exclude those categories. Automatic guard exclusion
+and file/task sampling configuration are separate higher-level interfaces.
+Arbitrary proposal models remain supported by `NoiseSampler::importance`.
+The common-scale proposal does not implement experiment-specific mixtures or
+residual-class distributions.

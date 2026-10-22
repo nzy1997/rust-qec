@@ -463,3 +463,266 @@ fn equivalent_proposals_preserve_exact_draws_and_entropy_including_forced_sites(
         }
     }
 }
+
+#[test]
+fn scaled_proposals_preserve_exclusive_proportions_endpoints_exclusions_and_exact_weights() {
+    use std::collections::BTreeSet;
+    let p = model(&[
+        &["3/4", "1/6", "1/12"],
+        &["0", "1/3", "2/3"],
+        &["1", "0", "0"],
+        &["1/4", "0", "3/4"],
+    ]);
+    let proposal = p
+        .scaled_proposal(
+            &BigRational::from_integer(2.into()),
+            &BTreeSet::from([3]),
+            &NoiseOptions::default(),
+        )
+        .unwrap();
+    let q = proposal.model();
+    let expected = model(&[
+        &["1/2", "1/3", "1/6"],
+        &["0", "1/3", "2/3"],
+        &["1", "0", "0"],
+        &["1/4", "0", "3/4"],
+    ]);
+    for site in 0..4 {
+        assert_eq!(q.probabilities(site), expected.probabilities(site));
+    }
+    let report = proposal.summary();
+    assert_eq!(
+        (
+            report.categories,
+            report.scaled_categories,
+            report.unchanged_categories,
+            report.excluded_categories,
+            report.endpoint_categories
+        ),
+        (4, 1, 3, 1, 2)
+    );
+    let mut total_p = BigRational::from_integer(0.into());
+    let mut weighted = total_p.clone();
+    for assignment in 0..81 {
+        let mut digits = assignment;
+        let mut faults = Vec::new();
+        let mut literal_p = BigRational::from_integer(1.into());
+        let mut literal_q = literal_p.clone();
+        for site in 0..4 {
+            let choice = digits % 3;
+            digits /= 3;
+            literal_p *= p.probabilities(site).unwrap()[choice].value();
+            literal_q *= expected.probabilities(site).unwrap()[choice].value();
+            if choice > 0 {
+                faults.push(FaultSelection {
+                    site,
+                    alternative: choice - 1,
+                });
+            }
+        }
+        let actual_p = p.probability(&faults).unwrap();
+        let actual_q = q.probability(&faults).unwrap();
+        assert_eq!(actual_p, literal_p);
+        assert_eq!(actual_q, literal_q);
+        total_p += &literal_p;
+        if literal_q == BigRational::from_integer(0.into()) {
+            assert_eq!(literal_p, literal_q);
+        } else {
+            weighted += &literal_q * (actual_p / actual_q);
+        }
+    }
+    assert_eq!(total_p, BigRational::from_integer(1.into()));
+    assert_eq!(weighted, total_p);
+    let sampler =
+        NoiseSampler::importance(p.clone(), proposal.into_model(), NoiseOptions::default())
+            .unwrap();
+    let mut sum_weight = BigRational::from_integer(0.into());
+    let mut event_weight = sum_weight.clone();
+    for a in 0..6 {
+        for b in 0..3 {
+            for c in 0..4 {
+                let mut words = Words::new(vec![a, b, c]);
+                let draw = sampler.draw(&mut words).unwrap();
+                assert_eq!(words.at, 3);
+                assert_eq!(draw.entropy_words, 3);
+                assert_eq!(
+                    draw.likelihood_ratio,
+                    &draw.physical_probability / &draw.proposal_probability
+                );
+                assert_eq!(
+                    draw.physical_probability,
+                    p.probability(&draw.faults).unwrap()
+                );
+                sum_weight += &draw.likelihood_ratio;
+                if draw.faults.contains(&FaultSelection {
+                    site: 0,
+                    alternative: 1,
+                }) {
+                    event_weight += &draw.likelihood_ratio;
+                }
+            }
+        }
+    }
+    assert_eq!(
+        sum_weight / BigRational::from_integer(72.into()),
+        BigRational::from_integer(1.into())
+    );
+    assert_eq!(
+        event_weight / BigRational::from_integer(72.into()),
+        BigRational::new(1.into(), 12.into())
+    );
+}
+
+#[test]
+fn correlated_chains_scale_exclusive_masses_and_unit_scales_keep_seeded_streams() {
+    use std::collections::BTreeSet;
+    let circuit = parse_circuit(
+        "CORRELATED_ERROR(1/5) X0\nELSE_CORRELATED_ERROR(3/10) Z0",
+        &ParseOptions::default(),
+    )
+    .unwrap();
+    let instrument = compile_affine(
+        &circuit,
+        &CompileOptions::default(),
+        &ScalarArithmetic::default(),
+    )
+    .unwrap();
+    let p = NoiseModel::physical(&instrument, &NoiseOptions::default()).unwrap();
+    let q = p
+        .scaled_proposal(
+            &BigRational::from_integer(2.into()),
+            &BTreeSet::new(),
+            &NoiseOptions::default(),
+        )
+        .unwrap();
+    let expected = model(&[&["3/25", "2/5", "12/25"]]);
+    assert_eq!(q.model().probabilities(0), expected.probabilities(0));
+    for scale in [
+        BigRational::from_integer(1.into()),
+        BigRational::new_raw((-3).into(), (-3).into()),
+    ] {
+        let q = p
+            .scaled_proposal(&scale, &BTreeSet::new(), &NoiseOptions::default())
+            .unwrap();
+        assert_eq!(q.summary().scaled_categories, 0);
+        assert_eq!(
+            q.summary().proposal_scale,
+            BigRational::from_integer(1.into())
+        );
+        let physical = NoiseSampler::physical(p.clone(), NoiseOptions::default());
+        let importance =
+            NoiseSampler::importance(p.clone(), q.into_model(), NoiseOptions::default()).unwrap();
+        let mut a = SplitMix64::new(20261020);
+        let mut b = a;
+        for _ in 0..128 {
+            assert_eq!(
+                physical.draw(&mut a).unwrap(),
+                importance.draw(&mut b).unwrap()
+            );
+            assert_eq!(a.state(), b.state());
+        }
+    }
+    let q = p
+        .scaled_proposal(
+            &BigRational::new(1.into(), 2.into()),
+            &BTreeSet::new(),
+            &NoiseOptions::default(),
+        )
+        .unwrap();
+    assert_eq!(
+        q.model().probabilities(0),
+        model(&[&["39/50", "1/10", "3/25"]]).probabilities(0)
+    );
+}
+
+#[test]
+fn proposal_scales_reject_bad_support_raw_rationals_indices_and_denominator_budgets() {
+    use std::collections::BTreeSet;
+    let p = model(&[&["1/2", "1/2"]]);
+    let options = NoiseOptions::default();
+    let excluded = BTreeSet::new();
+    for scale in [
+        BigRational::new_raw(1.into(), 0.into()),
+        BigRational::new_raw(0.into(), 0.into()),
+        BigRational::new_raw(2.into(), (-3).into()),
+        BigRational::from_integer(0.into()),
+    ] {
+        assert!(matches!(
+            p.scaled_proposal(&scale, &excluded, &options),
+            Err(NoiseError::InvalidProposalScale)
+        ));
+    }
+    for scale in [
+        BigRational::from_integer(2.into()),
+        BigRational::from_integer(3.into()),
+    ] {
+        assert!(matches!(
+            p.scaled_proposal(&scale, &excluded, &options),
+            Err(NoiseError::ScaledProbability { site: 0 })
+        ));
+    }
+    assert!(matches!(
+        p.scaled_proposal(
+            &BigRational::from_integer(1.into()),
+            &BTreeSet::from([1]),
+            &options
+        ),
+        Err(NoiseError::InvalidExcludedSite { site: 1 })
+    ));
+    let q = p
+        .scaled_proposal(
+            &BigRational::from_integer(100.into()),
+            &BTreeSet::from([0]),
+            &options,
+        )
+        .unwrap();
+    assert_eq!(q.model().probabilities(0), p.probabilities(0));
+    let p = model(&[&["9/10", "1/10"]]);
+    assert!(matches!(
+        p.scaled_proposal(
+            &BigRational::new(1.into(), 7.into()),
+            &excluded,
+            &NoiseOptions {
+                max_denominator_bits: 4,
+                ..options
+            }
+        ),
+        Err(NoiseError::DenominatorLimit { .. })
+    ));
+    let q = model(&[])
+        .scaled_proposal(&BigRational::from_integer(2.into()), &excluded, &options)
+        .unwrap();
+    assert_eq!(q.summary().categories, 0);
+    assert_eq!(
+        q.model().probability(&[]).unwrap(),
+        BigRational::from_integer(1.into())
+    );
+}
+
+#[test]
+fn tiny_scaled_alternatives_remain_nonzero_and_total_error_endpoints_stay_unchanged() {
+    use std::collections::BTreeSet;
+    let tiny: rmagna::probability::Probability = "1e-400".parse().unwrap();
+    let p = NoiseModel::new(
+        vec![vec![tiny.complement(), tiny]],
+        &NoiseOptions::default(),
+    )
+    .unwrap();
+    let scale = BigRational::from_integer(num_bigint::BigInt::from(10).pow(200));
+    let q = p
+        .scaled_proposal(&scale, &BTreeSet::new(), &NoiseOptions::default())
+        .unwrap();
+    assert_eq!(
+        q.model().probabilities(0).unwrap()[1],
+        "1e-200".parse().unwrap()
+    );
+    let endpoints = model(&[&["0", "1/3", "2/3"], &["1", "0"]]);
+    let q = endpoints
+        .scaled_proposal(&scale, &BTreeSet::new(), &NoiseOptions::default())
+        .unwrap();
+    assert_eq!(q.summary().endpoint_categories, 2);
+    assert_eq!(q.summary().scaled_categories, 0);
+    for site in 0..2 {
+        assert_eq!(q.model().probabilities(site), endpoints.probabilities(site));
+    }
+}
