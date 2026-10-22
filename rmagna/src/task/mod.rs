@@ -2,8 +2,10 @@
 mod compose;
 mod evaluate;
 pub use evaluate::{
-    ContractionResources, EvaluationOptions, ExactInterval, TaskEnumeration,
-    TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskSectorMasses, TaskWeightSector,
+    ContractionResources, EvaluationOptions, ExactInterval, RunFailure, RunPhase, RunStatus,
+    RunTimings, TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator,
+    TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskVariances,
+    TaskWeightSector, run_task_batch,
 };
 mod parse;
 use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};

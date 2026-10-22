@@ -2099,5 +2099,77 @@ of retained accumulators is independent of draw count; integer sizes can grow
 and remain bounded by that budget. Tests use independent centered full-list
 oracles with unequal noise and history weights, zero draws, irrational values,
 scale changes of 10,000 square-root-two powers, disjoint partitions and explicit
-unavailable, invalid, arithmetic and count-overflow cases. Run summaries and
-sampler-pilot decisions are separate interfaces.
+unavailable, invalid, arithmetic and count-overflow cases. Run summaries are described below;
+sampler-pilot decisions remain a separate interface.
+
+## Seeded task batches and partial failures
+
+`TaskEvaluator::run_batch` reuses a prepared evaluator and starts a fresh
+`SplitMix64` stream at the requested seed. `task::run_task_batch` additionally
+owns and measures preparation. Both consume the existing per-draw contributions
+once and retain exact streaming estimates, paired conditional-error variance,
+weight ESS and noise-corrected efficiency diagnostics.
+
+```rust
+use std::path::Path;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, RunStatus, TaskOptions, TaskRunOptions, parse_task, run_task_batch};
+
+let parse = ParseOptions::default();
+let physical = parse_circuit("X_ERROR(1/4) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]", &parse)?;
+let task = parse_task(r#"{"error_observables":[0]}"#, Path::new("."), &TaskOptions::default())?;
+let modules = task.load_modules(&physical, &parse)?;
+let result = run_task_batch(
+    &physical, &modules, &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Physical, &TaskRunOptions { shots: 16, seed: 7, ..Default::default() },
+)?;
+assert_eq!(result.status, RunStatus::Complete);
+assert_eq!((result.completed, result.failed, result.not_attempted), (16, 0, 0));
+assert_eq!(result.statistics.as_ref().unwrap().completed, 16);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Run options default to one shot, seed zero, the existing statistics limits and
+1,000,000 retained Boolean record values. Shot counts must be positive. Only
+explicit task `sample_records` are retained per draw; their total requested
+value count is checked before entropy or callbacks. The retention cap counts
+values, not vector overhead or total process bytes. Without requested records,
+the number of retained statistical accumulators is independent of shot count;
+exact integer sizes can grow under the arithmetic budget. Repeated prepared
+calls with the same seed reproduce the same contributions and records. The RNG
+contract is the independent Rust stream, rather than upstream's stream.
+
+`statistics` contains complete-run estimates only. Any ordinary preparation,
+draw, accumulation or finalization failure makes status `Failed` and leaves
+that field absent. Successfully summarized completed draws move to
+`partial_statistics`, never masquerading as a complete estimate. A missing
+error definition remains absent; zero acceptance has no conditional error rate.
+Variances are variances of mean estimators, including the paired delta-method
+conditional ratio, and are absent with fewer than two completed draws. Numeric
+square roots and file serialization remain separate export operations.
+
+Preparation failures have zero completed/failed draws and every requested draw
+not attempted. A sampling or accumulation failure stops at one failed attempt;
+its zero-based shot index is recorded, and that row enters neither statistics
+nor retained records. Statistics and efficiency update together atomically.
+Finalization can also exhaust exact arithmetic while summarizing already
+completed rows. Such a failure has no failed-shot index and does not invent an
+additional attempted draw; any unavailable provisional aggregate stays absent.
+The accounting identity is always `requested = completed + failed + not_attempted`.
+
+The wrapper records measured preparation time; reused preparation has no new
+preparation measurement. Sampling time covers its draw/accumulation loop and
+total time also covers finalization. `completed_network_compilations` and
+`completed_history_groups` sum diagnostics from committed draws only; they do
+not count work inside failed attempts, and observation groups are distinct
+from individual marginal contractions. Detailed query/decoder instrumentation,
+provenance, JSON schemas and CLI integration follow separately.
+
+Tests compare fixed-seed batches with independent centered full-list statistics
+under physical/importance noise, exact/affine histories and both causal
+strategies. They cover signed moments, paired ratios, repeated prepared calls,
+owned preparation, bounded record retention, callback/contraction/arithmetic
+failures, atomic statistics/efficiency alignment, zero/one completed draw,
+undefined metrics and finalization failure accounting.
