@@ -11,8 +11,13 @@ use crate::unitary::{CompiledUnitary, DensityBoundary};
 use num_rational::BigRational;
 use num_traits::One;
 mod enumeration;
+mod run;
 pub use enumeration::{
     ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses, TaskWeightSector,
+};
+pub use run::{
+    RunFailure, RunPhase, RunStatus, RunTimings, TaskRunOptions, TaskRunResult, TaskRunStatistics,
+    TaskVariances, run_task_batch,
 };
 
 #[derive(Clone, Copy, Debug, Default)]
