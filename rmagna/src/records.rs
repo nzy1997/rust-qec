@@ -6,13 +6,24 @@ use crate::noise::RandomSource;
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use num_bigint::BigInt;
 use std::{cmp::Ordering, fmt};
+mod enumeration;
+pub use enumeration::{
+    RecordEnumerationOptions, ReportedBranch, ReportedEnumeration, enumerate_reported_conditioned,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SamplingError {
     InvalidMass,
     ImpossibleCondition,
     ImpossibleSupport,
-    EntropyLimit { limit: usize },
+    EntropyLimit {
+        limit: usize,
+    },
+    EnumerationLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
     ExponentRange,
     Instrument(InstrumentError),
     Scalar(ScalarError),
@@ -33,6 +44,14 @@ impl fmt::Display for SamplingError {
             Self::EntropyLimit { limit } => write!(
                 f,
                 "reported sampling exhausted its {limit} random-word budget"
+            ),
+            Self::EnumerationLimit {
+                option,
+                limit,
+                required,
+            } => write!(
+                f,
+                "reported enumeration needs {option} >= {required}; configured limit is {limit}"
             ),
             Self::ExponentRange => {
                 write!(f, "random prefix exceeds the exact scalar exponent range")
@@ -148,19 +167,12 @@ pub struct AffineProposalDraw {
     pub entropy_words: usize,
 }
 
-/// Propose a group uniformly from conservative conditioned affine support.
-/// This does not evaluate physical mass: interference-zero proposals remain
-/// valid draws and must receive zero weight from the caller's exact evaluation.
-/// One random word supplies up to 64 independent support directions, low bit
-/// first; deterministic groups consume no entropy.
-pub fn propose_affine_reported(
+fn conditioned_support(
     instrument: &CompiledInstrument,
     query: &RecordQuery<'_>,
     faults: &[FaultSelection],
-    random: &mut impl RandomSource,
-    options: &SamplingOptions,
     arithmetic: &ScalarArithmetic,
-) -> Result<AffineProposalDraw, SamplingError> {
+) -> Result<crate::gf2::AffineSupport, SamplingError> {
     let parities = query
         .given
         .iter()
@@ -189,7 +201,23 @@ pub fn propose_affine_reported(
         .map(|j| BitVector::from_indices(parities.len(), [query.given.len() + j]))
         .collect::<Result<Vec<_>, _>>()
         .map_err(InstrumentError::from)?;
-    let family = family.linear_image(&keep).map_err(InstrumentError::from)?;
+    Ok(family.linear_image(&keep).map_err(InstrumentError::from)?)
+}
+
+/// Propose a group uniformly from conservative conditioned affine support.
+/// This does not evaluate physical mass: interference-zero proposals remain
+/// valid draws and must receive zero weight from the caller's exact evaluation.
+/// One random word supplies up to 64 independent support directions, low bit
+/// first; deterministic groups consume no entropy.
+pub fn propose_affine_reported(
+    instrument: &CompiledInstrument,
+    query: &RecordQuery<'_>,
+    faults: &[FaultSelection],
+    random: &mut impl RandomSource,
+    options: &SamplingOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<AffineProposalDraw, SamplingError> {
+    let family = conditioned_support(instrument, query, faults, arithmetic)?;
     let entropy_words = family.dimension().div_ceil(64);
     if entropy_words > options.max_entropy_words {
         return Err(SamplingError::EntropyLimit {

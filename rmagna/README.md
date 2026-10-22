@@ -1816,3 +1816,52 @@ combinations and iterative alternative choices, avoiding circuit-depth recursion
 and repeated scans over all identity sites for each sparse pattern. Exact
 probability limits also apply during accumulation. Limit failures are errors;
 no assignments are silently truncated, sampled or rounded.
+
+## Exact conditional reported-group enumeration
+
+`records::enumerate_reported_conditioned` enumerates every positive physical
+outcome of an ordered reported-parity group, given earlier reported conditions.
+It uses no entropy and excludes final postselection from its marginal queries.
+Each branch contains complete label values and their joint physical mass with
+the given conditions; the separate `condition_mass` is the sum of branch masses.
+Divide by that mass only when a normalized conditional distribution is needed.
+
+```rust
+use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+use rmagna::instrument::{CompileOptions, compile_affine};
+use rmagna::records::{RecordEnumerationOptions, RecordQuery, enumerate_reported_conditioned};
+use rmagna::scalar::ScalarArithmetic;
+
+let a = ScalarArithmetic::default();
+let circuit = parse_circuit("H 0\nM 0", &ParseOptions::default())?;
+let instrument = compile_affine(&circuit, &CompileOptions::default(), &a)?;
+let parities = [BitExpr::atom(BitAtom::Record(0))];
+let distribution = enumerate_reported_conditioned(
+    &instrument, &RecordQuery { given: &[], parities: &parities }, &[],
+    &RecordEnumerationOptions::default(), &a,
+)?;
+assert_eq!(distribution.branches.len(), 2);
+assert_eq!(distribution.branches[0].mass, a.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The conditioned structural affine support identifies independent unresolved
+labels. Exact joint prefix marginals then prune interference-zero branches;
+structural points are never assumed to have positive physical probability.
+`max_record_bits` bounds structural rank, rather than the number of repeated or
+complemented labels. Defaults are 64 independent bits, 4,096 positive branches,
+1,000,000 actual marginal queries and 256 contraction terms. Scalar arithmetic
+limits also apply. A rank-zero or empty group needs one conditioning query and
+returns its single deterministic group with the conditioning mass. Impossible
+physical conditions are errors.
+
+Traversal visits independent labels in pivot order and false before true,
+then reconstructs all original labels. Complete results report structural rank
+and actual query count. Branch-frontier and query limits fail explicitly, with
+no silently incomplete distribution. A one-branch budget can therefore succeed
+inside a larger structural support when all other physical branches cancel.
+Tests compare an independent biased four-state distribution under all report
+flips, both compilers and all probability preparation modes, and cover zero
+interference, postselection separation, 65 correlated records/129 labels,
+conditioned and empty groups, and exact limit boundaries. This group primitive
+does not invoke external decoders; causal history traversal is a separate layer.
