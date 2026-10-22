@@ -23,7 +23,8 @@ def expected():
 
 
 def valid(strategy):
-    return dict(configuration=dict(max_terms=16), compilation=dict(strategy=strategy), **expected())
+    return dict(configuration=dict(max_terms=16, warm_replays=0), compilation=dict(strategy=strategy),
+                warm_replays=None, compile_ms=0, query_ms=0.25, **expected())
 
 
 class AffineComparisonTests(unittest.TestCase):
@@ -81,8 +82,8 @@ class AffineComparisonTests(unittest.TestCase):
                    "magna": types.SimpleNamespace(compile_circuit=lambda *args, **kwargs: original),
                    "magna.file_api": types.SimpleNamespace(NoiseDraw=lambda *args: None)}
         for compiler, strategy in [("shared", "SharedCommutingLayer"), ("parity_copies", "ParityCopies")]:
-            for broken in [0, 1]:
-                with self.subTest(compiler=compiler, broken=broken), tempfile.TemporaryDirectory() as directory:
+            for broken, malformed_warm in [(i, warm) for i in [0, 1] for warm in [False, True]]:
+                with self.subTest(compiler=compiler, broken=broken, malformed_warm=malformed_warm), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory).resolve()
                     binary = root / "binary"
                     binary.write_text("offline unchanged binary identity")
@@ -103,8 +104,12 @@ class AffineComparisonTests(unittest.TestCase):
                         index = len(calls)
                         calls.append(command)
                         actual = valid(strategy)
+                        self.assertEqual(command[command.index("--warm-replays") + 1], "0")
                         if index == broken:
-                            actual["compilation"] = dict(strategy="wrong") if broken == 0 else []
+                            if malformed_warm:
+                                actual["configuration"]["warm_replays"] = False
+                            else:
+                                actual["compilation"] = dict(strategy="wrong") if broken == 0 else []
                         actual["unique_marker"] = f"task-{index}"
                         payload = json.dumps(actual)
                         payloads.append(payload)

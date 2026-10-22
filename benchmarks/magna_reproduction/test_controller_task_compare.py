@@ -25,7 +25,8 @@ def expected(bit=False):
 
 
 def valid(bit=False):
-    return dict(configuration=dict(max_terms=16), **expected(bit))
+    return dict(configuration=dict(max_terms=16, warm_replays=0),
+                warm_replays=None, compile_ms=0, query_ms=0.25, **expected(bit))
 
 
 class ControllerComparisonTests(unittest.TestCase):
@@ -139,14 +140,20 @@ class ControllerComparisonTests(unittest.TestCase):
             binary = root / "binary"
             binary.write_text("unchanged offline identity")
             args = Namespace(upstream=root, one="dk", timeout=1, compiler=None,
-                             probability_preparation=None, fiber_search_rank=16)
-            for broken in [0, 1]:
+                             probability_preparation=None, fiber_search_rank=16, warm_replays=0)
+            for broken, malformed_warm in [(i, warm) for i in [0, 1] for warm in [False, True]]:
                 calls = []
                 def rust(command, **kwargs):
                     history = json.loads(Path(command[command.index("--history") + 1]).read_text())
                     index = len(calls)
                     calls.append(history)
-                    payload = f"unique-malformed-history-{index}" if index == broken else json.dumps(valid(bool(index)))
+                    self.assertEqual(command[command.index("--warm-replays") + 1], "0")
+                    actual = valid(bool(index))
+                    actual["unique_marker"] = f"unique-malformed-history-{index}"
+                    if index == broken and malformed_warm:
+                        actual["configuration"]["warm_replays"] = False
+                    payload = (f"unique-malformed-history-{index}" if index == broken and not malformed_warm
+                               else json.dumps(actual))
                     return subprocess.CompletedProcess(command, 0, payload, f"stderr-{index}")
                 with patch.dict(sys.modules, modules), patch.object(sys, "path", sys.path[:]), patch.object(driver.subprocess, "run", side_effect=rust):
                     row = driver.one(args, binary)
