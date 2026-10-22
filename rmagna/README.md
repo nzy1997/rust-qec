@@ -662,8 +662,10 @@ at 100,000 per draw, with separate noise and history entropy budgets. The explic
 `CausalStrategy::ColdPrefix` baseline also caps prefix compiles at 100,000. The
 default fixed-template route below reuses its Clifford circuit across histories;
 final scalar query closures are still prepared per query. Affine-support histories
-are described below; causal importance proposals and complete paper-performance validation remain
-subsequent work. Terminal recovery and task evaluation are described below.
+are described below. [Task and causal importance sampling](#task-and-causal-importance-sampling)
+is available through `new_with_sampling`. File/run/result integration and complete
+paper-performance validation remain subsequent work. Terminal recovery and task
+evaluation are described below.
 
 Tests enumerate majority histories, preserve repeated observations and atomic
 register updates, distinguish active and inactive guarded paths, verify correlated
