@@ -436,6 +436,10 @@ pub(super) fn compile(
             options.probability_preparation,
             options.max_prepared_probabilities,
         )?),
+        density_queries: Arc::new(densities::DensityQueries::new(
+            options.density_preparation,
+            options.max_prepared_densities,
+        )?),
         live_wires: Arc::new(state.live),
         record_wires: Arc::new(state.records),
         event_rows: Arc::new(rows),

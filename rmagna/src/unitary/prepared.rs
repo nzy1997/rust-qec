@@ -253,6 +253,9 @@ impl PreparedDensityOverlap {
         )?;
         Ok(self)
     }
+    pub(crate) fn matches_programs(&self, left: &CompiledUnitary, right: &CompiledUnitary) -> bool {
+        Arc::ptr_eq(&self.left, &left.program) && Arc::ptr_eq(&self.right, &right.program)
+    }
     pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
         self.closure.resource.as_ref()
     }
@@ -265,7 +268,7 @@ impl PreparedDensityOverlap {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, UnitaryError> {
-        if !Arc::ptr_eq(&self.left, &left.program) || !Arc::ptr_eq(&self.right, &right.program) {
+        if !self.matches_programs(left, right) {
             return Err(UnitaryError::IncompatibleProgram);
         }
         if left_outcomes.width() != self.left_events || right_outcomes.width() != self.right_events

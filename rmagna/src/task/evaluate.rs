@@ -26,7 +26,7 @@ struct Target {
 }
 enum Execution {
     Linear {
-        instrument: CompiledInstrument,
+        instrument: Box<CompiledInstrument>,
         model: NoiseModel,
         sampler: NoiseSampler,
     },
@@ -172,7 +172,7 @@ impl TaskEvaluator {
                 .map_err(|e| error("noise", e))?;
             let sampler = NoiseSampler::physical(model.clone(), options.runtime.noise);
             Execution::Linear {
-                instrument,
+                instrument: Box::new(instrument),
                 model,
                 sampler,
             }
@@ -184,6 +184,20 @@ impl TaskEvaluator {
             requested,
             execution,
             options,
+        })
+    }
+    pub fn prepared_density_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, TaskError> {
+        Ok(match &self.execution {
+            Execution::Linear { instrument, .. } => Some(
+                instrument
+                    .prepared_density_statistics()
+                    .map_err(|e| error("prepared_densities", e))?,
+            ),
+            Execution::Causal(program) => program
+                .prepared_density_statistics()
+                .map_err(|e| error("prepared_densities", e))?,
         })
     }
     pub fn prepared_probability_statistics(

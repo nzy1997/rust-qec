@@ -140,7 +140,8 @@ class ControllerComparisonTests(unittest.TestCase):
             binary = root / "binary"
             binary.write_text("unchanged offline identity")
             args = Namespace(upstream=root, one="dk", timeout=1, compiler=None,
-                             probability_preparation=None, fiber_search_rank=16, warm_replays=0)
+                             probability_preparation=None, density_preparation=None,
+                             fiber_search_rank=16, warm_replays=0)
             for broken, malformed_warm in [(i, warm) for i in [0, 1] for warm in [False, True]]:
                 calls = []
                 def rust(command, **kwargs):
