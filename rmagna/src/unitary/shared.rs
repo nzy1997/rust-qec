@@ -370,6 +370,7 @@ pub(super) fn compile(
         query_reference: Arc::clone(&query_reference),
         observation_reduction,
         reference_phase: Arc::clone(&phase),
+        query_reference_phase: Arc::clone(&query_phase),
         shared: Some(updates),
         circuit,
         positions,

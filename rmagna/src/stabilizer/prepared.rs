@@ -78,6 +78,10 @@ impl PreparedAffineContraction {
         })
     }
 
+    pub(crate) fn output_columns(&self) -> &[BitVector] {
+        &self.columns
+    }
+
     /// Contract a compatible ket, including updates to a zero reference.
     /// An incompatible structure is rejected before returning a zero result.
     pub fn contract(
