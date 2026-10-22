@@ -150,6 +150,11 @@ impl AffineKet {
         keep: &[usize],
         arithmetic: &ScalarArithmetic,
     ) -> Result<Option<Self>, StabilizerError> {
+        self.retain_boundary(keep)?.contract(arithmetic)
+    }
+
+    /// Relabel retained boundary indices without contracting hidden paths.
+    pub(crate) fn retain_boundary(&self, keep: &[usize]) -> Result<Self, StabilizerError> {
         let map = |value: &BitVector| -> Result<BitVector, Gf2Error> {
             let mut mapped = BitVector::zeros(keep.len())?;
             for (i, &j) in keep.iter().enumerate() {
@@ -157,19 +162,15 @@ impl AffineKet {
             }
             Ok(mapped)
         };
-        let offset = map(&self.offset)?;
-        let columns = self
-            .columns
-            .iter()
-            .map(map)
-            .collect::<Result<Vec<_>, _>>()?;
         Self::new(
-            offset,
-            columns,
+            map(&self.offset)?,
+            self.columns
+                .iter()
+                .map(map)
+                .collect::<Result<Vec<_>, _>>()?,
             self.phase.clone(),
             self.coefficient.clone(),
-        )?
-        .contract(arithmetic)
+        )
     }
 
     pub fn prepare(&self) -> Result<PreparedKet, StabilizerError> {
@@ -465,6 +466,22 @@ impl PreparedZProjection {
             phase,
             polar_images,
         })
+    }
+
+    /// Prepare a boundary sum on the structural image without selecting an
+    /// event outcome. The zero outcome itself need not be consistent.
+    pub(crate) fn prepare_sum(
+        &self,
+        keep: &[usize],
+    ) -> Result<PreparedAffineContraction, StabilizerError> {
+        let structure = AffineKet::new(
+            BitVector::zeros(self.reference.width())?,
+            self.columns.clone(),
+            self.phase.clone(),
+            ExactScalar::one(),
+        )?
+        .retain_boundary(keep)?;
+        PreparedAffineContraction::new(&structure)
     }
 
     /// Apply the prepared constraints without refactoring or restricting their

@@ -357,14 +357,17 @@ pub struct DensityBoundary<'a> {
     pub outcomes: &'a BitVector,
 }
 
-/// Fixed trace/event constraint elimination, shared across one reference
-/// program's Pauli assignments. Final phase closure is still query specific.
+/// Fixed trace/event constraints and retained-boundary Gaussian contraction,
+/// shared across one reference program's Pauli assignments. Final non-Clifford
+/// phase closure is still query specific.
 pub struct PreparedProbability {
     program: Arc<InsertionProgram>,
     physical_width: usize,
     event_count: usize,
     projection: PreparedZProjection,
-    legs: [Vec<usize>; 2],
+    contraction: crate::stabilizer::PreparedAffineContraction,
+    keep: Vec<usize>,
+    phase_widths: [usize; 2],
 }
 
 impl PreparedProbability {
@@ -388,9 +391,18 @@ impl PreparedProbability {
         let joint = state
             .boundary
             .tensor(&state.boundary.conjugate(), arithmetic)?;
-        close(
-            self.projection.project(&joint, &rhs)?,
-            &self.legs,
+        let retained = self
+            .projection
+            .project(&joint, &rhs)?
+            .map(|ket| ket.retain_boundary(&self.keep))
+            .transpose()?;
+        let contracted = match retained {
+            Some(ket) => self.contraction.contract(&ket, arithmetic)?,
+            None => None,
+        };
+        close_retained(
+            contracted,
+            &self.phase_widths,
             &[(&state.phase, false), (&state.phase, true)],
             max_terms,
             arithmetic,
@@ -462,15 +474,19 @@ impl CompiledUnitary {
                 .map(|row| BitVector::from_indices(total, row.ones()))
                 .collect::<Result<Vec<_>, _>>()?,
         );
+        let projection = PreparedZProjection::new(&joint, &constraints)?;
+        let keep = (self.width()..half)
+            .chain(half + self.width()..total)
+            .collect::<Vec<_>>();
+        let contraction = projection.prepare_sum(&keep)?;
         Ok(PreparedProbability {
             program: Arc::clone(&self.program),
             physical_width: self.width(),
             event_count: rows.len(),
-            projection: PreparedZProjection::new(&joint, &constraints)?,
-            legs: [
-                (self.width()..half).collect(),
-                (half + self.width()..total).collect(),
-            ],
+            projection,
+            contraction,
+            keep,
+            phase_widths: [half - self.width(); 2],
         })
     }
 
@@ -855,6 +871,28 @@ fn close(
     max_terms: usize,
     arithmetic: &ScalarArithmetic,
 ) -> Result<NetworkValue, UnitaryError> {
+    let keep = legs.iter().flatten().copied().collect::<Vec<_>>();
+    let retained = match ket {
+        Some(ket) => ket.sum_boundary(&keep, arithmetic)?,
+        None => None,
+    };
+    close_retained(
+        retained,
+        &legs.iter().map(Vec::len).collect::<Vec<_>>(),
+        phases,
+        max_terms,
+        arithmetic,
+    )
+}
+
+/// Close an already retained and contracted boundary in phase-family order.
+fn close_retained(
+    ket: Option<AffineKet>,
+    widths: &[usize],
+    phases: &[(&ParityPhase, bool)],
+    max_terms: usize,
+    arithmetic: &ScalarArithmetic,
+) -> Result<NetworkValue, UnitaryError> {
     let zero = || NetworkValue {
         value: ExactScalar::zero(),
         quotient_rank: 0,
@@ -863,33 +901,34 @@ fn close(
     let Some(ket) = ket else {
         return Ok(zero());
     };
-    let keep = legs.iter().flatten().copied().collect::<Vec<_>>();
-    let Some(ket) = ket.sum_boundary(&keep, arithmetic)? else {
-        return Ok(zero());
-    };
-    if phases.len() != legs.len()
+    let width = widths
+        .iter()
+        .try_fold(0_usize, |a, &b| a.checked_add(b))
+        .ok_or(UnitaryError::DimensionOverflow)?;
+    if ket.width() != width
+        || phases.len() != widths.len()
         || phases
             .iter()
-            .zip(legs)
-            .any(|((p, _), l)| p.num_variables() != l.len())
+            .zip(widths)
+            .any(|((p, _), &n)| p.num_variables() != n)
     {
         return Err(UnitaryError::DimensionMismatch);
     }
     let mut constant = 0;
     let mut terms = Vec::new();
     let mut offset = 0;
-    for ((phase, conjugate), indices) in phases.iter().zip(legs) {
+    for ((phase, conjugate), &length) in phases.iter().zip(widths) {
         let sign = |c: u8| if *conjugate { (8 - c) & 7 } else { c };
         constant = (constant + sign(phase.constant())) & 7;
         for (axis, c) in phase.terms() {
             terms.push((
-                BitVector::from_indices(keep.len(), axis.ones().map(|j| offset + j))?,
+                BitVector::from_indices(width, axis.ones().map(|j| offset + j))?,
                 sign(*c),
             ));
         }
-        offset += indices.len();
+        offset += length;
     }
-    let phase = ParityPhase::new(keep.len(), constant, terms)?;
+    let phase = ParityPhase::new(width, constant, terms)?;
     let restricted = phase.restrict(ket.offset(), ket.columns())?;
     let prepared = ClosedPhaseSum::new_adaptive(
         &restricted,

@@ -1131,8 +1131,11 @@ any insertion view of that same program. Preparing a perturbed view still uses
 the original reference; a separately compiled program is rejected even if its
 gates and dimensions happen to match.
 
-The plan shares binary elimination, mapped support columns and the reference
-quadratic restriction across queries. It owns immutable preparation storage;
+The plan shares binary elimination, mapped support columns, the reference
+quadratic restriction and retained-boundary Gaussian contraction across queries.
+Its structural reference does not select an outcome: an inconsistent zero event
+cannot disable a later nonzero event or a fault-flipped event. It owns immutable
+preparation storage;
 callers can retain it explicitly. Ordinary `probability_z` remains available.
 Queries still construct their joint ket and perform final phase closure and
 non-Clifford resource preparation, so this is partial preparation and makes no
@@ -1382,3 +1385,8 @@ ambient signature row space; each slice remains full width. Even terms are skipp
 and the odd-span rank is a certified stopping bound. The full radical and quotient
 basis are unchanged. Wide dense embeddings are checked against every ambient
 coordinate-pair equation, including zero-signature cancellation with odd terms.
+
+Prepared probability tests include deterministic impossible outcomes made
+possible by a fault, immutable preparation from a perturbed view, both compiler
+strategies and direct literal event masses. Final non-Clifford phase closure
+remains query-specific.

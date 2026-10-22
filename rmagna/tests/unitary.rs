@@ -1477,3 +1477,86 @@ fn fixed_input_observation_relations_cross_packed_words_without_losing_paths() {
         }
     }
 }
+
+#[test]
+fn prepared_probability_traces_accept_fault_flipped_zero_reference_events() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::X(0)),
+        G::Clifford(C::H(1)),
+        G::T { qubit: 0, turns: 3 },
+        G::T { qubit: 1, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+    ];
+    let rows = [bits(3, 1), bits(3, 6)];
+    let fault = PauliInsertion {
+        before_gate: 0,
+        word: PauliWord::new(bits(3, 1), bits(3, 2), 3).unwrap(),
+    };
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let perturbed = base
+            .with_insertions(std::slice::from_ref(&fault), &a)
+            .unwrap();
+        let reference_plan = base.prepare_probability(&rows, &a).unwrap();
+        let perturbed_plan = perturbed.prepare_probability(&rows, &a).unwrap();
+        for (state, assignments) in [(&base, vec![]), (&perturbed, vec![fault.clone()])] {
+            let values = dense_inserted(&gates, 3, 0, &assignments, &a);
+            for outcome in 0..4 {
+                let mut expected = ExactScalar::zero();
+                for (x, amplitude) in values.iter().enumerate() {
+                    let actual = (x & 1) | ((((x >> 1) ^ (x >> 2)) & 1) << 1);
+                    if actual == outcome {
+                        expected = a
+                            .add(&expected, &a.norm_squared(amplitude).unwrap())
+                            .unwrap();
+                    }
+                }
+                for plan in [&reference_plan, &perturbed_plan] {
+                    let actual = plan.evaluate(state, &bits(2, outcome), 4, &a).unwrap();
+                    assert_eq!(
+                        actual.value, expected,
+                        "strategy={strategy:?}, outcome={outcome}"
+                    );
+                    let cold = state
+                        .probability_z(&rows, &bits(2, outcome), 4, &a)
+                        .unwrap();
+                    assert_eq!(actual.quotient_rank, cold.quotient_rank);
+                    assert_eq!(actual.terms, cold.terms);
+                    if expected.is_zero() {
+                        assert_eq!(
+                            plan.evaluate(state, &bits(2, outcome), 0, &a)
+                                .unwrap()
+                                .value,
+                            ExactScalar::zero()
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            reference_plan
+                .evaluate(&base, &bits(2, 0), 4, &a)
+                .unwrap()
+                .value,
+            ExactScalar::zero()
+        );
+        assert_eq!(
+            reference_plan
+                .evaluate(&perturbed, &bits(2, 0), 4, &a)
+                .unwrap()
+                .value,
+            ExactScalar::one()
+        );
+    }
+}
