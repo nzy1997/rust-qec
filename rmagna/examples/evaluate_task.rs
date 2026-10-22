@@ -14,12 +14,32 @@ impl RandomSource for Entropy {
 use rmagna::runtime::ControllerRegistry;
 use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
 use rmagna::scalar::ExactScalar;
-use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
+use rmagna::task::{
+    EvaluationOptions, TaskError, TaskEvaluation, TaskEvaluator, TaskOptions, parse_task,
+};
 fn scalar(value: &ExactScalar) -> serde_json::Value {
     serde_json::json!({"coefficients":value.coefficients().each_ref().map(|c|c.to_string()),"power":value.power()})
 }
 fn field(value: &ExactField) -> serde_json::Value {
     serde_json::json!(value.coefficients().each_ref().map(|c| c.to_string()))
+}
+fn evaluate_once(
+    evaluator: &TaskEvaluator,
+    history: Option<&[Vec<bool>]>,
+    seed: u64,
+    fixed: Option<u64>,
+) -> Result<TaskEvaluation, TaskError> {
+    if let Some(groups) = history {
+        evaluator.evaluate_prescribed_history(&[], groups)
+    } else {
+        evaluator.sample_prescribed(
+            &[],
+            &mut Entropy {
+                random: SplitMix64::new(seed),
+                fixed,
+            },
+        )
+    }
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -28,6 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: evaluate_task PHYSICAL TASK [SEED]")?;
     let task_path = args.next().ok_or("missing task JSON path")?;
     let mut seed = 0;
+    let mut warm_replays = 0_usize;
     let mut history = None;
     let mut options = EvaluationOptions::default();
     let mut fixed = None;
@@ -38,6 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut module_root = None;
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            "--warm-replays" => {
+                warm_replays = args.next().ok_or("missing warm replay count")?.parse()?;
+            }
             "--probability-preparation" => {
                 probability_mode = args.next().ok_or("missing probability preparation mode")?;
             }
@@ -97,6 +121,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => seed = argument.parse::<u64>()?,
         }
     }
+    if warm_replays > 16 {
+        return Err("warm replay count must be between zero and 16".into());
+    }
     options.runtime.compile.probability_preparation = match probability_mode.as_str() {
         "cold" => rmagna::instrument::ProbabilityPreparation::Cold,
         "trace" => rmagna::instrument::ProbabilityPreparation::Trace,
@@ -151,19 +178,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = std::time::Instant::now();
     let evaluator = TaskEvaluator::new(&physical, &modules, &registry, options)?;
     let compile_ms = start.elapsed().as_secs_f64() * 1000.;
+    let history: Option<Vec<Vec<bool>>> = history
+        .map(|path| -> Result<_, Box<dyn std::error::Error>> {
+            Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
+        })
+        .transpose()?;
     let query = std::time::Instant::now();
-    let draw = if let Some(path) = history {
-        let groups: Vec<Vec<bool>> = serde_json::from_str(&std::fs::read_to_string(path)?)?;
-        evaluator.evaluate_prescribed_history(&[], &groups)?
-    } else {
-        evaluator.sample_prescribed(
-            &[],
-            &mut Entropy {
-                random: SplitMix64::new(seed),
-                fixed,
-            },
-        )?
-    };
+    let draw = evaluate_once(&evaluator, history.as_deref(), seed, fixed)?;
+    let query_ms = query.elapsed().as_secs_f64() * 1000.;
+    let first_cache = evaluator.prepared_probability_statistics()?;
+    let mut replay_ms = Vec::new();
+    for _ in 0..warm_replays {
+        let start = std::time::Instant::now();
+        let repeated = evaluate_once(&evaluator, history.as_deref(), seed, fixed)?;
+        let elapsed = start.elapsed().as_secs_f64() * 1000.;
+        if repeated != draw {
+            return Err(
+                "warm replay changed an exact evaluation field or controller transcript".into(),
+            );
+        }
+        if evaluator.prepared_probability_statistics()? != first_cache {
+            return Err("warm replay changed retained probability cache counts".into());
+        }
+        replay_ms.push(elapsed);
+    }
+    let warm = (warm_replays > 0).then(|| serde_json::json!({"count":warm_replays,"query_ms":replay_ms,
+        "cache_unchanged":true,"scope":"same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"}));
+    let probability_cache = first_cache.map(|s|
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources}));
     let compilation_scope = if evaluator.sampled_history() {
         match options.runtime.strategy {
             rmagna::runtime::CausalStrategy::FixedTemplate => "initial_fixed_template",
@@ -172,8 +214,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         "linear_instrument"
     };
-    let probability_cache = evaluator.prepared_probability_statistics()?.map(|s|
-        serde_json::json!({"cached_queries": s.cached_queries, "fixed_resources": s.fixed_resources}));
     let d = evaluator.compilation();
     let compilation = serde_json::json!({"scope":compilation_scope,"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,
         "reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,
@@ -181,7 +221,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "coherent_width":d.coherent_width,"reference_coherent_width":d.reference_coherent_width,"shared_observations_before_reduction":d.shared_observations_before_reduction,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables});
     println!(
         "{}",
-        serde_json::json!({"compilation":compilation,"prepared_probability_cache":probability_cache,"configuration":{"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query.elapsed().as_secs_f64()*1000.})
+        serde_json::json!({"compilation":compilation,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
     );
     Ok(())
 }

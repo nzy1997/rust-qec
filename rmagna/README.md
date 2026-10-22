@@ -1475,3 +1475,24 @@ packaged tasks and both prescribed TQD3 histories against the pinned native
 implementation. TQD3 retains 20 query/resource families, with two acceptance
 terms and four target terms. These are exact no-fault correctness witnesses,
 not the 31-task draw matrix or paper precision/performance results.
+
+## Bounded warm replay diagnostics
+
+`evaluate_task --warm-replays N` (zero through 16, default zero) repeats the same
+assignment on one evaluator and decoder process. Entropy is reset to the declared
+seed/constant word, or the prescribed history is reused. Every exact evaluation
+field and controller transcript must match the first call; retained query/resource
+counts must remain unchanged. A mismatch returns an error. Replay calls still
+execute controllers and Gaussian queries; only preparation already owned by the
+evaluator can be reused.
+
+`query_ms` measures the first evaluation after history-file loading; `warm_replays`
+contains separate call times. Exact comparisons and cache checks occur outside
+each timer. Both differential drivers accept `--warm-replays` and verify its count,
+checks and finite nonnegative times in the Rust output. The receipt marks these
+as same-assignment diagnostics. They are separate from independent Monte Carlo
+draws and the formal multi-process performance protocol.
+
+Two warm replays match every exact field and retain the same cache counts on
+all 26 affine tasks and both prescribed TQD3 histories. A deliberately stateful
+decoder negative control changes its output on replay and is rejected.

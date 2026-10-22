@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import importlib
 import json
+import math
 import os
 import signal
 from pathlib import Path
@@ -21,11 +22,14 @@ def main():
     parser.add_argument("--compiler", choices=["shared", "parity_copies"])
     parser.add_argument("--probability-preparation", choices=["cold", "trace", "fixed"])
     parser.add_argument("--fiber-search-rank", type=int, default=16)
+    parser.add_argument("--warm-replays", type=int, default=0)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=TASKS)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--one", choices=TASKS, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if not 0 <= args.warm_replays <= 16:
+        parser.error("warm replay count must be between zero and 16")
     if args.fiber_search_rank < 0 or (args.probability_preparation != "fixed" and args.fiber_search_rank != 16):
         parser.error("a custom nonnegative fiber search rank requires fixed preparation")
     if args.timeout <= 0:
@@ -43,6 +47,7 @@ def main():
     document = dict(schema="rmagna.controller-task-comparison.v1", status="running",
         scope="prescribed no-fault observations from two native entropy endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
         rust_binary_sha256=before, compiler=args.compiler, probability_preparation=args.probability_preparation,
+        warm_replays=args.warm_replays,
         fiber_search_rank=args.fiber_search_rank if args.probability_preparation=="fixed" else None, tasks=args.tasks, cases=rows)
     with args.out.open("x", encoding="utf-8") as output:
         output.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
@@ -54,6 +59,7 @@ def main():
     for name in args.tasks:
         command = [sys.executable, "-I", __file__, "--upstream", str(args.upstream),
                    "--rust-example", str(binary), "--one", name, "--timeout", str(args.timeout)]
+        command += ["--warm-replays", str(args.warm_replays)]
         if args.compiler:
             command += ["--compiler", args.compiler]
         if args.probability_preparation:
@@ -93,8 +99,46 @@ def main():
         raise SystemExit(1)
 
 
+WARM_SCOPE = "same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"
+
+
+def validate_warm_result(actual, count):
+    if count is None:
+        return
+    if type(count) is not int or not 0 <= count <= 16:
+        raise ValueError("declared warm replay count must be an integer from zero through 16")
+    reported = actual["configuration"].get("warm_replays")
+    if type(reported) is not int or reported != count:
+        raise ValueError("Rust example did not apply the declared warm replay count")
+    def duration(value):
+        if type(value) not in (int, float) or value < 0:
+            return False
+        try:
+            return math.isfinite(value)
+        except OverflowError:
+            return False
+    if any(not duration(actual.get(key)) for key in ["compile_ms", "query_ms"]):
+        raise ValueError("Rust first-call/init timings must be finite nonnegative numbers")
+    if "warm_replays" not in actual:
+        raise ValueError("Rust result is missing its warm replay diagnostics")
+    warm = actual["warm_replays"]
+    if count == 0:
+        if warm is not None:
+            raise ValueError("Rust result reports warm replays although zero were requested")
+        return
+    if not isinstance(warm, dict):
+        raise ValueError("Rust warm replay diagnostics must be an object")
+    if type(warm.get("count")) is not int or warm["count"] != count:
+        raise ValueError("Rust warm replay diagnostic count is incorrect")
+    times = warm.get("query_ms")
+    if not isinstance(times, list) or len(times) != count or any(not duration(t) for t in times):
+        raise ValueError("Rust warm replay timings are incomplete or invalid")
+    if warm.get("cache_unchanged") is not True or warm.get("scope") != WARM_SCOPE:
+        raise ValueError("Rust warm replay identity/cache scope checks are incomplete")
+
+
 def compare_result(result, expected, word, max_terms, classical, compiler=None,
-                   probability_preparation=None, fiber_search_rank=16):
+                   probability_preparation=None, fiber_search_rank=16, warm_replays=None):
     """Retain one history's raw output even when a successful child is malformed."""
     try:
         actual = json.loads(result.stdout)
@@ -104,6 +148,7 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
         if (not isinstance(config, dict) or type(config.get("max_terms")) is not int
                 or config["max_terms"] != max_terms):
             raise ValueError("Rust example did not apply the declared term budget")
+        validate_warm_result(actual, warm_replays)
         if probability_preparation:
             if config.get("probability_preparation") != probability_preparation:
                 raise ValueError("Rust example did not apply the declared probability preparation")
@@ -205,6 +250,7 @@ def one(args, binary):
             command = [str(binary), str(root / run["circuit"]), str(root / run["task"]),
                        "--max-terms", str(options["max_terms"]), "--controllers", str(config_path), "--python", sys.executable,
                        "--module-root", str(root)]
+            command += ["--warm-replays", str(args.warm_replays)]
             if args.compiler:
                 command += ["--compiler", args.compiler]
             if args.probability_preparation:
@@ -226,13 +272,14 @@ def one(args, binary):
             cases.append(compare_result(result, expected, word, options["max_terms"],
                                         "error_observables" in compiled.task["raw"], compiler=args.compiler,
                                         probability_preparation=args.probability_preparation,
-                                        fiber_search_rank=args.fiber_search_rank))
+                                        fiber_search_rank=args.fiber_search_rank, warm_replays=args.warm_replays))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
                     upstream_commit=captured.manifest["upstream"]["commit"], native_sha256=captured.native_sha256,
                     reference_manifest_sha256=captured.manifest_sha256, rust_binary_sha256=binary_hash,
                     compiler=args.compiler, probability_preparation=args.probability_preparation,
+                    warm_replays=args.warm_replays,
         fiber_search_rank=args.fiber_search_rank if args.probability_preparation=="fixed" else None, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                             for p in (config_path, root / "run.json", root / run["circuit"], root / run["task"])}, cases=cases)
 

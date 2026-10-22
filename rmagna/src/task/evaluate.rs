@@ -53,6 +53,7 @@ impl From<&crate::unitary::NetworkValue> for ContractionResources {
         }
     }
 }
+#[derive(PartialEq, Eq)]
 pub struct TaskEvaluation {
     /// Post-preparation Clifford circuit constructions, excluding scalar queries.
     pub network_compilations: usize,
