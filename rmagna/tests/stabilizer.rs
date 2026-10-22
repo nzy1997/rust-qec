@@ -727,3 +727,190 @@ fn prepared_z_projections_preserve_wide_complex_amplitudes_and_empty_boundaries(
         ExactScalar::one().negated()
     );
 }
+
+#[test]
+fn prepared_affine_contractions_preserve_literal_updated_path_amplitudes() {
+    use rmagna::stabilizer::PreparedAffineContraction;
+    let a = ScalarArithmetic::default();
+    let mut next = rng();
+    for width in 0..=5 {
+        for paths in 0..=8 {
+            for _ in 0..3 {
+                let reference = random_ket(width, paths, &mut next, &a);
+                let plan = PreparedAffineContraction::new(&reference).unwrap();
+                for update in 0..8 {
+                    let phase = QuadraticForm::new(
+                        (next() & 3) as u8,
+                        reference
+                            .phase()
+                            .linear()
+                            .iter()
+                            .map(|&c| (c + 2 * (next() & 1) as u8) & 3)
+                            .collect(),
+                        reference.phase().upper().to_vec(),
+                    )
+                    .unwrap();
+                    let coefficient = if update == 0 {
+                        ExactScalar::zero()
+                    } else {
+                        a.omega((next() & 7) as i64, -3).unwrap()
+                    };
+                    let input = AffineKet::new(
+                        bits(width, next()),
+                        reference.columns().to_vec(),
+                        phase,
+                        coefficient,
+                    )
+                    .unwrap();
+                    let expected = literal(&input, &a);
+                    let actual = plan.contract(&input, &a).unwrap();
+                    assert_state(actual.as_ref(), width, &expected, &a);
+                    if let Some(ket) = actual {
+                        let rows = (0..width)
+                            .map(|i| {
+                                BitVector::from_indices(
+                                    ket.columns().len(),
+                                    ket.columns()
+                                        .iter()
+                                        .enumerate()
+                                        .filter_map(|(j, c)| c.get(i).unwrap().then_some(j)),
+                                )
+                                .unwrap()
+                            })
+                            .collect::<Vec<_>>();
+                        assert_eq!(
+                            rmagna::gf2::LinearFactorization::new(ket.columns().len(), &rows)
+                                .unwrap()
+                                .pivot_columns()
+                                .len(),
+                            ket.columns().len()
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn prepared_affine_contractions_handle_zero_references_and_wide_hidden_paths() {
+    use rmagna::stabilizer::{PreparedAffineContraction, StabilizerError};
+    let a = ScalarArithmetic::default();
+    let width = 129;
+    let reference = AffineKet::new(
+        BitVector::zeros(width).unwrap(),
+        vec![BitVector::zeros(width).unwrap(); 2],
+        QuadraticForm::new(3, vec![2, 0], vec![bits(2, 0); 2]).unwrap(),
+        ExactScalar::one(),
+    )
+    .unwrap();
+    let plan = PreparedAffineContraction::new(&reference).unwrap();
+    assert!(plan.contract(&reference, &a).unwrap().is_none());
+    let offset = BitVector::from_indices(width, [64, 128]).unwrap();
+    let input = AffineKet::new(
+        offset.clone(),
+        reference.columns().to_vec(),
+        QuadraticForm::new(1, vec![0, 0], vec![bits(2, 0); 2]).unwrap(),
+        a.omega(3, -2).unwrap(),
+    )
+    .unwrap();
+    let ket = plan.contract(&input, &a).unwrap().unwrap();
+    assert!(ket.columns().is_empty());
+    assert_eq!(ket.offset(), &offset);
+    assert_eq!(
+        ket.prepare().unwrap().amplitude(&offset, &a).unwrap(),
+        a.omega(5, 2).unwrap()
+    );
+    assert_eq!(
+        ket.prepare()
+            .unwrap()
+            .amplitude(&BitVector::zeros(width).unwrap(), &a)
+            .unwrap(),
+        ExactScalar::zero()
+    );
+    let zero_coefficient = AffineKet::new(
+        reference.offset().clone(),
+        reference.columns().to_vec(),
+        reference.phase().clone(),
+        ExactScalar::zero(),
+    )
+    .unwrap();
+    let zero_plan = PreparedAffineContraction::new(&zero_coefficient).unwrap();
+    assert_eq!(zero_plan.contract(&input, &a).unwrap().unwrap(), ket);
+    for (columns, phase) in [
+        (
+            vec![
+                BitVector::from_indices(width, [0]).unwrap(),
+                BitVector::zeros(width).unwrap(),
+            ],
+            input.phase().clone(),
+        ),
+        (
+            input.columns().to_vec(),
+            QuadraticForm::new(1, vec![1, 0], vec![bits(2, 0); 2]).unwrap(),
+        ),
+        (
+            input.columns().to_vec(),
+            QuadraticForm::new(1, vec![0, 0], vec![bits(2, 2), bits(2, 0)]).unwrap(),
+        ),
+    ] {
+        let incompatible =
+            AffineKet::new(offset.clone(), columns, phase, ExactScalar::zero()).unwrap();
+        assert!(matches!(
+            plan.contract(&incompatible, &a),
+            Err(StabilizerError::IncompatibleContraction)
+        ));
+    }
+    let paths = 129;
+    let mut upper = vec![BitVector::zeros(paths).unwrap(); paths];
+    for j in (0..paths - 1).step_by(2) {
+        upper[j].set(j + 1, true).unwrap();
+    }
+    let mut linear = vec![0; paths];
+    linear[paths - 1] = 1;
+    let reference = AffineKet::new(
+        offset.clone(),
+        vec![BitVector::zeros(width).unwrap(); paths],
+        QuadraticForm::new(2, linear, upper.clone()).unwrap(),
+        a.omega(5, -4).unwrap(),
+    )
+    .unwrap();
+    let plan = PreparedAffineContraction::new(&reference).unwrap();
+    for shift in 0..4 {
+        let mut linear = vec![0; paths];
+        for (j, coefficient) in linear.iter_mut().enumerate().take(paths - 1) {
+            *coefficient = 2 * u8::from((j + shift) % 3 == 0);
+        }
+        linear[paths - 1] = if shift & 1 == 0 { 1 } else { 3 };
+        let mut phase = 5 + 2 * shift as i64 + if shift & 1 == 0 { 1 } else { -1 };
+        for j in (0..paths - 1).step_by(2) {
+            phase += 4 * i64::from(linear[j] == 2 && linear[j + 1] == 2);
+        }
+        let input = AffineKet::new(
+            offset.clone(),
+            reference.columns().to_vec(),
+            QuadraticForm::new(shift as u8, linear, upper.clone()).unwrap(),
+            reference.coefficient().clone(),
+        )
+        .unwrap();
+        let actual = plan.contract(&input, &a).unwrap().unwrap();
+        assert_eq!(
+            actual.prepare().unwrap().amplitude(&offset, &a).unwrap(),
+            a.omega(phase, paths as i64 - 4).unwrap()
+        );
+    }
+    let narrow = ScalarArithmetic::new(1).unwrap();
+    let input = AffineKet::new(
+        bits(3, 0),
+        vec![bits(3, 1)],
+        QuadraticForm::new(0, vec![1], vec![bits(1, 0)]).unwrap(),
+        a.integer(3).unwrap(),
+    )
+    .unwrap();
+    assert!(
+        PreparedAffineContraction::new(&input)
+            .unwrap()
+            .contract(&input, &narrow)
+            .is_err()
+    );
+}

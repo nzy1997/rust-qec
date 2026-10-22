@@ -267,27 +267,33 @@ pub(crate) enum EliminationStep {
 }
 
 /// Numeric state shared by cold and prepared Gaussian elimination.
-struct QuadraticValues {
-    linear: Vec<u8>,
+pub(crate) struct QuadraticValues {
+    pub(crate) linear: Vec<u8>,
     phase: i16,
     sqrt2_power: i64,
 }
 impl QuadraticValues {
-    fn new(form: &QuadraticForm) -> Self {
+    pub(crate) fn new(form: &QuadraticForm) -> Self {
+        Self::from_linear(form.constant, form.linear.clone())
+    }
+    pub(crate) fn from_linear(constant: u8, linear: Vec<u8>) -> Self {
         Self {
-            linear: form.linear.clone(),
-            phase: i16::from(form.constant) * 2,
+            linear,
+            phase: i16::from(constant) * 2,
             sqrt2_power: 0,
         }
     }
-    fn scalar(&self, arithmetic: &ScalarArithmetic) -> Result<ExactScalar, QuadraticError> {
+    pub(crate) fn scalar(
+        &self,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ExactScalar, QuadraticError> {
         Ok(arithmetic.omega(i64::from(self.phase), self.sqrt2_power)?)
     }
 }
 
 /// Structural actions depend on adjacency and linear parity, not even phases.
 /// The same value updates execute a cold step or a prepared query.
-enum QuadraticAction {
+pub(crate) enum QuadraticAction {
     Odd {
         x: usize,
         neighbors: Vec<usize>,
@@ -303,7 +309,7 @@ enum QuadraticAction {
     },
 }
 impl QuadraticAction {
-    fn apply(&self, values: &mut QuadraticValues) -> Result<bool, QuadraticError> {
+    pub(crate) fn apply(&self, values: &mut QuadraticValues) -> Result<bool, QuadraticError> {
         values.sqrt2_power = values
             .sqrt2_power
             .checked_add(if matches!(self, Self::Odd { .. }) {
@@ -381,7 +387,7 @@ impl QuadraticElimination {
             _ => EliminationStep::Unary,
         })
     }
-    fn eliminate_recorded(
+    pub(crate) fn eliminate_recorded(
         &mut self,
         x: usize,
         preferred: &[bool],

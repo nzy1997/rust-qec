@@ -1,5 +1,8 @@
 //! Unnormalized affine quadratic kets with exact phase-preserving contraction.
 
+mod prepared;
+pub use prepared::PreparedAffineContraction;
+
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{EliminationStep, QuadraticElimination, QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
@@ -10,6 +13,7 @@ pub enum StabilizerError {
     DimensionMismatch,
     DimensionOverflow,
     IncompatibleProjection,
+    IncompatibleContraction,
     Binary(Gf2Error),
     Quadratic(QuadraticError),
     Scalar(ScalarError),
@@ -28,6 +32,10 @@ impl fmt::Display for StabilizerError {
             Self::IncompatibleProjection => write!(
                 f,
                 "prepared projection requires unchanged support columns, quadratic cross terms and odd linear coefficients"
+            ),
+            Self::IncompatibleContraction => write!(
+                f,
+                "prepared contraction requires unchanged support columns, quadratic cross terms and odd linear coefficients"
             ),
             Self::Binary(error) => error.fmt(f),
             Self::Quadratic(error) => error.fmt(f),
@@ -100,6 +108,18 @@ impl AffineKet {
     }
     pub fn coefficient(&self) -> &ExactScalar {
         &self.coefficient
+    }
+
+    fn same_structure(&self, other: &Self) -> bool {
+        self.width() == other.width()
+            && self.columns == other.columns
+            && self.phase.upper() == other.phase.upper()
+            && self
+                .phase
+                .linear()
+                .iter()
+                .zip(other.phase.linear())
+                .all(|(a, b)| (a ^ b) & 1 == 0)
     }
 
     pub(crate) fn into_parts(self) -> (BitVector, Vec<BitVector>, QuadraticForm, ExactScalar) {
@@ -457,15 +477,7 @@ impl PreparedZProjection {
         if input.width() != self.reference.width() || outcomes.width() != self.rows.len() {
             return Err(StabilizerError::DimensionMismatch);
         }
-        if input.columns != self.reference.columns
-            || input.phase.upper() != self.reference.phase.upper()
-            || input
-                .phase
-                .linear()
-                .iter()
-                .zip(self.reference.phase.linear())
-                .any(|(a, b)| (a ^ b) & 1 != 0)
-        {
+        if !input.same_structure(&self.reference) {
             return Err(StabilizerError::IncompatibleProjection);
         }
         let mut rhs = outcomes.clone();
