@@ -2029,6 +2029,19 @@ preparation. Existing per-execution and exact arithmetic limits also apply.
 No partial result is returned on failure. Importance-configured evaluators,
 including unit-scale proposals, and nonempty task `sample_records` are rejected.
 
+`enumerate_physical_with_costs(&options, &meter)` shares a caller-owned
+`ExecutionMeter` across all patterns, unresolved group enumeration, interrupted
+causal replays, decoder calls, and final response queries. Its query quota counts
+all physical contractions, including response queries that are excluded from
+`TaskEnumeration::marginal_queries`. Support certificates and cold-prefix
+compilations are measured separately. The meter retains actual work after errors;
+no partial-sector estimate is returned. A fresh meter gives each call independent
+quotas and a cooperative deadline, checked between operations and traversal units.
+An executing contraction or external callback is not interrupted. Preparation is
+separate; construct the evaluator with `new_with_costs` and the same meter when
+preparation must share those limits. Unobserved enumeration retains its existing
+semantics and incurs no timing collection.
+
 The covered responses are unconditional masses, never divided by covered noise
 probability or accepted mass. Let their acceptance and error be `A` and `E`,
 and omitted physical noise probability be `u`. The rigorous full-distribution
