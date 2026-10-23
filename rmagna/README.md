@@ -8,6 +8,58 @@ Bounded [probability-query preparation](#bounded-instrument-probability-preparat
 supports opt-in trace-plan and fixed-resource reuse. The full experiment runner
 remains a separate deliverable.
 
+## Command-line file tasks
+
+```sh
+cargo run --release -p rmagna -- validate circuit.magna --task task.json --json
+cargo run --release -p rmagna -- inspect circuit.magna --task task.json --json
+cargo run --release -p rmagna -- run circuit.magna --task task.json --shots 1024 --seed 7 --json --output run.json
+cargo run -p rmagna -- --help
+```
+
+The standalone `rmagna` executable embeds its decoder host, so it does not need
+the source checkout at runtime. `validate` parses and fingerprints the inputs;
+`inspect` additionally compiles the evaluator and target normalization. Neither
+draws noise, samples histories, nor calls decoders. `run` prepares the evaluator
+and performs actual noisy draws, with preparation included in its run limits.
+Task module paths resolve relative to the task JSON directory.
+
+The CLI defaults to the shared commuting-layer compiler, affine-support history
+sampling, fixed causal templates, fixed probability/density preparation on
+demand, and direct Pauli insertions. Library defaults remain as documented below.
+Use `--history-sampler exact_marginal`, `--compiler parity_copies`,
+`--probability-preparation cold|trace|fixed`, `--density-preparation cold|trace|fixed`
+and `--causal-strategy fixed|cold` to select alternatives. Prepared insertion
+catalogs require `--insertion-preparation prepared`; their entry/byte limits are
+explicit options and bound the catalog estimate rather than process memory.
+`--noise-proposal-scale 3/2` or `--noise-proposal-scale 1.5` selects exactly the
+same rational importance proposal, including when the requested scale equals one.
+The CLI rejects duplicate, unknown and inapplicable options before decoder imports.
+
+External Python decoders require `--controllers controllers.json`; optionally
+select `--python /path/to/python` and `--module-root /path/to/decoder/sources`.
+Explicit decoder modules execute on import, including during validation and
+inspection. The embedded host blocks imports of `magna` and reports source and
+configuration hashes; complete manifests and transport limits participate in
+controller fingerprints. These identities retain the API's
+`caller_declared_unverified` attestation; dependency binaries are not attested.
+`--decoder-timeout` bounds each process exchange separately from the run deadline.
+
+`--json` emits one JSON object on stdout. Human summaries distinguish acceptance,
+joint error mass and conditional error, with undefined quantities shown as `n/a`.
+`--output` reserves a new JSON file before importing decoders and refuses to
+overwrite an existing file. Both output channels describe the same result.
+Engine failures retain completed-prefix statistics and return exit code 1;
+invalid CLI arguments return 2. Numeric export failure also returns 1, preserves
+actual counts, execution status, costs and metadata, and leaves numeric fields
+null. The CLI does not persist its in-memory exact statistics on that failure;
+use `FileRunReport::raw_result` through the Rust API when exact recovery is needed.
+Input/preparation errors before a report exists produce a minimal failure receipt.
+Run limits are checked between operations and do not preempt a running contraction.
+
+This entry point does not yet implement native option-file compatibility,
+enumeration, sampler comparison, progress reporting, or paper campaign orchestration.
+
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
 `omega = exp(i*pi/4)`. Coefficients are arbitrary-width signed integers, and
@@ -2707,8 +2759,8 @@ The current `query_preparation: on_demand` declaration is intentional. Cold quer
 modes execute directly; trace/fixed modes create families as requested. Cache
 metadata describes only retained families, with null reference-cache receipts
 for the cold-prefix causal strategy. It does not claim exhaustive preparation of
-all task query families. Full eager preparation, a command-line interface, Python
-bindings and the upstream compatibility ledger remain separate deliverables.
+all task query families. Full eager preparation, Python bindings and the upstream
+compatibility ledger remain separate deliverables.
 
 Tests compare whole reports with exact batches and analytic projected-target,
 recovery and signed-moment values. They cover both causal strategies/history
