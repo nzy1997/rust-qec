@@ -2,6 +2,7 @@
 
 mod insertions;
 mod observations;
+mod phase_map;
 pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;

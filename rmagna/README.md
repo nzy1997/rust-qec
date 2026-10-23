@@ -2604,3 +2604,25 @@ The options fingerprint now records the insertion mode and, for prepared mode,
 both limits. Even direct-mode options digests differ from earlier versions
 because the resolved configuration now includes this field; circuit and module
 content digests retain their existing definitions.
+
+## Fixed-query phase coordinate maps
+
+Fixed-fiber probability and density families prepare the coordinate restriction
+of each reference phase leg once. Warm queries combine updated coefficients,
+conjugations and offset signs directly on the retained coordinates. They avoid
+constructing a full-width composed phase and retransposing the same support
+columns. The frozen fiber partition and its resource counts remain unchanged;
+the cold and trace-only query routes retain their existing independent closure.
+
+The immutable maps cache reference axes only. A term hidden by reference
+cancellation can reappear after a Pauli update; such an axis is mapped exactly
+through the prepared coordinate rows without growing a warm cache. Zero images,
+dependent columns, scalar legs and global eighth-root constants are retained.
+These tables belong to query preparation, outside the instrument insertion-table
+footprint; neither footprint is a process-memory cap.
+
+Independent truth tables cover 130 input and retained coordinates, multiple
+conjugated legs, shifted offsets, dependent columns, cancelled axes and scalar
+vacua. Mixed T/CS/CCZ inverse pairs with faults between the pairs are compared
+against dense amplitudes, probability sums and reduced-density matrices. Existing
+native masses and history fixtures also exercise the fixed query route.
