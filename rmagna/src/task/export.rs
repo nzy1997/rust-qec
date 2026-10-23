@@ -415,6 +415,11 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             "total timing cannot be smaller than a measured component",
         ));
     }
+    if result.execution_costs.query.attempted > result.execution_limits.max_queries {
+        return Err(invalid(
+            "attempted queries exceed the declared execution limit",
+        ));
+    }
     for cost in [
         result.execution_costs.compilation,
         result.execution_costs.query,
@@ -512,6 +517,10 @@ pub fn export_batch_metrics(
     output.insert("timings".to_owned(),json!({"preparation_seconds":result.timings.preparation_seconds,"sampling_seconds":result.timings.sampling_seconds,"total_seconds":result.timings.total_seconds}));
     output.insert("completed_resources".to_owned(),json!({"network_compilations":result.completed_network_compilations,"history_groups":result.completed_history_groups}));
     let costs = result.execution_costs;
+    output.insert(
+        "execution_limits".to_owned(),
+        result.execution_limits.to_json(),
+    );
     let encode_cost = |cost: crate::costs::OperationCost| json!({"attempted":cost.attempted,"succeeded":cost.succeeded,"failed":cost.failed,"seconds":cost.seconds});
     output.insert(
         "execution_costs".to_owned(),

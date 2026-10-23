@@ -317,6 +317,7 @@ pub fn fingerprint_content(
         "scalar_coefficient_bits": input.evaluation.scalars.max_coefficient_bits(),
         "field_coefficient_bits": input.evaluation.fields.max_coefficient_bits(),
         "run": {
+            "execution_limits": input.run.execution_limits.to_json(),
             "shots": input.run.shots, "seed": input.run.seed,
             "max_retained_record_values": input.run.max_retained_record_values,
             "statistics": {"max_dimensions": input.run.statistics.max_dimensions, "coefficient_bits": input.run.statistics.arithmetic.max_coefficient_bits()},

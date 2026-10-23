@@ -297,6 +297,8 @@ fn every_resolved_execution_and_export_setting_changes_the_options_digest() {
         |e| e.evaluation.scalars = ScalarArithmetic::new(12345).unwrap(),
         |e| e.evaluation.fields = FieldArithmetic::new(12345),
         |e| e.run.shots += 1,
+        |e| e.run.execution_limits.max_queries = 12345,
+        |e| e.run.execution_limits.max_duration = Some(std::time::Duration::new(123, 456)),
         |e| e.run.seed += 1,
         |e| e.run.max_retained_record_values += 1,
         |e| e.run.statistics.max_dimensions += 1,
@@ -341,6 +343,11 @@ fn every_resolved_execution_and_export_setting_changes_the_options_digest() {
             assert!(hashes.insert(env.fingerprints().options));
         }
     }
+    let mut first = baseline();
+    first.run.execution_limits.max_duration = Some(std::time::Duration::new(u64::MAX, 1));
+    let one = first.fingerprints();
+    first.run.execution_limits.max_duration = Some(std::time::Duration::new(u64::MAX, 2));
+    assert_ne!(one.options, first.fingerprints().options); // Nanoseconds must not round away.
 }
 #[test]
 fn controllers_and_exact_proposals_are_declared_without_invoking_callbacks() {
