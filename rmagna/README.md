@@ -2409,3 +2409,73 @@ record groups, empty-input callbacks and their failures, cached/concurrent
 target/moment queries, target normalization, compilation/contraction failures,
 noise failures before a query and accumulator failures after successful work.
 Identical seeded draws and final RNG states verify observational equivalence.
+
+## Per-run query and time budgets
+
+`TaskRunOptions::execution_limits` configures `costs::ExecutionLimits`: maximum
+logical query attempts (`u64::MAX` by default) and an optional nonnegative
+`Duration` (`None` by default). The same limits can be supplied directly to
+`ExecutionMeter::new` for individually profiled operations. They apply to this
+collector's lifetime; each batch creates a fresh collector.
+
+```rust
+use std::path::Path;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::costs::ExecutionLimits;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, RunStatus, TaskEvaluator, TaskOptions,
+    TaskRunOptions, parse_task};
+
+let physical = parse_circuit("I 0", &ParseOptions::default())?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?
+    .load_modules(&physical, &ParseOptions::default())?;
+let evaluator = TaskEvaluator::new(&physical, &modules,
+    &ControllerRegistry::default(), EvaluationOptions::default())?;
+let result = evaluator.run_batch(&TaskRunOptions {
+    shots: 3, execution_limits: ExecutionLimits { max_queries: 2, ..Default::default() },
+    ..Default::default()
+})?;
+assert_eq!(result.status, RunStatus::Failed);
+assert_eq!(result.completed, 2);
+assert_eq!(result.execution_costs.query.attempted, 2);
+assert_eq!(result.execution_costs.query.failed, 0); // Third query never began.
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The query quota includes every logical query described above: target
+normalization during owned preparation, conditional history marginals,
+acceptance, classical success, target overlap and moments. A query rejected
+before starting consumes no attempt and creates no fictitious kernel failure.
+Its enclosing run still fails with an explicit `max_queries` reason, preserves
+the completed prefix and leaves main estimates null. A failed actual query
+consumes one query attempt. Owned preparation and sampling share one quota;
+reused-evaluator batches exclude previous preparation and start fresh.
+
+Deadlines are cooperative: check elapsed wall time before each measured
+operation and, for batches, before each draw's entropy and callbacks. At or past
+the exact duration boundary, the next operation is rejected. Zero duration is
+an immediate exhaustion control. An in-progress operation, unmetered setup,
+accumulation or finalization is not interrupted and can exceed the duration;
+the limit is not a hard process timeout. Individually profiled samples check
+measured operation boundaries; their caller owns any pre-draw check through
+`ExecutionMeter::check_time`.
+
+`TaskRunResult::execution_limits` and exported `execution_limits` record the
+applied quota and exact `max_duration` as `{"seconds": u64, "nanoseconds": u32}`
+or null. Fingerprints include both values without converting duration through
+binary64, so even nanosecond differences at large second counts remain distinct.
+Export rejects counters exceeding the declared quota. Concurrent and repeated
+batches share prepared query caches while retaining separate quotas/deadlines.
+
+Source compatibility: full struct literals for `TaskRunOptions` and
+`TaskRunResult` must supply `execution_limits`; callers using
+`..Default::default()` for run options keep the unbounded defaults. `CostError`
+is now an enum: construct or match `CounterOverflow { operation }`,
+`QueryLimit { limit }` and `TimeLimit { limit }` instead of the previous
+`CostError { operation }` struct.
+
+Tests check exact N and N-1 query boundaries, partial prefixes, target
+normalization, both causal strategies and history samplers, profiled seeded
+equivalence, fresh repeated/concurrent quotas, zero-duration failures before
+work, nested quota exhaustion, exact controlled deadline boundaries and
+nanosecond-preserving fingerprints. Deadline tests do not sleep.

@@ -1,12 +1,13 @@
 //! Seeded batches with exact statistics and explicit partial-failure accounting.
 use super::*;
-use crate::costs::ExecutionCosts;
+use crate::costs::{ExecutionCosts, ExecutionLimits};
 use crate::noise::SplitMix64;
 use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, StatisticsOptions};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug)]
 pub struct TaskRunOptions {
+    pub execution_limits: ExecutionLimits,
     pub shots: u64,
     pub seed: u64,
     pub statistics: StatisticsOptions,
@@ -16,6 +17,7 @@ pub struct TaskRunOptions {
 impl Default for TaskRunOptions {
     fn default() -> Self {
         Self {
+            execution_limits: ExecutionLimits::default(),
             shots: 1,
             seed: 0,
             statistics: StatisticsOptions::default(),
@@ -95,6 +97,7 @@ pub struct TaskRunStatistics {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TaskRunResult {
+    pub execution_limits: ExecutionLimits,
     /// Logical work of this call, including preparation when owned and failed attempts.
     pub execution_costs: ExecutionCosts,
     pub status: RunStatus,
@@ -213,7 +216,7 @@ impl TaskEvaluator {
     /// Ordinary task/arithmetic failures return Failed results; invalid run
     /// configuration returns an error before any entropy or callbacks.
     pub fn run_batch(&self, options: &TaskRunOptions) -> Result<TaskRunResult, TaskError> {
-        self.run_batch_observed(options, &ExecutionMeter::default())
+        self.run_batch_observed(options, &ExecutionMeter::new(options.execution_limits))
     }
     fn run_batch_observed(
         &self,
@@ -230,7 +233,11 @@ impl TaskEvaluator {
         let mut failed = 0;
         let sampling = Instant::now();
         for shot in 0..options.shots {
-            let row = match self.sample_with_costs(&mut random, meter) {
+            let row = match meter
+                .check_time()
+                .map_err(TaskError::from)
+                .and_then(|()| self.sample_with_costs(&mut random, meter))
+            {
                 Ok(row) => row,
                 Err(e) => {
                     failures.push(RunFailure {
@@ -294,6 +301,7 @@ impl TaskEvaluator {
             (None, statistics)
         };
         Ok(TaskRunResult {
+            execution_limits: meter.limits(),
             execution_costs: meter.snapshot(),
             status,
             requested: options.shots,
@@ -333,7 +341,7 @@ pub fn run_task_batch(
         modules.task.observables.len(),
     )?;
     let preparation = Instant::now();
-    let meter = ExecutionMeter::default();
+    let meter = ExecutionMeter::new(run.execution_limits);
     let prepared =
         TaskEvaluator::new_with_costs(physical, modules, registry, evaluation, sampling, &meter);
     let preparation_seconds = preparation.elapsed().as_secs_f64();
@@ -345,6 +353,7 @@ pub fn run_task_batch(
             Ok(result)
         }
         Err(e) => Ok(TaskRunResult {
+            execution_limits: meter.limits(),
             execution_costs: meter.snapshot(),
             status: RunStatus::Failed,
             requested: run.shots,
