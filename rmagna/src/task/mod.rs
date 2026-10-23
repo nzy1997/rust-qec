@@ -10,11 +10,16 @@ pub use evaluate::{
     TaskWeightSector, run_task_batch,
 };
 mod parse;
+mod provenance;
 use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};
 use crate::gf2::BitVector;
 use crate::pauli::PauliWord;
 use num_bigint::BigUint;
 pub use parse::parse_task;
+pub use provenance::{
+    ContentFingerprints, FingerprintError, FingerprintInputs, FingerprintOptions,
+    canonical_fingerprint, fingerprint_content,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,

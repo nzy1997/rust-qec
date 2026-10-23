@@ -13,6 +13,7 @@ description = "Exact global-network algebra for near-Clifford quantum simulation
 num-bigint = "0.4.8"
 num-rational = "0.4"
 num-traits = "0.2"
+sha2 = "0.10"
 
-serde_json = { version = "1", features = ["raw_value", "float_roundtrip"] }
+serde_json = { version = "1", features = ["raw_value", "float_roundtrip", "arbitrary_precision"] }
 serde = { version = "1", features = ["derive"] }

@@ -2252,3 +2252,77 @@ variance-efficiency coefficients, and all accumulated contributions vanish.
 Genuine interference-zero affine proposals preserve these zero/undefined
 distinctions. Both completed-resource counters must be zero when no draw commits;
 preparation and interrupted attempts belong to separate work accounting.
+
+## Loaded-content fingerprints
+
+`task::fingerprint_content` identifies seven independently hashed categories:
+physical circuit, validated task, ideal state, recovery, controller declarations,
+resolved options and noise sampling. It uses loaded snapshots and never opens
+files or executes callbacks. Circuit identities include original text, format
+and effective width; this preserves exact probability spelling and distinguishes
+padded module views. Comments and whitespace therefore affect circuit identity.
+Target identities also retain ordered output mappings and auxiliary projections.
+Missing modules hash a domain-specific null, distinct from an empty module.
+
+```rust
+use std::{collections::BTreeMap, path::Path};
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::NoiseSampling;
+use rmagna::numeric::NumericOptions;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, FingerprintInputs, FingerprintOptions,
+    TaskOptions, TaskRunOptions, fingerprint_content, parse_task};
+
+let physical = parse_circuit("I 0", &ParseOptions::default())?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?
+    .load_modules(&physical, &ParseOptions::default())?;
+let fingerprints = fingerprint_content(&FingerprintInputs {
+    physical: &physical, modules: &modules, controllers: &ControllerRegistry::default(),
+    controller_identities: &BTreeMap::new(), evaluation: EvaluationOptions::default(),
+    run: TaskRunOptions::default(), sampling: &NoiseSampling::Physical,
+    numeric: NumericOptions::default(),
+}, FingerprintOptions::default())?;
+assert_eq!(fingerprints.to_json()["algorithm"], "sha256");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Encoding `rmagna-provenance-v1` hashes its UTF-8 name, a zero byte, the category
+name, a zero byte and canonical UTF-8 JSON. Keys sort lexicographically at every
+level, arrays retain semantic order, strings use JSON escapes with lowercase
+hex digits and non-ASCII UTF-8, and numbers use serde_json's Display form.
+This local encoding does not mathematically normalize JSON numbers or implement
+RFC 8785. `canonical_fingerprint` exposes the same encoding in the `json` domain.
+The manifest records both algorithm and encoding; digests use lowercase hex.
+
+Options include all evaluation/compiler/history/cache/arithmetic limits, batch
+shots and seed, statistics/record-retention limits and numerical export budget.
+Parsing budgets are excluded because inputs are already loaded and validated.
+Noise sampling has a separate identity: physical and unit-scale importance
+remain distinct. Exact proposal numerator/denominator strings are retained
+without rounding; this records the supplied configuration and does not validate
+its executability. RNG/build/software metadata belongs to the result layer.
+
+Controller names and versions, plus optional per-binding JSON identity material,
+are explicitly `caller_declared_unverified`. Unknown binding names fail. Equal
+declarations can describe different Rust closures: closure source cannot be
+introspected. External worker manifests supplied here are also declarations,
+and their contents are not independently attested by hashing them.
+
+`FingerprintOptions` defaults to 16 MiB of encoded JSON per category and depth
+64 (root depth zero). Domain prefixes are excluded from the byte budget. Hash
+encoding is streamed; object-key sorting and loaded/constructed JSON still use
+memory, so these are encoding limits rather than process-memory caps. Any
+category exceeding either limit fails without returning a partial set. Paths
+and source-location metadata are excluded, and modifying files after module
+loading cannot alter those snapshots' identities.
+
+Tests retain independent Python hashlib witnesses, UTF-8/control escapes,
+arbitrary-width numbers and masks, nested key and semantic array order, exact
+byte/depth boundaries, loaded/reloaded module snapshots, path independence,
+projected targets, every current resolved option, caller declarations and tiny
+exact proposal scales.
+
+The crate enables serde_json `arbitrary_precision` for loaded number lexemes,
+while retaining `raw_value` and `float_roundtrip` for the existing parsing and
+binary64 result paths. Arbitrary-width integers remain integers in canonical
+JSON; the encoding still does not mathematically normalize number spellings.
