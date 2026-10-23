@@ -1,14 +1,20 @@
 //! Fixed scalar closure for probability and reduced density-overlap families.
+use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::fibers::{FiberOptions, PreparedCliffordFibers};
 use crate::stabilizer::PreparedAffineContraction;
+
+struct FixedResource {
+    fibers: PreparedCliffordFibers,
+    phase_map: PhaseRestriction,
+}
 
 struct ScalarClosure {
     projection: PreparedZProjection,
     contraction: PreparedAffineContraction,
     keep: Vec<usize>,
     widths: Vec<usize>,
-    resource: Option<PreparedCliffordFibers>,
+    resource: Option<FixedResource>,
 }
 impl ScalarClosure {
     fn new(
@@ -33,12 +39,13 @@ impl ScalarClosure {
         max_terms: usize,
         options: FiberOptions,
     ) -> Result<(), UnitaryError> {
-        let phase = compose_phases(&self.widths, phases)?;
-        let phase = phase.restrict(
-            &BitVector::zeros(phase.num_variables())?,
-            self.contraction.output_columns(),
-        )?;
-        self.resource = Some(PreparedCliffordFibers::new(&phase, max_terms, options)?);
+        let phase_map =
+            PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
+        let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
+        self.resource = Some(FixedResource {
+            fibers: PreparedCliffordFibers::new(&phase, max_terms, options)?,
+            phase_map,
+        });
         Ok(())
     }
     fn evaluate(
@@ -64,19 +71,22 @@ impl ScalarClosure {
         let Some(ket) = contracted else {
             return Ok(zero_network_value());
         };
-        if resource.num_terms() > max_terms {
+        if resource.fibers.num_terms() > max_terms {
             return Err(PhaseError::FiberTermLimit {
-                coordinates: resource.enumerated_coordinates(),
-                quotient_rank: resource.quotient_rank(),
+                coordinates: resource.fibers.enumerated_coordinates(),
+                quotient_rank: resource.fibers.quotient_rank(),
                 limit: max_terms,
             }
             .into());
         }
-        let phase = compose_phases(&self.widths, phases)?.restrict(ket.offset(), ket.columns())?;
+        debug_assert_eq!(ket.columns(), self.contraction.output_columns());
+        let phase = resource.phase_map.apply(phases, ket.offset())?;
         Ok(NetworkValue {
-            value: resource.evaluate(&phase, ket.phase(), ket.coefficient(), arithmetic)?,
-            quotient_rank: resource.quotient_rank(),
-            terms: resource.num_terms(),
+            value: resource
+                .fibers
+                .evaluate(&phase, ket.phase(), ket.coefficient(), arithmetic)?,
+            quotient_rank: resource.fibers.quotient_rank(),
+            terms: resource.fibers.num_terms(),
         })
     }
 }
@@ -137,7 +147,7 @@ impl PreparedProbability {
     }
     /// Fixed counts precede adaptive radical absorption and can be larger.
     pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
-        self.closure.resource.as_ref()
+        self.closure.resource.as_ref().map(|r| &r.fibers)
     }
     pub fn evaluate(
         &self,
@@ -257,7 +267,7 @@ impl PreparedDensityOverlap {
         Arc::ptr_eq(&self.left, &left.program) && Arc::ptr_eq(&self.right, &right.program)
     }
     pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
-        self.closure.resource.as_ref()
+        self.closure.resource.as_ref().map(|r| &r.fibers)
     }
     pub fn evaluate(
         &self,

@@ -2401,3 +2401,249 @@ fn prepared_shared_signs_cover_late_snapshot_cuts_and_equal_lowered_boundaries()
         );
     }
 }
+
+#[test]
+fn fixed_query_phase_maps_preserve_cancelled_rotation_pairs_after_faults() {
+    use rmagna::unitary::{CompilerStrategy as S, DensityLayout, InsertionPreparationOptions};
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::T { qubit: 0, turns: 7 },
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 1,
+        },
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 3,
+        },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::H(2)),
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+        G::Clifford(C::H(0)),
+    ];
+    let target_gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::Clifford(C::S { qubit: 0, turns: 1 }),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 2,
+        }),
+    ];
+    let catalog = [
+        PauliInsertion {
+            before_gate: 4,
+            word: PauliWord::new(bits(3, 1), bits(3, 0), 0).unwrap(),
+        },
+        PauliInsertion {
+            before_gate: 6,
+            word: PauliWord::new(bits(3, 2), bits(3, 2), 2).unwrap(),
+        },
+        PauliInsertion {
+            before_gate: 8,
+            word: PauliWord::new(bits(3, 4), bits(3, 1), 4).unwrap(),
+        },
+    ];
+    let row = [bits(3, 5)];
+    let focused_row = [bits(3, 1)];
+    let target_row = [bits(3, 2)];
+    let left = DensityLayout {
+        outputs: &[2, 0],
+        event_rows: &row,
+    };
+    let right = DensityLayout {
+        outputs: &[1, 2],
+        event_rows: &target_row,
+    };
+    let target_values = dense(&target_gates, 3, 0, &a);
+    for strategy in [S::ParityCopies, S::SharedCommutingLayer] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let target = UnitaryCircuit::new(3, target_gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let insertion_plan = base
+            .prepare_insertions(&catalog, InsertionPreparationOptions::default())
+            .unwrap();
+        let probability = base
+            .prepare_probability_with_fibers(&row, 4096, Default::default(), &a)
+            .unwrap();
+        let focused_probability = base
+            .prepare_probability_with_fibers(&focused_row, 4096, Default::default(), &a)
+            .unwrap();
+        let focused_terms = focused_probability
+            .fixed_phase_resource()
+            .unwrap()
+            .num_terms();
+        let density = base
+            .prepare_density_overlap_with_fibers(left, &target, right, 4096, Default::default(), &a)
+            .unwrap();
+        let snapshot = (
+            probability.fixed_phase_resource().unwrap().num_terms(),
+            density.fixed_phase_resource().unwrap().num_terms(),
+        );
+        for mask in 0..8 {
+            let selected = (0..3).filter(|&j| mask >> j & 1 != 0).collect::<Vec<_>>();
+            let faults = selected
+                .iter()
+                .map(|&j| catalog[j].clone())
+                .collect::<Vec<_>>();
+            let state = base
+                .with_prepared_insertions(&insertion_plan, &selected, &a)
+                .unwrap();
+            let values = dense_inserted(&gates, 3, 0, &faults, &a);
+            for (j, value) in values.iter().enumerate() {
+                assert_eq!(
+                    &state.amplitude(&bits(3, j), 4096, &a).unwrap().value,
+                    value
+                );
+            }
+            for outcome in [false, true] {
+                let expected = values
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| row[0].dot(&bits(3, *j)).unwrap() == outcome)
+                    .fold(ExactScalar::zero(), |s, (_, v)| {
+                        a.add(&s, &a.norm_squared(v).unwrap()).unwrap()
+                    });
+                let event = bits(1, usize::from(outcome));
+                let focused_expected = values
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| (*index & 1 != 0) == outcome)
+                    .fold(ExactScalar::zero(), |sum, (_, value)| {
+                        a.add(&sum, &a.norm_squared(value).unwrap()).unwrap()
+                    });
+                let focused_result = focused_probability
+                    .evaluate(&state, &event, 4096, &a)
+                    .unwrap();
+                assert_eq!(
+                    focused_result.value, focused_expected,
+                    "focused strategy={strategy:?}, mask={mask}, outcome={outcome}"
+                );
+                assert_eq!(
+                    state
+                        .probability_z(&focused_row, &event, 4096, &a)
+                        .unwrap()
+                        .value,
+                    focused_expected
+                );
+                assert_eq!(focused_result.terms, focused_terms);
+                let result = probability.evaluate(&state, &event, 4096, &a).unwrap();
+                assert_eq!(result.value, expected);
+                assert_eq!(
+                    state.probability_z(&row, &event, 4096, &a).unwrap().value,
+                    expected
+                );
+                assert_eq!(result.terms, snapshot.0);
+                for target_outcome in [false, true] {
+                    let expected = density_product(
+                        &reduced_density(&values, 3, left.outputs, &row[0], outcome, &a),
+                        &reduced_density(
+                            &target_values,
+                            3,
+                            right.outputs,
+                            &target_row[0],
+                            target_outcome,
+                            &a,
+                        ),
+                        &a,
+                    );
+                    let result = density
+                        .evaluate(
+                            &state,
+                            &target,
+                            &event,
+                            &bits(1, usize::from(target_outcome)),
+                            4096,
+                            &a,
+                        )
+                        .unwrap();
+                    assert_eq!(
+                        result.value, expected,
+                        "strategy={strategy:?}, mask={mask}, outcomes={outcome}/{target_outcome}"
+                    );
+                    if !expected.is_zero() {
+                        assert_eq!(result.terms, snapshot.1);
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            focused_probability
+                .fixed_phase_resource()
+                .unwrap()
+                .num_terms(),
+            focused_terms
+        );
+        assert_eq!(
+            snapshot,
+            (
+                probability.fixed_phase_resource().unwrap().num_terms(),
+                density.fixed_phase_resource().unwrap().num_terms()
+            )
+        );
+    }
+
+    // Isolate the cancelled axis so a larger commuting layer cannot move this
+    // rotation pair outside the shared reference group.
+    let cancelled_pair = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::Clifford(C::H(2)),
+        G::T { qubit: 0, turns: 1 },
+        G::T { qubit: 0, turns: 7 },
+        G::Clifford(C::H(0)),
+    ];
+    let fault = PauliInsertion {
+        before_gate: 4,
+        word: PauliWord::new(bits(3, 1), bits(3, 0), 0).unwrap(),
+    };
+    for strategy in [S::ParityCopies, S::SharedCommutingLayer] {
+        let base = UnitaryCircuit::new(3, cancelled_pair)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let row = [bits(3, 1)];
+        let family = base
+            .prepare_probability_with_fibers(&row, 4096, Default::default(), &a)
+            .unwrap();
+        let state = base
+            .with_insertions(std::slice::from_ref(&fault), &a)
+            .unwrap();
+        let values = dense_inserted(&cancelled_pair, 3, 0, std::slice::from_ref(&fault), &a);
+        for outcome in [false, true] {
+            let expected = values
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| (*index & 1 != 0) == outcome)
+                .fold(ExactScalar::zero(), |sum, (_, value)| {
+                    a.add(&sum, &a.norm_squared(value).unwrap()).unwrap()
+                });
+            assert_eq!(expected, a.omega(0, -2).unwrap());
+            let event = bits(1, usize::from(outcome));
+            assert_eq!(
+                family.evaluate(&state, &event, 4096, &a).unwrap().value,
+                expected,
+                "isolated cancelled axis strategy={strategy:?}, outcome={outcome}"
+            );
+            assert_eq!(
+                state.probability_z(&row, &event, 4096, &a).unwrap().value,
+                expected
+            );
+        }
+    }
+}
