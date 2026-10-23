@@ -2322,7 +2322,14 @@ byte/depth boundaries, loaded/reloaded module snapshots, path independence,
 projected targets, every current resolved option, caller declarations and tiny
 exact proposal scales.
 
-The crate enables serde_json `arbitrary_precision` for loaded number lexemes,
-while retaining `raw_value` and `float_roundtrip` for the existing parsing and
-binary64 result paths. Arbitrary-width integers remain integers in canonical
-JSON; the encoding still does not mathematically normalize number spellings.
+The Value entry fingerprints numbers as supplied in serde_json's Display form.
+For numeric text that must retain its exact spelling, use
+canonical_raw_fingerprint with a checked serde_json RawValue. It sorts object
+keys, keeps the last duplicate key, normalizes string escapes and retains number
+tokens verbatim, including arbitrary-width integers and large exponents.
+Numbers are not converted to binary64. This entry uses the same json domain and
+encoding; converting a Value with serde_json to_raw_value gives the same digest.
+Already-parsed Value numbers cannot recover precision lost before the call.
+The crate retains raw_value and float_roundtrip without enabling a global
+arbitrary_precision dependency feature. Byte/depth limits bound encoded output;
+raw JSON decoding, object sorting and caller-owned values still allocate memory.

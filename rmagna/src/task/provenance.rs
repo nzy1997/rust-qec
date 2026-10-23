@@ -6,6 +6,7 @@ use crate::noise::NoiseSampling;
 use crate::numeric::NumericOptions;
 use crate::runtime::{CausalStrategy, ControllerRegistry, HistorySampler};
 use crate::unitary::CompilerStrategy;
+use serde_json::value::RawValue;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, fmt};
@@ -32,12 +33,14 @@ pub enum FingerprintError {
     ByteLimit { limit: usize },
     DepthLimit { limit: usize },
     UnknownController { name: String },
+    InvalidJson { message: String },
 }
 impl fmt::Display for FingerprintError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ByteLimit { limit } => write!(f, "canonical JSON exceeds {limit} bytes"),
             Self::DepthLimit { limit } => write!(f, "canonical JSON exceeds nesting depth {limit}"),
+            Self::InvalidJson { message } => write!(f, "cannot decode raw JSON: {message}"),
             Self::UnknownController { name } => {
                 write!(f, "identity material names unregistered controller {name}")
             }
@@ -52,6 +55,62 @@ struct Encoder {
     options: FingerprintOptions,
 }
 impl Encoder {
+    fn new(domain: &str, options: FingerprintOptions) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(ENCODING.as_bytes());
+        hasher.update([0]);
+        hasher.update(domain.as_bytes());
+        hasher.update([0]);
+        Self {
+            hasher,
+            bytes: 0,
+            options,
+        }
+    }
+    fn finish(self) -> String {
+        format!("{:x}", self.hasher.finalize())
+    }
+    fn raw_value(&mut self, value: &RawValue, depth: usize) -> Result<(), FingerprintError> {
+        if depth > self.options.max_depth {
+            return Err(FingerprintError::DepthLimit {
+                limit: self.options.max_depth,
+            });
+        }
+        let text = value.get().trim();
+        match text.as_bytes().first().copied() {
+            Some(b'{') => {
+                self.write(b"{")?;
+                let values: BTreeMap<String, Box<RawValue>> = read_raw_json(text)?;
+                for (index, (key, value)) in values.iter().enumerate() {
+                    if index != 0 {
+                        self.write(b",")?;
+                    }
+                    self.string(key)?;
+                    self.write(b":")?;
+                    self.raw_value(value, depth.saturating_add(1))?;
+                }
+                self.write(b"}")
+            }
+            Some(b'[') => {
+                self.write(b"[")?;
+                let values: Vec<Box<RawValue>> = read_raw_json(text)?;
+                for (index, value) in values.iter().enumerate() {
+                    if index != 0 {
+                        self.write(b",")?;
+                    }
+                    self.raw_value(value, depth.saturating_add(1))?;
+                }
+                self.write(b"]")
+            }
+            Some(b'"') => self.string(&read_raw_json::<String>(text)?),
+            // RawValue has already checked the JSON grammar. Number tokens
+            // are emitted directly, without binary64 or arbitrary_precision.
+            Some(b'-' | b'0'..=b'9' | b't' | b'f' | b'n') => self.write(text.as_bytes()),
+            _ => Err(FingerprintError::InvalidJson {
+                message: "expected a JSON value".to_owned(),
+            }),
+        }
+    }
     fn write(&mut self, bytes: &[u8]) -> Result<(), FingerprintError> {
         self.bytes = self
             .bytes
@@ -132,23 +191,19 @@ impl Encoder {
         }
     }
 }
+fn read_raw_json<T: serde::de::DeserializeOwned>(text: &str) -> Result<T, FingerprintError> {
+    serde_json::from_str(text).map_err(|error| FingerprintError::InvalidJson {
+        message: error.to_string(),
+    })
+}
 fn fingerprint(
     domain: &str,
     value: &Value,
     options: FingerprintOptions,
 ) -> Result<String, FingerprintError> {
-    let mut hasher = Sha256::new();
-    hasher.update(ENCODING.as_bytes());
-    hasher.update([0]);
-    hasher.update(domain.as_bytes());
-    hasher.update([0]);
-    let mut encoder = Encoder {
-        hasher,
-        bytes: 0,
-        options,
-    };
+    let mut encoder = Encoder::new(domain, options);
     encoder.value(value, 0)?;
-    Ok(format!("{:x}", encoder.hasher.finalize()))
+    Ok(encoder.finish())
 }
 /// SHA-256 of `rmagna-provenance-v1\0json\0` followed by canonical UTF-8 JSON.
 /// Keys sort lexicographically; arrays retain order; numbers use serde_json's
@@ -158,6 +213,19 @@ pub fn canonical_fingerprint(
     options: FingerprintOptions,
 ) -> Result<String, FingerprintError> {
     fingerprint("json", value, options)
+}
+
+/// Encode checked raw JSON in the same json domain while preserving number
+/// token spelling, including arbitrary-width integers and large exponents.
+/// Object keys sort; duplicate keys keep the last value, as in serde_json Value.
+/// Parsed strings use the same UTF-8/escape rules. Limits bound encoded output.
+pub fn canonical_raw_fingerprint(
+    value: &RawValue,
+    options: FingerprintOptions,
+) -> Result<String, FingerprintError> {
+    let mut encoder = Encoder::new("json", options);
+    encoder.raw_value(value, 0)?;
+    Ok(encoder.finish())
 }
 
 pub struct FingerprintInputs<'a> {

@@ -9,7 +9,7 @@ use rmagna::scalar::ScalarArithmetic;
 use rmagna::task::{
     ContentFingerprints, EvaluationOptions, FingerprintError, FingerprintInputs,
     FingerprintOptions, LoadedModules, TaskOptions, TaskRunOptions, canonical_fingerprint,
-    fingerprint_content, parse_task,
+    canonical_raw_fingerprint, fingerprint_content, parse_task,
 };
 use rmagna::unitary::CompilerStrategy;
 use serde_json::{Value, json};
@@ -86,12 +86,21 @@ fn canonical_sha256_matches_independent_python_hashlib_witnesses_and_limits() {
             "9ecc110542dc1ffca055b3436bdf31fee2f7e77f60d169b4eeeadafe2b5fa2f8",
         ),
     ];
-    for (text, hash) in witnesses {
-        let value = serde_json::from_str(text).unwrap();
+    for (index, (text, hash)) in witnesses.into_iter().enumerate() {
+        let raw: Box<serde_json::value::RawValue> = serde_json::from_str(text).unwrap();
         assert_eq!(
-            canonical_fingerprint(&value, FingerprintOptions::default()).unwrap(),
+            canonical_raw_fingerprint(&raw, FingerprintOptions::default()).unwrap(),
             hash
         );
+        // The second witness requires exact number tokens. The Value entry
+        // fingerprints already-parsed numbers in serde_json's Display form.
+        if index != 1 {
+            let value = serde_json::from_str(text).unwrap();
+            assert_eq!(
+                canonical_fingerprint(&value, FingerprintOptions::default()).unwrap(),
+                hash
+            );
+        }
     }
     let first: Value = serde_json::from_str(r#"{"z":{"b":1,"a":2},"a":[{"d":3,"c":4}]}"#).unwrap();
     let second: Value = serde_json::from_str(r#"{"a":[{"c":4,"d":3}],"z":{"a":2,"b":1}}"#).unwrap();
@@ -504,4 +513,111 @@ impl Drop for Files {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+#[test]
+fn raw_json_numbers_preserve_spelling_without_workspace_feature_changes() {
+    // Independent literal canonical bytes and Python hashlib; no numeric cast.
+    let cases = [
+        (
+            r##"123456789012345678901234567890"##,
+            r##"123456789012345678901234567890"##,
+            "ddc435295ffd70726362a3172eabfb4d8f1fba8684a1cd00a884a20e63dba35d",
+        ),
+        (
+            r##"123456789012345678901234567891"##,
+            r##"123456789012345678901234567891"##,
+            "ec854ff481363da8f861108edc076baa1611ab6b90dc3d59262e9545a34149fc",
+        ),
+        (
+            r##"1e400"##,
+            r##"1e400"##,
+            "1abf56ebf542ec6081eafd6c28015f2d784675e9cc0b856b669aacf5499e7cb0",
+        ),
+        (
+            r##"-0"##,
+            r##"-0"##,
+            "f5fa17937f779329a3b97e6b4a6c927021afb023d2aa3e6e4d7cfb88577af271",
+        ),
+        (
+            r##"1.0"##,
+            r##"1.0"##,
+            "12341dcbc8e90d56b7a9f29e7333c7ea552b706094388869159b038366a87e57",
+        ),
+        (
+            r##"1e0"##,
+            r##"1e0"##,
+            "0fedbdfe9dafd77441c270de8fcc532ba51589c45144ccea54b0196745de47b8",
+        ),
+        (
+            r##"{ "b": [1e400, -0], "a": 123456789012345678901234567890 }"##,
+            r##"{"a":123456789012345678901234567890,"b":[1e400,-0]}"##,
+            "361f1ff2a1a24011a02abff103db6941703fc56dada14c110e17b861d5dc56f5",
+        ),
+        (
+            r##"{"$serde_json::private::Number":"1234"}"##,
+            r##"{"$serde_json::private::Number":"1234"}"##,
+            "a399c96a67b5db1f4100f7c680abc36bbb0ddb8c3d3a0046805ab2df45d78775",
+        ),
+    ];
+    for (source, canonical, expected) in cases {
+        let raw: Box<serde_json::value::RawValue> = serde_json::from_str(source).unwrap();
+        let options = FingerprintOptions {
+            max_json_bytes: canonical.len(),
+            max_depth: 2,
+        };
+        assert_eq!(canonical_raw_fingerprint(&raw, options).unwrap(), expected);
+        assert_eq!(
+            canonical_raw_fingerprint(
+                &raw,
+                FingerprintOptions {
+                    max_json_bytes: canonical.len() - 1,
+                    ..options
+                }
+            ),
+            Err(FingerprintError::ByteLimit {
+                limit: canonical.len() - 1
+            })
+        );
+    }
+    let array: Box<serde_json::value::RawValue> = serde_json::from_str("[[]]").unwrap();
+    assert!(
+        canonical_raw_fingerprint(
+            &array,
+            FingerprintOptions {
+                max_json_bytes: 4,
+                max_depth: 1
+            }
+        )
+        .is_ok()
+    );
+    assert_eq!(
+        canonical_raw_fingerprint(
+            &array,
+            FingerprintOptions {
+                max_json_bytes: 4,
+                max_depth: 0
+            }
+        ),
+        Err(FingerprintError::DepthLimit { limit: 0 })
+    );
+    let object: Box<serde_json::value::RawValue> =
+        serde_json::from_str(r#"{"$serde_json::private::Number":"1234"}"#).unwrap();
+    let number: Box<serde_json::value::RawValue> = serde_json::from_str("1234").unwrap();
+    assert_ne!(
+        canonical_raw_fingerprint(&object, Default::default()).unwrap(),
+        canonical_raw_fingerprint(&number, Default::default()).unwrap()
+    );
+    let duplicate: Box<serde_json::value::RawValue> =
+        serde_json::from_str(r#"{"a":0,"a":1}"#).unwrap();
+    assert_eq!(
+        canonical_raw_fingerprint(&duplicate, Default::default()).unwrap(),
+        canonical_fingerprint(&json!({"a":1}), Default::default()).unwrap()
+    );
+    let text = format!("{}0{}", "[".repeat(200), "]".repeat(200));
+    let deep: Box<serde_json::value::RawValue> = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        canonical_raw_fingerprint(&deep, Default::default()),
+        Err(FingerprintError::DepthLimit { limit: 64 })
+    );
 }

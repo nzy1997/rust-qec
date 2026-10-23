@@ -18,7 +18,7 @@ use num_bigint::BigUint;
 pub use parse::parse_task;
 pub use provenance::{
     ContentFingerprints, FingerprintError, FingerprintInputs, FingerprintOptions,
-    canonical_fingerprint, fingerprint_content,
+    canonical_fingerprint, canonical_raw_fingerprint, fingerprint_content,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
