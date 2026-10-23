@@ -403,6 +403,11 @@ pub struct FileRunReport {
     numeric: NumericOptions,
 }
 impl FileRunReport {
+    /// Captured input identities, resolved options, and actual preparation
+    /// metadata, available even when numerical serialization fails.
+    pub fn metadata(&self) -> &Value {
+        &self.metadata
+    }
     pub fn raw_result(&self) -> &TaskRunResult {
         &self.result
     }
