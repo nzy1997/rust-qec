@@ -2056,8 +2056,10 @@ biased non-Clifford decoder histories, correlated alternatives rescued by report
 flips, guard-dependent active/inactive/zero/forced choices, signed moments,
 recovery and projected or entangled partial targets. They also verify exact
 global resource boundaries and omitted-sector extremal/interior responses,
-empty sectors, undefined zero-acceptance rates and arithmetic failures. Run-file
-and result schemas and specialized paper proposals remain separate deliverables.
+empty sectors, undefined zero-acceptance rates and arithmetic failures. Native
+option-file compatibility and specialized paper proposals remain separate.
+Owned Rust sector results and schema-2 exports are described below in the
+file-based exact sector reports section.
 
 ## Correctly rounded numeric exports
 
@@ -2781,3 +2783,75 @@ samplers, physical/importance noise, guarded categories, record retention,
 concurrent reuse, snapshot/path identities, exact input byte limits, malformed
 UTF-8/modules, missing bindings, partial decoder failure, zero-duration
 preparation and retained typed results after numerical export failure.
+
+## File-based exact sector reports
+
+`FileTask::enumerate` and `CompiledFileTask::enumerate` integrate physical noise
+sectors and every positive causal history. `FileEnumerationOptions` contains the
+noise/history traversal budgets and an `ExecutionLimits` query quota and
+cooperative deadline. Fresh calls share these limits with target normalization
+and reference compilation; compiled calls count only their new traversal work.
+Neither entrypoint draws entropy. Importance proposals, including unit-scale
+proposals, and nonempty `sample_records` are rejected before preparation or
+callbacks. Controller bindings retain their deterministic/stateless contract.
+
+```rust
+use std::collections::BTreeMap;
+use rmagna::file_api::{FileEnumerationOptions, FileLoadOptions, FileTask, FileTaskOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+
+# let root = std::env::temp_dir().join(format!("rmagna-enumeration-doc-{}",std::process::id()));
+# std::fs::create_dir_all(&root)?;
+# std::fs::write(root.join("physical.magna"), "X_ERROR(1/3) 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]")?;
+# std::fs::write(root.join("task.json"), r#"{"error_observables":[0]}"#)?;
+# let physical = root.join("physical.magna");
+# let task_json = root.join("task.json");
+let task = FileTask::load(
+    &physical, Some(&task_json), &ControllerRegistry::default(),
+    NoiseSampling::Physical, FileTaskOptions::default(), &FileLoadOptions::default(),
+    BTreeMap::new(),
+)?;
+let report = task.enumerate(&FileEnumerationOptions::default())?;
+assert_eq!(report.raw_result()?.covered_probability.to_string(), "1");
+assert_eq!(report.to_json()?["result"]["masses"]["error"]["value"], 1.0/3.0);
+# std::fs::remove_dir_all(root)?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`FileEnumerationReport` owns `Result<TaskEnumeration, TaskError>`, captured
+metadata and actual execution costs. A failed traversal returns no partial sector
+estimate. Preparation and traversal failures have separate phases and preserve
+operation counts in a failed schema-2 envelope with `result: null`. A metadata
+snapshot failure marks the report failed while retaining an already completed
+exact result, available through `raw_result` or `into_raw_result`.
+
+Successful JSON reports contain exact rational covered/omitted noise probability,
+per-weight sectors, unconditional covered response masses and full-distribution
+acceptance/error/conditional-error intervals. Covered masses are never divided
+by covered probability or acceptance. Each real response/interval endpoint has
+`value`, `scientific` and exact rational cyclotomic `coefficients` in the stated
+four-element omega basis. Underflow and overflow use null ordinary values with
+scientific representations and explicit paths in `numerics`. Undefined error
+definitions and zero-denominator conditional ratios are null. Numeric export
+failures leave the complete typed result and costs owned by the report.
+
+Enumeration fingerprints bind all traversal limits and exact duration fields.
+They use the same content-domain encoding as sampling fingerprints, but replace
+the run and sampling configurations with exact-enumeration settings; no seed,
+draw count, Monte Carlo variance or ESS is invented. File/module snapshots and
+controller identities are shared with ordinary file runs. Timings exclude input
+loading, fingerprinting and numerical export, and include preparation only for
+fresh calls. The standalone CLI enumeration command remains a follow-up.
+
+Tests cover analytic categorical and nonlinear Boolean sums, rigorous omitted
+mass bounds, projected targets and recovery after deleting captured files,
+both causal execution strategies, configuration-sensitive identities,
+preparation/shared-query/deadline and decoder failures, undefined errors and
+zero acceptance, irrational moments and positive error of size `2^-1200`.
+
+Exact sector reports retain `target_normalization` as compact coefficients of
+`1, omega, omega^2, omega^3` and a dyadic `2**power` exponent. Projected targets
+retain their captured norm after source deletion or numerical export failure.
+Accepted, error and target-success masses are already normalized; consumers must
+not divide by this norm again. The field is null when no target is configured.

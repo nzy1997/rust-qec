@@ -1,4 +1,5 @@
 //! Owned file-task snapshots, reusable compilation, and schema-2 run reports.
+mod enumeration;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};
 use crate::costs::{ExecutionCosts, ExecutionLimits, ExecutionMeter, OperationCost};
 use crate::noise::NoiseSampling;
@@ -10,6 +11,7 @@ use crate::task::{
     TaskRunResult, export_batch_metrics, fingerprint_content, parse_task, resolved_options,
     run_task_batch_inspected, sampling_configuration, validate_snapshot_fingerprints,
 };
+pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fmt, io::Read, path::Path, sync::Arc, time::Instant};
 
@@ -194,6 +196,9 @@ impl FileTask {
     }
     fn descriptor(&self, run: &TaskRunOptions) -> Result<Value, FileApiError> {
         let fingerprints = self.fingerprints(run)?;
+        Ok(self.descriptor_value(resolved_options(&self.fingerprint_input(run)), fingerprints))
+    }
+    fn descriptor_value(&self, options: Value, fingerprints: ContentFingerprints) -> Value {
         let i = &self.inputs;
         let t = i.modules.task();
         let target=i.modules.ideal_state().map(|p|json!({"qubits":p.circuit().num_qubits(),"outputs":p.outputs(),"postselection":p.postselection()}));
@@ -202,11 +207,11 @@ impl FileTask {
             crate::runtime::HistorySampler::ExactMarginal => "exact_marginal",
             crate::runtime::HistorySampler::AffineSupport => "affine_support",
         };
-        Ok(json!({
+        json!({
             "schema_version":2,"software_version":concat!("rmagna-",env!("CARGO_PKG_VERSION")),
             "software":{"name":"rmagna","version":env!("CARGO_PKG_VERSION"),"implementation":"independent_rust"},
             "circuit":circuit_summary(&i.physical),
-            "options":resolved_options(&self.fingerprint_input(run)),
+            "options":options,
             "fingerprints":fingerprints.to_json(),
             "provenance_limits":{"max_json_bytes":i.options.fingerprints.max_json_bytes,"max_depth":i.options.fingerprints.max_depth},
             "method":match i.sampling {NoiseSampling::Physical=>"global_boundary_with_independent_original_noise",NoiseSampling::Importance{..}=>"global_boundary_with_noise_importance_sampling"},
@@ -215,7 +220,7 @@ impl FileTask {
             "evaluation":{"ideal_state":target,"recovery":recovery,"output_mapping":t.outputs(),"error_observables":t.error_observables(),"sample_records":t.sample_records(),"moment_count":t.observables().len(),
                 "error_metric":if t.error_observables().is_some(){"wrong when any listed OBSERVABLE_INCLUDE parity is one"}else if target.is_some(){"target infidelity after terminal recovery"}else{"declared output task"},
                 "observables":if recovery.is_some(){"after recovery, before target projection"}else{"physical output"}}
-        }))
+        })
     }
     /// Validate and describe captured content for a proposed run without quantum
     /// queries, callbacks, entropy, or construction of execution plans.
