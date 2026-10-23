@@ -3,6 +3,7 @@ mod compose;
 mod export;
 pub use export::{BatchExportError, export_batch_metrics};
 mod evaluate;
+pub(crate) use evaluate::run_task_batch_inspected;
 pub use evaluate::{
     ContractionResources, EvaluationOptions, ExactInterval, RunFailure, RunPhase, RunStatus,
     RunTimings, TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator,
@@ -20,6 +21,7 @@ pub use provenance::{
     ContentFingerprints, FingerprintError, FingerprintInputs, FingerprintOptions,
     canonical_fingerprint, canonical_raw_fingerprint, fingerprint_content,
 };
+pub(crate) use provenance::{resolved_options, sampling_configuration};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,

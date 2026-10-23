@@ -273,29 +273,7 @@ fn preparation(mode: QueryPreparation) -> Value {
         }),
     }
 }
-/// Fingerprint loaded snapshots without opening paths or invoking controllers.
-/// All seven categories must fit; errors return no partial fingerprint set.
-pub fn fingerprint_content(
-    input: &FingerprintInputs<'_>,
-    limits: FingerprintOptions,
-) -> Result<ContentFingerprints, FingerprintError> {
-    let versions = input.controllers.versions();
-    for name in input.controller_identities.keys() {
-        if !versions.contains_key(name) {
-            return Err(FingerprintError::UnknownController { name: name.clone() });
-        }
-    }
-    let task = input.modules.task();
-    let words = task
-        .observables()
-        .iter()
-        .map(|word| {
-            json!({
-                "width": word.width(), "phase": word.phase(),
-                "x": word.x().ones().collect::<Vec<_>>(), "z": word.z().ones().collect::<Vec<_>>(),
-            })
-        })
-        .collect::<Vec<_>>();
+pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
     let runtime = input.evaluation.runtime;
     let compile = runtime.compile;
     let options = json!({
@@ -328,14 +306,45 @@ pub fn fingerprint_content(
         },
         "numeric_work_bits": input.numeric.max_work_bits,
     });
-    let sampling = match input.sampling {
+    options
+}
+
+pub(crate) fn sampling_configuration(policy: &NoiseSampling) -> Value {
+    match policy {
         NoiseSampling::Physical => json!({"mode": "physical"}),
         NoiseSampling::Importance { proposal_scale } => json!({
             "mode": "importance", "proposal_scale": {
                 "numerator": proposal_scale.numer().to_string(), "denominator": proposal_scale.denom().to_string(),
             },
         }),
-    };
+    }
+}
+
+/// Fingerprint loaded snapshots without opening paths or invoking controllers.
+/// All seven categories must fit; errors return no partial fingerprint set.
+pub fn fingerprint_content(
+    input: &FingerprintInputs<'_>,
+    limits: FingerprintOptions,
+) -> Result<ContentFingerprints, FingerprintError> {
+    let versions = input.controllers.versions();
+    for name in input.controller_identities.keys() {
+        if !versions.contains_key(name) {
+            return Err(FingerprintError::UnknownController { name: name.clone() });
+        }
+    }
+    let task = input.modules.task();
+    let words = task
+        .observables()
+        .iter()
+        .map(|word| {
+            json!({
+                "width": word.width(), "phase": word.phase(),
+                "x": word.x().ones().collect::<Vec<_>>(), "z": word.z().ones().collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    let options = resolved_options(input);
+    let sampling = sampling_configuration(input.sampling);
     Ok(ContentFingerprints {
         circuit: fingerprint("circuit", &circuit(input.physical), limits)?,
         task: fingerprint("task", &json!({"outputs": task.outputs(), "error_observables": task.error_observables(), "sample_records": task.sample_records(), "observables": words}), limits)?,

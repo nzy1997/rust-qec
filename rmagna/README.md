@@ -2626,3 +2626,88 @@ conjugated legs, shifted offsets, dependent columns, cancelled axes and scalar
 vacua. Mixed T/CS/CCZ inverse pairs with faults between the pairs are compared
 against dense amplitudes, probability sums and reduced-density matrices. Existing
 native masses and history fixtures also exercise the fixed query route.
+
+## Owned file tasks and versioned reports
+
+`file_api::FileTask` owns a parsed circuit, loaded task/target/recovery snapshots,
+a captured controller registry, declared controller identities and execution
+configuration. `FileTask::load` bounds circuit and task reads with
+`FileLoadOptions`, resolves relative module paths once and validates UTF-8.
+`from_loaded` accepts existing parsed snapshots. Later source-file changes,
+deleted module files and additions to the caller's registry do not alter the
+captured task. Cloning a `FileTask` shares that immutable snapshot.
+
+```rust
+use std::{collections::BTreeMap, path::Path};
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::file_api::{FileTask, FileTaskOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{TaskOptions, TaskRunOptions, parse_task};
+
+let parse = ParseOptions::default();
+let circuit = parse_circuit("H 0", &parse)?;
+let modules = parse_task(r#"{"observables":[[1,0]]}"#, Path::new("."),
+    &TaskOptions::default())?.load_modules(&circuit, &parse)?;
+let task = FileTask::from_loaded(circuit, modules, &ControllerRegistry::default(),
+    NoiseSampling::Physical, FileTaskOptions::default(), BTreeMap::new())?;
+let run = TaskRunOptions { shots: 8, seed: 19, ..Default::default() };
+assert_eq!(task.inspect(&run)?["route"], "not_compiled");
+let compiled = task.compile()?;
+let report = compiled.run(&run)?;
+let json = report.to_json()?;
+assert_eq!(json["schema_version"], 2);
+assert_eq!(json["software"]["name"], "rmagna");
+assert_eq!(json["estimates"]["moments"], serde_json::json!([1.0]));
+assert_eq!(report.raw_result().completed, 8);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`FileTask::inspect(&run)` validates the proposed run and fingerprints without
+quantum queries, controller callbacks or entropy. `compile()` constructs a
+`CompiledFileTask`; `compile_with_limits` additionally bounds that preparation.
+`CompiledFileTask::inspect(&run)` describes its actual route and retained caches
+without drawing. Controller callbacks retain the existing deterministic/stateless
+contract. Optional identity JSON is a caller declaration, not a code attestation;
+unknown binding names and fingerprint byte/depth limits fail explicitly.
+
+`FileTask::run` owns fresh preparation and shares the run's deadline/query quota
+with it. Ordinary preparation failures return failed reports with zero attempted
+draws. `CompiledFileTask::run` reuses preparation while creating a fresh RNG,
+accumulators, deadline and operation collector for each call. Concurrent calls
+share caches and preserve separate run state. Invalid run configuration and
+fingerprint failures reject before drawing or invoking callbacks.
+
+`FileRunReport::to_json` builds a schema-2 envelope around the existing exact
+batch metrics. It records the independent `rmagna` software identity, execution
+route, sampling/evaluation meanings, actual configuration and limits, all seven
+content fingerprints, compilation diagnostics, cache counts and actual per-call
+operation costs. It retains scientific-number twins, conditional ratio and paired
+uncertainty semantics, requested records and failure/partial-statistic placement.
+No complete-run estimates are emitted for a failed batch. A numerical export
+error leaves the typed batch available through `raw_result()` or
+`into_raw_result()`; a metadata snapshot error similarly owns the completed batch
+in `FileApiError::Snapshot`.
+
+Compilation metadata is also mirrored under `resources.compilation` in a run
+report. `preparation_included_in_this_call` distinguishes fresh preparation from
+a previously compiled task. Captured preparation costs remain separate from
+`resources.queries`/`compilations` and `execution_costs`, which count actual work
+of this call, including failed attempts. Run `timings` measure the engine call,
+excluding file loading, fingerprinting and JSON export. Preparation is included
+only when owned. Query/decoder/support/compiler component times are inclusive and
+must not be added together; the report marks this explicitly.
+
+The current `query_preparation: on_demand` declaration is intentional. Cold query
+modes execute directly; trace/fixed modes create families as requested. Cache
+metadata describes only retained families, with null reference-cache receipts
+for the cold-prefix causal strategy. It does not claim exhaustive preparation of
+all task query families. Full eager preparation, a command-line interface, Python
+bindings and the upstream compatibility ledger remain separate deliverables.
+
+Tests compare whole reports with exact batches and analytic projected-target,
+recovery and signed-moment values. They cover both causal strategies/history
+samplers, physical/importance noise, guarded categories, record retention,
+concurrent reuse, snapshot/path identities, exact input byte limits, malformed
+UTF-8/modules, missing bindings, partial decoder failure, zero-duration
+preparation and retained typed results after numerical export failure.

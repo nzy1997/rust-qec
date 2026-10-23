@@ -16,6 +16,7 @@ mod run;
 pub use enumeration::{
     ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses, TaskWeightSector,
 };
+pub(crate) use run::run_task_batch_inspected;
 pub use run::{
     RunFailure, RunPhase, RunStatus, RunTimings, TaskRunOptions, TaskRunResult, TaskRunStatistics,
     TaskVariances, run_task_batch,
@@ -93,6 +94,16 @@ fn error(field: &str, e: impl fmt::Display) -> TaskError {
     TaskError::new(field, e.to_string())
 }
 impl TaskEvaluator {
+    /// Actual execution route selected by task composition and runtime options.
+    pub fn execution_route(&self) -> &'static str {
+        match &self.execution {
+            Execution::Linear { .. } => "linear_affine",
+            Execution::Causal(_) => match self.options.runtime.strategy {
+                crate::runtime::CausalStrategy::FixedTemplate => "causal_fixed_template",
+                crate::runtime::CausalStrategy::ColdPrefix => "causal_cold_prefix",
+            },
+        }
+    }
     pub fn new(
         physical: &Circuit,
         modules: &LoadedModules,
