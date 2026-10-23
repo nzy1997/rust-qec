@@ -19,6 +19,7 @@ that an arbitrary circuit containing that gate will fit in memory.
 | --- | --- | --- |
 | `NearCliffordExecutor` | Interpreted/adaptive execution, one-shot `run`, reusable sampling | Structured shots or flat measurement bytes |
 | `CompiledNearCliffordExecutor` | An offline Clifford-frame plan reused across batches; compiled-only gate support and native counts | Structured shots, flat measurement bytes, or postselected counts |
+| `CompiledNearCliffordEagerSampler` | Explicitly opt in to early raw-detector rejection, with a different error/cache contract | Postselected counts; full records through the original executor |
 | `ActiveState` | Low-level state/frame inspection and controlled experiments | Explicit state operations; not a circuit-sampling replacement |
 
 Compile once, then retain the mutable sampler for repeated calls. Compilation,
@@ -234,6 +235,68 @@ The first nonempty counts call may lazily construct an affine detector/observabl
 model for a rotation-free plan within its remaining plan budget. A declined model
 keeps the existing sampling path; structured/flat calls do not use that counts
 model. Include this first-call work when measuring lifecycle costs.
+
+### Opt in to eager postselection
+
+`plan.prepare_eager_postselected_sampler()` creates a separate sampler that can
+use detector conditions determined by recorded random events to reject lanes
+before executing their earlier quantum work. It uses the plan's Strict or Fused
+arithmetic and the same raw all-zero-detector/observable-XOR count definition.
+The existing `prepare_sampler()` remains the default.
+
+```rust
+use rand::{RngCore, SeedableRng, rngs::StdRng};
+use rstim::near_clifford::{CompiledNearCliffordExecutor, CompiledRotationArithmetic};
+
+fn main() -> Result<(), String> {
+    let text = "R 0 1\nH 0\nT 0\nMX 0\nX_ERROR(0.1) 1\nM 1\n\
+                DETECTOR rec[-1]\nOBSERVABLE_INCLUDE(7) rec[-2]\n";
+    for arithmetic in [
+        CompiledRotationArithmetic::Strict,
+        CompiledRotationArithmetic::Fused,
+    ] {
+        let plan = CompiledNearCliffordExecutor::compile_text_with_arithmetic(text, arithmetic)?;
+        let mut ordinary = plan.prepare_sampler()?;
+        let mut eager = plan.prepare_eager_postselected_sampler()?;
+        let mut ordinary_rng = StdRng::seed_from_u64(1739);
+        let mut eager_rng = ordinary_rng.clone();
+
+        let expected = ordinary.sample_postselected_counts(1024, 7, &mut ordinary_rng)?;
+        let actual = eager.sample_postselected_counts(1024, 7, &mut eager_rng)?;
+        assert_eq!(actual, expected);
+        let ordinary_next: [u64; 16] = std::array::from_fn(|_| ordinary_rng.next_u64());
+        let eager_next: [u64; 16] = std::array::from_fn(|_| eager_rng.next_u64());
+        assert_eq!(eager_next, ordinary_next);
+        println!("{arithmetic:?}: {actual:?}");
+    }
+    Ok(())
+}
+```
+
+Successful eager counts calls preserve the corresponding counts and complete
+typed caller random stream, including random events for rejected lanes. The
+example checks a finite continuation on this input; it is not an equivalence
+proof for every circuit. Start comparisons with fresh equivalent sampler states
+and cloned RNGs, as above.
+
+**The error and cache contract is different.** Eager rejection can omit earlier
+quantum allocation or numerical errors and coefficient-cache publication on
+rejected lanes. Failed-call RNG prefixes and identical cache contents are not
+promised. If an application relies on those error paths or cache population,
+retain `prepare_sampler()`.
+
+The first suitable counts call lazily constructs a bounded detector predicate;
+include that work in first-call cost when benchmarking. Small batches and models
+whose predicate is unavailable use the original sampling path. Performance
+depends on circuit and batch size, so measure the intended workload before
+enabling eager sampling. The eager sampler's `sample_measurements_u8` and
+`sample_measurements_u8_with_sweep` methods always use the original full-record
+path. Counts calls also have `sample_postselected_counts_with_sweep`.
+
+`prepare_eager_postselected_sampler_with_cache_budget(bytes)` selects the same
+0..=64 MiB coefficient-cache budget. The predicate has separate bounded
+reservations; this budget is not a process-memory ceiling. Report compilation,
+sampler preparation, first and later counts calls separately.
 
 ## Sweeps and classical feedback
 

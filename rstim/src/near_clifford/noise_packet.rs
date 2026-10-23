@@ -7,6 +7,12 @@ pub(super) struct NoisePacket {
 }
 
 impl NoisePacket {
+    pub(super) fn reserved_bytes(&self) -> Option<usize> {
+        self.planes
+            .capacity()
+            .checked_mul(size_of::<[u64; 4]>())?
+            .checked_add(size_of::<Self>())
+    }
     #[cfg(test)]
     pub(super) fn lazy_error_reserved_bytes(&self) -> usize {
         self.planes

@@ -19,7 +19,8 @@ use std::sync::{Arc, OnceLock};
 
 mod compiled;
 pub use compiled::{
-    CompiledNearCliffordExecutor, CompiledNearCliffordSampler, CompiledRotationArithmetic,
+    CompiledNearCliffordEagerSampler, CompiledNearCliffordExecutor, CompiledNearCliffordSampler,
+    CompiledRotationArithmetic,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
