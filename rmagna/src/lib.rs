@@ -5,6 +5,7 @@ pub mod clifford;
 pub mod costs;
 pub mod enumeration;
 pub mod field;
+pub mod file_api;
 pub mod gf2;
 pub mod instrument;
 pub mod noise;

@@ -26,7 +26,7 @@ impl Default for TaskRunOptions {
     }
 }
 impl TaskRunOptions {
-    fn validate(&self, records: usize, moments: usize) -> Result<usize, TaskError> {
+    pub(crate) fn validate(&self, records: usize, moments: usize) -> Result<usize, TaskError> {
         if self.shots == 0 {
             return Err(TaskError::new("run.shots", "shot count must be positive"));
         }
@@ -335,6 +335,27 @@ pub fn run_task_batch(
     sampling: &NoiseSampling,
     run: &TaskRunOptions,
 ) -> Result<TaskRunResult, TaskError> {
+    run_task_batch_inspected(
+        physical,
+        modules,
+        registry,
+        evaluation,
+        sampling,
+        run,
+        |_, _, _| (),
+    )
+    .map(|(result, _)| result)
+}
+
+pub(crate) fn run_task_batch_inspected<R>(
+    physical: &Circuit,
+    modules: &LoadedModules,
+    registry: &ControllerRegistry,
+    evaluation: EvaluationOptions,
+    sampling: &NoiseSampling,
+    run: &TaskRunOptions,
+    inspect: impl FnOnce(&TaskEvaluator, ExecutionCosts, f64) -> R,
+) -> Result<(TaskRunResult, Option<R>), TaskError> {
     let started = Instant::now();
     run.validate(
         modules.task.sample_records.len(),
@@ -347,37 +368,42 @@ pub fn run_task_batch(
     let preparation_seconds = preparation.elapsed().as_secs_f64();
     match prepared {
         Ok(evaluator) => {
+            let preparation_costs = meter.snapshot();
             let mut result = evaluator.run_batch_observed(run, &meter)?;
             result.timings.preparation_seconds = Some(preparation_seconds);
             result.timings.total_seconds = started.elapsed().as_secs_f64();
-            Ok(result)
+            let metadata = inspect(&evaluator, preparation_costs, preparation_seconds);
+            Ok((result, Some(metadata)))
         }
-        Err(e) => Ok(TaskRunResult {
-            execution_limits: meter.limits(),
-            execution_costs: meter.snapshot(),
-            status: RunStatus::Failed,
-            requested: run.shots,
-            completed: 0,
-            failed: 0,
-            not_attempted: run.shots,
-            seed: run.seed,
-            statistics: None,
-            partial_statistics: None,
-            efficiency: None,
-            sampled_records: (!modules.task.sample_records.is_empty()).then(Vec::new),
-            failures: vec![RunFailure {
-                phase: RunPhase::Preparation,
-                shot: None,
-                kind: "TaskError",
-                message: e.to_string(),
-            }],
-            timings: RunTimings {
-                preparation_seconds: Some(preparation_seconds),
-                sampling_seconds: 0.0,
-                total_seconds: started.elapsed().as_secs_f64(),
+        Err(e) => Ok((
+            TaskRunResult {
+                execution_limits: meter.limits(),
+                execution_costs: meter.snapshot(),
+                status: RunStatus::Failed,
+                requested: run.shots,
+                completed: 0,
+                failed: 0,
+                not_attempted: run.shots,
+                seed: run.seed,
+                statistics: None,
+                partial_statistics: None,
+                efficiency: None,
+                sampled_records: (!modules.task.sample_records.is_empty()).then(Vec::new),
+                failures: vec![RunFailure {
+                    phase: RunPhase::Preparation,
+                    shot: None,
+                    kind: "TaskError",
+                    message: e.to_string(),
+                }],
+                timings: RunTimings {
+                    preparation_seconds: Some(preparation_seconds),
+                    sampling_seconds: 0.0,
+                    total_seconds: started.elapsed().as_secs_f64(),
+                },
+                completed_network_compilations: 0,
+                completed_history_groups: 0,
             },
-            completed_network_compilations: 0,
-            completed_history_groups: 0,
-        }),
+            None,
+        )),
     }
 }
