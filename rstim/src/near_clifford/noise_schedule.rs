@@ -1653,3 +1653,7 @@ mod tests {
         }
     }
 }
+
+#[path = "active_free_predicate.rs"]
+mod active_free_predicate;
+pub(super) use active_free_predicate::ActiveFreePredicate;
