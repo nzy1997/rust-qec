@@ -14,6 +14,7 @@ remains a separate deliverable.
 cargo run --release -p rmagna -- validate circuit.magna --task task.json --json
 cargo run --release -p rmagna -- inspect circuit.magna --task task.json --json
 cargo run --release -p rmagna -- run circuit.magna --task task.json --shots 1024 --seed 7 --json --output run.json
+cargo run --release -p rmagna -- enumerate circuit.magna --task task.json --max-weight 1 --json --output sector.json
 cargo run -p rmagna -- --help
 ```
 
@@ -24,10 +25,34 @@ draws noise, samples histories, nor calls decoders. `run` prepares the evaluator
 and performs actual noisy draws, with preparation included in its run limits.
 Task module paths resolve relative to the task JSON directory.
 
+`enumerate` integrates physical noise categories through `--max-weight` and all
+positive causal histories. The cutoff accepts a nonnegative decimal integer,
+including values larger than machine integers; such ceilings select the same
+finite full sector, while every storage and work quota still applies. It reports
+unconditional covered acceptance/error
+masses, exact covered and omitted probability, and rigorous full-distribution
+intervals, including a conditional-error interval. It does not renormalize the
+covered sector or invent Monte Carlo uncertainty. Human summaries distinguish
+these masses and bounds, display scientific values when ordinary floats
+underflow, and use `n/a` for undefined quantities.
+
+Enumeration-only limits are `--max-patterns` (positive), `--max-fault-entries`,
+`--max-enumeration-sites`, `--max-site-weight-pairs`,
+`--max-enumeration-probability-bits`, `--max-history-branches`,
+`--max-history-record-bits`, `--max-marginal-queries` and `--max-replay-attempts`.
+Defaults are listed by `--help`; every resolved limit participates in the report's
+options fingerprint. The enumeration site cap bounds potential physical
+categories separately from the compiler's `--max-noise-sites`. The marginal-query
+cap counts history traversal only; `--max-queries` includes preparation and final
+responses too. `--max-seconds` shares one cooperative deadline with preparation.
+Enumeration rejects `--shots`, `--seed`, `--noise-proposal-scale`,
+`--history-sampler` and `--max-record-values` before importing decoders. Task
+`sample_records` requests are rejected before compilation or decoder calls.
+
 The CLI defaults to the shared commuting-layer compiler, affine-support history
 sampling, fixed causal templates, fixed probability/density preparation on
 demand, and direct Pauli insertions. Library defaults remain as documented below.
-Use `--history-sampler exact_marginal`, `--compiler parity_copies`,
+For sampling, use `--history-sampler exact_marginal`. Use `--compiler parity_copies`,
 `--probability-preparation cold|trace|fixed`, `--density-preparation cold|trace|fixed`
 and `--causal-strategy fixed|cold` to select alternatives. Prepared insertion
 catalogs require `--insertion-preparation prepared`; their entry/byte limits are
@@ -56,9 +81,13 @@ null. The CLI does not persist its in-memory exact statistics on that failure;
 use `FileRunReport::raw_result` through the Rust API when exact recovery is needed.
 Input/preparation errors before a report exists produce a minimal failure receipt.
 Run limits are checked between operations and do not preempt a running contraction.
+Failed exact enumeration emits `result: null` with the failure phase and actual
+costs. If only numeric export fails, the CLI retains actual traversal counts and
+metadata, marks the engine status separately, and does not persist the in-memory
+exact responses. Use `FileEnumerationReport::raw_result` for their typed recovery.
 
 This entry point does not yet implement native option-file compatibility,
-enumeration, sampler comparison, progress reporting, or paper campaign orchestration.
+sampler comparison, progress reporting, or paper campaign orchestration.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -2842,7 +2871,7 @@ the run and sampling configurations with exact-enumeration settings; no seed,
 draw count, Monte Carlo variance or ESS is invented. File/module snapshots and
 controller identities are shared with ordinary file runs. Timings exclude input
 loading, fingerprinting and numerical export, and include preparation only for
-fresh calls. The standalone CLI enumeration command remains a follow-up.
+fresh calls. The standalone `enumerate` command uses this API and report schema.
 
 Tests cover analytic categorical and nonlinear Boolean sums, rigorous omitted
 mass bounds, projected targets and recovery after deleting captured files,
