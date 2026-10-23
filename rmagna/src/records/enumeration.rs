@@ -117,8 +117,21 @@ pub fn enumerate_reported_conditioned(
     options: &RecordEnumerationOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<ReportedEnumeration, SamplingError> {
+    enumerate_reported_conditioned_observed(instrument, query, faults, options, arithmetic, None)
+}
+
+pub(crate) fn enumerate_reported_conditioned_observed(
+    instrument: &CompiledInstrument,
+    query: &RecordQuery<'_>,
+    faults: &[FaultSelection],
+    options: &RecordEnumerationOptions,
+    arithmetic: &ScalarArithmetic,
+    meter: Option<&ExecutionMeter>,
+) -> Result<ReportedEnumeration, SamplingError> {
     limit("max_branches", options.max_branches, 1)?;
-    let family = conditioned_support(instrument, query, faults, arithmetic)?;
+    let family = observe(meter, OperationKind::Support, || {
+        conditioned_support(instrument, query, faults, arithmetic)
+    })?;
     let rank = family.dimension();
     limit("max_record_bits", options.max_record_bits, rank as u128)?;
     let coordinates = Coordinates::new(family)?;
@@ -150,15 +163,17 @@ pub fn enumerate_reported_conditioned(
                 .filter_map(|(j, &b)| b.then_some(j)),
         )
         .map_err(InstrumentError::from)?;
-        Ok(instrument
-            .reported_probability(
-                &parities[..values.len()],
-                &bits,
-                faults,
-                options.max_terms,
-                arithmetic,
-            )?
-            .value)
+        observe(meter, OperationKind::Query, || {
+            Ok(instrument
+                .reported_probability(
+                    &parities[..values.len()],
+                    &bits,
+                    faults,
+                    options.max_terms,
+                    arithmetic,
+                )?
+                .value)
+        })
     };
     let condition_mass = mass(&given)?;
     if condition_mass.real_sign()? != Ordering::Greater {
@@ -170,6 +185,9 @@ pub fn enumerate_reported_conditioned(
     }];
     let mut branches = Vec::new();
     while let Some(node) = stack.pop() {
+        if let Some(meter) = meter {
+            meter.check_time()?;
+        }
         if node.values.len() == rank {
             let values = coordinates.decode(&node.values)?;
             branches.push(ReportedBranch {

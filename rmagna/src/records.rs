@@ -8,6 +8,7 @@ use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use num_bigint::BigInt;
 use std::{cmp::Ordering, fmt};
 mod enumeration;
+pub(crate) use enumeration::enumerate_reported_conditioned_observed;
 pub use enumeration::{
     RecordEnumerationOptions, ReportedBranch, ReportedEnumeration, enumerate_reported_conditioned,
 };
