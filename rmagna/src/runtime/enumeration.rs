@@ -1,6 +1,6 @@
 //! Exact forward-causal replay of positive physical observation groups.
 use super::*;
-use crate::records::{RecordEnumerationOptions, enumerate_reported_conditioned};
+use crate::records::{RecordEnumerationOptions, enumerate_reported_conditioned_observed};
 use std::cell::{Cell, RefCell};
 
 #[derive(Clone, Copy, Debug)]
@@ -132,6 +132,7 @@ impl<'a> HistoryMode<'a> {
         faults: &[FaultSelection],
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
+        meter: Option<&ExecutionMeter>,
     ) -> Result<Option<Vec<Vec<bool>>>, RuntimeError> {
         let Self::Enumerated {
             budget,
@@ -147,39 +148,39 @@ impl<'a> HistoryMode<'a> {
             max_marginal_queries: budget.options.max_marginal_queries - budget.queries.get(),
             max_terms,
         };
-        let result =
-            enumerate_reported_conditioned(instrument, query, faults, &options, arithmetic)
-                .map_err(|error| match error {
-                    SamplingError::EnumerationLimit {
-                        option: "max_marginal_queries",
-                        required,
-                        ..
-                    } => RuntimeError::EnumerationLimit {
-                        option: "max_marginal_queries",
-                        limit: budget.options.max_marginal_queries,
-                        required: budget.queries.get() as u128 + required,
-                    },
-                    SamplingError::EnumerationLimit {
-                        option: "max_branches",
-                        required,
-                        ..
-                    } => RuntimeError::EnumerationLimit {
-                        option: "max_branches",
-                        limit: budget.options.max_branches,
-                        required: (budget.options.max_branches - available_branches) as u128
-                            + required,
-                    },
-                    SamplingError::EnumerationLimit {
-                        option: "max_record_bits",
-                        required,
-                        ..
-                    } => RuntimeError::EnumerationLimit {
-                        option: "max_record_bits",
-                        limit: budget.options.max_record_bits,
-                        required,
-                    },
-                    error => RuntimeError::Sampling(error),
-                })?;
+        let result = enumerate_reported_conditioned_observed(
+            instrument, query, faults, &options, arithmetic, meter,
+        )
+        .map_err(|error| match error {
+            SamplingError::EnumerationLimit {
+                option: "max_marginal_queries",
+                required,
+                ..
+            } => RuntimeError::EnumerationLimit {
+                option: "max_marginal_queries",
+                limit: budget.options.max_marginal_queries,
+                required: budget.queries.get() as u128 + required,
+            },
+            SamplingError::EnumerationLimit {
+                option: "max_branches",
+                required,
+                ..
+            } => RuntimeError::EnumerationLimit {
+                option: "max_branches",
+                limit: budget.options.max_branches,
+                required: (budget.options.max_branches - available_branches) as u128 + required,
+            },
+            SamplingError::EnumerationLimit {
+                option: "max_record_bits",
+                required,
+                ..
+            } => RuntimeError::EnumerationLimit {
+                option: "max_record_bits",
+                limit: budget.options.max_record_bits,
+                required,
+            },
+            error => RuntimeError::Sampling(error),
+        })?;
         budget
             .queries
             .set(budget.queries.get() + result.marginal_queries);
@@ -237,6 +238,19 @@ impl CausalProgram {
         options: HistoryEnumerationOptions,
         arithmetic: &ScalarArithmetic,
     ) -> Result<EnumeratedHistories, RuntimeError> {
+        self.enumerate_prescribed_histories_observed(requested, faults, options, arithmetic, None)
+    }
+    pub(crate) fn enumerate_prescribed_histories_observed(
+        &self,
+        requested: &[BitExpr],
+        faults: &[FaultSelection],
+        options: HistoryEnumerationOptions,
+        arithmetic: &ScalarArithmetic,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<EnumeratedHistories, RuntimeError> {
+        if let Some(meter) = meter {
+            meter.check_time()?;
+        }
         self.validate_requested(requested)?;
         limit("max_branches", options.max_branches, 1)?;
         let probability = self.model.probability(faults)?;
@@ -250,6 +264,9 @@ impl CausalProgram {
         let mut pending = vec![Vec::<Vec<bool>>::new()];
         let mut histories = Vec::new();
         while let Some(prefix) = pending.pop() {
+            if let Some(meter) = meter {
+                meter.check_time()?;
+            }
             budget.attempt()?;
             let available_branches = options.max_branches - histories.len() - pending.len();
             let draw = NoiseDraw {
@@ -269,7 +286,7 @@ impl CausalProgram {
                     budget: &budget,
                     available_branches,
                 },
-                None,
+                meter,
             ) {
                 Ok(history) => {
                     if history

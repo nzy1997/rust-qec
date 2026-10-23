@@ -915,6 +915,7 @@ impl PathState<'_> {
                     &faults,
                     self.program.options.sampling.max_terms,
                     arithmetic,
+                    self.meter,
                 )? {
                     return Err(ExecutionError::Branch { group, outcomes });
                 }

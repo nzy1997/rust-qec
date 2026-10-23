@@ -190,6 +190,26 @@ impl TaskEvaluator {
         &self,
         options: &TaskEnumerationOptions,
     ) -> Result<TaskEnumeration, TaskError> {
+        self.enumerate_physical_observed(options, None)
+    }
+    /// Enumerate with call-local operation accounting and cooperative limits.
+    /// The caller's meter retains successful and failed work even on error;
+    /// no partial-sector estimates are returned. Preparation is separate.
+    pub fn enumerate_physical_with_costs(
+        &self,
+        options: &TaskEnumerationOptions,
+        meter: &ExecutionMeter,
+    ) -> Result<TaskEnumeration, TaskError> {
+        self.enumerate_physical_observed(options, Some(meter))
+    }
+    fn enumerate_physical_observed(
+        &self,
+        options: &TaskEnumerationOptions,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<TaskEnumeration, TaskError> {
+        if let Some(meter) = meter {
+            meter.check_time()?;
+        }
         if self.scaled_proposal_summary().is_some() {
             return Err(TaskError::new(
                 "enumeration.sampling",
@@ -227,6 +247,9 @@ impl TaskEvaluator {
         let one = ExactScalar::one();
         let likelihood = BigRational::one();
         for pattern in sector.patterns() {
+            if let Some(meter) = meter {
+                meter.check_time()?;
+            }
             let weight = &mut by_weight[pattern.weight()];
             weight.patterns += 1;
             let mut add = |row| -> Result<(), TaskError> {
@@ -247,14 +270,17 @@ impl TaskEvaluator {
                         options.histories.max_branches,
                         histories as u128 + 1,
                     )?;
-                    add(self.evaluate(EvaluationInput {
-                        instrument,
-                        faults: &pattern.faults,
-                        history_mass: &one,
-                        noise_probability: pattern.probability.value(),
-                        likelihood: &likelihood,
-                        history: None,
-                    })?)?;
+                    add(self.evaluate_observed(
+                        EvaluationInput {
+                            instrument,
+                            faults: &pattern.faults,
+                            history_mass: &one,
+                            noise_probability: pattern.probability.value(),
+                            likelihood: &likelihood,
+                            history: None,
+                        },
+                        meter,
+                    )?)?;
                     histories += 1;
                 }
                 Execution::Causal(program) => {
@@ -265,11 +291,12 @@ impl TaskEvaluator {
                         max_record_bits: options.histories.max_record_bits,
                     };
                     let result = program
-                        .enumerate_prescribed_histories(
+                        .enumerate_prescribed_histories_observed(
                             &[],
                             &pattern.faults,
                             remaining,
                             &self.options.scalars,
+                            meter,
                         )
                         .map_err(|e| {
                             history_error(e, &options.histories, histories, queries, replays)
@@ -285,7 +312,7 @@ impl TaskEvaluator {
                         // Exact integration needs the joint quantum response;
                         // do not divide by H and subsequently multiply H back.
                         input.history_mass = &one;
-                        add(self.evaluate(input)?)?;
+                        add(self.evaluate_observed(input, meter)?)?;
                     }
                     if total_mass != one {
                         return Err(TaskError::new(
@@ -313,6 +340,9 @@ impl TaskEvaluator {
             sector.omitted_probability(),
             &self.options.fields,
         )?;
+        if let Some(meter) = meter {
+            meter.check_time()?;
+        }
         Ok(TaskEnumeration {
             masses,
             by_weight,

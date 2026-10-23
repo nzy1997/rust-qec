@@ -157,7 +157,10 @@ impl ProbabilityParser {
     pub fn parse(&self, text: &str) -> Result<Probability, ProbabilityError> {
         Probability::from_rational(self.rational(text)?)
     }
-    pub(crate) fn rational(&self, text: &str) -> Result<BigRational, ProbabilityError> {
+    /// Parse an exact signed rational under this parser's token and exponent
+    /// budgets, without restricting the value to the probability interval.
+    /// Use [`Self::parse`] when a value between zero and one is required.
+    pub fn rational(&self, text: &str) -> Result<BigRational, ProbabilityError> {
         if text.len() > self.max_token_bytes {
             return Err(ProbabilityError::TokenLimit {
                 bytes: text.len(),
