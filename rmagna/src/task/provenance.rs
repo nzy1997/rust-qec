@@ -347,6 +347,20 @@ fn fingerprint_with_options(
     options: Value,
     limits: FingerprintOptions,
 ) -> Result<ContentFingerprints, FingerprintError> {
+    fingerprint_with_configuration(
+        input,
+        &options,
+        &sampling_configuration(input.sampling),
+        limits,
+    )
+}
+
+pub(crate) fn fingerprint_with_configuration(
+    input: &FingerprintInputs<'_>,
+    options: &Value,
+    sampling: &Value,
+    limits: FingerprintOptions,
+) -> Result<ContentFingerprints, FingerprintError> {
     let versions = input.controllers.versions();
     for name in input.controller_identities.keys() {
         if !versions.contains_key(name) {
@@ -364,14 +378,13 @@ fn fingerprint_with_options(
             })
         })
         .collect::<Vec<_>>();
-    let sampling = sampling_configuration(input.sampling);
     Ok(ContentFingerprints {
         circuit: fingerprint("circuit", &circuit(input.physical), limits)?,
         task: fingerprint("task", &json!({"outputs": task.outputs(), "error_observables": task.error_observables(), "sample_records": task.sample_records(), "observables": words}), limits)?,
         ideal_state: fingerprint("ideal_state", &input.modules.ideal_state().map(|target| json!({"circuit": circuit(target.circuit()), "outputs": target.outputs(), "postselection": target.postselection()})).unwrap_or(Value::Null), limits)?,
         recovery: fingerprint("recovery", &input.modules.recovery().map(circuit).unwrap_or(Value::Null), limits)?,
         controllers: fingerprint("controllers", &json!({"attestation": "caller_declared_unverified", "versions": versions, "identities": input.controller_identities}), limits)?,
-        options: fingerprint("options", &options, limits)?,
-        sampling: fingerprint("sampling", &sampling, limits)?,
+        options: fingerprint("options", options, limits)?,
+        sampling: fingerprint("sampling", sampling, limits)?,
     })
 }
