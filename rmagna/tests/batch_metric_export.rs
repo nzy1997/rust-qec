@@ -643,3 +643,146 @@ fn total_timings_bound_each_component_without_adding_floats() {
         invalid_state(&result);
     }
 }
+
+#[test]
+fn zero_weight_counts_match_zero_sums_and_unavailable_efficiency() {
+    let mut positive = base();
+    export(&positive);
+    let e = positive.efficiency.as_mut().unwrap();
+    assert!(!e.mean_weight.as_ref().unwrap().is_zero());
+    assert!(!e.effective_sample_size.is_zero());
+    e.zero_weights = e.completed;
+    invalid_state(&positive);
+
+    // Genuine interference-zero affine proposals retain zero complete weights.
+    let files = Files::new();
+    let parse = ParseOptions::default();
+    let source = parse_circuit("H 0\nT 0\nT_DAG 0\nH 0\nM 0", &parse).unwrap();
+    let modules = parse_task(
+        r#"{"sample_records":[0],"error_observables":[]}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap()
+    .load_modules(&source, &parse)
+    .unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.history_sampler = rmagna::runtime::HistorySampler::AffineSupport;
+    options.runtime.compile.compiler_strategy =
+        rmagna::unitary::CompilerStrategy::SharedCommutingLayer;
+    options.runtime.compile.probability_preparation =
+        rmagna::instrument::QueryPreparation::FixedFibers(Default::default());
+    options.runtime.compile.density_preparation =
+        rmagna::instrument::QueryPreparation::FixedFibers(Default::default());
+    let evaluator =
+        TaskEvaluator::new(&source, &modules, &ControllerRegistry::default(), options).unwrap();
+    let mut zero = None;
+    let mut mixed = None;
+    for seed in 0..64 {
+        let result = evaluator
+            .run_batch(&TaskRunOptions {
+                shots: 2,
+                seed,
+                ..Default::default()
+            })
+            .unwrap();
+        let zeros = result.efficiency.as_ref().unwrap().zero_weights;
+        if zeros == 2 {
+            zero = Some(result);
+        } else if zeros == 1 {
+            mixed = Some(result);
+        }
+        if zero.is_some() && mixed.is_some() {
+            break;
+        }
+    }
+    let zero = zero.expect("bounded seeds include two zero-weight affine proposals");
+    let payload = export(&zero);
+    assert_eq!(payload["efficiency"]["zero_weights"], 2);
+    assert_eq!(payload["weights"]["mean"], 0.0);
+    assert_eq!(payload["weights"]["ess"], 0.0);
+    assert!(payload["efficiency"]["rho"].is_null());
+    assert_eq!(payload["efficiency"]["status"], "zero_acceptance");
+    let mixed = mixed.expect("bounded seeds include one zero and one positive weight");
+    let payload = export(&mixed);
+    assert_eq!(payload["efficiency"]["zero_weights"], 1);
+    assert!(payload["weights"]["mean"].as_f64().unwrap() > 0.0);
+    assert!(payload["weights"]["ess"].as_f64().unwrap() > 0.0);
+    for index in 0..5 {
+        let mut bad = zero.clone();
+        match index {
+            0 => bad.efficiency.as_mut().unwrap().zero_weights = 0,
+            1 => {
+                bad.efficiency.as_mut().unwrap().mean_weight = Some(ExactField::one());
+                bad.statistics.as_mut().unwrap().mean_weight = ExactField::one();
+            }
+            2 => {
+                bad.efficiency.as_mut().unwrap().effective_sample_size = ExactField::one();
+                bad.efficiency.as_mut().unwrap().rho = Some(ExactField::one());
+                bad.statistics.as_mut().unwrap().effective_sample_size = ExactField::one();
+            }
+            3 => {
+                bad.efficiency.as_mut().unwrap().status =
+                    rmagna::statistics::EfficiencyStatus::Available;
+                bad.efficiency.as_mut().unwrap().kappa = Some(ExactField::one());
+                bad.efficiency.as_mut().unwrap().variance_coefficient = Some(ExactField::one());
+                bad.efficiency
+                    .as_mut()
+                    .unwrap()
+                    .exact_marginal_variance_coefficient = Some(ExactField::one());
+            }
+            _ => {
+                bad.statistics
+                    .as_mut()
+                    .unwrap()
+                    .moments
+                    .push(ExactField::one());
+                bad.statistics
+                    .as_mut()
+                    .unwrap()
+                    .variances
+                    .moments
+                    .push(Some(ExactField::zero()));
+            }
+        }
+        invalid_state(&bad);
+    }
+}
+
+#[test]
+fn zero_completed_draws_cannot_publish_committed_resources() {
+    let files = Files::new();
+    files.put("zero-target.magna", "I 0\nI 1");
+    let parse = ParseOptions::default();
+    let source = parse_circuit("I 0", &parse).unwrap();
+    let modules = parse_task(r#"{"outputs":[0],"ideal_state":{"circuit":"zero-target.magna","outputs":[0],"postselection":{"1":1}}}"#, &files.0, &TaskOptions::default()).unwrap().load_modules(&source, &parse).unwrap();
+    let result = rmagna::task::run_task_batch(
+        &source,
+        &modules,
+        &ControllerRegistry::default(),
+        EvaluationOptions::default(),
+        &NoiseSampling::Physical,
+        &TaskRunOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(result.status, RunStatus::Failed);
+    assert_eq!(result.failures[0].phase, RunPhase::Preparation);
+    assert_eq!(result.completed, 0);
+    assert_eq!(
+        (
+            result.completed_network_compilations,
+            result.completed_history_groups
+        ),
+        (0, 0)
+    );
+    assert_eq!(
+        export(&result)["completed_resources"],
+        json!({"network_compilations":0,"history_groups":0})
+    );
+    for (networks, groups) in [(1, 0), (0, 1), (1, 1), (usize::MAX, usize::MAX)] {
+        let mut bad = result.clone();
+        bad.completed_network_compilations = networks;
+        bad.completed_history_groups = groups;
+        invalid_state(&bad);
+    }
+}

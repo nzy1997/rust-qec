@@ -177,6 +177,13 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             "requested must be positive and equal completed + failed + not_attempted",
         ));
     }
+    if result.completed == 0
+        && (result.completed_network_compilations != 0 || result.completed_history_groups != 0)
+    {
+        return Err(invalid(
+            "completed resources require at least one completed draw",
+        ));
+    }
     if result.failed > 1 {
         return Err(invalid("a stopped batch can have at most one failed draw"));
     }
@@ -295,6 +302,35 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
     if let Some(e) = &result.efficiency {
         if e.completed != result.completed || e.zero_weights > e.completed {
             return Err(invalid("efficiency counters disagree with completed draws"));
+        }
+        // Complete weights are nonnegative. Their sum and sum of squares
+        // vanish exactly when every completed weight is zero (including n=0).
+        let all_weights_zero = e.zero_weights == e.completed;
+        if all_weights_zero != e.effective_sample_size.is_zero()
+            || all_weights_zero != e.mean_weight.as_ref().is_none_or(ExactField::is_zero)
+            || (all_weights_zero
+                && matches!(
+                    e.status,
+                    EfficiencyStatus::Available | EfficiencyStatus::ZeroResidualVariance
+                ))
+        {
+            return Err(invalid(
+                "zero-weight count contradicts mean, ESS or efficiency availability",
+            ));
+        }
+        if all_weights_zero
+            && summary.is_some_and(|s| {
+                !s.accepted.is_zero()
+                    || s.error.as_ref().is_some_and(|v| !v.is_zero())
+                    || s.moments.iter().any(|v| !v.is_zero())
+                    || s.variances.accepted.as_ref().is_some_and(|v| !v.is_zero())
+                    || s.variances.error.as_ref().is_some_and(|v| !v.is_zero())
+                    || s.variances.moments.iter().flatten().any(|v| !v.is_zero())
+            })
+        {
+            return Err(invalid(
+                "all-zero weights require zero accumulated contributions",
+            ));
         }
         let available = e.status == EfficiencyStatus::Available;
         if e.kappa.is_some() != available

@@ -2245,3 +2245,10 @@ component (components are compared separately to avoid addition rounding).
 The crate enables serde_json's `float_roundtrip` feature so its supported JSON
 writer/reader path preserves binary64 bits, including scientific mantissas
 immediately below one. This does not prescribe other JSON consumers' parsers.
+
+The zero-weight count must also agree with whether the completed nonnegative
+weights have zero mean and zero ESS. All-zero weights have no rho or available
+variance-efficiency coefficients, and all accumulated contributions vanish.
+Genuine interference-zero affine proposals preserve these zero/undefined
+distinctions. Both completed-resource counters must be zero when no draw commits;
+preparation and interrupted attempts belong to separate work accounting.
