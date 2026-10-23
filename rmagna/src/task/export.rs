@@ -29,13 +29,23 @@ impl std::error::Error for BatchExportError {
         }
     }
 }
-struct Encoder {
+pub(crate) struct Encoder {
     options: NumericOptions,
     underflow: Vec<String>,
     overflow: Vec<String>,
 }
 impl Encoder {
-    fn number(
+    pub(crate) fn new(options: NumericOptions) -> Self {
+        Self {
+            options,
+            underflow: Vec::new(),
+            overflow: Vec::new(),
+        }
+    }
+    pub(crate) fn numerics(&self) -> Value {
+        json!({"representation":"mantissa * 2**exponent2","underflow_fields":self.underflow,"overflow_fields":self.overflow})
+    }
+    pub(crate) fn number(
         &mut self,
         path: &str,
         value: Option<&ExactField>,
@@ -446,11 +456,7 @@ pub fn export_batch_metrics(
     options: NumericOptions,
 ) -> Result<Value, BatchExportError> {
     validate(result)?;
-    let mut encoder = Encoder {
-        options,
-        underflow: Vec::new(),
-        overflow: Vec::new(),
-    };
+    let mut encoder = Encoder::new(options);
     let mut output = serde_json::Map::new();
     if let Some(statistics) = &result.statistics {
         output.extend(
@@ -535,6 +541,6 @@ pub fn export_batch_metrics(
         json!("mean joint contributions; conditional error is ratio of aggregate means"),
     );
     output.insert("uncertainty".to_owned(),json!("IID draw standard errors; conditional ratio uses paired delta method; null for fewer than two draws"));
-    output.insert("numerics".to_owned(),json!({"representation":"mantissa * 2**exponent2","underflow_fields":encoder.underflow,"overflow_fields":encoder.overflow}));
+    output.insert("numerics".to_owned(), encoder.numerics());
     Ok(Value::Object(output))
 }

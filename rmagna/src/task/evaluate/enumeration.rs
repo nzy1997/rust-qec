@@ -75,6 +75,8 @@ pub struct ExactInterval {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskEnumeration {
     pub masses: TaskSectorMasses,
+    /// Captured unnormalized projected-target norm; masses already divide by it.
+    pub target_normalization: Option<ExactScalar>,
     pub by_weight: Vec<TaskWeightSector>,
     pub covered_probability: Probability,
     pub omitted_probability: Probability,
@@ -345,6 +347,7 @@ impl TaskEvaluator {
         }
         Ok(TaskEnumeration {
             masses,
+            target_normalization: self.target.as_ref().map(|target| target.norm.clone()),
             by_weight,
             covered_probability: sector.covered_probability().clone(),
             omitted_probability: sector.omitted_probability().clone(),

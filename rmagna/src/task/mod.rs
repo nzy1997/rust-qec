@@ -15,6 +15,7 @@ mod provenance;
 use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};
 use crate::gf2::BitVector;
 use crate::pauli::PauliWord;
+pub(crate) use export::Encoder as NumericEncoder;
 use num_bigint::BigUint;
 pub use parse::parse_task;
 pub use provenance::{
@@ -22,7 +23,8 @@ pub use provenance::{
     canonical_fingerprint, canonical_raw_fingerprint, fingerprint_content,
 };
 pub(crate) use provenance::{
-    resolved_options, sampling_configuration, validate_snapshot_fingerprints,
+    fingerprint_with_configuration, resolved_options, sampling_configuration,
+    validate_snapshot_fingerprints,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
