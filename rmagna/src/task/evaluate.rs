@@ -259,6 +259,14 @@ impl TaskEvaluator {
             Execution::Causal(program) => program.scaled_proposal_summary(),
         }
     }
+    pub fn prepared_insertion_statistics(
+        &self,
+    ) -> Option<crate::instrument::PreparedInsertionStatistics> {
+        match &self.execution {
+            Execution::Linear { instrument, .. } => instrument.prepared_insertion_statistics(),
+            Execution::Causal(program) => program.prepared_insertion_statistics(),
+        }
+    }
     pub fn prepared_density_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, TaskError> {

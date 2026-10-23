@@ -97,3 +97,39 @@ absent `magna_example_decoders` module through legacy fixture bindings.
 The portable task-local decoder test passes. Retain this upstream discrepancy
 in the later compatibility ledger; do not treat it as a Rust regression or
 silently edit the reference to turn it green.
+
+## Compare prepared insertion execution
+
+After building `cargo build --release --locked -p rmagna --example evaluate_task`,
+the bounded differential drivers can explicitly select prepared noise and
+controller insertions:
+
+```sh
+python3 benchmarks/magna_reproduction/affine_task_compare.py \
+  --upstream /absolute/path/to/magna \
+  --rust-example /absolute/path/to/protected/evaluate_task \
+  --compiler shared --probability-preparation fixed --density-preparation fixed \
+  --insertion-preparation prepared --max-insertion-table-bytes 268435456 \
+  --warm-replays 2 --out /absolute/path/to/new-affine-results.json
+python3 benchmarks/magna_reproduction/controller_task_compare.py \
+  --upstream /absolute/path/to/magna \
+  --rust-example /absolute/path/to/protected/evaluate_task \
+  --compiler shared --probability-preparation fixed --density-preparation fixed \
+  --insertion-preparation prepared --max-insertion-table-bytes 1073741824 \
+  --warm-replays 2 --timeout 600 --out /absolute/path/to/new-controller-results.json
+```
+
+Use the pinned reference Python environment to run these commands. Keep the
+binary unchanged during a capture; its receipt binds its content hash. The
+drivers validate the applied mode, effective limits and retained catalog size;
+custom byte/entry limits require prepared mode. Defaults remain direct
+propagation. These prescribed no-fault comparisons validate conditional task
+results and decoder histories. They do not establish noisy Monte Carlo
+throughput or reproduce paper precision curves. Warm replays exclude first-query
+preparation and report the same prescribed history separately.
+
+The controller command allows a 1 GiB insertion-table estimate and a 600-second
+per-Rust-history bound so it can check the larger TQD5 example. The table cap
+excludes the existing program, temporary input catalog and query caches; it is
+not a process-memory cap. Use `--tasks tqd3` to select one controller example.
+Preparation refusals and timed-out histories remain failed cases in the receipt.

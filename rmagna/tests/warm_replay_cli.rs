@@ -400,3 +400,97 @@ fn actual_density_flags_share_fixed_rank_and_reject_invalid_modes_and_capacity()
         );
     }
 }
+
+#[test]
+fn actual_insertion_flags_select_retained_catalogs_and_reject_invalid_limits() {
+    for compiler in ["parity_copies", "shared"] {
+        for mode in ["direct", "prepared"] {
+            let fixture = Fixture::new(false);
+            let mut flags = vec![
+                "--compiler",
+                compiler,
+                "--probability-preparation",
+                "fixed",
+                "--density-preparation",
+                "fixed",
+                "--warm-replays",
+                "2",
+                "--insertion-preparation",
+                mode,
+            ];
+            if mode == "prepared" {
+                flags.extend([
+                    "--max-insertion-table-bytes",
+                    "8192",
+                    "--max-insertion-catalog-entries",
+                    "2",
+                ]);
+            }
+            let value = fixture.success(&flags);
+            check_result(&fixture, &value, 2);
+            assert_eq!(value["configuration"]["insertion_preparation"], mode);
+            if mode == "direct" {
+                assert!(value["prepared_insertions"].is_null());
+                assert!(value["configuration"]["max_insertion_table_bytes"].is_null());
+                assert!(value["configuration"]["max_insertion_catalog_entries"].is_null());
+            } else {
+                assert_eq!(value["configuration"]["max_insertion_table_bytes"], 8192);
+                assert_eq!(value["configuration"]["max_insertion_catalog_entries"], 2);
+                // One measurement-report alternative and one decision-X prototype.
+                assert_eq!(value["prepared_insertions"]["catalog_entries"], 2);
+                let bytes = value["prepared_insertions"]["estimated_peak_bytes"]
+                    .as_u64()
+                    .unwrap();
+                assert!(bytes > 0 && bytes <= 8192);
+            }
+        }
+    }
+    for flags in [
+        vec!["--insertion-preparation"],
+        vec!["--insertion-preparation", "unknown"],
+        vec!["--max-insertion-table-bytes"],
+        vec!["--max-insertion-table-bytes", "1"],
+        vec!["--max-insertion-catalog-entries", "1"],
+        vec![
+            "--insertion-preparation",
+            "prepared",
+            "--max-insertion-table-bytes",
+            "-1",
+        ],
+        vec![
+            "--insertion-preparation",
+            "prepared",
+            "--max-insertion-catalog-entries",
+            "not-an-integer",
+        ],
+    ] {
+        let fixture = Fixture::new(false);
+        let (result, output) = fixture.execute(&flags);
+        assert!(result.is_err(), "{flags:?}");
+        assert!(output.is_empty());
+        assert!(fixture.calls().is_empty());
+        assert!(
+            !fixture.path("plugin.imported").exists(),
+            "invalid arguments imported a decoder: {flags:?}"
+        );
+    }
+    for (flag, value, reason) in [
+        ("--max-insertion-table-bytes", "1", "max_table_bytes"),
+        (
+            "--max-insertion-catalog-entries",
+            "1",
+            "max_catalog_entries",
+        ),
+    ] {
+        let fixture = Fixture::new(false);
+        let (result, output) =
+            fixture.execute(&["--insertion-preparation", "prepared", flag, value]);
+        let error = result.unwrap_err();
+        assert!(error.contains(reason), "{error}");
+        assert!(output.is_empty());
+        assert!(
+            fixture.calls().is_empty(),
+            "insufficient preparation limits invoked a decoder"
+        );
+    }
+}

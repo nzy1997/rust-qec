@@ -2,7 +2,9 @@
 
 mod densities;
 mod gates;
+mod insertions;
 mod lower;
+pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 mod probabilities;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -28,6 +30,7 @@ pub enum InstrumentError {
     },
     NonAffineQuery,
     PreparedQueryCacheUnavailable,
+    PreparedInsertionCatalogUnavailable,
     UnknownDecision {
         call: usize,
         bit: usize,
@@ -65,6 +68,9 @@ pub enum InstrumentError {
 impl fmt::Display for InstrumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::PreparedInsertionCatalogUnavailable => {
+                write!(f, "compiled insertion catalog metadata is unavailable")
+            }
             Self::NeedsHistory { operation } => {
                 write!(f, "operation {operation} requires a causal history runtime")
             }
@@ -135,6 +141,7 @@ impl From<UnitaryError> for InstrumentError {
 
 #[derive(Clone, Copy, Debug)]
 pub struct CompileOptions {
+    pub insertion_preparation: InsertionPreparation,
     pub compiler_strategy: crate::unitary::CompilerStrategy,
     pub probability_preparation: ProbabilityPreparation,
     pub max_prepared_probabilities: usize,
@@ -147,6 +154,7 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
+            insertion_preparation: InsertionPreparation::Direct,
             compiler_strategy: crate::unitary::CompilerStrategy::ParityCopies,
             probability_preparation: ProbabilityPreparation::Cold,
             max_prepared_probabilities: 64,
@@ -160,6 +168,7 @@ impl Default for CompileOptions {
 }
 #[derive(Clone, Debug)]
 pub struct FaultAlternative {
+    catalog_index: Option<usize>,
     probability: Probability,
     word: PauliWord,
 }
@@ -197,6 +206,8 @@ pub struct FaultSelection {
 
 #[derive(Clone)]
 pub struct CompiledInstrument {
+    insertion_catalog: Option<Arc<insertions::InsertionCatalog>>,
+    initial_prepared_insertions: Vec<usize>,
     unitary: Arc<CompiledUnitary>,
     probability_queries: Arc<probabilities::ProbabilityQueries>,
     density_queries: Arc<densities::DensityQueries>,
@@ -239,6 +250,14 @@ pub fn compile_unitary(
 }
 
 impl CompiledInstrument {
+    pub fn prepared_insertion_statistics(&self) -> Option<PreparedInsertionStatistics> {
+        self.insertion_catalog
+            .as_ref()
+            .map(|c| PreparedInsertionStatistics {
+                catalog_entries: c.plan.len(),
+                estimated_peak_bytes: c.plan.estimated_peak_bytes(),
+            })
+    }
     pub fn compilation(&self) -> &crate::unitary::CompilationDiagnostics {
         self.unitary.compilation()
     }
@@ -283,12 +302,21 @@ impl CompiledInstrument {
     ) -> Result<Self, InstrumentError> {
         let mut branch = self.clone();
         let mut x = BitVector::zeros(self.coherent_qubits())?;
+        branch.initial_prepared_insertions.clear();
         for (&(call, bit), &value) in decisions {
             let &wire = self
                 .decision_wires
                 .get(&(call, bit))
                 .ok_or(InstrumentError::UnknownDecision { call, bit })?;
             x.set(wire, value)?;
+            if value && let Some(catalog) = &self.insertion_catalog {
+                branch.initial_prepared_insertions.push(
+                    *catalog
+                        .decisions
+                        .get(&(call, bit))
+                        .ok_or(InstrumentError::PreparedInsertionCatalogUnavailable)?,
+                );
+            }
         }
         branch.initial_insertions = if x.is_zero() {
             vec![]
@@ -335,7 +363,15 @@ impl CompiledInstrument {
         arithmetic: &ScalarArithmetic,
     ) -> Result<CompiledUnitary, InstrumentError> {
         let mut seen = BTreeSet::new();
-        let mut insertions = self.initial_insertions.clone();
+        let mut indices = self
+            .insertion_catalog
+            .as_ref()
+            .map(|_| self.initial_prepared_insertions.clone());
+        let mut insertions = if indices.is_some() {
+            vec![]
+        } else {
+            self.initial_insertions.clone()
+        };
         for fault in faults {
             if !seen.insert(fault.site) {
                 return Err(InstrumentError::RepeatedFault { site: fault.site });
@@ -354,10 +390,25 @@ impl CompiledInstrument {
                         site: fault.site,
                         alternative: fault.alternative,
                     })?;
-            insertions.push(PauliInsertion {
-                before_gate: site.before_gate,
-                word: alternative.word.clone(),
-            });
+            if let Some(indices) = &mut indices {
+                indices.push(
+                    alternative
+                        .catalog_index
+                        .ok_or(InstrumentError::PreparedInsertionCatalogUnavailable)?,
+                );
+            } else {
+                insertions.push(PauliInsertion {
+                    before_gate: site.before_gate,
+                    word: alternative.word.clone(),
+                });
+            }
+        }
+        if let (Some(catalog), Some(indices)) = (&self.insertion_catalog, indices) {
+            return Ok(self.unitary.with_prepared_insertions(
+                &catalog.plan,
+                &indices,
+                arithmetic,
+            )?);
         }
         Ok(self.unitary.with_insertions(&insertions, arithmetic)?)
     }
