@@ -6,6 +6,7 @@ use enumeration::{ExecutionError, HistoryMode};
 mod registry;
 mod resolve;
 use crate::circuit::{BitAtom, BitExpr, Circuit, LocatedOperation, Operation};
+use crate::costs::{CostError, ExecutionMeter, OperationKind, observe};
 use crate::gf2::BitVector;
 use crate::instrument::{
     CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError,
@@ -16,8 +17,8 @@ use crate::noise::{
     ScaledProposalSummary,
 };
 use crate::records::{
-    RecordQuery, SamplingError, SamplingOptions, propose_affine_reported,
-    sample_reported_conditioned,
+    RecordQuery, SamplingError, SamplingOptions, propose_affine_reported_observed,
+    sample_reported_conditioned_observed,
 };
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::unitary::CompiledUnitary;
@@ -27,6 +28,7 @@ pub use registry::{Controller, ControllerRegistry};
 use std::{collections::BTreeMap, fmt};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeError {
+    Cost(CostError),
     EnumerationLimit {
         option: &'static str,
         limit: usize,
@@ -74,6 +76,7 @@ pub enum RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cost(error) => error.fmt(f),
             Self::EnumerationLimit {
                 option,
                 limit,
@@ -125,6 +128,11 @@ impl fmt::Display for RuntimeError {
     }
 }
 impl std::error::Error for RuntimeError {}
+impl From<CostError> for RuntimeError {
+    fn from(error: CostError) -> Self {
+        Self::Cost(error)
+    }
+}
 impl From<NoiseError> for RuntimeError {
     fn from(e: NoiseError) -> Self {
         Self::Noise(e)
@@ -321,6 +329,16 @@ impl CausalProgram {
         arithmetic: &ScalarArithmetic,
         sampling: &NoiseSampling,
     ) -> Result<Self, RuntimeError> {
+        Self::new_observed(circuit, registry, options, arithmetic, sampling, None)
+    }
+    pub(crate) fn new_observed(
+        circuit: &Circuit,
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+        sampling: &NoiseSampling,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<Self, RuntimeError> {
         let names = registry.names();
         for op in circuit.operations() {
             if let Operation::Control {
@@ -333,12 +351,18 @@ impl CausalProgram {
                 return Err(RuntimeError::MissingBinding { name: name.clone() });
             }
         }
-        let reference = match options.strategy {
-            CausalStrategy::FixedTemplate => compile_causal(circuit, &options.compile, arithmetic)?,
-            CausalStrategy::ColdPrefix => {
-                compile_affine(&resolve::potential(circuit), &options.compile, arithmetic)?
+        let reference = observe(meter, OperationKind::Compilation, || {
+            match options.strategy {
+                CausalStrategy::FixedTemplate => {
+                    compile_causal(circuit, &options.compile, arithmetic)
+                        .map_err(RuntimeError::from)
+                }
+                CausalStrategy::ColdPrefix => {
+                    compile_affine(&resolve::potential(circuit), &options.compile, arithmetic)
+                        .map_err(RuntimeError::from)
+                }
             }
-        };
+        })?;
         let model = NoiseModel::physical(&reference, &options.noise)?;
         let mut source_sites = BTreeMap::new();
         for (site, category) in reference.noise_sites().iter().enumerate() {
@@ -443,10 +467,26 @@ impl CausalProgram {
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
     ) -> Result<ResolvedHistory, RuntimeError> {
+        self.resolve_observed(requested, random, arithmetic, None)
+    }
+    pub(crate) fn resolve_observed(
+        &self,
+        requested: &[BitExpr],
+        random: &mut impl RandomSource,
+        arithmetic: &ScalarArithmetic,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<ResolvedHistory, RuntimeError> {
         self.validate_requested(requested)?;
         let draw = self.sampler.draw(random)?;
-        self.execute(requested, draw, random, arithmetic, HistoryMode::Sample)
-            .map_err(ExecutionError::runtime)
+        self.execute(
+            requested,
+            draw,
+            random,
+            arithmetic,
+            HistoryMode::Sample,
+            meter,
+        )
+        .map_err(ExecutionError::runtime)
     }
     pub fn resolve_prescribed(
         &self,
@@ -469,6 +509,7 @@ impl CausalProgram {
             random,
             arithmetic,
             HistoryMode::Sample,
+            None,
         )
         .map_err(ExecutionError::runtime)
     }
@@ -540,6 +581,7 @@ impl CausalProgram {
             &mut crate::noise::SplitMix64::new(0),
             arithmetic,
             HistoryMode::Prescribed(groups),
+            None,
         )
         .map_err(ExecutionError::runtime)
     }
@@ -595,6 +637,7 @@ impl CausalProgram {
         random: &mut impl RandomSource,
         arithmetic: &ScalarArithmetic,
         mode: HistoryMode<'_>,
+        meter: Option<&ExecutionMeter>,
     ) -> Result<ResolvedHistory, ExecutionError> {
         // Choices for inactive guarded categories are discarded, including their
         // probabilities; they have no physical action or path weight.
@@ -605,6 +648,7 @@ impl CausalProgram {
             .collect::<BTreeMap<_, _>>();
         let mut state = PathState {
             program: self,
+            meter,
             chosen,
             decisions: BTreeMap::new(),
             guards: BTreeMap::new(),
@@ -633,9 +677,9 @@ impl CausalProgram {
                         .map(|e| resolve::expression(e, &state.decisions, false))
                         .collect::<Result<Vec<_>, _>>()?;
                     let values = state.sample_inputs(end, &inputs, random, arithmetic)?;
-                    let result = self
-                        .registry
-                        .evaluate(name, *call, &values, outputs.len())?;
+                    let result = observe(meter, OperationKind::Decoder, || {
+                        self.registry.evaluate(name, *call, &values, outputs.len())
+                    })?;
                     let observed = ControllerCall {
                         name: name.clone(),
                         call: *call,
@@ -697,15 +741,18 @@ impl CausalProgram {
         )
         .map_err(InstrumentError::from)?;
         state.mode.query()?;
-        let history_mass = instrument
-            .reported_probability(
-                &parities,
-                &values,
-                &faults,
-                self.options.sampling.max_terms,
-                arithmetic,
-            )?
-            .value;
+        let history_mass = observe(meter, OperationKind::Query, || {
+            instrument
+                .reported_probability(
+                    &parities,
+                    &values,
+                    &faults,
+                    self.options.sampling.max_terms,
+                    arithmetic,
+                )
+                .map_err(RuntimeError::from)
+        })?
+        .value;
         let noise_probability = if instrument.noise_sites().len() == self.model.num_sites() {
             // Every potential category remains active, so the already validated
             // physical draw product is also the final causal path probability.
@@ -738,6 +785,7 @@ impl CausalProgram {
 }
 struct PathState<'a> {
     program: &'a CausalProgram,
+    meter: Option<&'a ExecutionMeter>,
     chosen: BTreeMap<usize, usize>,
     decisions: BTreeMap<(usize, usize), bool>,
     guards: BTreeMap<usize, bool>,
@@ -781,7 +829,10 @@ impl PathState<'_> {
         } else {
             let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
             self.mode.compilation()?;
-            let instrument = compile_affine(&prefix, &self.program.options.compile, arithmetic)?;
+            let instrument = observe(self.meter, OperationKind::Compilation, || {
+                compile_affine(&prefix, &self.program.options.compile, arithmetic)
+                    .map_err(RuntimeError::from)
+            })?;
             self.network_compilations += 1;
             Ok(instrument)
         }
@@ -890,16 +941,19 @@ impl PathState<'_> {
             )
             .map_err(InstrumentError::from)?;
             self.mode.query()?;
-            if instrument
-                .reported_probability(
-                    &parities,
-                    &bits,
-                    &faults,
-                    self.program.options.sampling.max_terms,
-                    arithmetic,
-                )?
-                .value
-                .is_zero()
+            if observe(self.meter, OperationKind::Query, || {
+                instrument
+                    .reported_probability(
+                        &parities,
+                        &bits,
+                        &faults,
+                        self.program.options.sampling.max_terms,
+                        arithmetic,
+                    )
+                    .map_err(RuntimeError::from)
+            })?
+            .value
+            .is_zero()
             {
                 return Err(RuntimeError::InvalidHistory {
                     group,
@@ -919,24 +973,26 @@ impl PathState<'_> {
         };
         let (values, entropy_words) = match self.program.options.history_sampler {
             HistorySampler::ExactMarginal => {
-                let draw = sample_reported_conditioned(
+                let draw = sample_reported_conditioned_observed(
                     &instrument,
                     &query,
                     &faults,
                     random,
                     &options,
                     arithmetic,
+                    self.meter,
                 )?;
                 (draw.values, draw.entropy_words)
             }
             HistorySampler::AffineSupport => {
-                let draw = propose_affine_reported(
+                let draw = propose_affine_reported_observed(
                     &instrument,
                     &query,
                     &faults,
                     random,
                     &options,
                     arithmetic,
+                    self.meter,
                 )?;
                 let previous = self.proposal_mass.as_ref().expect("actual affine proposal");
                 self.proposal_mass = Some(

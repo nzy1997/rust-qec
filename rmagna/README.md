@@ -2164,8 +2164,9 @@ preparation measurement. Sampling time covers its draw/accumulation loop and
 total time also covers finalization. `completed_network_compilations` and
 `completed_history_groups` sum diagnostics from committed draws only; they do
 not count work inside failed attempts, and observation groups are distinct
-from individual marginal contractions. Detailed query/decoder instrumentation,
-provenance, JSON schemas and CLI integration follow separately.
+from individual marginal contractions. Actual per-call costs and loaded-content
+fingerprints are described below; file-result schemas and CLI integration follow
+separately.
 
 Tests compare fixed-seed batches with independent centered full-list statistics
 under physical/importance noise, exact/affine histories and both causal
@@ -2180,8 +2181,9 @@ undefined metrics and finalization failure accounting.
 estimates, standard errors, scientific twins, weight/efficiency diagnostics and
 explicit count/failure/timing fields. It exports the numerical payload used by
 a file-result layer; it does not claim a complete versioned result document.
-Execution metadata, content fingerprints and detailed query instrumentation are
-separate responsibilities. No `schema_version` is attached to this payload.
+It includes actual execution costs. File execution metadata and loaded-content
+fingerprints are separate responsibilities. No `schema_version` is attached to
+this payload.
 
 ```rust
 use std::path::Path;
@@ -2333,3 +2335,77 @@ Already-parsed Value numbers cannot recover precision lost before the call.
 The crate retains raw_value and float_roundtrip without enabling a global
 arbitrary_precision dependency feature. Byte/depth limits bound encoded output;
 raw JSON decoding, object sorting and caller-owned values still allocate memory.
+
+## Actual execution costs
+
+`costs::ExecutionMeter` collects attempted, successful and failed operations and
+their wall times. `TaskEvaluator::new_with_costs` records preparation;
+`sample_with_costs` records one draw. Existing constructors and `sample` retain
+their semantics without collecting costs. Each `run_batch` owns a fresh collector;
+`run_task_batch` uses one collector across its owned preparation and draw loop.
+Snapshots are stored in `TaskRunResult::execution_costs` and exported as
+`execution_costs` with `scope = "this_call_including_failed_attempts"`.
+
+```rust
+use std::path::Path;
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::costs::ExecutionMeter;
+use rmagna::noise::{NoiseSampling, SplitMix64};
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{EvaluationOptions, TaskEvaluator, TaskOptions, parse_task};
+
+let physical = parse_circuit("I 0", &ParseOptions::default())?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?
+    .load_modules(&physical, &ParseOptions::default())?;
+let meter = ExecutionMeter::default();
+let evaluator = TaskEvaluator::new_with_costs(&physical, &modules,
+    &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Physical, &meter)?;
+evaluator.sample_with_costs(&mut SplitMix64::new(7), &meter)?;
+assert_eq!(meter.snapshot().compilation.succeeded, 1);
+assert_eq!(meter.snapshot().query.succeeded, 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The four categories have explicit logical boundaries:
+
+- `compilation` counts circuit program constructions: target preparation,
+  protocol reference and cold causal prefixes/final instruments. It does not
+  count every prepared query-family plan or stabilizer decomposition.
+- `query` counts physical marginal, acceptance, target-density, classical
+  accepted-success and Pauli-moment invocations, plus target normalization when
+  preparation is owned. Empty and deterministic logical queries still count.
+  Cache hits count because they still evaluate the requested network; cold
+  family planning inside a query is included in its elapsed time.
+- `decoder` counts registry evaluations, including empty-input calls, callback
+  errors and incorrect output shapes.
+- `support` counts conditioned structural affine-support constructions used
+  by the affine history proposal. It excludes entropy generation and proposal
+  arithmetic after support construction.
+
+Timings are inclusive wall seconds. They include called code within each
+boundary; nested manually measured operations are permitted, so categories are
+not a partition to sum into total runtime. Sampling overhead, noise draws,
+exact accumulation and finalization are outside these four categories and
+remain in their existing batch timing scopes. First-query family preparation
+is not retroactively attributed to constructor preparation time.
+
+Counts survive returned errors and unwinding panics; an exhausted u64 attempt
+counter fails before invoking the operation. A query returning exact zero is a
+successful query, even if a later validation or accumulator rejects the draw.
+Snapshots taken during an active operation can have unfinished attempts;
+finished batch snapshots balance attempted = succeeded + failed, which JSON
+export validates along with finite nonnegative times.
+
+Collectors are passed explicitly and retain no references in compiled objects.
+There is no global or thread-local state and no subtraction of shared lifetime
+counters. Concurrent and repeated runs over one prepared evaluator have their
+own counts, and reused batches exclude earlier preparation. Existing
+`completed_resources` still counts committed rows only; actual costs also retain
+the work of a failed draw or preparation.
+
+Tests independently count both causal strategies and history samplers, duplicate
+record groups, empty-input callbacks and their failures, cached/concurrent
+target/moment queries, target normalization, compilation/contraction failures,
+noise failures before a query and accumulator failures after successful work.
+Identical seeded draws and final RNG states verify observational equivalence.

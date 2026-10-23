@@ -1,5 +1,6 @@
 //! Exact physical reported-record sampling, separate from postselection.
 use crate::circuit::{BitAtom, BitExpr};
+use crate::costs::{CostError, ExecutionMeter, OperationKind, observe};
 use crate::gf2::BitVector;
 use crate::instrument::{CompiledInstrument, FaultSelection, InstrumentError};
 use crate::noise::RandomSource;
@@ -13,6 +14,7 @@ pub use enumeration::{
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SamplingError {
+    Cost(CostError),
     InvalidMass,
     ImpossibleCondition,
     ImpossibleSupport,
@@ -31,6 +33,7 @@ pub enum SamplingError {
 impl fmt::Display for SamplingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Cost(error) => error.fmt(f),
             Self::ImpossibleCondition => {
                 write!(f, "reported history condition has zero physical mass")
             }
@@ -62,6 +65,11 @@ impl fmt::Display for SamplingError {
     }
 }
 impl std::error::Error for SamplingError {}
+impl From<CostError> for SamplingError {
+    fn from(error: CostError) -> Self {
+        Self::Cost(error)
+    }
+}
 impl From<InstrumentError> for SamplingError {
     fn from(error: InstrumentError) -> Self {
         Self::Instrument(error)
@@ -217,7 +225,20 @@ pub fn propose_affine_reported(
     options: &SamplingOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<AffineProposalDraw, SamplingError> {
-    let family = conditioned_support(instrument, query, faults, arithmetic)?;
+    propose_affine_reported_observed(instrument, query, faults, random, options, arithmetic, None)
+}
+pub(crate) fn propose_affine_reported_observed(
+    instrument: &CompiledInstrument,
+    query: &RecordQuery<'_>,
+    faults: &[FaultSelection],
+    random: &mut impl RandomSource,
+    options: &SamplingOptions,
+    arithmetic: &ScalarArithmetic,
+    meter: Option<&ExecutionMeter>,
+) -> Result<AffineProposalDraw, SamplingError> {
+    let family = observe(meter, OperationKind::Support, || {
+        conditioned_support(instrument, query, faults, arithmetic)
+    })?;
     let entropy_words = family.dimension().div_ceil(64);
     if entropy_words > options.max_entropy_words {
         return Err(SamplingError::EntropyLimit {
@@ -280,6 +301,19 @@ pub fn sample_reported_conditioned(
     options: &SamplingOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<ReportedDraw, SamplingError> {
+    sample_reported_conditioned_observed(
+        instrument, query, faults, random, options, arithmetic, None,
+    )
+}
+pub(crate) fn sample_reported_conditioned_observed(
+    instrument: &CompiledInstrument,
+    query: &RecordQuery<'_>,
+    faults: &[FaultSelection],
+    random: &mut impl RandomSource,
+    options: &SamplingOptions,
+    arithmetic: &ScalarArithmetic,
+    meter: Option<&ExecutionMeter>,
+) -> Result<ReportedDraw, SamplingError> {
     for parity in query.given.iter().map(|(p, _)| p).chain(query.parities) {
         for atom in &parity.terms {
             match atom {
@@ -311,15 +345,18 @@ pub fn sample_reported_conditioned(
         )
         .map_err(InstrumentError::from)
     };
-    let mut mass = instrument
-        .reported_probability(
-            &rows,
-            &bits(&outcomes)?,
-            faults,
-            options.max_terms,
-            arithmetic,
-        )?
-        .value;
+    let mut mass = observe(meter, OperationKind::Query, || {
+        instrument
+            .reported_probability(
+                &rows,
+                &bits(&outcomes)?,
+                faults,
+                options.max_terms,
+                arithmetic,
+            )
+            .map_err(SamplingError::from)
+    })?
+    .value;
     if mass.is_zero() {
         return Err(SamplingError::ImpossibleCondition);
     }
@@ -329,15 +366,18 @@ pub fn sample_reported_conditioned(
     for parity in query.parities {
         rows.push(parity.clone());
         outcomes.push(false);
-        let zero = instrument
-            .reported_probability(
-                &rows,
-                &bits(&outcomes)?,
-                faults,
-                options.max_terms,
-                arithmetic,
-            )?
-            .value;
+        let zero = observe(meter, OperationKind::Query, || {
+            instrument
+                .reported_probability(
+                    &rows,
+                    &bits(&outcomes)?,
+                    faults,
+                    options.max_terms,
+                    arithmetic,
+                )
+                .map_err(SamplingError::from)
+        })?
+        .value;
         let draw = bernoulli_ratio(
             &zero,
             &mass,

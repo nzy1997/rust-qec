@@ -1,5 +1,6 @@
 //! Seeded batches with exact statistics and explicit partial-failure accounting.
 use super::*;
+use crate::costs::ExecutionCosts;
 use crate::noise::SplitMix64;
 use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, StatisticsOptions};
 use std::time::Instant;
@@ -94,6 +95,8 @@ pub struct TaskRunStatistics {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct TaskRunResult {
+    /// Logical work of this call, including preparation when owned and failed attempts.
+    pub execution_costs: ExecutionCosts,
     pub status: RunStatus,
     pub requested: u64,
     pub completed: u64,
@@ -210,6 +213,13 @@ impl TaskEvaluator {
     /// Ordinary task/arithmetic failures return Failed results; invalid run
     /// configuration returns an error before any entropy or callbacks.
     pub fn run_batch(&self, options: &TaskRunOptions) -> Result<TaskRunResult, TaskError> {
+        self.run_batch_observed(options, &ExecutionMeter::default())
+    }
+    fn run_batch_observed(
+        &self,
+        options: &TaskRunOptions,
+        meter: &ExecutionMeter,
+    ) -> Result<TaskRunResult, TaskError> {
         let started = Instant::now();
         let dimensions = options.validate(self.requested.len(), self.task.observables.len())?;
         let has_error = self.target.is_some() || self.error_parities.is_some();
@@ -220,7 +230,7 @@ impl TaskEvaluator {
         let mut failed = 0;
         let sampling = Instant::now();
         for shot in 0..options.shots {
-            let row = match self.sample(&mut random) {
+            let row = match self.sample_with_costs(&mut random, meter) {
                 Ok(row) => row,
                 Err(e) => {
                     failures.push(RunFailure {
@@ -284,6 +294,7 @@ impl TaskEvaluator {
             (None, statistics)
         };
         Ok(TaskRunResult {
+            execution_costs: meter.snapshot(),
             status,
             requested: options.shots,
             completed,
@@ -322,17 +333,19 @@ pub fn run_task_batch(
         modules.task.observables.len(),
     )?;
     let preparation = Instant::now();
+    let meter = ExecutionMeter::default();
     let prepared =
-        TaskEvaluator::new_with_sampling(physical, modules, registry, evaluation, sampling);
+        TaskEvaluator::new_with_costs(physical, modules, registry, evaluation, sampling, &meter);
     let preparation_seconds = preparation.elapsed().as_secs_f64();
     match prepared {
         Ok(evaluator) => {
-            let mut result = evaluator.run_batch(run)?;
+            let mut result = evaluator.run_batch_observed(run, &meter)?;
             result.timings.preparation_seconds = Some(preparation_seconds);
             result.timings.total_seconds = started.elapsed().as_secs_f64();
             Ok(result)
         }
         Err(e) => Ok(TaskRunResult {
+            execution_costs: meter.snapshot(),
             status: RunStatus::Failed,
             requested: run.shots,
             completed: 0,

@@ -44,6 +44,11 @@ impl fmt::Display for TaskError {
     }
 }
 impl std::error::Error for TaskError {}
+impl From<crate::costs::CostError> for TaskError {
+    fn from(error: crate::costs::CostError) -> Self {
+        Self::new("execution_costs", error.to_string())
+    }
+}
 #[derive(Clone, Copy, Debug)]
 pub struct TaskOptions {
     pub max_json_bytes: usize,

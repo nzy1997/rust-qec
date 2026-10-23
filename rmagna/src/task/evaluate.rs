@@ -1,5 +1,6 @@
 use super::*;
 use crate::circuit::{BitAtom, BitExpr};
+use crate::costs::{ExecutionMeter, OperationKind, observe};
 use crate::field::{ExactField, FieldArithmetic};
 use crate::instrument::{CompiledInstrument, FaultSelection, compile_affine, compile_unitary};
 use crate::noise::{NoiseModel, NoiseSampler, NoiseSampling, RandomSource, ScaledProposalSummary};
@@ -115,6 +116,27 @@ impl TaskEvaluator {
         options: EvaluationOptions,
         sampling: &NoiseSampling,
     ) -> Result<Self, TaskError> {
+        Self::new_observed(physical, modules, registry, options, sampling, None)
+    }
+    /// Prepare while recording actual compiler and target-normalization work.
+    pub fn new_with_costs(
+        physical: &Circuit,
+        modules: &LoadedModules,
+        registry: &ControllerRegistry,
+        options: EvaluationOptions,
+        sampling: &NoiseSampling,
+        meter: &ExecutionMeter,
+    ) -> Result<Self, TaskError> {
+        Self::new_observed(physical, modules, registry, options, sampling, Some(meter))
+    }
+    fn new_observed(
+        physical: &Circuit,
+        modules: &LoadedModules,
+        registry: &ControllerRegistry,
+        options: EvaluationOptions,
+        sampling: &NoiseSampling,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<Self, TaskError> {
         let a = &options.scalars;
         let max_terms = options.runtime.sampling.max_terms;
         let task = modules.task.clone();
@@ -143,8 +165,10 @@ impl TaskEvaluator {
             })
             .transpose()?;
         let target = if let Some(target) = &modules.ideal {
-            let unitary = compile_unitary(&target.circuit, &options.runtime.compile, a)
-                .map_err(|e| error("ideal_state", e))?;
+            let unitary = observe(meter, OperationKind::Compilation, || {
+                compile_unitary(&target.circuit, &options.runtime.compile, a)
+                    .map_err(|e| error("ideal_state", e))
+            })?;
             let rows = target
                 .postselection
                 .keys()
@@ -160,10 +184,12 @@ impl TaskEvaluator {
                     .filter_map(|(j, &v)| v.then_some(j)),
             )
             .map_err(|e| error("ideal_state.postselection", e))?;
-            let norm = unitary
-                .probability_z(&rows, &outcomes, max_terms, a)
-                .map_err(|e| error("ideal_state.normalization", e))?
-                .value;
+            let norm = observe(meter, OperationKind::Query, || {
+                unitary
+                    .probability_z(&rows, &outcomes, max_terms, a)
+                    .map_err(|e| error("ideal_state.normalization", e))
+            })?
+            .value;
             if norm.is_zero() {
                 return Err(TaskError::new(
                     "ideal_state.normalization",
@@ -188,12 +214,21 @@ impl TaskEvaluator {
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
             Execution::Causal(Box::new(
-                CausalProgram::new_with_sampling(&composed, registry, options.runtime, a, sampling)
-                    .map_err(|e| error("runtime", e))?,
+                CausalProgram::new_observed(
+                    &composed,
+                    registry,
+                    options.runtime,
+                    a,
+                    sampling,
+                    meter,
+                )
+                .map_err(|e| error("runtime", e))?,
             ))
         } else {
-            let instrument = compile_affine(&composed, &options.runtime.compile, a)
-                .map_err(|e| error("circuit", e))?;
+            let instrument = observe(meter, OperationKind::Compilation, || {
+                compile_affine(&composed, &options.runtime.compile, a)
+                    .map_err(|e| error("circuit", e))
+            })?;
             let model = NoiseModel::physical(&instrument, &options.runtime.noise)
                 .map_err(|e| error("noise", e))?;
             let sampler = NoiseSampler::configured(
@@ -274,12 +309,27 @@ impl TaskEvaluator {
         }
     }
     pub fn sample(&self, random: &mut impl RandomSource) -> Result<TaskEvaluation, TaskError> {
+        self.sample_observed(random, None)
+    }
+    /// Record logical work, including errors, without changing the draw stream.
+    pub fn sample_with_costs(
+        &self,
+        random: &mut impl RandomSource,
+        meter: &ExecutionMeter,
+    ) -> Result<TaskEvaluation, TaskError> {
+        self.sample_observed(random, Some(meter))
+    }
+    fn sample_observed(
+        &self,
+        random: &mut impl RandomSource,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<TaskEvaluation, TaskError> {
         match &self.execution {
             Execution::Causal(program) => {
                 let history = program
-                    .resolve(&self.requested, random, &self.options.scalars)
+                    .resolve_observed(&self.requested, random, &self.options.scalars, meter)
                     .map_err(|e| error("runtime", e))?;
-                self.evaluate(EvaluationInput::history(&history))
+                self.evaluate_observed(EvaluationInput::history(&history), meter)
             }
             Execution::Linear {
                 instrument,
@@ -287,14 +337,17 @@ impl TaskEvaluator {
                 ..
             } => {
                 let draw = sampler.draw(random).map_err(|e| error("noise", e))?;
-                self.evaluate(EvaluationInput {
-                    instrument,
-                    faults: &draw.faults,
-                    history_mass: &ExactScalar::one(),
-                    noise_probability: &draw.physical_probability,
-                    likelihood: &draw.likelihood_ratio,
-                    history: None,
-                })
+                self.evaluate_observed(
+                    EvaluationInput {
+                        instrument,
+                        faults: &draw.faults,
+                        history_mass: &ExactScalar::one(),
+                        noise_probability: &draw.physical_probability,
+                        likelihood: &draw.likelihood_ratio,
+                        history: None,
+                    },
+                    meter,
+                )
             }
         }
     }
@@ -356,13 +409,22 @@ impl TaskEvaluator {
         }
     }
     fn evaluate(&self, input: EvaluationInput<'_>) -> Result<TaskEvaluation, TaskError> {
+        self.evaluate_observed(input, None)
+    }
+    fn evaluate_observed(
+        &self,
+        input: EvaluationInput<'_>,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<TaskEvaluation, TaskError> {
         let a = &self.options.scalars;
         let f = &self.options.fields;
         let max_terms = self.options.runtime.sampling.max_terms;
-        let acceptance_query = input
-            .instrument
-            .acceptance(input.faults, max_terms, a)
-            .map_err(|e| error("acceptance", e))?;
+        let acceptance_query = observe(meter, OperationKind::Query, || {
+            input
+                .instrument
+                .acceptance(input.faults, max_terms, a)
+                .map_err(|e| error("acceptance", e))
+        })?;
         let acceptance_resources = ContractionResources::from(&acceptance_query);
         let raw_acceptance = acceptance_query.value;
         let accepted = f
@@ -373,7 +435,7 @@ impl TaskEvaluator {
             )
             .map_err(|e| error("acceptance", e))?;
         let target_query = if let Some(target) = &self.target {
-            Some(
+            Some(observe(meter, OperationKind::Query, || {
                 input
                     .instrument
                     .target_density_weight(
@@ -388,8 +450,8 @@ impl TaskEvaluator {
                         max_terms,
                         a,
                     )
-                    .map_err(|e| error("target_success", e))?,
-            )
+                    .map_err(|e| error("target_success", e))
+            })?)
         } else {
             None
         };
@@ -433,11 +495,13 @@ impl TaskEvaluator {
                 .collect::<Result<Vec<_>, _>>()?;
             let zeros =
                 BitVector::zeros(parities.len()).map_err(|e| error("error_observables", e))?;
-            let success = input
-                .instrument
-                .accepted_probability(&parities, &zeros, input.faults, max_terms, a)
-                .map_err(|e| error("error_observables", e))?
-                .value;
+            let success = observe(meter, OperationKind::Query, || {
+                input
+                    .instrument
+                    .accepted_probability(&parities, &zeros, input.faults, max_terms, a)
+                    .map_err(|e| error("error_observables", e))
+            })?
+            .value;
             a.subtract(&raw_acceptance, &success)
                 .map_err(|e| error("error", e))?
         } else {
@@ -457,11 +521,13 @@ impl TaskEvaluator {
         let mut moments = Vec::new();
         let mut raw_moments = Vec::new();
         for word in &self.task.observables {
-            let raw = input
-                .instrument
-                .pauli_moment(&self.task.outputs, word, input.faults, max_terms, a)
-                .map_err(|e| error("observables", e))?
-                .value;
+            let raw = observe(meter, OperationKind::Query, || {
+                input
+                    .instrument
+                    .pauli_moment(&self.task.outputs, word, input.faults, max_terms, a)
+                    .map_err(|e| error("observables", e))
+            })?
+            .value;
             moments.push(
                 f.contribution(&raw, input.normalization_mass(), input.likelihood)
                     .map_err(|e| error("observables", e))?,

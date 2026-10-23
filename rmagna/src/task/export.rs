@@ -415,12 +415,27 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             "total timing cannot be smaller than a measured component",
         ));
     }
+    for cost in [
+        result.execution_costs.compilation,
+        result.execution_costs.query,
+        result.execution_costs.decoder,
+        result.execution_costs.support,
+    ] {
+        if cost.succeeded.checked_add(cost.failed) != Some(cost.attempted)
+            || !cost.seconds.is_finite()
+            || cost.seconds < 0.0
+        {
+            return Err(invalid(
+                "execution cost counts must balance and seconds must be finite and nonnegative",
+            ));
+        }
+    }
     Ok(())
 }
 
 /// Export the numerical payload shared by complete and failed batch results.
-/// This is not a full versioned file result: execution metadata, fingerprints
-/// and detailed query instrumentation must be supplied by their owning layer.
+/// This is not a full versioned file result: execution metadata and fingerprints
+/// must be supplied by their owning layer.
 pub fn export_batch_metrics(
     result: &TaskRunResult,
     options: NumericOptions,
@@ -496,6 +511,16 @@ pub fn export_batch_metrics(
     output.insert("failures".to_owned(),json!(result.failures.iter().map(|f|json!({"phase":match f.phase {RunPhase::Preparation=>"preparation",RunPhase::Sampling=>"sampling",RunPhase::Accumulation=>"accumulation",RunPhase::Finalization=>"finalization"},"shot":f.shot,"type":f.kind,"message":f.message})).collect::<Vec<_>>()));
     output.insert("timings".to_owned(),json!({"preparation_seconds":result.timings.preparation_seconds,"sampling_seconds":result.timings.sampling_seconds,"total_seconds":result.timings.total_seconds}));
     output.insert("completed_resources".to_owned(),json!({"network_compilations":result.completed_network_compilations,"history_groups":result.completed_history_groups}));
+    let costs = result.execution_costs;
+    let encode_cost = |cost: crate::costs::OperationCost| json!({"attempted":cost.attempted,"succeeded":cost.succeeded,"failed":cost.failed,"seconds":cost.seconds});
+    output.insert(
+        "execution_costs".to_owned(),
+        json!({
+            "scope":"this_call_including_failed_attempts", "timing":"inclusive_wall_seconds",
+            "compilation":encode_cost(costs.compilation),"query":encode_cost(costs.query),
+            "decoder":encode_cost(costs.decoder),"support":encode_cost(costs.support),
+        }),
+    );
     output.insert(
         "normalization".to_owned(),
         json!("mean joint contributions; conditional error is ratio of aggregate means"),

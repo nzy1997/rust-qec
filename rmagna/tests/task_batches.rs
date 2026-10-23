@@ -547,6 +547,11 @@ fn an_accumulator_failure_discards_only_the_failed_draw_and_keeps_records_aligne
     assert_eq!(result.failures[0].phase, RunPhase::Accumulation);
     assert_eq!(result.failures[0].shot, Some(1));
     assert!(result.failures[0].message.contains("run.efficiency"));
+    // Both attempted rows completed their quantum work, but only one was
+    // committed. Actual costs must retain the discarded row's three queries.
+    assert_eq!(result.execution_costs.query.attempted, 6);
+    assert_eq!(result.execution_costs.query.failed, 0);
+    assert_eq!(result.execution_costs.support.attempted, 2);
     let partial = result.partial_statistics.unwrap();
     assert_eq!(partial.completed, 1);
     assert_eq!(partial.accepted, ExactField::one());
