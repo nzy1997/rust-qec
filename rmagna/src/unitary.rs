@@ -1,6 +1,8 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod insertions;
 mod observations;
+pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;
 pub use prepared::{DensityLayout, PreparedDensityOverlap, PreparedProbability};
@@ -23,7 +25,19 @@ pub enum UnitaryError {
     RepeatedQubit,
     RepeatedOutput,
     IncompatibleProgram,
-    InvalidInsertion { position: usize, gate_count: usize },
+    InvalidInsertion {
+        position: usize,
+        gate_count: usize,
+    },
+    InvalidPreparedInsertion {
+        index: usize,
+        count: usize,
+    },
+    InsertionResourceLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
     Binary(Gf2Error),
     Clifford(CliffordError),
     Phase(PhaseError),
@@ -48,7 +62,19 @@ impl fmt::Display for UnitaryError {
             Self::RepeatedOutput => write!(f, "target output list contains duplicate qubits"),
             Self::IncompatibleProgram => write!(
                 f,
-                "prepared query requires a view of its original compiled program"
+                "prepared plan requires a view of its original compiled program"
+            ),
+            Self::InvalidPreparedInsertion { index, count } => write!(
+                f,
+                "prepared insertion index {index} is outside catalog size {count}"
+            ),
+            Self::InsertionResourceLimit {
+                option,
+                limit,
+                required,
+            } => write!(
+                f,
+                "insertion preparation needs {option} >= {required}; configured limit is {limit}"
             ),
             Self::InvalidInsertion {
                 position,
@@ -467,6 +493,18 @@ impl CompiledUnitary {
         insertions: &[PauliInsertion],
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, UnitaryError> {
+        if insertions.is_empty() {
+            // Preserve the identity-frame coefficient budget check while
+            // sharing the already reduced immutable no-fault query boundary.
+            arithmetic.multiply(self.program.reference.coefficient(), &ExactScalar::one())?;
+            return Ok(Self {
+                physical_width: self.physical_width,
+                boundary: Arc::clone(&self.program.query_reference),
+                phase: Arc::clone(&self.program.query_reference_phase),
+                compilation: Arc::clone(&self.compilation),
+                program: Arc::clone(&self.program),
+            });
+        }
         let count = self.program.positions.len() - 1;
         let mut grouped = BTreeMap::<usize, Vec<&PauliWord>>::new();
         for insertion in insertions {
@@ -505,9 +543,17 @@ impl CompiledUnitary {
                 }
             }
         }
+        self.with_insertion_frame(&frame, &grouped, arithmetic)
+    }
+    fn with_insertion_frame(
+        &self,
+        frame: &PauliWord,
+        grouped: &BTreeMap<usize, Vec<&PauliWord>>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
         let boundary = Arc::new(frame.apply(&self.program.reference, arithmetic)?);
         let phase = if let Some(updates) = &self.program.shared {
-            Arc::new(updates.phase(&grouped)?)
+            Arc::new(updates.phase(grouped)?)
         } else {
             Arc::clone(&self.program.reference_phase)
         };
