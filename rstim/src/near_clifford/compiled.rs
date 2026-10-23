@@ -30,7 +30,7 @@ mod noise_spans;
 use noise_spans::NoiseSpans;
 #[path = "noise_schedule.rs"]
 mod noise_schedule;
-use noise_schedule::NoiseSigns;
+use noise_schedule::{ActiveFreePredicate, NoiseSigns};
 #[cfg(test)]
 #[path = "../../tests/support/near_clifford_structural.rs"]
 mod conditional_fixture;
@@ -1830,6 +1830,27 @@ impl CompiledNearCliffordExecutor {
     pub fn prepare_sampler(&self) -> Result<CompiledNearCliffordSampler<'_>, String> {
         self.prepare_sampler_with_cache_budget(DEFAULT_CACHE_BYTE_BUDGET)
     }
+    /// Prepare an explicitly eager postselected-counts sampler.
+    ///
+    /// The existing prepared sampler and its methods keep their current semantics.
+    /// The eager wrapper may omit quantum work, errors and cache publication for
+    /// lanes whose raw detector predicates already prove rejection. See
+    /// [`CompiledNearCliffordEagerSampler`] for the distinct error/cache contract.
+    pub fn prepare_eager_postselected_sampler(
+        &self,
+    ) -> Result<CompiledNearCliffordEagerSampler<'_>, String> {
+        self.prepare_eager_postselected_sampler_with_cache_budget(DEFAULT_CACHE_BYTE_BUDGET)
+    }
+    /// The eager sampler with the same 0..=64MiB coefficient-cache budget.
+    pub fn prepare_eager_postselected_sampler_with_cache_budget(
+        &self,
+        cache_bytes: usize,
+    ) -> Result<CompiledNearCliffordEagerSampler<'_>, String> {
+        Ok(CompiledNearCliffordEagerSampler {
+            sampler: self.prepare_sampler_with_cache_budget(cache_bytes)?,
+            predicate: OnceLock::new(),
+        })
+    }
     /// Optional coefficient transitions use a conservative reservation, not RSS.
     /// Zero disables caching. Admission/allocation failure falls back to arithmetic.
     pub fn prepare_sampler_with_cache_budget(
@@ -1882,6 +1903,8 @@ impl CompiledNearCliffordExecutor {
             #[cfg(test)]
             last_packet_error_producer: None,
             #[cfg(test)]
+            last_eager_rejected_mask: 0,
+            #[cfg(test)]
             observe_lazy_error_producer: false,
             #[cfg(test)]
             materialized_packet_reference: false,
@@ -1926,6 +1949,8 @@ pub struct CompiledNearCliffordSampler<'a> {
     last_packet_live_mask: u64,
     #[cfg(test)]
     last_packet_error_producer: Option<PacketErrorProducerObservation>,
+    #[cfg(test)]
+    last_eager_rejected_mask: u64,
     #[cfg(test)]
     observe_lazy_error_producer: bool,
     #[cfg(test)]
@@ -3630,7 +3655,31 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
         coherent: bool,
+        noise_packet: Option<&mut NoisePacket>,
+    ) -> Result<(), String> {
+        self.packet_with_predicate(
+            lanes,
+            sweep,
+            rng,
+            output,
+            coherent,
+            noise_packet,
+            None,
+            &mut Vec::new(),
+            0,
+        )
+    }
+    fn packet_with_predicate(
+        &mut self,
+        lanes: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+        coherent: bool,
         mut noise_packet: Option<&mut NoisePacket>,
+        predicate: Option<&ActiveFreePredicate>,
+        predicate_scratch: &mut Vec<u64>,
+        predicate_byte_budget: usize,
     ) -> Result<(), String> {
         let mut x = std::mem::take(&mut self.packet_x);
         let mut z = std::mem::take(&mut self.packet_z);
@@ -3734,7 +3783,31 @@ impl CompiledNearCliffordSampler<'_> {
             } else {
                 (1u64 << lanes) - 1
             };
-            let mut live = all;
+            let preselected = if matches!(output, BatchOutput::Counts { .. }) {
+                predicate
+                    .and_then(|model| {
+                        model.packet_rejection_mask(
+                            plan,
+                            lanes,
+                            sweep,
+                            &tape,
+                            &noise_masks,
+                            noise_packet.as_deref(),
+                            independent_packet.as_ref(),
+                            predicate_scratch,
+                            predicate_byte_budget,
+                            16_000_000,
+                        )
+                    })
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+            #[cfg(test)]
+            {
+                self.last_eager_rejected_mask = preselected;
+            }
+            let mut live = all & !preselected;
             let mut event = 0;
             let mut noise_event = 0;
             let mut independent_event = 0;
@@ -3749,8 +3822,11 @@ impl CompiledNearCliffordSampler<'_> {
             let mut logical = 0u64;
             // Rejected lanes must not be mistaken for cache-admission failures:
             // their counts are already final and they need no scalar replay.
-            let mut rejected = 0u64;
+            let mut rejected = preselected;
             for (node, op) in plan.operations.iter().enumerate().skip(plan.prefix_len) {
+                if preselected != 0 && postselect && live == 0 {
+                    break;
+                }
                 match op {
                     PlanOp::Basis(gates) => {
                         for gate in gates {
@@ -4271,6 +4347,16 @@ impl CompiledNearCliffordSampler<'_> {
         rng: &mut impl Rng,
         output: &mut BatchOutput<'_>,
     ) -> Result<(), String> {
+        self.sample_batch_with_predicate(shots, sweep, rng, output, None)
+    }
+    fn sample_batch_with_predicate(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+        output: &mut BatchOutput<'_>,
+        predicate: Option<&ActiveFreePredicate>,
+    ) -> Result<(), String> {
         let packet_bytes = self
             .plan
             .random_kinds
@@ -4376,6 +4462,25 @@ impl CompiledNearCliffordSampler<'_> {
             } else {
                 None
             };
+            // Optional scratch is admitted only after every original packet buffer
+            // and compact sidecar, preserving their admission priority.
+            let predicate_byte_budget = self
+                .scalar_tape_other_bytes()
+                .and_then(|n| {
+                    self.packet_tape
+                        .capacity()
+                        .checked_mul(size_of::<u64>())
+                        .and_then(|t| n.checked_add(t))
+                })
+                .and_then(|n| {
+                    noise_packet
+                        .as_ref()
+                        .map_or(Some(0), |p| p.reserved_bytes())
+                        .and_then(|b| n.checked_add(b))
+                })
+                .and_then(|n| PACKET_BYTE_BUDGET.checked_sub(n))
+                .unwrap_or(0);
+            let mut predicate_scratch = Vec::new();
             for offset in (0..shots).step_by(64) {
                 let lanes = (shots - offset).min(64);
                 let coherent = coherent_eligible && (!self.pack_enabled || self.cache.is_none());
@@ -4386,9 +4491,24 @@ impl CompiledNearCliffordSampler<'_> {
                     } else {
                         None
                     };
-                    self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    if predicate.is_some() {
+                        self.packet_with_predicate(
+                            lanes,
+                            sweep,
+                            rng,
+                            output,
+                            coherent,
+                            compact,
+                            predicate,
+                            &mut predicate_scratch,
+                            predicate_byte_budget,
+                        )?;
+                    } else {
+                        self.packet(lanes, sweep, rng, output, coherent, compact)?;
+                    }
                 } else {
                     drop(noise_packet.take());
+                    predicate_scratch = Vec::new();
                     for _ in 0..lanes {
                         output.row(self.row_for_output(sweep, rng, output)?);
                     }
@@ -4400,6 +4520,129 @@ impl CompiledNearCliffordSampler<'_> {
             }
         }
         Ok(())
+    }
+}
+
+/// Explicit eager raw-detector postselection on successful counts calls.
+///
+/// A nonzero known-event detector may reject a lane before earlier quantum
+/// physics is executed. Consequently this opt-in sampler may omit its allocation
+/// or numerical errors and coefficient-cache publication. Exact legacy errors,
+/// cache population and failed-call RNG prefixes are not promised. The existing
+/// `prepare_sampler` and counts/record APIs remain the unchanged default.
+///
+/// Successful counts preserve raw detector/observable semantics and the complete
+/// typed caller random stream. Observable presence is checked even for zero shots.
+/// The first suitable nonempty counts call may construct a bounded predicate;
+/// declined models/workspace use the original path. Original packet resource
+/// admission and coherent reset still precede the complete random producer.
+/// Ordinary record calls below use the original physical executor and no filter.
+/// Reservations are conservative accounting, not process RSS or OS limits.
+pub struct CompiledNearCliffordEagerSampler<'a> {
+    sampler: CompiledNearCliffordSampler<'a>,
+    predicate: OnceLock<Option<ActiveFreePredicate>>,
+}
+impl CompiledNearCliffordEagerSampler<'_> {
+    /// Sample raw all-zero-detector counts under the explicit eager contract.
+    pub fn sample_postselected_counts(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        self.sample_postselected_counts_with_sweep(shots, observable_index, &[], rng)
+    }
+    /// Eager counts with the same missing-sweep-bits-are-false convention.
+    pub fn sample_postselected_counts_with_sweep(
+        &mut self,
+        shots: usize,
+        observable_index: u32,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordPostselectedCounts, String> {
+        let plan = self.sampler.plan;
+        if !plan.annotation_positions.iter().any(|&position| {
+            matches!(&plan.operations[position],
+            PlanOp::Annotation{observable:Some(index),..}if *index==observable_index)
+        }) {
+            return Err(format!(
+                "observable {observable_index} is absent from the compiled circuit"
+            ));
+        }
+        if shots < 32 {
+            return self.sampler.sample_postselected_counts_with_sweep(
+                shots,
+                observable_index,
+                sweep,
+                rng,
+            );
+        }
+        let predicate = self.predicate.get_or_init(|| {
+            // The existing full-affine model cannot retain a model on these
+            // plans, so its shared reservation cannot overlap this construction.
+            if !plan.operations.iter().any(|op| {
+                matches!(
+                    op,
+                    PlanOp::Rotate { .. }
+                        | PlanOp::Measure(Measurement {
+                            projection: Projection::Active { .. },
+                            ..
+                        })
+                )
+            }) {
+                return None;
+            }
+            ActiveFreePredicate::build(
+                plan,
+                plan.counts_plan_budget.min(8 * 1024 * 1024),
+                16_000_000,
+            )
+        });
+        let Some(predicate) = predicate else {
+            return self.sampler.sample_postselected_counts_with_sweep(
+                shots,
+                observable_index,
+                sweep,
+                rng,
+            );
+        };
+        let mut counts = NearCliffordPostselectedCounts {
+            attempted: shots,
+            ..Default::default()
+        };
+        self.sampler.sample_batch_with_predicate(
+            shots,
+            sweep,
+            rng,
+            &mut BatchOutput::Counts {
+                observable_index,
+                counts: &mut counts,
+            },
+            Some(predicate),
+        )?;
+        Ok(counts)
+    }
+    /// Original full-record path; no eager predicate is applied by this call.
+    pub fn sample_measurements_u8(
+        &mut self,
+        shots: usize,
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        self.sampler.sample_measurements_u8(shots, rng)
+    }
+    /// Original full-record path with sweep controls; no eager predicate.
+    pub fn sample_measurements_u8_with_sweep(
+        &mut self,
+        shots: usize,
+        sweep: &[bool],
+        rng: &mut impl Rng,
+    ) -> Result<NearCliffordMeasurementBatch, String> {
+        self.sampler
+            .sample_measurements_u8_with_sweep(shots, sweep, rng)
+    }
+    /// Current underlying cache reservation; eager calls may publish fewer entries.
+    pub fn coefficient_cache_reserved_bytes(&self) -> usize {
+        self.sampler.coefficient_cache_reserved_bytes()
     }
 }
 
@@ -7810,3 +8053,7 @@ mod owned_coefficient_cache_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "eager_postselection_tests.rs"]
+mod eager_postselection_tests;
