@@ -386,3 +386,260 @@ fn inconsistent_public_results_and_negative_variances_are_explicit_errors() {
         matches!(export_batch_metrics(&bad,NumericOptions::default()),Err(BatchExportError::Numeric {field,..}) if field=="standard_errors.error")
     );
 }
+
+fn stopped_prefix() -> TaskRunResult {
+    let mut result = base();
+    result.status = RunStatus::Failed;
+    result.requested = 4;
+    result.failed = 1;
+    result.not_attempted = 1;
+    result.partial_statistics = result.statistics.take();
+    result.failures = vec![RunFailure {
+        phase: RunPhase::Sampling,
+        shot: Some(2),
+        kind: "TaskError",
+        message: "offline".to_owned(),
+    }];
+    result
+}
+fn finalization_failure() -> RunFailure {
+    RunFailure {
+        phase: RunPhase::Finalization,
+        shot: None,
+        kind: "StatisticsError",
+        message: "summary budget exceeded".to_owned(),
+    }
+}
+fn invalid_state(result: &TaskRunResult) {
+    let before = result.clone();
+    assert!(matches!(
+        export_batch_metrics(result, NumericOptions::default()),
+        Err(BatchExportError::InvalidState(_))
+    ));
+    assert_eq!(result, &before);
+}
+
+#[test]
+fn prefix_summaries_require_explanatory_finalization_and_complete_loop_accounting() {
+    let stopped = stopped_prefix();
+    export(&stopped);
+    for missing_statistics in [false, true] {
+        let mut result = stopped.clone();
+        if missing_statistics {
+            result.partial_statistics = None;
+        } else {
+            result.efficiency = None;
+        }
+        invalid_state(&result);
+        result.failures.push(finalization_failure());
+        let payload = export(&result);
+        assert!(payload["estimates"].is_null());
+        assert_eq!(payload["completed"], 2);
+    }
+    let mut both = stopped.clone();
+    both.partial_statistics = None;
+    both.efficiency = None;
+    both.failures.push(finalization_failure());
+    invalid_state(&both);
+    both.failures.push(finalization_failure());
+    assert!(export(&both)["weights"].is_null());
+    let mut early = stopped;
+    early.failed = 0;
+    early.not_attempted = 2;
+    early.partial_statistics = None;
+    early.failures = vec![finalization_failure()];
+    invalid_state(&early);
+    early.requested = early.completed;
+    early.not_attempted = 0;
+    assert!(export(&early)["partial_statistics"].is_null());
+}
+
+#[test]
+fn retained_records_are_rectangular_for_complete_and_failed_prefixes() {
+    for mut result in [base(), stopped_prefix()] {
+        result.sampled_records = Some(vec![vec![false, true], vec![true, false]]);
+        assert_eq!(
+            export(&result)["sampled_records"],
+            json!([[false, true], [true, false]])
+        );
+        result.sampled_records.as_mut().unwrap()[1].push(false);
+        invalid_state(&result);
+        result.sampled_records = Some(vec![vec![], vec![]]);
+        assert_eq!(export(&result)["sampled_records"], json!([[], []]));
+        result.sampled_records = None;
+        assert!(export(&result)["sampled_records"].is_null());
+    }
+}
+
+#[test]
+fn metric_and_uncertainty_availability_follow_count_and_denominator() {
+    let one = run(
+        "M 0\nOBSERVABLE_INCLUDE(0) rec[-1]",
+        r#"{"error_observables":[0]}"#,
+        TaskRunOptions::default(),
+    );
+    for index in 0..4 {
+        let mut result = one.clone();
+        let s = result.statistics.as_mut().unwrap();
+        match index {
+            0 => s.variances.accepted = Some(ExactField::one()),
+            1 => s.variances.error = Some(ExactField::zero()),
+            2 => s.variances.conditional_error = Some(ExactField::zero()),
+            _ => {
+                s.moments.push(ExactField::zero());
+                s.variances.moments.push(Some(ExactField::zero()));
+            }
+        }
+        invalid_state(&result);
+    }
+    for index in 0..5 {
+        let mut result = base();
+        let s = result.statistics.as_mut().unwrap();
+        match index {
+            0 => s.variances.accepted = None,
+            1 => s.variances.error = None,
+            2 => s.variances.conditional_error = None,
+            3 => {
+                s.conditional_error = None;
+                s.variances.conditional_error = None;
+            }
+            _ => {
+                s.moments.push(ExactField::zero());
+                s.variances.moments.push(None);
+            }
+        }
+        invalid_state(&result);
+    }
+    let mut zero = run(
+        "M 0\nDETECTOR rec[-1]\nPOSTSELECT !det[0]\nOBSERVABLE_INCLUDE(0) rec[-1]",
+        r#"{"error_observables":[0]}"#,
+        TaskRunOptions {
+            shots: 2,
+            ..Default::default()
+        },
+    );
+    assert!(export(&zero)["estimates"]["conditional_error"].is_null());
+    zero.statistics.as_mut().unwrap().conditional_error = Some(ExactField::zero());
+    zero.statistics
+        .as_mut()
+        .unwrap()
+        .variances
+        .conditional_error = Some(ExactField::zero());
+    invalid_state(&zero);
+}
+
+#[test]
+fn efficiency_status_coefficients_and_duplicate_weight_summaries_must_agree() {
+    use rmagna::statistics::EfficiencyStatus;
+    for index in 0..9 {
+        let mut result = base();
+        let e = result.efficiency.as_mut().unwrap();
+        match index {
+            0 => e.status = EfficiencyStatus::NoErrorMetric,
+            1 => e.status = EfficiencyStatus::InsufficientSamples,
+            2 => e.status = EfficiencyStatus::ZeroAcceptance,
+            3 => e.kappa = None,
+            4 => e.variance_coefficient = None,
+            5 => e.exact_marginal_variance_coefficient = None,
+            6 => result.statistics.as_mut().unwrap().mean_weight = ExactField::zero(),
+            7 => result.statistics.as_mut().unwrap().effective_sample_size = ExactField::zero(),
+            _ => e.mean_weight = None,
+        }
+        invalid_state(&result);
+    }
+    let mut missing = run(
+        "I 0",
+        "{}",
+        TaskRunOptions {
+            shots: 2,
+            ..Default::default()
+        },
+    );
+    assert_eq!(export(&missing)["efficiency"]["status"], "no_error_metric");
+    missing.efficiency.as_mut().unwrap().kappa = Some(ExactField::zero());
+    invalid_state(&missing);
+    let mut singleton = run(
+        "I 0",
+        r#"{"error_observables":[]}"#,
+        TaskRunOptions::default(),
+    );
+    assert_eq!(
+        export(&singleton)["efficiency"]["status"],
+        "insufficient_samples"
+    );
+    singleton.efficiency.as_mut().unwrap().status = EfficiencyStatus::ZeroAcceptance;
+    invalid_state(&singleton);
+}
+
+#[test]
+fn genuine_importance_batch_round_trips_boundary_binary64_bits() {
+    let files = Files::new();
+    let parse = ParseOptions::default();
+    let source = parse_circuit("X_ERROR(9007199254740993/18014398509481984) 0", &parse).unwrap();
+    let modules = parse_task("{}", &files.0, &TaskOptions::default())
+        .unwrap()
+        .load_modules(&source, &parse)
+        .unwrap();
+    let evaluator = TaskEvaluator::new_with_sampling(
+        &source,
+        &modules,
+        &ControllerRegistry::default(),
+        EvaluationOptions::default(),
+        &NoiseSampling::Importance {
+            proposal_scale: "9007199254740992/9007199254740993".parse().unwrap(),
+        },
+    )
+    .unwrap();
+    let result = evaluator
+        .run_batch(&TaskRunOptions {
+            shots: 1,
+            seed: 6,
+            ..Default::default()
+        })
+        .unwrap();
+    let payload = export(&result);
+    let text = serde_json::to_string(&payload).unwrap();
+    let reparsed: Value = serde_json::from_str(&text).unwrap();
+    for pointer in [
+        "/estimates/acceptance",
+        "/estimates_scientific/acceptance/mantissa",
+    ] {
+        let original = payload.pointer(pointer).unwrap().as_f64().unwrap();
+        assert_eq!(original.to_bits(), 0x3fefffffffffffff);
+        assert_eq!(
+            reparsed
+                .pointer(pointer)
+                .unwrap()
+                .as_f64()
+                .unwrap()
+                .to_bits(),
+            original.to_bits()
+        );
+        let token = serde_json::to_string(payload.pointer(pointer).unwrap()).unwrap();
+        assert_eq!(token, "0.9999999999999999");
+        let typed: f64 = serde_json::from_str(&token).unwrap();
+        assert_eq!(typed.to_bits(), original.to_bits());
+    }
+    assert_eq!(reparsed, payload);
+}
+
+#[test]
+fn total_timings_bound_each_component_without_adding_floats() {
+    let mut result = base();
+    for (preparation, sampling, total) in [
+        (None, 0.0, 0.0),
+        (Some(1.0), 1.0, 1.0),
+        (Some(0.1), 0.2, 0.3),
+    ] {
+        result.timings.preparation_seconds = preparation;
+        result.timings.sampling_seconds = sampling;
+        result.timings.total_seconds = total;
+        export(&result);
+    }
+    for (preparation, sampling, total) in [(None, 1.0, 0.0), (Some(1.0), 0.0, 0.5)] {
+        result.timings.preparation_seconds = preparation;
+        result.timings.sampling_seconds = sampling;
+        result.timings.total_seconds = total;
+        invalid_state(&result);
+    }
+}

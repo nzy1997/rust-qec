@@ -231,6 +231,39 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             "failed results require failures and absent main statistics",
         ));
     }
+    let preparation_failed = result
+        .failures
+        .iter()
+        .any(|f| f.phase == RunPhase::Preparation);
+    let finalization_failures = result
+        .failures
+        .iter()
+        .filter(|f| f.phase == RunPhase::Finalization)
+        .count();
+    let summary = result
+        .statistics
+        .as_ref()
+        .or(result.partial_statistics.as_ref());
+    if preparation_failed {
+        if result.efficiency.is_some() {
+            return Err(invalid(
+                "preparation failure cannot have accumulated efficiency",
+            ));
+        }
+    } else {
+        if result.failed == 0 && result.not_attempted != 0 {
+            return Err(invalid(
+                "only a preparation or draw failure can leave unattempted draws",
+            ));
+        }
+        let missing_summaries = usize::from(result.completed > 0 && summary.is_none())
+            + usize::from(result.efficiency.is_none());
+        if finalization_failures != missing_summaries {
+            return Err(invalid(
+                "each unavailable accumulated summary requires its own finalization failure",
+            ));
+        }
+    }
     for s in [&result.statistics, &result.partial_statistics]
         .into_iter()
         .flatten()
@@ -243,20 +276,72 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
         if s.moments.len() != s.variances.moments.len() {
             return Err(invalid("moment estimate and variance counts differ"));
         }
-        if (s.error.is_none() && (s.variances.error.is_some() || s.conditional_error.is_some()))
-            || (s.conditional_error.is_none() && s.variances.conditional_error.is_some())
+        let enough_samples = s.completed >= 2;
+        let conditional_defined = s.error.is_some() && !s.accepted.is_zero();
+        if s.conditional_error.is_some() != conditional_defined
+            || s.variances.accepted.is_some() != enough_samples
+            || s.variances.error.is_some() != (enough_samples && s.error.is_some())
+            || s.variances.conditional_error.is_some() != (enough_samples && conditional_defined)
+            || s.variances
+                .moments
+                .iter()
+                .any(|v| v.is_some() != enough_samples)
         {
             return Err(invalid(
-                "undefined metrics cannot have estimates or variances",
+                "metric and variance availability must match definitions and completed count",
             ));
         }
     }
-    if result
-        .efficiency
-        .as_ref()
-        .is_some_and(|s| s.completed != result.completed || s.zero_weights > s.completed)
-    {
-        return Err(invalid("efficiency counters disagree with completed draws"));
+    if let Some(e) = &result.efficiency {
+        if e.completed != result.completed || e.zero_weights > e.completed {
+            return Err(invalid("efficiency counters disagree with completed draws"));
+        }
+        let available = e.status == EfficiencyStatus::Available;
+        if e.kappa.is_some() != available
+            || e.variance_coefficient.is_some() != available
+            || e.exact_marginal_variance_coefficient.is_some() != available
+            || e.mean_weight.is_some() != (e.completed > 0)
+            || e.rho.is_some() == e.effective_sample_size.is_zero()
+        {
+            return Err(invalid(
+                "efficiency status and optional diagnostics disagree",
+            ));
+        }
+        if (e.completed < 2
+            && !matches!(
+                e.status,
+                EfficiencyStatus::NoErrorMetric | EfficiencyStatus::InsufficientSamples
+            ))
+            || (e.completed >= 2 && e.status == EfficiencyStatus::InsufficientSamples)
+        {
+            return Err(invalid("efficiency status disagrees with completed count"));
+        }
+        if let Some(s) = summary {
+            if e.mean_weight.as_ref() != Some(&s.mean_weight)
+                || e.effective_sample_size != s.effective_sample_size
+            {
+                return Err(invalid(
+                    "statistics and efficiency weight summaries disagree",
+                ));
+            }
+            let status_matches = if s.error.is_none() {
+                e.status == EfficiencyStatus::NoErrorMetric
+            } else if s.completed < 2 {
+                e.status == EfficiencyStatus::InsufficientSamples
+            } else if s.accepted.is_zero() {
+                e.status == EfficiencyStatus::ZeroAcceptance
+            } else {
+                matches!(
+                    e.status,
+                    EfficiencyStatus::Available | EfficiencyStatus::ZeroResidualVariance
+                )
+            };
+            if !status_matches {
+                return Err(invalid(
+                    "efficiency status disagrees with defined metrics and acceptance",
+                ));
+            }
+        }
     }
     if result
         .sampled_records
@@ -266,6 +351,12 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
         return Err(invalid(
             "retained record count disagrees with completed draws",
         ));
+    }
+    if let Some(rows) = &result.sampled_records
+        && let Some(first) = rows.first()
+        && rows.iter().any(|row| row.len() != first.len())
+    {
+        return Err(invalid("retained record rows must have a common width"));
     }
     if !result.timings.sampling_seconds.is_finite()
         || result.timings.sampling_seconds < 0.0
@@ -277,6 +368,16 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             .is_some_and(|s| !s.is_finite() || s < 0.0)
     {
         return Err(invalid("timings must be finite and nonnegative"));
+    }
+    if result.timings.sampling_seconds > result.timings.total_seconds
+        || result
+            .timings
+            .preparation_seconds
+            .is_some_and(|s| s > result.timings.total_seconds)
+    {
+        return Err(invalid(
+            "total timing cannot be smaller than a measured component",
+        ));
     }
     Ok(())
 }

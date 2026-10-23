@@ -2235,3 +2235,13 @@ Tests check literal binary statistics and standard errors, signed moments,
 `1e-400`/`1e400` values and variances, the direct-rounding subnormal control,
 undefined-versus-zero distinctions, extreme kappa, failed/provisional placement,
 finalization accounting, malformed public state and JSON round trips.
+
+The exporter also rejects unexplained missing completed-prefix summaries,
+ragged retained rows, uncertainty availability inconsistent with sample count,
+and contradictory efficiency status or duplicated weight summaries. Each missing
+accumulated summary requires its own finalization failure; a finalization-only
+failure follows all requested draws. Total time must be at least each measured
+component (components are compared separately to avoid addition rounding).
+The crate enables serde_json's `float_roundtrip` feature so its supported JSON
+writer/reader path preserves binary64 bits, including scientific mantissas
+immediately below one. This does not prescribe other JSON consumers' parsers.
