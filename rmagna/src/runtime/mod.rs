@@ -393,6 +393,13 @@ impl CausalProgram {
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
         self.sampler.scaled_proposal_summary()
     }
+    pub fn prepared_insertion_statistics(
+        &self,
+    ) -> Option<crate::instrument::PreparedInsertionStatistics> {
+        self.reference
+            .as_ref()
+            .and_then(|r| r.prepared_insertion_statistics())
+    }
     pub fn prepared_density_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, RuntimeError> {

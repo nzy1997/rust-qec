@@ -138,6 +138,39 @@ fn effect_bytes(width: usize, observations: usize, count: usize) -> u128 {
         .saturating_add(size_of::<shared::InsertionEffects<'_>>() as u128)
 }
 impl CompiledUnitary {
+    /// Preflight a catalog's conservative table requirement without creating
+    /// or cloning its input words. Does not validate catalog positions/masks.
+    pub fn insertion_preparation_requirement(
+        &self,
+        count: usize,
+        options: InsertionPreparationOptions,
+    ) -> Result<u128, UnitaryError> {
+        if count > options.max_catalog_entries {
+            return Err(UnitaryError::InsertionResourceLimit {
+                option: "max_catalog_entries",
+                limit: options.max_catalog_entries,
+                required: count as u128,
+            });
+        }
+        if count == 0 {
+            return Ok(0);
+        }
+        let (width, observations) = self
+            .program
+            .shared
+            .as_ref()
+            .map_or((0, 0), |s| s.effect_dimensions());
+        let required = estimated_bytes(self.program.reference.width(), self.width(), count)
+            .saturating_add(effect_bytes(width, observations, count));
+        if required > options.max_table_bytes as u128 {
+            return Err(UnitaryError::InsertionResourceLimit {
+                option: "max_table_bytes",
+                limit: options.max_table_bytes,
+                required,
+            });
+        }
+        Ok(required)
+    }
     /// Prepare a supplied catalog against the original immutable program,
     /// even when this receiver is an already perturbed assignment view.
     pub fn prepare_insertions(
@@ -145,13 +178,8 @@ impl CompiledUnitary {
         catalog: &[PauliInsertion],
         options: InsertionPreparationOptions,
     ) -> Result<PreparedInsertions, UnitaryError> {
-        if catalog.len() > options.max_catalog_entries {
-            return Err(UnitaryError::InsertionResourceLimit {
-                option: "max_catalog_entries",
-                limit: options.max_catalog_entries,
-                required: catalog.len() as u128,
-            });
-        }
+        let estimated_peak_bytes =
+            self.insertion_preparation_requirement(catalog.len(), options)?;
         let count = self.program.positions.len() - 1;
         for insertion in catalog {
             if insertion.before_gate > count {
@@ -173,20 +201,6 @@ impl CompiledUnitary {
             });
         }
         let width = self.program.reference.width();
-        let (effect_width, observations) = self
-            .program
-            .shared
-            .as_ref()
-            .map_or((0, 0), |s| s.effect_dimensions());
-        let estimated_peak_bytes = estimated_bytes(width, self.width(), catalog.len())
-            .saturating_add(effect_bytes(effect_width, observations, catalog.len()));
-        if estimated_peak_bytes > options.max_table_bytes as u128 {
-            return Err(UnitaryError::InsertionResourceLimit {
-                option: "max_table_bytes",
-                limit: options.max_table_bytes,
-                required: estimated_peak_bytes,
-            });
-        }
         let mut order = (0..catalog.len()).collect::<Vec<_>>();
         order.sort_unstable_by_key(|&j| Reverse((catalog[j].before_gate, j)));
         let mut suffix = Suffix::identity(width)?;

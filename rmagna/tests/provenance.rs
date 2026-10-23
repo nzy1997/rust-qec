@@ -290,6 +290,12 @@ fn every_resolved_execution_and_export_setting_changes_the_options_digest() {
         |e| e.evaluation.runtime.compile.max_coherent_qubits += 1,
         |e| e.evaluation.runtime.compile.max_gates += 1,
         |e| e.evaluation.runtime.compile.max_noise_sites += 1,
+        |e| {
+            e.evaluation.runtime.compile.insertion_preparation =
+                rmagna::instrument::InsertionPreparation::Prepared(
+                    rmagna::unitary::InsertionPreparationOptions::default(),
+                )
+        },
         |e| e.evaluation.runtime.noise.max_denominator_bits += 1,
         |e| e.evaluation.runtime.noise.max_entropy_words += 1,
         |e| e.evaluation.runtime.sampling.max_terms += 1,
@@ -344,6 +350,22 @@ fn every_resolved_execution_and_export_setting_changes_the_options_digest() {
         }
     }
     let mut first = baseline();
+    let mut insertion_hashes = std::collections::BTreeSet::new();
+    for options in [
+        rmagna::unitary::InsertionPreparationOptions::default(),
+        rmagna::unitary::InsertionPreparationOptions {
+            max_catalog_entries: 9,
+            ..Default::default()
+        },
+        rmagna::unitary::InsertionPreparationOptions {
+            max_table_bytes: 9,
+            ..Default::default()
+        },
+    ] {
+        first.evaluation.runtime.compile.insertion_preparation =
+            rmagna::instrument::InsertionPreparation::Prepared(options);
+        assert!(insertion_hashes.insert(first.fingerprints().options));
+    }
     first.run.execution_limits.max_duration = Some(std::time::Duration::new(u64::MAX, 1));
     let one = first.fingerprints();
     first.run.execution_limits.max_duration = Some(std::time::Duration::new(u64::MAX, 2));
