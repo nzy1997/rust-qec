@@ -1969,3 +1969,322 @@ fn prepared_density_layouts_reject_invalid_shapes_and_preserve_the_vacuum() {
         ExactScalar::one()
     );
 }
+
+#[test]
+fn prepared_insertion_suffixes_match_every_three_qubit_pauli_and_dense_amplitudes() {
+    use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
+    let a = ScalarArithmetic::default();
+    let gates = [
+        C::H(0),
+        C::S { qubit: 1, turns: 0 },
+        C::S { qubit: 0, turns: 1 },
+        C::Cx {
+            control: 0,
+            target: 2,
+        },
+        C::S { qubit: 2, turns: 2 },
+        C::Cz { a: 1, b: 2 },
+        C::S { qubit: 1, turns: 3 },
+        C::X(2),
+        C::Z(0),
+        C::Swap { a: 0, b: 1 },
+        C::H(2),
+    ]
+    .map(G::Clifford);
+    let catalog = (0..=gates.len())
+        .flat_map(|position| {
+            (0..8).flat_map(move |x| {
+                (0..8).map(move |z| PauliInsertion {
+                    before_gate: position,
+                    word: PauliWord::new(
+                        bits(3, x),
+                        bits(3, z),
+                        ((position + x + 3 * z) % 8) as u8,
+                    )
+                    .unwrap(),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 5), &a, strategy)
+            .unwrap();
+        let prepared = base
+            .prepare_insertions(&catalog, InsertionPreparationOptions::default())
+            .unwrap();
+        assert_eq!(prepared.len(), catalog.len());
+        assert!(!prepared.is_empty());
+        for (index, insertion) in catalog.iter().enumerate() {
+            let updated = base
+                .with_prepared_insertions(&prepared, &[index], &a)
+                .unwrap();
+            let expected = dense_inserted(&gates, 3, 5, std::slice::from_ref(insertion), &a);
+            for (output, value) in expected.iter().enumerate() {
+                assert_eq!(
+                    &updated.amplitude(&bits(3, output), 1, &a).unwrap().value,
+                    value,
+                    "{strategy:?} / {index} / {output}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn prepared_mixed_phase_assignments_preserve_order_repetition_and_original_program() {
+    use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(1)),
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 3,
+        },
+        G::Clifford(C::Cx {
+            control: 1,
+            target: 2,
+        }),
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::H(0)),
+        G::T { qubit: 1, turns: 7 },
+    ];
+    // Entries 1 and 2 share a position and anticommute; supplied order matters.
+    let catalog = [
+        (8, 3, 5, 7),
+        (3, 1, 0, 1),
+        (3, 0, 1, 3),
+        (0, 6, 3, 2),
+        (5, 7, 5, 6),
+        (1, 2, 4, 5),
+        (4, 3, 3, 0),
+        (2, 0, 6, 4),
+    ]
+    .map(|(before_gate, x, z, phase)| PauliInsertion {
+        before_gate,
+        word: PauliWord::new(bits(3, x), bits(3, z), phase).unwrap(),
+    });
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let changed = base.with_insertions(&catalog[0..2], &a).unwrap();
+        let prepared = changed
+            .prepare_insertions(&catalog, InsertionPreparationOptions::default())
+            .unwrap();
+        let assignments: &[&[usize]] = &[
+            &[],
+            &[0],
+            &[1, 2],
+            &[2, 1],
+            &[1, 1],
+            &[4, 3, 4],
+            &[7, 2, 7, 0],
+        ];
+        for indices in assignments {
+            let insertions = indices
+                .iter()
+                .map(|&j| catalog[j].clone())
+                .collect::<Vec<_>>();
+            let expected = dense_inserted(&gates, 3, 0, &insertions, &a);
+            let direct = base.with_insertions(&insertions, &a).unwrap();
+            let updated = changed
+                .with_prepared_insertions(&prepared, indices, &a)
+                .unwrap();
+            for (output, value) in expected.iter().enumerate() {
+                assert_eq!(
+                    &updated.amplitude(&bits(3, output), 256, &a).unwrap().value,
+                    value
+                );
+                assert_eq!(
+                    &direct.amplitude(&bits(3, output), 256, &a).unwrap().value,
+                    value
+                );
+            }
+        }
+        // Reversed equal-position order differs by the exact scalar -1.
+        let xz = base
+            .with_prepared_insertions(&prepared, &[1, 2], &a)
+            .unwrap();
+        let zx = base
+            .with_prepared_insertions(&prepared, &[2, 1], &a)
+            .unwrap();
+        for output in 0..8 {
+            assert_eq!(
+                xz.amplitude(&bits(3, output), 256, &a).unwrap().value,
+                zx.amplitude(&bits(3, output), 256, &a)
+                    .unwrap()
+                    .value
+                    .negated()
+            );
+        }
+        let other = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        assert!(matches!(
+            other.with_prepared_insertions(&prepared, &[], &a),
+            Err(UnitaryError::IncompatibleProgram)
+        ));
+        assert!(matches!(
+            base.with_prepared_insertions(&prepared, &[8], &a),
+            Err(UnitaryError::InvalidPreparedInsertion { index: 8, count: 8 })
+        ));
+    }
+}
+
+#[test]
+fn insertion_preparation_budgets_wide_masks_empty_catalogs_and_scalar_vacuum_are_exact() {
+    use rmagna::unitary::InsertionPreparationOptions as Options;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 64,
+        }),
+        G::Clifford(C::S {
+            qubit: 128,
+            turns: 3,
+        }),
+        G::Clifford(C::Swap { a: 1, b: 128 }),
+    ];
+    let base = UnitaryCircuit::new(129, gates)
+        .unwrap()
+        .compile(&BitVector::zeros(129).unwrap(), &a)
+        .unwrap();
+    let catalog = [
+        PauliInsertion {
+            before_gate: 0,
+            word: PauliWord::new(
+                BitVector::from_indices(129, [0, 64, 128]).unwrap(),
+                BitVector::from_indices(129, [1, 63, 128]).unwrap(),
+                7,
+            )
+            .unwrap(),
+        },
+        PauliInsertion {
+            before_gate: 4,
+            word: PauliWord::identity(129).unwrap(),
+        },
+    ];
+    let prepared = base
+        .prepare_insertions(&catalog, Options::default())
+        .unwrap();
+    let bytes = usize::try_from(prepared.estimated_peak_bytes()).unwrap();
+    assert!(
+        base.prepare_insertions(
+            &catalog,
+            Options {
+                max_catalog_entries: 2,
+                max_table_bytes: bytes
+            }
+        )
+        .is_ok()
+    );
+    assert!(
+        matches!(base.prepare_insertions(&catalog,Options{max_table_bytes:bytes-1,..Default::default()}),Err(UnitaryError::InsertionResourceLimit{option:"max_table_bytes",limit,required}) if limit==bytes-1 && required==bytes as u128)
+    );
+    assert!(matches!(
+        base.prepare_insertions(
+            &catalog,
+            Options {
+                max_catalog_entries: 1,
+                ..Default::default()
+            }
+        ),
+        Err(UnitaryError::InsertionResourceLimit {
+            option: "max_catalog_entries",
+            limit: 1,
+            required: 2
+        })
+    ));
+    for chosen in [&[0][..], &[1, 0, 0][..]] {
+        let direct = base
+            .with_insertions(
+                &chosen
+                    .iter()
+                    .map(|&j| catalog[j].clone())
+                    .collect::<Vec<_>>(),
+                &a,
+            )
+            .unwrap();
+        let fast = base
+            .with_prepared_insertions(&prepared, chosen, &a)
+            .unwrap();
+        assert_eq!(
+            direct.overlap(&fast, 1, &a).unwrap().value,
+            ExactScalar::one()
+        );
+    }
+    let empty = base
+        .prepare_insertions(
+            &[],
+            Options {
+                max_catalog_entries: 0,
+                max_table_bytes: 0,
+            },
+        )
+        .unwrap();
+    assert_eq!(empty.estimated_peak_bytes(), 0);
+    assert!(empty.is_empty());
+    let restored = base
+        .with_insertions(&catalog[..1], &a)
+        .unwrap()
+        .with_prepared_insertions(&empty, &[], &a)
+        .unwrap();
+    assert_eq!(
+        restored.overlap(&base, 1, &a).unwrap().value,
+        ExactScalar::one()
+    );
+    let bad = PauliInsertion {
+        before_gate: 5,
+        word: PauliWord::identity(129).unwrap(),
+    };
+    assert!(matches!(
+        base.prepare_insertions(&[bad], Options::default()),
+        Err(UnitaryError::InvalidInsertion {
+            position: 5,
+            gate_count: 4
+        })
+    ));
+    let bad = PauliInsertion {
+        before_gate: 0,
+        word: PauliWord::identity(128).unwrap(),
+    };
+    assert!(matches!(
+        base.prepare_insertions(&[bad], Options::default()),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    let vacuum = UnitaryCircuit::new(0, [])
+        .unwrap()
+        .compile(&bits(0, 0), &a)
+        .unwrap();
+    let scalar = [PauliInsertion {
+        before_gate: 0,
+        word: PauliWord::new(bits(0, 0), bits(0, 0), 3).unwrap(),
+    }];
+    let plan = vacuum
+        .prepare_insertions(&scalar, Options::default())
+        .unwrap();
+    assert_eq!(
+        vacuum
+            .with_prepared_insertions(&plan, &[0, 0, 0], &a)
+            .unwrap()
+            .amplitude(&bits(0, 0), 1, &a)
+            .unwrap()
+            .value,
+        a.omega(1, 0).unwrap()
+    );
+}

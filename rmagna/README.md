@@ -2479,3 +2479,66 @@ normalization, both causal strategies and history samplers, profiled seeded
 equivalence, fresh repeated/concurrent quotas, zero-duration failures before
 work, nested quota exhaustion, exact controlled deadline boundaries and
 nanosecond-preserving fingerprints. Deadline tests do not sleep.
+
+## Prepared Pauli insertion catalogs
+
+`CompiledUnitary::prepare_insertions` prepares an explicit catalog once against
+its immutable original program. `with_prepared_insertions` takes catalog indices
+and combines their pretransported Clifford frames without walking the gate
+sequence again. Shared-layer phase updates and fixed-input observation reduction
+still apply. Different circuit positions are processed in time order; entries
+at one position retain their supplied order, and repeated indices are allowed.
+Every call replaces the assignment relative to the original program, even when
+called on a perturbed view. A catalog cannot be used with a separately compiled
+program, including an otherwise identical circuit.
+
+```rust
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::pauli::PauliWord;
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+use rmagna::unitary::{InsertionPreparationOptions, PauliInsertion, UnitaryCircuit,
+    UnitaryGate};
+
+let arithmetic = ScalarArithmetic::default();
+let base = UnitaryCircuit::new(1, [UnitaryGate::Clifford(CliffordGate::H(0))])?
+    .compile(&BitVector::zeros(1)?, &arithmetic)?;
+let catalog = [PauliInsertion {
+    before_gate: 0,
+    word: PauliWord::new(BitVector::from_indices(1, [0])?, BitVector::zeros(1)?, 0)?,
+}];
+let prepared = base.prepare_insertions(&catalog, InsertionPreparationOptions::default())?;
+let changed = base.with_prepared_insertions(&prepared, &[0], &arithmetic)?;
+assert_eq!(changed.amplitude(&BitVector::from_indices(1, [0])?, 1, &arithmetic)?.value,
+    arithmetic.omega(0, -1)?.negated());
+let restored = changed.with_prepared_insertions(&prepared, &[], &arithmetic)?;
+assert_eq!(restored.overlap(&base, 1, &arithmetic)?.value, ExactScalar::one());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Preparation scans the Clifford gates backward, maintains exact images of input
+X/Z generators, and captures each catalog word's suffix image. Phases remain
+modulo eight, including non-Hermitian words and same-position anticommutation.
+The direct `with_insertions` route remains available. An empty assignment on
+either route now shares the immutable no-fault query reference directly while
+retaining its coefficient-budget check.
+
+`InsertionPreparationOptions` defaults to one million catalog entries and a
+64 MiB conservative preparation estimate. Limits are checked before allocating
+the suffix-image table or cloning catalog entries. `estimated_peak_bytes`
+includes packed masks, entry metadata, sorting/lookup indices and temporary
+word allowance; it excludes the existing compiled program, caller-owned catalog
+and allocator rounding, and is not a process-memory cap. An empty catalog has
+zero table footprint. Applying a selection uses memory proportional to that
+selection and is outside the preparation estimate. Exceeded limits, invalid
+positions/mask widths, invalid selection indices and incompatible programs are
+explicit errors. `UnitaryError` gains `InvalidPreparedInsertion` and
+`InsertionResourceLimit`; exhaustive matches must handle these new variants.
+
+This is the unitary catalog primitive. Instrument noise/decision catalog wiring
+and complete-task throughput validation follow separately. Tests compare every
+three-qubit Pauli at every position to dense exact amplitudes, compare reverse
+suffix images to forward conjugation as phased operators, and retain mixed
+T/CS/CCZ, both compiler strategies, repeated/noncommuting insertions, original
+assignment replacement, 129-wire masks, exact resource boundaries and the
+zero-wire scalar vacuum.
