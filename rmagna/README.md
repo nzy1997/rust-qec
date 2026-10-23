@@ -2759,8 +2759,8 @@ The current `query_preparation: on_demand` declaration is intentional. Cold quer
 modes execute directly; trace/fixed modes create families as requested. Cache
 metadata describes only retained families, with null reference-cache receipts
 for the cold-prefix causal strategy. It does not claim exhaustive preparation of
-all task query families. Full eager preparation, a command-line interface, Python
-bindings and the upstream compatibility ledger remain separate deliverables.
+all task query families. Full eager preparation, Python bindings and the upstream
+compatibility ledger remain separate deliverables.
 
 Tests compare whole reports with exact batches and analytic projected-target,
 recovery and signed-moment values. They cover both causal strategies/history
