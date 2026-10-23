@@ -2637,6 +2637,11 @@ configuration. `FileTask::load` bounds circuit and task reads with
 deleted module files and additions to the caller's registry do not alter the
 captured task. Cloning a `FileTask` shares that immutable snapshot.
 
+Snapshot admission validates captured content and controller identities without
+assuming a future run. Statistics, record-retention and run-dependent fingerprint
+budgets are checked by `fingerprints`, `inspect` and `run` against the supplied
+`TaskRunOptions`; loading does not impose their hypothetical default values.
+
 ```rust
 use std::{collections::BTreeMap, path::Path};
 use rmagna::circuit::{ParseOptions, parse_circuit};

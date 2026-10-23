@@ -21,7 +21,9 @@ pub use provenance::{
     ContentFingerprints, FingerprintError, FingerprintInputs, FingerprintOptions,
     canonical_fingerprint, canonical_raw_fingerprint, fingerprint_content,
 };
-pub(crate) use provenance::{resolved_options, sampling_configuration};
+pub(crate) use provenance::{
+    resolved_options, sampling_configuration, validate_snapshot_fingerprints,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,

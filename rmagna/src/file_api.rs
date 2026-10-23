@@ -8,7 +8,7 @@ use crate::task::{
     BatchExportError, ContentFingerprints, EvaluationOptions, FingerprintError, FingerprintInputs,
     FingerprintOptions, LoadedModules, TaskError, TaskEvaluator, TaskOptions, TaskRunOptions,
     TaskRunResult, export_batch_metrics, fingerprint_content, parse_task, resolved_options,
-    run_task_batch_inspected, sampling_configuration,
+    run_task_batch_inspected, sampling_configuration, validate_snapshot_fingerprints,
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fmt, io::Read, path::Path, sync::Arc, time::Instant};
@@ -138,7 +138,10 @@ impl FileTask {
                 options,
             }),
         };
-        task.fingerprints(&TaskRunOptions::default())?;
+        validate_snapshot_fingerprints(
+            &task.fingerprint_input(&TaskRunOptions::default()),
+            task.inputs.options.fingerprints,
+        )?;
         Ok(task)
     }
     /// Resolve all module paths now; inspection, compilation and runs never

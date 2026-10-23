@@ -326,6 +326,27 @@ pub fn fingerprint_content(
     input: &FingerprintInputs<'_>,
     limits: FingerprintOptions,
 ) -> Result<ContentFingerprints, FingerprintError> {
+    fingerprint_with_options(input, resolved_options(input), limits)
+}
+
+/// Validate captured content without assuming a future run's limits or encoding.
+pub(crate) fn validate_snapshot_fingerprints(
+    input: &FingerprintInputs<'_>,
+    limits: FingerprintOptions,
+) -> Result<(), FingerprintError> {
+    let mut options = resolved_options(input);
+    options
+        .as_object_mut()
+        .expect("resolved options object")
+        .remove("run");
+    fingerprint_with_options(input, options, limits).map(|_| ())
+}
+
+fn fingerprint_with_options(
+    input: &FingerprintInputs<'_>,
+    options: Value,
+    limits: FingerprintOptions,
+) -> Result<ContentFingerprints, FingerprintError> {
     let versions = input.controllers.versions();
     for name in input.controller_identities.keys() {
         if !versions.contains_key(name) {
@@ -343,7 +364,6 @@ pub fn fingerprint_content(
             })
         })
         .collect::<Vec<_>>();
-    let options = resolved_options(input);
     let sampling = sampling_configuration(input.sampling);
     Ok(ContentFingerprints {
         circuit: fingerprint("circuit", &circuit(input.physical), limits)?,

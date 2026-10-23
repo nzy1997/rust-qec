@@ -693,3 +693,146 @@ fn identity_and_run_validation_precede_callbacks_and_preserve_declared_configura
     assert_eq!(missing["execution_costs"]["decoder"]["attempted"], 0);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[test]
+fn snapshot_accepts_explicit_run_statistics_limits_before_any_default_run() {
+    use rmagna::field::ExactField;
+
+    let files = Files::new();
+    let text = json!({"observables": vec![[1_usize, 0]; 63]}).to_string();
+    files.put("physical.magna", "H 0");
+    files.put("task.json", &text);
+    let registry = ControllerRegistry::default();
+    let parsed = loaded(
+        "H 0",
+        &text,
+        &files.0,
+        &registry,
+        options(),
+        NoiseSampling::Physical,
+    );
+    let from_files = FileTask::load(
+        &files.0.join("physical.magna"),
+        Some(&files.0.join("task.json")),
+        &registry,
+        NoiseSampling::Physical,
+        options(),
+        &FileLoadOptions::default(),
+        BTreeMap::new(),
+    )
+    .unwrap();
+    let mut run = TaskRunOptions {
+        shots: 2,
+        ..Default::default()
+    };
+    run.statistics.max_dimensions = 65;
+    for task in [parsed, from_files] {
+        assert!(task.fingerprints(&TaskRunOptions::default()).is_err());
+        assert!(task.inspect(&TaskRunOptions::default()).is_err());
+        assert!(task.run(&TaskRunOptions::default()).is_err());
+        let description = task.inspect(&run).unwrap();
+        assert_eq!(description["route"], "not_compiled");
+        assert_eq!(
+            description["options"]["run"]["statistics"]["max_dimensions"],
+            65
+        );
+        let fresh = task.run(&run).unwrap();
+        assert_eq!(fresh.raw_result().completed, 2);
+        let moments = &fresh.raw_result().statistics.as_ref().unwrap().moments;
+        assert_eq!(moments.len(), 63);
+        assert!(moments.iter().all(|value| value == &ExactField::one()));
+        let compiled = task.compile().unwrap();
+        assert!(compiled.inspect(&TaskRunOptions::default()).is_err());
+        assert!(compiled.run(&TaskRunOptions::default()).is_err());
+        let repeated = compiled.run(&run).unwrap();
+        same_rows(fresh.raw_result(), repeated.raw_result());
+        assert_eq!(
+            fresh.to_json().unwrap()["fingerprints"],
+            task.fingerprints(&run).unwrap().to_json()
+        );
+    }
+}
+
+#[test]
+fn snapshot_fingerprint_admission_does_not_require_hypothetical_run_options_to_fit() {
+    use rmagna::task::{FingerprintInputs, FingerprintOptions, fingerprint_content};
+
+    let files = Files::new();
+    files.put("physical.magna", "H 0");
+    files.put("task.json", "{}");
+    let parse = ParseOptions::default();
+    let physical = parse_circuit("H 0", &parse).unwrap();
+    let modules = parse_task("{}", &files.0, &TaskOptions::default())
+        .unwrap()
+        .load_modules(&physical, &parse)
+        .unwrap();
+    let registry = ControllerRegistry::default();
+    let identities = BTreeMap::new();
+    let sampling = NoiseSampling::Physical;
+    let defaults = FileTaskOptions::default();
+    let mut run = TaskRunOptions {
+        max_retained_record_values: 0,
+        ..Default::default()
+    };
+    run.statistics.max_dimensions = 2;
+    run.execution_limits.max_queries = 0;
+    let mut input = FingerprintInputs {
+        physical: &physical,
+        modules: &modules,
+        controllers: &registry,
+        controller_identities: &identities,
+        evaluation: defaults.evaluation,
+        run,
+        sampling: &sampling,
+        numeric: defaults.numeric,
+    };
+    // Discover the real boundary through the separately tested public encoder.
+    // The contract under test is when validation occurs, not JSON byte counting.
+    let mut lower = 0;
+    let mut upper = FingerprintOptions::default().max_json_bytes;
+    assert!(fingerprint_content(&input, FingerprintOptions::default()).is_ok());
+    while lower + 1 < upper {
+        let middle = lower + (upper - lower) / 2;
+        let limits = FingerprintOptions {
+            max_json_bytes: middle,
+            ..Default::default()
+        };
+        if fingerprint_content(&input, limits).is_ok() {
+            upper = middle;
+        } else {
+            lower = middle;
+        }
+    }
+    let limits = FingerprintOptions {
+        max_json_bytes: upper,
+        ..Default::default()
+    };
+    let expected = fingerprint_content(&input, limits).unwrap();
+    input.run = TaskRunOptions::default();
+    assert!(fingerprint_content(&input, limits).is_err());
+    let options = FileTaskOptions {
+        fingerprints: limits,
+        ..Default::default()
+    };
+    let parsed =
+        FileTask::from_loaded(physical, modules, &registry, sampling, options, identities).unwrap();
+    let from_files = FileTask::load(
+        &files.0.join("physical.magna"),
+        Some(&files.0.join("task.json")),
+        &registry,
+        NoiseSampling::Physical,
+        options,
+        &FileLoadOptions::default(),
+        BTreeMap::new(),
+    )
+    .unwrap();
+    for task in [parsed, from_files] {
+        assert_eq!(task.fingerprints(&run).unwrap(), expected);
+        assert_eq!(
+            task.inspect(&run).unwrap()["fingerprints"],
+            expected.to_json()
+        );
+        assert!(task.fingerprints(&TaskRunOptions::default()).is_err());
+        assert!(task.inspect(&TaskRunOptions::default()).is_err());
+    }
+}
