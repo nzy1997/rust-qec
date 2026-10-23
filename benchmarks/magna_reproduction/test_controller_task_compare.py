@@ -25,11 +25,37 @@ def expected(bit=False):
 
 
 def valid(bit=False):
-    return dict(configuration=dict(max_terms=16, warm_replays=0),
+    return dict(configuration=dict(max_terms=16, warm_replays=0, insertion_preparation="direct",
+                max_insertion_table_bytes=None, max_insertion_catalog_entries=None),
                 warm_replays=None, compile_ms=0, query_ms=0.25, **expected(bit))
 
 
 class ControllerComparisonTests(unittest.TestCase):
+    def test_insertion_admission_keeps_raw_failure_evidence_for_both_modes(self):
+        from argparse import Namespace
+        import insertion_options
+        for mode in ["direct", "prepared"]:
+            args = Namespace(insertion_preparation=mode, max_insertion_table_bytes=None,
+                             max_insertion_catalog_entries=None)
+            base = valid(False)
+            base["configuration"].update(insertion_options.resolved(args))
+            base["prepared_insertions"] = (dict(catalog_entries=2, estimated_peak_bytes=19)
+                                           if mode == "prepared" else None)
+            values = [base, dict(base, configuration={}), dict(base, prepared_insertions={}),
+                      dict(base, prepared_insertions=dict(catalog_entries=True, estimated_peak_bytes=19))]
+            for index, actual in enumerate(values):
+                with self.subTest(mode=mode, index=index):
+                    payload = json.dumps(actual)
+                    result = subprocess.CompletedProcess([], 0, payload, "insertion-stderr")
+                    row = driver.compare_result(result, expected(), 7, 16, False, insertion_args=args)
+                    self.assertEqual(row["reference"], expected())
+                    self.assertEqual(row["status"], "matched" if index == 0 else "failed")
+                    if index:
+                        self.assertEqual(row["returncode"], 0)
+                        self.assertEqual(row["stdout"], payload)
+                        self.assertEqual(row["stderr"], "insertion-stderr")
+                        self.assertTrue(row["error"])
+
     def test_malformed_schema_budget_and_fields_retain_raw_output_and_reference(self):
         malformed = ["unique-malformed-output", "[]", "null"]
         for key, value in [("configuration", []), ("configuration", {"max_terms": 15}),
@@ -141,8 +167,9 @@ class ControllerComparisonTests(unittest.TestCase):
             binary.write_text("unchanged offline identity")
             args = Namespace(upstream=root, one="dk", timeout=1, compiler=None,
                              probability_preparation=None, density_preparation=None,
-                             fiber_search_rank=16, warm_replays=0)
-            for broken, malformed_warm in [(i, warm) for i in [0, 1] for warm in [False, True]]:
+                             fiber_search_rank=16, warm_replays=0, insertion_preparation="direct",
+                             max_insertion_table_bytes=None, max_insertion_catalog_entries=None)
+            for broken, malformed_kind in [(i, kind) for i in [0, 1] for kind in ["schema", "warm", "insertion"]]:
                 calls = []
                 def rust(command, **kwargs):
                     history = json.loads(Path(command[command.index("--history") + 1]).read_text())
@@ -151,9 +178,11 @@ class ControllerComparisonTests(unittest.TestCase):
                     self.assertEqual(command[command.index("--warm-replays") + 1], "0")
                     actual = valid(bool(index))
                     actual["unique_marker"] = f"unique-malformed-history-{index}"
-                    if index == broken and malformed_warm:
+                    if index == broken and malformed_kind == "insertion":
+                        actual["configuration"]["insertion_preparation"] = "prepared"
+                    if index == broken and malformed_kind == "warm":
                         actual["configuration"]["warm_replays"] = False
-                    payload = (f"unique-malformed-history-{index}" if index == broken and not malformed_warm
+                    payload = (f"unique-malformed-history-{index}" if index == broken and malformed_kind == "schema"
                                else json.dumps(actual))
                     return subprocess.CompletedProcess(command, 0, payload, f"stderr-{index}")
                 with patch.dict(sys.modules, modules), patch.object(sys, "path", sys.path[:]), patch.object(driver.subprocess, "run", side_effect=rust):

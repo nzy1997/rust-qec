@@ -419,6 +419,7 @@ pub(super) fn compile(
                 }
             }
             alternatives.push(FaultAlternative {
+                catalog_index: None,
                 probability,
                 word: PauliWord::new(x, z, phase)?,
             });
@@ -430,7 +431,18 @@ pub(super) fn compile(
             identity: site.identity,
         });
     }
+    let insertion_catalog = match options.insertion_preparation {
+        InsertionPreparation::Direct => None,
+        InsertionPreparation::Prepared(options) => Some(Arc::new(insertions::prepare(
+            &unitary,
+            &mut sites,
+            &state.decisions,
+            options,
+        )?)),
+    };
     Ok(CompiledInstrument {
+        insertion_catalog,
+        initial_prepared_insertions: vec![],
         unitary: Arc::new(unitary),
         probability_queries: Arc::new(probabilities::ProbabilityQueries::new(
             options.probability_preparation,

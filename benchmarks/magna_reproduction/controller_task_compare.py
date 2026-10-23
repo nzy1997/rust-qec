@@ -16,6 +16,8 @@ TASKS = ["dk", "logical-distillation", "tqd3", "tqd4", "tqd5"]
 
 
 def main():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import insertion_options
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--rust-example", type=Path, required=True)
@@ -28,7 +30,9 @@ def main():
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=TASKS)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--one", choices=TASKS, help=argparse.SUPPRESS)
+    insertion_options.add_arguments(parser)
     args = parser.parse_args()
+    insertion_options.validate(args, parser)
     if not 0 <= args.warm_replays <= 16:
         parser.error("warm replay count must be between zero and 16")
     if args.fiber_search_rank < 0 or (args.probability_preparation != "fixed" and args.density_preparation != "fixed" and args.fiber_search_rank != 16):
@@ -48,7 +52,7 @@ def main():
     document = dict(schema="rmagna.controller-task-comparison.v1", status="running",
         scope="prescribed no-fault observations from two native entropy endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
         rust_binary_sha256=before, compiler=args.compiler, probability_preparation=args.probability_preparation,
-        density_preparation=args.density_preparation, warm_replays=args.warm_replays,
+        density_preparation=args.density_preparation, warm_replays=args.warm_replays, **insertion_options.resolved(args),
         fiber_search_rank=args.fiber_search_rank if "fixed" in (args.probability_preparation, args.density_preparation) else None, tasks=args.tasks, cases=rows)
     with args.out.open("x", encoding="utf-8") as output:
         output.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
@@ -61,6 +65,7 @@ def main():
         command = [sys.executable, "-I", __file__, "--upstream", str(args.upstream),
                    "--rust-example", str(binary), "--one", name, "--timeout", str(args.timeout)]
         command += ["--warm-replays", str(args.warm_replays)]
+        command += insertion_options.command(args)
         if args.compiler:
             command += ["--compiler", args.compiler]
         if args.probability_preparation:
@@ -143,7 +148,7 @@ def validate_warm_result(actual, count):
 
 def compare_result(result, expected, word, max_terms, classical, compiler=None,
                    probability_preparation=None, fiber_search_rank=16, warm_replays=None,
-                          density_preparation=None):
+                          density_preparation=None, insertion_args=None):
     """Retain one history's raw output even when a successful child is malformed."""
     try:
         actual = json.loads(result.stdout)
@@ -153,6 +158,9 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
         if (not isinstance(config, dict) or type(config.get("max_terms")) is not int
                 or config["max_terms"] != max_terms):
             raise ValueError("Rust example did not apply the declared term budget")
+        if insertion_args is not None:
+            import insertion_options
+            insertion_options.verify(actual, insertion_args)
         validate_warm_result(actual, warm_replays)
         for key, mode in [("probability_preparation", probability_preparation),
                           ("density_preparation", density_preparation)]:
@@ -212,6 +220,7 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
 
 def one(args, binary):
     import reference
+    import insertion_options
     from witness_environment import native_reference
     root = args.upstream.resolve() / "examples" / args.one
     config_path = root / "controllers.json"
@@ -258,6 +267,7 @@ def one(args, binary):
                        "--max-terms", str(options["max_terms"]), "--controllers", str(config_path), "--python", sys.executable,
                        "--module-root", str(root)]
             command += ["--warm-replays", str(args.warm_replays)]
+            command += insertion_options.command(args)
             if args.compiler:
                 command += ["--compiler", args.compiler]
             if args.probability_preparation:
@@ -282,14 +292,14 @@ def one(args, binary):
                                         "error_observables" in compiled.task["raw"], compiler=args.compiler,
                                         probability_preparation=args.probability_preparation,
                                         fiber_search_rank=args.fiber_search_rank, warm_replays=args.warm_replays,
-                                        density_preparation=args.density_preparation))
+                                        density_preparation=args.density_preparation, insertion_args=args))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
                     upstream_commit=captured.manifest["upstream"]["commit"], native_sha256=captured.native_sha256,
                     reference_manifest_sha256=captured.manifest_sha256, rust_binary_sha256=binary_hash,
                     compiler=args.compiler, probability_preparation=args.probability_preparation,
-                    density_preparation=args.density_preparation, warm_replays=args.warm_replays,
+                    density_preparation=args.density_preparation, warm_replays=args.warm_replays, **insertion_options.resolved(args),
         fiber_search_rank=args.fiber_search_rank if "fixed" in (args.probability_preparation, args.density_preparation) else None, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                             for p in (config_path, root / "run.json", root / run["circuit"], root / run["task"])}, cases=cases)
 

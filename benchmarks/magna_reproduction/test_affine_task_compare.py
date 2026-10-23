@@ -23,11 +23,37 @@ def expected():
 
 
 def valid(strategy):
-    return dict(configuration=dict(max_terms=16, warm_replays=0), compilation=dict(strategy=strategy),
+    return dict(configuration=dict(max_terms=16, warm_replays=0, insertion_preparation="direct",
+                max_insertion_table_bytes=None, max_insertion_catalog_entries=None), compilation=dict(strategy=strategy),
                 warm_replays=None, compile_ms=0, query_ms=0.25, **expected())
 
 
 class AffineComparisonTests(unittest.TestCase):
+    def test_insertion_admission_keeps_raw_failure_evidence_for_both_modes(self):
+        from argparse import Namespace
+        import insertion_options
+        for mode in ["direct", "prepared"]:
+            args = Namespace(insertion_preparation=mode, max_insertion_table_bytes=None,
+                             max_insertion_catalog_entries=None)
+            base = valid("SharedCommutingLayer")
+            base["configuration"].update(insertion_options.resolved(args))
+            base["prepared_insertions"] = (dict(catalog_entries=2, estimated_peak_bytes=19)
+                                           if mode == "prepared" else None)
+            values = [base, dict(base, configuration={}), dict(base, prepared_insertions={}),
+                      dict(base, prepared_insertions=dict(catalog_entries=True, estimated_peak_bytes=19))]
+            for index, actual in enumerate(values):
+                with self.subTest(mode=mode, index=index):
+                    payload = json.dumps(actual)
+                    result = subprocess.CompletedProcess([], 0, payload, "insertion-stderr")
+                    row = driver.compare_affine_result(result, expected(), 16, None, insertion_args=args)
+                    self.assertEqual(row["reference"], expected())
+                    self.assertEqual(row["status"], "matched" if index == 0 else "failed")
+                    if index:
+                        self.assertEqual(row["returncode"], 0)
+                        self.assertEqual(row["stdout"], payload)
+                        self.assertEqual(row["stderr"], "insertion-stderr")
+                        self.assertTrue(row["error"])
+
     def test_compiler_validation_retains_raw_output_stderr_and_native_reference(self):
         for compiler, strategy in [("shared", "SharedCommutingLayer"), ("parity_copies", "ParityCopies")]:
             for compilation in [None, [], {}, dict(strategy="wrong"), dict(strategy=strategy)]:
@@ -82,8 +108,8 @@ class AffineComparisonTests(unittest.TestCase):
                    "magna": types.SimpleNamespace(compile_circuit=lambda *args, **kwargs: original),
                    "magna.file_api": types.SimpleNamespace(NoiseDraw=lambda *args: None)}
         for compiler, strategy in [("shared", "SharedCommutingLayer"), ("parity_copies", "ParityCopies")]:
-            for broken, malformed_warm in [(i, warm) for i in [0, 1] for warm in [False, True]]:
-                with self.subTest(compiler=compiler, broken=broken, malformed_warm=malformed_warm), tempfile.TemporaryDirectory() as directory:
+            for broken, malformed_kind in [(i, kind) for i in [0, 1] for kind in ["schema", "warm", "insertion"]]:
+                with self.subTest(compiler=compiler, broken=broken, malformed_kind=malformed_kind), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory).resolve()
                     binary = root / "binary"
                     binary.write_text("offline unchanged binary identity")
@@ -106,7 +132,9 @@ class AffineComparisonTests(unittest.TestCase):
                         actual = valid(strategy)
                         self.assertEqual(command[command.index("--warm-replays") + 1], "0")
                         if index == broken:
-                            if malformed_warm:
+                            if malformed_kind == "insertion":
+                                actual["configuration"]["insertion_preparation"] = "prepared"
+                            elif malformed_kind == "warm":
                                 actual["configuration"]["warm_replays"] = False
                             else:
                                 actual["compilation"] = dict(strategy="wrong") if broken == 0 else []

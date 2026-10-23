@@ -2537,8 +2537,7 @@ positions/mask widths, invalid selection indices and incompatible programs are
 explicit errors. `UnitaryError` gains `InvalidPreparedInsertion` and
 `InsertionResourceLimit`; exhaustive matches must handle these new variants.
 
-This is the unitary catalog primitive. Instrument noise/decision catalog wiring
-and complete-task throughput validation follow separately. Tests compare every
+Tests compare every
 three-qubit Pauli at every position to dense exact amplitudes, compare reverse
 suffix images to forward conjugation as phased operators, and retain mixed
 T/CS/CCZ, both compiler strategies, repeated/noncommuting insertions, original
@@ -2561,3 +2560,47 @@ forward physical Pauli propagation across 129 wires and 130 observations, and
 compare mixed-phase assignments at every boundary against dense amplitudes and
 fixed-resource probability queries. They include late snapshot cuts, shuffled
 catalog order, equal lowered gate boundaries and exact shared-table byte limits.
+
+## Instrument insertion preparation
+
+`instrument::CompileOptions::insertion_preparation` defaults to
+`InsertionPreparation::Direct`. Selecting
+`InsertionPreparation::Prepared(InsertionPreparationOptions::default())` builds
+one immutable catalog containing every physical noise alternative and every
+controller decision's virtual-input X. It checks the combined entry and byte
+limits before constructing the temporary input catalog. The table estimate has
+the scope described above; the compiler's temporary input catalog is excluded,
+as are existing circuit metadata and allocator overhead.
+
+Fault assignments and resolved decision bits select indices into that catalog.
+Filtering inactive guarded categories preserves their original indices, even
+when active site numbers change. Fixed-template branches share the original
+catalog through `Arc`; they do not rebuild it for each history. Cold-prefix
+execution prepares a separate catalog for each compiled prefix and final branch.
+Those catalogs are ephemeral, so its top-level
+`prepared_insertion_statistics()` returns `None`. Linear and fixed-template
+evaluators return the retained reference catalog's entry count and estimated
+peak table bytes, including an explicit zero-entry, zero-byte empty catalog.
+
+`evaluate_task` and both task comparison drivers accept
+`--insertion-preparation direct|prepared`, `--max-insertion-table-bytes N` and
+`--max-insertion-catalog-entries N`. Custom limits require prepared mode. The
+example emits the selected mode and effective limits in `configuration`, and
+retained catalog diagnostics in `prepared_insertions`. The comparison drivers
+validate those fields before accepting a result. All modes retain the same
+exact fault/history semantics and seeded random stream; choosing preparation
+does not change the noise proposal or history sampler.
+
+Tests compare both propagation modes against native affine and causal mass
+witnesses, full seeded task rows and RNG state. They also cover correlated
+Pauli/report categories, inactive guards, multiple controllers, projected
+targets, recovery, signed moments, importance sampling, concurrent use and exact
+catalog resource boundaries. Task-scale timing remains a separate measurement.
+
+Source compatibility: exhaustive `instrument::CompileOptions` literals must
+provide `insertion_preparation` or use `..Default::default()`, and exhaustive
+`InstrumentError` matches must handle `PreparedInsertionCatalogUnavailable`.
+The options fingerprint now records the insertion mode and, for prepared mode,
+both limits. Even direct-mode options digests differ from earlier versions
+because the resolved configuration now includes this field; circuit and module
+content digests retain their existing definitions.

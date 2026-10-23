@@ -231,169 +231,182 @@ fn prescribed_causal_histories_match_pinned_native_joint_masses() {
     );
     let vectors = data["vectors"].as_array().unwrap();
     assert_eq!(vectors.len(), 18);
-    for (index, vector) in vectors.iter().enumerate() {
-        let name = vector["case"].as_str().unwrap().to_owned();
-        let mut registry = ControllerRegistry::default();
-        let majority = name == "majority";
-        registry
-            .register("decision", "1", move |bits: &[bool]| {
-                Ok(vec![if majority {
-                    bits.iter().filter(|&&v| v).count() >= 2
-                } else {
-                    bits.iter().fold(false, |p, b| p ^ b)
-                }])
-            })
-            .unwrap();
-        let source = parse(vector["source"].as_str().unwrap(), &registry);
-        let program =
-            CausalProgram::new(&source, &registry, RuntimeOptions::default(), &a).unwrap();
-        let mut faults = Vec::new();
-        for fault in vector["faults"].as_array().unwrap() {
-            let line = fault["line"].as_u64().unwrap() as usize;
-            let op = source
-                .operations()
-                .iter()
-                .find(|op| {
-                    op.location.line == line && matches!(op.operation, Operation::Noise { .. })
+    for insertion_preparation in [
+        rmagna::instrument::InsertionPreparation::Direct,
+        rmagna::instrument::InsertionPreparation::Prepared(
+            rmagna::unitary::InsertionPreparationOptions::default(),
+        ),
+    ] {
+        for (index, vector) in vectors.iter().enumerate() {
+            let runtime = RuntimeOptions {
+                compile: CompileOptions {
+                    insertion_preparation,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let name = vector["case"].as_str().unwrap().to_owned();
+            let mut registry = ControllerRegistry::default();
+            let majority = name == "majority";
+            registry
+                .register("decision", "1", move |bits: &[bool]| {
+                    Ok(vec![if majority {
+                        bits.iter().filter(|&&v| v).count() >= 2
+                    } else {
+                        bits.iter().fold(false, |p, b| p ^ b)
+                    }])
                 })
                 .unwrap();
-            faults.push(FaultSelection {
-                site: program.potential_site(op.id).unwrap(),
-                alternative: fault["alternative"].as_u64().unwrap() as usize,
-            });
-        }
-        for flip in vector["report_flips"].as_array().unwrap() {
-            let record = flip.as_u64().unwrap() as usize;
-            let op = source
-                .operations()
+            let source = parse(vector["source"].as_str().unwrap(), &registry);
+            let program = CausalProgram::new(&source, &registry, runtime, &a).unwrap();
+            let mut faults = Vec::new();
+            for fault in vector["faults"].as_array().unwrap() {
+                let line = fault["line"].as_u64().unwrap() as usize;
+                let op = source
+                    .operations()
+                    .iter()
+                    .find(|op| {
+                        op.location.line == line && matches!(op.operation, Operation::Noise { .. })
+                    })
+                    .unwrap();
+                faults.push(FaultSelection {
+                    site: program.potential_site(op.id).unwrap(),
+                    alternative: fault["alternative"].as_u64().unwrap() as usize,
+                });
+            }
+            for flip in vector["report_flips"].as_array().unwrap() {
+                let record = flip.as_u64().unwrap() as usize;
+                let op = source
+                    .operations()
+                    .iter()
+                    .find(|op| matches!(op.operation,Operation::Measure {record:r,..} if r==record))
+                    .unwrap();
+                faults.push(FaultSelection {
+                    site: program.potential_site(op.id).unwrap(),
+                    alternative: 0,
+                });
+            }
+            let expected_calls = vector["calls"].as_array().unwrap();
+            let bits = expected_calls
                 .iter()
-                .find(|op| matches!(op.operation,Operation::Measure {record:r,..} if r==record))
+                .flat_map(|call| {
+                    call["inputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|value| value.as_u64().unwrap() != 0)
+                })
+                .collect::<Vec<_>>();
+            let outputs = vector["outputs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect::<Vec<_>>();
+            let draw = program
+                .sample_prescribed(&outputs, &zero(&a), &faults, &mut Words::bits(&bits), &a)
                 .unwrap();
-            faults.push(FaultSelection {
-                site: program.potential_site(op.id).unwrap(),
-                alternative: 0,
-            });
-        }
-        let expected_calls = vector["calls"].as_array().unwrap();
-        let bits = expected_calls
-            .iter()
-            .flat_map(|call| {
-                call["inputs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|value| value.as_u64().unwrap() != 0)
-            })
-            .collect::<Vec<_>>();
-        let outputs = vector["outputs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|v| v.as_u64().unwrap() as usize)
-            .collect::<Vec<_>>();
-        let draw = program
-            .sample_prescribed(&outputs, &zero(&a), &faults, &mut Words::bits(&bits), &a)
+            let mut groups = expected_calls
+                .iter()
+                .map(|call| {
+                    call["inputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() != 0)
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            if name == "guarded" {
+                groups.push(vec![expected_calls[0]["outputs"][0].as_u64().unwrap() != 0]);
+            }
+            let fixed = program
+                .resolve_prescribed_history(&[], &faults, &groups, &a)
+                .unwrap();
+            assert_eq!(fixed.entropy_words(), (0, 0));
+            assert_eq!(fixed.network_compilations(), 0);
+            assert_eq!(program.reference_compilations(), 1);
+            let cold_program = CausalProgram::new(
+                &source,
+                &registry,
+                RuntimeOptions {
+                    strategy: rmagna::runtime::CausalStrategy::ColdPrefix,
+                    ..runtime
+                },
+                &a,
+            )
             .unwrap();
-        let mut groups = expected_calls
-            .iter()
-            .map(|call| {
-                call["inputs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.as_u64().unwrap() != 0)
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-        if name == "guarded" {
-            groups.push(vec![expected_calls[0]["outputs"][0].as_u64().unwrap() != 0]);
-        }
-        let fixed = program
-            .resolve_prescribed_history(&[], &faults, &groups, &a)
-            .unwrap();
-        assert_eq!(fixed.entropy_words(), (0, 0));
-        assert_eq!(fixed.network_compilations(), 0);
-        assert_eq!(program.reference_compilations(), 1);
-        let cold_program = CausalProgram::new(
-            &source,
-            &registry,
-            RuntimeOptions {
-                strategy: rmagna::runtime::CausalStrategy::ColdPrefix,
-                ..Default::default()
-            },
-            &a,
-        )
-        .unwrap();
-        let cold = cold_program
-            .resolve_prescribed_history(&[], &faults, &groups, &a)
-            .unwrap();
-        assert_eq!(cold.history_mass(), fixed.history_mass());
-        assert_eq!(cold.controller_calls(), fixed.controller_calls());
-        assert_eq!(cold.noise_probability(), fixed.noise_probability());
-        assert_eq!(cold.network_compilations(), groups.len() + 1);
-        let cold_masses = cold
-            .instrument()
-            .masses(&outputs, &zero(&a), cold.faults(), 256, &a)
-            .unwrap();
-        assert_eq!(cold_masses.error, draw.masses.error);
-        assert_eq!(cold_masses.accepted.value, draw.masses.accepted.value);
-        assert_eq!(
-            cold_masses.target_success.value,
-            draw.masses.target_success.value
-        );
-        assert_eq!(fixed.history_mass(), &draw.history_mass);
-        assert_eq!(fixed.controller_calls(), draw.controller_calls);
-        let fixed_masses = fixed
-            .instrument()
-            .masses(&outputs, &zero(&a), fixed.faults(), 256, &a)
-            .unwrap();
-        assert_eq!(fixed_masses.accepted.value, draw.masses.accepted.value);
-        assert_eq!(
-            fixed_masses.target_success.value,
-            draw.masses.target_success.value
-        );
-        assert_eq!(fixed_masses.error, draw.masses.error);
-        assert_eq!(draw.controller_calls.len(), expected_calls.len());
-        for (actual, expected) in draw.controller_calls.iter().zip(expected_calls) {
+            let cold = cold_program
+                .resolve_prescribed_history(&[], &faults, &groups, &a)
+                .unwrap();
+            assert_eq!(cold.history_mass(), fixed.history_mass());
+            assert_eq!(cold.controller_calls(), fixed.controller_calls());
+            assert_eq!(cold.noise_probability(), fixed.noise_probability());
+            assert_eq!(cold.network_compilations(), groups.len() + 1);
+            let cold_masses = cold
+                .instrument()
+                .masses(&outputs, &zero(&a), cold.faults(), 256, &a)
+                .unwrap();
+            assert_eq!(cold_masses.error, draw.masses.error);
+            assert_eq!(cold_masses.accepted.value, draw.masses.accepted.value);
             assert_eq!(
-                actual.inputs,
-                expected["inputs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.as_u64().unwrap() != 0)
-                    .collect::<Vec<_>>()
+                cold_masses.target_success.value,
+                draw.masses.target_success.value
             );
+            assert_eq!(fixed.history_mass(), &draw.history_mass);
+            assert_eq!(fixed.controller_calls(), draw.controller_calls);
+            let fixed_masses = fixed
+                .instrument()
+                .masses(&outputs, &zero(&a), fixed.faults(), 256, &a)
+                .unwrap();
+            assert_eq!(fixed_masses.accepted.value, draw.masses.accepted.value);
             assert_eq!(
-                actual.outputs,
-                expected["outputs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|v| v.as_u64().unwrap() != 0)
-                    .collect::<Vec<_>>()
+                fixed_masses.target_success.value,
+                draw.masses.target_success.value
             );
-        }
-        for (actual, key) in [
-            (&draw.history_mass, "history_mass"),
-            (&draw.masses.accepted.value, "acceptance"),
-            (&draw.masses.error, "error"),
-            (&draw.masses.target_success.value, "target_success"),
-        ] {
-            let expected = &vector[key];
-            let coefficients = std::array::from_fn(|j| {
-                expected["coefficients"][j]
-                    .as_str()
-                    .unwrap()
-                    .parse()
-                    .unwrap()
-            });
-            assert_eq!(
-                actual,
-                &a.scalar(coefficients, expected["power"].as_i64().unwrap())
-                    .unwrap(),
-                "{name} vector {index} {key}"
-            );
+            assert_eq!(fixed_masses.error, draw.masses.error);
+            assert_eq!(draw.controller_calls.len(), expected_calls.len());
+            for (actual, expected) in draw.controller_calls.iter().zip(expected_calls) {
+                assert_eq!(
+                    actual.inputs,
+                    expected["inputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() != 0)
+                        .collect::<Vec<_>>()
+                );
+                assert_eq!(
+                    actual.outputs,
+                    expected["outputs"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() != 0)
+                        .collect::<Vec<_>>()
+                );
+            }
+            for (actual, key) in [
+                (&draw.history_mass, "history_mass"),
+                (&draw.masses.accepted.value, "acceptance"),
+                (&draw.masses.error, "error"),
+                (&draw.masses.target_success.value, "target_success"),
+            ] {
+                let expected = &vector[key];
+                let coefficients = std::array::from_fn(|j| {
+                    expected["coefficients"][j]
+                        .as_str()
+                        .unwrap()
+                        .parse()
+                        .unwrap()
+                });
+                assert_eq!(
+                    actual,
+                    &a.scalar(coefficients, expected["power"].as_i64().unwrap())
+                        .unwrap(),
+                    "{name} vector {index} {key}"
+                );
+            }
         }
     }
 }

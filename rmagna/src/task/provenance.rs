@@ -1,7 +1,7 @@
 //! Versioned identities of loaded content and declared configuration.
 use super::{EvaluationOptions, LoadedModules, TaskRunOptions};
 use crate::circuit::Circuit;
-use crate::instrument::QueryPreparation;
+use crate::instrument::{InsertionPreparation, QueryPreparation};
 use crate::noise::NoiseSampling;
 use crate::numeric::NumericOptions;
 use crate::runtime::{CausalStrategy, ControllerRegistry, HistorySampler};
@@ -304,6 +304,10 @@ pub fn fingerprint_content(
         "max_history_queries": runtime.max_history_queries, "max_history_inputs": runtime.max_history_inputs,
         "max_prefix_compiles": runtime.max_prefix_compiles,
         "compile": {
+            "insertion_preparation": match compile.insertion_preparation {
+                InsertionPreparation::Direct=>json!({"mode":"direct"}),
+                InsertionPreparation::Prepared(options)=>json!({"mode":"prepared","max_catalog_entries":options.max_catalog_entries,"max_table_bytes":options.max_table_bytes}),
+            },
             "compiler_strategy": match compile.compiler_strategy { CompilerStrategy::ParityCopies => "parity_copies", CompilerStrategy::SharedCommutingLayer => "shared_commuting_layer" },
             "probability_preparation": preparation(compile.probability_preparation),
             "max_prepared_probabilities": compile.max_prepared_probabilities,
