@@ -6,6 +6,7 @@ struct Input {
     first: usize,
     count: usize,
     active: bool,
+    contributes: bool,
 }
 
 struct Quota {
@@ -263,6 +264,7 @@ impl ActiveFreePredicate {
                 first: variables,
                 count,
                 active,
+                contributes: false,
             };
             variables = variables.checked_add(count)?;
         }
@@ -469,6 +471,7 @@ impl ActiveFreePredicate {
                 }
             }
         }
+        Self::mark_contributing_inputs(&mut inputs, output_words, &columns, &mut quota)?;
         Some(Self {
             eligible,
             inputs,
@@ -478,6 +481,21 @@ impl ActiveFreePredicate {
             words: output_words,
             columns,
         })
+    }
+    fn mark_contributing_inputs(
+        inputs: &mut [Input],
+        words: usize,
+        columns: &[u64],
+        quota: &mut Quota,
+    ) -> Option<()> {
+        for input in inputs {
+            let first = input.first.checked_mul(words)?;
+            let end = input.first.checked_add(input.count)?.checked_mul(words)?;
+            let effects = columns.get(first..end)?;
+            quota.tick(effects.len().checked_add(1)?)?;
+            input.contributes = effects.iter().any(|word| *word != 0);
+        }
+        Some(())
     }
     fn column(&self, variable: usize) -> Option<&[u64]> {
         if variable >= self.variables {
@@ -608,8 +626,19 @@ impl<'a> Iterator for PacketColumns<'a> {
             self.event += 1;
             let input = self.model.inputs[event];
             self.first = input.first;
-            self.count = input.count;
+            self.count = 0;
             self.category = 0;
+            if !input.contributes {
+                // The complete producer has already consumed this event. Keep
+                // its sidecar ordinal even when no detector needs its mask.
+                match kind {
+                    RandomKind::Noise { .. } => self.noise_event += 1,
+                    RandomKind::Independent => self.independent_event += 1,
+                    RandomKind::Active => {}
+                }
+                continue;
+            }
+            self.count = input.count;
             self.masks.fill(0);
             match kind {
                 RandomKind::Active => {
@@ -649,6 +678,10 @@ impl<'a> Iterator for PacketColumns<'a> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "zero_effect_inputs_tests.rs"]
+mod zero_effect_inputs_tests;
 
 impl ActiveFreePredicate {
     // Only a model built from this same immutable plan may be used. The caller
