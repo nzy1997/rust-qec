@@ -7,6 +7,8 @@ struct Input {
     count: usize,
     active: bool,
     contributes: bool,
+    // Immutable category-level support; at most 15 Noise choices per input.
+    contributing_categories: u16,
 }
 
 struct Quota {
@@ -265,6 +267,7 @@ impl ActiveFreePredicate {
                 count,
                 active,
                 contributes: false,
+                contributing_categories: 0,
             };
             variables = variables.checked_add(count)?;
         }
@@ -493,7 +496,19 @@ impl ActiveFreePredicate {
             let end = input.first.checked_add(input.count)?.checked_mul(words)?;
             let effects = columns.get(first..end)?;
             quota.tick(effects.len().checked_add(1)?)?;
-            input.contributes = effects.iter().any(|word| *word != 0);
+            if input.count > 15 {
+                return None;
+            }
+            let mut categories = 0u16;
+            for (offset, &bits) in effects.iter().enumerate() {
+                if bits != 0 {
+                    // A nonempty effects slice implies words > 0. Every
+                    // category is within the checked input range above.
+                    categories |= 1u16 << (offset / words);
+                }
+            }
+            input.contributing_categories = categories;
+            input.contributes = categories != 0;
         }
         Some(())
     }
@@ -601,6 +616,7 @@ struct PacketColumns<'a> {
     first: usize,
     count: usize,
     category: usize,
+    contributing_categories: u16,
     masks: [u64; 15],
 }
 impl<'a> Iterator for PacketColumns<'a> {
@@ -611,14 +627,11 @@ impl<'a> Iterator for PacketColumns<'a> {
                 let category = self.category;
                 self.category += 1;
                 let mask = self.masks[category] & self.all;
-                if mask == 0 {
+                if mask == 0 || self.contributing_categories & (1u16 << category) == 0 {
                     continue;
                 }
                 let model = self.model;
                 let column = model.column(self.first + category)?;
-                if column.iter().all(|word| *word == 0) {
-                    continue;
-                }
                 return Some((column, mask));
             }
             let event = self.event;
@@ -626,6 +639,7 @@ impl<'a> Iterator for PacketColumns<'a> {
             self.event += 1;
             let input = self.model.inputs[event];
             self.first = input.first;
+            self.contributing_categories = input.contributing_categories;
             self.count = 0;
             self.category = 0;
             if !input.contributes {
@@ -682,6 +696,10 @@ impl<'a> Iterator for PacketColumns<'a> {
 #[cfg(test)]
 #[path = "zero_effect_inputs_tests.rs"]
 mod zero_effect_inputs_tests;
+
+#[cfg(test)]
+#[path = "category_effect_mask_tests.rs"]
+mod category_effect_mask_tests;
 
 impl ActiveFreePredicate {
     // Only a model built from this same immutable plan may be used. The caller
@@ -766,6 +784,7 @@ impl ActiveFreePredicate {
             first: 0,
             count: 0,
             category: 0,
+            contributing_categories: 0,
             masks: [0; 15],
         };
         let sweeps = self.sweeps.iter().enumerate().filter_map(|(i, index)| {
