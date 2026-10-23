@@ -29,9 +29,8 @@ impl PhaseUpdates {
         insertions: &BTreeMap<usize, Vec<&PauliWord>>,
     ) -> Result<ParityPhase, UnitaryError> {
         let mut frame = PauliWord::identity(self.width)?;
-        let mut constant = 0;
-        let mut terms = self.outside.clone();
-        let mut selected = self.selected.iter().peekable();
+        let mut flips = BitVector::zeros(self.selected.len())?;
+        let mut selected = self.selected.iter().enumerate().peekable();
         for position in self.cut_gate..self.cliffords.len() {
             // At the cut gate all physical insertions precede the snapshot.
             // Their signs already reside in the copied observation frame.
@@ -42,30 +41,138 @@ impl PhaseUpdates {
                     frame = word.multiply(&frame)?;
                 }
             }
-            while selected.peek().is_some_and(|s| s.gate == position) {
-                let observation = selected.next().expect("peeked selected slot");
+            while selected.peek().is_some_and(|(_, s)| s.gate == position) {
+                let (index, observation) = selected.next().expect("peeked selected slot");
                 let mut flip = false;
                 for &q in &observation.qubits {
                     flip ^= frame.x().get(q)?;
                 }
-                let negative = observation.negative ^ flip;
-                if negative {
-                    constant = (constant + observation.coefficient) & 7;
-                }
-                terms.push((
-                    observation.coordinates.clone(),
-                    if negative {
-                        (8 - observation.coefficient) & 7
-                    } else {
-                        observation.coefficient
-                    },
-                ));
+                flips.set(index, flip)?;
             }
             if let Some(gate) = self.cliffords[position] {
                 frame = frame.conjugated(gate)?;
             }
         }
+        self.phase_from_effects(&flips)
+    }
+    pub(super) fn effect_dimensions(&self) -> (usize, usize) {
+        (self.width, self.selected.len())
+    }
+    pub(super) fn phase_from_effects(
+        &self,
+        flips: &BitVector,
+    ) -> Result<ParityPhase, UnitaryError> {
+        if flips.width() != self.selected.len() {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let mut constant = 0;
+        let mut terms = self.outside.clone();
+        for (index, observation) in self.selected.iter().enumerate() {
+            let negative = observation.negative ^ flips.get(index)?;
+            if negative {
+                constant = (constant + observation.coefficient) & 7;
+            }
+            terms.push((
+                observation.coordinates.clone(),
+                if negative {
+                    (8 - observation.coefficient) & 7
+                } else {
+                    observation.coefficient
+                },
+            ));
+        }
         Ok(ParityPhase::new(self.coordinates, constant, terms)?)
+    }
+}
+
+/// Reverse linear action on later observation signs. Eighth-root global Pauli
+/// phases stay in the separate exact Clifford frame, not these binary masks.
+pub(super) struct InsertionEffects<'a> {
+    updates: &'a PhaseUpdates,
+    x: Vec<BitVector>,
+    z: Vec<BitVector>,
+    cursor: usize,
+    next_selected: usize,
+}
+impl<'a> InsertionEffects<'a> {
+    pub(super) fn new(updates: &'a PhaseUpdates) -> Result<Self, UnitaryError> {
+        let (width, observations) = updates.effect_dimensions();
+        let rows = if observations == 0 { 0 } else { width };
+        Ok(Self {
+            updates,
+            x: vec![BitVector::zeros(observations)?; rows],
+            z: vec![BitVector::zeros(observations)?; rows],
+            cursor: updates.cliffords.len(),
+            next_selected: observations,
+        })
+    }
+    fn prepend(&mut self, gate: CliffordGate) -> Result<(), UnitaryError> {
+        // Only commutation signs matter, so Pauli X/Z gate phases disappear.
+        match gate {
+            CliffordGate::H(q) => std::mem::swap(&mut self.x[q], &mut self.z[q]),
+            CliffordGate::S { qubit, turns } => {
+                if turns & 1 != 0 {
+                    let z = self.z[qubit].clone();
+                    self.x[qubit].xor_assign(&z)?;
+                }
+            }
+            CliffordGate::Cx { control, target } => {
+                let x = self.x[target].clone();
+                self.x[control].xor_assign(&x)?;
+                let z = self.z[control].clone();
+                self.z[target].xor_assign(&z)?;
+            }
+            CliffordGate::Cz { a, b } => {
+                let zb = self.z[b].clone();
+                self.x[a].xor_assign(&zb)?;
+                let za = self.z[a].clone();
+                self.x[b].xor_assign(&za)?;
+            }
+            CliffordGate::Swap { a, b } => {
+                self.x.swap(a, b);
+                self.z.swap(a, b);
+            }
+            CliffordGate::X(_) | CliffordGate::Z(_) => {}
+        }
+        Ok(())
+    }
+    pub(super) fn image_at(
+        &mut self,
+        position: usize,
+        word: &PauliWord,
+    ) -> Result<BitVector, UnitaryError> {
+        let observations = self.updates.selected.len();
+        let mut effects = BitVector::zeros(observations)?;
+        if observations == 0 || position <= self.updates.cut_gate {
+            return Ok(effects);
+        }
+        if position > self.cursor || word.width() != self.updates.width {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        while self.cursor > position {
+            self.cursor -= 1;
+            if let Some(gate) = self.updates.cliffords[self.cursor] {
+                self.prepend(gate)?;
+            }
+            // Direct evaluation observes before applying this gate. The reverse
+            // pass first transports later signs, then installs this observation.
+            while self.next_selected > 0
+                && self.updates.selected[self.next_selected - 1].gate == self.cursor
+            {
+                self.next_selected -= 1;
+                for &q in &self.updates.selected[self.next_selected].qubits {
+                    let value = !self.x[q].get(self.next_selected)?;
+                    self.x[q].set(self.next_selected, value)?;
+                }
+            }
+        }
+        for q in word.x().ones() {
+            effects.xor_assign(&self.x[q])?;
+        }
+        for q in word.z().ones() {
+            effects.xor_assign(&self.z[q])?;
+        }
+        Ok(effects)
     }
 }
 
@@ -382,4 +489,95 @@ pub(super) fn compile(
         program,
         compilation,
     })
+}
+
+#[cfg(test)]
+mod insertion_effect_tests {
+    use super::*;
+    #[test]
+    fn reverse_effects_match_forward_physical_frames_across_mask_words_and_cut() {
+        let gates = vec![
+            Some(CliffordGate::H(0)),
+            Some(CliffordGate::S {
+                qubit: 64,
+                turns: 3,
+            }),
+            Some(CliffordGate::Cx {
+                control: 0,
+                target: 128,
+            }),
+            Some(CliffordGate::Cz { a: 63, b: 64 }),
+            Some(CliffordGate::H(128)),
+            Some(CliffordGate::S { qubit: 0, turns: 1 }),
+            Some(CliffordGate::Swap { a: 64, b: 128 }),
+            Some(CliffordGate::X(63)),
+            Some(CliffordGate::Z(128)),
+            Some(CliffordGate::Cx {
+                control: 128,
+                target: 0,
+            }),
+            Some(CliffordGate::S {
+                qubit: 63,
+                turns: 2,
+            }),
+            None,
+        ];
+        let selected = (0..130)
+            .map(|j| Selected {
+                gate: 3 + j / 15,
+                qubits: vec![j % 129, (j + 64) % 129],
+                coordinates: BitVector::from_indices(131, [j]).unwrap(),
+                coefficient: ([1, 3, 4, 7])[j % 4],
+                negative: j % 3 == 0,
+            })
+            .collect::<Vec<_>>();
+        let updates = PhaseUpdates {
+            width: 129,
+            cut_gate: 3,
+            cliffords: gates,
+            selected,
+            outside: vec![(BitVector::from_indices(131, [130]).unwrap(), 2)],
+            coordinates: 131,
+        };
+        let word = PauliWord::new(
+            BitVector::from_indices(129, [0, 63, 64, 128]).unwrap(),
+            BitVector::from_indices(129, [1, 64, 127]).unwrap(),
+            5,
+        )
+        .unwrap();
+        let mut reverse = InsertionEffects::new(&updates).unwrap();
+        for position in (0..=updates.cliffords.len()).rev() {
+            let actual = reverse.image_at(position, &word).unwrap();
+            let mut frame = PauliWord::identity(129).unwrap();
+            let mut expected = BitVector::zeros(130).unwrap();
+            for gate in updates.cut_gate..updates.cliffords.len() {
+                if gate == position && gate > updates.cut_gate {
+                    frame = word.clone();
+                }
+                for (j, observation) in updates
+                    .selected
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, s)| s.gate == gate)
+                {
+                    let flip = observation
+                        .qubits
+                        .iter()
+                        .fold(false, |v, &q| v ^ frame.x().get(q).unwrap());
+                    expected.set(j, flip).unwrap();
+                }
+                if let Some(c) = updates.cliffords[gate] {
+                    frame = frame.conjugated(c).unwrap();
+                }
+            }
+            assert_eq!(actual, expected, "position {position}");
+            if position <= updates.cut_gate {
+                assert!(actual.is_zero());
+            }
+        }
+        assert!(matches!(
+            updates.phase_from_effects(&BitVector::zeros(129).unwrap()),
+            Err(UnitaryError::DimensionMismatch)
+        ));
+    }
 }

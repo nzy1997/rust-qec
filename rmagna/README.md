@@ -2485,8 +2485,9 @@ nanosecond-preserving fingerprints. Deadline tests do not sleep.
 `CompiledUnitary::prepare_insertions` prepares an explicit catalog once against
 its immutable original program. `with_prepared_insertions` takes catalog indices
 and combines their pretransported Clifford frames without walking the gate
-sequence again. Shared-layer phase updates and fixed-input observation reduction
-still apply. Different circuit positions are processed in time order; entries
+sequence again. Shared-layer observation signs are prepared as binary effects,
+and fixed-input observation reduction still applies. Different circuit positions
+are processed in time order; entries
 at one position retain their supplied order, and repeated indices are allowed.
 Every call replaces the assignment relative to the original program, even when
 called on a perturbed view. A catalog cannot be used with a separately compiled
@@ -2526,7 +2527,8 @@ retaining its coefficient-budget check.
 `InsertionPreparationOptions` defaults to one million catalog entries and a
 64 MiB conservative preparation estimate. Limits are checked before allocating
 the suffix-image table or cloning catalog entries. `estimated_peak_bytes`
-includes packed masks, entry metadata, sorting/lookup indices and temporary
+includes packed frame/sign masks, suffix-image tables, entry metadata,
+sorting/lookup indices and temporary
 word allowance; it excludes the existing compiled program, caller-owned catalog
 and allocator rounding, and is not a process-memory cap. An empty catalog has
 zero table footprint. Applying a selection uses memory proportional to that
@@ -2542,3 +2544,20 @@ suffix images to forward conjugation as phased operators, and retain mixed
 T/CS/CCZ, both compiler strategies, repeated/noncommuting insertions, original
 assignment replacement, 129-wire masks, exact resource boundaries and the
 zero-wire scalar vacuum.
+
+For shared-layer compilation, each catalog entry additionally stores its exact
+effect on the selected non-Clifford observation signs. A reverse binary Clifford
+pass prepares those masks; assignment combines them by XOR and rebuilds the phase
+from fixed observation coordinates, with no scan of the original gate sequence.
+Global eighth-root phases remain in the transported Pauli frame. Insertions at
+or before the reference snapshot cut have zero later sign effect because their
+signs already reside in the copied observations. They still change the boundary
+through their full Clifford frame, so that cut rule does not drop their action.
+
+Sign-generator tables, retained masks and scratch are included in the same
+preparation-byte preflight. Empty catalogs and programs without selected shared
+observations remain valid. Additional tests compare reverse sign effects with
+forward physical Pauli propagation across 129 wires and 130 observations, and
+compare mixed-phase assignments at every boundary against dense amplitudes and
+fixed-resource probability queries. They include late snapshot cuts, shuffled
+catalog order, equal lowered gate boundaries and exact shared-table byte limits.

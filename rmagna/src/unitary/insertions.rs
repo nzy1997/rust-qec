@@ -19,6 +19,7 @@ impl Default for InsertionPreparationOptions {
 struct Entry {
     original: PauliInsertion,
     transported: PauliWord,
+    shared_effect: Option<BitVector>,
 }
 pub struct PreparedInsertions {
     program: Arc<InsertionProgram>,
@@ -126,6 +127,16 @@ fn estimated_bytes(width: usize, physical: usize, count: usize) -> u128 {
             size_of::<PreparedInsertions>() as u128 + 4 * size_of::<Vec<usize>>() as u128,
         )
 }
+fn effect_bytes(width: usize, observations: usize, count: usize) -> u128 {
+    if observations == 0 {
+        return 0;
+    }
+    let masks = (observations.div_ceil(64) as u128).saturating_mul(8);
+    (2 * (width as u128) + 8)
+        .saturating_mul(masks + size_of::<BitVector>() as u128)
+        .saturating_add((count as u128).saturating_mul(masks))
+        .saturating_add(size_of::<shared::InsertionEffects<'_>>() as u128)
+}
 impl CompiledUnitary {
     /// Prepare a supplied catalog against the original immutable program,
     /// even when this receiver is an already perturbed assignment view.
@@ -162,7 +173,13 @@ impl CompiledUnitary {
             });
         }
         let width = self.program.reference.width();
-        let estimated_peak_bytes = estimated_bytes(width, self.width(), catalog.len());
+        let (effect_width, observations) = self
+            .program
+            .shared
+            .as_ref()
+            .map_or((0, 0), |s| s.effect_dimensions());
+        let estimated_peak_bytes = estimated_bytes(width, self.width(), catalog.len())
+            .saturating_add(effect_bytes(effect_width, observations, catalog.len()));
         if estimated_peak_bytes > options.max_table_bytes as u128 {
             return Err(UnitaryError::InsertionResourceLimit {
                 option: "max_table_bytes",
@@ -171,10 +188,14 @@ impl CompiledUnitary {
             });
         }
         let mut order = (0..catalog.len()).collect::<Vec<_>>();
-        order.sort_unstable_by_key(|&j| {
-            Reverse((self.program.positions[catalog[j].before_gate], j))
-        });
+        order.sort_unstable_by_key(|&j| Reverse((catalog[j].before_gate, j)));
         let mut suffix = Suffix::identity(width)?;
+        let mut effects = self
+            .program
+            .shared
+            .as_ref()
+            .map(shared::InsertionEffects::new)
+            .transpose()?;
         let gates = self.program.circuit.gates();
         let mut cursor = gates.len();
         let mut entries = Vec::with_capacity(catalog.len());
@@ -187,10 +208,15 @@ impl CompiledUnitary {
                 suffix.prepend(gates[cursor])?;
             }
             let transported = suffix.image(&original.word, width)?;
+            let shared_effect = effects
+                .as_mut()
+                .map(|e| e.image_at(original.before_gate, &original.word))
+                .transpose()?;
             lookup[index] = entries.len();
             entries.push(Entry {
                 original: original.clone(),
                 transported,
+                shared_effect,
             });
         }
         Ok(PreparedInsertions {
@@ -229,16 +255,32 @@ impl CompiledUnitary {
                 .push(entry);
         }
         let mut frame = PauliWord::identity(self.program.reference.width())?;
+        let mut effects = self
+            .program
+            .shared
+            .as_ref()
+            .map(|s| BitVector::zeros(s.effect_dimensions().1))
+            .transpose()?;
         let mut grouped = BTreeMap::new();
         for (&position, entries) in &ordered {
             let mut words = Vec::with_capacity(entries.len());
             for entry in entries {
                 frame = entry.transported.multiply(&frame)?;
+                if let (Some(total), Some(effect)) = (&mut effects, &entry.shared_effect) {
+                    total.xor_assign(effect)?;
+                }
                 words.push(&entry.original.word);
             }
             grouped.insert(position, words);
         }
-        self.with_insertion_frame(&frame, &grouped, arithmetic)
+        let phase = self
+            .program
+            .shared
+            .as_ref()
+            .zip(effects.as_ref())
+            .map(|(s, e)| s.phase_from_effects(e).map(Arc::new))
+            .transpose()?;
+        self.with_insertion_frame(&frame, &grouped, phase, arithmetic)
     }
 }
 

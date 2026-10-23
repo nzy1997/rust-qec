@@ -543,16 +543,19 @@ impl CompiledUnitary {
                 }
             }
         }
-        self.with_insertion_frame(&frame, &grouped, arithmetic)
+        self.with_insertion_frame(&frame, &grouped, None, arithmetic)
     }
     fn with_insertion_frame(
         &self,
         frame: &PauliWord,
         grouped: &BTreeMap<usize, Vec<&PauliWord>>,
+        phase_override: Option<Arc<ParityPhase>>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, UnitaryError> {
         let boundary = Arc::new(frame.apply(&self.program.reference, arithmetic)?);
-        let phase = if let Some(updates) = &self.program.shared {
+        let phase = if let Some(phase) = phase_override {
+            phase
+        } else if let Some(updates) = &self.program.shared {
             Arc::new(updates.phase(grouped)?)
         } else {
             Arc::clone(&self.program.reference_phase)

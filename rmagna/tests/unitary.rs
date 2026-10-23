@@ -2288,3 +2288,116 @@ fn insertion_preparation_budgets_wide_masks_empty_catalogs_and_scalar_vacuum_are
         a.omega(1, 0).unwrap()
     );
 }
+
+#[test]
+fn prepared_shared_signs_cover_late_snapshot_cuts_and_equal_lowered_boundaries() {
+    use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::T { qubit: 2, turns: 1 },
+        G::Clifford(C::H(2)),
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::T { qubit: 0, turns: 1 },
+        G::T { qubit: 1, turns: 3 },
+        G::T { qubit: 2, turns: 7 },
+        G::Clifford(C::S { qubit: 0, turns: 3 }),
+        G::Clifford(C::Cz { a: 0, b: 1 }),
+        G::T { qubit: 0, turns: 5 },
+        G::Clifford(C::Swap { a: 0, b: 1 }),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::T { qubit: 1, turns: 1 },
+        G::Clifford(C::H(0)),
+        G::Cs {
+            a: 0,
+            b: 1,
+            turns: 3,
+        },
+    ];
+    let base = UnitaryCircuit::new(3, gates)
+        .unwrap()
+        .compile_with_strategy(&bits(3, 3), &a, CompilerStrategy::SharedCommutingLayer)
+        .unwrap();
+    assert!(base.compilation().reference_layer.unwrap() > 0);
+    let mut catalog = (0..=gates.len())
+        .flat_map(|position| {
+            [1, 2, 3, 5, 7].into_iter().flat_map(move |x| {
+                [0, 1, 4, 7].into_iter().map(move |z| PauliInsertion {
+                    before_gate: position,
+                    word: PauliWord::new(bits(3, x), bits(3, z), ((position + x + z) % 8) as u8)
+                        .unwrap(),
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut shuffle = 0x72fa891;
+    for j in (1..catalog.len()).rev() {
+        let k = next(&mut shuffle) % (j + 1);
+        catalog.swap(j, k);
+    }
+    let plan = base
+        .prepare_insertions(&catalog, InsertionPreparationOptions::default())
+        .unwrap();
+    let bytes = usize::try_from(plan.estimated_peak_bytes()).unwrap();
+    assert!(
+        base.prepare_insertions(
+            &catalog,
+            InsertionPreparationOptions {
+                max_table_bytes: bytes,
+                ..Default::default()
+            }
+        )
+        .is_ok()
+    );
+    assert!(
+        matches!(base.prepare_insertions(&catalog,InsertionPreparationOptions{max_table_bytes:bytes-1,..Default::default()}),Err(UnitaryError::InsertionResourceLimit{required,..}) if required==bytes as u128)
+    );
+    let row = [bits(3, 1)];
+    let frozen = base
+        .prepare_probability_with_fibers(&row, 1024, rmagna::fibers::FiberOptions::default(), &a)
+        .unwrap();
+    let mut cases = (0..catalog.len()).map(|j| vec![j]).collect::<Vec<_>>();
+    let mut seed = 0x8155c13;
+    cases.extend((0..48).map(|_| {
+        (0..4)
+            .map(|_| next(&mut seed) % catalog.len())
+            .collect::<Vec<_>>()
+    }));
+    cases.extend([vec![1, 1], vec![25, 4, 25, 4], vec![48, 46, 3, 48]]);
+    for selected in cases {
+        let insertions = selected
+            .iter()
+            .map(|&j| catalog[j].clone())
+            .collect::<Vec<_>>();
+        let expected = dense_inserted(&gates, 3, 3, &insertions, &a);
+        let changed = base.with_prepared_insertions(&plan, &selected, &a).unwrap();
+        let direct = base.with_insertions(&insertions, &a).unwrap();
+        for (output, value) in expected.iter().enumerate() {
+            assert_eq!(
+                &changed.amplitude(&bits(3, output), 1024, &a).unwrap().value,
+                value
+            );
+            assert_eq!(
+                &direct.amplitude(&bits(3, output), 1024, &a).unwrap().value,
+                value
+            );
+        }
+        let event = expected
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| j & 1 == 1)
+            .try_fold(ExactScalar::zero(), |s, (_, v)| {
+                a.add(&s, &a.norm_squared(v).unwrap())
+            })
+            .unwrap();
+        assert_eq!(
+            frozen
+                .evaluate(&changed, &bits(1, 1), 1024, &a)
+                .unwrap()
+                .value,
+            event
+        );
+    }
+}
