@@ -74,6 +74,13 @@ fn execute(args: &Args) -> Result<Value> {
                 Err(error) => output::export_failure(&report, &error),
             }
         }
+        Mode::Enumerate => {
+            let report = task.enumerate(&args.enumeration)?;
+            match report.to_json() {
+                Ok(value) => value,
+                Err(error) => output::enumeration_export_failure(&report, &error),
+            }
+        }
     };
     value["controller_process"] = worker.as_ref().map_or(
         Value::Null,
@@ -99,7 +106,10 @@ pub fn main() -> u8 {
     };
     let help = (raw.len() == 1 && matches!(raw[0].as_str(), "--help" | "-h"))
         || (raw.len() == 2
-            && matches!(raw[0].as_str(), "run" | "inspect" | "validate")
+            && matches!(
+                raw[0].as_str(),
+                "run" | "inspect" | "validate" | "enumerate"
+            )
             && matches!(raw[1].as_str(), "--help" | "-h"));
     if help || raw == ["--version"] {
         let text = if help {
