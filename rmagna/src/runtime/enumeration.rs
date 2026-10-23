@@ -269,6 +269,7 @@ impl CausalProgram {
                     budget: &budget,
                     available_branches,
                 },
+                None,
             ) {
                 Ok(history) => {
                     if history

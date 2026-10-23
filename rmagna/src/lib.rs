@@ -2,6 +2,7 @@
 
 pub mod circuit;
 pub mod clifford;
+pub mod costs;
 pub mod enumeration;
 pub mod field;
 pub mod gf2;
