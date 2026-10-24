@@ -3094,9 +3094,11 @@ snapshot and any successful partial compilation. An ordinary compilation or
 family failure returns a failed report with costs, timing, fingerprints and
 failure context. `partial_task()` and `into_parts()` retain compiled resources
 for explicit inspection or retry; session `inspect` and `run` require a
-successful preparation result. Fingerprint/configuration errors before execution
-remain `FileApiError`s. Metadata failure leaves the typed stage result intact
-but prevents the session from claiming completed preparation.
+successful preparation result. Fresh and reused preparation expose fingerprint
+admission failures through owned failed `preparation.metadata` reports, including
+failures before compilation starts. Check `report().is_complete()` and
+`report().metadata_failure()`. Metadata failure preserves a typed stage result
+when one exists, but prevents the session from claiming completed preparation.
 
 `CompiledFileTask::prepare_sampling` also accepts fresh preparation limits and
 returns an owned receipt. Its call-local costs exclude prior compilation and
