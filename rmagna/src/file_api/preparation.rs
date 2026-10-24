@@ -189,17 +189,25 @@ impl FileTask {
         &self,
         options: &FilePreparationOptions,
     ) -> Result<PreparedFileTask, FileApiError> {
+        Ok(self.prepare_sampling_owned(options))
+    }
+    // Shared owned implementation prevents comparison from discarding another
+    // completed pilot through an outer preparation error.
+    pub(super) fn prepare_sampling_owned(
+        &self,
+        options: &FilePreparationOptions,
+    ) -> PreparedFileTask {
         let started = Instant::now();
         let meter = ExecutionMeter::new(options.execution_limits);
         let mut metadata = match self.preparation_descriptor(options, None) {
             Ok(metadata) => metadata,
             Err((metadata, error)) => {
-                return Ok(PreparedFileTask {
+                return PreparedFileTask {
                     compiled: None,
                     report: metadata_failure_report(
                         metadata, error, options, &meter, started, None,
                     ),
-                });
+                };
             }
         };
         let i = &self.inputs;
@@ -225,17 +233,17 @@ impl FileTask {
                 };
                 let report =
                     compiled.prepare_sampling_report(metadata, options, &meter, started, true);
-                Ok(PreparedFileTask {
+                PreparedFileTask {
                     compiled: Some(compiled),
                     report,
-                })
+                }
             }
             Err(error) => {
                 metadata["route"] = json!("unavailable");
                 metadata["compilation"] = json!({"status":"preparation_failed","query_preparation":"not_started",
                     "preparation_seconds":preparation.seconds,"preparation_costs":costs_json(preparation.costs),
                     "preparation_limits":preparation.limits.to_json(),"preparation_included_in_this_call":true});
-                Ok(PreparedFileTask {
+                PreparedFileTask {
                     compiled: None,
                     report: FilePreparationReport {
                         options: *options,
@@ -246,7 +254,7 @@ impl FileTask {
                         execution_costs: meter.snapshot(),
                         seconds: started.elapsed().as_secs_f64(),
                     },
-                })
+                }
             }
         }
     }

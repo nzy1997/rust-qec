@@ -3138,3 +3138,52 @@ if prepared.report().is_complete() {
 ```
 
 File preparation includes descriptor/fingerprint work in its total elapsed time and shared deadline. If fingerprint admission fails, the owned failed preparation receipt preserves resolved options, the metadata failure and known compilation/query costs; unavailable fingerprints are explicit null values. Fresh sessions do not compile after that failure. Reused compiled tasks remain owned by their caller and expose their prior compilation costs separately.
+
+## Independent history-sampler pilots
+
+`FileTask::compare_samplers(&FileSamplerComparisonOptions)` compiles and
+explicitly prepares a fresh task for each history sampler. `pilot.shots` must be
+at least two per channel; affine-support uses `pilot.seed` and exact-marginal
+uses checked `pilot.seed + 1`. Seed overflow, invalid pilot configuration,
+cold-prefix execution and non-fixed policies for used scalar families are
+rejected before callbacks or sampling. Unused density/moment policies need not
+be fixed. Preparation and sampling have separate per-channel limits and timing
+scopes. The original file task's configuration remains unchanged.
+
+The owned comparison retains each preparation receipt and typed batch, including
+partial or failed batches. The second channel is attempted after an ordinary
+failed first pilot. Numerical-export failures retain typed batches and actual
+counts, but persist no fabricated estimates. Use `affine_support()` and
+`exact_marginal()` for immutable pilot evidence, `status()` and `reason()` for
+the comparison outcome, and `decision()` for an optional recommendation.
+
+Complete successful pilots with an available ordinary-range affine efficiency
+estimate use `Gamma = kappa * (affine_sampling_seconds / exact_sampling_seconds)`.
+The binary64 operation order, overflow rejection and tie rule match the pinned
+native binding: recommend exact-marginal only for `Gamma > 1`; ties recommend
+affine-support. `Gamma` is a pilot point estimate, not a precision guarantee.
+Missing error metrics, zero residual variance, numerical-range limits or invalid
+times produce no recommendation. Inspect preparation and resource costs
+separately. The JSON report always states `automatic_switching: false` and
+`production_started: false`; no production run occurs.
+
+```rust
+use rmagna::file_api::{FileApiError, FileSamplerComparisonOptions, FileTask};
+# fn compare(task: &FileTask) -> Result<(), FileApiError> {
+let mut options = FileSamplerComparisonOptions::default();
+options.pilot.shots = 32;
+options.pilot.seed = 7;
+// The task must configure fixed preparation for its used scalar families.
+let report = task.compare_samplers(&options)?;
+let evidence = report.to_json();
+assert_eq!(evidence["automatic_switching"], false);
+# Ok(())
+# }
+```
+
+Preparation fingerprint failures are owned failed pilot receipts, including before
+compilation. Each channel admits its own run descriptor before drawing; a later
+channel's metadata failure preserves an earlier completed pilot and both
+preparation receipts. Global invalid-count/seed/route/policy errors are rejected
+before either channel compiles. Scientific-range kappa remains inconclusive with
+an explicit range reason rather than a misleading available reason.
