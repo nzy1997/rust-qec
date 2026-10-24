@@ -1,4 +1,6 @@
 //! Causal reported-history proposals, controllers and guarded-noise execution.
+mod preparation;
+pub(crate) use preparation::sampling_layout_expression;
 mod enumeration;
 pub mod process;
 pub use enumeration::{EnumeratedHistories, HistoryEnumerationOptions};
@@ -28,6 +30,9 @@ pub use registry::{Controller, ControllerRegistry};
 use std::{collections::BTreeMap, fmt};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuntimeError {
+    PreparationUnavailable {
+        strategy: &'static str,
+    },
     Cost(CostError),
     EnumerationLimit {
         option: &'static str,
@@ -76,6 +81,10 @@ pub enum RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::PreparationUnavailable { strategy } => write!(
+                f,
+                "reusable sampling-family preparation requires fixed_template; {strategy} compiles history-specific programs"
+            ),
             Self::Cost(error) => error.fmt(f),
             Self::EnumerationLimit {
                 option,

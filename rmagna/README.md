@@ -3017,3 +3017,65 @@ This API prepares only the layouts supplied by its caller. It does not imply
 that all queries of a task have been prepared, and does not increment execution
 query or circuit-compilation counters. Task-level eager planning, its timing
 receipt and deadline accounting require a separate execution stage.
+
+## Preparing task sampling families
+
+`TaskEvaluator::prepare_sampling_queries(options, &meter)` explicitly prepares
+its configured reusable sampling families. Linear tasks prepare acceptance,
+the selected classical-error or target-density family, and declared Pauli
+moments. Fixed-template causal tasks additionally prepare observation geometry
+for all external controls (including zero-input controls), the first guard of
+each potential noise category, and terminal requested records. Decision atoms
+become constants in layouts; callbacks are never invoked. Actual decisions,
+nonzero measurement outcomes, report flips and physical faults remain data for
+later evaluations against those same families.
+
+For `exact_marginal`, preparation includes each group's condition prefix and
+every subsequent bit prefix. For `affine_support`, it validates the captured
+structural support parent and records a `cold` request; no numerical support
+cache is retained. Both prepare the complete final-history probability and the
+conditioned task-response families. The stage does not request unused support
+parents for linear or exact-marginal tasks. `cold_prefix` returns an explicit
+unsupported-scope error because its history-specific programs have no reusable
+fixed template. Exact enumeration can use different query layouts and is
+outside this sampling-family preparation scope.
+
+The owned `SamplingPreparationReport` includes the result, execution route,
+options, logical history/layout row counts, wall time, and per-kind plus total
+planned/attempted/created/reused/cold/failed counts. Planned requests include
+semantic requests sharing the same physical key. The planner checks
+`max_requests`, `max_history_rows` and `max_layout_rows` before constructing any
+query resource. The last limit bounds duplicated logical prefix rows, rather
+than replacing compiled physical-matrix or fiber budgets. On a preflight error,
+planned counts describe the accepted bounded prefix and attempted counts stay
+zero. A construction failure retains completed families and their counts;
+repeating the explicit stage reuses that successful prefix.
+
+The caller's `ExecutionMeter` deadline is checked before planning, between
+resource constructions and after the final construction. An individual exact
+construction is not preempted. Deadline and preflight failures do not invent a
+failed construction attempt. The stage does not consume entropy, evaluate a
+scalar or increment compiler/query/decoder/support operation counters, even
+with a zero scalar-query quota. Its measured wall time is a separate receipt.
+Existing target normalization remains a real scalar query during evaluator
+construction, outside this stage.
+
+A successful receipt can contain `cold` requests. `all_families_retained()`
+requires successful completion and no cold request, so an affine-support
+receipt remains false even when every scalar family is retained. Trace plans still defer
+phase-resource construction until evaluation. Neither this method nor a cache
+count alone establishes that subsequent sampling has no preparation cost.
+File/CLI eager modes and sampler comparison require their own integration.
+
+```rust
+use rmagna::costs::ExecutionMeter;
+use rmagna::task::{SamplingPreparationOptions, TaskError, TaskEvaluator};
+# fn prepare(evaluator: &TaskEvaluator) -> Result<(), TaskError> {
+let report = evaluator.prepare_sampling_queries(
+    SamplingPreparationOptions::default(),
+    &ExecutionMeter::default(),
+);
+report.result?;
+# Ok(())
+# }
+```

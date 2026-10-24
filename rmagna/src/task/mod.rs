@@ -5,10 +5,11 @@ pub use export::{BatchExportError, export_batch_metrics};
 mod evaluate;
 pub(crate) use evaluate::run_task_batch_inspected;
 pub use evaluate::{
-    ContractionResources, EvaluationOptions, ExactInterval, RunFailure, RunPhase, RunStatus,
-    RunTimings, TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator,
-    TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskVariances,
-    TaskWeightSector, run_task_batch,
+    ContractionResources, EvaluationOptions, ExactInterval, FamilyPreparationCounts, RunFailure,
+    RunPhase, RunStatus, RunTimings, SamplingPreparationOptions, SamplingPreparationReport,
+    TaskEnumeration, TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskRunOptions,
+    TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskVariances, TaskWeightSector,
+    run_task_batch,
 };
 mod parse;
 mod provenance;
