@@ -5,7 +5,9 @@ mod gates;
 mod insertions;
 mod lower;
 mod moments;
+mod preparation;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
+pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -546,14 +548,7 @@ impl CompiledInstrument {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<NetworkValue, InstrumentError> {
-        if word.width() != outputs.len() {
-            return Err(UnitaryError::DimensionMismatch.into());
-        }
-        let physical = self.output_wires(outputs)?;
-        let map = |mask: &BitVector| {
-            BitVector::from_indices(self.unitary.width(), mask.ones().map(|j| physical[j]))
-        };
-        let word = PauliWord::new(map(word.x())?, map(word.z())?, word.phase())?;
+        let word = self.physical_word(outputs, word)?;
         self.moment_queries.evaluate(
             &self.inserted(faults, arithmetic)?,
             &word,
@@ -562,6 +557,24 @@ impl CompiledInstrument {
             max_terms,
             arithmetic,
         )
+    }
+    fn physical_word(
+        &self,
+        outputs: &[usize],
+        word: &PauliWord,
+    ) -> Result<PauliWord, InstrumentError> {
+        if word.width() != outputs.len() {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        let physical = self.output_wires(outputs)?;
+        let map = |mask: &BitVector| {
+            BitVector::from_indices(self.unitary.width(), mask.ones().map(|j| physical[j]))
+        };
+        Ok(PauliWord::new(
+            map(word.x())?,
+            map(word.z())?,
+            word.phase(),
+        )?)
     }
     pub fn masses(
         &self,

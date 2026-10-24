@@ -316,7 +316,7 @@ pub struct DensityLayout<'a> {
     pub event_rows: &'a [BitVector],
 }
 impl DensityLayout<'_> {
-    fn validate(&self, width: usize) -> Result<(), UnitaryError> {
+    pub(crate) fn validate(&self, width: usize) -> Result<(), UnitaryError> {
         if self.event_rows.iter().any(|r| r.width() != width) {
             return Err(UnitaryError::DimensionMismatch);
         }

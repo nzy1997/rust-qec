@@ -2982,3 +2982,38 @@ Exact sector reports retain `target_normalization` as compact coefficients of
 retain their captured norm after source deletion or numerical export failure.
 Accepted, error and target-success masses are already normalized; consumers must
 not divide by this norm again. The field is null when no target is configured.
+
+## Explicit instrument query preparation
+
+`CompiledInstrument::prepare_query` accepts an `InstrumentQueryLayout` and
+returns `QueryPreparationOutcome::{Created, Reused, Cold}`. The layouts cover
+acceptance, reported probability, accepted probability, target density overlap,
+Pauli moments, and the reported-support parent. Preparation validates logical
+records, output maps and target layouts even when a scalar family's configured
+policy is `Cold`. In that case it returns `Cold` without retaining a scalar
+plan. The reported-support layout validates the existing structural record transport
+and returns `Cold`: conservative affine support has no retained numerical family.
+Its phase-independent on-demand behavior and sampling semantics remain unchanged.
+
+The call constructs the same immutable family used by subsequent evaluations.
+It uses the original compiled reference and takes no noise assignment, outcome
+bits, random stream or decoder callback. It does not evaluate a scalar response
+or select a history. Outcome constants remain right-hand-side data for later
+queries, so one prepared family covers nonzero outcomes and physical/readout
+faults. Equivalent physical keys deduplicate across layout kinds: acceptance
+and a reported probability with the same ordered physical rows reuse one plan.
+Pauli keys include the complex phase; density keys preserve output ordering and
+target program identity.
+
+Fixed-resource term limits apply to both newly created and reused plans.
+Construction failures publish no incomplete plan. A certified zero projected
+Pauli moment retains a family without constructing a phase resource, including
+with a zero term budget. An explicit resource-preparation request can fail a
+term cap even when a later query with an inconsistent outcome can return zero
+without contracting that resource. Trace preparation retains geometry without
+freezing a phase resource; its contraction budget is checked on evaluation.
+
+This API prepares only the layouts supplied by its caller. It does not imply
+that all queries of a task have been prepared, and does not increment execution
+query or circuit-compilation counters. Task-level eager planning, its timing
+receipt and deadline accounting require a separate execution stage.

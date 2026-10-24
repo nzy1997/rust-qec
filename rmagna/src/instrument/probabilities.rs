@@ -73,16 +73,47 @@ impl ProbabilityQueries {
         if matches!(self.mode, ProbabilityPreparation::Cold) {
             return Ok(state.probability_z(rows, outcomes, max_terms, arithmetic)?);
         }
+        let (plan, _) = self.plan(state, rows, max_terms, arithmetic)?;
+        Ok(plan.evaluate(state, outcomes, max_terms, arithmetic)?)
+    }
+    pub(super) fn prepare(
+        &self,
+        state: &CompiledUnitary,
+        rows: &[BitVector],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<QueryPreparationOutcome, InstrumentError> {
+        if rows.iter().any(|r| r.width() != state.width()) {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        state
+            .width()
+            .checked_add(rows.len())
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        if matches!(self.mode, ProbabilityPreparation::Cold) {
+            return Ok(QueryPreparationOutcome::Cold);
+        }
+        let (plan, outcome) = self.plan(state, rows, max_terms, arithmetic)?;
+        super::preparation::validate_resource(plan.fixed_phase_resource(), max_terms)?;
+        Ok(outcome)
+    }
+    fn plan(
+        &self,
+        state: &CompiledUnitary,
+        rows: &[BitVector],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<(Arc<PreparedProbability>, QueryPreparationOutcome), InstrumentError> {
         // One lock serializes preparation and enforces the bound across threads.
         // Evaluation runs after releasing it. Plans own programs, while programs
         // never own this cache, so retaining branches creates no reference cycle.
-        let plan = {
+        let result = {
             let mut plans = self
                 .plans
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
             if let Some(plan) = plans.get(rows) {
-                Arc::clone(plan)
+                (Arc::clone(plan), QueryPreparationOutcome::Reused)
             } else {
                 if plans.len() >= self.limit {
                     return Err(InstrumentError::ResourceLimit {
@@ -99,9 +130,9 @@ impl ProbabilityQueries {
                 };
                 let plan = Arc::new(plan);
                 plans.insert(rows.to_vec(), Arc::clone(&plan));
-                plan
+                (plan, QueryPreparationOutcome::Created)
             }
         };
-        Ok(plan.evaluate(state, outcomes, max_terms, arithmetic)?)
+        Ok(result)
     }
 }
