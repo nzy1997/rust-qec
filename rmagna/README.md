@@ -3525,3 +3525,43 @@ finite phase functions. The external comparison harness uses the stronger
 check and confirms all 15 pinned cores are already canonical, with identical
 ordinary and Python `-O` receipts. This normalization primitive does not yet
 select or transport catalogue terms in quantum queries.
+
+## Prepared catalogue phase resources
+
+`catalogue::PreparedCataloguePhase::new` prepares a matched certified
+constrained decomposition for one reference `ParityPhase`. It fixes the
+Clifford quotient, canonical table, coordinate maps and each term's affine
+support. The resource owns its coefficients and geometry after the catalogue
+and reference are dropped. `Ok(None)` reports no matching dimension/table;
+a real construction or update failure remains an error. An empty catalogue
+returns no match immediately. A nonempty probe can spend bounded quotient/core
+work before discovering that no entry applies.
+
+`evaluate` computes an exact scalar sum with a changing quadratic boundary,
+coefficient and phase. `expand` returns contracted Clifford kets with arbitrary
+output labels, including nonzero origins and dependent columns. Term supports
+may overlap and cancel; callers must sum the complete expansion. No labelled
+output assignments are enumerated. The update must differ from the fixed
+resource by a Clifford phase, preserving arbitrary global phases. Dimension
+and signature validation precede the zero-coefficient shortcut; mismatched
+updates never silently choose another construction.
+
+`CataloguePreparationOptions` bounds terms (default 256), canonical-core work
+and retained geometry (default 16,777,216 logical 64-bit words). Geometry counts
+the quotient basis, lifted reference axes, each consistent nonzero term's
+forward/original affine maps and quadratic bit rows, plus rounded quadratic
+linear bytes. Input data, allocator overhead, finite core tables and temporary
+workspaces are separate; this is not a process-memory cap. Full coordinate
+matrices are expanded only after the word admission check. Inconsistent and
+zero terms keep their catalogue term count while retaining no support geometry.
+`num_terms`, `quotient_rank`, `canonical_phase_table` and `geometry_words` report
+the frozen resource rather than a guessed computational-fiber size.
+
+Tests compare every expanded output amplitude and scalar against independent
+finite sums for overlapping CCZ and paired two-T supports, complex coefficients,
+signed/Clifford updates and dependent labels. Cases with 65/129 coordinates
+check complex radical sums and nonzero output origins without enumerating their
+full domain. Term/geometry boundaries, missing keys, inconsistent supports,
+coefficient budgets, source lifetimes and zero/signature failures are explicit.
+This algebra primitive does not yet install built-in catalogue data, select
+products/injection or change task-query execution or benchmark performance.
