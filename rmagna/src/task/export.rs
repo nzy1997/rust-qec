@@ -212,10 +212,13 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
         ));
     }
     if result.failures.iter().any(|f| {
-        matches!(f.phase, RunPhase::Preparation | RunPhase::Finalization) && f.shot.is_some()
+        matches!(
+            f.phase,
+            RunPhase::Preparation | RunPhase::Finalization | RunPhase::Progress
+        ) && f.shot.is_some()
     }) {
         return Err(invalid(
-            "preparation/finalization failures cannot name a failed draw",
+            "preparation/progress/finalization failures cannot name a failed draw",
         ));
     }
     if result
@@ -268,9 +271,15 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             ));
         }
     } else {
-        if result.failed == 0 && result.not_attempted != 0 {
+        if result.failed == 0
+            && result.not_attempted != 0
+            && !result
+                .failures
+                .iter()
+                .any(|f| f.phase == RunPhase::Progress)
+        {
             return Err(invalid(
-                "only a preparation or draw failure can leave unattempted draws",
+                "only a preparation, draw, or progress failure can leave unattempted draws",
             ));
         }
         let missing_summaries = usize::from(result.completed > 0 && summary.is_none())
@@ -519,7 +528,7 @@ pub fn export_batch_metrics(
         output.insert(name.to_owned(), json!(count));
     }
     output.insert("sampled_records".to_owned(), json!(result.sampled_records));
-    output.insert("failures".to_owned(),json!(result.failures.iter().map(|f|json!({"phase":match f.phase {RunPhase::Preparation=>"preparation",RunPhase::Sampling=>"sampling",RunPhase::Accumulation=>"accumulation",RunPhase::Finalization=>"finalization"},"shot":f.shot,"type":f.kind,"message":f.message})).collect::<Vec<_>>()));
+    output.insert("failures".to_owned(),json!(result.failures.iter().map(|f|json!({"phase":match f.phase {RunPhase::Preparation=>"preparation",RunPhase::Sampling=>"sampling",RunPhase::Accumulation=>"accumulation",RunPhase::Finalization=>"finalization",RunPhase::Progress=>"progress"},"shot":f.shot,"type":f.kind,"message":f.message})).collect::<Vec<_>>()));
     output.insert("timings".to_owned(),json!({"preparation_seconds":result.timings.preparation_seconds,"sampling_seconds":result.timings.sampling_seconds,"total_seconds":result.timings.total_seconds}));
     output.insert("completed_resources".to_owned(),json!({"network_compilations":result.completed_network_compilations,"history_groups":result.completed_history_groups}));
     let costs = result.execution_costs;

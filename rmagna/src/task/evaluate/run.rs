@@ -1,8 +1,10 @@
 //! Seeded batches with exact statistics and explicit partial-failure accounting.
 use super::*;
+mod progress;
 use crate::costs::{ExecutionCosts, ExecutionLimits};
 use crate::noise::SplitMix64;
 use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, StatisticsOptions};
+pub use progress::{BatchProgress, ProgressObserver, ProgressReceipt};
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug)]
@@ -59,6 +61,7 @@ pub enum RunPhase {
     Sampling,
     Accumulation,
     Finalization,
+    Progress,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RunFailure {
@@ -223,7 +226,31 @@ impl TaskEvaluator {
         options: &TaskRunOptions,
         meter: &ExecutionMeter,
     ) -> Result<TaskRunResult, TaskError> {
+        self.run_batch_monitored(options, meter, None)
+    }
+    /// Observe a continuous seeded batch without storing progress events or
+    /// changing its draw stream. Observer errors retain the committed prefix.
+    pub fn run_batch_with_progress(
+        &self,
+        options: &TaskRunOptions,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<TaskRunResult, TaskError> {
+        self.run_batch_monitored(
+            options,
+            &ExecutionMeter::new(options.execution_limits),
+            Some(observer),
+        )
+    }
+    fn run_batch_monitored(
+        &self,
+        options: &TaskRunOptions,
+        meter: &ExecutionMeter,
+        mut observer: Option<&mut ProgressObserver<'_>>,
+    ) -> Result<TaskRunResult, TaskError> {
         let started = Instant::now();
+        if let Some(observer) = observer.as_deref_mut() {
+            observer.reset();
+        }
         let dimensions = options.validate(self.requested.len(), self.task.observables.len())?;
         let has_error = self.target.is_some() || self.error_parities.is_some();
         let mut accumulator = Accumulator::new(dimensions, has_error, options.statistics)?;
@@ -231,7 +258,8 @@ impl TaskEvaluator {
         let mut random = SplitMix64::new(options.seed);
         let mut failures = Vec::new();
         let mut failed = 0;
-        let sampling = Instant::now();
+        let mut sampling = Instant::now();
+        let mut sampling_seconds = 0.0;
         for shot in 0..options.shots {
             let row = match meter
                 .check_time()
@@ -263,8 +291,35 @@ impl TaskEvaluator {
             if let Some(records) = &mut records {
                 records.push(row.sampled_records);
             }
+            let completed = accumulator.statistics.count();
+            if let Some(observer) = observer.as_deref_mut()
+                && observer.due(completed, options.shots)
+            {
+                sampling_seconds += sampling.elapsed().as_secs_f64();
+                let paused = Instant::now();
+                let notification = observer.notify(
+                    &accumulator,
+                    options,
+                    self.options.runtime.history_sampler,
+                    meter,
+                    sampling_seconds,
+                );
+                let notification =
+                    notification.and_then(|()| meter.check_time().map_err(TaskError::from));
+                observer.add_seconds(paused.elapsed().as_secs_f64());
+                sampling = Instant::now();
+                if let Err(error) = notification {
+                    failures.push(RunFailure {
+                        phase: RunPhase::Progress,
+                        shot: None,
+                        kind: "ProgressError",
+                        message: error.to_string(),
+                    });
+                    break;
+                }
+            }
         }
-        let sampling_seconds = sampling.elapsed().as_secs_f64();
+        sampling_seconds += sampling.elapsed().as_secs_f64();
         let statistics = match accumulator.summarize() {
             Ok(summary) => summary,
             Err(e) => {
