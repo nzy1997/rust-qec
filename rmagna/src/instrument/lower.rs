@@ -445,6 +445,9 @@ pub(super) fn compile(
         insertion_catalog,
         initial_prepared_insertions: vec![],
         unitary: Arc::new(unitary),
+        support_queries: Arc::new(support::SupportQueries::new(
+            options.probability_preparation,
+        )),
         probability_queries: Arc::new(probabilities::ProbabilityQueries::new(
             options.probability_preparation,
             options.max_prepared_probabilities,

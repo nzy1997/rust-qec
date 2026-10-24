@@ -7,7 +7,7 @@ use rmagna::instrument::QueryPreparation;
 use rmagna::noise::NoiseSampling;
 use rmagna::runtime::{CausalStrategy, ControllerRegistry, HistorySampler};
 use rmagna::task::{RunStatus, TaskRunOptions, TaskRunResult};
-use serde_json::json;
+use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
     path::PathBuf,
@@ -100,6 +100,26 @@ fn same(a: &TaskRunResult, b: &TaskRunResult) {
         b.execution_costs.support.attempted
     );
 }
+fn assert_support_cache_transition(
+    before: &Value,
+    after: &Value,
+    sampler: HistorySampler,
+    labels: usize,
+    quotient_rank: usize,
+    terms: usize,
+) {
+    assert!(before["support"].is_null());
+    let mut expected = before.clone();
+    if sampler == HistorySampler::AffineSupport {
+        expected["support"] = json!({
+            "labels": labels,
+            "quotient_rank": quotient_rank,
+            "terms": terms,
+            "method": "capped_probability_parent_affine_envelope"
+        });
+    }
+    assert_eq!(after, &expected);
+}
 const SOURCE: &str = "X_ERROR(1/4) 3\nH 0 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[majority] det[0] det[1] det[2] -> ctrl[0]\nCX ctrl[0] 3\nX_ERROR(1/5) ctrl[0] 3\nM 3\nOBSERVABLE_INCLUDE(0) rec[-1]";
 fn make_registry(calls: &Arc<AtomicUsize>, fail_first: bool) -> ControllerRegistry {
     let mut r = ControllerRegistry::default();
@@ -157,9 +177,13 @@ fn actual_pilots_match_independent_prepared_channels_without_mutating_configurat
         let batch = independent.run(&run).unwrap();
         same(pilot.raw_result().unwrap(), batch.raw_result());
         let saved = pilot.to_json();
-        assert_eq!(
-            saved["preparation"]["compilation"]["retained_caches"],
-            saved["sampling"]["compilation"]["retained_caches"]
+        assert_support_cache_transition(
+            &saved["preparation"]["compilation"]["retained_caches"],
+            &saved["sampling"]["compilation"]["retained_caches"],
+            method,
+            3,
+            0,
+            1,
         );
         assert_eq!(
             saved["preparation"]["execution_costs"]["compilation"]["succeeded"],
@@ -469,9 +493,13 @@ fn nonclifford_weighted_pilots_keep_true_sampler_statistics_and_prepared_caches(
                 .unwrap();
             same(pilot.raw_result().unwrap(), batch.raw_result());
             let value = pilot.to_json();
-            assert_eq!(
-                value["preparation"]["compilation"]["retained_caches"],
-                value["sampling"]["compilation"]["retained_caches"]
+            assert_support_cache_transition(
+                &value["preparation"]["compilation"]["retained_caches"],
+                &value["sampling"]["compilation"]["retained_caches"],
+                method,
+                1,
+                2,
+                2,
             );
         }
     }
@@ -689,9 +717,19 @@ fn projected_magic_target_pilots_preserve_literal_feedback_moments_and_normaliza
         let result = file.compare_samplers(&config).unwrap();
         assert_eq!(calls.load(Ordering::Relaxed) - count_before, 64);
         assert_eq!(file.inspect(&config.pilot).unwrap(), unchanged);
-        for (pilot, single, seed) in [
-            (result.affine_support(), &affine_single, 0x918),
-            (result.exact_marginal(), &exact_single, 0x919),
+        for (pilot, single, seed, method) in [
+            (
+                result.affine_support(),
+                &affine_single,
+                0x918,
+                HistorySampler::AffineSupport,
+            ),
+            (
+                result.exact_marginal(),
+                &exact_single,
+                0x919,
+                HistorySampler::ExactMarginal,
+            ),
         ] {
             assert!(pilot.is_complete());
             let prepared = single.prepare_sampling(&config.preparation).unwrap();
@@ -732,9 +770,13 @@ fn projected_magic_target_pilots_preserve_literal_feedback_moments_and_normaliza
                     .all(|r| r.len() == 2 && r[0] == r[1])
             );
             let receipt = pilot.to_json();
-            assert_eq!(
-                receipt["preparation"]["compilation"]["retained_caches"],
-                receipt["sampling"]["compilation"]["retained_caches"]
+            assert_support_cache_transition(
+                &receipt["preparation"]["compilation"]["retained_caches"],
+                &receipt["sampling"]["compilation"]["retained_caches"],
+                method,
+                1,
+                2,
+                2,
             );
             assert_eq!(
                 receipt["sampling"]["fingerprints"],

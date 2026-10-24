@@ -312,6 +312,40 @@ pub struct CausalProgram {
     guarded_sites: std::collections::BTreeSet<usize>,
 }
 impl CausalProgram {
+    /// The owning task declares all terminal requested records in addition to
+    /// every potential callback/guard observation. Decision bits contribute
+    /// constants only after causal substitution and are not transport labels.
+    pub(crate) fn capture_support_transport(
+        &mut self,
+        requested: &[BitExpr],
+    ) -> Result<(), RuntimeError> {
+        if self.options.history_sampler != HistorySampler::AffineSupport {
+            return Ok(());
+        }
+        let mut parities = requested.to_vec();
+        for op in self.circuit.operations() {
+            match &op.operation {
+                Operation::Control {
+                    call: Some(_),
+                    inputs,
+                    ..
+                } => parities.extend(inputs.iter().cloned()),
+                Operation::Noise {
+                    guard: Some(guard), ..
+                } => parities.push(guard.clone()),
+                _ => {}
+            }
+        }
+        for parity in &mut parities {
+            parity
+                .terms
+                .retain(|atom| matches!(atom, BitAtom::Record(_)));
+        }
+        if let Some(reference) = &self.reference {
+            self.reference = Some(reference.with_support_transport(&parities)?);
+        }
+        Ok(())
+    }
     /// Compile one fixed coherent template, or the explicitly selected cold
     /// prefix baseline. Controller names are checked before drawing entropy.
     /// Future operations are trace preserving in physical history queries.
@@ -401,6 +435,16 @@ impl CausalProgram {
     }
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
         self.sampler.scaled_proposal_summary()
+    }
+    pub fn prepared_support_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedSupportStatistics>, RuntimeError> {
+        Ok(self
+            .reference
+            .as_ref()
+            .map(CompiledInstrument::prepared_support_statistics)
+            .transpose()?
+            .flatten())
     }
     pub fn prepared_insertion_statistics(
         &self,

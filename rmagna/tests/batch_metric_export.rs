@@ -657,9 +657,13 @@ fn zero_weight_counts_match_zero_sums_and_unavailable_efficiency() {
     // Genuine interference-zero affine proposals retain zero complete weights.
     let files = Files::new();
     let parse = ParseOptions::default();
-    let source = parse_circuit("H 0\nT 0\nT_DAG 0\nH 0\nM 0", &parse).unwrap();
+    let source = parse_circuit(
+        "H 0 1 2 3\nCCZ 0 1 2\nCCZ 0 1 3\nCCZ 0 2 3\nH 0 1 2 3\nM 0 1 2 3",
+        &parse,
+    )
+    .unwrap();
     let modules = parse_task(
-        r#"{"sample_records":[0],"error_observables":[]}"#,
+        r#"{"sample_records":[0,1,2,3],"error_observables":[]}"#,
         &files.0,
         &TaskOptions::default(),
     )

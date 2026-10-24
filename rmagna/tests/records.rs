@@ -343,7 +343,7 @@ fn affine_group_proposals_preserve_report_correlations_and_ignore_selection() {
                 &faults,
                 &mut random,
                 &SamplingOptions {
-                    max_terms: 0,
+                    max_terms: 1,
                     ..Default::default()
                 },
                 &a,
@@ -389,7 +389,7 @@ fn affine_group_proposals_preserve_report_correlations_and_ignore_selection() {
 }
 
 #[test]
-fn affine_proposals_reweight_irrational_histories_and_retain_interference_zeros() {
+fn affine_proposals_reweight_irrational_histories_and_remove_certified_zeros() {
     use rmagna::records::{RecordQuery, propose_affine_reported};
     let a = ScalarArithmetic::default();
     let parity = [BitExpr::atom(BitAtom::Record(0))];
@@ -403,7 +403,7 @@ fn affine_proposals_reweight_irrational_histories_and_retain_interference_zeros(
         let protocol = compile_affine(&source, &CompileOptions::default(), &a).unwrap();
         let mut weighted_mean = ExactScalar::zero();
         let mut weights = ExactScalar::zero();
-        for word in 0..2 {
+        for word in 0..if cancel { 1 } else { 2 } {
             let draw = propose_affine_reported(
                 &protocol,
                 &RecordQuery {
@@ -413,14 +413,18 @@ fn affine_proposals_reweight_irrational_histories_and_retain_interference_zeros(
                 &[],
                 &mut Words::new(vec![word]),
                 &SamplingOptions {
-                    max_terms: 0,
+                    max_terms: 2,
                     ..Default::default()
                 },
                 &a,
             )
             .unwrap();
             assert_eq!(draw.values, [word != 0]);
-            assert_eq!(draw.proposal_mass, a.omega(0, -2).unwrap());
+            assert_eq!(
+                draw.proposal_mass,
+                a.omega(0, if cancel { 0 } else { -2 }).unwrap()
+            );
+            assert_eq!(draw.entropy_words, usize::from(!cancel));
             let outcome = BitVector::from_indices(1, (word != 0).then_some(0)).unwrap();
             let physical = protocol
                 .reported_probability(&parity, &outcome, &[], 256, &a)
@@ -440,7 +444,9 @@ fn affine_proposals_reweight_irrational_histories_and_retain_interference_zeros(
                     .unwrap()
             };
             assert_eq!(physical, expected);
-            let weight = a.multiply(&physical, &a.omega(0, 2).unwrap()).unwrap();
+            let weight = a
+                .multiply(&physical, &a.omega(0, if cancel { 0 } else { 2 }).unwrap())
+                .unwrap();
             weights = a
                 .add(&weights, &a.multiply(&draw.proposal_mass, &weight).unwrap())
                 .unwrap();

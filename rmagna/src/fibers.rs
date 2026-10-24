@@ -148,7 +148,7 @@ impl PreparedCliffordFibers {
     /// The boundary's path variables use this partition's coordinate domain;
     /// its output labels need not be independent. Terms can overlap and cancel.
     /// No output-label assignments are enumerated.
-    pub(crate) fn expand(
+    pub fn expand(
         &self,
         updated: &ParityPhase,
         boundary: &AffineKet,

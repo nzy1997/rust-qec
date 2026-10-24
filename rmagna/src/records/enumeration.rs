@@ -130,7 +130,9 @@ pub(crate) fn enumerate_reported_conditioned_observed(
 ) -> Result<ReportedEnumeration, SamplingError> {
     limit("max_branches", options.max_branches, 1)?;
     let family = observe(meter, OperationKind::Support, || {
-        conditioned_support(instrument, query, faults, arithmetic)
+        // Enumeration verifies each physical marginal, so a conservative
+        // branch envelope does not require the full probability-parent resource.
+        conditioned_support(instrument, query, faults, None, arithmetic)
     })?;
     let rank = family.dimension();
     limit("max_record_bits", options.max_record_bits, rank as u128)?;

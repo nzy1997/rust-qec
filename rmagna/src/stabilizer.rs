@@ -172,6 +172,28 @@ impl AffineKet {
             self.coefficient.clone(),
         )
     }
+    /// Relabel by computational parity rows without summing hidden paths.
+    pub(crate) fn linear_boundary(&self, rows: &[BitVector]) -> Result<Self, StabilizerError> {
+        if rows.iter().any(|r| r.width() != self.width()) {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        let map = |v: &BitVector| -> Result<BitVector, StabilizerError> {
+            let mut result = BitVector::zeros(rows.len())?;
+            for (j, row) in rows.iter().enumerate() {
+                result.set(j, row.dot(v)?)?;
+            }
+            Ok(result)
+        };
+        Self::new(
+            map(&self.offset)?,
+            self.columns
+                .iter()
+                .map(map)
+                .collect::<Result<Vec<_>, _>>()?,
+            self.phase.clone(),
+            self.coefficient.clone(),
+        )
+    }
 
     pub fn prepare(&self) -> Result<PreparedKet, StabilizerError> {
         let rows = transpose_columns(self.width(), &self.columns)?;
@@ -481,6 +503,19 @@ impl PreparedZProjection {
             ExactScalar::one(),
         )?
         .retain_boundary(keep)?;
+        PreparedAffineContraction::new(&structure)
+    }
+    pub(crate) fn prepare_linear_sum(
+        &self,
+        rows: &[BitVector],
+    ) -> Result<PreparedAffineContraction, StabilizerError> {
+        let structure = AffineKet::new(
+            BitVector::zeros(self.reference.width())?,
+            self.columns.clone(),
+            self.phase.clone(),
+            ExactScalar::one(),
+        )?
+        .linear_boundary(rows)?;
         PreparedAffineContraction::new(&structure)
     }
 

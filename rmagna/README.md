@@ -1272,7 +1272,8 @@ but cannot create labels outside this family. `CompiledInstrument::reported_supp
 includes prescribed faults, report flips, duplicate parities and inversions, and
 excludes postselection.
 
-`records::propose_affine_reported` conditions that family on the given reported
+`records::propose_affine_reported` instead uses the unselected diagonal probability
+parent described below, and conditions its certified term supports on the given reported
 values and proposes the requested group uniformly. It returns the proposal's
 exact dyadic mass and entropy count, without querying physical probabilities.
 A physical interference zero is a valid proposal; its eventual weighted
@@ -1282,9 +1283,9 @@ The causal runtime selects this proposal explicitly as described below.
 
 Each random word supplies up to 64 independent directions, low bit first.
 Deterministic groups use no entropy. Invalid records, faults, structural
-conditions and entropy budgets fail before drawing. `max_terms` does not apply
-to this algebraic proposal; the caller's later physical contractions still use
-their explicit phase-resource budgets.
+conditions and entropy budgets fail before drawing. `max_terms` bounds the
+prepared probability-parent decomposition and is rechecked on reuse; the
+caller's later physical contractions retain their own explicit resource checks.
 
 ```rust
 use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
@@ -1306,9 +1307,38 @@ assert_eq!(draw.proposal_mass, arithmetic.omega(0, -2)?);
 
 ## Affine-proposed causal histories
 
+The proposal parent now traces the bra/ket physical labels while retaining the
+declared observation parities and phase legs. Gaussian contraction and certified
+Clifford-fiber reduction produce exact labelled probability terms.
+`PreparedProbabilitySupport::evaluate` returns these terms: summing their
+amplitudes at a label word gives its physical probability, rather than a state
+amplitude. `PreparedCliffordFibers::expand` is also available for general labelled
+phase networks and preserves complex coefficients and hidden-path cancellation.
+Neither operation enumerates the exponentially many label words.
+
+`reported_support_terms` maps the nonzero Clifford terms to affine certificates.
+Condition each term separately, project the requested parities, then span the
+union. Forming the hull before conditioning can introduce avoidable affine zeros.
+This removes the spurious outcome one for `H; T; T_DAG; H; M`, while a four-bit
+nonaffine interference example retains all 16 proposals, including six exact zeros.
+The original `structural_z_support` and `reported_support` remain conservative
+Gaussian-boundary primitives; they are no longer the default history proposal.
+
+The owning task captures every potential decoder/guard observation and requested
+record in a fixed transport span. Generic instrument proposals retain all records
+unless `with_support_transport` declares a smaller span; a subsequent query
+outside that span fails explicitly. Preparation is immutable and shared across
+branches, built on demand in one fixed slot. A failed low-budget construction is
+not cached. Fixed probability preparation supplies its configured fiber search;
+other probability modes use default fiber-search options for this proposal parent.
+Cold-prefix support parents are ephemeral. Numerical enumeration continues to
+use its conservative structural branch certificate and exact physical marginals.
+`prepared_support_statistics` reports transport labels and fixed resource counts;
+file reports include them under `compilation.retained_caches.support`.
+
 Set `RuntimeOptions::history_sampler` to `HistorySampler::AffineSupport` to
 propose each controller/guard/requested-record group uniformly from its
-conditioned conservative support. `ExactMarginal` remains the current Rust
+conditioned certified affine envelope. `ExactMarginal` remains the current Rust
 default. Both choices retain causal reported inputs and atomic controller
 decisions; neither includes selection predicates or silently changes methods.
 
@@ -1341,6 +1371,14 @@ target overlap agree with analytical physical enumeration for both fixed-templat
 and cold-prefix strategies. The family can contain additional zero histories;
 these tests do not establish the same proposal variance as another compiler or
 complete prepared-decomposition reuse.
+
+The small committed capped-support witnesses cover all 31 distinct proposal
+outcomes across cancellation, biased repeated T measurements, nonaffine zeros,
+and adaptive feedback with a report flip. Both compiler strategies and causal
+strategies match the pinned native proposal and physical masses exactly. An
+independent Walsh-polynomial oracle checks arbitrary parity labels, computational
+inputs and Pauli updates. Wide tests retain 81 free bits without enumerating
+their support. These checks do not establish paper-scale throughput or precision.
 
 The unitary compiler stores its frozen observations as an immutable general
 `ParityPhase`, including its constant. Scalar closures compose each family's

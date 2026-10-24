@@ -33,6 +33,105 @@ fn literal(n: usize, phase: impl Fn(usize) -> u8, a: &ScalarArithmetic) -> Exact
     a.scalar(lattice.map(Into::into), 0).unwrap()
 }
 #[test]
+fn labelled_fiber_expansions_match_literal_complex_path_sums_with_hidden_paths() {
+    use rmagna::stabilizer::AffineKet;
+    let a = ScalarArithmetic::default();
+    let reference =
+        ParityPhase::new(4, 3, [(bits(4, 1), 1), (bits(4, 3), 3), (bits(4, 14), 7)]).unwrap();
+    let plan = PreparedCliffordFibers::new(&reference, 16, FiberOptions::default()).unwrap();
+    for width in [0, 3, 65, 129] {
+        let column =
+            |j: usize| BitVector::from_indices(width, (0..width).filter(|&i| i % 7 == j)).unwrap();
+        // Two coincident columns and one hidden column force Gaussian path
+        // sums; the oracle below enumerates the original 16 paths directly.
+        let columns = vec![
+            column(0),
+            column(1),
+            column(0),
+            BitVector::zeros(width).unwrap(),
+        ];
+        let offset = column(2);
+        let mut upper = vec![bits(4, 0); 4];
+        upper[0].set(2, true).unwrap();
+        upper[1].set(3, true).unwrap();
+        let phase = QuadraticForm::new(1, vec![1, 2, 3, 0], upper).unwrap();
+        let boundary = AffineKet::new(
+            offset.clone(),
+            columns.clone(),
+            phase,
+            a.omega(3, -7).unwrap(),
+        )
+        .unwrap();
+        for changed in [false, true] {
+            let updated = ParityPhase::new(
+                4,
+                if changed { 1 } else { 3 },
+                [(bits(4, 1), 1), (bits(4, 3), 3), (bits(4, 14), 7)]
+                    .into_iter()
+                    .chain(changed.then_some((bits(4, 5), 2)))
+                    .chain(changed.then_some((bits(4, 9), 4))),
+            )
+            .unwrap();
+            let terms = plan.expand(&updated, &boundary, &a).unwrap();
+            let prepared = terms
+                .iter()
+                .map(|term| term.prepare().unwrap())
+                .collect::<Vec<_>>();
+            let mut oracle = std::collections::HashMap::<BitVector, ExactScalar>::new();
+            for word in 0usize..16 {
+                let b = |j: usize| (word >> j) & 1usize;
+                let mut label = offset.clone();
+                for (j, col) in columns.iter().enumerate() {
+                    if b(j) != 0 {
+                        label.xor_assign(col).unwrap();
+                    }
+                }
+                let p = if changed { 1 } else { 3 }
+                    + b(0)
+                    + 3 * (b(0) ^ b(1))
+                    + 7 * (b(1) ^ b(2) ^ b(3))
+                    + if changed {
+                        2 * (b(0) ^ b(2)) + 4 * (b(0) ^ b(3))
+                    } else {
+                        0
+                    };
+                let q = 1 + b(0) + 2 * b(1) + 3 * b(2) + 2 * b(0) * b(2) + 2 * b(1) * b(3);
+                let amplitude = a.omega((3 + p + 2 * q) as i64, -7).unwrap();
+                let old = oracle
+                    .get(&label)
+                    .cloned()
+                    .unwrap_or_else(ExactScalar::zero);
+                oracle.insert(label, a.add(&old, &amplitude).unwrap());
+            }
+            for (label, expected) in oracle {
+                let actual = prepared.iter().fold(ExactScalar::zero(), |total, k| {
+                    a.add(&total, &k.amplitude(&label, &a).unwrap()).unwrap()
+                });
+                assert_eq!(actual, expected, "width={width},changed={changed}");
+            }
+        }
+    }
+    let invalid =
+        AffineKet::new(bits(1, 0), vec![bits(1, 1)], zero(1), ExactScalar::zero()).unwrap();
+    assert!(matches!(
+        plan.expand(&reference, &invalid, &a),
+        Err(PhaseError::DimensionMismatch)
+    ));
+    let incompatible =
+        ParityPhase::new(4, 3, [(bits(4, 1), 2), (bits(4, 3), 3), (bits(4, 14), 7)]).unwrap();
+    let boundary = AffineKet::new(
+        bits(1, 0),
+        vec![bits(1, 0); 4],
+        zero(4),
+        ExactScalar::zero(),
+    )
+    .unwrap();
+    assert!(matches!(
+        plan.expand(&incompatible, &boundary, &a),
+        Err(PhaseError::NotClifford)
+    ));
+}
+#[test]
 fn t_pairs_and_ccz_use_two_certified_affine_clifford_terms() {
     let a = ScalarArithmetic::default();
     let pair = ParityPhase::new(2, 0, [(bits(2, 1), 1), (bits(2, 2), 1)]).unwrap();

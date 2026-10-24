@@ -95,6 +95,24 @@ fn same_rows(a: &TaskRunResult, b: &TaskRunResult) {
     assert_eq!(a.failures, b.failures);
     assert_eq!(a.completed_history_groups, b.completed_history_groups);
 }
+fn retained_after_sampling(
+    mut before: Value,
+    sampler: HistorySampler,
+    labels: usize,
+    quotient_rank: usize,
+    terms: usize,
+) -> Value {
+    assert!(before["support"].is_null());
+    if sampler == HistorySampler::AffineSupport {
+        before["support"] = json!({
+            "labels": labels,
+            "quotient_rank": quotient_rank,
+            "terms": terms,
+            "method": "capped_probability_parent_affine_envelope"
+        });
+    }
+    before
+}
 #[test]
 fn fresh_preparation_owns_deleted_sources_and_separates_later_sampling_costs() {
     for sampler in [HistorySampler::ExactMarginal, HistorySampler::AffineSupport] {
@@ -146,6 +164,7 @@ fn fresh_preparation_owns_deleted_sources_and_separates_later_sampling_costs() {
         };
         let before = prepared.inspect(&run).unwrap();
         let retained = before["compilation"]["retained_caches"].clone();
+        let retained = retained_after_sampling(retained, sampler, 1, 2, 2);
         drop(files);
         let baseline = file.run(&run).unwrap();
         drop(file);
@@ -291,6 +310,7 @@ fn nonlinear_preparation_never_invokes_decoders_and_keeps_both_seeded_samplers()
             ..Default::default()
         };
         let before = prepared.inspect(&run).unwrap()["compilation"]["retained_caches"].clone();
+        let before = retained_after_sampling(before, sampler, 4, 0, 1);
         let a = prepared.run(&run).unwrap();
         let b = file.run(&run).unwrap();
         same_rows(a.raw_result(), b.raw_result());
@@ -649,6 +669,7 @@ fn file_policy_matrix_preserves_literal_projected_target_feedback_and_fresh_batc
                 };
                 let before = prepared.inspect(&run).unwrap();
                 let retained = before["compilation"]["retained_caches"].clone();
+                let retained = retained_after_sampling(retained, sampler, 1, 2, 2);
                 let receipt = prepared.report().to_json();
                 drop(files);
                 let baseline = file.run(&run).unwrap();

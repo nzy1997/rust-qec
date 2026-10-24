@@ -180,6 +180,7 @@ fn conditioned_support(
     instrument: &CompiledInstrument,
     query: &RecordQuery<'_>,
     faults: &[FaultSelection],
+    max_terms: Option<usize>,
     arithmetic: &ScalarArithmetic,
 ) -> Result<crate::gf2::AffineSupport, SamplingError> {
     let parities = query
@@ -188,7 +189,10 @@ fn conditioned_support(
         .map(|(p, _)| p.clone())
         .chain(query.parities.iter().cloned())
         .collect::<Vec<_>>();
-    let family = instrument.reported_support(&parities, faults, arithmetic)?;
+    let families = match max_terms {
+        Some(limit) => instrument.reported_support_terms(&parities, faults, limit, arithmetic)?,
+        None => vec![instrument.reported_support(&parities, faults, arithmetic)?],
+    };
     let constraints = (0..query.given.len())
         .map(|j| BitVector::from_indices(parities.len(), [j]))
         .collect::<Result<Vec<_>, _>>()
@@ -202,18 +206,38 @@ fn conditioned_support(
             .filter_map(|(j, (_, value))| value.then_some(j)),
     )
     .map_err(InstrumentError::from)?;
-    let family = family
-        .condition(&constraints, &outcomes)
-        .map_err(InstrumentError::from)?
-        .ok_or(SamplingError::ImpossibleSupport)?;
     let keep = (0..query.parities.len())
         .map(|j| BitVector::from_indices(parities.len(), [query.given.len() + j]))
         .collect::<Result<Vec<_>, _>>()
         .map_err(InstrumentError::from)?;
-    Ok(family.linear_image(&keep).map_err(InstrumentError::from)?)
+    let mut envelope: Option<crate::gf2::AffineSupport> = None;
+    for family in families {
+        let Some(family) = family
+            .condition(&constraints, &outcomes)
+            .map_err(InstrumentError::from)?
+        else {
+            continue;
+        };
+        let family = family.linear_image(&keep).map_err(InstrumentError::from)?;
+        envelope = Some(match envelope {
+            None => family,
+            Some(previous) => {
+                let mut columns = previous.columns().to_vec();
+                columns.extend_from_slice(family.columns());
+                let mut difference = family.offset().clone();
+                difference
+                    .xor_assign(previous.offset())
+                    .map_err(InstrumentError::from)?;
+                columns.push(difference);
+                crate::gf2::AffineSupport::new(previous.offset().clone(), columns)
+                    .map_err(InstrumentError::from)?
+            }
+        });
+    }
+    envelope.ok_or(SamplingError::ImpossibleSupport)
 }
 
-/// Propose a group uniformly from conservative conditioned affine support.
+/// Propose a group uniformly from conditioned, Clifford-certified affine support.
 /// This does not evaluate physical mass: interference-zero proposals remain
 /// valid draws and must receive zero weight from the caller's exact evaluation.
 /// One random word supplies up to 64 independent support directions, low bit
@@ -238,7 +262,13 @@ pub(crate) fn propose_affine_reported_observed(
     meter: Option<&ExecutionMeter>,
 ) -> Result<AffineProposalDraw, SamplingError> {
     let family = observe(meter, OperationKind::Support, || {
-        conditioned_support(instrument, query, faults, arithmetic)
+        conditioned_support(
+            instrument,
+            query,
+            faults,
+            Some(options.max_terms),
+            arithmetic,
+        )
     })?;
     let entropy_words = family.dimension().div_ceil(64);
     if entropy_words > options.max_entropy_words {

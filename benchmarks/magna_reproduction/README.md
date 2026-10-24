@@ -5,6 +5,21 @@ an independent Rust backend is compared with them. It inventories 31 packaged
 tasks, 57 upstream test modules and every deposited paper file. It does not
 implement a simulator or claim reproduction of the paper's precision curves.
 
+The capped-support witness generator captures complete small observation sets,
+not Monte Carlo precision estimates. Regenerate into a new path and compare the
+result with `rmagna/tests/data/capped-support-reference.json`:
+
+```sh
+python3 benchmarks/magna_reproduction/capped_support_vectors.py \
+  --upstream /absolute/path/to/magna --out /absolute/path/to/new-capped-vectors.json
+```
+
+Use the pinned reference Python environment, then repeat with `-O`. The two
+captures must agree. Each artifact binds the native extension and source-manifest
+hashes. The committed witnesses contain all 31 distinct proposals for four cases,
+including affine-certified cancellation, biased T measurements, genuine
+nonaffine zeros and a flipped adaptive observation.
+
 The public implementation is
 [`56847478c840395735146ef1e1ccdc3d8aedc10f`](https://github.com/itpyi/magna/tree/56847478c840395735146ef1e1ccdc3d8aedc10f).
 The [paper data deposit](https://doi.org/10.5281/zenodo.23386778) records an older

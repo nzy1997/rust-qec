@@ -9,6 +9,7 @@ mod preparation;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 pub use preparation::{InstrumentQueryLayout, QueryPreparationOutcome};
 mod probabilities;
+mod support;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
@@ -25,6 +26,7 @@ use std::{
     fmt,
     sync::Arc,
 };
+pub use support::PreparedSupportStatistics;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstrumentError {
@@ -34,6 +36,7 @@ pub enum InstrumentError {
     NonAffineQuery,
     PreparedQueryCacheUnavailable,
     PreparedInsertionCatalogUnavailable,
+    UncapturedSupportQuery,
     UnknownDecision {
         call: usize,
         bit: usize,
@@ -71,6 +74,10 @@ pub enum InstrumentError {
 impl fmt::Display for InstrumentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::UncapturedSupportQuery => write!(
+                f,
+                "reported query is outside the captured support transport; declare all required observation parities"
+            ),
             Self::PreparedInsertionCatalogUnavailable => {
                 write!(f, "compiled insertion catalog metadata is unavailable")
             }
@@ -222,6 +229,7 @@ pub struct CompiledInstrument {
     probability_queries: Arc<probabilities::ProbabilityQueries>,
     density_queries: Arc<densities::DensityQueries>,
     moment_queries: Arc<moments::MomentQueries>,
+    support_queries: Arc<support::SupportQueries>,
     live_wires: Arc<Vec<usize>>,
     record_wires: Arc<Vec<usize>>,
     event_rows: Arc<Vec<BitVector>>,
@@ -261,6 +269,68 @@ pub fn compile_unitary(
 }
 
 impl CompiledInstrument {
+    /// Restrict a cloned instrument's probability-parent transport to the span
+    /// of explicitly declared observation parities. Subsequent support queries
+    /// outside that span fail instead of silently choosing another proposal.
+    /// This does not change physical probability or acceptance queries.
+    pub fn with_support_transport(&self, parities: &[BitExpr]) -> Result<Self, InstrumentError> {
+        let indices = (0..self.num_records()).collect::<Vec<_>>();
+        let rows = parities
+            .iter()
+            .map(|p| record_row(p, &indices, self.num_records()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut result = self.clone();
+        result.support_queries = Arc::new(
+            self.support_queries
+                .with_transport(self.num_records(), &rows)?,
+        );
+        Ok(result)
+    }
+    pub fn prepared_support_statistics(
+        &self,
+    ) -> Result<Option<PreparedSupportStatistics>, InstrumentError> {
+        self.support_queries.statistics(self.num_records())
+    }
+    /// Exact Clifford-term support certificates from the unselected diagonal
+    /// record probability parent. Condition each term before spanning a union;
+    /// a hull taken before conditioning can retain unnecessary affine zeros.
+    pub fn reported_support_terms(
+        &self,
+        parities: &[BitExpr],
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Vec<AffineSupport>, InstrumentError> {
+        let indices = (0..self.num_records()).collect::<Vec<_>>();
+        let rows = parities
+            .iter()
+            .map(|p| record_row(p, &indices, self.num_records()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let rows = self.support_queries.map_rows(&rows)?;
+        let constants = BitVector::from_indices(
+            parities.len(),
+            parities
+                .iter()
+                .enumerate()
+                .filter_map(|(j, p)| p.constant.then_some(j)),
+        )?;
+        let terms = self.support_queries.evaluate(
+            &self.inserted(faults, arithmetic)?,
+            &self.record_wires,
+            max_terms,
+            arithmetic,
+        )?;
+        terms
+            .into_iter()
+            .map(|term| {
+                Ok(
+                    AffineSupport::new(term.offset().clone(), term.columns().to_vec())?
+                        .linear_image(&rows)?
+                        .translated(&constants)?,
+                )
+            })
+            .collect()
+    }
     pub fn prepared_insertion_statistics(&self) -> Option<PreparedInsertionStatistics> {
         self.insertion_catalog
             .as_ref()
