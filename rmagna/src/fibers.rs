@@ -3,6 +3,7 @@ use crate::gf2::{BitVector, LinearFactorization};
 use crate::phase::{ParityPhase, PhaseError, add_quadratic};
 use crate::quadratic::QuadraticForm;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
+use crate::stabilizer::AffineKet;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FiberOptions {
@@ -130,6 +131,61 @@ impl PreparedCliffordFibers {
     pub fn clifford_directions(&self) -> &[BitVector] {
         &self.directions
     }
+    fn updated_boundary(
+        &self,
+        updated: &ParityPhase,
+        boundary: &QuadraticForm,
+    ) -> Result<(u8, QuadraticForm), PhaseError> {
+        if boundary.num_variables() != self.reference.num_variables()
+            || updated.num_variables() != self.reference.num_variables()
+        {
+            return Err(PhaseError::DimensionMismatch);
+        }
+        let (global, correction) = updated.subtract(&self.reference)?.clifford()?;
+        Ok((global, add_quadratic(boundary, &correction)?))
+    }
+    /// Expand a labelled phase network into exact contracted Clifford kets.
+    /// The boundary's path variables use this partition's coordinate domain;
+    /// its output labels need not be independent. Terms can overlap and cancel.
+    /// No output-label assignments are enumerated.
+    pub(crate) fn expand(
+        &self,
+        updated: &ParityPhase,
+        boundary: &AffineKet,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Vec<AffineKet>, PhaseError> {
+        let (global, quadratic) = self.updated_boundary(updated, boundary.phase())?;
+        let image = |value: &BitVector| -> Result<BitVector, PhaseError> {
+            let mut result = BitVector::zeros(boundary.width())?;
+            for j in value.ones() {
+                result.xor_assign(&boundary.columns()[j])?;
+            }
+            Ok(result)
+        };
+        let columns = self
+            .directions
+            .iter()
+            .map(image)
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut terms = Vec::with_capacity(self.num_terms());
+        for fiber in &self.fibers {
+            let mut offset = boundary.offset().clone();
+            offset.xor_assign(&image(&fiber.shift)?)?;
+            let phase = add_quadratic(
+                &fiber.phase,
+                &quadratic.restrict(&fiber.shift, &self.directions)?,
+            )?;
+            let coefficient = arithmetic.multiply(
+                boundary.coefficient(),
+                &arithmetic.omega(i64::from((global + fiber.global) & 7), 0)?,
+            )?;
+            let ket = AffineKet::new(offset, columns.clone(), phase, coefficient)?;
+            if let Some(ket) = ket.contract(arithmetic)? {
+                terms.push(ket);
+            }
+        }
+        Ok(terms)
+    }
     /// Updates must differ by a Clifford phase. The prepared affine partition
     /// and exact reference phase on every fiber remain unchanged.
     pub fn evaluate(
@@ -139,13 +195,7 @@ impl PreparedCliffordFibers {
         coefficient: &ExactScalar,
         arithmetic: &ScalarArithmetic,
     ) -> Result<ExactScalar, PhaseError> {
-        if boundary.num_variables() != self.reference.num_variables()
-            || updated.num_variables() != self.reference.num_variables()
-        {
-            return Err(PhaseError::DimensionMismatch);
-        }
-        let (global, correction) = updated.subtract(&self.reference)?.clifford()?;
-        let boundary = add_quadratic(boundary, &correction)?;
+        let (global, boundary) = self.updated_boundary(updated, boundary)?;
         let mut total = ExactScalar::zero();
         for fiber in &self.fibers {
             let phase = add_quadratic(
