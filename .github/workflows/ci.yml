@@ -114,6 +114,9 @@ jobs:
       - name: Check Magna controller JSON feature compatibility
         if: steps.scope.outputs.rust == 'true'
         run: make test-magna-controller-json
+      - name: Check Magna catalogue JSON feature compatibility
+        if: steps.scope.outputs.rust == 'true'
+        run: make test-magna-catalogue-json
       - name: Check semantic OpenQASM 2 conversion
         if: steps.scope.outputs.rust == 'true'
         run: cargo test --locked -p rstim --no-default-features --features qasm --test qasm2_frontend --test qasm2_lowering --test qasm2_semantics --test qasm2_boundary --test qasm2_export --test qasm2_roundtrip --test qasm2_document

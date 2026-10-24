@@ -3409,3 +3409,70 @@ with `benchmarks/magna_reproduction/pattern_response_vectors.py` and the pinned
 source, and compare ordinary and Python `-O` captures. The comparison maps source
 operations explicitly, checks the native total-mass field and target
 normalization, and verifies exact Boolean responses and sector recombination.
+
+## Certified constrained phase catalogues
+
+`catalogue::PhaseCatalogue` loads or accepts exact decompositions of a finite
+phase table into `CliffordIndicator` terms. Each term has an exact cyclotomic
+coefficient, Boolean affine parity constraints and a Clifford `ParityPhase`.
+Supports may overlap or be inconsistent, and terms may cancel. Before accepting
+an entry, the implementation reconstructs every assignment exactly and compares
+it with `omega^phase_table[x]`. This supports the two-term identity
+`CCZ(x) = 1 - 2 indicator(x0 = x1 = x2 = 1)`, which is not a disjoint partition.
+No floating-point tests or claimed names/certificates replace reconstruction.
+
+Construct a `PhaseDecompositionInput` and call `insert`, or use
+`from_json`/`extend_json` for native schema-1 tables. The JSON contract uses
+`dimension`, `core_phase_mod8` and `terms`; each term contains four exact integer
+`coefficient` values, `constraints` mask/bit pairs and `clifford_parities`
+mask/signed-integer pairs. Clifford turns are reduced modulo four and multiply
+the parity by `i^turns`. Integers retain their original token type and arbitrary
+coefficient precision: floats, strings, private serde numeric/raw tags and
+wrong container shapes are rejected. Duplicate decoded object keys, duplicate
+dimension/table entries, unknown fields, invalid masks and non-Clifford typed
+phases are explicit errors. Optional native `coordinate_derivation` provenance
+is shape checked; certification proves the actual entry and does not trust its
+derivation claim.
+
+`CatalogueLimits` bounds input UTF-8 bytes, entries, dimension, total phase-table
+values, term/constraint/normalized parity counts and verification work. The
+work count includes each assignment comparison plus its indicator, constraint
+and normalized parity checks. Defaults allow dimension 20, 1,048,576 table values and 16,777,216 work
+units. This is a logical work bound, not an allocator byte estimate.
+JSON decoding checks raw parity rows against the remaining row capacity before
+normalizing each entry; usage and verification work count stored normalized
+rows. A redundant JSON representation can therefore need more row capacity
+than its certificate.
+Scalar arithmetic additionally bounds coefficients and aligned operations; raw JSON
+integer parsing applies a conservative literal-size bound before construction.
+Failed parsing, certification, arithmetic or budget checks leave the existing
+catalogue unchanged. JSON entry errors use indices within the input document,
+including when extending an existing catalogue. `usage`, borrowed `get` and `entries` inspect immutable
+certificates; catalogue clones share the certified entries.
+
+```rust
+use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue};
+use rmagna::scalar::ScalarArithmetic;
+let source = r#"{"schema_version":1,"entries":[{"dimension":0,"core_phase_mod8":[0],"terms":[{"coefficient":[1,0,0,0],"constraints":[],"clifford_parities":[]}]}]}"#;
+let catalogue = PhaseCatalogue::from_json(source, &CatalogueLimits::default(), &ScalarArithmetic::default())?;
+assert_eq!(catalogue.get(0, &[0]).unwrap().terms().len(), 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The bounded `validate_phase_catalogue` example reads an external JSON file and
+prints its source hash, complete entry list and certified usage. The comparison
+harness verifies the frozen source and all native table entries:
+
+```text
+cargo build --locked -p rmagna --example validate_phase_catalogue
+python benchmarks/magna_reproduction/catalogue_compare.py --upstream PINNED_SOURCE --rust-example target/debug/examples/validate_phase_catalogue --out NEW_RECEIPT.json
+```
+
+The 15-entry pinned catalogue certifies 93 phase values using 27 indicator
+terms. This layer provides certified data, not catalogue selection, products,
+phase injection, assignment transport or query integration. It does not yet
+change the compiler, sampler, contraction terms or benchmark performance.
+
+`make test-magna-catalogue-json` runs catalogue regressions with the default
+serde_json features and with `arbitrary_precision` enabled in Rust CI. The default
+features already include `float_roundtrip`.
