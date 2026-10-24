@@ -1,5 +1,7 @@
 use num_traits::Signed;
-use rmagna::file_api::{FileEnumerationOptions, FileLoadOptions, FileTaskOptions};
+use rmagna::file_api::{
+    FileEnumerationOptions, FileLoadOptions, FilePreparationOptions, FileTaskOptions,
+};
 use rmagna::instrument::{InsertionPreparation, ProbabilityPreparation, QueryPreparation};
 use rmagna::noise::NoiseSampling;
 use rmagna::probability::ProbabilityParser;
@@ -9,12 +11,14 @@ use rmagna::task::TaskRunOptions;
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
-pub const HELP: &str = "rmagna validate|inspect|run|enumerate CIRCUIT [OPTIONS]
+pub const HELP: &str = "rmagna validate|inspect|prepare|run|enumerate|compare-samplers CIRCUIT [OPTIONS]
 
 validate parses and fingerprints inputs without quantum queries or callbacks.
 inspect additionally compiles the protocol, without draws or decoder callbacks.
 run prepares and performs real noisy draws from a fresh SplitMix64 seed.
 enumerate integrates bounded physical noise sectors and all positive histories.
+prepare explicitly builds configured sampling families without draws or callbacks.
+compare-samplers prepares independent affine/exact pilots; no production switching.
 
 Inputs and output:
   --task FILE                         Task JSON; module paths are relative to it
@@ -29,10 +33,10 @@ Inputs and output:
 
 Run configuration:
   --shots N                           Positive draw count (default 1; run only)
-  --seed N                            u64 seed (default 0; run only)
+  --seed N                            u64 seed (default 0; run or compare-samplers)
   --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
   --compiler shared|parity_copies      Default shared
-  --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate
+  --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
   --causal-strategy fixed|cold         Default fixed
   --probability-preparation cold|trace|fixed        Default fixed, on demand
   --density-preparation cold|trace|fixed            Default fixed, on demand
@@ -44,6 +48,18 @@ Run configuration:
   --insertion-preparation direct|prepared           Default direct
   --max-insertion-table-bytes N        Prepared insertion estimate cap (default 67108864)
   --max-insertion-catalog-entries N    Prepared insertion entry cap (default 1000000)
+
+Preparation and pilot comparison:
+  --pilot-shots N                     At least two draws per channel (default 2; compare only)
+  --max-preparation-requests N         Static request cap (default 4096; prepare/compare)
+  --max-preparation-history-rows N     Static history row cap (default 4096; prepare/compare)
+  --max-preparation-layout-rows N      Duplicated prefix row cap (default 1000000; prepare/compare)
+  --max-preparation-queries N          Compilation/target quota per channel (compare only)
+  --max-preparation-seconds SECONDS    Preparation deadline per channel (compare only)
+
+prepare uses --max-queries/--max-seconds across compilation and query preparation.
+compare uses them for each sampling pilot, with separate preparation limits above.
+Standalone prepare releases resources at exit; its receipt is not a reusable cache.
 
 Exact enumeration only:
   --max-weight N                      Nonnegative decimal category cutoff (default 1; unbounded input)
@@ -62,19 +78,18 @@ Limits (zero is allowed for quotas unless marked positive):
   --max-coherent-qubits N             Compiled coherent width budget
   --max-gates N                       Compiled gate budget
   --max-noise-sites N                 Compiled noise site budget
-  --max-queries N                     Call-wide query quota, including failures
+  --max-queries N                     Call-wide query quota; per sampling pilot in compare
   --max-seconds SECONDS               Positive deadline checked between operations
   --max-source-bytes N                Positive per-circuit source byte limit
   --max-task-bytes N                  Positive task JSON byte limit
-  --max-record-values N               Requested Boolean values per run; not enumerate
+  --max-record-values N               Requested Boolean values per run/pilot; not enumerate/prepare
   --numeric-work-bits N               Numeric export intermediate integer bit cap
   --fingerprint-bytes N               Positive canonical JSON byte limit
 
 Python is launched only with --controllers. Explicit decoder modules may execute
 on import, including during validate/inspect. The host cannot import magna.
 CLI defaults differ from library defaults. Resolved options are in every success
-report. Native option files, compare-samplers and progress are not yet
-supported. Use the Rust API for typed exact results if numeric export fails.
+report. Native option files and progress are not yet supported. Use the Rust API for typed exact results if numeric export fails.
 ";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -83,6 +98,8 @@ pub enum Mode {
     Inspect,
     Run,
     Enumerate,
+    Prepare,
+    Compare,
 }
 pub struct Args {
     pub mode: Mode,
@@ -98,6 +115,7 @@ pub struct Args {
     pub load: FileLoadOptions,
     pub run: TaskRunOptions,
     pub enumeration: FileEnumerationOptions,
+    pub preparation: FilePreparationOptions,
     pub sampling: NoiseSampling,
 }
 fn duration(text: &str, flag: &str) -> Result<Duration, String> {
@@ -123,6 +141,16 @@ const ENUMERATION_FLAGS: [&str; 10] = [
     "--max-history-record-bits",
     "--max-marginal-queries",
     "--max-replay-attempts",
+];
+const PREPARATION_FLAGS: [&str; 3] = [
+    "--max-preparation-requests",
+    "--max-preparation-history-rows",
+    "--max-preparation-layout-rows",
+];
+const COMPARISON_FLAGS: [&str; 3] = [
+    "--pilot-shots",
+    "--max-preparation-queries",
+    "--max-preparation-seconds",
 ];
 impl Flags {
     fn text(&mut self, flag: &str) -> Option<String> {
@@ -165,6 +193,30 @@ impl Args {
                 "{flag} is unavailable in enumerate; exact physical histories do not use a sampling policy"
             ));
         }
+        for (allowed, names, modes) in [
+            (
+                matches!(mode, Mode::Prepare | Mode::Compare),
+                PREPARATION_FLAGS.as_slice(),
+                "prepare or compare-samplers",
+            ),
+            (
+                mode == Mode::Compare,
+                COMPARISON_FLAGS.as_slice(),
+                "compare-samplers",
+            ),
+        ] {
+            if !allowed && let Some(flag) = names.iter().find(|flag| flags.0.contains_key(**flag)) {
+                return Err(format!("{flag} requires {modes}"));
+            }
+        }
+        if mode == Mode::Prepare && flags.0.contains_key("--max-record-values") {
+            return Err(
+                "--max-record-values is unavailable in prepare; no draws are retained".into(),
+            );
+        }
+        if mode == Mode::Compare && flags.0.contains_key("--history-sampler") {
+            return Err("--history-sampler is unavailable in compare-samplers; both channels are selected explicitly".into());
+        }
         let json = flags.text("--json").is_some();
         let output = flags.text("--output").map(PathBuf::from);
         let task = flags.text("--task").map(PathBuf::from);
@@ -189,17 +241,42 @@ impl Args {
         let mut file = FileTaskOptions::default();
         let mut load = FileLoadOptions::default();
         let mut run = TaskRunOptions::default();
-        if mode != Mode::Run
+        if !matches!(mode, Mode::Run | Mode::Compare)
             && ["--shots", "--seed"]
                 .iter()
                 .any(|f| flags.0.contains_key(*f))
         {
-            return Err("--shots and --seed require run".to_owned());
+            return Err("--shots and --seed require run; compare-samplers accepts --seed".into());
+        }
+        if mode == Mode::Compare && flags.0.contains_key("--shots") {
+            return Err("--shots requires run; use --pilot-shots in compare-samplers".into());
         }
         configure_limits(&mut flags, &mut file, &mut load, &mut run)?;
         let mut enumeration = configure_enumeration(&mut flags)?;
         enumeration.execution_limits = run.execution_limits;
         configure_runtime(&mut flags, &mut file)?;
+        if mode == Mode::Compare {
+            run.shots = flags.number("--pilot-shots", 2)?;
+            if run.shots < 2 {
+                return Err("--pilot-shots requires at least two draws per channel".into());
+            }
+            if run.seed == u64::MAX {
+                return Err("--seed + 1 overflows u64; choose a smaller seed".into());
+            }
+        }
+        let preparation = configure_preparation(&mut flags, mode, &run)?;
+        if mode == Mode::Compare {
+            if file.evaluation.runtime.strategy != CausalStrategy::FixedTemplate {
+                return Err("compare-samplers requires --causal-strategy fixed".into());
+            }
+            if !matches!(
+                file.evaluation.runtime.compile.probability_preparation,
+                QueryPreparation::FixedFibers(_)
+            ) {
+                return Err("compare-samplers requires --probability-preparation fixed".into());
+            }
+        }
+
         let sampling = if let Some(text) = flags.text("--noise-proposal-scale") {
             let proposal_scale = ProbabilityParser::default()
                 .rational(&text)
@@ -228,6 +305,7 @@ impl Args {
             load,
             run,
             enumeration,
+            preparation,
             sampling,
         })
     }
@@ -240,7 +318,12 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
         Some("inspect") => Mode::Inspect,
         Some("run") => Mode::Run,
         Some("enumerate") => Mode::Enumerate,
-        _ => return Err("expected validate, inspect, run, or enumerate; use --help".to_owned()),
+        Some("prepare") => Mode::Prepare,
+        Some("compare-samplers") => Mode::Compare,
+        _ => return Err(
+            "expected validate, inspect, prepare, run, enumerate, or compare-samplers; use --help"
+                .to_owned(),
+        ),
     };
     let mut flags = Flags(BTreeMap::new());
     let mut circuit = None;
@@ -291,6 +374,8 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-insertion-catalog-entries"
                 | "--noise-proposal-scale"
         ) && !ENUMERATION_FLAGS.contains(&arg.as_str())
+            && !PREPARATION_FLAGS.contains(&arg.as_str())
+            && !COMPARISON_FLAGS.contains(&arg.as_str())
         {
             return Err(format!("unknown option {arg}; use --help"));
         }
@@ -309,6 +394,29 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
     }
     let circuit = circuit.ok_or("missing CIRCUIT path")?;
     Ok((mode, circuit, flags))
+}
+
+fn configure_preparation(
+    flags: &mut Flags,
+    mode: Mode,
+    run: &TaskRunOptions,
+) -> Result<FilePreparationOptions, String> {
+    let mut options = FilePreparationOptions::default();
+    let q = &mut options.queries;
+    q.max_requests = flags.number("--max-preparation-requests", q.max_requests)?;
+    q.max_history_rows = flags.number("--max-preparation-history-rows", q.max_history_rows)?;
+    q.max_layout_rows = flags.number("--max-preparation-layout-rows", q.max_layout_rows)?;
+    if mode == Mode::Prepare {
+        options.execution_limits = run.execution_limits;
+    }
+    options.execution_limits.max_queries = flags.number(
+        "--max-preparation-queries",
+        options.execution_limits.max_queries,
+    )?;
+    if let Some(text) = flags.text("--max-preparation-seconds") {
+        options.execution_limits.max_duration = Some(duration(&text, "--max-preparation-seconds")?);
+    }
+    Ok(options)
 }
 
 fn configure_enumeration(flags: &mut Flags) -> Result<FileEnumerationOptions, String> {
