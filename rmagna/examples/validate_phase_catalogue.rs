@@ -1,5 +1,5 @@
 //! Certify a bounded external phase catalogue without compiling quantum tasks.
-use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue};
+use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue, builtin_phase_catalogue};
 use rmagna::gf2::BitVector;
 use rmagna::phase::{CanonicalPhaseCore, ParityPhase, PhaseCoreLimits};
 use rmagna::scalar::ScalarArithmetic;
@@ -46,18 +46,19 @@ fn phase_from_table(
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args_os().skip(1);
-    let path = args
-        .next()
-        .ok_or("usage: validate_phase_catalogue CATALOGUE_JSON [--check-canonical-cores]")?;
-    let check_cores = match (args.next(), args.next()) {
-        (None, None) => false,
-        (Some(flag), None) if flag == "--check-canonical-cores" => true,
-        _ => {
-            return Err(
-                "usage: validate_phase_catalogue CATALOGUE_JSON [--check-canonical-cores]".into(),
-            );
+    let usage = "usage: validate_phase_catalogue CATALOGUE_JSON [--check-canonical-cores] [--check-builtin]";
+    let path = args.next().ok_or(usage)?;
+    let mut check_cores = false;
+    let mut check_builtin = false;
+    for flag in args {
+        if flag == "--check-canonical-cores" && !check_cores {
+            check_cores = true;
+        } else if flag == "--check-builtin" && !check_builtin {
+            check_builtin = true;
+        } else {
+            return Err(usage.into());
         }
-    };
+    }
     let limits = CatalogueLimits::default();
     let path = std::path::PathBuf::from(path);
     let mut bytes = Vec::new();
@@ -74,6 +75,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let source = std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?;
     let catalogue = PhaseCatalogue::from_json(source, &limits, &ScalarArithmetic::default())?;
+    let builtin = if check_builtin {
+        let builtin = builtin_phase_catalogue()?;
+        if builtin.usage().entries != catalogue.usage().entries {
+            return Err("external and built-in catalogue entry counts differ".into());
+        }
+        Some(builtin)
+    } else {
+        None
+    };
     let u = catalogue.usage();
     let entries = catalogue.entries().enumerate().map(|(index,e)| {
         let mut entry = serde_json::json!({"dimension":e.dimension(),"phase_table":e.phase_table(),"terms":e.terms().len()});
@@ -86,12 +96,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             entry["canonical_core"] = serde_json::json!(true);
         }
+        if let Some(builtin) = builtin {
+            let generated = builtin.get(e.dimension(), e.phase_table())
+                .ok_or_else(|| format!("external entry {index} is absent from the built-in catalogue"))?;
+            if generated.terms().len() != e.terms().len() {
+                return Err(format!("external entry {index} has a different built-in term count").into());
+            }
+            entry["builtin_match"] = serde_json::json!(true);
+        }
         Ok(entry)
     }).collect::<Result<Vec<_>,Box<dyn std::error::Error>>>()?;
     let mut result = serde_json::json!({"schema_version":1,"status":"certified","source_sha256":format!("{:x}",Sha256::digest(&bytes)),
         "usage":{"entries":u.entries,"table_values":u.table_values,"terms":u.terms,"constraint_rows":u.constraint_rows,"parity_rows":u.parity_rows,"verification_work":u.verification_work.to_string()},"entries":entries});
     if check_cores {
         result["canonical_cores_checked"] = serde_json::json!(true);
+    }
+    if check_builtin {
+        result["builtin_checked"] = serde_json::json!(true);
     }
     println!("{result}");
     Ok(())

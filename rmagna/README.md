@@ -3563,5 +3563,54 @@ signed/Clifford updates and dependent labels. Cases with 65/129 coordinates
 check complex radical sums and nonzero output origins without enumerating their
 full domain. Term/geometry boundaries, missing keys, inconsistent supports,
 coefficient budgets, source lifetimes and zero/signature failures are explicit.
-This algebra primitive does not yet install built-in catalogue data, select
+The independent built-in catalogue is described below. This algebra primitive does not yet select
 products/injection or change task-query execution or benchmark performance.
+
+
+## Independently generated built-in phase catalogue
+
+`catalogue::builtin_phase_catalogue()` returns one shared immutable catalogue,
+constructed and exactly certified on first use with no file access, controller
+calls, random draws or quantum queries. Cloning shares certified entries; an
+extension modifies only the clone. Initialization failures are returned as
+`CatalogueError`, rather than silently selecting an incomplete catalogue.
+
+The fifteen keys and 27 indicator terms cover all canonical signatures on zero,
+one and two coordinates, the three-coordinate CCZ core, and three canonical
+four-coordinate 422 cores. Small signatures use an exhaustive search for a
+parity whose two affine hyperplanes have Clifford restrictions. CCZ uses the
+overlapping identity `omega^(4*a*b*c) = 1 - 2*[a=b=c=1]`. The 422 phase
+`a+d+4*a*b*c+4*b*c*d` has two Clifford restrictions on `a XOR d`; two invertible
+linear coordinate changes produce its other catalogue cores. Each full phase
+table is reconstructed exactly before publication of the shared catalogue.
+These identities and Rust generation are independent of external catalogue
+source code and data; no external catalogue file is bundled.
+
+```rust
+use rmagna::catalogue::builtin_phase_catalogue;
+let catalogue = builtin_phase_catalogue()?;
+assert_eq!(catalogue.usage().entries, 15);
+assert_eq!(catalogue.usage().table_values, 93);
+assert_eq!(catalogue.usage().terms, 27);
+assert_eq!(catalogue.get(3, &[0,0,0,0,0,0,0,4]).unwrap().terms().len(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`validate_phase_catalogue CATALOGUE_JSON --check-builtin` requires the external
+catalogue to have the same complete dimension/table keys and per-entry term
+counts as the independently generated catalogue. Both optional audit flags can
+be combined in either order; unknown or duplicate flags are rejected. Ordinary
+external certification continues to accept other exactly reconstructed entries.
+`catalogue_compare.py` requests both this check and `--check-canonical-cores`,
+and validates all fifteen pinned external entries. The comparison can run with
+Python `-I -B` or `-I -B -O`, writing a new receipt each time. Indicator extensions
+away from their affine supports need not equal the external representation;
+exact represented values, keys and term counts are the comparison contract.
+
+Tests independently construct all expected tables from monomials, check every
+indicator sum, verify concurrent shared access and isolated clone extension,
+and compare 120 signed/even/global updates through prepared scalar and labelled
+amplitude queries against direct finite sums. Built-in certificates can now be
+passed to `PreparedCataloguePhase`. Automatic selection in query engines,
+products and injection transport remain subsequent work; this API alone does
+not claim a runtime speedup.
