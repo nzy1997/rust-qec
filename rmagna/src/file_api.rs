@@ -1,4 +1,9 @@
 //! Owned file-task snapshots, reusable compilation, and schema-2 run reports.
+mod comparison;
+pub use comparison::{
+    FileSamplerComparison, FileSamplerComparisonOptions, FileSamplerPilot, SamplerComparisonStatus,
+    SamplerDecision,
+};
 mod enumeration;
 mod preparation;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};

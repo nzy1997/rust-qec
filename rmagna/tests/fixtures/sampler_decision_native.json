@@ -1,0 +1,244 @@
+{
+  "reference_revision": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "oracle": "magna._native.decide_file_sampler",
+  "cases": [
+    {
+      "name": "tie",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "expected": {
+        "gamma": "3ff0000000000000",
+        "affine_support_seconds_per_draw": "3fe0000000000000",
+        "exact_marginal_seconds_per_draw": "3fe0000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "affine_faster",
+      "kappa_bits": "4000000000000000",
+      "affine_bits": "3fd0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 8,
+      "expected": {
+        "gamma": "3fe0000000000000",
+        "affine_support_seconds_per_draw": "3fa0000000000000",
+        "exact_marginal_seconds_per_draw": "3fc0000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "exact_faster",
+      "kappa_bits": "3ff8000000000000",
+      "affine_bits": "4010000000000000",
+      "exact_bits": "4008000000000000",
+      "count": 8,
+      "expected": {
+        "gamma": "4000000000000000",
+        "affine_support_seconds_per_draw": "3fe0000000000000",
+        "exact_marginal_seconds_per_draw": "3fd8000000000000",
+        "recommended_sampler": "exact_marginal"
+      }
+    },
+    {
+      "name": "zero_kappa",
+      "kappa_bits": "0000000000000000",
+      "affine_bits": "4022000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 16,
+      "expected": {
+        "gamma": "0000000000000000",
+        "affine_support_seconds_per_draw": "3fe2000000000000",
+        "exact_marginal_seconds_per_draw": "3fb0000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "negative_zero_kappa",
+      "kappa_bits": "8000000000000000",
+      "affine_bits": "4022000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 16,
+      "expected": {
+        "gamma": "8000000000000000",
+        "affine_support_seconds_per_draw": "3fe2000000000000",
+        "exact_marginal_seconds_per_draw": "3fb0000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "zero_times_infinity",
+      "kappa_bits": "0000000000000000",
+      "affine_bits": "7fefffffffffffff",
+      "exact_bits": "0000000000000001",
+      "count": 2,
+      "error": "pilot Gamma exceeds floating-point range"
+    },
+    {
+      "name": "overflow_gamma",
+      "kappa_bits": "7fefffffffffffff",
+      "affine_bits": "4000000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "pilot Gamma exceeds floating-point range"
+    },
+    {
+      "name": "overflow_ratio",
+      "kappa_bits": "0000000000000001",
+      "affine_bits": "7fefffffffffffff",
+      "exact_bits": "0000000000000001",
+      "count": 2,
+      "error": "pilot Gamma exceeds floating-point range"
+    },
+    {
+      "name": "underflow_gamma",
+      "kappa_bits": "0000000000000001",
+      "affine_bits": "0000000000000001",
+      "exact_bits": "7fefffffffffffff",
+      "count": 2,
+      "expected": {
+        "gamma": "0000000000000000",
+        "affine_support_seconds_per_draw": "0000000000000000",
+        "exact_marginal_seconds_per_draw": "7fdfffffffffffff",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "underflow_per_draw",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "0000000000000001",
+      "exact_bits": "0000000000000001",
+      "count": 64,
+      "expected": {
+        "gamma": "3ff0000000000000",
+        "affine_support_seconds_per_draw": "0000000000000000",
+        "exact_marginal_seconds_per_draw": "0000000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "large_count",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 9223372036854775807,
+      "expected": {
+        "gamma": "3ff0000000000000",
+        "affine_support_seconds_per_draw": "3c00000000000000",
+        "exact_marginal_seconds_per_draw": "3c00000000000000",
+        "recommended_sampler": "affine_support"
+      }
+    },
+    {
+      "name": "single_count_binding",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "4000000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 1,
+      "expected": {
+        "gamma": "4000000000000000",
+        "affine_support_seconds_per_draw": "4000000000000000",
+        "exact_marginal_seconds_per_draw": "3ff0000000000000",
+        "recommended_sampler": "exact_marginal"
+      }
+    },
+    {
+      "name": "zero_count",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 0,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "nan_field_0",
+      "kappa_bits": "7ff8000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "nan_field_1",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "7ff8000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "nan_field_2",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "7ff8000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "infinity_field_0",
+      "kappa_bits": "7ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "infinity_field_1",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "7ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "infinity_field_2",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "7ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "negative_field_0",
+      "kappa_bits": "bff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "negative_field_1",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "bff0000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "negative_field_2",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "bff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "zero_affine_time",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "0000000000000000",
+      "exact_bits": "3ff0000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    },
+    {
+      "name": "zero_exact_time",
+      "kappa_bits": "3ff0000000000000",
+      "affine_bits": "3ff0000000000000",
+      "exact_bits": "0000000000000000",
+      "count": 2,
+      "error": "finite positive pilot times and count required"
+    }
+  ]
+}

@@ -133,3 +133,22 @@ per-Rust-history bound so it can check the larger TQD5 example. The table cap
 excludes the existing program, temporary input catalog and query caches; it is
 not a process-memory cap. Use `--tasks tqd3` to select one controller example.
 Preparation refusals and timed-out histories remain failed cases in the receipt.
+
+## Native sampler-decision witnesses
+
+`rmagna/tests/fixtures/sampler_decision_native.json` contains 24 tiny binary64
+witnesses captured from the pinned native `decide_file_sampler` binding. It
+records source revision and native-extension SHA-256, input/output float bits,
+and rejected nonfinite/range cases. These are decision-contract fixtures, not
+performance or paper-precision results. Regenerate with the reference environment:
+
+```sh
+python3 benchmarks/magna_reproduction/sampler_decision_reference.py \
+  --magna-root /absolute/path/to/magna --output /absolute/path/to/new-decisions.json
+```
+
+Repeat under `python3 -O` and compare the two files byte for byte. The largest
+count witness stays within the native Python binding's signed-size input range;
+Rust pilot shot counts remain `u64`. The capture checks the strict `Gamma > 1`
+exact-marginal recommendation, including the affine-support tie rule and the
+native multiplication/division order at floating-point limits.
