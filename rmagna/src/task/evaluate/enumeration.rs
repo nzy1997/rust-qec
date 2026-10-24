@@ -1,16 +1,31 @@
 //! Exact unconditional task response over a bounded physical noise sector.
 use super::*;
 use crate::enumeration::{EnumerationOptions, enumerate_noise};
+use crate::instrument::FaultSelection;
 use crate::probability::Probability;
 use crate::runtime::{HistoryEnumerationOptions, RuntimeError};
 use std::cmp::Ordering;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct TaskEnumerationOptions {
     pub noise: EnumerationOptions,
     /// Global complete-history, query and replay budgets across all patterns.
     /// The independent-bit limit remains local to each unresolved group.
     pub histories: HistoryEnumerationOptions,
+    pub include_patterns: bool,
+    /// Total scalar response fields across retained patterns, excluding choices
+    /// already bounded by noise.max_fault_entries. Checked before traversal.
+    pub max_retained_response_values: usize,
+}
+impl Default for TaskEnumerationOptions {
+    fn default() -> Self {
+        Self {
+            noise: EnumerationOptions::default(),
+            histories: HistoryEnumerationOptions::default(),
+            include_patterns: false,
+            max_retained_response_values: 1_000_000,
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskSectorMasses {
@@ -29,7 +44,7 @@ impl TaskSectorMasses {
         }
     }
     fn weighted(
-        row: TaskEvaluation,
+        row: &TaskEvaluation,
         probability: &BigRational,
         f: &FieldArithmetic,
     ) -> Result<Self, TaskError> {
@@ -59,6 +74,15 @@ impl TaskSectorMasses {
         Ok(())
     }
 }
+/// One original categorical assignment, with quantum histories integrated.
+/// Response masses exclude this pattern's physical noise probability.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TaskPatternResponse {
+    pub choices: Vec<FaultSelection>,
+    pub probability: Probability,
+    pub histories: usize,
+    pub response: TaskSectorMasses,
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TaskWeightSector {
     pub weight: usize,
@@ -81,6 +105,7 @@ pub struct TaskEnumeration {
     pub covered_probability: Probability,
     pub omitted_probability: Probability,
     pub patterns: usize,
+    pub pattern_responses: Option<Vec<TaskPatternResponse>>,
     pub histories: usize,
     pub marginal_queries: usize,
     pub replay_attempts: usize,
@@ -231,6 +256,18 @@ impl TaskEvaluator {
         };
         let sector =
             enumerate_noise(model, &options.noise).map_err(|e| error("enumeration.noise", e))?;
+        if options.include_patterns {
+            let fields =
+                2_u128 + u128::from(self.target.is_some()) + self.task.observables.len() as u128;
+            limit(
+                "max_retained_response_values",
+                options.max_retained_response_values,
+                sector.patterns().len() as u128 * fields,
+            )?;
+        }
+        let mut pattern_responses = options
+            .include_patterns
+            .then(|| Vec::with_capacity(sector.patterns().len()));
         let mut by_weight = sector
             .by_weight()
             .iter()
@@ -254,15 +291,30 @@ impl TaskEvaluator {
             }
             let weight = &mut by_weight[pattern.weight()];
             weight.patterns += 1;
-            let mut add = |row| -> Result<(), TaskError> {
+            let start_histories = weight.histories;
+            let mut response = options
+                .include_patterns
+                .then(|| TaskSectorMasses::zero(self));
+            let mut add = |row: TaskEvaluation| -> Result<(), TaskError> {
                 let weighted = TaskSectorMasses::weighted(
-                    row,
+                    &row,
                     pattern.probability.value(),
                     &self.options.fields,
                 )?;
                 weight.masses.add(&weighted, &self.options.fields)?;
                 masses.add(&weighted, &self.options.fields)?;
                 weight.histories += 1;
+                if let Some(response) = &mut response {
+                    response.add(
+                        &TaskSectorMasses {
+                            accepted: row.accepted,
+                            error: row.error,
+                            target_success: row.target_success,
+                            moments: row.moments,
+                        },
+                        &self.options.fields,
+                    )?;
+                }
                 Ok(())
             };
             match &self.execution {
@@ -335,6 +387,14 @@ impl TaskEvaluator {
                         })?;
                 }
             }
+            if let Some(records) = &mut pattern_responses {
+                records.push(TaskPatternResponse {
+                    choices: pattern.faults.clone(),
+                    probability: pattern.probability.clone(),
+                    histories: weight.histories - start_histories,
+                    response: response.expect("enabled pattern response"),
+                });
+            }
         }
         let (full_acceptance, full_error, conditional_error) = bounds(
             &masses,
@@ -352,6 +412,7 @@ impl TaskEvaluator {
             covered_probability: sector.covered_probability().clone(),
             omitted_probability: sector.omitted_probability().clone(),
             patterns: sector.patterns().len(),
+            pattern_responses,
             histories,
             marginal_queries: queries,
             replay_attempts: replays,

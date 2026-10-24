@@ -21,6 +21,8 @@ impl FileEnumerationOptions {
             "max_site_weight_pairs":n.max_site_weight_pairs,"max_probability_bits":n.max_probability_bits},
             "histories":{"max_branches":h.max_branches,"max_record_bits":h.max_record_bits,
                 "max_marginal_queries":h.max_marginal_queries,"max_replay_attempts":h.max_replay_attempts},
+            "include_patterns":self.enumeration.include_patterns,
+            "max_retained_response_values":self.enumeration.max_retained_response_values,
             "execution_limits":self.execution_limits.to_json()})
     }
 }
@@ -228,6 +230,11 @@ impl FileEnumerationReport {
                     "patterns":sector.patterns,"histories":sector.histories,
                     "masses":masses(&sector.masses, error_defined, &format!("result.by_weight.{j}.masses"), &mut encoder)?}));
             }
+            let patterns = result.pattern_responses.as_ref().map(|patterns| patterns.iter().enumerate().map(|(j, p)| {
+                Ok(json!({"weight":p.choices.len(),"choices":p.choices.iter().map(|c|json!({"category":c.site,"channel":c.alternative})).collect::<Vec<_>>(),
+                    "probability":probability(&p.probability),"histories":p.histories,
+                    "response":masses(&p.response,error_defined,&format!("result.pattern_responses.{j}.response"),&mut encoder)?}))
+            }).collect::<Result<Vec<_>,BatchExportError>>()).transpose()?;
             value["result"] = json!({
                 "semantics":"unconditional covered masses; no covered-probability or acceptance renormalization",
                 "error_defined":error_defined,"covered_probability":probability(&result.covered_probability),
@@ -238,6 +245,7 @@ impl FileEnumerationReport {
                     "power":norm.power(),"scale":"2**power",
                     "basis":"1,omega,omega^2,omega^3; omega=exp(i*pi/4)"})),
                 "by_weight":sectors,"patterns":result.patterns,"histories":result.histories,
+                "pattern_responses":patterns,"pattern_response_semantics":"quantum history integrated; excludes physical pattern probability",
                 "marginal_queries":result.marginal_queries,"replay_attempts":result.replay_attempts,
                 "network_compilations":result.network_compilations,
                 "full_acceptance":interval(Some(&result.full_acceptance),"result.full_acceptance",&mut encoder)?,
