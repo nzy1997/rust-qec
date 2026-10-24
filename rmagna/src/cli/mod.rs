@@ -2,7 +2,7 @@ mod args;
 mod output;
 
 use args::{Args, Mode};
-use rmagna::file_api::FileTask;
+use rmagna::file_api::{FileSamplerComparisonOptions, FileTask};
 use rmagna::runtime::ControllerRegistry;
 use rmagna::runtime::process::ControllerProcess;
 use serde_json::{Value, json};
@@ -74,6 +74,13 @@ fn execute(args: &Args) -> Result<Value> {
                 Err(error) => output::export_failure(&report, &error),
             }
         }
+        Mode::Prepare => task.prepare_sampling(&args.preparation)?.report().to_json(),
+        Mode::Compare => task
+            .compare_samplers(&FileSamplerComparisonOptions {
+                pilot: args.run,
+                preparation: args.preparation,
+            })?
+            .to_json(),
         Mode::Enumerate => {
             let report = task.enumerate(&args.enumeration)?;
             match report.to_json() {
@@ -108,7 +115,7 @@ pub fn main() -> u8 {
         || (raw.len() == 2
             && matches!(
                 raw[0].as_str(),
-                "run" | "inspect" | "validate" | "enumerate"
+                "run" | "inspect" | "validate" | "enumerate" | "prepare" | "compare-samplers"
             )
             && matches!(raw[1].as_str(), "--help" | "-h"));
     if help || raw == ["--version"] {

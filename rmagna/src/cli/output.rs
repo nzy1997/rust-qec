@@ -162,6 +162,92 @@ fn estimate(value: &Value, key: &str) -> String {
         _ => "n/a".to_owned(),
     }
 }
+fn number_or_na(value: &Value) -> String {
+    value
+        .as_f64()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "n/a".into())
+}
+fn preparation_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()> {
+    let counts = &value["sampling_preparation"]["counts"];
+    if !counts.is_null() {
+        writeln!(
+            stdout,
+            "Prepared families: {} created, {} reused, {} cold; {}/{} requests attempted",
+            counts["created"],
+            counts["reused"],
+            counts["cold"],
+            counts["attempted"],
+            counts["planned"]
+        )?;
+    }
+    writeln!(
+        stdout,
+        "Preparation seconds: {}",
+        number_or_na(&value["timings"]["total_seconds"])
+    )?;
+    for key in ["failure", "metadata_failure"] {
+        if let Some(message) = value[key]["message"].as_str() {
+            writeln!(
+                stdout,
+                "{}: {message}",
+                value[key]["field"].as_str().unwrap_or("preparation")
+            )?;
+        }
+    }
+    Ok(())
+}
+fn comparison_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "Pilot draws per sampler: {}",
+        value["pilot_shots_per_channel"]
+    )?;
+    if let Some(sampler) = value["recommended_sampler"].as_str() {
+        writeln!(
+            stdout,
+            "Gamma: {}; recommended sampler: {sampler}",
+            value["gamma"]
+        )?;
+    } else {
+        writeln!(
+            stdout,
+            "No recommendation: {}",
+            value["reason"].as_str().unwrap_or("unavailable")
+        )?;
+    }
+    for sampler in ["affine_support", "exact_marginal"] {
+        let pilot = &value["pilots"][sampler];
+        writeln!(
+            stdout,
+            "{sampler}: {}; preparation seconds: {}; sampling seconds: {}",
+            pilot["status"].as_str().unwrap_or("unavailable"),
+            number_or_na(&pilot["preparation"]["timings"]["total_seconds"]),
+            number_or_na(&pilot["sampling_receipt"]["sampling_seconds"])
+        )?;
+        for key in ["failure", "metadata_failure"] {
+            if let Some(message) = pilot["preparation"][key]["message"].as_str() {
+                writeln!(stdout, "  preparation: {message}")?;
+            }
+        }
+        for key in ["failure", "sampling_export_failure"] {
+            if let Some(message) = pilot[key].as_str() {
+                writeln!(stdout, "  {message}")?;
+            }
+        }
+        if let Some(failures) = pilot["sampling"]["failures"].as_array() {
+            for failure in failures {
+                if let Some(message) = failure["message"].as_str() {
+                    writeln!(stdout, "  sampling: {message}")?;
+                }
+            }
+        }
+    }
+    writeln!(
+        stdout,
+        "Pilot point estimate only; automatic switching disabled; no production run."
+    )
+}
 pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
     let mut stdout = io::stdout().lock();
     if json_output {
@@ -199,6 +285,12 @@ pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
             ] {
                 writeln!(stdout, "{prefix}{label}: {}", estimate(statistics, key))?;
             }
+        }
+        if value["kind"] == "preparation" {
+            preparation_summary(&mut stdout, value)?;
+        }
+        if value["kind"] == "sampler_comparison" {
+            comparison_summary(&mut stdout, value)?;
         }
         if value["kind"] == "enumeration" {
             enumeration_summary(&mut stdout, value)?;
