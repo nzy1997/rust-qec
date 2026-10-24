@@ -365,10 +365,11 @@ pub(super) fn compile(
             | Operation::Annotation { .. } => {}
         }
     }
-    let unitary = UnitaryCircuit::new(state.width, state.program)?.compile_with_strategy(
+    let unitary = UnitaryCircuit::new(state.width, state.program)?.compile_with_path_limit(
         &BitVector::zeros(state.width)?,
         arithmetic,
         options.compiler_strategy,
+        options.max_path_bits,
     )?;
     let mut rows = Vec::new();
     let mut outcomes = BitVector::zeros(state.selections.len())?;
@@ -505,10 +506,11 @@ pub(super) fn unitary(
         }
     }
     Ok(
-        UnitaryCircuit::new(circuit.num_qubits(), gates)?.compile_with_strategy(
+        UnitaryCircuit::new(circuit.num_qubits(), gates)?.compile_with_path_limit(
             &BitVector::zeros(circuit.num_qubits())?,
             arithmetic,
             options.compiler_strategy,
+            options.max_path_bits,
         )?,
     )
 }

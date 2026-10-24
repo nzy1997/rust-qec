@@ -153,6 +153,8 @@ pub struct CompileOptions {
     pub moment_preparation: QueryPreparation,
     pub max_prepared_moments: usize,
     pub max_coherent_qubits: usize,
+    /// Raw paths in the chosen Clifford lowering, before local contraction.
+    pub max_path_bits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
 }
@@ -168,6 +170,7 @@ impl Default for CompileOptions {
             moment_preparation: QueryPreparation::Cold,
             max_prepared_moments: 64,
             max_coherent_qubits: 65536,
+            max_path_bits: 1_000_000,
             max_gates: 1_000_000,
             max_noise_sites: 1_000_000,
         }

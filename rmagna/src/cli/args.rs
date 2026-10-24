@@ -78,6 +78,7 @@ Limits (zero is allowed for quotas unless marked positive):
   --max-terms N                       Query contraction term budget
   --max-coherent-qubits N             Compiled coherent width budget
   --max-gates N                       Compiled gate budget
+  --max-path-bits N                   Raw Clifford paths before contraction (default 1000000)
   --max-noise-sites N                 Compiled noise site budget
   --max-queries N                     Call-wide query quota; per sampling pilot in compare
   --max-seconds SECONDS               Positive deadline checked between operations
@@ -375,6 +376,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-terms"
                 | "--compiler"
                 | "--max-coherent-qubits"
+                | "--max-path-bits"
                 | "--max-gates"
                 | "--max-noise-sites"
                 | "--max-prepared-probabilities"
@@ -538,6 +540,7 @@ fn configure_runtime(flags: &mut Flags, file: &mut FileTaskOptions) -> Result<()
     compile.max_coherent_qubits =
         flags.number("--max-coherent-qubits", compile.max_coherent_qubits)?;
     compile.max_gates = flags.number("--max-gates", compile.max_gates)?;
+    compile.max_path_bits = flags.number("--max-path-bits", compile.max_path_bits)?;
     compile.max_noise_sites = flags.number("--max-noise-sites", compile.max_noise_sites)?;
     compile.max_prepared_probabilities = flags.number(
         "--max-prepared-probabilities",

@@ -268,6 +268,7 @@ pub(super) fn compile(
     source: &UnitaryCircuit,
     input: &BitVector,
     arithmetic: &ScalarArithmetic,
+    max_path_bits: usize,
 ) -> Result<CompiledUnitary, UnitaryError> {
     if input.width() != source.width {
         return Err(UnitaryError::DimensionMismatch);
@@ -319,7 +320,7 @@ pub(super) fn compile(
         }
     }
     if slots.is_empty() {
-        let mut result = source.compile(input, arithmetic)?;
+        let mut result = source.compile_parity(input, arithmetic, max_path_bits)?;
         Arc::make_mut(&mut result.compilation).strategy = CompilerStrategy::SharedCommutingLayer;
         return Ok(result);
     }
@@ -441,6 +442,7 @@ pub(super) fn compile(
         coordinates: phase_width,
     };
     let phase = Arc::new(updates.phase(&BTreeMap::new())?);
+    let raw_path_variables = check_raw_paths(&gates, max_path_bits)?;
     let initial =
         CliffordCircuit::computational(BitVector::from_indices(coherent_width, input.ones())?)?;
     let circuit = CliffordCircuit::new(coherent_width, gates)?;
@@ -471,6 +473,7 @@ pub(super) fn compile(
         shared_observations_before_reduction: rank,
         clifford_gates: circuit.gates().len(),
         path_variables: boundary.columns().len(),
+        raw_path_variables,
     });
     let program = Arc::new(InsertionProgram {
         reference: Arc::clone(&boundary),

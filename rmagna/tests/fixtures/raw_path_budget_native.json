@@ -1,0 +1,72 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.raw-path-budget-reference.v1",
+  "scope": "matched Clifford lowerings only; phase observation lowerings can differ",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "case": "zero_paths",
+      "minimum_successful_cap": 0,
+      "rejected_caps": [],
+      "source": "I 2\nX 1\nS 2"
+    },
+    {
+      "case": "cancelled_pair",
+      "minimum_successful_cap": 2,
+      "rejected_caps": [
+        0,
+        1
+      ],
+      "source": "H 0\nH 0\nI 2"
+    },
+    {
+      "case": "eight_cancelled",
+      "minimum_successful_cap": 8,
+      "rejected_caps": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "source": "H 0\nH 0\nH 0\nH 0\nH 0\nH 0\nH 0\nH 0\nI 2"
+    },
+    {
+      "case": "entangled",
+      "minimum_successful_cap": 4,
+      "rejected_caps": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "source": "H 0\nCX 0 1\nH 1\nS 2\nH 0\nH 2"
+    },
+    {
+      "case": "measurement_reset",
+      "minimum_successful_cap": 4,
+      "rejected_caps": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "source": "H 0\nH 0\nM 0\nR 0\nH 0\nH 0\nM 0\nI 2"
+    },
+    {
+      "case": "wide_cancelled",
+      "minimum_successful_cap": 4,
+      "rejected_caps": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "source": "I 128\nH 128\nH 128\nH 64\nH 64"
+    }
+  ]
+}
