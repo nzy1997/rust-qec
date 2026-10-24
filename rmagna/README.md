@@ -3476,3 +3476,52 @@ change the compiler, sampler, contraction terms or benchmark performance.
 `make test-magna-catalogue-json` runs catalogue regressions with the default
 serde_json features and with `arbitrary_precision` enabled in Rust CI. The default
 features already include `float_roundtrip`.
+
+## Canonical non-Clifford phase cores
+
+`phase::CanonicalPhaseCore::new(&phase, &limits)` separates a third-level parity
+phase into a finite canonical core, a global eighth-root phase and a Clifford
+quadratic correction. For every Boolean word `x`,
+`phase(x) = core[x] + global + 2 * quadratic(x) (mod 8)`.
+In a fixed coordinate basis, the core retains linear monomial coefficients
+modulo two, quadratic coefficients modulo four and cubic coefficients modulo
+eight. Higher monomials of a parity phase vanish modulo eight. The constructor
+uses direct parity-axis contributions and a subset transform, without a
+stabilizer decomposition, quotient-assignment sampler or floating-point work.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::phase::{CanonicalPhaseCore, ParityPhase, PhaseCoreLimits};
+let phase = ParityPhase::new(2, 0, [(BitVector::from_indices(2, [0, 1])?, 1)])?;
+let core = CanonicalPhaseCore::new(&phase, &PhaseCoreLimits::default())?;
+assert_eq!(core.phase_table(), &[0, 1, 1, 4]);
+let (global, correction) = core.clifford_correction();
+assert_eq!(global, 0);
+assert_eq!(correction.evaluate(&BitVector::from_indices(2, [0, 1])?)?, 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`PhaseCoreLimits` defaults to dimension 20, 1,048,576 table values and 67,108,864
+logical work units. Dimension, table and work admission precede expansion.
+Work counts the monomial contributions and `(dimension + 1) * table_values`
+subset/table visits; it is not a wall-time or allocator byte bound. `work_units`
+reports the admitted count. Constant/zero-coordinate phases still have one
+core value. Table admission also enforces the `isize::MAX` byte-vector capacity
+ceiling when a caller raises the configured quota. Large coordinate spaces are
+explicitly rejected even when their signature is low rank: callers must choose and restrict to an appropriate
+quotient first. The constructor does not silently change coordinates.
+
+Sign changes, affine translations and Clifford/global corrections preserve
+the core in the same coordinate basis. General coordinate changes can produce
+a different table, so this is not a classifier under arbitrary linear changes
+or an optimal decomposition search. Tests compare exhaustive small signatures
+and random shifted/mixed coordinates with independent finite differences of
+complete phase values, including the two-coordinate parity and CCZ identities.
+
+`validate_phase_catalogue CATALOGUE_JSON --check-canonical-cores` additionally
+requires every certified table to be a canonical third-level core. Default
+catalogue certification continues to accept other exactly reconstructible
+finite phase functions. The external comparison harness uses the stronger
+check and confirms all 15 pinned cores are already canonical, with identical
+ordinary and Python `-O` receipts. This normalization primitive does not yet
+select or transport catalogue terms in quantum queries.

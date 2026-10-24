@@ -1,5 +1,8 @@
 //! Third-hierarchy parity phases, the Clifford radical, and prepared exact sums.
 
+mod core;
+pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
+
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
@@ -12,6 +15,11 @@ pub enum PhaseError {
     InvalidPhase,
     DimensionMismatch,
     NotClifford,
+    CoreLimit {
+        option: &'static str,
+        limit: u128,
+        required: u128,
+    },
     TermLimit {
         rank: usize,
         limit: usize,
@@ -33,6 +41,14 @@ impl fmt::Display for PhaseError {
             Self::InvalidPhase => write!(f, "parity phases must lie between zero and seven"),
             Self::DimensionMismatch => write!(f, "phase and affine coordinate dimensions disagree"),
             Self::NotClifford => write!(f, "phase has a nonzero third-derivative signature"),
+            Self::CoreLimit {
+                option,
+                limit,
+                required,
+            } => write!(
+                f,
+                "{option} = {limit} is insufficient; need at least {required}"
+            ),
             Self::TermLimit { rank, limit } => write!(
                 f,
                 "quotient rank {rank} exceeds the limit of {limit} computational terms"
