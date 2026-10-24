@@ -224,8 +224,8 @@ impl PreparedPauliMoment {
             word.phase(),
         )?;
         let closure = if zero {
-            // A Z-event projector anticommutes with P, so Pi P Pi = 0
-            // independently of outcomes and of the prepared state's support.
+            // If P anticommutes with a Z-row observable, P exchanges its eigenspaces,
+            // so the corresponding event projector satisfies Pi P Pi = 0.
             None
         } else {
             let joint = moment_joint(reference, &lifted, arithmetic)?;
