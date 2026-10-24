@@ -1,5 +1,6 @@
 //! Owned file-task snapshots, reusable compilation, and schema-2 run reports.
 mod enumeration;
+mod preparation;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};
 use crate::costs::{ExecutionCosts, ExecutionLimits, ExecutionMeter, OperationCost};
 use crate::noise::NoiseSampling;
@@ -12,6 +13,7 @@ use crate::task::{
     run_task_batch_inspected, sampling_configuration, validate_snapshot_fingerprints,
 };
 pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
+pub use preparation::{FilePreparationOptions, FilePreparationReport, PreparedFileTask};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fmt, io::Read, path::Path, sync::Arc, time::Instant};
 
@@ -199,6 +201,9 @@ impl FileTask {
         Ok(self.descriptor_value(resolved_options(&self.fingerprint_input(run)), fingerprints))
     }
     fn descriptor_value(&self, options: Value, fingerprints: ContentFingerprints) -> Value {
+        self.descriptor_value_with_fingerprints(options, fingerprints.to_json())
+    }
+    fn descriptor_value_with_fingerprints(&self, options: Value, fingerprints: Value) -> Value {
         let i = &self.inputs;
         let t = i.modules.task();
         let target=i.modules.ideal_state().map(|p|json!({"qubits":p.circuit().num_qubits(),"outputs":p.outputs(),"postselection":p.postselection()}));
@@ -212,7 +217,7 @@ impl FileTask {
             "software":{"name":"rmagna","version":env!("CARGO_PKG_VERSION"),"implementation":"independent_rust"},
             "circuit":circuit_summary(&i.physical),
             "options":options,
-            "fingerprints":fingerprints.to_json(),
+            "fingerprints":fingerprints,
             "provenance_limits":{"max_json_bytes":i.options.fingerprints.max_json_bytes,"max_depth":i.options.fingerprints.max_depth},
             "method":match i.sampling {NoiseSampling::Physical=>"global_boundary_with_independent_original_noise",NoiseSampling::Importance{..}=>"global_boundary_with_noise_importance_sampling"},
             "history_sampler":history,
