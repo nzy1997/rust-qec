@@ -443,6 +443,67 @@ fn preparation_and_pilot_failures_have_nonzero_exit_status_and_keep_receipts() {
     );
 }
 #[test]
+fn human_comparison_reports_partial_draws_export_failures_and_unstarted_sampling() {
+    let f = Files::new();
+    f.simple();
+    for limits in [
+        vec!["--pilot-shots", "48", "--max-queries", "24"],
+        vec!["--numeric-work-bits", "0"],
+    ] {
+        let mut args = vec!["compare-samplers", "circuit.magna", "--task", "task.json"];
+        args.extend(limits);
+        let out = f.run(&args);
+        assert_eq!(out.status.code(), Some(1));
+        let text = String::from_utf8(out.stdout).unwrap();
+        args.push("--json");
+        let value = f.json(&args, 1);
+        assert!(text.contains(&format!(
+            "Pilot draws requested per sampler: {}",
+            value["pilot_shots_per_channel"]
+        )));
+        for method in ["affine_support", "exact_marginal"] {
+            let pilot = &value["pilots"][method];
+            let receipt = &pilot["sampling_receipt"];
+            let completed = receipt["completed"].as_u64().unwrap();
+            assert!(completed > 0);
+            if receipt["requested"] == 48 {
+                assert!(completed < 48);
+                assert_eq!(receipt["failed"], 1);
+                assert!(receipt["not_attempted"].as_u64().unwrap() > 0);
+            } else {
+                assert_eq!(completed, 2);
+                assert_eq!(receipt["failed"], 0);
+                assert_eq!(receipt["not_attempted"], 0);
+                assert!(pilot["sampling"].is_null());
+                assert!(pilot["sampling_export_failure"].is_string());
+            }
+            assert!(text.contains(&format!(
+                "{method}: {}; draws: requested {}, completed {}, failed {}, not attempted {}",
+                pilot["status"].as_str().unwrap(),
+                receipt["requested"],
+                receipt["completed"],
+                receipt["failed"],
+                receipt["not_attempted"]
+            )));
+        }
+    }
+    f.put("task.json", r#"{"sample_records":[0]}"#);
+    let out = f.run(&[
+        "compare-samplers",
+        "circuit.magna",
+        "--task",
+        "task.json",
+        "--max-prepared-probabilities",
+        "1",
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains(
+        "affine_support: complete; draws: requested 2, completed 2, failed 0, not attempted 0"
+    ));
+    assert!(text.contains("exact_marginal: failed; draws: sampling not started"));
+}
+#[test]
 fn isolated_decoder_preparation_has_no_callbacks_and_pilots_make_only_requested_calls() {
     let f = Files::new();
     f.put("circuit.magna","H 0\nT 0\nH 0\nM(1/5) 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCX ctrl[0] 1\nX_ERROR(1/7) 1\nM 1\nI 2\nOBSERVABLE_INCLUDE(0) rec[-1]");

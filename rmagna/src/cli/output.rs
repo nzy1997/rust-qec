@@ -200,7 +200,7 @@ fn preparation_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()>
 fn comparison_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()> {
     writeln!(
         stdout,
-        "Pilot draws per sampler: {}",
+        "Pilot draws requested per sampler: {}",
         value["pilot_shots_per_channel"]
     )?;
     if let Some(sampler) = value["recommended_sampler"].as_str() {
@@ -218,9 +218,21 @@ fn comparison_summary(stdout: &mut impl Write, value: &Value) -> io::Result<()> 
     }
     for sampler in ["affine_support", "exact_marginal"] {
         let pilot = &value["pilots"][sampler];
+        let receipt = &pilot["sampling_receipt"];
+        let draws = if receipt.is_object() {
+            format!(
+                "requested {}, completed {}, failed {}, not attempted {}",
+                receipt["requested"],
+                receipt["completed"],
+                receipt["failed"],
+                receipt["not_attempted"]
+            )
+        } else {
+            "sampling not started".to_owned()
+        };
         writeln!(
             stdout,
-            "{sampler}: {}; preparation seconds: {}; sampling seconds: {}",
+            "{sampler}: {}; draws: {draws}; preparation seconds: {}; sampling seconds: {}",
             pilot["status"].as_str().unwrap_or("unavailable"),
             number_or_na(&pilot["preparation"]["timings"]["total_seconds"]),
             number_or_na(&pilot["sampling_receipt"]["sampling_seconds"])
