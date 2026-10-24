@@ -4,6 +4,7 @@ mod densities;
 mod gates;
 mod insertions;
 mod lower;
+mod moments;
 pub use insertions::{InsertionPreparation, PreparedInsertionStatistics};
 mod probabilities;
 use crate::circuit::{BitAtom, BitExpr, Circuit};
@@ -147,6 +148,8 @@ pub struct CompileOptions {
     pub max_prepared_probabilities: usize,
     pub density_preparation: QueryPreparation,
     pub max_prepared_densities: usize,
+    pub moment_preparation: QueryPreparation,
+    pub max_prepared_moments: usize,
     pub max_coherent_qubits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
@@ -160,6 +163,8 @@ impl Default for CompileOptions {
             max_prepared_probabilities: 64,
             density_preparation: QueryPreparation::Cold,
             max_prepared_densities: 16,
+            moment_preparation: QueryPreparation::Cold,
+            max_prepared_moments: 64,
             max_coherent_qubits: 65536,
             max_gates: 1_000_000,
             max_noise_sites: 1_000_000,
@@ -211,6 +216,7 @@ pub struct CompiledInstrument {
     unitary: Arc<CompiledUnitary>,
     probability_queries: Arc<probabilities::ProbabilityQueries>,
     density_queries: Arc<densities::DensityQueries>,
+    moment_queries: Arc<moments::MomentQueries>,
     live_wires: Arc<Vec<usize>>,
     record_wires: Arc<Vec<usize>>,
     event_rows: Arc<Vec<BitVector>>,
@@ -268,6 +274,9 @@ impl CompiledInstrument {
     }
     pub fn prepared_density_statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
         self.density_queries.statistics()
+    }
+    pub fn prepared_moment_statistics(&self) -> Result<PreparedQueryStatistics, InstrumentError> {
+        self.moment_queries.statistics()
     }
     fn probability(
         &self,
@@ -545,13 +554,14 @@ impl CompiledInstrument {
             BitVector::from_indices(self.unitary.width(), mask.ones().map(|j| physical[j]))
         };
         let word = PauliWord::new(map(word.x())?, map(word.z())?, word.phase())?;
-        Ok(self.inserted(faults, arithmetic)?.pauli_moment(
+        self.moment_queries.evaluate(
+            &self.inserted(faults, arithmetic)?,
             &word,
             &self.event_rows,
             &self.outcomes,
             max_terms,
             arithmetic,
-        )?)
+        )
     }
     pub fn masses(
         &self,

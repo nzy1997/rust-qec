@@ -287,6 +287,12 @@ fn every_resolved_execution_and_export_setting_changes_the_options_digest() {
                 QueryPreparation::FixedFibers(FiberOptions::default())
         },
         |e| e.evaluation.runtime.compile.max_prepared_densities += 1,
+        |e| e.evaluation.runtime.compile.moment_preparation = QueryPreparation::Trace,
+        |e| {
+            e.evaluation.runtime.compile.moment_preparation =
+                QueryPreparation::FixedFibers(FiberOptions::default())
+        },
+        |e| e.evaluation.runtime.compile.max_prepared_moments += 1,
         |e| e.evaluation.runtime.compile.max_coherent_qubits += 1,
         |e| e.evaluation.runtime.compile.max_gates += 1,
         |e| e.evaluation.runtime.compile.max_noise_sites += 1,

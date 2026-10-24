@@ -452,6 +452,10 @@ pub(super) fn compile(
             options.density_preparation,
             options.max_prepared_densities,
         )?),
+        moment_queries: Arc::new(moments::MomentQueries::new(
+            options.moment_preparation,
+            options.max_prepared_moments,
+        )?),
         live_wires: Arc::new(state.live),
         record_wires: Arc::new(state.records),
         event_rows: Arc::new(rows),
