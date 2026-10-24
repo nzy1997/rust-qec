@@ -2,6 +2,8 @@
 
 mod prepared;
 pub use prepared::PreparedAffineContraction;
+mod boundary;
+pub use boundary::PreparedLinearBoundary;
 
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{EliminationStep, QuadraticElimination, QuadraticError, QuadraticForm};
@@ -14,6 +16,7 @@ pub enum StabilizerError {
     DimensionOverflow,
     IncompatibleProjection,
     IncompatibleContraction,
+    IncompatibleBoundaryMap,
     Binary(Gf2Error),
     Quadratic(QuadraticError),
     Scalar(ScalarError),
@@ -22,6 +25,10 @@ pub enum StabilizerError {
 impl fmt::Display for StabilizerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::IncompatibleBoundaryMap => write!(
+                f,
+                "prepared boundary map requires unchanged source width and support columns"
+            ),
             Self::DimensionMismatch => write!(
                 f,
                 "ket boundary, path, or constraint dimensions do not agree"
@@ -505,18 +512,17 @@ impl PreparedZProjection {
         .retain_boundary(keep)?;
         PreparedAffineContraction::new(&structure)
     }
-    pub(crate) fn prepare_linear_sum(
+    pub(crate) fn prepare_linear_boundary(
         &self,
         rows: &[BitVector],
-    ) -> Result<PreparedAffineContraction, StabilizerError> {
+    ) -> Result<PreparedLinearBoundary, StabilizerError> {
         let structure = AffineKet::new(
             BitVector::zeros(self.reference.width())?,
             self.columns.clone(),
             self.phase.clone(),
             ExactScalar::one(),
-        )?
-        .linear_boundary(rows)?;
-        PreparedAffineContraction::new(&structure)
+        )?;
+        PreparedLinearBoundary::new(&structure, rows)
     }
 
     /// Apply the prepared constraints without refactoring or restricting their

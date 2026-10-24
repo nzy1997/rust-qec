@@ -1336,6 +1336,14 @@ use its conservative structural branch certificate and exact physical marginals.
 `prepared_support_statistics` reports transport labels and fixed resource counts;
 file reports include them under `compilation.retained_caches.support`.
 
+`stabilizer::PreparedLinearBoundary` prepares the parity images of fixed support
+columns. `apply` maps only the changing offset and retains the input's exact
+coefficient and complete quadratic phase. Source width or column changes are
+explicit errors, including for zero coefficients. Probability parents reuse
+this map after their prepared projection. Captured observation rows also have
+immutable prepared transport coordinates; other queries within the declared
+span use the same exact solver, without adding per-history cache entries.
+
 Set `RuntimeOptions::history_sampler` to `HistorySampler::AffineSupport` to
 propose each controller/guard/requested-record group uniformly from its
 conditioned certified affine envelope. `ExactMarginal` remains the current Rust
