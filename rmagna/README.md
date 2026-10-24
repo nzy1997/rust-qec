@@ -13,6 +13,8 @@ remains a separate deliverable.
 ```sh
 cargo run --release -p rmagna -- validate circuit.magna --task task.json --json
 cargo run --release -p rmagna -- inspect circuit.magna --task task.json --json
+cargo run --release -p rmagna -- prepare circuit.magna --task task.json --json --output prepared.json
+cargo run --release -p rmagna -- compare-samplers circuit.magna --task task.json --pilot-shots 32 --seed 7 --json
 cargo run --release -p rmagna -- run circuit.magna --task task.json --shots 1024 --seed 7 --json --output run.json
 cargo run --release -p rmagna -- enumerate circuit.magna --task task.json --max-weight 1 --json --output sector.json
 cargo run -p rmagna -- --help
@@ -88,7 +90,7 @@ metadata, marks the engine status separately, and does not persist the in-memory
 exact responses. Use `FileEnumerationReport::raw_result` for their typed recovery.
 
 This entry point does not yet implement native option-file compatibility,
-sampler comparison, progress reporting, or paper campaign orchestration.
+progress reporting, or paper campaign orchestration.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -3067,7 +3069,7 @@ phase-resource construction until evaluation. Neither this method nor a cache
 count alone establishes that subsequent sampling has no preparation cost.
 The owned [file preparation](#explicit-file-preparation-and-reusable-sessions)
 and [sampler comparison](#independent-history-sampler-pilots) APIs build on
-this stage. CLI integration remains separate work.
+this stage. The CLI exposes them as `prepare` and `compare-samplers`.
 
 ```rust
 use rmagna::costs::ExecutionMeter;
@@ -3123,8 +3125,8 @@ explicitly records unretained families; trace policies still defer phase-resourc
 construction. These modes are not labeled fully frozen warm execution. The scope
 covers configured reusable sampling families, excluding cold-prefix execution
 and exact-enumeration layouts. The owned Rust file API also provides
-[sampler comparison](#independent-history-sampler-pilots). CLI preparation and
-comparison remain separate integration work.
+[sampler comparison](#independent-history-sampler-pilots). Both are exposed by
+the CLI commands described below.
 
 ```rust
 use rmagna::file_api::{FileApiError, FilePreparationOptions, FileTask};
@@ -3190,3 +3192,37 @@ channel's metadata failure preserves an earlier completed pilot and both
 preparation receipts. Global invalid-count/seed/route/policy errors are rejected
 before either channel compiles. Scientific-range kappa remains inconclusive with
 an explicit range reason rather than a misleading available reason.
+
+## Preparation and comparison commands
+
+`rmagna prepare CIRCUIT --task TASK --json` explicitly compiles and prepares
+configured sampling families, emitting the owned preparation receipt without
+sampling. The process releases its resources at exit; the saved receipt does
+not transfer a cache to a later invocation. `--max-queries` and `--max-seconds`
+apply across compilation, target normalization and static family preparation.
+
+`rmagna compare-samplers CIRCUIT --task TASK --pilot-shots 32 --seed 7 --json`
+runs the two independent explicitly prepared pilots. `--pilot-shots` defaults
+to two and must be at least two; exact-marginal uses checked `seed + 1`.
+`--max-queries`, `--max-seconds` and `--max-record-values` bound each sampling
+pilot. Separate `--max-preparation-queries` and `--max-preparation-seconds` bound
+each channel's compilation/target/family preparation. Preparation defaults to
+an unlimited query quota and no deadline; compiler/fiber/cache caps still apply.
+Reported configuration fingerprints bind both phase budgets. The command never
+switches sampling policy or launches production work.
+
+Both commands accept `--max-preparation-requests`,
+`--max-preparation-history-rows` and `--max-preparation-layout-rows`. These flags
+are rejected in other modes. Comparison rejects `--shots` (use `--pilot-shots`),
+`--history-sampler` (both are chosen explicitly), cold-prefix execution and
+non-fixed probability preparation. Used target and moment families must also
+use fixed preparation. Standalone preparation accepts its configured cold/trace
+policies and reports their scope explicitly.
+
+JSON and optional exclusive `--output` files preserve per-channel receipts,
+actual completed/failed counts, typed-export failure diagnostics and identities.
+Human output shows prepared family counts, separate times, recommendations or
+inconclusive reasons. Failed reports exit with status 1; invalid arguments use
+status 2. An inconclusive completed pilot comparison exits successfully with no
+recommendation. Existing output files are refused before decoder imports or
+execution, and the isolated decoder host continues to block native imports.
