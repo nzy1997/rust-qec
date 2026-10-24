@@ -3614,3 +3614,48 @@ amplitude queries against direct finite sums. Built-in certificates can now be
 passed to `PreparedCataloguePhase`. Automatic selection in query engines,
 products and injection transport remain subsequent work; this API alone does
 not claim a runtime speedup.
+
+## Explicit prepared phase-resource selection
+
+`phase::PreparedPhaseResource::new` provides one scalar/labelled interface for
+certified catalogue indicators and deterministic Clifford fibers. It takes the
+reference phase, a maximum term count, `PhaseResourceOptions`, an optional
+borrowed catalogue, and scalar arithmetic. With a matching supplied certificate
+it prepares that catalogue resource. With no catalogue, an empty catalogue or a
+missing dimension/table key it prepares the existing fiber decomposition.
+The prepared result owns its data after the reference and catalogue are dropped.
+
+```rust
+use rmagna::catalogue::builtin_phase_catalogue;
+use rmagna::gf2::BitVector;
+use rmagna::phase::{ParityPhase, PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let phase = ParityPhase::new(2, 0, [
+    (BitVector::from_indices(2, [0])?, 1),
+    (BitVector::from_indices(2, [1])?, 1),
+])?;
+let resource = PreparedPhaseResource::new(&phase, 2, PhaseResourceOptions::default(),
+    Some(builtin_phase_catalogue()?), &arithmetic)?;
+assert_eq!(resource.kind(), PhaseResourceKind::CertifiedCatalogue);
+assert_eq!(resource.num_terms(), 2);
+resource.check_term_limit(2)?;
+assert!(resource.clifford_fibers().is_none());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`kind`, `quotient_rank` and `num_terms` describe the selected resource.
+`clifford_fibers` and `catalogue_resource` return only the actual selected variant;
+an overlapping catalogue is never described as a disjoint fiber partition.
+`evaluate` and `expand` retain exact Clifford/global updates, complex coefficients
+and dependent labels. `check_term_limit` checks a tighter per-query cap without
+changing the frozen strategy, including when a future response is zero.
+
+The catalogue term cap is the smaller of the constructor's maximum and
+`options.catalogue.max_terms`; its geometry/core budgets also remain explicit.
+A matched construction failure, incompatible update or arithmetic error is
+returned directly. Fallback happens only for absence of a matching certificate.
+Passing `None` leaves catalogue budgets irrelevant and preserves the original
+fiber construction and error behavior. This selector does not yet alter circuit,
+instrument or task-query defaults, and does not load the built-in catalogue
+implicitly. Installing it in those engines is a separate change.

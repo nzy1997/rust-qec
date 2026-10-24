@@ -1,7 +1,9 @@
 //! Third-hierarchy parity phases, the Clifford radical, and prepared exact sums.
 
 mod core;
+mod resource;
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
+pub use resource::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
 
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};
