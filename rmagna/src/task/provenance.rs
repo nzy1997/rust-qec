@@ -291,6 +291,8 @@ pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
             "max_prepared_probabilities": compile.max_prepared_probabilities,
             "density_preparation": preparation(compile.density_preparation),
             "max_prepared_densities": compile.max_prepared_densities,
+            "moment_preparation": preparation(compile.moment_preparation),
+            "max_prepared_moments": compile.max_prepared_moments,
             "max_coherent_qubits": compile.max_coherent_qubits, "max_gates": compile.max_gates,
             "max_noise_sites": compile.max_noise_sites,
         },

@@ -409,6 +409,15 @@ impl CausalProgram {
             .map(CompiledInstrument::prepared_density_statistics)
             .transpose()?)
     }
+    pub fn prepared_moment_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, RuntimeError> {
+        Ok(self
+            .reference
+            .as_ref()
+            .map(CompiledInstrument::prepared_moment_statistics)
+            .transpose()?)
+    }
     pub fn prepared_probability_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedProbabilityStatistics>, RuntimeError> {

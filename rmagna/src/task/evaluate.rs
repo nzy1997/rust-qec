@@ -292,6 +292,20 @@ impl TaskEvaluator {
                 .map_err(|e| error("prepared_densities", e))?,
         })
     }
+    pub fn prepared_moment_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedQueryStatistics>, TaskError> {
+        Ok(match &self.execution {
+            Execution::Linear { instrument, .. } => Some(
+                instrument
+                    .prepared_moment_statistics()
+                    .map_err(|e| error("prepared_moments", e))?,
+            ),
+            Execution::Causal(program) => program
+                .prepared_moment_statistics()
+                .map_err(|e| error("prepared_moments", e))?,
+        })
+    }
     pub fn prepared_probability_statistics(
         &self,
     ) -> Result<Option<crate::instrument::PreparedProbabilityStatistics>, TaskError> {

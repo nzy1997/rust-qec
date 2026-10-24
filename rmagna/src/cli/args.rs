@@ -36,9 +36,11 @@ Run configuration:
   --causal-strategy fixed|cold         Default fixed
   --probability-preparation cold|trace|fixed        Default fixed, on demand
   --density-preparation cold|trace|fixed            Default fixed, on demand
+  --moment-preparation cold|trace|fixed             Default fixed, on demand
   --fiber-search-rank N               Fixed preparation search rank (default 16)
   --max-prepared-probabilities N       Retained query cap (default 64)
   --max-prepared-densities N           Retained query cap (default 16)
+  --max-prepared-moments N             Retained query cap (default 64)
   --insertion-preparation direct|prepared           Default direct
   --max-insertion-table-bytes N        Prepared insertion estimate cap (default 67108864)
   --max-insertion-catalog-entries N    Prepared insertion entry cap (default 1000000)
@@ -279,8 +281,10 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-noise-sites"
                 | "--max-prepared-probabilities"
                 | "--max-prepared-densities"
+                | "--max-prepared-moments"
                 | "--probability-preparation"
                 | "--density-preparation"
+                | "--moment-preparation"
                 | "--fiber-search-rank"
                 | "--insertion-preparation"
                 | "--max-insertion-table-bytes"
@@ -418,6 +422,8 @@ fn configure_runtime(flags: &mut Flags, file: &mut FileTaskOptions) -> Result<()
     )?;
     compile.max_prepared_densities =
         flags.number("--max-prepared-densities", compile.max_prepared_densities)?;
+    compile.max_prepared_moments =
+        flags.number("--max-prepared-moments", compile.max_prepared_moments)?;
     configure_queries(flags, compile)?;
     configure_insertions(flags, compile)?;
     Ok(())
@@ -437,9 +443,15 @@ fn configure_queries(
         "fixed",
         &["cold", "trace", "fixed"],
     )?;
-    if flags.0.contains_key("--fiber-search-rank") && probability != "fixed" && density != "fixed" {
+    let moment = flags.choice("--moment-preparation", "fixed", &["cold", "trace", "fixed"])?;
+    if flags.0.contains_key("--fiber-search-rank")
+        && probability != "fixed"
+        && density != "fixed"
+        && moment != "fixed"
+    {
         return Err(
-            "--fiber-search-rank requires fixed probability or density preparation".to_owned(),
+            "--fiber-search-rank requires fixed probability, density or moment preparation"
+                .to_owned(),
         );
     }
     let mut fiber = rmagna::fibers::FiberOptions::default();
@@ -450,6 +462,11 @@ fn configure_queries(
         _ => ProbabilityPreparation::FixedFibers(fiber),
     };
     compile.density_preparation = match density.as_str() {
+        "cold" => QueryPreparation::Cold,
+        "trace" => QueryPreparation::Trace,
+        _ => QueryPreparation::FixedFibers(fiber),
+    };
+    compile.moment_preparation = match moment.as_str() {
         "cold" => QueryPreparation::Cold,
         "trace" => QueryPreparation::Trace,
         _ => QueryPreparation::FixedFibers(fiber),

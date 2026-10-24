@@ -101,6 +101,8 @@ fn real_noisy_draws_and_seeded_results_match_the_library() {
         QueryPreparation::FixedFibers(Default::default());
     options.evaluation.runtime.compile.density_preparation =
         QueryPreparation::FixedFibers(Default::default());
+    options.evaluation.runtime.compile.moment_preparation =
+        QueryPreparation::FixedFibers(Default::default());
     let task = FileTask::load(
         &files.0.join("circuit.magna"),
         Some(&files.0.join("task.json")),
@@ -415,6 +417,7 @@ fn arguments_and_existing_outputs_fail_before_decoder_import() {
         vec!["--max-seconds", "0"],
         vec!["--max-seconds", "1e-99"],
         vec!["--compiler", "typo"],
+        vec!["--moment-preparation", "typo"],
         vec!["--noise-proposal-scale", "0"],
         vec!["--noise-proposal-scale", "-1/3"],
         vec!["--noise-proposal-scale", "1/0"],
@@ -423,6 +426,8 @@ fn arguments_and_existing_outputs_fail_before_decoder_import() {
             "--probability-preparation",
             "cold",
             "--density-preparation",
+            "cold",
+            "--moment-preparation",
             "cold",
             "--fiber-search-rank",
             "16",
@@ -610,4 +615,118 @@ fn embedded_decoder_manifest_and_failed_prefix_survive_end_to_end() {
             .unwrap()
             .contains("cannot import a Magna quantum backend")
     );
+}
+
+#[test]
+fn moment_preparation_options_cache_limits_and_fingerprints_are_observable() {
+    let files = Files::new();
+    files.put("circuit.magna", "H 0\nT 0\nH 0");
+    files.put("task.json", r#"{"observables":[[0,1]]}"#);
+    let mut digests = std::collections::BTreeSet::new();
+    for mode in ["cold", "trace", "fixed"] {
+        let value = files.json(
+            &[
+                "run",
+                "circuit.magna",
+                "--task",
+                "task.json",
+                "--shots",
+                "2",
+                "--moment-preparation",
+                mode,
+                "--max-prepared-moments",
+                "2",
+                "--json",
+            ],
+            0,
+        );
+        assert_eq!(
+            value["estimates"]["moments"][0],
+            std::f64::consts::FRAC_1_SQRT_2
+        );
+        assert_eq!(value["standard_errors"]["moments"][0], 0.0);
+        assert_eq!(
+            value["options"]["compile"]["moment_preparation"]["mode"],
+            mode
+        );
+        assert_eq!(value["options"]["compile"]["max_prepared_moments"], 2);
+        assert_eq!(
+            value["compilation"]["retained_caches"]["moment"]["cached_queries"],
+            u64::from(mode != "cold")
+        );
+        assert_eq!(
+            value["compilation"]["retained_caches"]["moment"]["fixed_resources"],
+            u64::from(mode == "fixed")
+        );
+        assert!(
+            digests.insert(
+                value["fingerprints"]["options"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            )
+        );
+    }
+    let inspected = files.json(
+        &[
+            "inspect",
+            "circuit.magna",
+            "--probability-preparation",
+            "cold",
+            "--density-preparation",
+            "cold",
+            "--moment-preparation",
+            "fixed",
+            "--fiber-search-rank",
+            "1",
+            "--json",
+        ],
+        0,
+    );
+    assert_eq!(
+        inspected["options"]["compile"]["moment_preparation"]["max_search_rank"],
+        1
+    );
+    assert_eq!(
+        inspected["compilation"]["retained_caches"]["moment"]["cached_queries"],
+        0
+    );
+    files.put("task.json", r#"{"observables":[[0,1],[0,0]]}"#);
+    let limited = files.json(
+        &[
+            "run",
+            "circuit.magna",
+            "--task",
+            "task.json",
+            "--max-prepared-moments",
+            "1",
+            "--json",
+        ],
+        1,
+    );
+    assert_eq!(limited["completed"], 0);
+    assert_eq!(limited["execution_costs"]["query"]["attempted"], 3);
+    assert_eq!(limited["execution_costs"]["query"]["failed"], 1);
+    assert_eq!(
+        limited["compilation"]["retained_caches"]["moment"]["cached_queries"],
+        1
+    );
+    assert!(
+        limited["failures"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("max_prepared_moments")
+    );
+    let invalid = files.json(
+        &[
+            "run",
+            "circuit.magna",
+            "--max-prepared-moments",
+            "0",
+            "--json",
+        ],
+        1,
+    );
+    assert_eq!(invalid["compilation"]["status"], "preparation_failed");
+    assert_eq!(invalid["execution_costs"]["query"]["attempted"], 0);
 }

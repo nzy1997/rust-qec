@@ -137,6 +137,7 @@ fn all_enumeration_options_and_non_time_results_match_the_owned_file_api() {
     runtime.history_sampler = HistorySampler::AffineSupport;
     runtime.compile.probability_preparation = QueryPreparation::FixedFibers(Default::default());
     runtime.compile.density_preparation = QueryPreparation::FixedFibers(Default::default());
+    runtime.compile.moment_preparation = QueryPreparation::FixedFibers(Default::default());
     let task = FileTask::load(
         &files.0.join("circuit.magna"),
         Some(&files.0.join("task.json")),

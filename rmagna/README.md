@@ -50,10 +50,11 @@ Enumeration rejects `--shots`, `--seed`, `--noise-proposal-scale`,
 `sample_records` requests are rejected before compilation or decoder calls.
 
 The CLI defaults to the shared commuting-layer compiler, affine-support history
-sampling, fixed causal templates, fixed probability/density preparation on
+sampling, fixed causal templates, fixed probability/density/moment preparation on
 demand, and direct Pauli insertions. Library defaults remain as documented below.
 For sampling, use `--history-sampler exact_marginal`. Use `--compiler parity_copies`,
-`--probability-preparation cold|trace|fixed`, `--density-preparation cold|trace|fixed`
+`--probability-preparation cold|trace|fixed`, `--density-preparation cold|trace|fixed`,
+`--moment-preparation cold|trace|fixed`
 and `--causal-strategy fixed|cold` to select alternatives. Prepared insertion
 catalogs require `--insertion-preparation prepared`; their entry/byte limits are
 explicit options and bound the catalog estimate rather than process memory.
@@ -1553,8 +1554,57 @@ compilers, multiple inputs and varied multi-fault histories, all eight global
 Pauli phases, signed/complex values, dependent events and certified zeros. Wide
 65/129-wire examples cover cross-word rows and offsets; zero-wire queries,
 reference lifetime, preparation from perturbed views, incompatible programs and
-exact term-budget boundaries are also covered. These explicit unitary plans do
-not yet change instrument cache policy or claim complete task query preparation.
+exact term-budget boundaries are also covered. Instrument cache policy selects
+these plans as described below; complete task query preparation remains separate.
+
+## Bounded instrument moment preparation
+
+`CompileOptions::moment_preparation` selects `Cold` (the library default),
+`Trace`, or `FixedFibers(options)`. `max_prepared_moments` bounds retained families
+(default 64). A family key contains the complete physical Pauli word, including
+its global phase, and ordered physical event rows. Requested output order is
+mapped to physical wires first. Changed outcomes, faults and decision branches
+share the original program's immutable plans; distinct words or layouts consume
+distinct slots. No wide event rows are cloned merely to look up an existing plan.
+
+The bounded cache serializes preparation and releases its lock before evaluation.
+Failed resource preparation consumes no slot and can be retried with a larger
+term budget. Exceeding a family cap or fixed-resource budget fails explicitly;
+it does not select a different strategy. Plans own their original programs and
+programs do not own caches. Zero certificates need no enumerated phase resource.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::gf2::BitVector;
+use rmagna::instrument::{CompileOptions, QueryPreparation, compile_affine};
+use rmagna::pauli::PauliWord;
+use rmagna::scalar::ScalarArithmetic;
+let a = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nT 0\nH 0", &ParseOptions::default())?;
+let program = compile_affine(&source, &CompileOptions {
+    moment_preparation: QueryPreparation::FixedFibers(Default::default()),
+    max_prepared_moments: 1, ..Default::default()
+}, &a)?;
+let z = PauliWord::new(BitVector::zeros(1)?,BitVector::from_indices(1,[0])?,0)?;
+assert_eq!(program.pauli_moment(&[0],&z,&[],256,&a)?.value,a.omega(0,-1)?);
+assert_eq!(program.prepared_moment_statistics()?.cached_queries,1);
+assert_eq!(program.prepared_moment_statistics()?.fixed_resources,1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`prepared_moment_statistics` is available on instruments, causal programs and
+task evaluators. The latter two return `None` when cold-prefix execution has no
+persistent instrument cache. File reports include actual counts under
+`compilation.retained_caches.moment`; first-use construction remains part of the
+query cost in the current on-demand mode. This does not claim eager preparation.
+
+The CLI defaults to fixed moment preparation and accepts `--moment-preparation`
+and `--max-prepared-moments`. `--fiber-search-rank` applies to any configured
+fixed probability, density or moment policy. Policy, cap and fixed search options
+participate in the options fingerprint. Tests cover projected analytical moments,
+physical/report-flip fault combinations, phase-distinct keys, output permutations,
+cache/term limits and retry, concurrent reuse and lifetime, zero certificates,
+seeded nonlinear conditioned tasks under both causal strategies, and CLI receipts.
 
 ## Bounded instrument probability preparation
 
