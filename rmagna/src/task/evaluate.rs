@@ -11,6 +11,10 @@ use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::unitary::{CompiledUnitary, DensityBoundary};
 use num_rational::BigRational;
 use num_traits::One;
+mod preparation;
+pub use preparation::{
+    FamilyPreparationCounts, SamplingPreparationOptions, SamplingPreparationReport,
+};
 mod enumeration;
 mod run;
 pub use enumeration::{
