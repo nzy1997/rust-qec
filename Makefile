@@ -1,4 +1,4 @@
-.PHONY: help test test-magna-task-json test-magna-controller-json check build-shot-viewer fetch-doc-artifacts build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
+.PHONY: help test test-magna-catalogue-json test-magna-task-json test-magna-controller-json check build-shot-viewer fetch-doc-artifacts build-site release rsmp-v1-readiness publication-evidence-check bench-surface-smoke bench-surface-full surface-decoder-compare-smoke surface-decoder-compare-full bb-circuit-bposd-compare-smoke bb-circuit-bposd-compare-plot-smoke bb-circuit-bposd-compare-full qec-code-random-window-bench-smoke qec-code-random-window-bench-full qec-code-random-window-bench-no-target-smoke qec-code-random-window-bench-no-target-multiseed-smoke qec-code-random-window-bench-no-target-ladder-smoke qec-code-random-window-bench-issue225-readiness-smoke
 
 DEFAULT_BRANCH ?= master
 
@@ -21,6 +21,7 @@ QEC_CODE_RANDOM_WINDOW_BASELINE_HEADER := case_id,paper_case,baseline_method,bas
 help:
 	@echo "Available targets:"
 	@echo "  test                 - Run workspace tests"
+	@echo "  test-magna-catalogue-json - Check exact catalogue JSON across serde features"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  test-magna-task-json - Check strict task JSON types across serde feature combinations"
 	@echo "  test-magna-controller-json - Check strict controller wire types across serde features"
@@ -57,6 +58,10 @@ test-magna-controller-json:
 	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test controller_process
 	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test controller_process
 	cargo test --locked -p rmagna --features serde_json/arbitrary_precision,serde_json/float_roundtrip --test controller_process
+
+test-magna-catalogue-json:
+	cargo test --locked -p rmagna --test phase_catalogue
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test phase_catalogue
 
 check:
 	cargo check --locked --workspace
