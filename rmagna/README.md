@@ -3079,3 +3079,62 @@ report.result?;
 # Ok(())
 # }
 ```
+
+## Explicit file preparation and reusable sessions
+
+`FileTask::prepare_sampling(&FilePreparationOptions)` compiles captured content
+and prepares its configured sampling families with one deadline and scalar-query
+quota. Compilation and target normalization retain their actual operation
+counts; static family construction has its own receipt and consumes no scalar
+query quota, entropy or controller calls. This is an explicit opt-in API:
+`compile`, ordinary `run` and `enumerate` keep their existing behavior.
+
+The returned `PreparedFileTask` owns its `FilePreparationReport`, captured input
+snapshot and any successful partial compilation. An ordinary compilation or
+family failure returns a failed report with costs, timing, fingerprints and
+failure context. `partial_task()` and `into_parts()` retain compiled resources
+for explicit inspection or retry; session `inspect` and `run` require a
+successful preparation result. Fresh and reused preparation expose fingerprint
+admission failures through owned failed `preparation.metadata` reports, including
+failures before compilation starts. Check `report().is_complete()` and
+`report().metadata_failure()`. Metadata failure preserves a typed stage result
+when one exists, but prevents the session from claiming completed preparation.
+
+`CompiledFileTask::prepare_sampling` also accepts fresh preparation limits and
+returns an owned receipt. Its call-local costs exclude prior compilation and
+target normalization. A retry reuses successfully retained families. A failed
+stage never starts a sampling batch or invokes a decoder.
+
+A prepared session's later `run` starts a fresh RNG, statistics accumulator,
+query quota and deadline. It retains the original preparation receipt in
+`compilation.query_preparation_receipt`, with
+`query_preparation_included_in_this_call: false`. Batch sampling time and
+operation costs exclude that prior stage. Inspection and run metadata capture
+current caches and bind preparation method, row/request caps and exact duration
+limits into the configuration fingerprint. Source/task/controller identities
+remain content based; preparation does not reopen source or module files.
+
+`FilePreparationReport::to_json` emits a schema-2 `kind: preparation` report with
+no Monte Carlo estimates, seed or shot count. It distinguishes compilation,
+sampling-family and metadata failures. A successful stage with cold policies
+explicitly records unretained families; trace policies still defer phase-resource
+construction. These modes are not labeled fully frozen warm execution. The scope
+covers configured reusable sampling families, excluding cold-prefix execution
+and exact-enumeration layouts. CLI preparation and sampler comparison remain
+separate integration work.
+
+```rust
+use rmagna::file_api::{FileApiError, FilePreparationOptions, FileTask};
+use rmagna::task::TaskRunOptions;
+# fn prepare_then_sample(task: &FileTask) -> Result<(), FileApiError> {
+let prepared = task.prepare_sampling(&FilePreparationOptions::default())?;
+let preparation_receipt = prepared.report().to_json();
+if prepared.report().is_complete() {
+    let batch = prepared.run(&TaskRunOptions { shots: 16, seed: 7, ..Default::default() })?;
+    assert_eq!(batch.raw_result().completed, 16);
+}
+# Ok(())
+# }
+```
+
+File preparation includes descriptor/fingerprint work in its total elapsed time and shared deadline. If fingerprint admission fails, the owned failed preparation receipt preserves resolved options, the metadata failure and known compilation/query costs; unavailable fingerprints are explicit null values. Fresh sessions do not compile after that failure. Reused compiled tasks remain owned by their caller and expose their prior compilation costs separately.
