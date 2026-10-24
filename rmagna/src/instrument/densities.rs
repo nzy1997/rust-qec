@@ -1,6 +1,6 @@
 //! Bounded density-overlap plans distinguished by layouts and program identity.
 use super::*;
-use crate::unitary::{DensityBoundary, PreparedDensityOverlap};
+use crate::unitary::{DensityBoundary, DensityLayout, PreparedDensityOverlap};
 use std::sync::Mutex;
 
 struct Entry {
@@ -14,9 +14,9 @@ impl Entry {
     fn matches(
         &self,
         left: &CompiledUnitary,
-        boundary: &DensityBoundary<'_>,
+        boundary: &DensityLayout<'_>,
         right: &CompiledUnitary,
-        target: &DensityBoundary<'_>,
+        target: &DensityLayout<'_>,
     ) -> bool {
         self.left_outputs == boundary.outputs
             && self.right_outputs == target.outputs
@@ -75,7 +75,54 @@ impl DensityQueries {
         {
             return Err(UnitaryError::DimensionMismatch.into());
         }
-        let plan = {
+        let (plan, _) = self.plan(
+            left,
+            boundary.layout(),
+            right,
+            target.layout(),
+            max_terms,
+            arithmetic,
+        )?;
+        Ok(plan.evaluate(
+            left,
+            right,
+            boundary.outcomes,
+            target.outcomes,
+            max_terms,
+            arithmetic,
+        )?)
+    }
+    pub(super) fn prepare(
+        &self,
+        left: &CompiledUnitary,
+        boundary: DensityLayout<'_>,
+        right: &CompiledUnitary,
+        target: DensityLayout<'_>,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<QueryPreparationOutcome, InstrumentError> {
+        boundary.validate(left.width())?;
+        target.validate(right.width())?;
+        if boundary.outputs.len() != target.outputs.len() {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        if matches!(self.mode, QueryPreparation::Cold) {
+            return Ok(QueryPreparationOutcome::Cold);
+        }
+        let (plan, outcome) = self.plan(left, boundary, right, target, max_terms, arithmetic)?;
+        super::preparation::validate_resource(plan.fixed_phase_resource(), max_terms)?;
+        Ok(outcome)
+    }
+    fn plan(
+        &self,
+        left: &CompiledUnitary,
+        boundary: DensityLayout<'_>,
+        right: &CompiledUnitary,
+        target: DensityLayout<'_>,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<(Arc<PreparedDensityOverlap>, QueryPreparationOutcome), InstrumentError> {
+        let result = {
             let mut entries = self
                 .entries
                 .lock()
@@ -84,7 +131,7 @@ impl DensityQueries {
                 .iter()
                 .find(|e| e.matches(left, &boundary, right, &target))
             {
-                Arc::clone(&entry.plan)
+                (Arc::clone(&entry.plan), QueryPreparationOutcome::Reused)
             } else {
                 if entries.len() >= self.limit {
                     return Err(InstrumentError::ResourceLimit {
@@ -94,20 +141,12 @@ impl DensityQueries {
                     });
                 }
                 let plan = match self.mode {
-                    QueryPreparation::Trace => left.prepare_density_overlap(
-                        boundary.layout(),
-                        right,
-                        target.layout(),
-                        arithmetic,
-                    )?,
+                    QueryPreparation::Trace => {
+                        left.prepare_density_overlap(boundary, right, target, arithmetic)?
+                    }
                     QueryPreparation::FixedFibers(options) => left
                         .prepare_density_overlap_with_fibers(
-                            boundary.layout(),
-                            right,
-                            target.layout(),
-                            max_terms,
-                            options,
-                            arithmetic,
+                            boundary, right, target, max_terms, options, arithmetic,
                         )?,
                     QueryPreparation::Cold => unreachable!("cold density queries returned above"),
                 };
@@ -119,16 +158,9 @@ impl DensityQueries {
                     right_rows: target.event_rows.to_vec(),
                     plan: Arc::clone(&plan),
                 });
-                plan
+                (plan, QueryPreparationOutcome::Created)
             }
         };
-        Ok(plan.evaluate(
-            left,
-            right,
-            boundary.outcomes,
-            target.outcomes,
-            max_terms,
-            arithmetic,
-        )?)
+        Ok(result)
     }
 }

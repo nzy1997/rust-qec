@@ -59,13 +59,46 @@ impl MomentQueries {
         if matches!(self.mode, QueryPreparation::Cold) {
             return Ok(state.pauli_moment(word, rows, outcomes, max_terms, arithmetic)?);
         }
-        let plan = {
+        let (plan, _) = self.plan(state, word, rows, max_terms, arithmetic)?;
+        Ok(plan.evaluate(state, outcomes, max_terms, arithmetic)?)
+    }
+    pub(super) fn prepare(
+        &self,
+        state: &CompiledUnitary,
+        word: &PauliWord,
+        rows: &[BitVector],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<QueryPreparationOutcome, InstrumentError> {
+        if word.width() != state.width() || rows.iter().any(|r| r.width() != state.width()) {
+            return Err(UnitaryError::DimensionMismatch.into());
+        }
+        state
+            .width()
+            .checked_add(rows.len())
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        if matches!(self.mode, QueryPreparation::Cold) {
+            return Ok(QueryPreparationOutcome::Cold);
+        }
+        let (plan, outcome) = self.plan(state, word, rows, max_terms, arithmetic)?;
+        super::preparation::validate_resource(plan.fixed_phase_resource(), max_terms)?;
+        Ok(outcome)
+    }
+    fn plan(
+        &self,
+        state: &CompiledUnitary,
+        word: &PauliWord,
+        rows: &[BitVector],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<(Arc<PreparedPauliMoment>, QueryPreparationOutcome), InstrumentError> {
+        let result = {
             let mut entries = self
                 .entries
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
             if let Some(entry) = entries.iter().find(|e| e.word == *word && e.rows == rows) {
-                Arc::clone(&entry.plan)
+                (Arc::clone(&entry.plan), QueryPreparationOutcome::Reused)
             } else {
                 if entries.len() >= self.limit {
                     return Err(InstrumentError::ResourceLimit {
@@ -90,10 +123,10 @@ impl MomentQueries {
                     rows: rows.to_vec(),
                     plan: Arc::clone(&plan),
                 });
-                plan
+                (plan, QueryPreparationOutcome::Created)
             }
         };
-        Ok(plan.evaluate(state, outcomes, max_terms, arithmetic)?)
+        Ok(result)
     }
 }
 
@@ -111,6 +144,18 @@ mod tests {
         let word = PauliWord::new(row.clone(), BitVector::zeros(3).unwrap(), 2).unwrap();
         let queries =
             MomentQueries::new(QueryPreparation::FixedFibers(Default::default()), 1).unwrap();
+        assert_eq!(
+            queries
+                .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
+                .unwrap(),
+            QueryPreparationOutcome::Created
+        );
+        assert_eq!(
+            queries
+                .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
+                .unwrap(),
+            QueryPreparationOutcome::Reused
+        );
         for rhs in [
             BitVector::zeros(1).unwrap(),
             BitVector::from_indices(1, [0]).unwrap(),
