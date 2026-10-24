@@ -674,9 +674,17 @@ impl<'a> Iterator for PacketColumns<'a> {
                     self.independent_event += 1;
                 }
                 RandomKind::Noise { choices, .. } => {
-                    let selected = self.hits[self.noise_event] & self.all;
+                    let noise_event = self.noise_event;
+                    let selected = self.hits[noise_event] & self.all;
+                    self.noise_event += 1;
+                    if selected == 0 {
+                        // No valid lane selected this event. Preserve its
+                        // sidecar ordinal, then skip the empty categories.
+                        self.count = 0;
+                        continue;
+                    }
                     self.masks = if let Some(packet) = self.noise {
-                        packet.choice_masks(self.noise_event, selected, choices)
+                        packet.choice_masks(noise_event, selected, choices)
                     } else {
                         packet_choice_masks(
                             selected,
@@ -686,7 +694,6 @@ impl<'a> Iterator for PacketColumns<'a> {
                             self.plan.random_kinds.len(),
                         )
                     };
-                    self.noise_event += 1;
                 }
             }
         }
@@ -700,6 +707,10 @@ mod zero_effect_inputs_tests;
 #[cfg(test)]
 #[path = "category_effect_mask_tests.rs"]
 mod category_effect_mask_tests;
+
+#[cfg(test)]
+#[path = "empty_noise_packet_tests.rs"]
+mod empty_noise_packet_tests;
 
 impl ActiveFreePredicate {
     // Only a model built from this same immutable plan may be used. The caller
