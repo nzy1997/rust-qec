@@ -3,7 +3,6 @@ mod compose;
 mod export;
 pub use export::{BatchExportError, export_batch_metrics};
 mod evaluate;
-pub(crate) use evaluate::run_task_batch_inspected;
 pub use evaluate::{
     BatchProgress, ContractionResources, EvaluationOptions, ExactInterval, FamilyPreparationCounts,
     ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
@@ -11,6 +10,7 @@ pub use evaluate::{
     TaskEvaluation, TaskEvaluator, TaskRunOptions, TaskRunResult, TaskRunStatistics,
     TaskSectorMasses, TaskVariances, TaskWeightSector, run_task_batch,
 };
+pub(crate) use evaluate::{RunHooks, run_task_batch_inspected};
 mod parse;
 mod provenance;
 use crate::circuit::{Circuit, Operation, ParseOptions, SourceLocation, parse_circuit};

@@ -20,11 +20,11 @@ mod run;
 pub use enumeration::{
     ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses, TaskWeightSector,
 };
-pub(crate) use run::run_task_batch_inspected;
 pub use run::{
     BatchProgress, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
     TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskVariances, run_task_batch,
 };
+pub(crate) use run::{RunHooks, run_task_batch_inspected};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct EvaluationOptions {

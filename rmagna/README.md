@@ -89,8 +89,8 @@ costs. If only numeric export fails, the CLI retains actual traversal counts and
 metadata, marks the engine status separately, and does not persist the in-memory
 exact responses. Use `FileEnumerationReport::raw_result` for their typed recovery.
 
-This entry point does not yet implement native option-file compatibility,
-progress reporting, or paper campaign orchestration.
+This entry point does not yet implement native option-file compatibility or
+paper campaign orchestration.
 
 `ExactScalar` represents
 `(a + b*omega + c*omega^2 + d*omega^3) * 2^power`, where
@@ -3254,8 +3254,7 @@ work, including the final notification. Notification errors stop the batch with
 statistics/records remain a failed report's prefix, including when the observer
 fails after the final completed draw. Actual compiler/query/decoder/support
 counters keep their existing meanings. An individual callback is not preempted.
-File API and CLI progress integration are separate follow-up work; this primitive
-does not add checkpointing or launch a production campaign.
+Progress observations do not add checkpointing or launch a production campaign.
 
 ```rust
 use std::num::NonZeroU64;
@@ -3271,3 +3270,45 @@ let observer_receipt = observer.receipt();
 # Ok(())
 # }
 ```
+
+
+## File and CLI progress receipts
+
+`FileTask`, `CompiledFileTask` and `PreparedFileTask` expose
+`run_with_progress(&run, &mut observer)`. They use the same committed-draw
+observer as `TaskEvaluator`, preserving seeded samples and exact statistics.
+Fresh file execution still shares its compilation/target preparation quota and
+deadline with sampling. Reused and explicitly prepared tasks start fresh run
+quotas and exclude prior preparation. Observer receipts reset before file
+validation, including rejected calls and preparation failures.
+
+Observed reports own a `progress` receipt with the interval, notification
+counts, last notified draw and measured diagnostic/observer time. They export
+that time as `timings.progress_seconds`. `options.run.progress_every` participates
+in the options fingerprint; physical content identities remain unchanged.
+Prepared reports retain both this option and the explicit preparation settings.
+Unobserved runs retain their existing schema and fingerprints. If metadata
+snapshotting fails after execution, `FileApiError::retained_result` and
+`retained_progress` keep the completed prefix and observation receipt available.
+
+`file_api::export_progress` exports one typed event using the configured numeric
+budget. An arithmetic or numeric diagnostic failure produces null efficiency
+and an explicit `diagnostic_failure`, without failing physical sampling. Missing
+or out-of-range kappa keeps its scientific status; it is never replaced by zero.
+The observer receipt's `diagnostic_failures` counts typed efficiency errors;
+caller-side numeric formatting errors are in each exported event instead.
+
+```text
+rmagna run circuit.magna --task task.json --shots 10000 --seed 731 \
+  --progress-every 4096 --json --output result.json
+```
+
+`--progress-every` is a positive u64 interval available only for `run`.
+Progress lines go to stderr after draws 4096, 8192 and 10000 in this example.
+Stdout and the exclusive output file each retain one final JSON report. Invalid
+intervals and wrong-mode options are rejected before importing decoders.
+Numeric progress formatting errors print an unavailable diagnostic and sampling
+continues; final numeric export retains its ordinary failure semantics. A stderr
+write failure stops with a progress failure, preserving all committed draws and
+reporting no failed physical draw. Progress itself imports no native backend,
+consumes no entropy and invokes no extra decoder callbacks.

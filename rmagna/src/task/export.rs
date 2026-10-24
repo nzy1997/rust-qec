@@ -141,7 +141,7 @@ impl Encoder {
             json!({"estimates":estimates,"estimates_scientific":scientific,"standard_errors":errors,"standard_errors_scientific":error_scientific}),
         )
     }
-    fn efficiency(&mut self, s: &EfficiencySummary) -> Result<Value, BatchExportError> {
+    pub(crate) fn efficiency(&mut self, s: &EfficiencySummary) -> Result<Value, BatchExportError> {
         let mut result = serde_json::Map::new();
         result.insert("status".to_owned(), json!(s.status.as_str()));
         result.insert("completed".to_owned(), json!(s.completed));

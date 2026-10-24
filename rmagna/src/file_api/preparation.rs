@@ -4,6 +4,7 @@ use crate::task::{
     FamilyPreparationCounts, SamplingPreparationOptions, SamplingPreparationReport,
     fingerprint_with_configuration,
 };
+use std::num::NonZeroU64;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FilePreparationOptions {
@@ -50,13 +51,34 @@ impl PreparedFileTask {
     /// Prior compilation and query preparation remain outside this batch's
     /// quota, RNG, statistics and sampling time. The saved receipt stays visible.
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, None)
+    }
+    pub fn run_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer))
+    }
+    fn run_observed(
+        &self,
+        run: &TaskRunOptions,
+        mut observer: Option<&mut ProgressObserver<'_>>,
+    ) -> Result<FileRunReport, FileApiError> {
+        if let Some(observer) = observer.as_deref_mut() {
+            observer.reset();
+        }
+        let interval = observer.as_ref().map(|o| o.receipt().every);
         let compiled = self.ready()?;
         // Validate fingerprint/export configuration before any draw or callback.
         let descriptor = compiled
             .task
-            .preparation_descriptor(&self.report.options, Some(run))
+            .preparation_descriptor(&self.report.options, Some(run), interval)
             .map_err(|(_, error)| error)?;
-        let mut report = compiled.run(run)?;
+        let mut report = match observer {
+            Some(observer) => compiled.run_with_progress(run, observer)?,
+            None => compiled.run(run)?,
+        };
         report
             .metadata
             .as_object_mut()
@@ -73,7 +95,7 @@ impl PreparedFileTask {
     ) -> Result<(), FileApiError> {
         let descriptor = compiled
             .task
-            .preparation_descriptor(&self.report.options, Some(run))
+            .preparation_descriptor(&self.report.options, Some(run), None)
             .map_err(|(_, error)| error)?;
         value
             .as_object_mut()
@@ -153,6 +175,7 @@ impl FileTask {
         &self,
         options: &FilePreparationOptions,
         run: Option<&TaskRunOptions>,
+        every: Option<NonZeroU64>,
     ) -> Result<Value, (Value, FileApiError)> {
         let defaults = TaskRunOptions::default();
         let chosen = run.unwrap_or(&defaults);
@@ -168,6 +191,9 @@ impl FileTask {
             object.remove("run");
         }
         object.insert("sampling_preparation".into(), options.to_json());
+        if let (Some(_), Some(every)) = (run, every) {
+            configured["run"]["progress_every"] = json!(every.get());
+        }
         let sampling = sampling_configuration(&self.inputs.sampling);
         let fingerprints = fingerprint_with_configuration(
             &input,
@@ -199,7 +225,7 @@ impl FileTask {
     ) -> PreparedFileTask {
         let started = Instant::now();
         let meter = ExecutionMeter::new(options.execution_limits);
-        let mut metadata = match self.preparation_descriptor(options, None) {
+        let mut metadata = match self.preparation_descriptor(options, None, None) {
             Ok(metadata) => metadata,
             Err((metadata, error)) => {
                 return PreparedFileTask {
@@ -268,7 +294,7 @@ impl CompiledFileTask {
     ) -> Result<FilePreparationReport, FileApiError> {
         let started = Instant::now();
         let meter = ExecutionMeter::new(options.execution_limits);
-        let metadata = match self.task.preparation_descriptor(options, None) {
+        let metadata = match self.task.preparation_descriptor(options, None, None) {
             Ok(metadata) => metadata,
             Err((metadata, error)) => {
                 return Ok(metadata_failure_report(

@@ -4,6 +4,8 @@ pub use comparison::{
     FileSamplerComparison, FileSamplerComparisonOptions, FileSamplerPilot, SamplerComparisonStatus,
     SamplerDecision,
 };
+mod progress;
+pub use progress::export_progress;
 mod enumeration;
 mod preparation;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};
@@ -13,9 +15,10 @@ use crate::numeric::NumericOptions;
 use crate::runtime::ControllerRegistry;
 use crate::task::{
     BatchExportError, ContentFingerprints, EvaluationOptions, FingerprintError, FingerprintInputs,
-    FingerprintOptions, LoadedModules, TaskError, TaskEvaluator, TaskOptions, TaskRunOptions,
-    TaskRunResult, export_batch_metrics, fingerprint_content, parse_task, resolved_options,
-    run_task_batch_inspected, sampling_configuration, validate_snapshot_fingerprints,
+    FingerprintOptions, LoadedModules, ProgressObserver, RunHooks, TaskError, TaskEvaluator,
+    TaskOptions, TaskRunOptions, TaskRunResult, export_batch_metrics, fingerprint_content,
+    parse_task, resolved_options, run_task_batch_inspected, sampling_configuration,
+    validate_snapshot_fingerprints,
 };
 pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
 pub use preparation::{FilePreparationOptions, FilePreparationReport, PreparedFileTask};
@@ -41,9 +44,16 @@ pub enum FileApiError {
     Snapshot {
         result: Box<TaskRunResult>,
         source: TaskError,
+        progress: Option<Box<crate::task::ProgressReceipt>>,
     },
 }
 impl FileApiError {
+    pub fn retained_progress(&self) -> Option<crate::task::ProgressReceipt> {
+        match self {
+            Self::Snapshot { progress, .. } => progress.as_deref().copied(),
+            _ => None,
+        }
+    }
     pub fn retained_result(&self) -> Option<&TaskRunResult> {
         match self {
             Self::Snapshot { result, .. } => Some(result),
@@ -56,7 +66,7 @@ impl fmt::Display for FileApiError {
         match self {
             Self::Input(e) => e.fmt(f),
             Self::Fingerprint(e) => write!(f, "file-task fingerprint: {e}"),
-            Self::Snapshot { result, source } => write!(
+            Self::Snapshot { result, source, .. } => write!(
                 f,
                 "cannot snapshot metadata after {} completed draws: {source}; typed result retained",
                 result.completed
@@ -277,7 +287,25 @@ impl FileTask {
     /// Fresh preparation shares the run quota/deadline; ordinary preparation
     /// failures produce failed reports with zero attempted draws.
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
-        let mut metadata = self.descriptor(run)?;
+        self.run_observed(run, None)
+    }
+    pub fn run_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer))
+    }
+    fn run_observed(
+        &self,
+        run: &TaskRunOptions,
+        mut observer: Option<&mut ProgressObserver<'_>>,
+    ) -> Result<FileRunReport, FileApiError> {
+        if let Some(observer) = observer.as_deref_mut() {
+            observer.reset();
+        }
+        let interval = observer.as_ref().map(|o| o.receipt().every);
+        let mut metadata = self.progress_descriptor(run, interval)?;
         let i = &self.inputs;
         let (result, snapshot) = run_task_batch_inspected(
             &i.physical,
@@ -286,16 +314,19 @@ impl FileTask {
             i.options.evaluation,
             &i.sampling,
             run,
-            |evaluator, costs, seconds| {
-                compilation_snapshot(
-                    evaluator,
-                    Preparation {
-                        seconds,
-                        costs,
-                        limits: run.execution_limits,
-                    },
-                    true,
-                )
+            RunHooks {
+                progress: observer.as_deref_mut(),
+                inspect: |evaluator: &TaskEvaluator, costs, seconds| {
+                    compilation_snapshot(
+                        evaluator,
+                        Preparation {
+                            seconds,
+                            costs,
+                            limits: run.execution_limits,
+                        },
+                        true,
+                    )
+                },
             },
         )?;
         match snapshot {
@@ -304,6 +335,7 @@ impl FileTask {
                 return Err(FileApiError::Snapshot {
                     result: Box::new(result),
                     source,
+                    progress: observer.as_ref().map(|o| Box::new(o.receipt())),
                 });
             }
             None => {
@@ -311,6 +343,9 @@ impl FileTask {
                 object.insert("route".to_owned(), json!("unavailable"));
                 object.insert("compilation".to_owned(),json!({"status":"preparation_failed","query_preparation":"unavailable","preparation_included_in_this_call":true}));
             }
+        }
+        if let Some(observer) = observer.as_deref() {
+            progress::attach_receipt(&mut metadata, observer.receipt());
         }
         Ok(FileRunReport {
             result,
@@ -354,18 +389,43 @@ impl CompiledFileTask {
         Ok(value)
     }
     pub fn run(&self, run: &TaskRunOptions) -> Result<FileRunReport, FileApiError> {
-        let mut metadata = self.task.descriptor(run)?;
-        let result = self.evaluator.run_batch(run)?;
+        self.run_observed(run, None)
+    }
+    pub fn run_with_progress(
+        &self,
+        run: &TaskRunOptions,
+        observer: &mut ProgressObserver<'_>,
+    ) -> Result<FileRunReport, FileApiError> {
+        self.run_observed(run, Some(observer))
+    }
+    fn run_observed(
+        &self,
+        run: &TaskRunOptions,
+        mut observer: Option<&mut ProgressObserver<'_>>,
+    ) -> Result<FileRunReport, FileApiError> {
+        if let Some(observer) = observer.as_deref_mut() {
+            observer.reset();
+        }
+        let interval = observer.as_ref().map(|o| o.receipt().every);
+        let mut metadata = self.task.progress_descriptor(run, interval)?;
+        let result = match observer.as_deref_mut() {
+            Some(observer) => self.evaluator.run_batch_with_progress(run, observer)?,
+            None => self.evaluator.run_batch(run)?,
+        };
         let snapshot = match compilation_snapshot(&self.evaluator, self.preparation, false) {
             Ok(snapshot) => snapshot,
             Err(source) => {
                 return Err(FileApiError::Snapshot {
                     result: Box::new(result),
                     source,
+                    progress: observer.as_ref().map(|o| Box::new(o.receipt())),
                 });
             }
         };
         add_snapshot(&mut metadata, snapshot);
+        if let Some(observer) = observer.as_deref() {
+            progress::attach_receipt(&mut metadata, observer.receipt());
+        }
         Ok(FileRunReport {
             result,
             metadata,
@@ -443,6 +503,9 @@ impl FileRunReport {
             .and_then(Value::as_object_mut)
             .expect("metric timings");
         times.extend(serde_json::from_value::<serde_json::Map<String,Value>>(json!({"compile_seconds":costs.compilation.seconds,"query_seconds":costs.query.seconds,"decoder_seconds":costs.decoder.seconds,"support_seconds":costs.support.seconds,"components_are_additive":false})).expect("timing object"));
+        if let Some(seconds) = self.metadata["progress"]["seconds"].as_f64() {
+            times.insert("progress_seconds".into(), json!(seconds));
+        }
         Ok(value)
     }
 }
