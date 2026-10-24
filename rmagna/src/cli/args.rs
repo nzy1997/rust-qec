@@ -63,6 +63,8 @@ compare uses them for each sampling pilot, with separate preparation limits abov
 Standalone prepare releases resources at exit; its receipt is not a reusable cache.
 
 Exact enumeration only:
+  --include-patterns                  Retain unweighted per-pattern responses
+  --max-pattern-response-values N     Retained scalar response cap (default 1000000)
   --max-weight N                      Nonnegative decimal category cutoff (default 1; unbounded input)
   --max-patterns N                    Positive pattern cap (default 100000)
   --max-fault-entries N               Stored fault entry cap (default 1000000)
@@ -133,7 +135,9 @@ fn duration(text: &str, flag: &str) -> Result<Duration, String> {
     Ok(result)
 }
 struct Flags(BTreeMap<String, String>);
-const ENUMERATION_FLAGS: [&str; 10] = [
+const ENUMERATION_FLAGS: [&str; 12] = [
+    "--include-patterns",
+    "--max-pattern-response-values",
     "--max-weight",
     "--max-patterns",
     "--max-fault-entries",
@@ -396,7 +400,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
         {
             return Err(format!("unknown option {arg}; use --help"));
         }
-        let value = if arg == "--json" {
+        let value = if matches!(arg.as_str(), "--json" | "--include-patterns") {
             String::new()
         } else {
             let value = it
@@ -438,6 +442,11 @@ fn configure_preparation(
 
 fn configure_enumeration(flags: &mut Flags) -> Result<FileEnumerationOptions, String> {
     let mut options = FileEnumerationOptions::default();
+    options.enumeration.include_patterns = flags.text("--include-patterns").is_some();
+    options.enumeration.max_retained_response_values = flags.number(
+        "--max-pattern-response-values",
+        options.enumeration.max_retained_response_values,
+    )?;
     let n = &mut options.enumeration.noise;
     if let Some(text) = flags.text("--max-weight") {
         n.max_weight = weight_cutoff(&text)?;

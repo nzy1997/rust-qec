@@ -18,7 +18,8 @@ pub use preparation::{
 mod enumeration;
 mod run;
 pub use enumeration::{
-    ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses, TaskWeightSector,
+    ExactInterval, TaskEnumeration, TaskEnumerationOptions, TaskPatternResponse, TaskSectorMasses,
+    TaskWeightSector,
 };
 pub use run::{
     BatchProgress, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,

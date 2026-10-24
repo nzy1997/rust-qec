@@ -3358,3 +3358,54 @@ rank, contraction terms, coherent width and prepared insertion table bytes.
 Native `max_doubled_path_bits`, phase `max_quotient_rank` and phase-table
 `max_table_bytes` contracts require their own implementations; they must not be
 silently mapped to this option or claimed as reproduced by it.
+
+## Retaining exact noise-pattern responses
+
+Set `TaskEnumerationOptions.include_patterns` to retain completed original
+categorical assignments in `TaskEnumeration.pattern_responses`. Its default is
+false, producing `None`. Each `TaskPatternResponse` owns category/channel
+`choices`, exact physical `probability`, positive `histories` count and a
+history-integrated `response`. These response masses have not been multiplied
+by physical pattern probability. Target error and target success use the same
+normalized target convention as ordinary task evaluation. Signed moments keep
+their sign. Multiplying each response by its probability and summing reconstructs
+the aggregate covered masses and the corresponding weight sector exactly.
+Responses are accumulated directly from exact history contributions, without
+dividing a weighted result by a small probability or rerunning queries/decoders.
+
+`max_retained_response_values` defaults to 1,000,000. Before the first pattern
+query or callback, the engine bounds the total number of retained scalar fields:
+two fields (acceptance and error), one when a target-success field is present,
+and one per declared moment, times the number of positive physical patterns.
+This is a logical value count, not a byte limit. Noise enumeration separately
+bounds pattern choices and probability integers. A zero cap permits an empty
+sector and is ignored when retention is disabled. Fresh target normalization
+can occur before this traversal preflight and keeps its actual query cost.
+
+File reports keep the numeric `result.patterns` count and place optional records
+in `result.pattern_responses`, including exact and scientific responses. Their
+configuration and cap participate in the options fingerprint. Category/channel
+indices belong to the captured Rust noise model; compare another implementation
+through original source-operation identities, since zero-probability category
+placeholders can change numbering. Correlated chains remain one category, and
+inactive guarded selections remain distinct latent physical patterns.
+
+```text
+rmagna enumerate physical.magna --task task.json --max-weight 2 \
+  --include-patterns --max-pattern-response-values 1000000 --json --output sectors.json
+```
+
+Retention flags apply only to `enumerate` and are validated before decoder
+imports. Enabling retention adds no quantum queries, decoder calls or entropy.
+Failures retain actual costs and do not publish complete estimates. Numerical
+export failure leaves all owned exact records in the Rust report; the CLI keeps
+its ordinary explicit non-persistence receipt. This feature does not add
+category action definitions or resume a failed enumeration cursor.
+
+The six pinned-native pattern-response witnesses cover joint report selection,
+mutually exclusive Pauli/correlated channels, forced empty/full sectors,
+nonlinear feedback with inactive guarded noise, and a projected target. Regenerate
+with `benchmarks/magna_reproduction/pattern_response_vectors.py` and the pinned
+source, and compare ordinary and Python `-O` captures. The comparison maps source
+operations explicitly, checks the native total-mass field and target
+normalization, and verifies exact Boolean responses and sector recombination.

@@ -1,0 +1,1333 @@
+{
+  "native_sha256": "24ec8f3c108ca3a624ca5b0fd0b536ceb01111736f5d737643eb8f44a6d4bd77",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "schema": "rmagna.pattern-response-reference.v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "vectors": [
+    {
+      "case": "joint_report_selection",
+      "category_source_operations": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "histories": 8,
+      "ideal": "I 0 1",
+      "max_weight": 3,
+      "patterns": [
+        {
+          "choices": [],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x48"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 0
+        },
+        {
+          "choices": [
+            {
+              "category": 2,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0xc"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 1,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x12"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 1,
+              "channel": 0
+            },
+            {
+              "category": 2,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x3"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 2
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x18"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            },
+            {
+              "category": 2,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x4"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 2
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            },
+            {
+              "category": 1,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x6"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 2
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            },
+            {
+              "category": 1,
+              "channel": 0
+            },
+            {
+              "category": 2,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x8c",
+            "numerator_hex": "0x1"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 3
+        }
+      ],
+      "source": "X_ERROR(1/4) 0\nX_ERROR(1/5) 1\nM(1/7) 0\nM 1\nDETECTOR rec[-2]\nPOSTSELECT det[0]",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": 0
+      },
+      "task": {
+        "observables": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ]
+        ],
+        "outputs": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "case": "categorical_chain",
+      "category_source_operations": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          3
+        ]
+      ],
+      "histories": 6,
+      "ideal": "I 0",
+      "max_weight": 1,
+      "patterns": [
+        {
+          "choices": [],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0x1c"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 0
+        },
+        {
+          "choices": [
+            {
+              "category": 1,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0x4"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 1,
+              "channel": 1
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0x8"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0x7"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 1
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0xe"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "-0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 2
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x64",
+            "numerator_hex": "0x15"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        }
+      ],
+      "source": "PAULI_CHANNEL_1(1/10,1/5,3/10) 0\nE(1/10) X0\nELSE_CORRELATED_ERROR(2/9) Z0\nY_ERROR(0) 0",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": 0
+      },
+      "task": {
+        "observables": [
+          [
+            0,
+            1
+          ]
+        ],
+        "outputs": [
+          0
+        ]
+      }
+    },
+    {
+      "case": "forced_empty",
+      "category_source_operations": [
+        [
+          0
+        ]
+      ],
+      "histories": 0,
+      "ideal": "I 0",
+      "max_weight": 0,
+      "patterns": [],
+      "source": "X_ERROR(1) 0",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": 0
+      },
+      "task": {
+        "outputs": [
+          0
+        ]
+      }
+    },
+    {
+      "case": "forced_full",
+      "category_source_operations": [
+        [
+          0
+        ]
+      ],
+      "histories": 1,
+      "ideal": "I 0",
+      "max_weight": 1,
+      "patterns": [
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x1",
+            "numerator_hex": "0x1"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 1
+        }
+      ],
+      "source": "X_ERROR(1) 0",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": 0
+      },
+      "task": {
+        "outputs": [
+          0
+        ]
+      }
+    },
+    {
+      "case": "nonlinear_guard",
+      "category_source_operations": [
+        [
+          6
+        ]
+      ],
+      "histories": 4,
+      "ideal": "I 0",
+      "max_weight": 1,
+      "patterns": [
+        {
+          "choices": [],
+          "probability": {
+            "denominator_hex": "0x5",
+            "numerator_hex": "0x4"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            }
+          ],
+          "weight": 0
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x5",
+            "numerator_hex": "0x1"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x2",
+                "-0x1",
+                "0x0",
+                "0x1"
+              ],
+              "exponent2": -2
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x1",
+                "0x0",
+                "-0x1"
+              ],
+              "exponent2": -1
+            }
+          ],
+          "weight": 1
+        }
+      ],
+      "source": "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nX_ERROR(1/5) ctrl[0] 1\nM 1",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": 0
+      },
+      "task": {
+        "observables": [
+          [
+            0,
+            1
+          ]
+        ],
+        "outputs": [
+          1
+        ]
+      }
+    },
+    {
+      "case": "projected_target",
+      "category_source_operations": [
+        [
+          3
+        ]
+      ],
+      "histories": 2,
+      "ideal": "H 0\nCX 0 1",
+      "max_weight": 1,
+      "patterns": [
+        {
+          "choices": [],
+          "probability": {
+            "denominator_hex": "0x5",
+            "numerator_hex": "0x4"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x2",
+                "0x1",
+                "0x0",
+                "-0x1"
+              ],
+              "exponent2": -3
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "0x1",
+                "0x0",
+                "-0x1"
+              ],
+              "exponent2": -1
+            }
+          ],
+          "weight": 0
+        },
+        {
+          "choices": [
+            {
+              "category": 0,
+              "channel": 0
+            }
+          ],
+          "probability": {
+            "denominator_hex": "0x5",
+            "numerator_hex": "0x1"
+          },
+          "response": [
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x1",
+                "0x0",
+                "0x0",
+                "0x0"
+              ],
+              "exponent2": 0
+            },
+            {
+              "coefficients_hex": [
+                "0x2",
+                "-0x1",
+                "0x0",
+                "0x1"
+              ],
+              "exponent2": -3
+            },
+            {
+              "coefficients_hex": [
+                "0x0",
+                "-0x1",
+                "0x0",
+                "0x1"
+              ],
+              "exponent2": -1
+            }
+          ],
+          "weight": 1
+        }
+      ],
+      "source": "H 0\nT 0\nH 0\nX_ERROR(1/5) 0",
+      "target_normalization": {
+        "coefficients_hex": [
+          "0x1",
+          "0x0",
+          "0x0",
+          "0x0"
+        ],
+        "exponent2": -1
+      },
+      "target_outputs": [
+        0
+      ],
+      "target_postselection": {
+        "1": 1
+      },
+      "task": {
+        "observables": [
+          [
+            0,
+            1
+          ]
+        ],
+        "outputs": [
+          0
+        ]
+      }
+    }
+  ]
+}
