@@ -1,5 +1,5 @@
 use num_traits::Signed;
-use rmagna::file_api::{FileLoadOptions, FileTaskOptions};
+use rmagna::file_api::{FileEnumerationOptions, FileLoadOptions, FileTaskOptions};
 use rmagna::instrument::{InsertionPreparation, ProbabilityPreparation, QueryPreparation};
 use rmagna::noise::NoiseSampling;
 use rmagna::probability::ProbabilityParser;
@@ -9,11 +9,12 @@ use rmagna::task::TaskRunOptions;
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
-pub const HELP: &str = "rmagna validate|inspect|run CIRCUIT [OPTIONS]
+pub const HELP: &str = "rmagna validate|inspect|run|enumerate CIRCUIT [OPTIONS]
 
 validate parses and fingerprints inputs without quantum queries or callbacks.
 inspect additionally compiles the protocol, without draws or decoder callbacks.
 run prepares and performs real noisy draws from a fresh SplitMix64 seed.
+enumerate integrates bounded physical noise sectors and all positive histories.
 
 Inputs and output:
   --task FILE                         Task JSON; module paths are relative to it
@@ -29,9 +30,9 @@ Inputs and output:
 Run configuration:
   --shots N                           Positive draw count (default 1; run only)
   --seed N                            u64 seed (default 0; run only)
-  --noise-proposal-scale RATIONAL      Exact positive scale; selects importance
+  --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
   --compiler shared|parity_copies      Default shared
-  --history-sampler affine_support|exact_marginal   Default affine_support
+  --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate
   --causal-strategy fixed|cold         Default fixed
   --probability-preparation cold|trace|fixed        Default fixed, on demand
   --density-preparation cold|trace|fixed            Default fixed, on demand
@@ -42,6 +43,18 @@ Run configuration:
   --max-insertion-table-bytes N        Prepared insertion estimate cap (default 67108864)
   --max-insertion-catalog-entries N    Prepared insertion entry cap (default 1000000)
 
+Exact enumeration only:
+  --max-weight N                      Nonnegative decimal category cutoff (default 1; unbounded input)
+  --max-patterns N                    Positive pattern cap (default 100000)
+  --max-fault-entries N               Stored fault entry cap (default 1000000)
+  --max-enumeration-sites N           Potential noise category cap (default 100000)
+  --max-site-weight-pairs N           Sector probability work cap (default 10000000)
+  --max-enumeration-probability-bits N Exact sector integer bit cap (default 1048576)
+  --max-history-branches N            Global complete/pending histories (default 4096)
+  --max-history-record-bits N         Independent bits per unresolved group (default 64)
+  --max-marginal-queries N            Global history marginal quota (default 1000000)
+  --max-replay-attempts N             Global complete/interrupted replays (default 1000000)
+
 Limits (zero is allowed for quotas unless marked positive):
   --max-terms N                       Query contraction term budget
   --max-coherent-qubits N             Compiled coherent width budget
@@ -51,14 +64,14 @@ Limits (zero is allowed for quotas unless marked positive):
   --max-seconds SECONDS               Positive deadline checked between operations
   --max-source-bytes N                Positive per-circuit source byte limit
   --max-task-bytes N                  Positive task JSON byte limit
-  --max-record-values N               Requested Boolean values retained per run
+  --max-record-values N               Requested Boolean values per run; not enumerate
   --numeric-work-bits N               Numeric export intermediate integer bit cap
   --fingerprint-bytes N               Positive canonical JSON byte limit
 
 Python is launched only with --controllers. Explicit decoder modules may execute
 on import, including during validate/inspect. The host cannot import magna.
 CLI defaults differ from library defaults. Resolved options are in every success
-report. Native option files, enumerate, compare-samplers and progress are not yet
+report. Native option files, compare-samplers and progress are not yet
 supported. Use the Rust API for typed exact results if numeric export fails.
 ";
 
@@ -67,6 +80,7 @@ pub enum Mode {
     Validate,
     Inspect,
     Run,
+    Enumerate,
 }
 pub struct Args {
     pub mode: Mode,
@@ -81,6 +95,7 @@ pub struct Args {
     pub file: FileTaskOptions,
     pub load: FileLoadOptions,
     pub run: TaskRunOptions,
+    pub enumeration: FileEnumerationOptions,
     pub sampling: NoiseSampling,
 }
 fn duration(text: &str, flag: &str) -> Result<Duration, String> {
@@ -95,6 +110,18 @@ fn duration(text: &str, flag: &str) -> Result<Duration, String> {
     Ok(result)
 }
 struct Flags(BTreeMap<String, String>);
+const ENUMERATION_FLAGS: [&str; 10] = [
+    "--max-weight",
+    "--max-patterns",
+    "--max-fault-entries",
+    "--max-enumeration-sites",
+    "--max-site-weight-pairs",
+    "--max-enumeration-probability-bits",
+    "--max-history-branches",
+    "--max-history-record-bits",
+    "--max-marginal-queries",
+    "--max-replay-attempts",
+];
 impl Flags {
     fn text(&mut self, flag: &str) -> Option<String> {
         self.0.remove(flag)
@@ -117,6 +144,25 @@ impl Flags {
 impl Args {
     pub fn parse(raw: Vec<String>) -> Result<Self, String> {
         let (mode, circuit, mut flags) = parse_tokens(raw)?;
+        if mode != Mode::Enumerate {
+            if let Some(flag) = ENUMERATION_FLAGS
+                .iter()
+                .find(|flag| flags.0.contains_key(**flag))
+            {
+                return Err(format!("{flag} requires enumerate"));
+            }
+        } else if let Some(flag) = [
+            "--noise-proposal-scale",
+            "--history-sampler",
+            "--max-record-values",
+        ]
+        .iter()
+        .find(|flag| flags.0.contains_key(**flag))
+        {
+            return Err(format!(
+                "{flag} is unavailable in enumerate; exact physical histories do not use a sampling policy"
+            ));
+        }
         let json = flags.text("--json").is_some();
         let output = flags.text("--output").map(PathBuf::from);
         let task = flags.text("--task").map(PathBuf::from);
@@ -149,6 +195,8 @@ impl Args {
             return Err("--shots and --seed require run".to_owned());
         }
         configure_limits(&mut flags, &mut file, &mut load, &mut run)?;
+        let mut enumeration = configure_enumeration(&mut flags)?;
+        enumeration.execution_limits = run.execution_limits;
         configure_runtime(&mut flags, &mut file)?;
         let sampling = if let Some(text) = flags.text("--noise-proposal-scale") {
             let proposal_scale = ProbabilityParser::default()
@@ -177,6 +225,7 @@ impl Args {
             file,
             load,
             run,
+            enumeration,
             sampling,
         })
     }
@@ -188,7 +237,8 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
         Some("validate") => Mode::Validate,
         Some("inspect") => Mode::Inspect,
         Some("run") => Mode::Run,
-        _ => return Err("expected validate, inspect, or run; use --help".to_owned()),
+        Some("enumerate") => Mode::Enumerate,
+        _ => return Err("expected validate, inspect, run, or enumerate; use --help".to_owned()),
     };
     let mut flags = Flags(BTreeMap::new());
     let mut circuit = None;
@@ -236,7 +286,8 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--max-insertion-table-bytes"
                 | "--max-insertion-catalog-entries"
                 | "--noise-proposal-scale"
-        ) {
+        ) && !ENUMERATION_FLAGS.contains(&arg.as_str())
+        {
             return Err(format!("unknown option {arg}; use --help"));
         }
         let value = if arg == "--json" {
@@ -254,6 +305,42 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
     }
     let circuit = circuit.ok_or("missing CIRCUIT path")?;
     Ok((mode, circuit, flags))
+}
+
+fn configure_enumeration(flags: &mut Flags) -> Result<FileEnumerationOptions, String> {
+    let mut options = FileEnumerationOptions::default();
+    let n = &mut options.enumeration.noise;
+    if let Some(text) = flags.text("--max-weight") {
+        n.max_weight = weight_cutoff(&text)?;
+    }
+    n.max_patterns = flags.number("--max-patterns", n.max_patterns)?;
+    if n.max_patterns == 0 {
+        return Err("--max-patterns must be positive".to_owned());
+    }
+    n.max_fault_entries = flags.number("--max-fault-entries", n.max_fault_entries)?;
+    n.max_sites = flags.number("--max-enumeration-sites", n.max_sites)?;
+    n.max_site_weight_pairs = flags.number("--max-site-weight-pairs", n.max_site_weight_pairs)?;
+    n.max_probability_bits =
+        flags.number("--max-enumeration-probability-bits", n.max_probability_bits)?;
+    let h = &mut options.enumeration.histories;
+    h.max_branches = flags.number("--max-history-branches", h.max_branches)?;
+    h.max_record_bits = flags.number("--max-history-record-bits", h.max_record_bits)?;
+    h.max_marginal_queries = flags.number("--max-marginal-queries", h.max_marginal_queries)?;
+    h.max_replay_attempts = flags.number("--max-replay-attempts", h.max_replay_attempts)?;
+    Ok(options)
+}
+
+fn weight_cutoff(text: &str) -> Result<usize, String> {
+    let digits = text.strip_prefix('+').unwrap_or(text);
+    if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return Err("--max-weight needs a nonnegative decimal integer".to_owned());
+    }
+    // Every pattern has at most num_sites <= usize::MAX faults. A larger
+    // ceiling selects the same finite sector; all allocation/work quotas
+    // still apply. Validate the entire token before accepting any overflow.
+    Ok(digits.bytes().fold(0usize, |n, b| {
+        n.saturating_mul(10).saturating_add(usize::from(b - b'0'))
+    }))
 }
 
 fn configure_limits(
