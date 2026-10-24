@@ -2647,3 +2647,352 @@ fn fixed_query_phase_maps_preserve_cancelled_rotation_pairs_after_faults() {
         }
     }
 }
+
+fn literal_projected_moment(
+    values: &[ExactScalar],
+    masks: &[usize],
+    outcomes: usize,
+    xmask: usize,
+    zmask: usize,
+    phase: u8,
+    a: &ScalarArithmetic,
+) -> ExactScalar {
+    let mut result = ExactScalar::zero();
+    for (input, ket) in values.iter().enumerate() {
+        let output = input ^ xmask;
+        if masks.iter().enumerate().any(|(j, mask)| {
+            (input & mask).count_ones() as usize % 2 != (outcomes >> j) & 1
+                || (output & mask).count_ones() as usize % 2 != (outcomes >> j) & 1
+        }) {
+            continue;
+        }
+        let factor = a
+            .omega(
+                i64::from(phase) + 4 * i64::from((input & zmask).count_ones() % 2),
+                0,
+            )
+            .unwrap();
+        let amplitude = a.multiply(&values[output].conjugate(), ket).unwrap();
+        result = a
+            .add(&result, &a.multiply(&amplitude, &factor).unwrap())
+            .unwrap();
+    }
+    result
+}
+
+#[test]
+fn prepared_pauli_families_match_independent_matrices_for_complex_faulted_projectors() {
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::H(1)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 2,
+        }),
+        G::Clifford(C::H(2)),
+        G::Cs {
+            a: 1,
+            b: 2,
+            turns: 3,
+        },
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 7 },
+        G::Ccz { a: 0, b: 1, c: 2 },
+        G::Clifford(C::H(1)),
+    ];
+    let circuit = UnitaryCircuit::new(3, gates).unwrap();
+    let updates = [
+        vec![],
+        vec![PauliInsertion {
+            before_gate: 4,
+            word: PauliWord::new(bits(3, 3), bits(3, 4), 1).unwrap(),
+        }],
+        vec![
+            PauliInsertion {
+                before_gate: 0,
+                word: PauliWord::new(bits(3, 5), bits(3, 3), 7).unwrap(),
+            },
+            PauliInsertion {
+                before_gate: gates.len(),
+                word: PauliWord::new(bits(3, 2), bits(3, 7), 2).unwrap(),
+            },
+        ],
+    ];
+    let mut nonzero = 0;
+    let mut complex = 0;
+    let mut certificates = 0;
+    let mut multi_term = 0;
+    let mut strict_budget_checked = false;
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for input in [0, 5] {
+            let base = circuit
+                .compile_with_strategy(&bits(3, input), &a, strategy)
+                .unwrap();
+            let views = updates
+                .iter()
+                .map(|u| base.with_insertions(u, &a).unwrap())
+                .collect::<Vec<_>>();
+            let states = updates
+                .iter()
+                .map(|u| dense_inserted(&gates, 3, input, u, &a))
+                .collect::<Vec<_>>();
+            for x in [0_usize, 1, 3, 7] {
+                for z in [0_usize, 7] {
+                    for phase in 0..8 {
+                        let word = PauliWord::new(bits(3, x), bits(3, z), phase).unwrap();
+                        for masks in [vec![], vec![3], vec![5, 6, 3], vec![3, 3]] {
+                            let rows = masks.iter().map(|&m| bits(3, m)).collect::<Vec<_>>();
+                            let trace = base.prepare_pauli_moment(&word, &rows, &a).unwrap();
+                            let frozen = base
+                                .prepare_pauli_moment_with_fibers(
+                                    &word,
+                                    &rows,
+                                    4096,
+                                    Default::default(),
+                                    &a,
+                                )
+                                .unwrap();
+                            let from_fault = views[1]
+                                .prepare_pauli_moment_with_fibers(
+                                    &word,
+                                    &rows,
+                                    4096,
+                                    Default::default(),
+                                    &a,
+                                )
+                                .unwrap();
+                            let zero = masks.iter().any(|m| (m & x).count_ones() % 2 == 1);
+                            assert_eq!(trace.has_zero_certificate(), zero);
+                            assert_eq!(frozen.has_zero_certificate(), zero);
+                            assert!(trace.fixed_phase_resource().is_none());
+                            if zero {
+                                certificates += 1;
+                                assert!(frozen.fixed_phase_resource().is_none());
+                            } else {
+                                let resource = frozen.fixed_phase_resource().unwrap();
+                                assert_eq!(
+                                    resource.num_terms(),
+                                    from_fault.fixed_phase_resource().unwrap().num_terms()
+                                );
+                                multi_term += usize::from(resource.num_terms() > 1);
+                            }
+                            for (index, (view, state)) in views.iter().zip(&states).enumerate() {
+                                for rhs in 0..1_usize << rows.len() {
+                                    let expected = literal_projected_moment(
+                                        state, &masks, rhs, x, z, phase, &a,
+                                    );
+                                    if !expected.is_zero() {
+                                        nonzero += 1;
+                                        if !strict_budget_checked
+                                            && let Some(resource) = frozen.fixed_phase_resource()
+                                            && resource.num_terms() > 1
+                                        {
+                                            let limit = resource.num_terms() - 1;
+                                            assert!(matches!(
+                                                frozen.evaluate(view, &bits(rows.len(), rhs), limit, &a),
+                                                Err(UnitaryError::Phase(rmagna::phase::PhaseError::FiberTermLimit { limit: actual, .. })) if actual == limit
+                                            ));
+                                            strict_budget_checked = true;
+                                        }
+                                    }
+                                    if expected.conjugate() != expected {
+                                        complex += 1;
+                                    }
+                                    for plan in [&trace, &frozen, &from_fault] {
+                                        let value = plan
+                                            .evaluate(
+                                                view,
+                                                &bits(rows.len(), rhs),
+                                                if zero { 0 } else { 4096 },
+                                                &a,
+                                            )
+                                            .unwrap();
+                                        assert_eq!(
+                                            value.value, expected,
+                                            "strategy={strategy:?} input={input} X{x} Z{z} phase={phase} rows={masks:?} rhs={rhs} view={index}"
+                                        );
+                                        if zero {
+                                            assert_eq!((value.quotient_rank, value.terms), (0, 0));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        nonzero > 100
+            && complex > 100
+            && certificates > 100
+            && multi_term > 0
+            && strict_budget_checked,
+        "nonzero={nonzero} complex={complex} certificates={certificates} multi_term={multi_term}"
+    );
+}
+
+#[test]
+fn prepared_pauli_wide_boundaries_keep_outcomes_updates_and_plan_ownership() {
+    for width in [65, 129] {
+        let a = ScalarArithmetic::default();
+        let last = width - 1;
+        let circuit = UnitaryCircuit::new(
+            width,
+            [
+                G::Clifford(C::H(0)),
+                G::Clifford(C::Cx {
+                    control: 0,
+                    target: last,
+                }),
+                G::T {
+                    qubit: last,
+                    turns: 1,
+                },
+            ],
+        )
+        .unwrap();
+        let base = circuit.compile(&bits(width, 0), &a).unwrap();
+        let word = PauliWord::new(
+            BitVector::from_indices(width, [0, last]).unwrap(),
+            BitVector::zeros(width).unwrap(),
+            0,
+        )
+        .unwrap();
+        let parity = BitVector::from_indices(width, [0, last]).unwrap();
+        let rows = [
+            parity.clone(),
+            BitVector::from_indices(width, [1]).unwrap(),
+            parity,
+        ];
+        let fixed = base
+            .prepare_pauli_moment_with_fibers(&word, &rows, 256, Default::default(), &a)
+            .unwrap();
+        let update = PauliWord::new(
+            BitVector::from_indices(width, [1]).unwrap(),
+            BitVector::from_indices(width, [last]).unwrap(),
+            5,
+        )
+        .unwrap();
+        let view = base
+            .with_insertions(
+                &[PauliInsertion {
+                    before_gate: 3,
+                    word: update,
+                }],
+                &a,
+            )
+            .unwrap();
+        let from_fault = view.prepare_pauli_moment(&word, &rows, &a).unwrap();
+        drop(base);
+        for rhs in 0..8 {
+            let expected = if rhs == 2 {
+                a.omega(4, -1).unwrap()
+            } else {
+                ExactScalar::zero()
+            };
+            assert_eq!(
+                fixed.evaluate(&view, &bits(3, rhs), 256, &a).unwrap().value,
+                expected
+            );
+            assert_eq!(
+                from_fault
+                    .evaluate(&view, &bits(3, rhs), 256, &a)
+                    .unwrap()
+                    .value,
+                expected
+            );
+        }
+        let foreign = circuit.compile(&bits(width, 0), &a).unwrap();
+        assert!(matches!(
+            fixed.evaluate(&foreign, &bits(3, 2), 256, &a),
+            Err(UnitaryError::IncompatibleProgram)
+        ));
+    }
+}
+
+#[test]
+fn prepared_pauli_zero_certificates_validate_program_and_dimensions_before_zero() {
+    let a = ScalarArithmetic::default();
+    let circuit =
+        UnitaryCircuit::new(3, [G::Clifford(C::H(0)), G::T { qubit: 1, turns: 1 }]).unwrap();
+    let base = circuit.compile(&bits(3, 0), &a).unwrap();
+    let rows = [bits(3, 1)];
+    let word = PauliWord::new(bits(3, 1), bits(3, 1), 2).unwrap();
+    let plan = base
+        .prepare_pauli_moment_with_fibers(&word, &rows, 0, Default::default(), &a)
+        .unwrap();
+    assert!(plan.has_zero_certificate());
+    assert!(plan.fixed_phase_resource().is_none());
+    for outcome in 0..2 {
+        let value = plan.evaluate(&base, &bits(1, outcome), 0, &a).unwrap();
+        assert_eq!(value.value, ExactScalar::zero());
+        assert_eq!(value.terms, 0);
+    }
+    assert!(matches!(
+        plan.evaluate(&base, &bits(2, 0), 0, &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    let foreign = circuit.compile(&bits(3, 0), &a).unwrap();
+    assert!(matches!(
+        plan.evaluate(&foreign, &bits(1, 0), 0, &a),
+        Err(UnitaryError::IncompatibleProgram)
+    ));
+    assert!(matches!(
+        base.prepare_pauli_moment(&PauliWord::identity(2).unwrap(), &rows, &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(matches!(
+        base.prepare_pauli_moment(&word, &[bits(2, 0)], &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    assert!(
+        !base
+            .prepare_pauli_moment(&word, &[], &a)
+            .unwrap()
+            .has_zero_certificate()
+    );
+}
+
+#[test]
+fn prepared_pauli_empty_program_and_fixed_term_limits_are_exact() {
+    let a = ScalarArithmetic::default();
+    let base = UnitaryCircuit::new(0, [])
+        .unwrap()
+        .compile(&bits(0, 0), &a)
+        .unwrap();
+    let word = PauliWord::new(bits(0, 0), bits(0, 0), 3).unwrap();
+    let rows = [bits(0, 0), bits(0, 0)];
+    let plan = base
+        .prepare_pauli_moment_with_fibers(&word, &rows, 1, Default::default(), &a)
+        .unwrap();
+    assert!(!plan.has_zero_certificate());
+    assert_eq!(plan.fixed_phase_resource().unwrap().num_terms(), 1);
+    assert_eq!(
+        plan.evaluate(&base, &bits(2, 0), 1, &a).unwrap().value,
+        a.omega(3, 0).unwrap()
+    );
+    for rhs in 1..4 {
+        assert_eq!(
+            plan.evaluate(&base, &bits(2, rhs), 0, &a).unwrap().value,
+            ExactScalar::zero()
+        );
+    }
+    assert!(plan.evaluate(&base, &bits(2, 0), 0, &a).is_err());
+    assert!(
+        base.prepare_pauli_moment_with_fibers(&word, &rows, 0, Default::default(), &a)
+            .is_err()
+    );
+    let trace = base.prepare_pauli_moment(&word, &rows, &a).unwrap();
+    assert_eq!(
+        trace.evaluate(&base, &bits(2, 0), 1, &a).unwrap().value,
+        a.omega(3, 0).unwrap()
+    );
+}

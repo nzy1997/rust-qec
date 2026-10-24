@@ -1,4 +1,4 @@
-//! Fixed scalar closure for probability and reduced density-overlap families.
+//! Fixed scalar closure for probability, Pauli moments and density overlaps.
 use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::fibers::{FiberOptions, PreparedCliffordFibers};
@@ -173,6 +173,135 @@ impl PreparedProbability {
             &joint,
             &rhs,
             &[(&state.phase, false), (&state.phase, true)],
+            max_terms,
+            arithmetic,
+        )
+    }
+}
+
+/// Immutable exact `<psi|Pi P Pi|psi>` family for one reference program, Pauli
+/// word and Z-event layout, retaining global complex phase. Outcome changes and
+/// Pauli insertions reuse its Gaussian constraints and optional phase resource.
+pub struct PreparedPauliMoment {
+    program: Arc<InsertionProgram>,
+    word: PauliWord,
+    physical_width: usize,
+    event_count: usize,
+    closure: Option<ScalarClosure>,
+}
+fn moment_joint(
+    boundary: &AffineKet,
+    word: &PauliWord,
+    arithmetic: &ScalarArithmetic,
+) -> Result<AffineKet, UnitaryError> {
+    Ok(boundary
+        .conjugate()
+        .tensor(&word.apply(boundary, arithmetic)?, arithmetic)?)
+}
+impl PreparedPauliMoment {
+    pub(super) fn prepare(
+        state: &CompiledUnitary,
+        word: &PauliWord,
+        rows: &[BitVector],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        if word.width() != state.width() || rows.iter().any(|r| r.width() != state.width()) {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        state
+            .width()
+            .checked_add(rows.len())
+            .ok_or(UnitaryError::DimensionOverflow)?;
+        let mut zero = false;
+        for row in rows {
+            zero |= row.dot(word.x())?;
+        }
+        let reference = &state.program.query_reference;
+        let half = reference.width();
+        let lifted = PauliWord::new(
+            BitVector::from_indices(half, word.x().ones())?,
+            BitVector::from_indices(half, word.z().ones())?,
+            word.phase(),
+        )?;
+        let closure = if zero {
+            // If P anticommutes with a Z-row observable, P exchanges its eigenspaces,
+            // so the corresponding event projector satisfies Pi P Pi = 0.
+            None
+        } else {
+            let joint = moment_joint(reference, &lifted, arithmetic)?;
+            let total = joint.width();
+            let mut constraints = (0..state.width())
+                .map(|q| BitVector::from_indices(total, [q, half + q]))
+                .collect::<Result<Vec<_>, _>>()?;
+            constraints.extend(
+                rows.iter()
+                    .map(|r| BitVector::from_indices(total, r.ones()))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+            // P commutes with every event. Equality of the physical bra/ket
+            // labels therefore enforces both projectors using only bra rows.
+            let legs = vec![
+                (state.width()..half).collect(),
+                (half + state.width()..total).collect(),
+            ];
+            Some(ScalarClosure::new(&joint, &constraints, legs)?)
+        };
+        Ok(Self {
+            program: Arc::clone(&state.program),
+            word: lifted,
+            physical_width: state.width(),
+            event_count: rows.len(),
+            closure,
+        })
+    }
+    pub(super) fn freeze(
+        mut self,
+        max_terms: usize,
+        options: FiberOptions,
+    ) -> Result<Self, UnitaryError> {
+        if let Some(closure) = &mut self.closure {
+            let phase = &self.program.query_reference_phase;
+            closure.freeze(&[(phase, true), (phase, false)], max_terms, options)?;
+        }
+        Ok(self)
+    }
+    /// A fixed Pauli/event anticommutation certificate, independent of outcomes.
+    pub fn has_zero_certificate(&self) -> bool {
+        self.closure.is_none()
+    }
+    /// Fixed counts precede adaptive radical absorption and can be larger.
+    /// A certified zero response needs no phase resource, even in fixed mode.
+    pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
+        self.closure
+            .as_ref()
+            .and_then(|c| c.resource.as_ref())
+            .map(|r| &r.fibers)
+    }
+    pub fn evaluate(
+        &self,
+        state: &CompiledUnitary,
+        outcomes: &BitVector,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<NetworkValue, UnitaryError> {
+        if !Arc::ptr_eq(&self.program, &state.program) {
+            return Err(UnitaryError::IncompatibleProgram);
+        }
+        if outcomes.width() != self.event_count {
+            return Err(UnitaryError::DimensionMismatch);
+        }
+        let Some(closure) = &self.closure else {
+            return Ok(zero_network_value());
+        };
+        let rhs = BitVector::from_indices(
+            self.physical_width + self.event_count,
+            outcomes.ones().map(|j| self.physical_width + j),
+        )?;
+        let joint = moment_joint(&state.boundary, &self.word, arithmetic)?;
+        closure.evaluate(
+            &joint,
+            &rhs,
+            &[(&state.phase, true), (&state.phase, false)],
             max_terms,
             arithmetic,
         )

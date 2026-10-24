@@ -1508,6 +1508,54 @@ queries still return zero without enumeration. The default `prepare_probability`
 retains adaptive query-specific closure. Final Gaussian elimination remains
 query-specific in the fixed-resource mode; whole-runtime caching is separate.
 
+## Prepared Pauli-moment families
+
+`CompiledUnitary::prepare_pauli_moment(word, rows, arithmetic)` prepares the
+fixed Gaussian geometry for exact `<psi|Pi P Pi|psi>`, retaining complex global
+phase for a general full-width Pauli word. Event outcomes and insertion views
+remain evaluation inputs. `prepare_pauli_moment_with_fibers` additionally freezes
+the same kind of certified phase resource as probability families, before
+adaptive radical absorption. Its resource can therefore require more terms than
+a cold query. Both constructors use the original program's reference, including
+when invoked on a perturbed view, and the resulting plan owns that reference.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::gf2::BitVector;
+use rmagna::instrument::{CompileOptions, compile_unitary};
+use rmagna::pauli::PauliWord;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::unitary::PauliInsertion;
+
+let a = ScalarArithmetic::default();
+let source = parse_circuit("H 0\nT 0\nH 0", &ParseOptions::default())?;
+let base = compile_unitary(&source, &CompileOptions::default(), &a)?;
+let z = PauliWord::new(BitVector::zeros(1)?, BitVector::from_indices(1,[0])?, 0)?;
+let plan = base.prepare_pauli_moment_with_fibers(&z, &[], 256, Default::default(), &a)?;
+let empty = BitVector::zeros(0)?;
+assert_eq!(plan.evaluate(&base, &empty, 256, &a)?.value, a.omega(0,-1)?);
+let changed = base.with_insertions(&[PauliInsertion {before_gate:1, word:z}], &a)?;
+assert_eq!(plan.evaluate(&changed, &empty, 256, &a)?.value, a.omega(4,-1)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+If `P` anticommutes with any Z-event row, `Pi P Pi` is identically zero.
+`has_zero_certificate()` exposes this sufficient anticommutation rule. Such
+plans need no phase resource or enumerated terms, even with a zero term budget.
+Otherwise the two projectors commute with `P`; physical bra/ket equality lets the
+prepared closure impose the event rows on the bra once. Repeated/dependent rows
+and inconsistent outcomes keep their exact semantics. An invalid outcome width
+or a different compiled program is rejected before using a zero certificate.
+`fixed_phase_resource()` is null for trace-only plans and for certified zero.
+
+Tests compare literal matrix sums on noncommuting three-qubit circuits under both
+compilers, multiple inputs and varied multi-fault histories, all eight global
+Pauli phases, signed/complex values, dependent events and certified zeros. Wide
+65/129-wire examples cover cross-word rows and offsets; zero-wire queries,
+reference lifetime, preparation from perturbed views, incompatible programs and
+exact term-budget boundaries are also covered. These explicit unitary plans do
+not yet change instrument cache policy or claim complete task query preparation.
+
 ## Bounded instrument probability preparation
 
 `CompileOptions::probability_preparation` selects `Cold` (the default), `Trace`
