@@ -325,7 +325,7 @@ fn causal_importance_skips_guarded_channels_and_retains_active_physical_path_pro
 }
 
 #[test]
-fn noise_and_nonuniform_history_likelihoods_combine_once_including_interference_zeros() {
+fn noise_and_nonuniform_history_likelihoods_combine_once_with_certified_support() {
     use rmagna::runtime::{CausalStrategy, HistorySampler};
     use rmagna::scalar::{ExactScalar, ScalarArithmetic};
     let files = Files::new();
@@ -367,6 +367,8 @@ fn noise_and_nonuniform_history_likelihoods_combine_once_including_interference_
                     let draw = program
                         .sample(&mut Words::new(vec![noise, u64::from(bit)]))
                         .unwrap();
+                    let bit = if cancel { false } else { bit };
+                    assert_eq!(draw.sampled_records, [bit]);
                     let p = if cancel {
                         if bit {
                             ExactScalar::zero()
@@ -386,11 +388,14 @@ fn noise_and_nonuniform_history_likelihoods_combine_once_including_interference_
                         .unwrap()
                     };
                     assert_eq!(draw.history_mass, p);
-                    assert_eq!(draw.history_proposal_mass, Some(a.omega(0, -2).unwrap()));
+                    assert_eq!(
+                        draw.history_proposal_mass,
+                        Some(a.omega(0, if cancel { 0 } else { -2 }).unwrap())
+                    );
                     let history_weight = f
                         .scale(
                             &f.from_scalar(&p).unwrap(),
-                            &BigRational::from_integer(2.into()),
+                            &BigRational::from_integer(if cancel { 1 } else { 2 }.into()),
                         )
                         .unwrap();
                     assert_eq!(draw.history_weight, history_weight);
@@ -935,7 +940,7 @@ fn task_prescribed_histories_are_conditional_queries_with_physical_enumeration_w
 }
 
 #[test]
-fn affine_history_tasks_use_proposal_mass_and_keep_zero_weight_draws() {
+fn affine_history_tasks_use_proposal_mass_and_remove_certified_zero_draws() {
     use rmagna::runtime::HistorySampler;
     use rmagna::scalar::{ExactScalar, ScalarArithmetic};
     let files = Files::new();
@@ -966,8 +971,12 @@ fn affine_history_tasks_use_proposal_mass_and_keep_zero_weight_draws() {
             let draw = program
                 .sample_prescribed(&[], &mut Words::new(vec![u64::from(bit)]))
                 .unwrap();
+            let bit = if cancel { false } else { bit };
             assert_eq!(draw.sampled_records, [bit]);
-            assert_eq!(draw.history_proposal_mass, Some(a.omega(0, -2).unwrap()));
+            assert_eq!(
+                draw.history_proposal_mass,
+                Some(a.omega(0, if cancel { 0 } else { -2 }).unwrap())
+            );
             let p = if cancel {
                 if bit {
                     ExactScalar::zero()
@@ -983,7 +992,10 @@ fn affine_history_tasks_use_proposal_mass_and_keep_zero_weight_draws() {
             };
             assert_eq!(draw.history_mass, p);
             let weight = f
-                .multiply(&f.from_scalar(&p).unwrap(), &rational(2, 1))
+                .multiply(
+                    &f.from_scalar(&p).unwrap(),
+                    &rational(if cancel { 1 } else { 2 }, 1),
+                )
                 .unwrap();
             assert_eq!(draw.history_weight, weight);
             assert_eq!(draw.accepted, weight);

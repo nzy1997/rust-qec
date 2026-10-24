@@ -229,17 +229,19 @@ impl TaskEvaluator {
             .map(|&record| BitExpr::atom(BitAtom::Record(record)))
             .collect::<Vec<_>>();
         let execution = if composed.needs_history_sampling() || !requested.is_empty() {
-            Execution::Causal(Box::new(
-                CausalProgram::new_observed(
-                    &composed,
-                    registry,
-                    options.runtime,
-                    a,
-                    sampling,
-                    meter,
-                )
-                .map_err(|e| error("runtime", e))?,
-            ))
+            let mut program = CausalProgram::new_observed(
+                &composed,
+                registry,
+                options.runtime,
+                a,
+                sampling,
+                meter,
+            )
+            .map_err(|e| error("runtime", e))?;
+            program
+                .capture_support_transport(&requested)
+                .map_err(|e| error("runtime.support_transport", e))?;
+            Execution::Causal(Box::new(program))
         } else {
             let instrument = observe(meter, OperationKind::Compilation, || {
                 compile_affine(&composed, &options.runtime.compile, a)
@@ -273,6 +275,18 @@ impl TaskEvaluator {
         match &self.execution {
             Execution::Linear { sampler, .. } => sampler.scaled_proposal_summary(),
             Execution::Causal(program) => program.scaled_proposal_summary(),
+        }
+    }
+    pub fn prepared_support_statistics(
+        &self,
+    ) -> Result<Option<crate::instrument::PreparedSupportStatistics>, TaskError> {
+        match &self.execution {
+            Execution::Linear { instrument, .. } => instrument
+                .prepared_support_statistics()
+                .map_err(|e| error("prepared_support", e)),
+            Execution::Causal(program) => program
+                .prepared_support_statistics()
+                .map_err(|e| error("prepared_support", e)),
         }
     }
     pub fn prepared_insertion_statistics(

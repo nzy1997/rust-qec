@@ -6,9 +6,11 @@ mod phase_map;
 pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;
+mod support;
 pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
+pub use support::PreparedProbabilitySupport;
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
