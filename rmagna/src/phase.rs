@@ -15,6 +15,11 @@ pub enum PhaseError {
     InvalidPhase,
     DimensionMismatch,
     NotClifford,
+    ResourceLimit {
+        option: &'static str,
+        limit: u128,
+        required: u128,
+    },
     CoreLimit {
         option: &'static str,
         limit: u128,
@@ -42,6 +47,11 @@ impl fmt::Display for PhaseError {
             Self::DimensionMismatch => write!(f, "phase and affine coordinate dimensions disagree"),
             Self::NotClifford => write!(f, "phase has a nonzero third-derivative signature"),
             Self::CoreLimit {
+                option,
+                limit,
+                required,
+            }
+            | Self::ResourceLimit {
                 option,
                 limit,
                 required,

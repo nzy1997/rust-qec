@@ -1,8 +1,10 @@
 //! Exact, immutable certificates for constrained Clifford phase decompositions.
 mod json;
+mod resource;
 use crate::gf2::BitVector;
 use crate::phase::ParityPhase;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
+pub use resource::{CataloguePreparationOptions, PreparedCataloguePhase};
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 /// One coefficient times a Clifford phase and an affine support indicator.
