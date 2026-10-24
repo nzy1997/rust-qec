@@ -25,6 +25,10 @@ pub enum UnitaryError {
     DimensionMismatch,
     DimensionOverflow,
     InvalidTurns,
+    RawPathLimit {
+        limit: usize,
+        required: usize,
+    },
     RepeatedQubit,
     RepeatedOutput,
     IncompatibleProgram,
@@ -57,6 +61,10 @@ impl fmt::Display for UnitaryError {
             Self::DimensionOverflow => {
                 write!(f, "unitary network width exceeds the platform index range")
             }
+            Self::RawPathLimit { limit, required } => write!(
+                f,
+                "max_path_bits = {limit} is insufficient; raw Clifford network needs {required}"
+            ),
             Self::InvalidTurns => write!(
                 f,
                 "T turns must be below eight and controlled-S turns below four"
@@ -145,7 +153,10 @@ pub struct CompilationDiagnostics {
     pub reference_coherent_width: usize,
     pub shared_observations_before_reduction: usize,
     pub clifford_gates: usize,
+    /// Variables retained after local Hadamard contraction.
     pub path_variables: usize,
+    /// Computational input support plus Hadamards before any contraction.
+    pub raw_path_variables: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -212,9 +223,24 @@ impl UnitaryCircuit {
         arithmetic: &ScalarArithmetic,
         strategy: CompilerStrategy,
     ) -> Result<CompiledUnitary, UnitaryError> {
+        self.compile_with_path_limit(input, arithmetic, strategy, usize::MAX)
+    }
+
+    /// Bound raw paths of the selected Clifford lowering before contraction.
+    /// Computational inputs contribute no support variables; each lowered H
+    /// contributes one path even when later local contractions remove it.
+    pub fn compile_with_path_limit(
+        &self,
+        input: &BitVector,
+        arithmetic: &ScalarArithmetic,
+        strategy: CompilerStrategy,
+        max_path_bits: usize,
+    ) -> Result<CompiledUnitary, UnitaryError> {
         match strategy {
-            CompilerStrategy::ParityCopies => self.compile(input, arithmetic),
-            CompilerStrategy::SharedCommutingLayer => shared::compile(self, input, arithmetic),
+            CompilerStrategy::ParityCopies => self.compile_parity(input, arithmetic, max_path_bits),
+            CompilerStrategy::SharedCommutingLayer => {
+                shared::compile(self, input, arithmetic, max_path_bits)
+            }
         }
     }
 
@@ -226,6 +252,15 @@ impl UnitaryCircuit {
         &self,
         input: &BitVector,
         arithmetic: &ScalarArithmetic,
+    ) -> Result<CompiledUnitary, UnitaryError> {
+        self.compile_parity(input, arithmetic, usize::MAX)
+    }
+
+    fn compile_parity(
+        &self,
+        input: &BitVector,
+        arithmetic: &ScalarArithmetic,
+        max_path_bits: usize,
     ) -> Result<CompiledUnitary, UnitaryError> {
         if input.width() != self.width {
             return Err(UnitaryError::DimensionMismatch);
@@ -273,6 +308,7 @@ impl UnitaryCircuit {
             .width
             .checked_add(coefficients.len())
             .ok_or(UnitaryError::DimensionOverflow)?;
+        let raw_path_variables = check_raw_paths(&lowered, max_path_bits)?;
         let initial =
             CliffordCircuit::computational(BitVector::from_indices(width, input.ones())?)?;
         let circuit = CliffordCircuit::new(width, lowered)?;
@@ -302,6 +338,7 @@ impl UnitaryCircuit {
             shared_observations_before_reduction: 0,
             clifford_gates: circuit.gates().len(),
             path_variables: boundary.columns().len(),
+            raw_path_variables,
         });
         let program = Arc::new(InsertionProgram {
             reference: Arc::clone(&boundary),
@@ -924,6 +961,18 @@ fn close_retained(
         quotient_rank: prepared.quotient_rank(),
         terms: prepared.num_terms(),
     })
+}
+
+// Check before Clifford evolution, which deliberately contracts paths at each H.
+fn check_raw_paths(gates: &[CliffordGate], limit: usize) -> Result<usize, UnitaryError> {
+    let required = gates
+        .iter()
+        .filter(|gate| matches!(gate, CliffordGate::H(_)))
+        .count();
+    if required > limit {
+        return Err(UnitaryError::RawPathLimit { limit, required });
+    }
+    Ok(required)
 }
 
 #[cfg(test)]

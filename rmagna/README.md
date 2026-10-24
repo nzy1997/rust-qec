@@ -3312,3 +3312,49 @@ continues; final numeric export retains its ordinary failure semantics. A stderr
 write failure stops with a progress failure, preserving all committed draws and
 reporting no failed physical draw. Progress itself imports no native backend,
 consumes no entropy and invokes no extra decoder callbacks.
+
+## Raw Clifford path limits
+
+`instrument::CompileOptions::max_path_bits` bounds the raw path-variable count
+of the selected lowered Clifford network before its first contraction. Current
+unitary inputs are computational states with zero support variables, so each
+lowered Hadamard contributes one raw variable. This includes Hadamards used to
+copy shared commuting observations. The default is 1,000,000 for library and
+CLI compilation, matching the existing source gate-cap scale; it does not adopt
+the native engine's smaller default. Zero permits networks with no raw paths.
+The cap applies to physical instruments, measurement/reset dilations, targets,
+fixed causal templates and cold replay compilations.
+
+`UnitaryCircuit::compile_with_path_limit(input, arithmetic, strategy, cap)`
+provides the same bounded lowering directly. Existing `compile` and
+`compile_with_strategy` remain unrestricted by a raw-path cap. An exceeded cap
+returns `UnitaryError::RawPathLimit` with the limit and full required count,
+before Clifford evolution or observation reduction. Lowering itself still uses
+its ordinary gate/width resources; a path cap is not a general allocation cap.
+`CompilationDiagnostics.raw_path_variables` records the raw count, while
+`path_variables` continues to record retained variables after local contraction.
+For example, eight consecutive H gates need eight raw paths even though their
+final computational boundary retains none.
+
+Use `--max-path-bits N` to configure file-based CLI execution or inspection. The
+resolved cap is in `options.compile` and its options fingerprint, while captured
+physical content identities remain unchanged. Failed preparation reports actual
+failed compilation work and does not invoke a decoder. Cold causal replay can
+instead reach its cap during sampling and retains its ordinary partial-failure
+accounting.
+
+These are raw paths of each engine's own lowering. Native and Rust shared-phase
+observation networks can have different raw counts; a byte-for-byte budget
+comparison must first establish that their lowerings match. The pinned-native
+fixture covers six matched Clifford networks, including cancelled Hadamards,
+entanglement, reset/measurement and 129 wires. It is regenerated with:
+
+```text
+python benchmarks/magna_reproduction/path_budget_vectors.py --upstream PINNED_SOURCE --out NEW_WITNESS.json
+```
+
+Ordinary and Python `-O` captures must agree. This cap is separate from retained
+rank, contraction terms, coherent width and prepared insertion table bytes.
+Native `max_doubled_path_bits`, phase `max_quotient_rank` and phase-table
+`max_table_bytes` contracts require their own implementations; they must not be
+silently mapped to this option or claimed as reproduced by it.

@@ -294,7 +294,7 @@ pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
             "moment_preparation": preparation(compile.moment_preparation),
             "max_prepared_moments": compile.max_prepared_moments,
             "max_coherent_qubits": compile.max_coherent_qubits, "max_gates": compile.max_gates,
-            "max_noise_sites": compile.max_noise_sites,
+            "max_noise_sites": compile.max_noise_sites, "max_path_bits": compile.max_path_bits,
         },
         "noise": {"max_denominator_bits": runtime.noise.max_denominator_bits, "max_entropy_words": runtime.noise.max_entropy_words},
         "records": {"max_terms": runtime.sampling.max_terms, "max_entropy_words": runtime.sampling.max_entropy_words},

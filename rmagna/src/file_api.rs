@@ -461,7 +461,7 @@ fn compilation_snapshot(
         json!({"route":evaluator.execution_route(),"proposal_summary":proposal,"compilation":{
         "status":"compiled","query_preparation":"on_demand","reference_scope":"compiled protocol diagnostics; caches list retained families, without exhaustive preparation",
             "preparation_seconds":preparation.seconds,"preparation_costs":costs_json(preparation.costs),"preparation_limits":preparation.limits.to_json(),"preparation_included_in_this_call":included,
-            "compiler_diagnostics":{"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,"reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,"phase_ancillas":d.phase_ancillas,"shared_phase_coordinates":d.shared_phase_coordinates,"coherent_width":d.coherent_width,"reference_coherent_width":d.reference_coherent_width,"shared_observations_before_reduction":d.shared_observations_before_reduction,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables},
+            "compiler_diagnostics":{"strategy":format!("{:?}",d.strategy),"layer_slots":d.layer_slots,"reference_layer":d.reference_layer,"reference_layer_slots":d.reference_layer_slots,"phase_ancillas":d.phase_ancillas,"shared_phase_coordinates":d.shared_phase_coordinates,"coherent_width":d.coherent_width,"reference_coherent_width":d.reference_coherent_width,"shared_observations_before_reduction":d.shared_observations_before_reduction,"clifford_gates":d.clifford_gates,"path_variables":d.path_variables,"raw_path_variables":d.raw_path_variables},
             "retained_caches":{"probability":probability,"density":density,"moment":moment,"insertions":insertions},"cache_scope":"reference evaluator; cold-prefix caches are ephemeral"
         }}),
     )
