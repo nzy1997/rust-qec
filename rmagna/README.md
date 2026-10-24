@@ -3065,7 +3065,9 @@ requires successful completion and no cold request, so an affine-support
 receipt remains false even when every scalar family is retained. Trace plans still defer
 phase-resource construction until evaluation. Neither this method nor a cache
 count alone establishes that subsequent sampling has no preparation cost.
-File/CLI eager modes and sampler comparison require their own integration.
+The owned [file preparation](#explicit-file-preparation-and-reusable-sessions)
+and [sampler comparison](#independent-history-sampler-pilots) APIs build on
+this stage. CLI integration remains separate work.
 
 ```rust
 use rmagna::costs::ExecutionMeter;
@@ -3120,8 +3122,9 @@ sampling-family and metadata failures. A successful stage with cold policies
 explicitly records unretained families; trace policies still defer phase-resource
 construction. These modes are not labeled fully frozen warm execution. The scope
 covers configured reusable sampling families, excluding cold-prefix execution
-and exact-enumeration layouts. CLI preparation and sampler comparison remain
-separate integration work.
+and exact-enumeration layouts. The owned Rust file API also provides
+[sampler comparison](#independent-history-sampler-pilots). CLI preparation and
+comparison remain separate integration work.
 
 ```rust
 use rmagna::file_api::{FileApiError, FilePreparationOptions, FileTask};
