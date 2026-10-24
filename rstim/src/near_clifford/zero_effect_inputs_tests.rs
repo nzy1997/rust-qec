@@ -244,6 +244,16 @@ fn zero_effect_inputs_success_streams_match_unsparsified_eager_execution() {
                 input.contributes = true;
                 input.contributing_categories = (1u16 << input.count) - 1;
             }
+            full_model.packet_inputs = ActiveFreePredicate::index_packet_inputs(
+                &full_model.inputs,
+                &plan.random_kinds,
+                &mut Quota {
+                    bytes: 0,
+                    limit: usize::MAX,
+                    work: usize::MAX,
+                },
+            )
+            .unwrap();
             reference.predicate.set(Some(full_model)).unwrap();
             let mut a = SmallRng::seed_from_u64(0x5e0f_2026_1023_0001 + cache as u64);
             let mut b = a.clone();
