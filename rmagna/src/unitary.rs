@@ -6,7 +6,9 @@ mod phase_map;
 pub use insertions::{InsertionPreparationOptions, PreparedInsertions};
 mod prepared;
 mod shared;
-pub use prepared::{DensityLayout, PreparedDensityOverlap, PreparedProbability};
+pub use prepared::{
+    DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
+};
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -456,6 +458,31 @@ impl CompiledUnitary {
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbability, UnitaryError> {
         self.prepare_probability(rows, arithmetic)?
+            .freeze(max_terms, options)
+    }
+
+    /// Prepare exact `<psi|Pi P Pi|psi>` for a fixed Pauli word and Z-event
+    /// layout. Outcomes and Pauli insertion updates remain evaluation inputs.
+    pub fn prepare_pauli_moment(
+        &self,
+        word: &PauliWord,
+        rows: &[BitVector],
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedPauliMoment, UnitaryError> {
+        PreparedPauliMoment::prepare(self, word, rows, arithmetic)
+    }
+
+    /// Additionally retain a certified fixed phase resource. Anticommuting
+    /// event/Pauli pairs certify zero without requiring any enumerated terms.
+    pub fn prepare_pauli_moment_with_fibers(
+        &self,
+        word: &PauliWord,
+        rows: &[BitVector],
+        max_terms: usize,
+        options: crate::fibers::FiberOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedPauliMoment, UnitaryError> {
+        self.prepare_pauli_moment(word, rows, arithmetic)?
             .freeze(max_terms, options)
     }
 
