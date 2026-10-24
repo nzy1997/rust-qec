@@ -22,8 +22,8 @@ pub use enumeration::{
 };
 pub(crate) use run::run_task_batch_inspected;
 pub use run::{
-    RunFailure, RunPhase, RunStatus, RunTimings, TaskRunOptions, TaskRunResult, TaskRunStatistics,
-    TaskVariances, run_task_batch,
+    BatchProgress, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
+    TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskVariances, run_task_batch,
 };
 
 #[derive(Clone, Copy, Debug, Default)]

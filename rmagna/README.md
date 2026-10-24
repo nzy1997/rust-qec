@@ -3226,3 +3226,48 @@ inconclusive reasons. Failed reports exit with status 1; invalid arguments use
 status 2. An inconclusive completed pilot comparison exits successfully with no
 recommendation. Existing output files are refused before decoder imports or
 execution, and the isolated decoder host continues to block native imports.
+
+## Observing continuous task batches
+
+`TaskEvaluator::run_batch_with_progress(&run, &mut observer)` observes one
+continuous seeded batch. `ProgressObserver::new` requires a positive
+`NonZeroU64` interval and a borrowed fallible callback. Notifications follow
+successfully committed intervals and a final successful remainder. They include
+completed/requested counts, configured history sampler, exact prefix efficiency
+(or its diagnostic error), actual operation costs and sampling time so far.
+There is no initial notification or notification for a failed/uncommitted draw.
+The engine stores no event list, draws no additional entropy and does not replay
+histories or construct queries for progress. Requested-record retention keeps
+its existing separate cap.
+
+The observer's call-local `receipt()` records attempted/successful/failed
+notifications, diagnostic failures, last notified count and measured diagnostic/
+observer seconds. Each run resets that receipt before validating configuration.
+A missing kappa remains an efficiency status, and a failed prefix diagnostic is
+an error value delivered to the callback; it does not change the physical batch.
+Callbacks should observe state without mutating controllers or physical inputs.
+
+Sampling time excludes prefix diagnostic/callback work, while total wall time
+and the cooperative deadline include it. The deadline is checked after observer
+work, including the final notification. Notification errors stop the batch with
+`RunPhase::Progress`, no failed-shot index and no invented failed draw. Completed
+statistics/records remain a failed report's prefix, including when the observer
+fails after the final completed draw. Actual compiler/query/decoder/support
+counters keep their existing meanings. An individual callback is not preempted.
+File API and CLI progress integration are separate follow-up work; this primitive
+does not add checkpointing or launch a production campaign.
+
+```rust
+use std::num::NonZeroU64;
+use rmagna::task::{BatchProgress, ProgressObserver, TaskError, TaskEvaluator, TaskRunOptions};
+# fn observe(evaluator: &TaskEvaluator) -> Result<(), TaskError> {
+let mut callback = |progress: &BatchProgress| {
+    eprintln!("Completed {}/{}", progress.completed, progress.requested);
+    Ok(())
+};
+let mut observer = ProgressObserver::new(NonZeroU64::new(4096).unwrap(), &mut callback);
+let batch = evaluator.run_batch_with_progress(&TaskRunOptions::default(), &mut observer)?;
+let observer_receipt = observer.receipt();
+# Ok(())
+# }
+```
