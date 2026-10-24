@@ -46,6 +46,9 @@ pub fn export_failure(report: &FileRunReport, error: &BatchExportError) -> Value
     value["execution_costs"] = costs(raw.execution_costs);
     value["execution_limits"] = raw.execution_limits.to_json();
     value["timings"] = json!({"preparation_seconds":raw.timings.preparation_seconds,"sampling_seconds":raw.timings.sampling_seconds,"total_seconds":raw.timings.total_seconds});
+    if let Some(seconds) = value["progress"]["seconds"].as_f64() {
+        value["timings"]["progress_seconds"] = json!(seconds);
+    }
     value["numeric_export"] = json!({"status":"failed","exact_results_persisted":false});
     value
 }
@@ -332,4 +335,27 @@ pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
         }
         Ok(())
     }
+}
+
+/// Keep diagnostics on stderr and leave stdout as the final report.
+pub fn progress(stderr: &mut impl Write, event: &Value) -> io::Result<()> {
+    let efficiency = &event["efficiency"];
+    let kappa = efficiency["kappa"]
+        .as_f64()
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| {
+            let reason = event["diagnostic_failure"]["message"]
+                .as_str()
+                .or_else(|| efficiency["status"].as_str())
+                .unwrap_or("unavailable");
+            format!("unavailable ({reason})")
+        });
+    writeln!(
+        stderr,
+        "[{}/{}] history_sampler={} kappa={kappa}",
+        event["completed"],
+        event["requested"],
+        event["history_sampler"].as_str().unwrap_or("unavailable")
+    )?;
+    stderr.flush()
 }

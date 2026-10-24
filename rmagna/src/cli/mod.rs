@@ -5,6 +5,7 @@ use args::{Args, Mode};
 use rmagna::file_api::{FileSamplerComparisonOptions, FileTask};
 use rmagna::runtime::ControllerRegistry;
 use rmagna::runtime::process::ControllerProcess;
+use rmagna::task::{BatchProgress, ProgressObserver, TaskError};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap, error::Error, fs::OpenOptions, io::Write, path::Path, process::Command,
@@ -68,7 +69,21 @@ fn execute(args: &Args) -> Result<Value> {
             value
         }
         Mode::Run => {
-            let report = task.run(&args.run)?;
+            let report = if let Some(every) = args.progress_every {
+                let mut callback = |event: &BatchProgress| {
+                    let diagnostic = rmagna::file_api::export_progress(event, args.file.numeric);
+                    output::progress(&mut std::io::stderr().lock(), &diagnostic).map_err(|error| {
+                        TaskError {
+                            field: "progress.stderr".into(),
+                            message: error.to_string(),
+                        }
+                    })
+                };
+                let mut observer = ProgressObserver::new(every, &mut callback);
+                task.run_with_progress(&args.run, &mut observer)?
+            } else {
+                task.run(&args.run)?
+            };
             match report.to_json() {
                 Ok(value) => value,
                 Err(error) => output::export_failure(&report, &error),

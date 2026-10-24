@@ -59,7 +59,7 @@ impl<'a> ProgressObserver<'a> {
     pub fn receipt(&self) -> ProgressReceipt {
         self.receipt
     }
-    pub(super) fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.receipt = ProgressReceipt::new(self.receipt.every);
     }
     pub(super) fn due(&self, completed: u64, requested: u64) -> bool {

@@ -7,6 +7,11 @@ use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, S
 pub use progress::{BatchProgress, ProgressObserver, ProgressReceipt};
 use std::time::Instant;
 
+pub(crate) struct RunHooks<'run, 'callback, I> {
+    pub inspect: I,
+    pub progress: Option<&'run mut ProgressObserver<'callback>>,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct TaskRunOptions {
     pub execution_limits: ExecutionLimits,
@@ -397,21 +402,30 @@ pub fn run_task_batch(
         evaluation,
         sampling,
         run,
-        |_, _, _| (),
+        RunHooks {
+            inspect: |_: &TaskEvaluator, _: ExecutionCosts, _: f64| (),
+            progress: None,
+        },
     )
     .map(|(result, _)| result)
 }
 
-pub(crate) fn run_task_batch_inspected<R>(
+pub(crate) fn run_task_batch_inspected<R, I>(
     physical: &Circuit,
     modules: &LoadedModules,
     registry: &ControllerRegistry,
     evaluation: EvaluationOptions,
     sampling: &NoiseSampling,
     run: &TaskRunOptions,
-    inspect: impl FnOnce(&TaskEvaluator, ExecutionCosts, f64) -> R,
-) -> Result<(TaskRunResult, Option<R>), TaskError> {
+    mut hooks: RunHooks<'_, '_, I>,
+) -> Result<(TaskRunResult, Option<R>), TaskError>
+where
+    I: FnOnce(&TaskEvaluator, ExecutionCosts, f64) -> R,
+{
     let started = Instant::now();
+    if let Some(observer) = hooks.progress.as_deref_mut() {
+        observer.reset();
+    }
     run.validate(
         modules.task.sample_records.len(),
         modules.task.observables.len(),
@@ -424,10 +438,10 @@ pub(crate) fn run_task_batch_inspected<R>(
     match prepared {
         Ok(evaluator) => {
             let preparation_costs = meter.snapshot();
-            let mut result = evaluator.run_batch_observed(run, &meter)?;
+            let mut result = evaluator.run_batch_monitored(run, &meter, hooks.progress)?;
             result.timings.preparation_seconds = Some(preparation_seconds);
             result.timings.total_seconds = started.elapsed().as_secs_f64();
-            let metadata = inspect(&evaluator, preparation_costs, preparation_seconds);
+            let metadata = (hooks.inspect)(&evaluator, preparation_costs, preparation_seconds);
             Ok((result, Some(metadata)))
         }
         Err(e) => Ok((

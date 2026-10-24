@@ -9,7 +9,7 @@ use rmagna::runtime::process::ProcessOptions;
 use rmagna::runtime::{CausalStrategy, HistorySampler};
 use rmagna::task::TaskRunOptions;
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
-use std::{collections::BTreeMap, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, num::NonZeroU64, path::PathBuf, time::Duration};
 
 pub const HELP: &str = "rmagna validate|inspect|prepare|run|enumerate|compare-samplers CIRCUIT [OPTIONS]
 
@@ -34,6 +34,7 @@ Inputs and output:
 Run configuration:
   --shots N                           Positive draw count (default 1; run only)
   --seed N                            u64 seed (default 0; run or compare-samplers)
+  --progress-every N                  Positive committed-draw interval on stderr (run only)
   --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
   --compiler shared|parity_copies      Default shared
   --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
@@ -89,7 +90,7 @@ Limits (zero is allowed for quotas unless marked positive):
 Python is launched only with --controllers. Explicit decoder modules may execute
 on import, including during validate/inspect. The host cannot import magna.
 CLI defaults differ from library defaults. Resolved options are in every success
-report. Native option files and progress are not yet supported. Use the Rust API for typed exact results if numeric export fails.
+report. Native option files are not yet supported. Use the Rust API for typed exact results if numeric export fails.
 ";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -114,6 +115,7 @@ pub struct Args {
     pub file: FileTaskOptions,
     pub load: FileLoadOptions,
     pub run: TaskRunOptions,
+    pub progress_every: Option<NonZeroU64>,
     pub enumeration: FileEnumerationOptions,
     pub preparation: FilePreparationOptions,
     pub sampling: NoiseSampling,
@@ -217,6 +219,17 @@ impl Args {
         if mode == Mode::Compare && flags.0.contains_key("--history-sampler") {
             return Err("--history-sampler is unavailable in compare-samplers; both channels are selected explicitly".into());
         }
+        if mode != Mode::Run && flags.0.contains_key("--progress-every") {
+            return Err("--progress-every requires run".into());
+        }
+        let progress_every = flags
+            .text("--progress-every")
+            .map(|value| {
+                value
+                    .parse::<NonZeroU64>()
+                    .map_err(|_| "--progress-every needs a positive u64 integer".to_owned())
+            })
+            .transpose()?;
         let json = flags.text("--json").is_some();
         let output = flags.text("--output").map(PathBuf::from);
         let task = flags.text("--task").map(PathBuf::from);
@@ -304,6 +317,7 @@ impl Args {
             file,
             load,
             run,
+            progress_every,
             enumeration,
             preparation,
             sampling,
@@ -346,6 +360,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
                 | "--python"
                 | "--module-root"
                 | "--decoder-timeout"
+                | "--progress-every"
                 | "--shots"
                 | "--seed"
                 | "--max-queries"
