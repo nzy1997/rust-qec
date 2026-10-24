@@ -168,6 +168,7 @@ fn zero_effect_inputs_construction_charges_visits_and_declines_invalid_ranges() 
         count: 2,
         active: false,
         contributes: false,
+        contributing_categories: 0,
     };
     let columns = [0, 0, 0, 1, 0, 0];
     let mut exact = [input];
@@ -241,6 +242,7 @@ fn zero_effect_inputs_success_streams_match_unsparsified_eager_execution() {
             assert!(full_model.inputs.iter().any(|input| !input.contributes));
             for input in &mut full_model.inputs {
                 input.contributes = true;
+                input.contributing_categories = (1u16 << input.count) - 1;
             }
             reference.predicate.set(Some(full_model)).unwrap();
             let mut a = SmallRng::seed_from_u64(0x5e0f_2026_1023_0001 + cache as u64);
