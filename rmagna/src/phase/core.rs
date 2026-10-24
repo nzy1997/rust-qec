@@ -53,10 +53,10 @@ impl CanonicalPhaseCore {
         check(
             "phase_core.max_table_values",
             count,
-            limits.max_table_values as u128,
+            limits.max_table_values.min(isize::MAX as usize) as u128,
         )?;
-        // Successful table admission proves the count fits usize, including
-        // when the caller raises the dimension limit beyond a machine word.
+        // A byte vector must fit isize, even when the configured usize quota
+        // is larger. Reject intrinsically unrepresentable capacities here.
         let count = usize::try_from(count).expect("table count bounded by usize option");
         let mut contributions = 0_u128;
         for (axis, coefficient) in phase.terms() {

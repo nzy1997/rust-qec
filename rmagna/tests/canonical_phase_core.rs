@@ -318,3 +318,42 @@ fn literal_four_coordinate_core_and_clifford_rest_survive_signs_and_affine_shift
         );
     }
 }
+
+#[test]
+fn unrepresentable_byte_vector_capacity_rejects_even_with_unbounded_user_quotas() {
+    let dimension = usize::BITS as usize - 1;
+    let count = 1_usize << dimension;
+    assert!(std::alloc::Layout::array::<u8>(count).is_err());
+    let phase = ParityPhase::new(dimension, 0, []).unwrap();
+    assert!(matches!(
+        CanonicalPhaseCore::new(
+            &phase,
+            &PhaseCoreLimits {
+                max_dimension: dimension,
+                max_table_values: usize::MAX,
+                max_work: u128::MAX,
+            }
+        ),
+        Err(PhaseError::CoreLimit {
+            option: "phase_core.max_table_values",
+            limit,
+            required,
+        }) if limit == isize::MAX as u128 && required == count as u128
+    ));
+    // Configured quotas tighter than the representability ceiling still win.
+    assert!(matches!(
+        CanonicalPhaseCore::new(
+            &phase,
+            &PhaseCoreLimits {
+                max_dimension: dimension,
+                max_table_values: 7,
+                max_work: u128::MAX,
+            }
+        ),
+        Err(PhaseError::CoreLimit {
+            option: "phase_core.max_table_values",
+            limit: 7,
+            required,
+        }) if required == count as u128
+    ));
+}

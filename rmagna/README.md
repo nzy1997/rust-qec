@@ -3506,8 +3506,9 @@ logical work units. Dimension, table and work admission precede expansion.
 Work counts the monomial contributions and `(dimension + 1) * table_values`
 subset/table visits; it is not a wall-time or allocator byte bound. `work_units`
 reports the admitted count. Constant/zero-coordinate phases still have one
-core value. Large coordinate spaces are explicitly rejected even when their
-signature is low rank: callers must choose and restrict to an appropriate
+core value. Table admission also enforces the `isize::MAX` byte-vector capacity
+ceiling when a caller raises the configured quota. Large coordinate spaces are
+explicitly rejected even when their signature is low rank: callers must choose and restrict to an appropriate
 quotient first. The constructor does not silently change coordinates.
 
 Sign changes, affine translations and Clifford/global corrections preserve
