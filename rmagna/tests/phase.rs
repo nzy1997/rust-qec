@@ -866,3 +866,120 @@ fn compressed_signature_quotients_match_full_wide_coordinate_equations() {
         }
     }
 }
+
+#[test]
+fn normalized_phase_differences_preserve_every_axis_and_independent_truth_values() {
+    let mut seed = 20261021_u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    for width in [0, 1, 3, 7, 65, 129] {
+        for _ in 0..24 {
+            let mut source = Vec::new();
+            let mut changed = Vec::new();
+            for _ in 0..40 {
+                let axis =
+                    BitVector::from_indices(width, (0..width).filter(|_| next() & 3 == 0)).unwrap();
+                let c = (next() & 7) as u8;
+                source.push((axis.clone(), c));
+                changed.push((axis.clone(), if next() & 1 == 0 { c } else { (8 - c) & 7 }));
+                source.push((axis.clone(), 2));
+                source.push((axis.clone(), 6));
+                if next() & 1 == 0 {
+                    changed.push((
+                        BitVector::from_indices(width, (0..width).filter(|_| next() & 3 == 0))
+                            .unwrap(),
+                        (next() & 7) as u8,
+                    ));
+                }
+            }
+            let left = ParityPhase::new(width, (next() & 7) as u8, source).unwrap();
+            let right = ParityPhase::new(width, (next() & 7) as u8, changed).unwrap();
+            let difference = left.subtract(&right).unwrap();
+            let previous = ParityPhase::new(
+                width,
+                (left.constant() + 8 - right.constant()) & 7,
+                left.terms()
+                    .iter()
+                    .cloned()
+                    .chain(right.terms().iter().map(|(a, c)| (a.clone(), (8 - c) & 7))),
+            )
+            .unwrap();
+            assert_eq!(difference, previous);
+            assert!(
+                difference
+                    .terms()
+                    .windows(2)
+                    .all(|terms| terms[0].0.words() < terms[1].0.words())
+            );
+            assert!(
+                difference
+                    .terms()
+                    .iter()
+                    .all(|(axis, c)| !axis.is_zero() && (1..=7).contains(c))
+            );
+            for _ in 0..64 {
+                let x =
+                    BitVector::from_indices(width, (0..width).filter(|_| next() & 1 != 0)).unwrap();
+                assert_eq!(
+                    difference.evaluate(&x).unwrap(),
+                    (left.evaluate(&x).unwrap() + 8 - right.evaluate(&x).unwrap()) & 7
+                );
+            }
+            let cancelled = left.subtract(&left).unwrap();
+            assert_eq!(cancelled.constant(), 0);
+            assert!(cancelled.terms().is_empty());
+        }
+    }
+}
+
+#[test]
+fn phase_difference_empty_inputs_cross_word_order_and_constants_are_exact() {
+    let axis = |j| BitVector::from_indices(129, [j]).unwrap();
+    let left = ParityPhase::new(129, 7, [(axis(0), 1), (axis(63), 4), (axis(64), 7)]).unwrap();
+    let right = ParityPhase::new(129, 2, [(axis(64), 2), (axis(128), 3), (axis(0), 1)]).unwrap();
+    let difference = left.subtract(&right).unwrap();
+    assert_eq!(difference.constant(), 5);
+    assert_eq!(
+        difference.terms(),
+        &[(axis(128), 5), (axis(64), 5), (axis(63), 4)]
+    );
+    for word in 0..16 {
+        let value = BitVector::from_indices(
+            129,
+            [0, 63, 64, 128]
+                .into_iter()
+                .enumerate()
+                .filter_map(|(j, k)| (word >> j & 1 != 0).then_some(k)),
+        )
+        .unwrap();
+        assert_eq!(
+            difference.evaluate(&value).unwrap(),
+            (5 + 4 * ((word >> 1) & 1) + 5 * ((word >> 2) & 1) + 5 * ((word >> 3) & 1)) as u8 & 7
+        );
+    }
+    let empty = ParityPhase::new(129, 0, []).unwrap();
+    assert_eq!(left.subtract(&empty).unwrap(), left);
+    let negative = empty.subtract(&right).unwrap();
+    assert_eq!(negative.constant(), 6);
+    assert_eq!(
+        negative.terms(),
+        &[(axis(128), 5), (axis(64), 6), (axis(0), 7)]
+    );
+    assert_eq!(empty.subtract(&empty).unwrap(), empty);
+    let scalar = ParityPhase::new(0, 7, []).unwrap();
+    assert_eq!(
+        scalar
+            .subtract(&ParityPhase::new(0, 2, []).unwrap())
+            .unwrap()
+            .constant(),
+        5
+    );
+    assert!(matches!(
+        left.subtract(&scalar),
+        Err(PhaseError::DimensionMismatch)
+    ));
+}

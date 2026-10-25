@@ -3770,3 +3770,18 @@ faults, projected events, complex moments, traced environments and dependent
 record labels. A six-coordinate missing key exercises real fiber fallback.
 Automatic instrument/file/CLI catalogue selection, products and injection are
 subsequent work; defaults and formal benchmark results are unchanged here.
+
+## Normalized phase differences
+
+`ParityPhase::subtract` merges the constructor's already normalized, unique axis
+lists in packed-word key order. Equal axes cancel before any axis clone or output
+allocation. Surviving coefficients and the global constant remain exact modulo
+eight, including when an update introduces axes absent from its reference.
+Empty inputs, complete cancellation and mismatched dimensions retain their
+existing behavior. No phase resource or compiler policy changes in this path.
+
+Tests compare every retained axis and coefficient with the prior
+constructor-based operation, independently check Boolean truth-table differences,
+and cover signed/duplicate inputs, empty phases, global constants and masks across
+64/128-bit boundaries. Bounded operation timings are kept as local diagnostic
+artifacts; they do not establish a task-level speedup or a paper benchmark result.
