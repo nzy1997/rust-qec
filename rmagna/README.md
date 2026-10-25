@@ -3785,3 +3785,59 @@ constructor-based operation, independently check Boolean truth-table differences
 and cover signed/duplicate inputs, empty phases, global constants and masks across
 64/128-bit boundaries. Bounded operation timings are kept as local diagnostic
 artifacts; they do not establish a task-level speedup or a paper benchmark result.
+
+## Built-in catalogue preparation in instrument and file queries
+
+`QueryPreparation::FixedCatalogue(PhaseResourceOptions)` selects the shared
+built-in certificates for cached probability, density, Pauli-moment and record
+support queries, with deterministic fibers when the current key is absent.
+Existing cold/trace/fixed-fiber defaults are unchanged. The mode is fixed
+preparation, so eager sampling-family preparation and independent sampler pilots
+can reuse its resources. Cache keys, bounds and immutable branch sharing remain
+the same; failed construction publishes no partial entry, and tighter reused
+term caps still apply.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::instrument::{CompileOptions, QueryPreparation, compile_affine};
+use rmagna::phase::PhaseResourceOptions;
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let mode = QueryPreparation::FixedCatalogue(PhaseResourceOptions::default());
+assert!(mode.is_fixed());
+let source = parse_circuit("H 0\nT 0\nH 0\nM 0", &ParseOptions::default())?;
+let program = compile_affine(&source, &CompileOptions {
+    probability_preparation: mode, density_preparation: mode,
+    moment_preparation: mode, ..Default::default()
+}, &arithmetic)?;
+assert_eq!(program.prepared_probability_statistics()?.cached_queries, 0);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The CLI and `evaluate_task` example accept `catalogue` alongside `cold`, `trace`
+and `fixed` for their available preparation flags. The CLI exposes it separately
+for `--probability-preparation`, `--density-preparation` and
+`--moment-preparation`. `--fiber-search-rank` controls its fallback search, and
+`compare-samplers` accepts catalogue mode for the used fixed query families.
+Catalogue construction bounds retain their `PhaseResourceOptions` defaults in
+the CLI; Rust callers can set them independently. These limits are logical
+core/work/geometry limits, not aliases for native table-byte or path limits.
+
+Cache statistics now include `catalogue_resources`, counting only actually
+selected certificates; a missing-key fiber is still a fixed resource but is not
+counted as catalogue use. Support statistics include `resource_kind`, reported
+as `certified_catalogue` or `clifford_fibers`. File snapshots retain both. Cold-
+prefix execution reports ephemeral caches as absent and cannot claim a complete
+eager preparation. Zero certificates occupy a family without a phase resource.
+`InstrumentQueryLayout::ReportedSupport` retains its structural-only contract;
+the first numeric support query constructs its selected resource. Consequently,
+an affine sampler's eager receipt can include a cold structural request even
+when its scalar families use catalogue preparation.
+
+Resolved file options fingerprint the mode, fallback rank/attempts, catalogue
+term/geometry bounds and all canonical-core limits. The potentially wide work
+budget is encoded as an exact decimal string. Tests vary all bounds for all
+three query families, compare seeded fresh/reused/prepared runs in both
+compilers and samplers with nonlinear callbacks, verify saved CLI JSON and
+pilots, and exercise explicit cache failures, retries and real missing-key
+fallback. Formal paper benchmarks and products/injection remain subsequent work.
