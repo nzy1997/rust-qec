@@ -3920,3 +3920,63 @@ Tests compare arbitrary small updates with literal path amplitudes and complete
 cold kets, cover 129 hidden paths with independently multiplied one-/two-variable
 Gauss sums, and preserve incompatible-boundary and arithmetic failures. This
 change does not alter decomposition counts, sampling configuration or quotas.
+
+## Exact statistics checkpoints
+
+`ExactStatistics` and `HistoryEfficiency` provide `checkpoint_json` and
+`from_checkpoint_json`. Schema 1 retains raw counts, sums, triangular products,
+weight moments and the efficiency reference moments/flags. Each rational
+cyclotomic value is encoded as four pairs of reduced decimal numerator/positive
+denominator strings; draw counts are canonical decimal strings as well. No
+floating-point estimate is used to reconstruct a checkpoint.
+
+```rust
+use rmagna::statistics::{CheckpointOptions, ExactStatistics, StatisticsOptions};
+use rmagna::field::ExactField;
+let options = StatisticsOptions::default();
+let mut original = ExactStatistics::new(2, options)?;
+original.push(&[ExactField::one(), ExactField::zero()], &ExactField::one())?;
+let text = original.checkpoint_json(CheckpointOptions::default())?;
+let mut resumed = ExactStatistics::from_checkpoint_json(
+    &text, options, CheckpointOptions::default())?;
+resumed.push(&[ExactField::one(), ExactField::one()], &ExactField::one())?;
+assert_eq!(resumed.count(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`CheckpointOptions::max_json_bytes` defaults to 16 MiB and bounds both accepted
+input and emitted output bytes. Encoding checks remaining numeric text capacity
+before large decimal conversions and uses a capped output writer. Decoding
+checks decimal length before integer conversion, reapplies the caller's field
+bit budget, then validates canonical fractions and real values. Restoring generic
+statistics also reapplies `StatisticsOptions::max_dimensions`; efficiency always
+has exactly two quantities. The byte limit is independent of total process
+memory, and parsed containers are checked before an accumulator is returned.
+
+Strict typed decoding rejects unknown/duplicate/missing fields, changed schema or
+kind, primitive/container substitutions and malformed coefficient/count strings.
+Both checkpoint roots and the nested efficiency `statistics` member must be JSON
+objects; complete positional arrays with identical field values are rejected.
+Shape, nonnegative weight/diagonal moments, zero-count totals and basic efficiency
+zero-weight/reference consistency are checked. These checks do not reconstruct
+the original observations or attest their source. Existing accumulators remain
+unchanged after failed encodes/restorations; callers receive an owned restored
+accumulator under the requested budgets.
+
+Dimension limits and checked triangular product counts are validated before
+allocating accumulator totals. A malformed product shape cannot trigger a
+quadratic accumulator allocation while its bounded JSON is being restored.
+
+The checkpoint contains no random generator, circuit/task identity, controller
+state, draw cursor, retained records or runtime quotas. It persists the exact
+statistics layer; complete sampling-task recovery is a separate layer. Tests
+resume weighted streams at empty/single/interior/final cuts, compare all exact
+statistics and efficiency values, and continue a saved checkpoint in a fresh
+process. A two-draw example verifies low bits above 512 bits and a literal unit
+variance; malformed inputs, arithmetic limits, byte endpoints and count overflow
+are also covered.
+
+`make test-magna-checkpoint-json` runs the same integration tests under default,
+`serde_json/arbitrary_precision`, `serde_json/float_roundtrip` and their combined
+configuration. CI invokes this documented command. Serde derive support uses the
+existing locked dependencies and does not enable a global JSON numeric feature.
