@@ -210,14 +210,44 @@ impl ParityPhase {
         if self.width != other.width {
             return Err(PhaseError::DimensionMismatch);
         }
-        Self::new(
-            self.width,
-            (self.constant + 8 - other.constant) & 7,
-            self.terms
+        // Both inputs are unique and sorted by packed-word keys. Merge directly
+        // and clone only surviving axes, including complete cancellation with
+        // no output allocation. Keep the constructor's canonical key order.
+        let mut terms = Vec::new();
+        let (mut left, mut right) = (0, 0);
+        while left < self.terms.len() && right < other.terms.len() {
+            let (axis, coefficient) = &self.terms[left];
+            let (other_axis, other_coefficient) = &other.terms[right];
+            match axis.words().cmp(other_axis.words()) {
+                std::cmp::Ordering::Less => {
+                    terms.push((axis.clone(), *coefficient));
+                    left += 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    terms.push((other_axis.clone(), (8 - other_coefficient) & 7));
+                    right += 1;
+                }
+                std::cmp::Ordering::Equal => {
+                    let difference = (coefficient + 8 - other_coefficient) & 7;
+                    if difference != 0 {
+                        terms.push((axis.clone(), difference));
+                    }
+                    left += 1;
+                    right += 1;
+                }
+            }
+        }
+        terms.extend_from_slice(&self.terms[left..]);
+        terms.extend(
+            other.terms[right..]
                 .iter()
-                .cloned()
-                .chain(other.terms.iter().map(|(a, c)| (a.clone(), (8 - c) & 7))),
-        )
+                .map(|(axis, c)| (axis.clone(), (8 - c) & 7)),
+        );
+        Ok(Self {
+            width: self.width,
+            constant: (self.constant + 8 - other.constant) & 7,
+            terms,
+        })
     }
 
     /// `Delta_u Delta_v Delta_w phase = 4 * signature(u,v,w) (mod 8)`.
