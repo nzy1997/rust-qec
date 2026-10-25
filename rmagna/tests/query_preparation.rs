@@ -109,6 +109,67 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
             assert_eq!(before.0.cached_queries, 3);
             assert_eq!(before.1.cached_queries, 1);
             assert_eq!(before.2.cached_queries, 1);
+            for statistics in [before.0, before.1, before.2] {
+                let expected = if mode.is_fixed() { Some(2) } else { None };
+                assert_eq!(statistics.maximum_quotient_rank, expected);
+                assert_eq!(statistics.maximum_terms, expected);
+                assert_eq!(statistics.maximum_phase_variables, expected);
+            }
+            if mode.is_fixed() {
+                // The zero-fault reference event fixes qubit 1. Preparing
+                // that unitary family directly gives the same retained sizes.
+                let reference = compile_unitary(
+                    &parse_circuit("H 0\nT 0\nH 0\nCX 0 1", &ParseOptions::default()).unwrap(),
+                    &config,
+                    &a,
+                )
+                .unwrap();
+                let rows = [bits(2, 2)];
+                let word = PauliWord::new(bits(2, 0), bits(2, 1), 2).unwrap();
+                let catalogue = matches!(mode, QueryPreparation::FixedCatalogue(_))
+                    .then(|| rmagna::catalogue::builtin_phase_catalogue().unwrap());
+                let probability = reference
+                    .prepare_probability(&rows, &a)
+                    .unwrap()
+                    .with_phase_resource(256, Default::default(), catalogue, &a)
+                    .unwrap();
+                let density = reference
+                    .prepare_density_overlap(
+                        DensityLayout {
+                            outputs: &[0],
+                            event_rows: &rows,
+                        },
+                        &target,
+                        DensityLayout {
+                            outputs: &[1],
+                            event_rows: &target_rows,
+                        },
+                        &a,
+                    )
+                    .unwrap()
+                    .with_phase_resource(256, Default::default(), catalogue, &a)
+                    .unwrap();
+                let moment = reference
+                    .prepare_pauli_moment(&word, &rows, &a)
+                    .unwrap()
+                    .with_phase_resource(256, Default::default(), catalogue, &a)
+                    .unwrap();
+                for (statistics, resource) in [before.0, before.1, before.2].into_iter().zip([
+                    probability.fixed_phase_resource().unwrap(),
+                    density.fixed_phase_resource().unwrap(),
+                    moment.fixed_phase_resource().unwrap(),
+                ]) {
+                    assert_eq!(
+                        statistics.maximum_quotient_rank,
+                        Some(resource.quotient_rank())
+                    );
+                    assert_eq!(statistics.maximum_terms, Some(resource.num_terms()));
+                    assert_eq!(
+                        statistics.maximum_phase_variables,
+                        Some(resource.num_variables())
+                    );
+                }
+            }
             let catalogue = matches!(mode, QueryPreparation::FixedCatalogue(_));
             assert_eq!(before.0.catalogue_resources, if catalogue { 3 } else { 0 });
             assert_eq!(before.1.catalogue_resources, usize::from(catalogue));
@@ -217,6 +278,15 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
                     p.prepared_density_statistics().unwrap(),
                     p.prepared_moment_statistics().unwrap(),
                 )
+            );
+            // Structural support remains cold; only this numeric query retains a parent.
+            p.reported_support_terms(&r, &[], 256, &a).unwrap();
+            assert_eq!(
+                p.prepared_support_statistics()
+                    .unwrap()
+                    .unwrap()
+                    .phase_variables,
+                3
             );
         }
     }

@@ -11,6 +11,7 @@ pub struct PreparedSupportStatistics {
     pub quotient_rank: usize,
     pub terms: usize,
     pub resource_kind: crate::phase::PhaseResourceKind,
+    pub phase_variables: usize,
 }
 pub(super) struct SupportQueries {
     mode: QueryPreparation,
@@ -91,6 +92,7 @@ impl SupportQueries {
                 quotient_rank: resource.quotient_rank(),
                 terms: resource.num_terms(),
                 resource_kind: resource.kind(),
+                phase_variables: resource.num_variables(),
             }
         }))
     }
