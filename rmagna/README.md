@@ -3980,3 +3980,73 @@ are also covered.
 `serde_json/arbitrary_precision`, `serde_json/float_roundtrip` and their combined
 configuration. CI invokes this documented command. Serde derive support uses the
 existing locked dependencies and does not enable a global JSON numeric feature.
+
+## Continuous in-memory task streams
+
+`TaskEvaluator::start_stream` owns one SplitMix64 state, exact accumulator and
+execution meter across bounded `TaskStream::advance` calls. Every chunk continues
+the original stream; it does not restart the seed or choose independent chunk
+seeds. The evaluator is borrowed, retaining its reusable compilation resources.
+The existing batch APIs retain their behavior and share the same sample/atomic
+commit helper with the stream.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{parse_task, EvaluationOptions, TaskEvaluator, TaskOptions,
+    TaskRunOptions, TaskStreamOptions, TaskStreamStatus};
+let parse = ParseOptions::default();
+let circuit = parse_circuit("H 0\nM 0", &parse)?;
+let modules = parse_task("{}", std::path::Path::new("."),
+    &TaskOptions::default())?.load_modules(&circuit, &parse)?;
+let evaluator = TaskEvaluator::new_with_sampling(&circuit, &modules,
+    &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Physical)?;
+let mut stream = evaluator.start_stream(TaskStreamOptions {
+    run: TaskRunOptions { shots: 4, seed: 9, ..Default::default() },
+    ..Default::default()
+})?;
+assert_eq!(stream.advance(2)?.status, TaskStreamStatus::Running);
+assert_eq!(stream.advance(99)?.status, TaskStreamStatus::DrawsComplete);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`advance(0)` is invalid. A positive advance after completion only returns another
+observation. `snapshot` reports requested/committed/failed/not-attempted counts,
+the original seed and actual current RNG state, exact prefix statistics and
+efficiency, logical costs, committed resource counts and timings. Statistics and
+efficiency are explicit `Result` values: derived diagnostics can exceed their
+arithmetic budget without consuming another draw. `DrawsComplete` means all
+draws committed; it does not replace checking those diagnostics. While Running,
+the reported statistics describe only the committed prefix.
+
+`StreamRecordRetention::Discard` is the default and keeps no output-row history.
+It still evaluates the same requested records and controllers. `Retain` applies
+`run.max_retained_record_values` to the whole requested stream before any entropy
+or callback; each snapshot owns a copy of the retained prefix. Discard makes this
+retention bound irrelevant and does not change sampling/physics quotas.
+
+One cumulative query quota and continuously running deadline cover all advances.
+In-memory pauses and snapshot computation spend that deadline. Sampling seconds
+include advance work but exclude prefix-summary computation and idle pauses;
+total seconds include the complete owned stream lifetime. Nested operation times
+remain inclusive rather than additive, as in the batch API.
+
+Sample/accumulation errors retain the aligned committed prefix and the actual
+post-attempt RNG state. Failed streams cannot advance again. An unwinding
+attempt also poisons the stream if the caller catches the panic; elapsed sampling
+time and failed logical operations remain visible. This does not retry physics,
+roll back entropy or replay controllers. Complete-run configuration validation
+and prefix observations perform no quantum queries, entropy or controller calls.
+
+Tests compare multiple chunk partitions with uninterrupted batches and direct
+same-seed samples for both samplers/compilers, explicitly checked linear
+execution, both causal
+strategies, nonlinear callbacks and importance sampling. They also cover genuine
+zero-weight affine histories, cumulative quota/deadline failures, record bounds,
+summary errors, elapsed idle deadlines, atomic accumulation failures and caught
+controller unwinds.
+This core has no persistent sampling-session restore, durable task/controller
+identity binding or file/CLI stream command; exact statistics checkpoints remain
+the separate layer described above.

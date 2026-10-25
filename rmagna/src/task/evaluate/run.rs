@@ -1,11 +1,15 @@
 //! Seeded batches with exact statistics and explicit partial-failure accounting.
 use super::*;
 mod progress;
+mod stream;
 use crate::costs::{ExecutionCosts, ExecutionLimits};
 use crate::noise::SplitMix64;
 use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, StatisticsOptions};
 pub use progress::{BatchProgress, ProgressObserver, ProgressReceipt};
 use std::time::Instant;
+pub use stream::{
+    StreamRecordRetention, TaskStream, TaskStreamOptions, TaskStreamReport, TaskStreamStatus,
+};
 
 pub(crate) struct RunHooks<'run, 'callback, I> {
     pub inspect: I,
@@ -219,6 +223,23 @@ impl Accumulator {
         }))
     }
 }
+fn sample_and_commit(
+    evaluator: &TaskEvaluator,
+    random: &mut impl RandomSource,
+    meter: &ExecutionMeter,
+    accumulator: &mut Accumulator,
+    arithmetic: &FieldArithmetic,
+    phase: &mut RunPhase,
+) -> Result<Vec<bool>, TaskError> {
+    *phase = RunPhase::Sampling;
+    let row = meter
+        .check_time()
+        .map_err(TaskError::from)
+        .and_then(|()| evaluator.sample_with_costs(random, meter))?;
+    *phase = RunPhase::Accumulation;
+    accumulator.push(&row, arithmetic)?;
+    Ok(row.sampled_records)
+}
 impl TaskEvaluator {
     /// Run from a fresh SplitMix64 seed, reusing this evaluator's preparation.
     /// Ordinary task/arithmetic failures return Failed results; invalid run
@@ -266,15 +287,19 @@ impl TaskEvaluator {
         let mut sampling = Instant::now();
         let mut sampling_seconds = 0.0;
         for shot in 0..options.shots {
-            let row = match meter
-                .check_time()
-                .map_err(TaskError::from)
-                .and_then(|()| self.sample_with_costs(&mut random, meter))
-            {
-                Ok(row) => row,
+            let mut phase = RunPhase::Sampling;
+            let committed_records = match sample_and_commit(
+                self,
+                &mut random,
+                meter,
+                &mut accumulator,
+                &options.statistics.arithmetic,
+                &mut phase,
+            ) {
+                Ok(records) => records,
                 Err(e) => {
                     failures.push(RunFailure {
-                        phase: RunPhase::Sampling,
+                        phase,
                         shot: Some(shot),
                         kind: "TaskError",
                         message: e.to_string(),
@@ -283,18 +308,8 @@ impl TaskEvaluator {
                     break;
                 }
             };
-            if let Err(e) = accumulator.push(&row, &options.statistics.arithmetic) {
-                failures.push(RunFailure {
-                    phase: RunPhase::Accumulation,
-                    shot: Some(shot),
-                    kind: "TaskError",
-                    message: e.to_string(),
-                });
-                failed = 1;
-                break;
-            }
             if let Some(records) = &mut records {
-                records.push(row.sampled_records);
+                records.push(committed_records);
             }
             let completed = accumulator.statistics.count();
             if let Some(observer) = observer.as_deref_mut()
