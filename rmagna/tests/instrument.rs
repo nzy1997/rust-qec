@@ -1256,6 +1256,7 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                     protocol.prepared_density_statistics().unwrap(),
                     PreparedQueryStatistics {
                         cached_queries,
+                        catalogue_resources: 0,
                         fixed_resources: if matches!(mode, QueryPreparation::FixedFibers(_)) {
                             cached_queries
                         } else {
@@ -1268,7 +1269,8 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                 cold.prepared_density_statistics().unwrap(),
                 PreparedQueryStatistics {
                     cached_queries: 0,
-                    fixed_resources: 0
+                    fixed_resources: 0,
+                    catalogue_resources: 0,
                 }
             );
         }

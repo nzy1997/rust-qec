@@ -1,6 +1,5 @@
 //! Independent prepared pilots; never switch or start production sampling.
 use super::*;
-use crate::instrument::QueryPreparation;
 use crate::runtime::{CausalStrategy, HistorySampler};
 
 #[derive(Clone, Copy, Debug)]
@@ -305,7 +304,7 @@ impl FileTask {
                 c.moment_preparation,
             ),
         ] {
-            if needed && !matches!(mode, QueryPreparation::FixedFibers(_)) {
+            if needed && !mode.is_fixed() {
                 return Err(input_error(
                     &format!("comparison.{name}"),
                     "used scalar families require fixed preparation to exclude first-use phase construction from pilot sampling time",

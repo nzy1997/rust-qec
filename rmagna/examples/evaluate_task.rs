@@ -178,19 +178,34 @@ pub fn run(
         "cold" => rmagna::instrument::ProbabilityPreparation::Cold,
         "trace" => rmagna::instrument::ProbabilityPreparation::Trace,
         "fixed" => rmagna::instrument::ProbabilityPreparation::FixedFibers(fiber_options),
-        _ => return Err("probability preparation must be cold, trace or fixed".into()),
+        "catalogue" => rmagna::instrument::ProbabilityPreparation::FixedCatalogue(
+            rmagna::phase::PhaseResourceOptions {
+                fibers: fiber_options,
+                ..Default::default()
+            },
+        ),
+        _ => return Err("probability preparation must be cold, trace, fixed or catalogue".into()),
     };
     options.runtime.compile.density_preparation = match density_mode.as_str() {
         "cold" => rmagna::instrument::QueryPreparation::Cold,
         "trace" => rmagna::instrument::QueryPreparation::Trace,
         "fixed" => rmagna::instrument::QueryPreparation::FixedFibers(fiber_options),
-        _ => return Err("density preparation must be cold, trace or fixed".into()),
+        "catalogue" => rmagna::instrument::QueryPreparation::FixedCatalogue(
+            rmagna::phase::PhaseResourceOptions {
+                fibers: fiber_options,
+                ..Default::default()
+            },
+        ),
+        _ => return Err("density preparation must be cold, trace, fixed or catalogue".into()),
     };
-    if probability_mode != "fixed"
-        && density_mode != "fixed"
+    if !matches!(probability_mode.as_str(), "fixed" | "catalogue")
+        && !matches!(density_mode.as_str(), "fixed" | "catalogue")
         && fiber_options.max_search_rank != rmagna::fibers::FiberOptions::default().max_search_rank
     {
-        return Err("fiber search rank requires fixed probability or density preparation".into());
+        return Err(
+            "fiber search rank requires fixed or catalogue probability or density preparation"
+                .into(),
+        );
     }
     let mut registry = ControllerRegistry::default();
     let worker = if let Some(config) = controllers {
@@ -271,9 +286,9 @@ pub fn run(
     let warm = (warm_replays > 0).then(|| serde_json::json!({"count":warm_replays,"query_ms":replay_ms,
         "cache_unchanged":true,"scope":"same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"}));
     let probability_cache = first_cache.0.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources}));
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
     let density_cache = first_cache.1.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources}));
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
     let insertion_catalog=first_cache.2.map(|s|serde_json::json!({"catalog_entries":s.catalog_entries,"estimated_peak_bytes":s.estimated_peak_bytes}));
     let compilation_scope = if evaluator.sampled_history() {
         match options.runtime.strategy {
@@ -291,7 +306,7 @@ pub fn run(
     writeln!(
         output,
         "{}",
-        serde_json::json!({"prepared_insertions":insertion_catalog,"compilation":compilation,"prepared_density_cache":density_cache,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"insertion_preparation":insertion_mode,"max_insertion_table_bytes":if insertion_mode=="prepared"{Some(insertion_options.max_table_bytes)}else{None},"max_insertion_catalog_entries":if insertion_mode=="prepared"{Some(insertion_options.max_catalog_entries)}else{None},"density_preparation":options.runtime.compile.density_preparation.name(),"max_prepared_densities":options.runtime.compile.max_prepared_densities,"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if probability_mode=="fixed" || density_mode=="fixed"{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
+        serde_json::json!({"prepared_insertions":insertion_catalog,"compilation":compilation,"prepared_density_cache":density_cache,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"insertion_preparation":insertion_mode,"max_insertion_table_bytes":if insertion_mode=="prepared"{Some(insertion_options.max_table_bytes)}else{None},"max_insertion_catalog_entries":if insertion_mode=="prepared"{Some(insertion_options.max_catalog_entries)}else{None},"density_preparation":options.runtime.compile.density_preparation.name(),"max_prepared_densities":options.runtime.compile.max_prepared_densities,"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if options.runtime.compile.probability_preparation.is_fixed() || options.runtime.compile.density_preparation.is_fixed(){Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
     )?;
     Ok(())
 }

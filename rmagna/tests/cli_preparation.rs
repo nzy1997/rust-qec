@@ -628,3 +628,86 @@ fn inconclusive_human_output_seed_boundary_and_exclusive_destination_are_explici
     );
     assert!(!f.0.join("imported.txt").exists());
 }
+
+#[test]
+fn catalogue_cli_modes_export_actual_resources_and_accept_prepared_sampler_pilots() {
+    let files = Files::new();
+    files.simple();
+    let flags = [
+        "--probability-preparation",
+        "catalogue",
+        "--density-preparation",
+        "catalogue",
+        "--moment-preparation",
+        "catalogue",
+        "--fiber-search-rank",
+        "0",
+    ];
+    let mut args = vec![
+        "run",
+        "circuit.magna",
+        "--task",
+        "task.json",
+        "--shots",
+        "12",
+        "--seed",
+        "31",
+        "--json",
+        "--output",
+        "result.json",
+    ];
+    args.extend(flags);
+    let result = files.json(&args, 0);
+    assert_eq!(
+        result,
+        serde_json::from_slice::<Value>(&std::fs::read(files.0.join("result.json")).unwrap())
+            .unwrap()
+    );
+    assert!(
+        result["compilation"]["retained_caches"]["probability"]["catalogue_resources"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(
+        result["compilation"]["retained_caches"]["support"]["resource_kind"],
+        "certified_catalogue"
+    );
+    for field in [
+        "probability_preparation",
+        "density_preparation",
+        "moment_preparation",
+    ] {
+        assert_eq!(result["options"]["compile"][field]["mode"], "catalogue");
+    }
+    for mode in ["prepare", "compare-samplers"] {
+        let mut args = vec![mode, "circuit.magna", "--task", "task.json", "--json"];
+        args.extend(flags);
+        let result = files.json(&args, 0);
+        if mode == "prepare" {
+            assert_eq!(result["status"], "complete");
+        } else {
+            for channel in ["affine_support", "exact_marginal"] {
+                assert_eq!(result["pilots"][channel]["status"], "complete");
+            }
+        }
+    }
+    files.bindings("from pathlib import Path\nPath('imported.txt').write_text('imported')\ndef decode(bits, config): return [bits[0]]\n");
+    let output = files.run(&[
+        "run",
+        "circuit.magna",
+        "--task",
+        "task.json",
+        "--controllers",
+        "controllers.json",
+        "--probability-preparation",
+        "catalog",
+        "--json",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(!files.0.join("imported.txt").exists());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("catalogue")
+            || String::from_utf8_lossy(&output.stdout).contains("catalogue")
+    );
+}

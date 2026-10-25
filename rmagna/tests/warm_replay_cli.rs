@@ -204,8 +204,12 @@ fn check_cache(value: &Value) {
             assert!(cache.is_null());
             continue;
         }
+        assert_eq!(cache["catalogue_resources"], 0);
         match value["configuration"][mode_key].as_str().unwrap() {
-            "cold" => assert_eq!(cache, &json!({"cached_queries":0,"fixed_resources":0})),
+            "cold" => assert_eq!(
+                cache,
+                &json!({"cached_queries":0,"fixed_resources":0,"catalogue_resources":0})
+            ),
             "trace" => {
                 assert!(cache["cached_queries"].as_u64().unwrap() > 0);
                 assert_eq!(cache["fixed_resources"], 0);

@@ -11,13 +11,19 @@ pub enum QueryPreparation {
     Cold,
     Trace,
     FixedFibers(FiberOptions),
+    /// Prefer a matching built-in certificate, otherwise retain fixed fibers.
+    FixedCatalogue(crate::phase::PhaseResourceOptions),
 }
 impl QueryPreparation {
+    pub fn is_fixed(self) -> bool {
+        matches!(self, Self::FixedFibers(_) | Self::FixedCatalogue(_))
+    }
     pub fn name(self) -> &'static str {
         match self {
             Self::Cold => "cold",
             Self::Trace => "trace",
             Self::FixedFibers(_) => "fixed",
+            Self::FixedCatalogue(_) => "catalogue",
         }
     }
 }
@@ -25,6 +31,8 @@ impl QueryPreparation {
 pub struct PreparedQueryStatistics {
     pub cached_queries: usize,
     pub fixed_resources: usize,
+    /// Actual selected catalogue resources; missing keys count as fibers.
+    pub catalogue_resources: usize,
 }
 /// Compatibility names for the probability-only preparation interface.
 pub use QueryPreparation as ProbabilityPreparation;
@@ -59,6 +67,11 @@ impl ProbabilityQueries {
             fixed_resources: plans
                 .values()
                 .filter(|p| p.fixed_phase_resource().is_some())
+                .count(),
+            catalogue_resources: plans
+                .values()
+                .filter_map(|p| p.fixed_phase_resource())
+                .filter(|r| r.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue)
                 .count(),
         })
     }
@@ -126,6 +139,14 @@ impl ProbabilityQueries {
                     ProbabilityPreparation::Trace => state.prepare_probability(rows, arithmetic)?,
                     ProbabilityPreparation::FixedFibers(options) => state
                         .prepare_probability_with_fibers(rows, max_terms, options, arithmetic)?,
+                    ProbabilityPreparation::FixedCatalogue(options) => state
+                        .prepare_probability(rows, arithmetic)?
+                        .with_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     ProbabilityPreparation::Cold => unreachable!("cold queries returned above"),
                 };
                 let plan = Arc::new(plan);

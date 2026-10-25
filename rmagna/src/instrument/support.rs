@@ -10,9 +10,10 @@ pub struct PreparedSupportStatistics {
     pub labels: usize,
     pub quotient_rank: usize,
     pub terms: usize,
+    pub resource_kind: crate::phase::PhaseResourceKind,
 }
 pub(super) struct SupportQueries {
-    options: FiberOptions,
+    mode: QueryPreparation,
     transport: Option<Vec<BitVector>>,
     coordinates: Option<crate::gf2::LinearFactorization>,
     captured_coordinates: HashMap<BitVector, BitVector>,
@@ -21,10 +22,7 @@ pub(super) struct SupportQueries {
 impl SupportQueries {
     pub(super) fn new(mode: QueryPreparation) -> Self {
         Self {
-            options: match mode {
-                QueryPreparation::FixedFibers(options) => options,
-                _ => FiberOptions::default(),
-            },
+            mode,
             transport: None,
             coordinates: None,
             captured_coordinates: HashMap::new(),
@@ -55,7 +53,7 @@ impl SupportQueries {
             })
             .collect::<Result<_, InstrumentError>>()?;
         Ok(Self {
-            options: self.options,
+            mode: self.mode,
             transport: Some(transport),
             coordinates: Some(coordinates),
             captured_coordinates,
@@ -92,6 +90,7 @@ impl SupportQueries {
                 labels: self.transport.as_ref().map_or(labels, Vec::len),
                 quotient_rank: resource.quotient_rank(),
                 terms: resource.num_terms(),
+                resource_kind: resource.kind(),
             }
         }))
     }
@@ -122,12 +121,26 @@ impl SupportQueries {
                         .map(|&j| BitVector::from_indices(state.width(), [j]))
                         .collect::<Result<Vec<_>, _>>()?,
                 };
-                *slot = Some(Arc::new(state.prepare_probability_support(
-                    &rows,
-                    max_terms,
-                    self.options,
-                    arithmetic,
-                )?));
+                let plan = match self.mode {
+                    QueryPreparation::FixedCatalogue(options) => state
+                        .prepare_probability_support_with_resource(
+                            &rows,
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
+                    other => state.prepare_probability_support(
+                        &rows,
+                        max_terms,
+                        match other {
+                            QueryPreparation::FixedFibers(options) => options,
+                            _ => FiberOptions::default(),
+                        },
+                        arithmetic,
+                    )?,
+                };
+                *slot = Some(Arc::new(plan));
             }
             Arc::clone(slot.as_ref().expect("prepared support"))
         };

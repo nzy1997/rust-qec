@@ -56,6 +56,11 @@ impl DensityQueries {
                 .iter()
                 .filter(|e| e.plan.fixed_phase_resource().is_some())
                 .count(),
+            catalogue_resources: entries
+                .iter()
+                .filter_map(|e| e.plan.fixed_phase_resource())
+                .filter(|r| r.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue)
+                .count(),
         })
     }
     pub(super) fn evaluate(
@@ -147,6 +152,14 @@ impl DensityQueries {
                     QueryPreparation::FixedFibers(options) => left
                         .prepare_density_overlap_with_fibers(
                             boundary, right, target, max_terms, options, arithmetic,
+                        )?,
+                    QueryPreparation::FixedCatalogue(options) => left
+                        .prepare_density_overlap(boundary, right, target, arithmetic)?
+                        .with_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
                         )?,
                     QueryPreparation::Cold => unreachable!("cold density queries returned above"),
                 };
