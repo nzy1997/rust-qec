@@ -3768,8 +3768,8 @@ three-qubit Pauli masks at every gate boundary in both compilers. Non-Clifford
 catalogue query families are checked against independent dense matrices under
 faults, projected events, complex moments, traced environments and dependent
 record labels. A six-coordinate missing key exercises real fiber fallback.
-Automatic instrument/file/CLI catalogue selection, products and injection are
-subsequent work; defaults and formal benchmark results are unchanged here.
+Explicit instrument/file/CLI preparation and paired-T certificate construction
+are described below. Defaults and formal benchmark results are unchanged here.
 
 ## Normalized phase differences
 
@@ -3840,7 +3840,8 @@ budget is encoded as an exact decimal string. Tests vary all bounds for all
 three query families, compare seeded fresh/reused/prepared runs in both
 compilers and samplers with nonlinear callbacks, verify saved CLI JSON and
 pilots, and exercise explicit cache failures, retries and real missing-key
-fallback. Formal paper benchmarks and products/injection remain subsequent work.
+fallback. Formal paper benchmarks and injection remain subsequent work;
+standalone paired-T certificates are described below.
 
 ## Retained query resource sizes
 
@@ -3863,3 +3864,38 @@ zero or adaptive cancellation. They are distinct from configured term/path
 quotas, raw Clifford paths, output labels and per-query execution counts. The
 additional inspection does not construct resources, evaluate quantum responses,
 consume entropy, change configuration fingerprints or alter cache bounds.
+
+## Certified paired-T products
+
+`PhaseCatalogue::paired_t_product` constructs a separate, single-entry catalogue
+for the independent positive-T phase `x0 + ... + x(n-1)` modulo eight. It combines
+consecutive two-coordinate certified factors and uses a one-coordinate factor
+for an odd tail. The zero-coordinate product is the identity. Required missing
+components return `None`; the constructor does not substitute another grouping.
+This is not an arbitrary component search or an injection heuristic.
+
+```rust
+use rmagna::catalogue::{builtin_phase_catalogue, CatalogueLimits};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let product = builtin_phase_catalogue()?.paired_t_product(
+    5, &CatalogueLimits::default(), &arithmetic)?.expect("one-/two-T factors");
+assert_eq!(product.usage().entries, 1);
+assert_eq!(product.usage().terms, 8);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Limits apply to the returned catalogue independently of source usage. Dimension,
+table values, terms, constraint/parity rows and complete reconstruction work are
+admitted before the Cartesian product is constructed. Arithmetic failures remain
+errors. Every output certificate is then reconstructed exactly over its complete
+table. Coordinates, complex coefficients, global phases, overlapping supports,
+zero terms and inconsistent constraints are preserved during composition. The
+source catalogue remains unchanged, and the returned catalogue owns its data.
+
+The standalone constructor does not change query-resource selection or file/CLI
+defaults. The returned certificate can be supplied explicitly to the existing
+catalogue resource API. Tests cover every assignment through eight coordinates,
+odd tails, empty/missing factors, complex overlapping components, all resource
+endpoints and failures without source mutation. No sampling or performance claim
+is implied by the certificate construction.
