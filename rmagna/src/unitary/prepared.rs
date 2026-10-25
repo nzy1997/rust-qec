@@ -1,11 +1,12 @@
 //! Fixed scalar closure for probability, Pauli moments and density overlaps.
 use super::phase_map::PhaseRestriction;
 use super::*;
-use crate::fibers::{FiberOptions, PreparedCliffordFibers};
+use crate::catalogue::PhaseCatalogue;
+use crate::phase::{PhaseResourceOptions, PreparedPhaseResource};
 use crate::stabilizer::PreparedAffineContraction;
 
 struct FixedResource {
-    fibers: PreparedCliffordFibers,
+    decomposition: PreparedPhaseResource,
     phase_map: PhaseRestriction,
 }
 
@@ -37,13 +38,17 @@ impl ScalarClosure {
         &mut self,
         phases: &[(&ParityPhase, bool)],
         max_terms: usize,
-        options: FiberOptions,
+        options: PhaseResourceOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
     ) -> Result<(), UnitaryError> {
         let phase_map =
             PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
         let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
         self.resource = Some(FixedResource {
-            fibers: PreparedCliffordFibers::new(&phase, max_terms, options)?,
+            decomposition: PreparedPhaseResource::new(
+                &phase, max_terms, options, catalogue, arithmetic,
+            )?,
             phase_map,
         });
         Ok(())
@@ -71,22 +76,18 @@ impl ScalarClosure {
         let Some(ket) = contracted else {
             return Ok(zero_network_value());
         };
-        if resource.fibers.num_terms() > max_terms {
-            return Err(PhaseError::FiberTermLimit {
-                coordinates: resource.fibers.enumerated_coordinates(),
-                quotient_rank: resource.fibers.quotient_rank(),
-                limit: max_terms,
-            }
-            .into());
-        }
+        resource.decomposition.check_term_limit(max_terms)?;
         debug_assert_eq!(ket.columns(), self.contraction.output_columns());
         let phase = resource.phase_map.apply(phases, ket.offset())?;
         Ok(NetworkValue {
-            value: resource
-                .fibers
-                .evaluate(&phase, ket.phase(), ket.coefficient(), arithmetic)?,
-            quotient_rank: resource.fibers.quotient_rank(),
-            terms: resource.fibers.num_terms(),
+            value: resource.decomposition.evaluate(
+                &phase,
+                ket.phase(),
+                ket.coefficient(),
+                arithmetic,
+            )?,
+            quotient_rank: resource.decomposition.quotient_rank(),
+            terms: resource.decomposition.num_terms(),
         })
     }
 }
@@ -135,19 +136,29 @@ impl PreparedProbability {
             closure: ScalarClosure::new(&joint, &constraints, legs)?,
         })
     }
-    pub(super) fn freeze(
+    /// Freeze an explicit phase resource against this family's original reference.
+    /// This consumes the family. Missing catalogue keys use fibers; failed
+    /// construction is returned directly without silently changing strategies.
+    pub fn with_phase_resource(
         mut self,
         max_terms: usize,
-        options: FiberOptions,
+        options: PhaseResourceOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
     ) -> Result<Self, UnitaryError> {
         let phase = &self.program.query_reference_phase;
-        self.closure
-            .freeze(&[(phase, false), (phase, true)], max_terms, options)?;
+        self.closure.freeze(
+            &[(phase, false), (phase, true)],
+            max_terms,
+            options,
+            catalogue,
+            arithmetic,
+        )?;
         Ok(self)
     }
     /// Fixed counts precede adaptive radical absorption and can be larger.
-    pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
-        self.closure.resource.as_ref().map(|r| &r.fibers)
+    pub fn fixed_phase_resource(&self) -> Option<&PreparedPhaseResource> {
+        self.closure.resource.as_ref().map(|r| &r.decomposition)
     }
     pub fn evaluate(
         &self,
@@ -254,14 +265,25 @@ impl PreparedPauliMoment {
             closure,
         })
     }
-    pub(super) fn freeze(
+    /// Freeze an explicit phase resource against this family's original reference.
+    /// This consumes the family. Missing catalogue keys use fibers; failed
+    /// construction is returned directly without silently changing strategies.
+    pub fn with_phase_resource(
         mut self,
         max_terms: usize,
-        options: FiberOptions,
+        options: PhaseResourceOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
     ) -> Result<Self, UnitaryError> {
         if let Some(closure) = &mut self.closure {
             let phase = &self.program.query_reference_phase;
-            closure.freeze(&[(phase, true), (phase, false)], max_terms, options)?;
+            closure.freeze(
+                &[(phase, true), (phase, false)],
+                max_terms,
+                options,
+                catalogue,
+                arithmetic,
+            )?;
         }
         Ok(self)
     }
@@ -271,11 +293,11 @@ impl PreparedPauliMoment {
     }
     /// Fixed counts precede adaptive radical absorption and can be larger.
     /// A certified zero response needs no phase resource, even in fixed mode.
-    pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
+    pub fn fixed_phase_resource(&self) -> Option<&PreparedPhaseResource> {
         self.closure
             .as_ref()
             .and_then(|c| c.resource.as_ref())
-            .map(|r| &r.fibers)
+            .map(|r| &r.decomposition)
     }
     pub fn evaluate(
         &self,
@@ -378,10 +400,15 @@ impl PreparedDensityOverlap {
             closure: ScalarClosure::new(&joint, &rows, legs)?,
         })
     }
-    pub(super) fn freeze(
+    /// Freeze an explicit phase resource against this family's original reference.
+    /// This consumes the family. Missing catalogue keys use fibers; failed
+    /// construction is returned directly without silently changing strategies.
+    pub fn with_phase_resource(
         mut self,
         max_terms: usize,
-        options: FiberOptions,
+        options: PhaseResourceOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
     ) -> Result<Self, UnitaryError> {
         let l = &self.left.query_reference_phase;
         let r = &self.right.query_reference_phase;
@@ -389,14 +416,16 @@ impl PreparedDensityOverlap {
             &[(l, false), (l, true), (r, true), (r, false)],
             max_terms,
             options,
+            catalogue,
+            arithmetic,
         )?;
         Ok(self)
     }
     pub(crate) fn matches_programs(&self, left: &CompiledUnitary, right: &CompiledUnitary) -> bool {
         Arc::ptr_eq(&self.left, &left.program) && Arc::ptr_eq(&self.right, &right.program)
     }
-    pub fn fixed_phase_resource(&self) -> Option<&PreparedCliffordFibers> {
-        self.closure.resource.as_ref().map(|r| &r.fibers)
+    pub fn fixed_phase_resource(&self) -> Option<&PreparedPhaseResource> {
+        self.closure.resource.as_ref().map(|r| &r.decomposition)
     }
     pub fn evaluate(
         &self,

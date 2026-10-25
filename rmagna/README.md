@@ -3714,3 +3714,59 @@ Passing `None` leaves catalogue budgets irrelevant and preserves the original
 fiber construction and error behavior. This selector does not yet alter circuit,
 instrument or task-query defaults, and does not load the built-in catalogue
 implicitly. Installing it in those engines is a separate change.
+
+## Catalogue resources in prepared quantum queries
+
+Prepared probability, density-overlap and Pauli-moment families now support
+`with_phase_resource(max_terms, options, catalogue, arithmetic)`. This consumes
+the prepared family and freezes the selected resource against its original
+reference, including when preparation starts from a Pauli-inserted view.
+`CompiledUnitary::prepare_probability_support_with_resource` supplies the same
+choice for labelled record-probability parents. The family owns its resource
+after a caller-owned catalogue is dropped.
+
+```rust
+use rmagna::catalogue::builtin_phase_catalogue;
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::phase::{PhaseResourceKind, PhaseResourceOptions};
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::unitary::{UnitaryCircuit, UnitaryGate};
+let arithmetic = ScalarArithmetic::default();
+let state = UnitaryCircuit::new(1, [
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+    UnitaryGate::T { qubit: 0, turns: 1 },
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+])?.compile(&BitVector::zeros(1)?, &arithmetic)?;
+let plan = state.prepare_probability(&[BitVector::from_indices(1, [0])?], &arithmetic)?
+    .with_phase_resource(2, PhaseResourceOptions::default(),
+        Some(builtin_phase_catalogue()?), &arithmetic)?;
+assert_eq!(plan.fixed_phase_resource().unwrap().kind(), PhaseResourceKind::CertifiedCatalogue);
+assert_eq!(plan.fixed_phase_resource().unwrap().num_terms(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The `fixed_phase_resource` getters return the actual `PreparedPhaseResource`,
+with its strategy, quotient rank, term count and variant-specific inspection.
+Existing `prepare_*_with_fibers` entrypoints and ordinary support preparation
+still select fibers and preserve their defaults. Cold/trace families retain no
+fixed resource; a Pauli/event anticommutation zero certificate still needs none.
+Instrument cache validation uses the common resource's term-limit check.
+
+As in the existing fiber entrypoints, an inconsistent projected boundary returns
+a zero response without evaluating its retained phase resource. It reports zero
+terms and accepts a zero evaluation cap. A consistent boundary checks the frozen
+term count against the caller's tighter cap before evaluating either resource
+strategy. Program identity and layout validation precede these paths. A static
+anticommutation zero certificate retains no resource and also accepts a zero cap.
+
+Catalogue rank-zero probability parents retain the direct Clifford support path;
+its result is computed from the complete Clifford function on the original
+coordinate domain, independently of the indicator expansion. Tests compare
+whole returned kets and column conventions with the fiber path for all 64
+three-qubit Pauli masks at every gate boundary in both compilers. Non-Clifford
+catalogue query families are checked against independent dense matrices under
+faults, projected events, complex moments, traced environments and dependent
+record labels. A six-coordinate missing key exercises real fiber fallback.
+Automatic instrument/file/CLI catalogue selection, products and injection are
+subsequent work; defaults and formal benchmark results are unchanged here.
