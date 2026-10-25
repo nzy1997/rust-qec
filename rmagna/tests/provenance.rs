@@ -656,3 +656,61 @@ fn raw_json_numbers_preserve_spelling_without_workspace_feature_changes() {
         Err(FingerprintError::DepthLimit { limit: 64 })
     );
 }
+
+#[test]
+fn catalogue_mode_and_every_resource_budget_bind_configuration_without_changing_content() {
+    use rmagna::phase::PhaseResourceOptions;
+    let mut environment = Environment::new("H 0\nT 0\nH 0", "{}", Path::new("."));
+    let unchanged = environment.fingerprints();
+    let mut variants = Vec::new();
+    let base = PhaseResourceOptions::default();
+    variants.push(base);
+    let mut c = base;
+    c.fibers.max_search_rank += 1;
+    variants.push(c);
+    let mut c = base;
+    c.fibers.attempts += 1;
+    variants.push(c);
+    let mut c = base;
+    c.catalogue.max_terms += 1;
+    variants.push(c);
+    let mut c = base;
+    c.catalogue.max_geometry_words += 1;
+    variants.push(c);
+    let mut c = base;
+    c.catalogue.core.max_dimension += 1;
+    variants.push(c);
+    let mut c = base;
+    c.catalogue.core.max_table_values += 1;
+    variants.push(c);
+    let mut c = base;
+    c.catalogue.core.max_work = u128::MAX;
+    variants.push(c);
+    let mut fingerprints = std::collections::BTreeSet::new();
+    for family in 0..3 {
+        for config in &variants {
+            environment.evaluation = EvaluationOptions::default();
+            let mode = QueryPreparation::FixedCatalogue(*config);
+            match family {
+                0 => {
+                    environment
+                        .evaluation
+                        .runtime
+                        .compile
+                        .probability_preparation = mode
+                }
+                1 => environment.evaluation.runtime.compile.density_preparation = mode,
+                _ => environment.evaluation.runtime.compile.moment_preparation = mode,
+            }
+            let changed = environment.fingerprints();
+            assert_ne!(changed.options, unchanged.options);
+            assert!(fingerprints.insert(changed.options.clone()));
+            let mut actual = changed.to_json();
+            let mut expected = unchanged.to_json();
+            actual.as_object_mut().unwrap().remove("options");
+            expected.as_object_mut().unwrap().remove("options");
+            assert_eq!(actual, expected);
+        }
+    }
+    assert_eq!(fingerprints.len(), 24);
+}

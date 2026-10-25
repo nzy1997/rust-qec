@@ -53,6 +53,7 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
         for mode in [
             QueryPreparation::Trace,
             QueryPreparation::FixedFibers(Default::default()),
+            QueryPreparation::FixedCatalogue(Default::default()),
         ] {
             let mut config = options(mode);
             config.compiler_strategy = strategy;
@@ -108,6 +109,11 @@ fn all_static_layouts_prime_the_same_families_for_faulted_nonzero_outcomes() {
             assert_eq!(before.0.cached_queries, 3);
             assert_eq!(before.1.cached_queries, 1);
             assert_eq!(before.2.cached_queries, 1);
+            let catalogue = matches!(mode, QueryPreparation::FixedCatalogue(_));
+            assert_eq!(before.0.catalogue_resources, if catalogue { 3 } else { 0 });
+            assert_eq!(before.1.catalogue_resources, usize::from(catalogue));
+            assert_eq!(before.2.catalogue_resources, usize::from(catalogue));
+            assert!(p.prepared_support_statistics().unwrap().is_none());
             let site = |denominator: i64| {
                 p.noise_sites()
                     .iter()
@@ -522,4 +528,123 @@ fn explicit_preparation_preserves_nonzero_term_boundaries_and_selected_policy() 
             );
         }
     }
+}
+
+#[test]
+fn catalogue_caches_report_real_missing_key_fallback_and_exact_biased_probabilities() {
+    let a = ScalarArithmetic::default();
+    let source = parse_circuit(
+        "H 0 1 2\nT 0 1 2\nH 0 1 2\nM 0 1 2",
+        &ParseOptions::default(),
+    )
+    .unwrap();
+    let p = compile_affine(
+        &source,
+        &options(QueryPreparation::FixedCatalogue(Default::default())),
+        &a,
+    )
+    .unwrap();
+    let rows = (0..3)
+        .map(|j| BitExpr::atom(BitAtom::Record(j)))
+        .collect::<Vec<_>>();
+    let p0 = a
+        .add(&a.omega(0, -2).unwrap(), &a.omega(0, -3).unwrap())
+        .unwrap();
+    let expected = a.multiply(&a.multiply(&p0, &p0).unwrap(), &p0).unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            p.reported_probability(&rows, &bits(3, 0), &[], 64, &a)
+                .unwrap()
+                .value,
+            expected
+        );
+        p.reported_support_terms(&rows, &[], 64, &a).unwrap();
+        let statistics = p.prepared_probability_statistics().unwrap();
+        assert_eq!(statistics.cached_queries, 1);
+        assert_eq!(statistics.fixed_resources, 1);
+        assert_eq!(statistics.catalogue_resources, 0);
+        let support = p.prepared_support_statistics().unwrap().unwrap();
+        assert_eq!(
+            support.resource_kind,
+            rmagna::phase::PhaseResourceKind::CliffordFibers
+        );
+        assert_eq!(support.quotient_rank, 6);
+        assert!(support.terms > 0);
+    }
+}
+
+#[test]
+fn catalogue_cache_failures_keep_empty_slots_and_tighter_reused_caps_still_apply() {
+    let a = ScalarArithmetic::default();
+    let source = parse_circuit("H 0\nT 0\nH 0\nM 0", &ParseOptions::default()).unwrap();
+    let rows = [BitExpr::atom(BitAtom::Record(0))];
+    let p = compile_affine(
+        &source,
+        &options(QueryPreparation::FixedCatalogue(Default::default())),
+        &a,
+    )
+    .unwrap();
+    let layout = Q::ReportedProbability { parities: &rows };
+    assert!(matches!(
+        p.prepare_query(layout, 1, &a),
+        Err(InstrumentError::Unitary(UnitaryError::Phase(
+            rmagna::phase::PhaseError::ResourceLimit {
+                option: "catalogue_preparation.max_terms",
+                ..
+            }
+        )))
+    ));
+    assert_eq!(
+        p.prepared_probability_statistics().unwrap().cached_queries,
+        0
+    );
+    assert_eq!(p.prepare_query(layout, 2, &a).unwrap(), O::Created);
+    assert_eq!(p.prepare_query(layout, 2, &a).unwrap(), O::Reused);
+    assert!(matches!(
+        p.prepare_query(layout, 1, &a),
+        Err(InstrumentError::Unitary(UnitaryError::Phase(
+            rmagna::phase::PhaseError::ResourceLimit {
+                option: "phase_resource.max_terms",
+                ..
+            }
+        )))
+    ));
+    assert_eq!(
+        p.prepared_probability_statistics()
+            .unwrap()
+            .catalogue_resources,
+        1
+    );
+    let mut low = rmagna::phase::PhaseResourceOptions::default();
+    low.catalogue.core.max_dimension = 0;
+    let p = compile_affine(&source, &options(QueryPreparation::FixedCatalogue(low)), &a).unwrap();
+    assert!(matches!(
+        p.prepare_query(layout, 256, &a),
+        Err(InstrumentError::Unitary(UnitaryError::Phase(
+            rmagna::phase::PhaseError::CoreLimit {
+                option: "phase_core.max_dimension",
+                ..
+            }
+        )))
+    ));
+    assert_eq!(
+        p.prepared_probability_statistics().unwrap().cached_queries,
+        0
+    );
+    low = rmagna::phase::PhaseResourceOptions::default();
+    low.catalogue.max_geometry_words = 0;
+    let p = compile_affine(&source, &options(QueryPreparation::FixedCatalogue(low)), &a).unwrap();
+    assert!(matches!(
+        p.prepare_query(layout, 256, &a),
+        Err(InstrumentError::Unitary(UnitaryError::Phase(
+            rmagna::phase::PhaseError::ResourceLimit {
+                option: "catalogue_preparation.max_geometry_words",
+                ..
+            }
+        )))
+    ));
+    assert_eq!(
+        p.prepared_probability_statistics().unwrap().cached_queries,
+        0
+    );
 }

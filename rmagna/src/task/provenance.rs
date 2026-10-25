@@ -268,6 +268,13 @@ fn preparation(mode: QueryPreparation) -> Value {
     match mode {
         QueryPreparation::Cold => json!({"mode": "cold"}),
         QueryPreparation::Trace => json!({"mode": "trace"}),
+        QueryPreparation::FixedCatalogue(options) => json!({
+            "mode": "catalogue",
+            "fibers": {"max_search_rank": options.fibers.max_search_rank, "attempts": options.fibers.attempts},
+            "catalogue": {"max_terms": options.catalogue.max_terms, "max_geometry_words": options.catalogue.max_geometry_words,
+                "core": {"max_dimension": options.catalogue.core.max_dimension, "max_table_values": options.catalogue.core.max_table_values,
+                    "max_work": options.catalogue.core.max_work.to_string()}},
+        }),
         QueryPreparation::FixedFibers(options) => json!({
             "mode": "fixed", "max_search_rank": options.max_search_rank, "attempts": options.attempts,
         }),

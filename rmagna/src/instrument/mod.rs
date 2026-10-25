@@ -65,6 +65,7 @@ pub enum InstrumentError {
         record: usize,
         count: usize,
     },
+    Catalogue(crate::catalogue::CatalogueError),
     Binary(Gf2Error),
     Pauli(PauliError),
     Probability(ProbabilityError),
@@ -114,6 +115,7 @@ impl fmt::Display for InstrumentError {
             Self::RecordOutOfBounds { record, count } => {
                 write!(f, "record {record} is outside record count {count}")
             }
+            Self::Catalogue(e) => e.fmt(f),
             Self::Binary(e) => e.fmt(f),
             Self::Pauli(e) => e.fmt(f),
             Self::Probability(e) => e.fmt(f),
@@ -123,6 +125,11 @@ impl fmt::Display for InstrumentError {
     }
 }
 impl std::error::Error for InstrumentError {}
+impl From<crate::catalogue::CatalogueError> for InstrumentError {
+    fn from(error: crate::catalogue::CatalogueError) -> Self {
+        Self::Catalogue(error)
+    }
+}
 impl From<Gf2Error> for InstrumentError {
     fn from(e: Gf2Error) -> Self {
         Self::Binary(e)

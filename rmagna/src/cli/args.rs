@@ -39,10 +39,10 @@ Run configuration:
   --compiler shared|parity_copies      Default shared
   --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
   --causal-strategy fixed|cold         Default fixed
-  --probability-preparation cold|trace|fixed        Default fixed, on demand
-  --density-preparation cold|trace|fixed            Default fixed, on demand
-  --moment-preparation cold|trace|fixed             Default fixed, on demand
-  --fiber-search-rank N               Fixed preparation search rank (default 16)
+  --probability-preparation cold|trace|fixed|catalogue  Default fixed, on demand
+  --density-preparation cold|trace|fixed|catalogue  Default fixed, on demand
+  --moment-preparation cold|trace|fixed|catalogue  Default fixed, on demand
+  --fiber-search-rank N               Fixed/catalogue fallback search rank (default 16)
   --max-prepared-probabilities N       Retained query cap (default 64)
   --max-prepared-densities N           Retained query cap (default 16)
   --max-prepared-moments N             Retained query cap (default 64)
@@ -287,11 +287,16 @@ impl Args {
             if file.evaluation.runtime.strategy != CausalStrategy::FixedTemplate {
                 return Err("compare-samplers requires --causal-strategy fixed".into());
             }
-            if !matches!(
-                file.evaluation.runtime.compile.probability_preparation,
-                QueryPreparation::FixedFibers(_)
-            ) {
-                return Err("compare-samplers requires --probability-preparation fixed".into());
+            if !file
+                .evaluation
+                .runtime
+                .compile
+                .probability_preparation
+                .is_fixed()
+            {
+                return Err(
+                    "compare-samplers requires --probability-preparation fixed or catalogue".into(),
+                );
             }
         }
 
@@ -571,21 +576,25 @@ fn configure_queries(
     let probability = flags.choice(
         "--probability-preparation",
         "fixed",
-        &["cold", "trace", "fixed"],
+        &["cold", "trace", "fixed", "catalogue"],
     )?;
     let density = flags.choice(
         "--density-preparation",
         "fixed",
-        &["cold", "trace", "fixed"],
+        &["cold", "trace", "fixed", "catalogue"],
     )?;
-    let moment = flags.choice("--moment-preparation", "fixed", &["cold", "trace", "fixed"])?;
+    let moment = flags.choice(
+        "--moment-preparation",
+        "fixed",
+        &["cold", "trace", "fixed", "catalogue"],
+    )?;
     if flags.0.contains_key("--fiber-search-rank")
-        && probability != "fixed"
-        && density != "fixed"
-        && moment != "fixed"
+        && ![probability.as_str(), density.as_str(), moment.as_str()]
+            .iter()
+            .any(|mode| matches!(*mode, "fixed" | "catalogue"))
     {
         return Err(
-            "--fiber-search-rank requires fixed probability, density or moment preparation"
+            "--fiber-search-rank requires fixed or catalogue probability, density or moment preparation"
                 .to_owned(),
         );
     }
@@ -594,16 +603,30 @@ fn configure_queries(
     compile.probability_preparation = match probability.as_str() {
         "cold" => ProbabilityPreparation::Cold,
         "trace" => ProbabilityPreparation::Trace,
+        "catalogue" => {
+            ProbabilityPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {
+                fibers: fiber,
+                ..Default::default()
+            })
+        }
         _ => ProbabilityPreparation::FixedFibers(fiber),
     };
     compile.density_preparation = match density.as_str() {
         "cold" => QueryPreparation::Cold,
         "trace" => QueryPreparation::Trace,
+        "catalogue" => QueryPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {
+            fibers: fiber,
+            ..Default::default()
+        }),
         _ => QueryPreparation::FixedFibers(fiber),
     };
     compile.moment_preparation = match moment.as_str() {
         "cold" => QueryPreparation::Cold,
         "trace" => QueryPreparation::Trace,
+        "catalogue" => QueryPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {
+            fibers: fiber,
+            ..Default::default()
+        }),
         _ => QueryPreparation::FixedFibers(fiber),
     };
     Ok(())

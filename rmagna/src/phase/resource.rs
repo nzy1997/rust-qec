@@ -17,6 +17,14 @@ pub enum PhaseResourceKind {
     CliffordFibers,
     CertifiedCatalogue,
 }
+impl PhaseResourceKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::CliffordFibers => "clifford_fibers",
+            Self::CertifiedCatalogue => "certified_catalogue",
+        }
+    }
+}
 enum Decomposition {
     Fibers(PreparedCliffordFibers),
     Catalogue(PreparedCataloguePhase),

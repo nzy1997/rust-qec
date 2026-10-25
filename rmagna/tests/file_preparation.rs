@@ -108,6 +108,7 @@ fn retained_after_sampling(
             "labels": labels,
             "quotient_rank": quotient_rank,
             "terms": terms,
+            "resource_kind": "clifford_fibers",
             "method": "capped_probability_parent_affine_envelope"
         });
     }
@@ -759,5 +760,141 @@ fn file_policy_matrix_preserves_literal_projected_target_feedback_and_fresh_batc
                 );
             }
         }
+    }
+}
+
+#[test]
+fn catalogue_file_sessions_keep_seeded_results_actual_caches_and_prepared_scope() {
+    use rmagna::unitary::CompilerStrategy;
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for sampler in [HistorySampler::ExactMarginal, HistorySampler::AffineSupport] {
+            for nonlinear in [false, true] {
+                let files = if nonlinear {
+                    noisy_files()
+                } else {
+                    target_files()
+                };
+                let calls = Arc::new(AtomicUsize::new(0));
+                let count = calls.clone();
+                let mut registry = ControllerRegistry::default();
+                registry
+                    .register("majority", "1", move |bits: &[bool]| {
+                        count.fetch_add(1, Ordering::Relaxed);
+                        Ok(vec![bits.iter().filter(|v| **v).count() >= 2])
+                    })
+                    .unwrap();
+                let mut fixed = options(sampler);
+                fixed.evaluation.runtime.compile.compiler_strategy = strategy;
+                let mut catalogue = fixed;
+                catalogue.evaluation.runtime.compile.probability_preparation =
+                    QueryPreparation::FixedCatalogue(Default::default());
+                catalogue.evaluation.runtime.compile.density_preparation =
+                    QueryPreparation::FixedCatalogue(Default::default());
+                catalogue.evaluation.runtime.compile.moment_preparation =
+                    QueryPreparation::FixedCatalogue(Default::default());
+                let original = files.load(&registry, fixed);
+                let file = files.load(&registry, catalogue);
+                let run = TaskRunOptions {
+                    shots: 24,
+                    seed: 981,
+                    ..Default::default()
+                };
+                let prepared = file.prepare_sampling(&Default::default()).unwrap();
+                assert!(prepared.report().is_complete());
+                assert_eq!(calls.load(Ordering::Relaxed), 0);
+                assert_eq!(
+                    prepared.report().stage().unwrap().all_families_retained(),
+                    sampler == HistorySampler::ExactMarginal
+                );
+                let before =
+                    prepared.inspect(&run).unwrap()["compilation"]["retained_caches"].clone();
+                assert!(
+                    before["probability"]["catalogue_resources"]
+                        .as_u64()
+                        .unwrap()
+                        > 0
+                );
+                let mut before = retained_after_sampling(
+                    before,
+                    sampler,
+                    if nonlinear { 4 } else { 1 },
+                    if nonlinear { 0 } else { 2 },
+                    if nonlinear { 1 } else { 2 },
+                );
+                if sampler == HistorySampler::AffineSupport {
+                    before["support"]["resource_kind"] = json!("certified_catalogue");
+                }
+                let a = prepared.run(&run).unwrap();
+                let b = file.run(&run).unwrap();
+                let c = original.run(&run).unwrap();
+                assert_eq!(
+                    calls.load(Ordering::Relaxed),
+                    if nonlinear { 72 } else { 0 }
+                );
+                same_rows(a.raw_result(), b.raw_result());
+                same_rows(a.raw_result(), c.raw_result());
+                assert_eq!(a.raw_result().completed, 24);
+                assert_eq!(
+                    prepared.inspect(&run).unwrap()["compilation"]["retained_caches"],
+                    before
+                );
+                let report = a.to_json().unwrap();
+                for family in [
+                    "probability_preparation",
+                    "density_preparation",
+                    "moment_preparation",
+                ] {
+                    assert_eq!(report["options"]["compile"][family]["mode"], "catalogue");
+                }
+                let compared = file
+                    .compare_samplers(&Default::default())
+                    .unwrap()
+                    .to_json();
+                assert_eq!(compared["pilots"]["affine_support"]["status"], "complete");
+                assert_eq!(compared["pilots"]["exact_marginal"]["status"], "complete");
+            }
+        }
+    }
+}
+
+#[test]
+fn catalogue_cold_prefix_remains_explicitly_ephemeral_and_not_eagerly_prepared() {
+    let files = target_files();
+    let mut c = options(HistorySampler::AffineSupport);
+    c.evaluation.runtime.strategy = CausalStrategy::ColdPrefix;
+    c.evaluation.runtime.compile.probability_preparation =
+        QueryPreparation::FixedCatalogue(Default::default());
+    c.evaluation.runtime.compile.density_preparation =
+        QueryPreparation::FixedCatalogue(Default::default());
+    c.evaluation.runtime.compile.moment_preparation =
+        QueryPreparation::FixedCatalogue(Default::default());
+    let file = files.load(&ControllerRegistry::default(), c);
+    let preparation = file.prepare_sampling(&Default::default()).unwrap();
+    assert!(!preparation.report().is_complete());
+    assert!(
+        preparation
+            .report()
+            .stage()
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap_err()
+            .message
+            .contains("cold_prefix")
+    );
+    let report = file
+        .run(&TaskRunOptions {
+            shots: 4,
+            seed: 981,
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(report.raw_result().completed, 4);
+    let value = report.to_json().unwrap();
+    for kind in ["probability", "density", "moment", "support"] {
+        assert!(value["compilation"]["retained_caches"][kind].is_null());
     }
 }

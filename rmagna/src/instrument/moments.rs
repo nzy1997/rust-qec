@@ -39,6 +39,11 @@ impl MomentQueries {
                 .iter()
                 .filter(|e| e.plan.fixed_phase_resource().is_some())
                 .count(),
+            catalogue_resources: entries
+                .iter()
+                .filter_map(|e| e.plan.fixed_phase_resource())
+                .filter(|r| r.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue)
+                .count(),
         })
     }
     pub(super) fn evaluate(
@@ -115,6 +120,14 @@ impl MomentQueries {
                         .prepare_pauli_moment_with_fibers(
                             word, rows, max_terms, options, arithmetic,
                         )?,
+                    QueryPreparation::FixedCatalogue(options) => state
+                        .prepare_pauli_moment(word, rows, arithmetic)?
+                        .with_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     QueryPreparation::Cold => unreachable!("cold moments returned above"),
                 };
                 let plan = Arc::new(plan);
@@ -142,41 +155,53 @@ mod tests {
             .unwrap();
         let row = BitVector::from_indices(3, [0]).unwrap();
         let word = PauliWord::new(row.clone(), BitVector::zeros(3).unwrap(), 2).unwrap();
-        let queries =
-            MomentQueries::new(QueryPreparation::FixedFibers(Default::default()), 1).unwrap();
-        assert_eq!(
-            queries
-                .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
-                .unwrap(),
-            QueryPreparationOutcome::Created
-        );
-        assert_eq!(
-            queries
-                .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
-                .unwrap(),
-            QueryPreparationOutcome::Reused
-        );
-        for rhs in [
-            BitVector::zeros(1).unwrap(),
-            BitVector::from_indices(1, [0]).unwrap(),
+        for mode in [
+            QueryPreparation::FixedFibers(Default::default()),
+            QueryPreparation::FixedCatalogue(Default::default()),
         ] {
-            let value = queries
-                .evaluate(&state, &word, std::slice::from_ref(&row), &rhs, 0, &a)
-                .unwrap();
-            assert_eq!(value.value, ExactScalar::zero());
-            assert_eq!((value.quotient_rank, value.terms), (0, 0));
-        }
-        assert_eq!(
-            queries.statistics().unwrap(),
-            PreparedQueryStatistics {
-                cached_queries: 1,
-                fixed_resources: 0
+            let queries = MomentQueries::new(mode, 1).unwrap();
+            assert_eq!(
+                queries
+                    .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
+                    .unwrap(),
+                QueryPreparationOutcome::Created
+            );
+            assert_eq!(
+                queries
+                    .prepare(&state, &word, std::slice::from_ref(&row), 0, &a)
+                    .unwrap(),
+                QueryPreparationOutcome::Reused
+            );
+            for rhs in [
+                BitVector::zeros(1).unwrap(),
+                BitVector::from_indices(1, [0]).unwrap(),
+            ] {
+                let value = queries
+                    .evaluate(&state, &word, std::slice::from_ref(&row), &rhs, 0, &a)
+                    .unwrap();
+                assert_eq!(value.value, ExactScalar::zero());
+                assert_eq!((value.quotient_rank, value.terms), (0, 0));
             }
-        );
-        assert!(matches!(
-            queries.evaluate(&state, &word, &[row], &BitVector::zeros(2).unwrap(), 0, &a),
-            Err(InstrumentError::Unitary(UnitaryError::DimensionMismatch))
-        ));
-        assert_eq!(queries.statistics().unwrap().cached_queries, 1);
+            assert_eq!(
+                queries.statistics().unwrap(),
+                PreparedQueryStatistics {
+                    cached_queries: 1,
+                    fixed_resources: 0,
+                    catalogue_resources: 0,
+                }
+            );
+            assert!(matches!(
+                queries.evaluate(
+                    &state,
+                    &word,
+                    std::slice::from_ref(&row),
+                    &BitVector::zeros(2).unwrap(),
+                    0,
+                    &a
+                ),
+                Err(InstrumentError::Unitary(UnitaryError::DimensionMismatch))
+            ));
+            assert_eq!(queries.statistics().unwrap().cached_queries, 1);
+        }
     }
 }

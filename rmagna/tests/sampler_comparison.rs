@@ -115,6 +115,7 @@ fn assert_support_cache_transition(
             "labels": labels,
             "quotient_rank": quotient_rank,
             "terms": terms,
+            "resource_kind": "clifford_fibers",
             "method": "capped_probability_parent_affine_envelope"
         });
     }
