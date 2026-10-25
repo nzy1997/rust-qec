@@ -3899,3 +3899,24 @@ catalogue resource API. Tests cover every assignment through eight coordinates,
 odd tails, empty/missing factors, complex overlapping components, all resource
 endpoints and failures without source mutation. No sampling or performance claim
 is implied by the certificate construction.
+
+## Affine boundary bases under changed phases
+
+`PreparedAffineContraction::contract_with_phase_updates` accepts arbitrary
+quadratic phases when the boundary width and support columns match its reference.
+Compatible constant/even linear updates use the original recorded elimination.
+Changed cross terms or linear parity reuse the certified pivot/kernel basis and
+run fresh exact Gaussian elimination in that basis. No changed plan is cached.
+
+The original `contract` API keeps its stricter structural contract. The new
+method also rejects changed width/columns before a zero-coefficient shortcut and
+keeps scalar arithmetic checks. Its changed-phase result uses the same basis,
+boundary ordering, unnormalized coefficients and output representation as cold
+contraction, without repeating the boundary GF(2) factorization.
+
+Clifford probability-support closures use this route for phase changes. If the
+boundary columns themselves change, they retain the general exact contraction.
+Tests compare arbitrary small updates with literal path amplitudes and complete
+cold kets, cover 129 hidden paths with independently multiplied one-/two-variable
+Gauss sums, and preserve incompatible-boundary and arithmetic failures. This
+change does not alter decomposition counts, sampling configuration or quotas.
