@@ -2,7 +2,7 @@
 use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::fibers::{FiberOptions, PreparedCliffordFibers};
-use crate::stabilizer::PreparedAffineContraction;
+use crate::stabilizer::{PreparedAffineContraction, PreparedLinearBoundary};
 
 /// Immutable probability parent for ordered computational output labels.
 /// Its exact Clifford terms certify an affine envelope, without claiming that
@@ -11,7 +11,7 @@ pub struct PreparedProbabilitySupport {
     program: Arc<InsertionProgram>,
     projection: PreparedZProjection,
     contraction: PreparedAffineContraction,
-    keep: Vec<BitVector>,
+    boundary_map: PreparedLinearBoundary,
     labels: usize,
     empty_phase: ParityPhase,
     phase_map: PhaseRestriction,
@@ -47,7 +47,8 @@ impl CompiledUnitary {
                 .map(|j| BitVector::from_indices(joint.width(), [j]))
                 .collect::<Result<Vec<_>, _>>()?,
         );
-        let contraction = projection.prepare_linear_sum(&keep)?;
+        let boundary_map = projection.prepare_linear_boundary(&keep)?;
+        let contraction = PreparedAffineContraction::new(boundary_map.reference())?;
         let magic = half - self.width();
         let empty_phase = ParityPhase::new(outputs.len(), 0, [])?;
         let phase = &self.program.query_reference_phase;
@@ -65,7 +66,7 @@ impl CompiledUnitary {
             program: Arc::clone(&self.program),
             projection,
             contraction,
-            keep,
+            boundary_map,
             labels: outputs.len(),
             empty_phase,
             phase_map,
@@ -107,7 +108,7 @@ impl PreparedProbabilitySupport {
         };
         let Some(ket) = self
             .contraction
-            .contract(&ket.linear_boundary(&self.keep)?, arithmetic)?
+            .contract(&self.boundary_map.apply(&ket)?, arithmetic)?
         else {
             return Ok(vec![]);
         };

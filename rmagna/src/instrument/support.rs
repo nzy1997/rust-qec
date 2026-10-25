@@ -2,6 +2,7 @@
 use super::*;
 use crate::fibers::FiberOptions;
 use crate::unitary::PreparedProbabilitySupport;
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub(super) struct SupportQueries {
     options: FiberOptions,
     transport: Option<Vec<BitVector>>,
     coordinates: Option<crate::gf2::LinearFactorization>,
+    captured_coordinates: HashMap<BitVector, BitVector>,
     plan: Mutex<Option<Arc<PreparedProbabilitySupport>>>,
 }
 impl SupportQueries {
@@ -25,6 +27,7 @@ impl SupportQueries {
             },
             transport: None,
             coordinates: None,
+            captured_coordinates: HashMap::new(),
             plan: Mutex::new(None),
         }
     }
@@ -40,10 +43,22 @@ impl SupportQueries {
             transport.len(),
             &crate::gf2::transpose_columns(width, &transport)?,
         )?;
+        let captured_coordinates = rows
+            .iter()
+            .map(|row| {
+                Ok((
+                    row.clone(),
+                    coordinates
+                        .solve(row)?
+                        .ok_or(InstrumentError::UncapturedSupportQuery)?,
+                ))
+            })
+            .collect::<Result<_, InstrumentError>>()?;
         Ok(Self {
             options: self.options,
             transport: Some(transport),
             coordinates: Some(coordinates),
+            captured_coordinates,
             plan: Mutex::new(None),
         })
     }
@@ -53,6 +68,9 @@ impl SupportQueries {
             Some(factor) => rows
                 .iter()
                 .map(|row| {
+                    if let Some(mapped) = self.captured_coordinates.get(row) {
+                        return Ok(mapped.clone());
+                    }
                     factor
                         .solve(row)?
                         .ok_or(InstrumentError::UncapturedSupportQuery)

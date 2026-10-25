@@ -294,6 +294,42 @@ fn captured_transport_limits_and_wide_support_fail_before_entropy_or_enumeration
         ))
     ));
     assert_eq!(entropy.1, 0);
+    let both = instrument
+        .with_support_transport(&[record(0), record(1)])
+        .unwrap();
+    let mut combined = record(0);
+    combined.xor_assign(&record(1));
+    let draw = propose_affine_reported(
+        &both,
+        &RecordQuery {
+            given: &[],
+            parities: &[combined],
+        },
+        &[],
+        &mut Word(1, 0),
+        &SamplingOptions::default(),
+        &a,
+    )
+    .unwrap();
+    assert_eq!(draw.values, [true]);
+    assert_eq!(draw.proposal_mass, a.omega(0, -2).unwrap());
+    let before = both.prepared_support_statistics().unwrap();
+    let mut inverted = record(1);
+    inverted.constant = true;
+    let draw = propose_affine_reported(
+        &both,
+        &RecordQuery {
+            given: &[],
+            parities: &[inverted],
+        },
+        &[],
+        &mut Word(1, 0),
+        &SamplingOptions::default(),
+        &a,
+    )
+    .unwrap();
+    assert_eq!(draw.values, [false]);
+    assert_eq!(both.prepared_support_statistics().unwrap(), before);
     let source = format!(
         "H {}\nT 0\nMX 0\nMX 0\nM {}",
         (0..81).map(|q| q.to_string()).collect::<Vec<_>>().join(" "),
