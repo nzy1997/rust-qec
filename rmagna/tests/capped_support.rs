@@ -139,6 +139,109 @@ fn diagonal_parent_terms_match_literal_walsh_probabilities_under_pauli_updates()
 }
 
 #[test]
+fn clifford_parent_geometry_changes_keep_exact_probabilities_and_global_phases() {
+    let a = ScalarArithmetic::default();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        for width in [2, 65] {
+            let free = width - 1;
+            let circuit = UnitaryCircuit::new(
+                width,
+                [
+                    UnitaryGate::Clifford(CliffordGate::H(0)),
+                    UnitaryGate::T { qubit: 0, turns: 1 },
+                    UnitaryGate::T { qubit: 0, turns: 1 },
+                    UnitaryGate::Clifford(CliffordGate::H(0)),
+                    UnitaryGate::Clifford(CliffordGate::H(free)),
+                ],
+            )
+            .unwrap();
+            for input in 0..2 {
+                let state = circuit
+                    .compile_with_strategy(&bits(width, input), &a, strategy)
+                    .unwrap();
+                let rows = [
+                    BitVector::from_indices(width, [free]).unwrap(),
+                    BitVector::from_indices(width, [0]).unwrap(),
+                    BitVector::from_indices(width, [0, free]).unwrap(),
+                    BitVector::from_indices(width, [0]).unwrap(),
+                ];
+                let plan = state
+                    .prepare_probability_support(&rows, 1, FiberOptions::default(), &a)
+                    .unwrap();
+                assert_eq!(
+                    (
+                        plan.fixed_phase_resource().quotient_rank(),
+                        plan.fixed_phase_resource().num_terms()
+                    ),
+                    (0, 1)
+                );
+                for x in 0..2 {
+                    for z in 0..2 {
+                        for global in 0..8 {
+                            let changed = state
+                                .with_insertions(
+                                    &[PauliInsertion {
+                                        before_gate: 2,
+                                        word: PauliWord::new(
+                                            bits(width, x),
+                                            bits(width, z),
+                                            global,
+                                        )
+                                        .unwrap(),
+                                    }],
+                                    &a,
+                                )
+                                .unwrap();
+                            let terms = plan.evaluate(&changed, 1, &a).unwrap();
+                            assert_eq!(terms.len(), 1);
+                            assert_eq!(
+                                rmagna::gf2::AffineSupport::new(
+                                    terms[0].offset().clone(),
+                                    terms[0].columns().to_vec()
+                                )
+                                .unwrap()
+                                .dimension(),
+                                if x == 1 { 1 } else { 2 }
+                            );
+                            let prepared = terms
+                                .iter()
+                                .map(|k| k.prepare().unwrap())
+                                .collect::<Vec<_>>();
+                            for word in 0..16 {
+                                let freebit = word & 1;
+                                let bit = word >> 1 & 1;
+                                let valid =
+                                    (word >> 2 & 1) == (freebit ^ bit) && (word >> 3 & 1) == bit;
+                                // H T T H has fair outcomes. Inserting X (or XZ)
+                                // between the Ts gives Z (or ZX), up to global phase,
+                                // hence a deterministic input^z. The other wire is fair.
+                                let expected = if !valid || x == 1 && bit != (input ^ z) {
+                                    ExactScalar::zero()
+                                } else {
+                                    a.omega(0, if x == 1 { -2 } else { -4 }).unwrap()
+                                };
+                                let actual = prepared.iter().fold(ExactScalar::zero(), |sum, k| {
+                                    a.add(&sum, &k.amplitude(&bits(4, word), &a).unwrap())
+                                        .unwrap()
+                                });
+                                assert_eq!(
+                                    actual, expected,
+                                    "{strategy:?} width={width},input={input},x={x},z={z},global={global},word={word}"
+                                );
+                            }
+                        }
+                    }
+                }
+                assert!(plan.evaluate(&state, 0, &a).is_err());
+            }
+        }
+    }
+}
+
+#[test]
 fn capped_envelopes_keep_genuine_nonaffine_zeros_and_condition_before_the_hull() {
     let a = ScalarArithmetic::default();
     let source = "H 0 1 2 3\nCCZ 0 1 2\nCCZ 0 1 3\nCCZ 0 2 3\nH 0 1 2 3\nM 0 1 2 3";
