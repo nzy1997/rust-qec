@@ -1,6 +1,7 @@
 //! Exact, immutable certificates for constrained Clifford phase decompositions.
 mod builtin;
 mod json;
+mod product;
 mod resource;
 use crate::gf2::BitVector;
 use crate::phase::ParityPhase;
