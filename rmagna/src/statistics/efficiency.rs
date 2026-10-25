@@ -36,11 +36,11 @@ pub struct EfficiencySummary {
 /// Fixed number of accumulators; integer sizes obey the arithmetic budget.
 #[derive(Clone)]
 pub struct HistoryEfficiency {
-    statistics: ExactStatistics,
+    pub(super) statistics: ExactStatistics,
     /// Sum of (L/W) times [A^2, A*E, E^2], for positive W.
-    reference: [ExactField; 3],
-    zero_weights: u64,
-    missing_error: bool,
+    pub(super) reference: [ExactField; 3],
+    pub(super) zero_weights: u64,
+    pub(super) missing_error: bool,
 }
 impl HistoryEfficiency {
     pub fn new(arithmetic: FieldArithmetic) -> Result<Self, StatisticsError> {

@@ -6,7 +6,9 @@
 use crate::field::{ExactField, FieldArithmetic, FieldError};
 use num_rational::BigRational;
 use std::{cmp::Ordering, fmt};
+mod checkpoint;
 mod efficiency;
+pub use checkpoint::{CheckpointError, CheckpointOptions};
 pub use efficiency::{EfficiencyStatus, EfficiencySummary, HistoryEfficiency};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -106,6 +108,13 @@ pub struct PairedRatio {
     /// Requires the module's sampling assumptions; no autocorrelation correction.
     pub variance: Option<ExactField>,
 }
+fn product_count(dimensions: usize) -> Result<usize, StatisticsError> {
+    dimensions
+        .checked_add(1)
+        .and_then(|n| dimensions.checked_mul(n))
+        .map(|n| n / 2)
+        .ok_or(StatisticsError::SizeOverflow)
+}
 fn position(i: usize, j: usize) -> usize {
     let (i, j) = if i <= j { (i, j) } else { (j, i) };
     j * (j + 1) / 2 + i
@@ -118,11 +127,7 @@ impl ExactStatistics {
                 limit: options.max_dimensions,
             });
         }
-        let size = dimensions
-            .checked_add(1)
-            .and_then(|n| dimensions.checked_mul(n))
-            .ok_or(StatisticsError::SizeOverflow)?
-            / 2;
+        let size = product_count(dimensions)?;
         Ok(Self {
             dimensions,
             count: 0,
