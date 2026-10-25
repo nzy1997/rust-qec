@@ -497,7 +497,15 @@ impl CompiledUnitary {
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbability, UnitaryError> {
         self.prepare_probability(rows, arithmetic)?
-            .freeze(max_terms, options)
+            .with_phase_resource(
+                max_terms,
+                crate::phase::PhaseResourceOptions {
+                    fibers: options,
+                    ..Default::default()
+                },
+                None,
+                arithmetic,
+            )
     }
 
     /// Prepare exact `<psi|Pi P Pi|psi>` for a fixed Pauli word and Z-event
@@ -522,7 +530,15 @@ impl CompiledUnitary {
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedPauliMoment, UnitaryError> {
         self.prepare_pauli_moment(word, rows, arithmetic)?
-            .freeze(max_terms, options)
+            .with_phase_resource(
+                max_terms,
+                crate::phase::PhaseResourceOptions {
+                    fibers: options,
+                    ..Default::default()
+                },
+                None,
+                arithmetic,
+            )
     }
 
     /// Prepare ordered output and event layouts for reduced density overlap.
@@ -548,7 +564,15 @@ impl CompiledUnitary {
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedDensityOverlap, UnitaryError> {
         self.prepare_density_overlap(boundary, target, target_boundary, arithmetic)?
-            .freeze(max_terms, options)
+            .with_phase_resource(
+                max_terms,
+                crate::phase::PhaseResourceOptions {
+                    fibers: options,
+                    ..Default::default()
+                },
+                None,
+                arithmetic,
+            )
     }
 
     /// Replace the insertion assignment relative to the original compiled
