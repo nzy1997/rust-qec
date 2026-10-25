@@ -1,6 +1,6 @@
 //! Explicit static family construction, without scalar responses or sampling.
 use super::*;
-use crate::fibers::PreparedCliffordFibers;
+use crate::phase::PreparedPhaseResource;
 use crate::unitary::DensityLayout;
 
 /// A query's fixed geometry. Outcome values and noise assignments are absent.
@@ -45,20 +45,13 @@ pub enum QueryPreparationOutcome {
     Cold,
 }
 pub(super) fn validate_resource(
-    resource: Option<&PreparedCliffordFibers>,
+    resource: Option<&PreparedPhaseResource>,
     max_terms: usize,
 ) -> Result<(), InstrumentError> {
-    if let Some(r) = resource
-        && r.num_terms() > max_terms
-    {
-        return Err(
-            UnitaryError::Phase(crate::phase::PhaseError::FiberTermLimit {
-                coordinates: r.enumerated_coordinates(),
-                quotient_rank: r.quotient_rank(),
-                limit: max_terms,
-            })
-            .into(),
-        );
+    if let Some(resource) = resource {
+        resource
+            .check_term_limit(max_terms)
+            .map_err(UnitaryError::from)?;
     }
     Ok(())
 }

@@ -2996,3 +2996,640 @@ fn prepared_pauli_empty_program_and_fixed_term_limits_are_exact() {
         a.omega(3, 0).unwrap()
     );
 }
+
+#[test]
+fn catalogue_query_families_match_literal_projected_densities_and_complex_moments() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseResourceKind, PhaseResourceOptions};
+    use rmagna::unitary::{CompilerStrategy, DensityLayout};
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(0)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Clifford(C::H(2)),
+        G::Clifford(C::S { qubit: 2, turns: 1 }),
+    ];
+    let target_gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 2,
+        }),
+        G::Clifford(C::H(1)),
+    ];
+    let rows = [bits(3, 1)];
+    let target_rows = [bits(3, 4)];
+    let left_layout = DensityLayout {
+        outputs: &[1, 0],
+        event_rows: &rows,
+    };
+    let right_layout = DensityLayout {
+        outputs: &[2, 1],
+        event_rows: &target_rows,
+    };
+    let word = PauliWord::new(bits(3, 0), bits(3, 1), 6).unwrap();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let target = UnitaryCircuit::new(3, target_gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let perturbed = base
+            .with_insertions(
+                &[PauliInsertion {
+                    before_gate: 3,
+                    word: PauliWord::new(bits(3, 4), bits(3, 2), 3).unwrap(),
+                }],
+                &a,
+            )
+            .unwrap();
+        let db = builtin_phase_catalogue().unwrap();
+        let probability = perturbed
+            .prepare_probability(&rows, &a)
+            .unwrap()
+            .with_phase_resource(64, PhaseResourceOptions::default(), Some(db), &a)
+            .unwrap();
+        let density = perturbed
+            .prepare_density_overlap(left_layout, &target, right_layout, &a)
+            .unwrap()
+            .with_phase_resource(64, PhaseResourceOptions::default(), Some(db), &a)
+            .unwrap();
+        let moment = perturbed
+            .prepare_pauli_moment(&word, &rows, &a)
+            .unwrap()
+            .with_phase_resource(64, PhaseResourceOptions::default(), Some(db), &a)
+            .unwrap();
+        for resource in [
+            probability.fixed_phase_resource(),
+            density.fixed_phase_resource(),
+            moment.fixed_phase_resource(),
+        ] {
+            let resource = resource.unwrap();
+            assert_eq!(resource.kind(), PhaseResourceKind::CertifiedCatalogue);
+            assert!(resource.num_terms() <= 2);
+        }
+        let counts = [
+            probability.fixed_phase_resource().unwrap().num_terms(),
+            density.fixed_phase_resource().unwrap().num_terms(),
+            moment.fixed_phase_resource().unwrap().num_terms(),
+        ];
+        assert_eq!(counts, [2, 2, 2]);
+        for position in [1, 3, 6] {
+            for x in [0, 1, 3, 5] {
+                for z in [0, 2, 7] {
+                    let fault = PauliInsertion {
+                        before_gate: position,
+                        word: PauliWord::new(
+                            bits(3, x),
+                            bits(3, z),
+                            ((position + x + z) & 7) as u8,
+                        )
+                        .unwrap(),
+                    };
+                    let state = base
+                        .with_insertions(std::slice::from_ref(&fault), &a)
+                        .unwrap();
+                    let values = dense_inserted(&gates, 3, 0, std::slice::from_ref(&fault), &a);
+                    let target_fault = PauliInsertion {
+                        before_gate: 1,
+                        word: PauliWord::new(bits(3, x & 3), bits(3, z), ((x + z) & 7) as u8)
+                            .unwrap(),
+                    };
+                    let target_state = target
+                        .with_insertions(std::slice::from_ref(&target_fault), &a)
+                        .unwrap();
+                    let target_values = dense_inserted(
+                        &target_gates,
+                        3,
+                        0,
+                        std::slice::from_ref(&target_fault),
+                        &a,
+                    );
+                    for outcome in 0..2 {
+                        let expected =
+                            literal_projected_moment(&values, &[1], outcome, 0, 0, 0, &a);
+                        let actual = probability
+                            .evaluate(&state, &bits(1, outcome), 64, &a)
+                            .unwrap();
+                        assert_eq!(actual.value, expected);
+                        assert_eq!(actual.terms, counts[0]);
+                        assert_eq!(
+                            moment
+                                .evaluate(&state, &bits(1, outcome), 64, &a)
+                                .unwrap()
+                                .value,
+                            literal_projected_moment(&values, &[1], outcome, 0, 1, 6, &a)
+                        );
+                        for target_outcome in 0..2 {
+                            let rho =
+                                reduced_density(&values, 3, &[1, 0], &rows[0], outcome != 0, &a);
+                            let tau = reduced_density(
+                                &target_values,
+                                3,
+                                &[2, 1],
+                                &target_rows[0],
+                                target_outcome != 0,
+                                &a,
+                            );
+                            assert_eq!(
+                                density
+                                    .evaluate(
+                                        &state,
+                                        &target_state,
+                                        &bits(1, outcome),
+                                        &bits(1, target_outcome),
+                                        64,
+                                        &a
+                                    )
+                                    .unwrap()
+                                    .value,
+                                density_product(&rho, &tau, &a)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            probability.fixed_phase_resource().unwrap().num_terms(),
+            counts[0]
+        );
+        assert_eq!(
+            density.fixed_phase_resource().unwrap().num_terms(),
+            counts[1]
+        );
+        assert_eq!(
+            moment.fixed_phase_resource().unwrap().num_terms(),
+            counts[2]
+        );
+    }
+}
+
+#[test]
+fn catalogue_query_caps_zero_certificates_and_original_program_checks_are_explicit() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseError, PhaseResourceOptions};
+    let a = ScalarArithmetic::default();
+    let circuit = UnitaryCircuit::new(
+        1,
+        [
+            G::Clifford(C::H(0)),
+            G::T { qubit: 0, turns: 1 },
+            G::Clifford(C::H(0)),
+        ],
+    )
+    .unwrap();
+    let base = circuit.compile(&bits(1, 0), &a).unwrap();
+    let unrelated = circuit.compile(&bits(1, 0), &a).unwrap();
+    let rows = [bits(1, 1)];
+    let db = Some(builtin_phase_catalogue().unwrap());
+    assert!(matches!(
+        base.prepare_probability(&rows, &a)
+            .unwrap()
+            .with_phase_resource(1, PhaseResourceOptions::default(), db, &a),
+        Err(UnitaryError::Phase(PhaseError::ResourceLimit {
+            option: "catalogue_preparation.max_terms",
+            ..
+        }))
+    ));
+    let plan = base
+        .prepare_probability(&rows, &a)
+        .unwrap()
+        .with_phase_resource(2, PhaseResourceOptions::default(), db, &a)
+        .unwrap();
+    assert!(matches!(
+        plan.evaluate(&base, &bits(1, 0), 1, &a),
+        Err(UnitaryError::Phase(PhaseError::ResourceLimit {
+            option: "phase_resource.max_terms",
+            ..
+        }))
+    ));
+    assert!(matches!(
+        plan.evaluate(&unrelated, &bits(1, 0), 2, &a),
+        Err(UnitaryError::IncompatibleProgram)
+    ));
+    assert!(matches!(
+        plan.evaluate(&base, &bits(2, 0), 2, &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+    let word = PauliWord::new(bits(1, 1), bits(1, 0), 0).unwrap();
+    let zero = base
+        .prepare_pauli_moment(&word, &rows, &a)
+        .unwrap()
+        .with_phase_resource(0, PhaseResourceOptions::default(), db, &a)
+        .unwrap();
+    assert!(zero.has_zero_certificate());
+    assert!(zero.fixed_phase_resource().is_none());
+    for bit in 0..2 {
+        assert_eq!(
+            zero.evaluate(&base, &bits(1, bit), 0, &a).unwrap().value,
+            ExactScalar::zero()
+        );
+    }
+    assert!(matches!(
+        zero.evaluate(&unrelated, &bits(1, 0), 0, &a),
+        Err(UnitaryError::IncompatibleProgram)
+    ));
+    assert!(matches!(
+        zero.evaluate(&base, &bits(2, 0), 0, &a),
+        Err(UnitaryError::DimensionMismatch)
+    ));
+}
+
+#[test]
+fn catalogue_record_support_has_exact_dependent_label_masses_after_source_drop() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseResourceKind, PhaseResourceOptions};
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(0)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Clifford(C::H(2)),
+    ];
+    let labels = [bits(3, 1), bits(3, 2), bits(3, 1)];
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let plan = {
+            let catalogue = builtin_phase_catalogue().unwrap().clone();
+            base.prepare_probability_support_with_resource(
+                &labels,
+                64,
+                PhaseResourceOptions::default(),
+                Some(&catalogue),
+                &a,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            plan.fixed_phase_resource().kind(),
+            PhaseResourceKind::CertifiedCatalogue
+        );
+        assert_eq!(plan.fixed_phase_resource().num_terms(), 2);
+        assert!(matches!(
+            plan.evaluate(&base, 1, &a),
+            Err(UnitaryError::Phase(_))
+        ));
+        for position in [1, 3, 5] {
+            for x in [0, 1, 3, 5] {
+                for z in [0, 2, 7] {
+                    let fault = PauliInsertion {
+                        before_gate: position,
+                        word: PauliWord::new(
+                            bits(3, x),
+                            bits(3, z),
+                            ((position + x + z) & 7) as u8,
+                        )
+                        .unwrap(),
+                    };
+                    let state = base
+                        .with_insertions(std::slice::from_ref(&fault), &a)
+                        .unwrap();
+                    let values = dense_inserted(&gates, 3, 0, std::slice::from_ref(&fault), &a);
+                    let terms = plan.evaluate(&state, 64, &a).unwrap();
+                    for label in 0..8 {
+                        let expected =
+                            literal_projected_moment(&values, &[1, 2, 1], label, 0, 0, 0, &a);
+                        let actual = terms
+                            .iter()
+                            .try_fold(ExactScalar::zero(), |sum, term| {
+                                a.add(
+                                    &sum,
+                                    &term
+                                        .prepare()
+                                        .unwrap()
+                                        .amplitude(&bits(3, label), &a)
+                                        .unwrap(),
+                                )
+                            })
+                            .unwrap();
+                        assert_eq!(
+                            actual, expected,
+                            "strategy={strategy:?} position={position} x={x} z={z} label={label}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn rank_zero_catalogue_record_support_preserves_fiber_kets_and_column_conventions() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseResourceKind, PhaseResourceOptions};
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::Clifford(C::Cx {
+            control: 0,
+            target: 1,
+        }),
+        G::Clifford(C::S { qubit: 0, turns: 1 }),
+        G::Clifford(C::H(2)),
+    ];
+    let labels = [bits(3, 1), bits(3, 3), bits(3, 1)];
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let base = UnitaryCircuit::new(3, gates)
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let fiber = base
+            .prepare_probability_support(&labels, 1, Default::default(), &a)
+            .unwrap();
+        let catalogue = base
+            .prepare_probability_support_with_resource(
+                &labels,
+                1,
+                PhaseResourceOptions::default(),
+                Some(builtin_phase_catalogue().unwrap()),
+                &a,
+            )
+            .unwrap();
+        assert_eq!(
+            fiber.fixed_phase_resource().kind(),
+            PhaseResourceKind::CliffordFibers
+        );
+        assert_eq!(
+            catalogue.fixed_phase_resource().kind(),
+            PhaseResourceKind::CertifiedCatalogue
+        );
+        assert_eq!(catalogue.fixed_phase_resource().quotient_rank(), 0);
+        for position in 0..=gates.len() {
+            for mask in 0..64 {
+                let fault = PauliInsertion {
+                    before_gate: position,
+                    word: PauliWord::new(
+                        bits(3, mask & 7),
+                        bits(3, mask >> 3),
+                        ((position + mask) & 7) as u8,
+                    )
+                    .unwrap(),
+                };
+                let state = base
+                    .with_insertions(std::slice::from_ref(&fault), &a)
+                    .unwrap();
+                let expected = fiber.evaluate(&state, 1, &a).unwrap();
+                let actual = catalogue.evaluate(&state, 1, &a).unwrap();
+                assert_eq!(
+                    actual, expected,
+                    "strategy={strategy:?} position={position} mask={mask}"
+                );
+                assert_eq!(actual.len(), 1);
+            }
+        }
+    }
+}
+
+#[test]
+fn missing_catalogue_query_key_retains_the_actual_fiber_fallback() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseResourceKind, PhaseResourceOptions};
+    use rmagna::unitary::CompilerStrategy;
+    let a = ScalarArithmetic::default();
+    let gates = (0..3)
+        .flat_map(|qubit| {
+            [
+                G::Clifford(C::H(qubit)),
+                G::T { qubit, turns: 1 },
+                G::Clifford(C::H(qubit)),
+            ]
+        })
+        .collect::<Vec<_>>();
+    let rows = (0..3).map(|j| bits(3, 1 << j)).collect::<Vec<_>>();
+    let values = dense(&gates, 3, 0, &a);
+    let expected = a.norm_squared(&values[0]).unwrap();
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let state = UnitaryCircuit::new(3, gates.iter().copied())
+            .unwrap()
+            .compile_with_strategy(&bits(3, 0), &a, strategy)
+            .unwrap();
+        let plan = state
+            .prepare_probability(&rows, &a)
+            .unwrap()
+            .with_phase_resource(
+                64,
+                PhaseResourceOptions::default(),
+                Some(builtin_phase_catalogue().unwrap()),
+                &a,
+            )
+            .unwrap();
+        let resource = plan.fixed_phase_resource().unwrap();
+        assert_eq!(resource.kind(), PhaseResourceKind::CliffordFibers);
+        assert_eq!(resource.quotient_rank(), 6);
+        assert!(resource.catalogue_resource().is_none());
+        assert!(resource.clifford_fibers().is_some());
+        assert_eq!(
+            plan.evaluate(&state, &bits(3, 0), 64, &a).unwrap().value,
+            expected
+        );
+    }
+}
+
+#[test]
+fn frozen_queries_preserve_zero_cost_projections_and_tighter_caps_for_both_resources() {
+    use rmagna::catalogue::builtin_phase_catalogue;
+    use rmagna::phase::{PhaseError, PhaseResourceKind, PhaseResourceOptions};
+    use rmagna::unitary::{CompilerStrategy, DensityLayout};
+    fn capped(value: Result<rmagna::unitary::NetworkValue, UnitaryError>, catalogue: bool) {
+        if catalogue {
+            assert!(matches!(
+                value,
+                Err(UnitaryError::Phase(PhaseError::ResourceLimit {
+                    option: "phase_resource.max_terms",
+                    limit: 0,
+                    required: 2 | 4,
+                }))
+            ));
+        } else {
+            assert!(matches!(
+                value,
+                Err(UnitaryError::Phase(PhaseError::FiberTermLimit {
+                    limit: 0,
+                    ..
+                }))
+            ));
+        }
+    }
+    let a = ScalarArithmetic::default();
+    let gates = [
+        G::Clifford(C::H(0)),
+        G::T { qubit: 0, turns: 1 },
+        G::Clifford(C::H(0)),
+    ];
+    let rows = [bits(1, 1), bits(1, 1)];
+    let inconsistent = bits(2, 2);
+    let compatible = bits(2, 0);
+    for strategy in [
+        CompilerStrategy::ParityCopies,
+        CompilerStrategy::SharedCommutingLayer,
+    ] {
+        let circuit = UnitaryCircuit::new(1, gates).unwrap();
+        let state = circuit
+            .compile_with_strategy(&bits(1, 0), &a, strategy)
+            .unwrap();
+        let other = circuit
+            .compile_with_strategy(&bits(1, 0), &a, strategy)
+            .unwrap();
+        let target = UnitaryCircuit::new(1, [G::Clifford(C::H(0))])
+            .unwrap()
+            .compile_with_strategy(&bits(1, 0), &a, strategy)
+            .unwrap();
+        let target_layout = DensityLayout {
+            outputs: &[0],
+            event_rows: &[],
+        };
+        let target_outcome = bits(0, 0);
+        for catalogue in [false, true] {
+            let db = if catalogue {
+                Some(builtin_phase_catalogue().unwrap())
+            } else {
+                None
+            };
+            let expected_kind = if catalogue {
+                PhaseResourceKind::CertifiedCatalogue
+            } else {
+                PhaseResourceKind::CliffordFibers
+            };
+            let probability = state
+                .prepare_probability(&rows, &a)
+                .unwrap()
+                .with_phase_resource(64, PhaseResourceOptions::default(), db, &a)
+                .unwrap();
+            let layout = DensityLayout {
+                outputs: &[0],
+                event_rows: &rows,
+            };
+            let density = state
+                .prepare_density_overlap(layout, &target, target_layout, &a)
+                .unwrap()
+                .with_phase_resource(64, PhaseResourceOptions::default(), db, &a)
+                .unwrap();
+            let word = PauliWord::new(bits(1, 0), bits(1, 1), 3).unwrap();
+            let moment = state
+                .prepare_pauli_moment(&word, &rows, &a)
+                .unwrap()
+                .with_phase_resource(64, PhaseResourceOptions::default(), db, &a)
+                .unwrap();
+            for resource in [
+                probability.fixed_phase_resource(),
+                density.fixed_phase_resource(),
+                moment.fixed_phase_resource(),
+            ] {
+                assert_eq!(resource.unwrap().kind(), expected_kind);
+            }
+            capped(probability.evaluate(&state, &compatible, 0, &a), catalogue);
+            capped(
+                density.evaluate(&state, &target, &compatible, &target_outcome, 0, &a),
+                catalogue,
+            );
+            capped(moment.evaluate(&state, &compatible, 0, &a), catalogue);
+            for limit in [0, 64] {
+                for value in [
+                    probability
+                        .evaluate(&state, &inconsistent, limit, &a)
+                        .unwrap(),
+                    density
+                        .evaluate(&state, &target, &inconsistent, &target_outcome, limit, &a)
+                        .unwrap(),
+                    moment.evaluate(&state, &inconsistent, limit, &a).unwrap(),
+                ] {
+                    assert_eq!(value.value, ExactScalar::zero());
+                    assert_eq!((value.quotient_rank, value.terms), (0, 0));
+                }
+            }
+            assert_eq!(
+                probability
+                    .evaluate(&state, &inconsistent, 64, &a)
+                    .unwrap()
+                    .value,
+                ExactScalar::zero()
+            );
+            assert_eq!(
+                density
+                    .evaluate(&state, &target, &inconsistent, &target_outcome, 64, &a)
+                    .unwrap()
+                    .value,
+                ExactScalar::zero()
+            );
+            assert_eq!(
+                moment
+                    .evaluate(&state, &inconsistent, 64, &a)
+                    .unwrap()
+                    .value,
+                ExactScalar::zero()
+            );
+            assert!(matches!(
+                probability.evaluate(&other, &inconsistent, 0, &a),
+                Err(UnitaryError::IncompatibleProgram)
+            ));
+            assert!(matches!(
+                probability.evaluate(&state, &bits(1, 0), 0, &a),
+                Err(UnitaryError::DimensionMismatch)
+            ));
+            assert!(matches!(
+                density.evaluate(&state, &other, &inconsistent, &target_outcome, 0, &a),
+                Err(UnitaryError::IncompatibleProgram)
+            ));
+            assert!(matches!(
+                density.evaluate(&state, &target, &bits(1, 0), &target_outcome, 0, &a),
+                Err(UnitaryError::DimensionMismatch)
+            ));
+            assert!(matches!(
+                moment.evaluate(&other, &inconsistent, 0, &a),
+                Err(UnitaryError::IncompatibleProgram)
+            ));
+            assert!(matches!(
+                moment.evaluate(&state, &bits(1, 0), 0, &a),
+                Err(UnitaryError::DimensionMismatch)
+            ));
+            let zero_word = PauliWord::new(bits(1, 1), bits(1, 0), 0).unwrap();
+            let zero = state
+                .prepare_pauli_moment(&zero_word, &rows, &a)
+                .unwrap()
+                .with_phase_resource(0, PhaseResourceOptions::default(), db, &a)
+                .unwrap();
+            assert!(zero.has_zero_certificate());
+            assert!(zero.fixed_phase_resource().is_none());
+            assert_eq!(
+                zero.evaluate(&state, &inconsistent, 0, &a).unwrap().value,
+                ExactScalar::zero()
+            );
+        }
+        let legacy = state
+            .prepare_probability_with_fibers(&rows, 64, Default::default(), &a)
+            .unwrap();
+        let zero = legacy.evaluate(&state, &inconsistent, 0, &a).unwrap();
+        assert_eq!(zero.value, ExactScalar::zero());
+        assert_eq!((zero.quotient_rank, zero.terms), (0, 0));
+    }
+}
