@@ -2,6 +2,7 @@
 use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::fibers::{FiberOptions, PreparedCliffordFibers};
+use crate::quadratic::QuadraticForm;
 use crate::stabilizer::{PreparedAffineContraction, PreparedLinearBoundary};
 
 /// Immutable probability parent for ordered computational output labels.
@@ -16,6 +17,13 @@ pub struct PreparedProbabilitySupport {
     empty_phase: ParityPhase,
     phase_map: PhaseRestriction,
     resource: PreparedCliffordFibers,
+    clifford: Option<CliffordSupport>,
+}
+struct CliffordSupport {
+    phase: ParityPhase,
+    global: u8,
+    quadratic: QuadraticForm,
+    contraction: PreparedAffineContraction,
 }
 impl CompiledUnitary {
     /// Retain ordered computational parity rows in the unselected diagonal
@@ -62,7 +70,7 @@ impl CompiledUnitary {
             &BitVector::zeros(keep.len())?,
         )?;
         let resource = PreparedCliffordFibers::new(&phase, max_terms, options)?;
-        Ok(PreparedProbabilitySupport {
+        let mut prepared = PreparedProbabilitySupport {
             program: Arc::clone(&self.program),
             projection,
             contraction,
@@ -71,10 +79,68 @@ impl CompiledUnitary {
             empty_phase,
             phase_map,
             resource,
-        })
+            clifford: None,
+        };
+        prepared.prepare_clifford(&joint, self.width(), arithmetic)?;
+        Ok(prepared)
     }
 }
 impl PreparedProbabilitySupport {
+    fn prepare_clifford(
+        &mut self,
+        joint: &AffineKet,
+        physical_width: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<(), UnitaryError> {
+        let variables = self.contraction.output_columns().len();
+        // A rank-zero resource has one Clifford term. Preserve the general
+        // expansion's coordinate order explicitly; a different domain keeps
+        // the general path, including its seeded support-column convention.
+        let identity_domain = self.resource.quotient_rank() == 0
+            && self.resource.clifford_directions().len() == variables
+            && self
+                .resource
+                .clifford_directions()
+                .iter()
+                .enumerate()
+                .all(|(j, v)| v.width() == variables && v.ones().eq(std::iter::once(j)));
+        if !identity_domain {
+            return Ok(());
+        }
+        let Some(projected) = self
+            .projection
+            .project(joint, &BitVector::zeros(physical_width)?)?
+        else {
+            return Ok(());
+        };
+        let Some(reference) = self
+            .contraction
+            .contract(&self.boundary_map.apply(&projected)?, arithmetic)?
+        else {
+            return Ok(());
+        };
+        let phase = self.phase_map.apply(
+            &[
+                (&self.empty_phase, false),
+                (&self.program.query_reference_phase, false),
+                (&self.program.query_reference_phase, true),
+            ],
+            reference.offset(),
+        )?;
+        let labelled = reference.retain_boundary(&(0..self.labels).collect::<Vec<_>>())?;
+        let (global, quadratic) = phase.clifford()?;
+        let contraction = PreparedAffineContraction::new(&clifford_probability_ket(
+            labelled, global, &quadratic, arithmetic,
+        )?)?;
+        self.clifford = Some(CliffordSupport {
+            phase,
+            global,
+            quadratic,
+            contraction,
+        });
+        Ok(())
+    }
+
     pub fn fixed_phase_resource(&self) -> &PreparedCliffordFibers {
         &self.resource
     }
@@ -121,6 +187,40 @@ impl PreparedProbabilitySupport {
             ket.offset(),
         )?;
         let labelled = ket.retain_boundary(&(0..self.labels).collect::<Vec<_>>())?;
+        if let Some(prepared) = &self.clifford {
+            // Certify only the changing correction. Common odd-axis terms
+            // cancel before Clifford conversion; recertifying the complete
+            // reference on each group can dominate the sampling workload.
+            let (global, correction) = phase.subtract(&prepared.phase)?.clifford()?;
+            let quadratic = crate::phase::add_quadratic(&prepared.quadratic, &correction)?;
+            let labelled = clifford_probability_ket(
+                labelled,
+                (prepared.global + global) & 7,
+                &quadratic,
+                arithmetic,
+            )?;
+            let contracted = match prepared.contraction.contract(&labelled, arithmetic) {
+                Ok(value) => value,
+                // Clifford updates can change cross terms or odd linear
+                // parity. Solve that exact geometry without growing a cache.
+                Err(StabilizerError::IncompatibleContraction) => labelled.contract(arithmetic)?,
+                Err(error) => return Err(error.into()),
+            };
+            return Ok(contracted.into_iter().collect());
+        }
         Ok(self.resource.expand(&phase, &labelled, arithmetic)?)
     }
+}
+
+fn clifford_probability_ket(
+    labelled: AffineKet,
+    global: u8,
+    phase: &QuadraticForm,
+    arithmetic: &ScalarArithmetic,
+) -> Result<AffineKet, UnitaryError> {
+    let (offset, columns, boundary, coefficient) = labelled.into_parts();
+    let quadratic = crate::phase::add_quadratic(&boundary, phase)?;
+    let coefficient =
+        arithmetic.multiply(&coefficient, &arithmetic.omega(i64::from(global), 0)?)?;
+    Ok(AffineKet::new(offset, columns, quadratic, coefficient)?)
 }

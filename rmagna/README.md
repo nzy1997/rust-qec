@@ -1344,6 +1344,15 @@ this map after their prepared projection. Captured observation rows also have
 immutable prepared transport coordinates; other queries within the declared
 span use the same exact solver, without adding per-history cache entries.
 
+A certified rank-zero probability parent with the identity fiber domain also
+prepares its labelled Gaussian contraction and certifies its reference phase.
+Updates certify only the Clifford correction and combine it with that boundary,
+preserving global phase and support
+column order. Compatible quadratic geometries reuse elimination; changed cross
+terms or odd linear parity are solved exactly without caching a new history.
+Other parents retain their general Clifford-fiber expansion. The certificate,
+term budget and program identity checks apply before either route.
+
 Set `RuntimeOptions::history_sampler` to `HistorySampler::AffineSupport` to
 propose each controller/guard/requested-record group uniformly from its
 conditioned certified affine envelope. `ExactMarginal` remains the current Rust
