@@ -71,6 +71,12 @@ impl PreparedPhaseResource {
             Decomposition::Catalogue(_) => PhaseResourceKind::CertifiedCatalogue,
         }
     }
+    pub fn num_variables(&self) -> usize {
+        match &self.decomposition {
+            Decomposition::Fibers(resource) => resource.num_variables(),
+            Decomposition::Catalogue(resource) => resource.num_variables(),
+        }
+    }
     pub fn quotient_rank(&self) -> usize {
         match &self.decomposition {
             Decomposition::Fibers(resource) => resource.quotient_rank(),

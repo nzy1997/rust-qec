@@ -33,6 +33,49 @@ pub struct PreparedQueryStatistics {
     pub fixed_resources: usize,
     /// Actual selected catalogue resources; missing keys count as fibers.
     pub catalogue_resources: usize,
+    /// Independent maxima over retained reference resources, not query quotas.
+    pub maximum_quotient_rank: Option<usize>,
+    pub maximum_terms: Option<usize>,
+    pub maximum_phase_variables: Option<usize>,
+}
+impl PreparedQueryStatistics {
+    pub(super) fn from_resources<'a>(
+        cached_queries: usize,
+        resources: impl Iterator<Item = &'a crate::phase::PreparedPhaseResource>,
+    ) -> Self {
+        let mut statistics = Self {
+            cached_queries,
+            fixed_resources: 0,
+            catalogue_resources: 0,
+            maximum_quotient_rank: None,
+            maximum_terms: None,
+            maximum_phase_variables: None,
+        };
+        for resource in resources {
+            statistics.fixed_resources += 1;
+            statistics.catalogue_resources +=
+                usize::from(resource.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue);
+            statistics.maximum_quotient_rank = Some(
+                statistics
+                    .maximum_quotient_rank
+                    .unwrap_or(0)
+                    .max(resource.quotient_rank()),
+            );
+            statistics.maximum_terms = Some(
+                statistics
+                    .maximum_terms
+                    .unwrap_or(0)
+                    .max(resource.num_terms()),
+            );
+            statistics.maximum_phase_variables = Some(
+                statistics
+                    .maximum_phase_variables
+                    .unwrap_or(0)
+                    .max(resource.num_variables()),
+            );
+        }
+        statistics
+    }
 }
 /// Compatibility names for the probability-only preparation interface.
 pub use QueryPreparation as ProbabilityPreparation;
@@ -62,18 +105,12 @@ impl ProbabilityQueries {
             .plans
             .lock()
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-        Ok(PreparedProbabilityStatistics {
-            cached_queries: plans.len(),
-            fixed_resources: plans
+        Ok(PreparedQueryStatistics::from_resources(
+            plans.len(),
+            plans
                 .values()
-                .filter(|p| p.fixed_phase_resource().is_some())
-                .count(),
-            catalogue_resources: plans
-                .values()
-                .filter_map(|p| p.fixed_phase_resource())
-                .filter(|r| r.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue)
-                .count(),
-        })
+                .filter_map(|plan| plan.fixed_phase_resource()),
+        ))
     }
     pub(super) fn evaluate(
         &self,
@@ -155,5 +192,136 @@ impl ProbabilityQueries {
             }
         };
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::phase::{ParityPhase, PhaseResourceOptions, PreparedPhaseResource};
+    #[test]
+    fn resource_peaks_are_independent_and_absent_for_nonfixed_families() {
+        let a = ScalarArithmetic::default();
+        let db = crate::catalogue::builtin_phase_catalogue().unwrap();
+        let bits = |width: usize, mask: usize| {
+            BitVector::from_indices(
+                width,
+                (0..width.min(usize::BITS as usize)).filter(|j| mask >> j & 1 != 0),
+            )
+            .unwrap()
+        };
+        let scalar = PreparedPhaseResource::new(
+            &ParityPhase::new(0, 7, []).unwrap(),
+            8,
+            PhaseResourceOptions::default(),
+            Some(db),
+            &a,
+        )
+        .unwrap();
+        let ccz = ParityPhase::new(
+            3,
+            0,
+            (1_usize..8).map(|m| (bits(3, m), if m.count_ones() % 2 == 1 { 1 } else { 7 })),
+        )
+        .unwrap();
+        let mut computational = PhaseResourceOptions::default();
+        computational.fibers.attempts = 0;
+        let ccz = PreparedPhaseResource::new(&ccz, 8, computational, None, &a).unwrap();
+        let wide =
+            ParityPhase::new(129, 2, [(BitVector::from_indices(129, [128]).unwrap(), 1)]).unwrap();
+        let wide =
+            PreparedPhaseResource::new(&wide, 8, PhaseResourceOptions::default(), Some(db), &a)
+                .unwrap();
+        assert_eq!(scalar.num_variables(), 0);
+        assert_eq!(ccz.num_variables(), 3);
+        assert_eq!(wide.num_variables(), 129);
+        assert_eq!(scalar.catalogue_resource().unwrap().num_variables(), 0);
+        assert_eq!(ccz.clifford_fibers().unwrap().num_variables(), 3);
+        assert_eq!(wide.catalogue_resource().unwrap().num_variables(), 129);
+        assert_eq!(
+            PreparedQueryStatistics::from_resources(4, [&scalar, &ccz, &wide].into_iter()),
+            PreparedQueryStatistics {
+                cached_queries: 4,
+                fixed_resources: 3,
+                catalogue_resources: 2,
+                maximum_quotient_rank: Some(3),
+                maximum_terms: Some(8),
+                maximum_phase_variables: Some(129),
+            }
+        );
+        let empty = PreparedQueryStatistics::from_resources(4, std::iter::empty());
+        assert_eq!(empty.cached_queries, 4);
+        assert_eq!(empty.fixed_resources, 0);
+        assert_eq!(empty.catalogue_resources, 0);
+        assert_eq!(empty.maximum_quotient_rank, None);
+        assert_eq!(empty.maximum_terms, None);
+        assert_eq!(empty.maximum_phase_variables, None);
+        assert_eq!(
+            PreparedQueryStatistics::from_resources(1, [&scalar].into_iter()).maximum_quotient_rank,
+            Some(0)
+        );
+        use crate::catalogue::{
+            CatalogueLimits, CliffordIndicator, PhaseCatalogue, PhaseDecompositionInput,
+        };
+        let mut catalogue = PhaseCatalogue::new();
+        let terms = (0..4)
+            .map(|assignment| {
+                let first = assignment & 1 != 0;
+                let second = assignment & 2 != 0;
+                CliffordIndicator {
+                    coefficient: a.omega(i64::from(first) + i64::from(second), 0).unwrap(),
+                    constraints: vec![(bits(4, 3), first), (bits(4, 12), second)],
+                    phase: ParityPhase::new(
+                        4,
+                        0,
+                        [(first, 1), (second, 4)]
+                            .into_iter()
+                            .filter(|(odd, _)| !odd)
+                            .map(|(_, mask)| (bits(4, mask), 2)),
+                    )
+                    .unwrap(),
+                }
+            })
+            .collect();
+        catalogue
+            .insert(
+                PhaseDecompositionInput {
+                    dimension: 4,
+                    phase_table: (0_u8..16).map(|value| value.count_ones() as u8).collect(),
+                    terms,
+                },
+                &CatalogueLimits::default(),
+                &a,
+            )
+            .unwrap();
+        let four_t = ParityPhase::new(4, 0, (0..4).map(|j| (bits(4, 1 << j), 1))).unwrap();
+        let four_t = PreparedPhaseResource::new(
+            &four_t,
+            8,
+            PhaseResourceOptions::default(),
+            Some(&catalogue),
+            &a,
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                four_t.quotient_rank(),
+                four_t.num_terms(),
+                four_t.num_variables()
+            ),
+            (4, 4, 4)
+        );
+        // Rank, term count and coordinate width have three different owners.
+        assert_eq!(
+            PreparedQueryStatistics::from_resources(5, [&scalar, &ccz, &wide, &four_t].into_iter()),
+            PreparedQueryStatistics {
+                cached_queries: 5,
+                fixed_resources: 4,
+                catalogue_resources: 3,
+                maximum_quotient_rank: Some(4),
+                maximum_terms: Some(8),
+                maximum_phase_variables: Some(129),
+            }
+        );
     }
 }

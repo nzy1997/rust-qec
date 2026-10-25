@@ -50,18 +50,12 @@ impl DensityQueries {
             .entries
             .lock()
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
-        Ok(PreparedQueryStatistics {
-            cached_queries: entries.len(),
-            fixed_resources: entries
+        Ok(PreparedQueryStatistics::from_resources(
+            entries.len(),
+            entries
                 .iter()
-                .filter(|e| e.plan.fixed_phase_resource().is_some())
-                .count(),
-            catalogue_resources: entries
-                .iter()
-                .filter_map(|e| e.plan.fixed_phase_resource())
-                .filter(|r| r.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue)
-                .count(),
-        })
+                .filter_map(|entry| entry.plan.fixed_phase_resource()),
+        ))
     }
     pub(super) fn evaluate(
         &self,

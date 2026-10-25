@@ -108,6 +108,7 @@ fn retained_after_sampling(
             "labels": labels,
             "quotient_rank": quotient_rank,
             "terms": terms,
+            "phase_variables": 3,
             "resource_kind": "clifford_fibers",
             "method": "capped_probability_parent_affine_envelope"
         });
