@@ -16,6 +16,10 @@ fn checked(value: Option<u128>) -> Result<u128, CatalogueError> {
 fn product_rows(a: u128, b: u128, c: u128, d: u128) -> Result<u128, CatalogueError> {
     checked(checked(a.checked_mul(b))?.checked_add(checked(c.checked_mul(d))?))
 }
+fn vector_capacity<T>(field: &str, count: u128) -> Result<(), CatalogueError> {
+    let capacity = (isize::MAX as usize / std::mem::size_of::<T>()) as u128;
+    limit(field, count, capacity)
+}
 impl PhaseCatalogue {
     /// Construct a separate, single-entry catalogue for `sum_j x_j (mod 8)`.
     /// Consecutive pairs use the certified two-T core; an odd last coordinate
@@ -24,8 +28,10 @@ impl PhaseCatalogue {
     ///
     /// Limits apply to the returned catalogue, independently of source usage.
     /// All product row counts and full reconstruction work are checked before
-    /// the Cartesian product is allocated. Arithmetic/validation failures remain
-    /// errors. The source and its shared immutable certificates are unchanged.
+    /// the Cartesian product is allocated. Vector byte capacities are checked
+    /// separately from logical quotas; this does not guarantee available memory.
+    /// Arithmetic/validation failures remain errors. The source and its shared
+    /// immutable certificates are unchanged.
     /// This does not search arbitrary component decompositions or select a
     /// runtime phase resource.
     pub fn paired_t_product(
@@ -35,6 +41,7 @@ impl PhaseCatalogue {
         arithmetic: &ScalarArithmetic,
     ) -> Result<Option<Self>, CatalogueError> {
         let count = assignments(dimension, limits)?;
+        vector_capacity::<u8>("catalogue.product.phase_table_capacity", count as u128)?;
         let mut factors = Vec::with_capacity(dimension.div_ceil(2));
         for offset in (0..dimension).step_by(2) {
             let width = (dimension - offset).min(2);
@@ -46,6 +53,8 @@ impl PhaseCatalogue {
         let mut terms = 1_u128;
         let mut constraints = 0_u128;
         let mut parities = 0_u128;
+        let mut max_term_constraints = 0_u128;
+        let mut max_term_parities = 0_u128;
         for (_, entry) in &factors {
             let next = entry.terms().len() as u128;
             let rows = entry
@@ -61,6 +70,26 @@ impl PhaseCatalogue {
             constraints = product_rows(constraints, next, terms, rows)?;
             parities = product_rows(parities, next, terms, phases)?;
             terms = checked(terms.checked_mul(next))?;
+            max_term_constraints = checked(
+                max_term_constraints.checked_add(
+                    entry
+                        .terms()
+                        .iter()
+                        .map(|t| t.constraints.len() as u128)
+                        .max()
+                        .unwrap_or(0),
+                ),
+            )?;
+            max_term_parities = checked(
+                max_term_parities.checked_add(
+                    entry
+                        .terms()
+                        .iter()
+                        .map(|t| t.phase.terms().len() as u128)
+                        .max()
+                        .unwrap_or(0),
+                ),
+            )?;
             limit("catalogue.max_terms", terms, limits.max_terms as u128)?;
             limit(
                 "catalogue.max_constraint_rows",
@@ -85,6 +114,12 @@ impl PhaseCatalogue {
             work,
             limits.max_verification_work,
         )?;
+        vector_capacity::<CliffordIndicator>("catalogue.product.terms_capacity", terms)?;
+        vector_capacity::<(BitVector, bool)>(
+            "catalogue.product.constraint_capacity",
+            max_term_constraints,
+        )?;
+        vector_capacity::<(BitVector, u8)>("catalogue.product.parity_capacity", max_term_parities)?;
         let mut product = vec![CliffordIndicator {
             coefficient: ExactScalar::one(),
             constraints: vec![],
@@ -97,11 +132,15 @@ impl PhaseCatalogue {
                     let coefficient = arithmetic
                         .multiply(&left.coefficient, &right.coefficient)
                         .map_err(|e| error("catalogue.product.coefficient", e))?;
-                    let mut constraints = left.constraints.clone();
+                    let mut constraints =
+                        Vec::with_capacity(left.constraints.len() + right.constraints.len());
+                    constraints.extend_from_slice(&left.constraints);
                     for (row, bit) in &right.constraints {
                         constraints.push((shifted(row, dimension, offset)?, *bit));
                     }
-                    let mut phases = left.phase.terms().to_vec();
+                    let mut phases =
+                        Vec::with_capacity(left.phase.terms().len() + right.phase.terms().len());
+                    phases.extend_from_slice(left.phase.terms());
                     for (row, c) in right.phase.terms() {
                         phases.push((shifted(row, dimension, offset)?, *c));
                     }
@@ -131,5 +170,35 @@ impl PhaseCatalogue {
             arithmetic,
         )?;
         Ok(Some(result))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn capacity_boundary<T>() {
+        let capacity = (isize::MAX as usize / std::mem::size_of::<T>()) as u128;
+        assert!(std::alloc::Layout::array::<T>(capacity as usize).is_ok());
+        assert!(vector_capacity::<T>("capacity", capacity).is_ok());
+        assert!(std::alloc::Layout::array::<T>((capacity + 1) as usize).is_err());
+        let e = vector_capacity::<T>("capacity", capacity + 1).unwrap_err();
+        assert_eq!(e.field, "capacity");
+        assert_eq!(
+            e.message,
+            format!(
+                "needs at least {}; configured limit is {capacity}",
+                capacity + 1
+            )
+        );
+        assert!(vector_capacity::<T>("capacity", u128::MAX).is_err());
+    }
+
+    #[test]
+    fn vector_capacity_matches_platform_layout_without_allocating() {
+        capacity_boundary::<u8>();
+        capacity_boundary::<CliffordIndicator>();
+        capacity_boundary::<(BitVector, bool)>();
+        capacity_boundary::<(BitVector, u8)>();
     }
 }
