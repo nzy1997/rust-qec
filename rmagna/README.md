@@ -3841,3 +3841,25 @@ three query families, compare seeded fresh/reused/prepared runs in both
 compilers and samplers with nonlinear callbacks, verify saved CLI JSON and
 pilots, and exercise explicit cache failures, retries and real missing-key
 fallback. Formal paper benchmarks and products/injection remain subsequent work.
+
+## Retained query resource sizes
+
+`PreparedQueryStatistics` includes independent maxima
+`maximum_quotient_rank`, `maximum_terms` and `maximum_phase_variables` over the
+actually retained fixed resources in a scalar-query cache. Each is `None` when
+there is no fixed resource, including an empty cache, trace preparation and a
+cache containing only anticommutation zero certificates. A retained rank-zero
+resource has `Some(0)` rank and a real term count. The independent maxima can
+come from different families; they are not a synthetic combined resource.
+
+`PreparedSupportStatistics::phase_variables` reports the selected probability
+parent resource's reference coordinate width. Its existing rank, terms and kind
+refer to the same resource. Both resource variants and `PreparedPhaseResource`
+expose `num_variables` for direct inspection. File snapshots and the evaluation
+example retain these sizes alongside cache/resource counts.
+
+These are retained reference preparation diagnostics, before any draw-specific
+zero or adaptive cancellation. They are distinct from configured term/path
+quotas, raw Clifford paths, output labels and per-query execution counts. The
+additional inspection does not construct resources, evaluate quantum responses,
+consume entropy, change configuration fingerprints or alter cache bounds.

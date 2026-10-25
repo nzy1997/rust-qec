@@ -119,6 +119,9 @@ impl PreparedCliffordFibers {
             fibers,
         })
     }
+    pub fn num_variables(&self) -> usize {
+        self.reference.num_variables()
+    }
     pub fn quotient_rank(&self) -> usize {
         self.quotient_rank
     }

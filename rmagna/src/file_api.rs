@@ -446,17 +446,24 @@ fn compilation_snapshot(
     included: bool,
 ) -> Result<Value, TaskError> {
     let d = evaluator.compilation();
+    let query_statistics = |s: crate::instrument::PreparedQueryStatistics| {
+        json!({
+            "cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,
+            "catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,
+            "maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables,
+        })
+    };
     let probability = evaluator
         .prepared_probability_statistics()?
-        .map(|s| json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
+        .map(query_statistics);
     let density = evaluator
         .prepared_density_statistics()?
-        .map(|s| json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
+        .map(query_statistics);
     let moment = evaluator
         .prepared_moment_statistics()?
-        .map(|s| json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
+        .map(query_statistics);
     let insertions=evaluator.prepared_insertion_statistics().map(|s|json!({"catalog_entries":s.catalog_entries,"estimated_peak_bytes":s.estimated_peak_bytes}));
-    let support=evaluator.prepared_support_statistics()?.map(|s|json!({"labels":s.labels,"quotient_rank":s.quotient_rank,"terms":s.terms,"resource_kind":s.resource_kind.name(),"method":"capped_probability_parent_affine_envelope"}));
+    let support=evaluator.prepared_support_statistics()?.map(|s|json!({"labels":s.labels,"quotient_rank":s.quotient_rank,"terms":s.terms,"resource_kind":s.resource_kind.name(),"phase_variables":s.phase_variables,"method":"capped_probability_parent_affine_envelope"}));
     let proposal=evaluator.scaled_proposal_summary().map(|s|json!({"proposal_scale":{"numerator":s.proposal_scale.numer().to_string(),"denominator":s.proposal_scale.denom().to_string()},"categories":s.categories,"scaled_categories":s.scaled_categories,"unchanged_categories":s.unchanged_categories,"excluded_categories":s.excluded_categories,"endpoint_categories":s.endpoint_categories}));
     Ok(
         json!({"route":evaluator.execution_route(),"proposal_summary":proposal,"compilation":{

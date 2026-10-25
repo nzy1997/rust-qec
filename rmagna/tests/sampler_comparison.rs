@@ -107,6 +107,7 @@ fn assert_support_cache_transition(
     labels: usize,
     quotient_rank: usize,
     terms: usize,
+    phase_variables: usize,
 ) {
     assert!(before["support"].is_null());
     let mut expected = before.clone();
@@ -115,6 +116,7 @@ fn assert_support_cache_transition(
             "labels": labels,
             "quotient_rank": quotient_rank,
             "terms": terms,
+            "phase_variables": phase_variables,
             "resource_kind": "clifford_fibers",
             "method": "capped_probability_parent_affine_envelope"
         });
@@ -185,6 +187,7 @@ fn actual_pilots_match_independent_prepared_channels_without_mutating_configurat
             3,
             0,
             1,
+            3,
         );
         assert_eq!(
             saved["preparation"]["execution_costs"]["compilation"]["succeeded"],
@@ -501,6 +504,7 @@ fn nonclifford_weighted_pilots_keep_true_sampler_statistics_and_prepared_caches(
                 1,
                 2,
                 2,
+                3,
             );
         }
     }
@@ -778,6 +782,7 @@ fn projected_magic_target_pilots_preserve_literal_feedback_moments_and_normaliza
                 1,
                 2,
                 2,
+                4,
             );
             assert_eq!(
                 receipt["sampling"]["fingerprints"],

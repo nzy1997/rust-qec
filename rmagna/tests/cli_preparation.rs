@@ -673,6 +673,22 @@ fn catalogue_cli_modes_export_actual_resources_and_accept_prepared_sampler_pilot
         result["compilation"]["retained_caches"]["support"]["resource_kind"],
         "certified_catalogue"
     );
+    assert_eq!(
+        result["compilation"]["retained_caches"]["probability"]["maximum_quotient_rank"],
+        2
+    );
+    assert_eq!(
+        result["compilation"]["retained_caches"]["probability"]["maximum_terms"],
+        2
+    );
+    assert_eq!(
+        result["compilation"]["retained_caches"]["probability"]["maximum_phase_variables"],
+        2
+    );
+    assert_eq!(
+        result["compilation"]["retained_caches"]["support"]["phase_variables"],
+        3
+    );
     for field in [
         "probability_preparation",
         "density_preparation",
