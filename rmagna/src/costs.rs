@@ -1,4 +1,4 @@
-//! Explicit call-local logical operation counters and inclusive wall times.
+//! Caller-owned logical operation counters, shared quotas and inclusive times.
 use std::{
     cell::RefCell,
     fmt,
@@ -38,9 +38,19 @@ impl ExecutionCosts {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CostError {
-    CounterOverflow { operation: OperationKind },
-    QueryLimit { limit: u64 },
-    TimeLimit { limit: Duration },
+    CounterOverflow {
+        operation: OperationKind,
+    },
+    QueryLimit {
+        limit: u64,
+    },
+    TimeLimit {
+        limit: Duration,
+    },
+    InvalidCheckpoint {
+        operation: OperationKind,
+        reason: &'static str,
+    },
 }
 impl fmt::Display for CostError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -57,6 +67,9 @@ impl fmt::Display for CostError {
                 "run exhausted max_seconds = {} between operations",
                 limit.as_secs_f64()
             ),
+            Self::InvalidCheckpoint { operation, reason } => {
+                write!(f, "execution {operation:?} checkpoint is invalid: {reason}")
+            }
         }
     }
 }
@@ -82,6 +95,49 @@ impl ExecutionLimits {
     }
 }
 
+/// Typed state captured between completed operations. Inclusive operation times
+/// may overlap; elapsed is the separately charged owned wall-clock duration.
+/// This carries no RNG, task identity, statistics or persistence encoding.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ExecutionMeterCheckpoint {
+    pub limits: ExecutionLimits,
+    pub costs: ExecutionCosts,
+    pub elapsed: Duration,
+}
+impl ExecutionMeterCheckpoint {
+    fn validate(&self) -> Result<(), CostError> {
+        for (kind, cost) in [
+            (OperationKind::Compilation, self.costs.compilation),
+            (OperationKind::Query, self.costs.query),
+            (OperationKind::Decoder, self.costs.decoder),
+            (OperationKind::Support, self.costs.support),
+        ] {
+            if cost.succeeded.checked_add(cost.failed) != Some(cost.attempted) {
+                return Err(CostError::InvalidCheckpoint {
+                    operation: kind,
+                    reason: "attempted must equal succeeded plus failed; in-flight operations cannot be restored",
+                });
+            }
+            if !cost.seconds.is_finite()
+                || cost.seconds < 0.0
+                || (cost.attempted == 0 && cost.seconds != 0.0)
+            {
+                return Err(CostError::InvalidCheckpoint {
+                    operation: kind,
+                    reason: "operation seconds must be finite and nonnegative, and zero without attempts",
+                });
+            }
+        }
+        if self.costs.query.attempted > self.limits.max_queries {
+            return Err(CostError::InvalidCheckpoint {
+                operation: OperationKind::Query,
+                reason: "query attempts exceed the saved max_queries",
+            });
+        }
+        Ok(())
+    }
+}
+
 /// One caller owns each collector. It is neither global nor shared across
 /// threads; concurrent runs construct their own collectors. Nested operations
 /// are supported, and elapsed times are inclusive, not additive partitions.
@@ -89,6 +145,7 @@ pub struct ExecutionMeter {
     costs: RefCell<ExecutionCosts>,
     limits: ExecutionLimits,
     started: Instant,
+    elapsed_offset: Duration,
 }
 impl Default for ExecutionMeter {
     fn default() -> Self {
@@ -101,10 +158,39 @@ impl ExecutionMeter {
             costs: RefCell::new(ExecutionCosts::default()),
             limits,
             started: Instant::now(),
+            elapsed_offset: Duration::ZERO,
         }
     }
     pub fn limits(&self) -> ExecutionLimits {
         self.limits
+    }
+    /// Charged elapsed time, including any restored prefix. Saturates at the
+    /// largest Duration; operation seconds remain separately inclusive.
+    pub fn elapsed(&self) -> Duration {
+        self.elapsed_offset.saturating_add(self.started.elapsed())
+    }
+    /// Capture completed counters and exact charged time. An active operation
+    /// is rejected instead of being silently restored as finished or retried.
+    pub fn checkpoint(&self) -> Result<ExecutionMeterCheckpoint, CostError> {
+        let checkpoint = ExecutionMeterCheckpoint {
+            limits: self.limits,
+            costs: self.snapshot(),
+            elapsed: self.elapsed(),
+        };
+        checkpoint.validate()?;
+        Ok(checkpoint)
+    }
+    /// Continue the same counters/limits, adding new owned lifetime to the saved
+    /// elapsed prefix. Downtime since capture is excluded. Already-exhausted
+    /// budgets remain inspectable and reject before another operation starts.
+    pub fn from_checkpoint(checkpoint: ExecutionMeterCheckpoint) -> Result<Self, CostError> {
+        checkpoint.validate()?;
+        Ok(Self {
+            costs: RefCell::new(checkpoint.costs),
+            limits: checkpoint.limits,
+            started: Instant::now(),
+            elapsed_offset: checkpoint.elapsed,
+        })
     }
     fn check_elapsed(&self, elapsed: Duration) -> Result<(), CostError> {
         if let Some(limit) = self.limits.max_duration
@@ -116,7 +202,7 @@ impl ExecutionMeter {
     }
     /// Check only the deadline, for example before drawing more entropy.
     pub fn check_time(&self) -> Result<(), CostError> {
-        self.check_elapsed(self.started.elapsed())
+        self.check_elapsed(self.elapsed())
     }
     pub fn snapshot(&self) -> ExecutionCosts {
         *self.costs.borrow()

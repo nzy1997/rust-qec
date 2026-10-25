@@ -4050,3 +4050,43 @@ controller unwinds.
 This core has no persistent sampling-session restore, durable task/controller
 identity binding or file/CLI stream command; exact statistics checkpoints remain
 the separate layer described above.
+
+## Restoring cumulative execution budgets
+
+`ExecutionMeter::checkpoint` captures an `ExecutionMeterCheckpoint` containing
+the original limits, complete attempted/succeeded/failed counters, inclusive
+operation seconds and separately charged elapsed `Duration`. Operation times can
+overlap and are not used to infer elapsed wall time.
+
+`ExecutionMeter::from_checkpoint` validates the supplied state and preserves all
+spent logical queries. New owned lifetime is added to the saved elapsed prefix;
+downtime after capture is excluded. Already-spent deadlines remain inspectable
+and reject before the next operation. Elapsed duration saturates at
+`Duration::MAX`. `ExecutionMeter::elapsed` exposes this charged duration directly.
+
+```rust
+use rmagna::costs::{CostError, ExecutionLimits, ExecutionMeter, OperationKind};
+let meter = ExecutionMeter::new(ExecutionLimits {
+    max_queries: 1, ..Default::default()
+});
+meter.measure::<_, CostError>(OperationKind::Query, || Ok(()))?;
+let resumed = ExecutionMeter::from_checkpoint(meter.checkpoint()?)?;
+assert!(matches!(resumed.measure::<(), CostError>(OperationKind::Query,
+    || panic!("spent quota must reject before action")),
+    Err(CostError::QueryLimit { limit: 1 })));
+# Ok::<(), CostError>(())
+```
+
+Checkpoints require `attempted = succeeded + failed` for every operation kind,
+with checked count addition. Capturing an active measurement is rejected.
+Seconds must be finite/nonnegative and zero for a kind with no attempts; query
+attempts cannot exceed the saved cap. Errors identify the operation kind and
+violated invariant. Restored count exhaustion still rejects before an action;
+nested calls, ordinary failures and caught unwinds retain their logical counts.
+
+This typed state does not serialize itself or bind a circuit, controller, RNG or
+statistics accumulator. A complete sampling checkpoint must validate those
+identities and cursor/statistical states in addition to restoring the meter.
+
+Checkpoint validation uses `CostError::InvalidCheckpoint { operation, reason }`.
+Code that exhaustively matches `CostError` must handle this new variant.
