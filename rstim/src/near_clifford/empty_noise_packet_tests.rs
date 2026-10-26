@@ -121,8 +121,6 @@ fn empty_noise_packets_preserve_ordered_columns_and_sidecar_ordinals() {
                         lanes,
                         all,
                         event: 0,
-                        noise_event: 0,
-                        independent_event: 0,
                         first: 0,
                         count: 0,
                         category: 0,
@@ -137,8 +135,7 @@ fn empty_noise_packets_preserve_ordered_columns_and_sidecar_ordinals() {
                         actual, expected,
                         "lanes={lanes}, empty={empty}, compact_noise={use_noise}, compact_independent={use_independent}"
                     );
-                    assert_eq!(columns.noise_event, plan.noise_event_count);
-                    assert_eq!(columns.independent_event, plan.independent_event_count);
+                    assert_eq!(columns.event, model.packet_inputs.len());
                     assert!(columns.next().is_none());
                     for sweep in [&[][..], &[true][..]] {
                         let mut expected_mask = 0;

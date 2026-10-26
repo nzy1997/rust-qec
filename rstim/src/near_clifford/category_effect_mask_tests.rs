@@ -255,8 +255,6 @@ fn category_effect_masks_match_scalar_for_mixed_categories_and_sidecars() {
                     lanes,
                     all,
                     event: 0,
-                    noise_event: 0,
-                    independent_event: 0,
                     first: 0,
                     count: 0,
                     category: 0,
@@ -352,6 +350,16 @@ fn category_effect_success_streams_match_full_category_traversal() {
                 input.contributes = true;
                 input.contributing_categories = (1u16 << input.count) - 1;
             }
+            full_model.packet_inputs = ActiveFreePredicate::index_packet_inputs(
+                &full_model.inputs,
+                &plan.random_kinds,
+                &mut Quota {
+                    bytes: 0,
+                    limit: usize::MAX,
+                    work: usize::MAX,
+                },
+            )
+            .unwrap();
             reference.predicate.set(Some(full_model)).unwrap();
             let mut a = SmallRng::seed_from_u64(0xca7e_2026_1023_0001 + cache as u64);
             let mut b = a.clone();

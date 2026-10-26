@@ -11,6 +11,12 @@ struct Input {
     contributing_categories: u16,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct PacketInput {
+    event: usize,
+    ordinal: usize,
+}
+
 struct Quota {
     bytes: usize,
     limit: usize,
@@ -178,6 +184,7 @@ fn apply(
 pub(in super::super) struct ActiveFreePredicate {
     eligible: Vec<usize>,
     inputs: Vec<Input>,
+    packet_inputs: Vec<PacketInput>,
     sweeps: Vec<u32>,
     sweep_first: usize,
     variables: usize,
@@ -475,9 +482,11 @@ impl ActiveFreePredicate {
             }
         }
         Self::mark_contributing_inputs(&mut inputs, output_words, &columns, &mut quota)?;
+        let packet_inputs = Self::index_packet_inputs(&inputs, &plan.random_kinds, &mut quota)?;
         Some(Self {
             eligible,
             inputs,
+            packet_inputs,
             sweeps,
             sweep_first,
             variables,
@@ -518,6 +527,43 @@ impl ActiveFreePredicate {
         }
         self.columns
             .get(variable * self.words..(variable + 1) * self.words)
+    }
+
+    fn index_packet_inputs(
+        inputs: &[Input],
+        kinds: &[RandomKind],
+        quota: &mut Quota,
+    ) -> Option<Vec<PacketInput>> {
+        if inputs.len() != kinds.len() {
+            return None;
+        }
+        quota.tick(inputs.len())?;
+        let count = inputs.iter().filter(|input| input.contributes).count();
+        let mut indexed = quota.zeros::<PacketInput>(count)?;
+        quota.tick(inputs.len())?;
+        let (mut noise, mut independent, mut next) = (0usize, 0usize, 0usize);
+        for (event, (input, kind)) in inputs.iter().zip(kinds).enumerate() {
+            // Ordinals belong to the complete producer, including events with
+            // zero detector effect. Retain their original index in each sidecar.
+            let ordinal = match kind {
+                RandomKind::Noise { .. } => {
+                    let ordinal = noise;
+                    noise = noise.checked_add(1)?;
+                    ordinal
+                }
+                RandomKind::Independent => {
+                    let ordinal = independent;
+                    independent = independent.checked_add(1)?;
+                    ordinal
+                }
+                RandomKind::Active => 0,
+            };
+            if input.contributes {
+                indexed[next] = PacketInput { event, ordinal };
+                next += 1;
+            }
+        }
+        Some(indexed)
     }
 }
 
@@ -610,9 +656,8 @@ struct PacketColumns<'a> {
     independent: Option<&'a IndependentPacket>,
     lanes: usize,
     all: u64,
+    // Cursor into the immutable contributing-event index, not the full tape.
     event: usize,
-    noise_event: usize,
-    independent_event: usize,
     first: usize,
     count: usize,
     category: usize,
@@ -634,7 +679,8 @@ impl<'a> Iterator for PacketColumns<'a> {
                 let column = model.column(self.first + category)?;
                 return Some((column, mask));
             }
-            let event = self.event;
+            let indexed = *self.model.packet_inputs.get(self.event)?;
+            let event = indexed.event;
             let kind = *self.plan.random_kinds.get(event)?;
             self.event += 1;
             let input = self.model.inputs[event];
@@ -643,13 +689,6 @@ impl<'a> Iterator for PacketColumns<'a> {
             self.count = 0;
             self.category = 0;
             if !input.contributes {
-                // The complete producer has already consumed this event. Keep
-                // its sidecar ordinal even when no detector needs its mask.
-                match kind {
-                    RandomKind::Noise { .. } => self.noise_event += 1,
-                    RandomKind::Independent => self.independent_event += 1,
-                    RandomKind::Active => {}
-                }
                 continue;
             }
             self.count = input.count;
@@ -661,7 +700,7 @@ impl<'a> Iterator for PacketColumns<'a> {
                 }
                 RandomKind::Independent => {
                     self.masks[0] = if let Some(packet) = self.independent {
-                        packet.mask(self.independent_event)
+                        packet.mask(indexed.ordinal)
                     } else {
                         let mut selected = 0;
                         for lane in 0..self.lanes {
@@ -671,15 +710,13 @@ impl<'a> Iterator for PacketColumns<'a> {
                         }
                         selected
                     };
-                    self.independent_event += 1;
                 }
                 RandomKind::Noise { choices, .. } => {
-                    let noise_event = self.noise_event;
+                    let noise_event = indexed.ordinal;
                     let selected = self.hits[noise_event] & self.all;
-                    self.noise_event += 1;
                     if selected == 0 {
-                        // No valid lane selected this event. Preserve its
-                        // sidecar ordinal, then skip the empty categories.
+                        // No valid lane selected this event. Skip its empty
+                        // categories; later inputs retain independent ordinals.
                         self.count = 0;
                         continue;
                     }
@@ -711,6 +748,10 @@ mod category_effect_mask_tests;
 #[cfg(test)]
 #[path = "empty_noise_packet_tests.rs"]
 mod empty_noise_packet_tests;
+
+#[cfg(test)]
+#[path = "contributing_event_index_tests.rs"]
+mod contributing_event_index_tests;
 
 impl ActiveFreePredicate {
     // Only a model built from this same immutable plan may be used. The caller
@@ -790,8 +831,6 @@ impl ActiveFreePredicate {
             lanes,
             all,
             event: 0,
-            noise_event: 0,
-            independent_event: 0,
             first: 0,
             count: 0,
             category: 0,
