@@ -90,3 +90,9 @@ and the [rmatching decoder](https://github.com/nzy1997/rust-qec/tree/master/rmat
 The full API reference is available on [docs.rs](https://docs.rs/rstim).
 
 Licensed under [Apache-2.0](LICENSE).
+
+For a Rust-only library dependency, set `default-features = false`. Core simulation,
+DEM analysis, measurement transforms, and QP101/SVG export remain available.
+Compressed sample archive readers, writers, and corruption fixtures require the
+`archive-zstd` feature, enabled by default and by `cli`. Archive metadata and
+uncompressed measurement transforms do not require it.

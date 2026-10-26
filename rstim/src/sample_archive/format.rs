@@ -433,6 +433,7 @@ impl GlobalHeader {
         Ok(header)
     }
 
+    #[cfg(feature = "archive-zstd")]
     pub(crate) fn validate_after_checksum(&self) -> Result<(), SampleArchiveError> {
         self.validate_shape()
     }
