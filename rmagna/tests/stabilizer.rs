@@ -914,3 +914,213 @@ fn prepared_affine_contractions_handle_zero_references_and_wide_hidden_paths() {
             .is_err()
     );
 }
+
+#[test]
+fn prepared_phase_updates_reuse_boundary_bases_and_preserve_cold_kets_and_literal_amplitudes() {
+    use rmagna::stabilizer::PreparedAffineContraction;
+    let a = ScalarArithmetic::default();
+    let mut next = rng();
+    let (mut retained, mut rebuilt) = (0, 0);
+    for width in 0..=5 {
+        for paths in 0..=8 {
+            let reference = random_ket(width, paths, &mut next, &a);
+            let plan = PreparedAffineContraction::new(&reference).unwrap();
+            for update in 0..6 {
+                let phase = if update == 0 {
+                    reference.phase().clone()
+                } else {
+                    random_ket(width, paths, &mut next, &a).phase().clone()
+                };
+                let input = AffineKet::new(
+                    bits(width, next()),
+                    reference.columns().to_vec(),
+                    phase,
+                    if update == 1 {
+                        ExactScalar::zero()
+                    } else {
+                        a.omega((next() & 7) as i64, -3).unwrap()
+                    },
+                )
+                .unwrap();
+                let actual = plan.contract_with_phase_updates(&input, &a).unwrap();
+                let cold = input.contract(&a).unwrap();
+                match plan.contract(&input, &a) {
+                    Ok(strict) => {
+                        retained += 1;
+                        assert_eq!(actual, strict);
+                    }
+                    Err(StabilizerError::IncompatibleContraction) => {
+                        rebuilt += 1;
+                        assert_eq!(actual, cold);
+                    }
+                    Err(error) => panic!("unexpected strict error: {error}"),
+                }
+                assert_state(actual.as_ref(), width, &literal(&input, &a), &a);
+            }
+        }
+    }
+    assert!(retained > 0 && rebuilt > 0);
+}
+
+#[test]
+fn arbitrary_phase_updates_keep_wide_zero_reference_bases_and_independent_gaussian_products() {
+    use rmagna::stabilizer::PreparedAffineContraction;
+    let a = ScalarArithmetic::default();
+    let paths = 129;
+    let width = 129;
+    let columns = vec![BitVector::zeros(width).unwrap(); paths];
+    let reference = AffineKet::new(
+        BitVector::zeros(width).unwrap(),
+        columns.clone(),
+        QuadraticForm::new(
+            0,
+            vec![0; paths],
+            vec![BitVector::zeros(paths).unwrap(); paths],
+        )
+        .unwrap(),
+        ExactScalar::zero(),
+    )
+    .unwrap();
+    let plan = PreparedAffineContraction::new(&reference).unwrap();
+    drop(reference);
+    for update in 0..8 {
+        let mut upper = vec![BitVector::zeros(paths).unwrap(); paths];
+        let mut linear = vec![0; paths];
+        let mut expected = a.omega((2 * update + 3) as i64, -4).unwrap();
+        for j in (0..paths - 1).step_by(2) {
+            let cross = (j / 2 + update) % 2 == 0;
+            // Even coefficients on a coupled pair give a nonzero two-bit
+            // Gauss sum; odd coefficients keep each uncoupled unary nonzero.
+            let l = 2 * ((j + update) % 2) as u8 + u8::from(!cross);
+            let r = 2 * ((j / 2 + update) % 2) as u8 + u8::from(!cross);
+            linear[j] = l;
+            linear[j + 1] = r;
+            if cross {
+                upper[j].set(j + 1, true).unwrap();
+            }
+            let mut factor = ExactScalar::zero();
+            for x in 0..2 {
+                for y in 0..2 {
+                    let phase = 2
+                        * (usize::from(l) * x
+                            + usize::from(r) * y
+                            + 2 * usize::from(cross) * x * y);
+                    factor = a.add(&factor, &a.omega(phase as i64, 0).unwrap()).unwrap();
+                }
+            }
+            expected = a.multiply(&expected, &factor).unwrap();
+        }
+        linear[paths - 1] = if update == 7 {
+            2
+        } else {
+            1 + 2 * (update % 2) as u8
+        };
+        expected = a
+            .multiply(
+                &expected,
+                &a.add(
+                    &ExactScalar::one(),
+                    &a.omega(2 * i64::from(linear[paths - 1]), 0).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(expected.is_zero(), update == 7);
+        let offset = BitVector::from_indices(width, [0, 64, 128]).unwrap();
+        let input = AffineKet::new(
+            offset.clone(),
+            columns.clone(),
+            QuadraticForm::new(update as u8 % 4, linear, upper).unwrap(),
+            a.omega(3, -4).unwrap(),
+        )
+        .unwrap();
+        let actual = plan.contract_with_phase_updates(&input, &a).unwrap();
+        assert_eq!(actual, input.contract(&a).unwrap());
+        match actual {
+            Some(ket) => {
+                assert!(ket.columns().is_empty());
+                assert_eq!(ket.offset(), &offset);
+                assert_eq!(
+                    ket.prepare().unwrap().amplitude(&offset, &a).unwrap(),
+                    expected
+                );
+            }
+            None => assert_eq!(expected, ExactScalar::zero()),
+        }
+    }
+}
+
+#[test]
+fn phase_update_routes_reject_changed_boundaries_before_zero_and_keep_arithmetic_limits() {
+    use rmagna::stabilizer::PreparedAffineContraction;
+    let a = ScalarArithmetic::default();
+    let zero = QuadraticForm::new(0, vec![0; 2], vec![bits(2, 0); 2]).unwrap();
+    let reference = AffineKet::new(
+        bits(3, 0),
+        vec![bits(3, 1), bits(3, 0)],
+        zero.clone(),
+        ExactScalar::one(),
+    )
+    .unwrap();
+    let plan = PreparedAffineContraction::new(&reference).unwrap();
+    let changed = QuadraticForm::new(1, vec![1, 0], vec![bits(2, 2), bits(2, 0)]).unwrap();
+    for input in [
+        AffineKet::new(
+            bits(3, 0),
+            vec![bits(3, 2), bits(3, 0)],
+            changed.clone(),
+            ExactScalar::zero(),
+        )
+        .unwrap(),
+        AffineKet::new(
+            bits(4, 0),
+            vec![bits(4, 1), bits(4, 0)],
+            changed.clone(),
+            ExactScalar::zero(),
+        )
+        .unwrap(),
+        AffineKet::new(
+            bits(3, 0),
+            vec![],
+            QuadraticForm::new(0, vec![], vec![]).unwrap(),
+            ExactScalar::zero(),
+        )
+        .unwrap(),
+    ] {
+        assert!(matches!(
+            plan.contract_with_phase_updates(&input, &a),
+            Err(StabilizerError::IncompatibleContraction)
+        ));
+    }
+    let zero_input = AffineKet::new(
+        bits(3, 7),
+        reference.columns().to_vec(),
+        changed.clone(),
+        ExactScalar::zero(),
+    )
+    .unwrap();
+    assert!(
+        plan.contract_with_phase_updates(&zero_input, &a)
+            .unwrap()
+            .is_none()
+    );
+    let input = AffineKet::new(
+        bits(3, 0),
+        reference.columns().to_vec(),
+        changed,
+        a.integer(3).unwrap(),
+    )
+    .unwrap();
+    assert!(matches!(
+        plan.contract(&input, &a),
+        Err(StabilizerError::IncompatibleContraction)
+    ));
+    assert!(
+        plan.contract_with_phase_updates(&input, &ScalarArithmetic::new(1).unwrap())
+            .is_err()
+    );
+    assert_eq!(
+        plan.contract_with_phase_updates(&reference, &a).unwrap(),
+        plan.contract(&reference, &a).unwrap()
+    );
+}

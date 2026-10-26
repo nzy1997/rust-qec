@@ -1262,6 +1262,9 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                         } else {
                             0
                         },
+                        maximum_quotient_rank: mode.is_fixed().then_some(0),
+                        maximum_terms: mode.is_fixed().then_some(1),
+                        maximum_phase_variables: mode.is_fixed().then_some(0),
                     }
                 );
             }
@@ -1271,6 +1274,9 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                     cached_queries: 0,
                     fixed_resources: 0,
                     catalogue_resources: 0,
+                    maximum_quotient_rank: None,
+                    maximum_terms: None,
+                    maximum_phase_variables: None,
                 }
             );
         }

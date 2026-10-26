@@ -284,7 +284,8 @@ fn a_closed_stderr_retains_the_committed_prefix_as_a_progress_failure() {
     use std::process::Stdio;
     let f = Files::new();
     let (reader, writer) = UnixStream::pair().unwrap();
-    drop(reader);
+    // The live peer makes the write-side shutdown the explicit failure source.
+    writer.shutdown(std::net::Shutdown::Write).unwrap();
     let descriptor: OwnedFd = writer.into();
     let out = f
         .command()
@@ -302,6 +303,7 @@ fn a_closed_stderr_retains_the_committed_prefix_as_a_progress_failure() {
         .stderr(Stdio::from(descriptor))
         .output()
         .unwrap();
+    drop(reader);
     let v = value(&out, 1);
     assert_eq!(v["completed"], 2);
     assert_eq!(v["failed"], 0);

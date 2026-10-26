@@ -6,9 +6,10 @@ mod evaluate;
 pub use evaluate::{
     BatchProgress, ContractionResources, EvaluationOptions, ExactInterval, FamilyPreparationCounts,
     ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
-    SamplingPreparationOptions, SamplingPreparationReport, TaskEnumeration, TaskEnumerationOptions,
-    TaskEvaluation, TaskEvaluator, TaskPatternResponse, TaskRunOptions, TaskRunResult,
-    TaskRunStatistics, TaskSectorMasses, TaskVariances, TaskWeightSector, run_task_batch,
+    SamplingPreparationOptions, SamplingPreparationReport, StreamRecordRetention, TaskEnumeration,
+    TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskPatternResponse, TaskRunOptions,
+    TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskStream, TaskStreamOptions,
+    TaskStreamReport, TaskStreamStatus, TaskVariances, TaskWeightSector, run_task_batch,
 };
 pub(crate) use evaluate::{RunHooks, run_task_batch_inspected};
 mod parse;

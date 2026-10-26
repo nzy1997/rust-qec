@@ -13,9 +13,12 @@ struct Step {
 /// width, support columns, quadratic cross terms and linear parity must agree.
 /// Every structural step is recorded even for a zero reference. Evaluation
 /// preserves unnormalized amplitudes and performs no support factorization.
+/// `contract_with_phase_updates` also admits arbitrary quadratic updates by
+/// repeating Gaussian elimination in the retained boundary basis.
 /// Non-Clifford phase resources and complete query closure are separate.
 pub struct PreparedAffineContraction {
     reference: AffineKet,
+    pivots: Vec<usize>,
     basis: Vec<BitVector>,
     restricted: QuadraticForm,
     steps: Vec<Step>,
@@ -69,6 +72,7 @@ impl PreparedAffineContraction {
         let columns = keep.iter().map(|&j| columns[j].clone()).collect();
         Ok(Self {
             reference: reference.clone(),
+            pivots: factor.pivot_columns().to_vec(),
             basis,
             restricted,
             steps,
@@ -80,6 +84,31 @@ impl PreparedAffineContraction {
 
     pub(crate) fn output_columns(&self) -> &[BitVector] {
         &self.columns
+    }
+
+    /// Contract arbitrary quadratic phase updates on the same boundary columns.
+    /// Compatible even updates retain the recorded elimination steps. Changed
+    /// cross terms or linear parity reuse the proved pivot/kernel basis while
+    /// recomputing exact Gaussian elimination. Boundary changes remain errors,
+    /// including for a zero input; no changed plan is cached.
+    pub fn contract_with_phase_updates(
+        &self,
+        input: &AffineKet,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<AffineKet>, StabilizerError> {
+        match self.contract(input, arithmetic) {
+            Err(StabilizerError::IncompatibleContraction)
+                if input.width() == self.reference.width()
+                    && input.columns == self.reference.columns =>
+            {
+                input.contract_with_basis(
+                    &self.pivots,
+                    &self.basis[self.pivots.len()..],
+                    arithmetic,
+                )
+            }
+            result => result,
+        }
     }
 
     /// Contract a compatible ket, including updates to a zero reference.

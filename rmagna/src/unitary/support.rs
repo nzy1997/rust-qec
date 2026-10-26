@@ -219,10 +219,13 @@ impl PreparedProbabilitySupport {
                 &quadratic,
                 arithmetic,
             )?;
-            let contracted = match prepared.contraction.contract(&labelled, arithmetic) {
+            let contracted = match prepared
+                .contraction
+                .contract_with_phase_updates(&labelled, arithmetic)
+            {
                 Ok(value) => value,
-                // Clifford updates can change cross terms or odd linear
-                // parity. Solve that exact geometry without growing a cache.
+                // A changed boundary map also invalidates the retained basis.
+                // Keep the general exact route without growing a cache.
                 Err(StabilizerError::IncompatibleContraction) => labelled.contract(arithmetic)?,
                 Err(error) => return Err(error.into()),
             };

@@ -286,9 +286,9 @@ pub fn run(
     let warm = (warm_replays > 0).then(|| serde_json::json!({"count":warm_replays,"query_ms":replay_ms,
         "cache_unchanged":true,"scope":"same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"}));
     let probability_cache = first_cache.0.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,"maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables}));
     let density_cache = first_cache.1.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources}));
+        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,"maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables}));
     let insertion_catalog=first_cache.2.map(|s|serde_json::json!({"catalog_entries":s.catalog_entries,"estimated_peak_bytes":s.estimated_peak_bytes}));
     let compilation_scope = if evaluator.sampled_history() {
         match options.runtime.strategy {

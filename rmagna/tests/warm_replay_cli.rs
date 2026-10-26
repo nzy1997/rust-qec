@@ -208,15 +208,35 @@ fn check_cache(value: &Value) {
         match value["configuration"][mode_key].as_str().unwrap() {
             "cold" => assert_eq!(
                 cache,
-                &json!({"cached_queries":0,"fixed_resources":0,"catalogue_resources":0})
+                &json!({"cached_queries":0,"fixed_resources":0,"catalogue_resources":0,"maximum_quotient_rank":null,"maximum_terms":null,"maximum_phase_variables":null})
             ),
             "trace" => {
                 assert!(cache["cached_queries"].as_u64().unwrap() > 0);
                 assert_eq!(cache["fixed_resources"], 0);
+                for field in [
+                    "maximum_quotient_rank",
+                    "maximum_terms",
+                    "maximum_phase_variables",
+                ] {
+                    assert_eq!(cache[field], Value::Null);
+                    assert!(cache.get(field).is_some());
+                }
             }
             "fixed" => {
                 assert!(cache["cached_queries"].as_u64().unwrap() > 0);
                 assert_eq!(cache["cached_queries"], cache["fixed_resources"]);
+                assert_eq!(cache["maximum_quotient_rank"], 2);
+                // Rank-zero search disables Clifford fiber search: both
+                // reference coordinates are enumerated, giving four terms.
+                assert_eq!(
+                    cache["maximum_terms"],
+                    if value["configuration"]["fiber_search_rank"] == 0 {
+                        4
+                    } else {
+                        2
+                    }
+                );
+                assert_eq!(cache["maximum_phase_variables"], 2);
             }
             _ => panic!("unknown preparation mode"),
         }
