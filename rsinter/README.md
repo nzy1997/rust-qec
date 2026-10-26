@@ -96,3 +96,9 @@ The [benchmark guide](https://nzy1997.github.io/rust-qec/benchmarks/) describes
 the benchmark spec and result formats.
 
 Apache-2.0 licensed; `LICENSE` is included in the crate.
+
+For in-process decoding, `rsinter::replay::build_decoder(name, toml_config)` returns
+an existing `Decoder` and its validated, normalized configuration. Enable the
+backend's runner feature, call `compile_for_dem`, then use the returned
+`CompiledDecoder::decode_shots_bit_packed` for b8 batches. This path performs no
+file I/O and uses the same configuration checks as replay.

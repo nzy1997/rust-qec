@@ -404,7 +404,13 @@ struct RilpqecConfigFile {
     verbose: Option<bool>,
 }
 
-fn build_decoder(name: &str, config: &str) -> Result<(Box<dyn Decoder>, Value), String> {
+/// Construct a decoder from its name and TOML configuration without performing I/O.
+///
+/// Returns the validated decoder and normalized configuration used by replay statistics.
+/// Compile it with [`Decoder::compile_for_dem`] to retain each backend's DEM validation
+/// and use the resulting [`crate::decode::CompiledDecoder`] for in-process batches.
+/// Backends require their corresponding `*-runner` Cargo feature.
+pub fn build_decoder(name: &str, config: &str) -> Result<(Box<dyn Decoder>, Value), String> {
     match name {
         "rbposd" => build_rbposd(config),
         "rbplsd" => build_rbplsd(config),

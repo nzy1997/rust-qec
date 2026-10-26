@@ -13,10 +13,12 @@ include = ["/src/**", "/tests/**", "/examples/**", "/doc/**", "/assets/**", "/RE
 description = "Stim-aligned stabilizer circuit simulator and detector error model toolkit"
 
 [features]
-default = ["unified-cli", "codegen-css", "shot-viewer", "plotting"]
+default = ["unified-cli", "codegen-css", "shot-viewer", "plotting", "archive-zstd"]
 benchmark-telemetry = []
 benchmark-tools = ["unified-cli"]
-cli = ["dep:clap"]
+cli = ["dep:clap", "archive-zstd"]
+# Native Zstandard support for compressed sample archives.
+archive-zstd = ["dep:zstd"]
 unified-cli = ["cli", "dep:rmatching", "dep:tempfile"]
 ilp = ["unified-cli", "dep:qec-ilp-core", "qec-ilp-core/highs"]
 codegen-css = ["dep:qec-code"]
@@ -35,7 +37,7 @@ qec-code = { version = "0.3.0", path = "../qec-code", optional = true }
 rmatching = { version = "0.3.0", path = "../rmatching", optional = true }
 qec-ilp-core = { version = "0.3.0", path = "../qec-ilp-core", optional = true }
 tempfile = { version = "3", optional = true }
-zstd = "0.13"
+zstd = { version = "0.13", optional = true }
 toml = "0.8"
 csv = { version = "1", optional = true }
 plotters = { version = "0.3", default-features = false, features = ["svg_backend", "line_series", "full_palette"], optional = true }
@@ -233,3 +235,29 @@ required-features = ["qasm", "unified-cli"]
 [[test]]
 name = "qasm2_feature_boundaries"
 required-features = ["unified-cli"]
+
+# Compressed archive integration suites require native Zstandard support.
+
+[[test]]
+name = "rsmp_archive_streaming"
+required-features = ["archive-zstd"]
+
+[[test]]
+name = "rsmp_v1_compatibility"
+required-features = ["archive-zstd"]
+
+[[test]]
+name = "rsmp_adaptive_codec"
+required-features = ["archive-zstd"]
+
+[[test]]
+name = "rsmp_archive_dense"
+required-features = ["archive-zstd"]
+
+[[test]]
+name = "rsmp_corruption_corpus"
+required-features = ["archive-zstd"]
+
+[[example]]
+name = "rsmp_corruption_corpus"
+required-features = ["archive-zstd"]

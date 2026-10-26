@@ -10,6 +10,7 @@ on:
       - '.cargo/**'
       - 'benchmarks/near_clifford/**'
       - 'tools/fetch_benchmark_artifacts.py'
+      - 'tools/verify_frozen_sota.py'
       - 'tools/test_fetch_benchmark_artifacts.py'
       - 'tools/benchmark_artifacts*'
       - 'tools/history_commit_map.txt'
@@ -27,6 +28,7 @@ on:
       - '.cargo/**'
       - 'benchmarks/near_clifford/**'
       - 'tools/fetch_benchmark_artifacts.py'
+      - 'tools/verify_frozen_sota.py'
       - 'tools/test_fetch_benchmark_artifacts.py'
       - 'tools/benchmark_artifacts*'
       - 'tools/history_commit_map.txt'
@@ -367,19 +369,21 @@ jobs:
         run: |
           python3 -m pip install numpy==2.4.6
           cargo fmt --manifest-path benchmarks/near_clifford/sota/Cargo.toml --check
+          cargo check --locked --manifest-path benchmarks/near_clifford/sota/Cargo.toml
           python3 benchmarks/near_clifford/sota/test_lowering.py
           python3 -O benchmarks/near_clifford/sota/test_lowering.py
           python3 benchmarks/near_clifford/sota/test_contract.py
           python3 -O benchmarks/near_clifford/sota/test_contract.py
-          python3 benchmarks/near_clifford/sota/verify.py benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json --git-sources
+          python3 tools/verify_frozen_sota.py sota benchmarks/near_clifford/results/apple-m4-current-sota-2026-10-07/results.json
       - name: Check compiled near-Clifford native-input evidence
         run: |
           cargo fmt --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml --check
+          cargo check --locked --manifest-path benchmarks/near_clifford/compiled_sota/Cargo.toml
           python3 benchmarks/near_clifford/compiled_sota/test_contract.py
           python3 -O benchmarks/near_clifford/compiled_sota/test_contract.py
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json --git-sources
-          python3 benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
-          python3 -O benchmarks/near_clifford/compiled_sota/verify.py benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json --git-sources
+          python3 tools/verify_frozen_sota.py compiled_sota benchmarks/near_clifford/results/apple-m4-compiled-sota-2026-10-07/results.json
+          python3 tools/verify_frozen_sota.py compiled_sota benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json
+          python3 -O tools/verify_frozen_sota.py compiled_sota benchmarks/near_clifford/results/apple-m4-compiled-noise-lazy-2026-10-07/results.json
       - name: Check native CPU peer benchmark contracts
         run: |
           python3 -I -m unittest discover -s benchmarks/near_clifford/current_cpu_peer -p 'test_*.py'
