@@ -3768,8 +3768,8 @@ three-qubit Pauli masks at every gate boundary in both compilers. Non-Clifford
 catalogue query families are checked against independent dense matrices under
 faults, projected events, complex moments, traced environments and dependent
 record labels. A six-coordinate missing key exercises real fiber fallback.
-Automatic instrument/file/CLI catalogue selection, products and injection are
-subsequent work; defaults and formal benchmark results are unchanged here.
+Explicit instrument/file/CLI preparation and paired-T certificate construction
+are described below. Defaults and formal benchmark results are unchanged here.
 
 ## Normalized phase differences
 
@@ -3840,7 +3840,8 @@ budget is encoded as an exact decimal string. Tests vary all bounds for all
 three query families, compare seeded fresh/reused/prepared runs in both
 compilers and samplers with nonlinear callbacks, verify saved CLI JSON and
 pilots, and exercise explicit cache failures, retries and real missing-key
-fallback. Formal paper benchmarks and products/injection remain subsequent work.
+fallback. Formal paper benchmarks and injection remain subsequent work;
+standalone paired-T certificates are described below.
 
 ## Retained query resource sizes
 
@@ -3863,3 +3864,189 @@ zero or adaptive cancellation. They are distinct from configured term/path
 quotas, raw Clifford paths, output labels and per-query execution counts. The
 additional inspection does not construct resources, evaluate quantum responses,
 consume entropy, change configuration fingerprints or alter cache bounds.
+
+## Certified paired-T products
+
+`PhaseCatalogue::paired_t_product` constructs a separate, single-entry catalogue
+for the independent positive-T phase `x0 + ... + x(n-1)` modulo eight. It combines
+consecutive two-coordinate certified factors and uses a one-coordinate factor
+for an odd tail. The zero-coordinate product is the identity. Required missing
+components return `None`; the constructor does not substitute another grouping.
+This is not an arbitrary component search or an injection heuristic.
+
+```rust
+use rmagna::catalogue::{builtin_phase_catalogue, CatalogueLimits};
+use rmagna::scalar::ScalarArithmetic;
+let arithmetic = ScalarArithmetic::default();
+let product = builtin_phase_catalogue()?.paired_t_product(
+    5, &CatalogueLimits::default(), &arithmetic)?.expect("one-/two-T factors");
+assert_eq!(product.usage().entries, 1);
+assert_eq!(product.usage().terms, 8);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Limits apply to the returned catalogue independently of source usage. Dimension,
+table values, terms, constraint/parity rows and complete reconstruction work are
+admitted before the Cartesian product is constructed. Arithmetic failures remain
+errors. Every output certificate is then reconstructed exactly over its complete
+table. Coordinates, complex coefficients, global phases, overlapping supports,
+zero terms and inconsistent constraints are preserved during composition. The
+source catalogue remains unchanged, and the returned catalogue owns its data.
+
+The standalone constructor does not change query-resource selection or file/CLI
+defaults. The returned certificate can be supplied explicitly to the existing
+catalogue resource API. Tests cover every assignment through eight coordinates,
+odd tails, empty/missing factors, complex overlapping components, all resource
+endpoints and failures without source mutation. No sampling or performance claim
+is implied by the certificate construction.
+
+## Affine boundary bases under changed phases
+
+`PreparedAffineContraction::contract_with_phase_updates` accepts arbitrary
+quadratic phases when the boundary width and support columns match its reference.
+Compatible constant/even linear updates use the original recorded elimination.
+Changed cross terms or linear parity reuse the certified pivot/kernel basis and
+run fresh exact Gaussian elimination in that basis. No changed plan is cached.
+
+The original `contract` API keeps its stricter structural contract. The new
+method also rejects changed width/columns before a zero-coefficient shortcut and
+keeps scalar arithmetic checks. Its changed-phase result uses the same basis,
+boundary ordering, unnormalized coefficients and output representation as cold
+contraction, without repeating the boundary GF(2) factorization.
+
+Clifford probability-support closures use this route for phase changes. If the
+boundary columns themselves change, they retain the general exact contraction.
+Tests compare arbitrary small updates with literal path amplitudes and complete
+cold kets, cover 129 hidden paths with independently multiplied one-/two-variable
+Gauss sums, and preserve incompatible-boundary and arithmetic failures. This
+change does not alter decomposition counts, sampling configuration or quotas.
+
+## Exact statistics checkpoints
+
+`ExactStatistics` and `HistoryEfficiency` provide `checkpoint_json` and
+`from_checkpoint_json`. Schema 1 retains raw counts, sums, triangular products,
+weight moments and the efficiency reference moments/flags. Each rational
+cyclotomic value is encoded as four pairs of reduced decimal numerator/positive
+denominator strings; draw counts are canonical decimal strings as well. No
+floating-point estimate is used to reconstruct a checkpoint.
+
+```rust
+use rmagna::statistics::{CheckpointOptions, ExactStatistics, StatisticsOptions};
+use rmagna::field::ExactField;
+let options = StatisticsOptions::default();
+let mut original = ExactStatistics::new(2, options)?;
+original.push(&[ExactField::one(), ExactField::zero()], &ExactField::one())?;
+let text = original.checkpoint_json(CheckpointOptions::default())?;
+let mut resumed = ExactStatistics::from_checkpoint_json(
+    &text, options, CheckpointOptions::default())?;
+resumed.push(&[ExactField::one(), ExactField::one()], &ExactField::one())?;
+assert_eq!(resumed.count(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`CheckpointOptions::max_json_bytes` defaults to 16 MiB and bounds both accepted
+input and emitted output bytes. Encoding checks remaining numeric text capacity
+before large decimal conversions and uses a capped output writer. Decoding
+checks decimal length before integer conversion, reapplies the caller's field
+bit budget, then validates canonical fractions and real values. Restoring generic
+statistics also reapplies `StatisticsOptions::max_dimensions`; efficiency always
+has exactly two quantities. The byte limit is independent of total process
+memory, and parsed containers are checked before an accumulator is returned.
+
+Strict typed decoding rejects unknown/duplicate/missing fields, changed schema or
+kind, primitive/container substitutions and malformed coefficient/count strings.
+Both checkpoint roots and the nested efficiency `statistics` member must be JSON
+objects; complete positional arrays with identical field values are rejected.
+Shape, nonnegative weight/diagonal moments, zero-count totals and basic efficiency
+zero-weight/reference consistency are checked. These checks do not reconstruct
+the original observations or attest their source. Existing accumulators remain
+unchanged after failed encodes/restorations; callers receive an owned restored
+accumulator under the requested budgets.
+
+Dimension limits and checked triangular product counts are validated before
+allocating accumulator totals. A malformed product shape cannot trigger a
+quadratic accumulator allocation while its bounded JSON is being restored.
+
+The checkpoint contains no random generator, circuit/task identity, controller
+state, draw cursor, retained records or runtime quotas. It persists the exact
+statistics layer; complete sampling-task recovery is a separate layer. Tests
+resume weighted streams at empty/single/interior/final cuts, compare all exact
+statistics and efficiency values, and continue a saved checkpoint in a fresh
+process. A two-draw example verifies low bits above 512 bits and a literal unit
+variance; malformed inputs, arithmetic limits, byte endpoints and count overflow
+are also covered.
+
+`make test-magna-checkpoint-json` runs the same integration tests under default,
+`serde_json/arbitrary_precision`, `serde_json/float_roundtrip` and their combined
+configuration. CI invokes this documented command. Serde derive support uses the
+existing locked dependencies and does not enable a global JSON numeric feature.
+
+## Continuous in-memory task streams
+
+`TaskEvaluator::start_stream` owns one SplitMix64 state, exact accumulator and
+execution meter across bounded `TaskStream::advance` calls. Every chunk continues
+the original stream; it does not restart the seed or choose independent chunk
+seeds. The evaluator is borrowed, retaining its reusable compilation resources.
+The existing batch APIs retain their behavior and share the same sample/atomic
+commit helper with the stream.
+
+```rust
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::task::{parse_task, EvaluationOptions, TaskEvaluator, TaskOptions,
+    TaskRunOptions, TaskStreamOptions, TaskStreamStatus};
+let parse = ParseOptions::default();
+let circuit = parse_circuit("H 0\nM 0", &parse)?;
+let modules = parse_task("{}", std::path::Path::new("."),
+    &TaskOptions::default())?.load_modules(&circuit, &parse)?;
+let evaluator = TaskEvaluator::new_with_sampling(&circuit, &modules,
+    &ControllerRegistry::default(), EvaluationOptions::default(),
+    &NoiseSampling::Physical)?;
+let mut stream = evaluator.start_stream(TaskStreamOptions {
+    run: TaskRunOptions { shots: 4, seed: 9, ..Default::default() },
+    ..Default::default()
+})?;
+assert_eq!(stream.advance(2)?.status, TaskStreamStatus::Running);
+assert_eq!(stream.advance(99)?.status, TaskStreamStatus::DrawsComplete);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`advance(0)` is invalid. A positive advance after completion only returns another
+observation. `snapshot` reports requested/committed/failed/not-attempted counts,
+the original seed and actual current RNG state, exact prefix statistics and
+efficiency, logical costs, committed resource counts and timings. Statistics and
+efficiency are explicit `Result` values: derived diagnostics can exceed their
+arithmetic budget without consuming another draw. `DrawsComplete` means all
+draws committed; it does not replace checking those diagnostics. While Running,
+the reported statistics describe only the committed prefix.
+
+`StreamRecordRetention::Discard` is the default and keeps no output-row history.
+It still evaluates the same requested records and controllers. `Retain` applies
+`run.max_retained_record_values` to the whole requested stream before any entropy
+or callback; each snapshot owns a copy of the retained prefix. Discard makes this
+retention bound irrelevant and does not change sampling/physics quotas.
+
+One cumulative query quota and continuously running deadline cover all advances.
+In-memory pauses and snapshot computation spend that deadline. Sampling seconds
+include advance work but exclude prefix-summary computation and idle pauses;
+total seconds include the complete owned stream lifetime. Nested operation times
+remain inclusive rather than additive, as in the batch API.
+
+Sample/accumulation errors retain the aligned committed prefix and the actual
+post-attempt RNG state. Failed streams cannot advance again. An unwinding
+attempt also poisons the stream if the caller catches the panic; elapsed sampling
+time and failed logical operations remain visible. This does not retry physics,
+roll back entropy or replay controllers. Complete-run configuration validation
+and prefix observations perform no quantum queries, entropy or controller calls.
+
+Tests compare multiple chunk partitions with uninterrupted batches and direct
+same-seed samples for both samplers/compilers, explicitly checked linear
+execution, both causal
+strategies, nonlinear callbacks and importance sampling. They also cover genuine
+zero-weight affine histories, cumulative quota/deadline failures, record bounds,
+summary errors, elapsed idle deadlines, atomic accumulation failures and caught
+controller unwinds.
+This core has no persistent sampling-session restore, durable task/controller
+identity binding or file/CLI stream command; exact statistics checkpoints remain
+the separate layer described above.
