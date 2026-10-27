@@ -866,3 +866,179 @@ fn committed_resources_require_successful_measured_work_for_every_draw_status() 
     );
     assert_eq!(boundary, before);
 }
+
+#[test]
+fn operation_seconds_require_attempts_across_draw_and_diagnostic_states() {
+    use rmagna::costs::{
+        CostError, ExecutionMeter, ExecutionMeterCheckpoint, OperationCost, OperationKind,
+    };
+    fn cost(report: &mut TaskStreamReport, kind: OperationKind) -> &mut OperationCost {
+        match kind {
+            OperationKind::Compilation => &mut report.execution_costs.compilation,
+            OperationKind::Query => &mut report.execution_costs.query,
+            OperationKind::Decoder => &mut report.execution_costs.decoder,
+            OperationKind::Support => &mut report.execution_costs.support,
+        }
+    }
+    let operations = [
+        (OperationKind::Compilation, "compilation"),
+        (OperationKind::Query, "query"),
+        (OperationKind::Decoder, "decoder"),
+        (OperationKind::Support, "support"),
+    ];
+    let unavailable = ExactStatistics::new(
+        2,
+        StatisticsOptions {
+            max_dimensions: 1,
+            ..Default::default()
+        },
+    )
+    .err()
+    .unwrap();
+    for status in [
+        TaskStreamStatus::Running,
+        TaskStreamStatus::DrawsComplete,
+        TaskStreamStatus::Failed,
+    ] {
+        for statistics_valid in [false, true] {
+            for efficiency_valid in [false, true] {
+                let mut report = literal(4, 9);
+                report.status = status;
+                report.timings.sampling_seconds = 1.0;
+                report.timings.total_seconds = 1.0;
+                match status {
+                    TaskStreamStatus::DrawsComplete => {
+                        report.requested = 4;
+                        report.not_attempted = 0;
+                    }
+                    TaskStreamStatus::Failed => {
+                        report.failed = 1;
+                        report.not_attempted = 4;
+                        report.failure = Some(RunFailure {
+                            phase: RunPhase::Sampling,
+                            shot: Some(4),
+                            kind: "TaskError",
+                            message: "operation timing fixture failure".to_owned(),
+                        });
+                    }
+                    TaskStreamStatus::Running => {}
+                }
+                if !statistics_valid {
+                    report.statistics = Err(rmagna::task::TaskError {
+                        field: "statistics".to_owned(),
+                        message: "explicitly unavailable diagnostic fixture".to_owned(),
+                    });
+                }
+                if !efficiency_valid {
+                    report.efficiency = Err(unavailable.clone());
+                }
+                let baseline = export(&report);
+                for (kind, name) in operations {
+                    for seconds in [1.0, f64::from_bits(1)] {
+                        let mut invalid = report.clone();
+                        cost(&mut invalid, kind).seconds = seconds;
+                        let before = invalid.clone();
+                        assert!(matches!(
+                            ExecutionMeter::from_checkpoint(ExecutionMeterCheckpoint {
+                                limits: invalid.execution_limits,
+                                costs: invalid.execution_costs,
+                                elapsed: std::time::Duration::from_secs(1),
+                            }),
+                            Err(CostError::InvalidCheckpoint { operation, .. }) if operation == kind
+                        ));
+                        let error =
+                            export_stream_metrics(&invalid, NumericOptions::default()).unwrap_err();
+                        assert!(matches!(error, StreamExportError::InvalidState(_)));
+                        assert!(
+                            error
+                                .to_string()
+                                .contains(&format!("execution_costs.{name}.seconds")),
+                            "{error}"
+                        );
+                        assert_eq!(invalid, before);
+                        assert!(matches!(
+                            export_stream_metrics(&invalid, NumericOptions { max_work_bits: 0 }),
+                            Err(StreamExportError::InvalidState(_))
+                        ));
+                        assert_eq!(invalid, before);
+                    }
+                    let mut signed_zero = report.clone();
+                    cost(&mut signed_zero, kind).seconds = -0.0;
+                    assert!(export_stream_metrics(&signed_zero, NumericOptions::default()).is_ok());
+                }
+                // Inclusive operation times overlap. Their sum exceeds owned
+                // sampling time, while each balanced operation has attempts.
+                let mut attempted = report.clone();
+                for (kind, _) in operations {
+                    let c = cost(&mut attempted, kind);
+                    c.attempted = 1;
+                    c.succeeded = 1;
+                    c.seconds = 1.0;
+                }
+                assert!(
+                    ExecutionMeter::from_checkpoint(ExecutionMeterCheckpoint {
+                        limits: attempted.execution_limits,
+                        costs: attempted.execution_costs,
+                        elapsed: std::time::Duration::from_secs(1),
+                    })
+                    .is_ok()
+                );
+                let before = attempted.clone();
+                let value = export(&attempted);
+                assert_eq!(attempted, before);
+                for key in [
+                    "draw_status",
+                    "estimation_status",
+                    "diagnostics",
+                    "estimates",
+                    "standard_errors",
+                    "efficiency",
+                    "weights",
+                    "random_state",
+                ] {
+                    assert_eq!(value[key], baseline[key], "{key}");
+                }
+                for (kind, _) in operations {
+                    cost(&mut attempted, kind).seconds = 0.0;
+                }
+                assert!(export_stream_metrics(&attempted, NumericOptions::default()).is_ok());
+            }
+        }
+    }
+    let mut empty = literal(0, 2);
+    empty.status = TaskStreamStatus::Failed;
+    empty.failed = 1;
+    empty.not_attempted = 1;
+    empty.failure = Some(RunFailure {
+        phase: RunPhase::Sampling,
+        shot: Some(0),
+        kind: "TaskError",
+        message: "empty timing fixture failure".to_owned(),
+    });
+    empty.timings.sampling_seconds = 1.0;
+    empty.timings.total_seconds = 1.0;
+    assert_eq!(export(&empty)["estimation_status"], "empty");
+    for (kind, name) in operations {
+        for seconds in [1.0, f64::from_bits(1)] {
+            let mut invalid = empty.clone();
+            cost(&mut invalid, kind).seconds = seconds;
+            let before = invalid.clone();
+            let error = export_stream_metrics(&invalid, NumericOptions::default()).unwrap_err();
+            assert!(matches!(error, StreamExportError::InvalidState(_)));
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("execution_costs.{name}.seconds"))
+            );
+            assert_eq!(invalid, before);
+        }
+        let c = cost(&mut empty, kind);
+        c.attempted = 1;
+        c.failed = 1;
+        c.seconds = 1.0;
+    }
+    let value = export(&empty);
+    assert_eq!(value["status"], "failed");
+    assert_eq!(value["estimation_status"], "empty");
+    assert!(value["estimates"].is_null());
+}

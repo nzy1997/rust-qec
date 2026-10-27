@@ -122,6 +122,18 @@ fn validate(report: &TaskStreamReport) -> Result<(), StreamExportError> {
         report.execution_costs,
         &report.timings,
     )?;
+    for (operation, cost) in [
+        ("compilation", report.execution_costs.compilation),
+        ("query", report.execution_costs.query),
+        ("decoder", report.execution_costs.decoder),
+        ("support", report.execution_costs.support),
+    ] {
+        if cost.attempted == 0 && cost.seconds != 0.0 {
+            return Err(StreamExportError::InvalidState(format!(
+                "execution_costs.{operation}.seconds must be zero without attempts",
+            )));
+        }
+    }
     if report.completed_network_compilations as u128
         > u128::from(report.execution_costs.compilation.succeeded)
     {
