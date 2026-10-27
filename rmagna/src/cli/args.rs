@@ -11,11 +11,12 @@ use rmagna::task::TaskRunOptions;
 use rmagna::unitary::{CompilerStrategy, InsertionPreparationOptions};
 use std::{collections::BTreeMap, num::NonZeroU64, path::PathBuf, time::Duration};
 
-pub const HELP: &str = "rmagna validate|inspect|prepare|run|enumerate|compare-samplers CIRCUIT [OPTIONS]
+pub const HELP: &str = "rmagna validate|inspect|prepare|run|stream|enumerate|compare-samplers CIRCUIT [OPTIONS]
 
 validate parses and fingerprints inputs without quantum queries or callbacks.
 inspect additionally compiles the protocol, without draws or decoder callbacks.
 run prepares and performs real noisy draws from a fresh SplitMix64 seed.
+stream keeps one exact accumulator and RNG, with durable resumable checkpoints.
 enumerate integrates bounded physical noise sectors and all positive histories.
 prepare explicitly builds configured sampling families without draws or callbacks.
 compare-samplers prepares independent affine/exact pilots; no production switching.
@@ -32,8 +33,8 @@ Inputs and output:
   --version                           Show the Rust implementation version
 
 Run configuration:
-  --shots N                           Positive draw count (default 1; run only)
-  --seed N                            u64 seed (default 0; run or compare-samplers)
+  --shots N                           Positive draw count (default 1; run or stream)
+  --seed N                            u64 seed (default 0; run, stream or compare-samplers)
   --progress-every N                  Positive committed-draw interval on stderr (run only)
   --noise-proposal-scale RATIONAL      Exact positive scale; unavailable in enumerate
   --compiler shared|parity_copies      Default shared
@@ -50,13 +51,27 @@ Run configuration:
   --max-insertion-table-bytes N        Prepared insertion estimate cap (default 67108864)
   --max-insertion-catalog-entries N    Prepared insertion entry cap (default 1000000)
 
+Continuous stream only:
+  --checkpoint-dir DIR                Required new directory; parent must exist
+  --resume FILE                       Previous CLI checkpoint; original options required
+  --checkpoint-every N                Positive advance interval (default 1000)
+  --stop-after N                      Stop after at most N additional draws (zero allowed)
+  --retain-records                    Retain sampled rows within --max-record-values
+  --max-checkpoint-bytes N             Positive read/write cap (default 16777216)
+
+Each invocation uses a new checkpoint directory and never overwrites older files.
+Resume binds resolved settings, loaded content, controller declarations/manifest,
+and the current executable file SHA-256. This is not code authentication.
+Compilation is rebuilt separately from cumulative sampling quotas. Controllers
+must be deterministic functions of explicit inputs; hidden state is not saved.
+
 Preparation and pilot comparison:
   --pilot-shots N                     At least two draws per channel (default 2; compare only)
   --max-preparation-requests N         Static request cap (default 4096; prepare/compare)
   --max-preparation-history-rows N     Static history row cap (default 4096; prepare/compare)
   --max-preparation-layout-rows N      Duplicated prefix row cap (default 1000000; prepare/compare)
-  --max-preparation-queries N          Compilation/target quota per channel (compare only)
-  --max-preparation-seconds SECONDS    Preparation deadline per channel (compare only)
+  --max-preparation-queries N          Separate compilation/target quota (compare or stream)
+  --max-preparation-seconds SECONDS    Separate preparation deadline (compare or stream)
 
 prepare uses --max-queries/--max-seconds across compilation and query preparation.
 compare uses them for each sampling pilot, with separate preparation limits above.
@@ -101,6 +116,7 @@ pub enum Mode {
     Validate,
     Inspect,
     Run,
+    Stream,
     Enumerate,
     Prepare,
     Compare,
@@ -122,6 +138,15 @@ pub struct Args {
     pub enumeration: FileEnumerationOptions,
     pub preparation: FilePreparationOptions,
     pub sampling: NoiseSampling,
+    pub stream: StreamArgs,
+}
+pub struct StreamArgs {
+    pub directory: Option<PathBuf>,
+    pub resume: Option<PathBuf>,
+    pub every: NonZeroU64,
+    pub stop_after: Option<u64>,
+    pub retain: bool,
+    pub max_bytes: usize,
 }
 fn duration(text: &str, flag: &str) -> Result<Duration, String> {
     let value = text
@@ -159,6 +184,14 @@ const COMPARISON_FLAGS: [&str; 3] = [
     "--max-preparation-queries",
     "--max-preparation-seconds",
 ];
+const STREAM_FLAGS: [&str; 6] = [
+    "--checkpoint-dir",
+    "--resume",
+    "--checkpoint-every",
+    "--stop-after",
+    "--retain-records",
+    "--max-checkpoint-bytes",
+];
 impl Flags {
     fn text(&mut self, flag: &str) -> Option<String> {
         self.0.remove(flag)
@@ -181,6 +214,31 @@ impl Flags {
 impl Args {
     pub fn parse(raw: Vec<String>) -> Result<Self, String> {
         let (mode, circuit, mut flags) = parse_tokens(raw)?;
+        if mode != Mode::Stream
+            && let Some(flag) = STREAM_FLAGS.iter().find(|f| flags.0.contains_key(**f))
+        {
+            return Err(format!("{flag} requires stream"));
+        }
+        let stream = StreamArgs {
+            directory: flags.text("--checkpoint-dir").map(PathBuf::from),
+            resume: flags.text("--resume").map(PathBuf::from),
+            every: flags.number("--checkpoint-every", NonZeroU64::new(1000).unwrap())?,
+            stop_after: flags
+                .text("--stop-after")
+                .map(|s| {
+                    s.parse::<u64>()
+                        .map_err(|_| "--stop-after needs a nonnegative u64 integer".to_owned())
+                })
+                .transpose()?,
+            retain: flags.text("--retain-records").is_some(),
+            max_bytes: flags.number("--max-checkpoint-bytes", 16usize << 20)?,
+        };
+        if mode == Mode::Stream && stream.directory.is_none() {
+            return Err("stream requires --checkpoint-dir with a new directory".into());
+        }
+        if stream.max_bytes == 0 || stream.max_bytes == usize::MAX {
+            return Err("--max-checkpoint-bytes must be positive and below usize::MAX".into());
+        }
         if mode != Mode::Enumerate {
             if let Some(flag) = ENUMERATION_FLAGS
                 .iter()
@@ -207,14 +265,17 @@ impl Args {
                 "prepare or compare-samplers",
             ),
             (
-                mode == Mode::Compare,
+                matches!(mode, Mode::Compare | Mode::Stream),
                 COMPARISON_FLAGS.as_slice(),
-                "compare-samplers",
+                "compare-samplers or stream",
             ),
         ] {
             if !allowed && let Some(flag) = names.iter().find(|flag| flags.0.contains_key(**flag)) {
                 return Err(format!("{flag} requires {modes}"));
             }
+        }
+        if mode == Mode::Stream && flags.0.contains_key("--pilot-shots") {
+            return Err("--pilot-shots requires compare-samplers".into());
         }
         if mode == Mode::Prepare && flags.0.contains_key("--max-record-values") {
             return Err(
@@ -259,12 +320,14 @@ impl Args {
         let mut file = FileTaskOptions::default();
         let mut load = FileLoadOptions::default();
         let mut run = TaskRunOptions::default();
-        if !matches!(mode, Mode::Run | Mode::Compare)
+        if !matches!(mode, Mode::Run | Mode::Stream | Mode::Compare)
             && ["--shots", "--seed"]
                 .iter()
                 .any(|f| flags.0.contains_key(*f))
         {
-            return Err("--shots and --seed require run; compare-samplers accepts --seed".into());
+            return Err(
+                "--shots and --seed require run or stream; compare-samplers accepts --seed".into(),
+            );
         }
         if mode == Mode::Compare && flags.0.contains_key("--shots") {
             return Err("--shots requires run; use --pilot-shots in compare-samplers".into());
@@ -331,6 +394,7 @@ impl Args {
             enumeration,
             preparation,
             sampling,
+            stream,
         })
     }
 }
@@ -341,11 +405,12 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
         Some("validate") => Mode::Validate,
         Some("inspect") => Mode::Inspect,
         Some("run") => Mode::Run,
+        Some("stream") => Mode::Stream,
         Some("enumerate") => Mode::Enumerate,
         Some("prepare") => Mode::Prepare,
         Some("compare-samplers") => Mode::Compare,
         _ => return Err(
-            "expected validate, inspect, prepare, run, enumerate, or compare-samplers; use --help"
+            "expected validate, inspect, prepare, run, stream, enumerate, or compare-samplers; use --help"
                 .to_owned(),
         ),
     };
@@ -402,10 +467,14 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
         ) && !ENUMERATION_FLAGS.contains(&arg.as_str())
             && !PREPARATION_FLAGS.contains(&arg.as_str())
             && !COMPARISON_FLAGS.contains(&arg.as_str())
+            && !STREAM_FLAGS.contains(&arg.as_str())
         {
             return Err(format!("unknown option {arg}; use --help"));
         }
-        let value = if matches!(arg.as_str(), "--json" | "--include-patterns") {
+        let value = if matches!(
+            arg.as_str(),
+            "--json" | "--include-patterns" | "--retain-records"
+        ) {
             String::new()
         } else {
             let value = it

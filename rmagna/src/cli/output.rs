@@ -52,7 +52,7 @@ pub fn export_failure(report: &FileRunReport, error: &BatchExportError) -> Value
     value["numeric_export"] = json!({"status":"failed","exact_results_persisted":false});
     value
 }
-fn costs(costs: ExecutionCosts) -> Value {
+pub(super) fn costs(costs: ExecutionCosts) -> Value {
     let row = |c: rmagna::costs::OperationCost| json!({"attempted":c.attempted,"succeeded":c.succeeded,"failed":c.failed,"seconds":c.seconds});
     json!({"scope":"this_call_including_failed_attempts","timing":"inclusive_wall_seconds","compilation":row(costs.compilation),"query":row(costs.query),"decoder":row(costs.decoder),"support":row(costs.support)})
 }
@@ -283,12 +283,16 @@ pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
         }
         if let Some(count) = value["completed"].as_u64() {
             writeln!(stdout, "Completed draws: {count}/{}", value["requested"])?;
-            let statistics = if value["status"] == "failed" {
+            let statistics = if value["kind"] == "stream" {
+                &value["metrics"]
+            } else if value["status"] == "failed" {
                 &value["partial_statistics"]
             } else {
                 value
             };
-            let prefix = if value["status"] == "failed" {
+            let prefix = if value["kind"] == "stream" && value["status"] != "complete" {
+                "Prefix "
+            } else if value["status"] == "failed" {
                 "Partial "
             } else {
                 ""
@@ -300,6 +304,11 @@ pub fn print(value: &Value, json_output: bool) -> io::Result<()> {
             ] {
                 writeln!(stdout, "{prefix}{label}: {}", estimate(statistics, key))?;
             }
+        }
+        if value["kind"] == "stream"
+            && let Some(path) = value["checkpoint"]["latest_committed"].as_str()
+        {
+            writeln!(stdout, "Checkpoint: {path}")?;
         }
         if value["kind"] == "preparation" {
             preparation_summary(&mut stdout, value)?;

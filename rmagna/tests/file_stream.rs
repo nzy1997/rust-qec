@@ -17,6 +17,31 @@ use std::{
 const IMPLEMENTATION: &str = "file-stream-integration-v1";
 const SOURCE: &str = "H 0 1\nT 0\nH 0\nX_ERROR(1/7) 0\nM(1/11) 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[0] det[1] -> ctrl[0]\nCH ctrl[0] 2";
 const TASK: &str = r#"{"outputs":[2],"ideal_state":"ideal.magna","recovery":"recovery.magna","sample_records":[0,1],"observables":[[1,0],[1,1]]}"#;
+
+#[test]
+fn stream_inspection_uses_discard_admission_and_the_exact_stream_identity() {
+    let files = Files::new();
+    let (task, trace) = files.load(
+        FileTaskOptions::default(),
+        NoiseSampling::Physical,
+        "v1",
+        "declared",
+        0,
+    );
+    let mut settings = options(false);
+    settings.run.shots = u64::MAX;
+    let report = task.inspect_stream(settings, IMPLEMENTATION).unwrap();
+    let identity = task.stream_identity(settings, IMPLEMENTATION).unwrap();
+    assert_eq!(report["fingerprints"], identity.content.to_json());
+    assert_eq!(report["options"]["stream"]["records"], "discard");
+    assert_eq!(
+        report["options"]["stream"]["encoding"],
+        "rmagna-file-task-stream-v1"
+    );
+    assert!(trace.lock().unwrap().is_empty());
+    settings.records = StreamRecordRetention::Retain;
+    assert!(task.inspect_stream(settings, IMPLEMENTATION).is_err());
+}
 type Trace = Arc<Mutex<Vec<Vec<bool>>>>;
 struct Files(PathBuf);
 impl Files {

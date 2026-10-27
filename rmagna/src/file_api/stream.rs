@@ -7,6 +7,24 @@ use crate::task::{
 };
 
 impl FileTask {
+    /// Describe a stream using its own retention admission and fingerprints,
+    /// without batch-sized record admission or compilation/callback work.
+    pub fn inspect_stream(
+        &self,
+        options: TaskStreamOptions,
+        implementation: &str,
+    ) -> Result<Value, FileApiError> {
+        let identity = self.stream_identity(options, implementation)?;
+        let mut configuration = resolved_options(&self.fingerprint_input(&options.run));
+        configuration["stream"] = json!({"encoding":"rmagna-file-task-stream-v1","records":match options.records {
+            StreamRecordRetention::Discard => "discard",
+            StreamRecordRetention::Retain => "retain",
+        }});
+        let mut value = self.descriptor_value(configuration, identity.content);
+        value["kind"] = json!("stream");
+        value["implementation"] = json!(identity.implementation);
+        Ok(value)
+    }
     /// Bind canonical loaded content and the actual stream configuration without
     /// reopening files, drawing entropy, preparing queries or calling controllers.
     /// The explicit implementation label and controller declarations are compared
