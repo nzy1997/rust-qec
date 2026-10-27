@@ -119,14 +119,17 @@ fn preflight(args: &Args) -> Result<Context, String> {
                 .map_err(|e| format!("exact checkpoint: {e}"))?;
             let requested = args.run.shots.to_string();
             let seed = args.run.seed.to_string();
+            let record_policy = if args.stream.retain { "retain" } else { "discard" };
             if raw["schema_version"] != 1
                 || raw["kind"] != "task_stream"
+                || raw["attestation"] != "caller_declared_unverified"
+                || raw["record_policy"] != record_policy
                 || raw["requested"].as_str() != Some(requested.as_str())
                 || raw["original_seed"].as_str() != Some(seed.as_str())
                 || raw["identity"]["implementation"] != implementation(&executable)
             {
                 return Err(
-                    "exact checkpoint schema, original count/seed or implementation mismatch"
+                    "exact checkpoint schema, attestation, record policy, original count/seed or implementation mismatch"
                         .into(),
                 );
             }

@@ -4348,6 +4348,8 @@ locations. Saved draw/unwind failures and diagnosed/export failures remain
 terminal on restoration. A completed saved stream exports without new draws,
 controller callbacks or entropy. Input/preparation errors retain the original
 `saved_prefix` and checkpoint location separately from newly restored counts.
+Without `--json`, the text summary displays available stream estimates, labels
+unfinished or failed prefixes, and prints the last committed checkpoint path.
 
 `cargo test --locked -p rmagna --test cli_stream` runs actual binaries in fresh
 processes for both samplers/compilers, physical/importance proposals and both

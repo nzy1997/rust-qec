@@ -242,13 +242,19 @@ fn incompatible_build_config_and_loaded_content_never_advance_the_saved_prefix()
     let prefix = value(f.stream("prefix", &["--stop-after", "2"]), 0);
     let path = f.checkpoint(&prefix);
     let bytes = std::fs::read(f.0.join(&path)).unwrap();
-    for (key, number, directory) in [
-        ("requested", 7, "numeric-count"),
-        ("original_seed", u64::MAX, "numeric-seed"),
+    for (key, wire, directory) in [
+        ("requested", json!(7), "numeric-count"),
+        ("original_seed", json!(u64::MAX), "numeric-seed"),
+        (
+            "attestation",
+            json!("unsupported"),
+            "unsupported-attestation",
+        ),
+        ("record_policy", json!("retain"), "changed-record-policy"),
     ] {
         let mut saved: Value = serde_json::from_slice(&bytes).unwrap();
         let mut raw: Value = serde_json::from_str(saved["checkpoint"].as_str().unwrap()).unwrap();
-        raw[key] = json!(number);
+        raw[key] = wire;
         saved["checkpoint"] = json!(raw.to_string());
         f.put("numeric-header.json", &saved.to_string());
         let v = value(f.stream(directory, &["--resume", "numeric-header.json"]), 1);
@@ -724,6 +730,54 @@ fn input_load_failures_use_the_same_report_schema_and_software_identity_as_other
         assert_eq!(load[phase]["status"], "not_started");
     }
     assert!(load["checkpoint"]["latest_committed"].is_null());
+}
+
+#[test]
+fn default_text_reports_real_stream_estimates_and_the_recoverable_checkpoint() {
+    let f = Files::new();
+    for (directory, stop, completed, status, estimate) in [
+        ("prefix", Some("3"), "3", "paused", "Prefix acceptance: 1"),
+        ("complete", None, "7", "complete", "acceptance: 1"),
+    ] {
+        let mut args = vec![
+            "stream",
+            "circuit.magna",
+            "--task",
+            "task.json",
+            "--history-sampler",
+            "exact_marginal",
+            "--shots",
+            "7",
+            "--seed",
+            "731",
+            "--checkpoint-dir",
+            directory,
+        ];
+        if let Some(stop) = stop {
+            args.extend(["--stop-after", stop]);
+        }
+        let out = f.run(&args);
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let text = String::from_utf8(out.stdout).unwrap();
+        let header = format!("rmagna: {status}");
+        let counts = format!("Completed draws: {completed}/7");
+        assert!(text.lines().any(|l| l == header), "{text}");
+        assert!(text.lines().any(|l| l == counts), "{text}");
+        assert!(text.lines().any(|l| l == estimate), "{text}");
+        let path = text
+            .lines()
+            .find_map(|l| l.strip_prefix("Checkpoint: "))
+            .expect("a usable checkpoint location in the human summary");
+        let saved: Value = serde_json::from_slice(&std::fs::read(f.0.join(path)).unwrap()).unwrap();
+        let raw: Value = serde_json::from_str(saved["checkpoint"].as_str().unwrap()).unwrap();
+        assert_eq!(raw["committed"], completed);
+        assert_eq!(raw["requested"], "7");
+        assert_eq!(raw["original_seed"], "731");
+    }
 }
 
 #[cfg(unix)]
