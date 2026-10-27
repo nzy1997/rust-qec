@@ -1,5 +1,39 @@
 # rmagna
 
+Optional exact T-pair injection is available through
+`FrozenPhasePlan::new_with_injection`. It uses the frozen native signature
+coordinates and the canonical core's odd parity rotations. Certified one-/two-T
+factors must each contain exactly two nonzero branches with the native disjoint
+parity constraints in outcome order. The native greedy difference-span pairing
+is deterministic, including integer-mask ordering and ties. All group constraints
+are factored first; construction enumerates only the independent support outcomes.
+
+`PhaseInjectionOptions` bounds candidate work, logical geometry words, and surviving
+terms. An explicit budget skip retains the original certificate. Arithmetic and
+certificate failures remain errors. `PhaseSelectionOptions::construction` bounds
+temporary certificate construction; `preparation.max_terms` admits the final
+selected transport. This permits a 64-term baseline to reduce to eight terms under
+an eight-term final cap. A skipped 64-term baseline still fails that final cap.
+Candidates are selected only when their exact surviving count is strictly smaller.
+The injection receipt records the original route, rotations, groups, constraint
+rank, candidate count, completed construction, selection and skip reason. Its work
+and geometry bounds describe logical payloads and exclude allocator overhead.
+
+Run `cargo run --locked -p rmagna --example phase_t_pair_injection` for a pinned
+correctness witness with twelve groups, three independent constraints, and a
+64-to-8 reduction. `cargo test --locked -p rmagna --test phase_injection` checks
+100 native cases, exact complex indicators, scalar sums, dependent labelled
+amplitudes, original-domain support, updates and failure admission. Regenerate its
+witness with `python benchmarks/magna_reproduction/capture_phase_injection.py
+--upstream /path/to/pinned/magna --out /path/to/new-witness.json`, then run
+`python benchmarks/magna_reproduction/compact_phase_injection_fixture.py
+--source /path/to/new-witness.json --out /path/to/new-fixture.json` to preserve
+all JSON values in the tracked compact representation. Ordinary Python and
+`python -O` must produce identical bytes. The generator verifies the pinned
+source and native binary before and after capture. These are bounded correctness
+examples; they do not measure representative speedups. Runtime and CLI defaults
+continue to use their existing paths.
+
 Independent Rust foundations for global-network near-Clifford simulation.
 The current package provides exact scalars, packed binary linear algebra,
 quadratic phase sums, phase-preserving stabilizer contraction and third-level
