@@ -122,6 +122,21 @@ fn validate(report: &TaskStreamReport) -> Result<(), StreamExportError> {
         report.execution_costs,
         &report.timings,
     )?;
+    if report.completed_network_compilations as u128
+        > u128::from(report.execution_costs.compilation.succeeded)
+    {
+        return Err(invalid(
+            "completed network compilations exceed successful measured compilation work",
+        ));
+    }
+    if report.completed_history_groups as u128
+        > u128::from(report.execution_costs.query.succeeded)
+            + u128::from(report.execution_costs.support.succeeded)
+    {
+        return Err(invalid(
+            "completed history groups exceed successful measured query and support work",
+        ));
+    }
     Ok(())
 }
 

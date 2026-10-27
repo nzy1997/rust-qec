@@ -4249,8 +4249,10 @@ rows, committed resources, exact execution limits, cumulative sampling costs and
 prefix timings. Counts and RNG use JSON integer tokens. The cost scope is
 `cumulative_stream_including_failed_attempts`; preparation and rebuilt caches are
 separate. Supplied public reports must have consistent cursors, terminal failures,
-summary availability, record shape, cost counts and timings. Invalid reports and
-numeric-work failures return contextual `StreamExportError` values.
+summary availability, record shape, cost counts and timings. Committed network
+compilations cannot exceed successful measured compilation work; committed history
+groups cannot exceed successful query and support work combined. Invalid reports
+and numeric-work failures return contextual `StreamExportError` values.
 
 Finite values use the existing ordinary/scientific convention. Ordinary underflow
 or overflow produces null with the scientific value retained and its field listed

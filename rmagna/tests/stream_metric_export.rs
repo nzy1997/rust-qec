@@ -774,3 +774,95 @@ fn undefined_error_metrics_and_running_diagnostics_remain_distinct_from_draw_fai
             || value["diagnostics"]["efficiency"]["status"] == "failed"
     );
 }
+
+#[test]
+fn committed_resources_require_successful_measured_work_for_every_draw_status() {
+    for status in [
+        TaskStreamStatus::Running,
+        TaskStreamStatus::DrawsComplete,
+        TaskStreamStatus::Failed,
+    ] {
+        let mut report = literal(4, 9);
+        report.status = status;
+        match status {
+            TaskStreamStatus::DrawsComplete => {
+                report.requested = 4;
+                report.not_attempted = 0;
+            }
+            TaskStreamStatus::Failed => {
+                report.failed = 1;
+                report.not_attempted = 4;
+                report.failure = Some(RunFailure {
+                    phase: RunPhase::Sampling,
+                    shot: Some(4),
+                    kind: "TaskError",
+                    message: "resource accounting failure fixture".to_owned(),
+                });
+            }
+            TaskStreamStatus::Running => {}
+        }
+        report.completed_network_compilations = 2;
+        report.completed_history_groups = 5;
+        report.execution_costs.compilation.attempted = 2;
+        report.execution_costs.compilation.succeeded = 2;
+        report.execution_costs.query.attempted = 2;
+        report.execution_costs.query.succeeded = 2;
+        report.execution_costs.support.attempted = 3;
+        report.execution_costs.support.succeeded = 3;
+        let before = report.clone();
+        let value = export(&report);
+        assert_eq!(report, before);
+        assert_eq!(value["completed_resources"]["network_compilations"], 2);
+        assert_eq!(value["completed_resources"]["history_groups"], 5);
+        assert_eq!(value["estimates"]["conditional_error"], 1.0 / 3.0);
+        assert_eq!(
+            value["draw_status"],
+            match status {
+                TaskStreamStatus::Running => "running",
+                TaskStreamStatus::DrawsComplete => "draws_complete",
+                TaskStreamStatus::Failed => "failed",
+            }
+        );
+        for (network, field) in [(true, "network compilations"), (false, "history groups")] {
+            let mut invalid = report.clone();
+            if network {
+                invalid.completed_network_compilations = 3;
+                invalid.execution_costs.compilation.attempted = 3;
+                invalid.execution_costs.compilation.failed = 1;
+            } else {
+                invalid.completed_history_groups = 6;
+                invalid.execution_costs.query.attempted = 3;
+                invalid.execution_costs.query.failed = 1;
+            }
+            let before = invalid.clone();
+            let error = export_stream_metrics(&invalid, NumericOptions::default()).unwrap_err();
+            assert!(matches!(error, StreamExportError::InvalidState(_)));
+            assert!(error.to_string().contains(field), "{error}");
+            assert_eq!(invalid, before);
+        }
+        // Work from uncommitted attempts may legitimately exceed committed resources.
+        report.completed_network_compilations = 1;
+        report.completed_history_groups = 2;
+        assert_eq!(export(&report)["estimates"], value["estimates"]);
+    }
+    // The combined success bound need not fit u64. Neither summation nor usize
+    // conversion may wrap or truncate to an artificially smaller bound.
+    let mut boundary = literal(4, 4);
+    boundary.completed_network_compilations = usize::MAX;
+    boundary.completed_history_groups = usize::MAX;
+    boundary.execution_limits.max_queries = u64::MAX;
+    boundary.execution_costs.compilation.attempted = u64::MAX;
+    boundary.execution_costs.compilation.succeeded = u64::MAX;
+    boundary.execution_costs.query.attempted = u64::MAX;
+    boundary.execution_costs.query.succeeded = u64::MAX;
+    boundary.execution_costs.support.attempted = 1;
+    boundary.execution_costs.support.succeeded = 1;
+    let before = boundary.clone();
+    let value = export(&boundary);
+    assert_eq!(value["status"], "complete");
+    assert_eq!(
+        value["completed_resources"]["history_groups"],
+        json!(usize::MAX)
+    );
+    assert_eq!(boundary, before);
+}
