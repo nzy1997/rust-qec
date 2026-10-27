@@ -4277,6 +4277,87 @@ combinations, restored and uninterrupted payloads, completed batch agreement,
 real zero weights, undefined metrics, diagnostic failures, terminal callback
 errors/unwinds, numeric range/work limits and malformed public reports.
 
+## Durable CLI sampling streams
+
+`stream` keeps one RNG, exact accumulator and cumulative sampling meter across
+bounded advances and fresh CLI processes. It uses the file-stream library API;
+`run` continues to start an independent batch. Given a circuit and task, pause
+after 30 draws of a 100-draw stream:
+
+```sh
+cargo run --locked -p rmagna -- stream CIRCUIT --task TASK.json \
+  --shots 100 --seed 731 --checkpoint-every 10 --stop-after 30 \
+  --checkpoint-dir /absolute/path/to/new-prefix --json
+```
+
+Use a new checkpoint directory whose parent exists. The final report's
+`checkpoint.latest_committed` gives the exact resume file:
+
+```sh
+cargo run --locked -p rmagna -- stream CIRCUIT --task TASK.json \
+  --shots 100 --seed 731 --checkpoint-every 10 \
+  --resume /absolute/path/to/new-prefix/checkpoint-00000000000000000003.json \
+  --checkpoint-dir /absolute/path/to/new-continuation --json
+```
+
+Repeat the original run configuration and controller options when resuming.
+`--stop-after` bounds **additional** draws; zero checkpoints without drawing.
+`--checkpoint-every` defaults to 1000. These operational controls and output
+locations can change. Sampling quotas remain cumulative; separate
+`--max-preparation-queries` and `--max-preparation-seconds` bound each process's
+rebuilt compilation/target resources. They do not reset the sampling meter.
+`--retain-records` admits the whole requested row history against
+`--max-record-values`; the default discards stored rows without changing their
+scientific contribution. Counts and seeds retain their full u64 precision.
+
+Before decoder imports, the CLI checks the checkpoint envelope, original typed
+configuration, raw controller declarations and current executable-file SHA-256,
+and reserves a new checkpoint directory. After imports/loading, it compares the
+canonical loaded-content identity and actual controller manifest before compiling
+or drawing. A copied unchanged executable can resume; rebuilding may change its
+SHA-256 and intentionally prevents resume. These checks compare file bytes and
+declarations; they do not authenticate mapped executable code or external callback
+implementations. Python controllers remain explicit and isolated from native
+`magna`; callbacks must be deterministic functions of their inputs/configuration.
+Hidden callback state and prepared caches are not checkpointed.
+
+Every invocation commits the initial/restored state before new draws, then an
+immutable checkpoint after each bounded advance. Checkpoint files use exclusive
+temporary creation, file synchronization, atomic no-clobber hard links and
+directory synchronization. Older files are never overwritten or removed. A
+process interruption can leave a pending file or an already-published newer
+checkpoint; resume from a valid committed file into another new directory.
+Synchronization or hard-link errors are explicit failures. Existing output or
+checkpoint destinations are refused before decoder imports. The optional
+`--output` report uses the existing CLI output behavior; exact durability comes
+from the checkpoint files.
+
+`--max-checkpoint-bytes` defaults to 16 MiB and bounds regular-file reads before
+parsing, nested exact-state encoding and the complete CLI checkpoint envelope.
+An initial encoding/publication failure prevents draws. A later failure preserves
+the prior committed file and actual current counts; IO publication errors also
+include `unpersisted_checkpoint` when its complete encoding fits the cap. If
+growth exceeds the cap, the prior checkpoint remains the durable recovery point.
+
+One structured report distinguishes `draw_outcome`, `diagnostic_outcome`,
+`persistence_outcome` and `export_outcome`. `paused` is a successful intentional
+prefix with provisional metrics. `complete` requires all requested draws,
+diagnostics, checkpoint publication and numerical export to succeed. Other
+failures return a nonzero exit code and preserve real counts and checkpoint
+locations. Saved draw/unwind failures and diagnosed/export failures remain
+terminal on restoration. A completed saved stream exports without new draws,
+controller callbacks or entropy. Input/preparation errors retain the original
+`saved_prefix` and checkpoint location separately from newly restored counts.
+
+`cargo test --locked -p rmagna --test cli_stream` runs actual binaries in fresh
+processes for both samplers/compilers, physical/importance proposals and both
+record policies. It checks exact non-time checkpoint equality, batch numerical
+parity, Python callback traces, target/recovery identities, cumulative quota and
+terminal failures, zero-weight histories, u64 extremes, bounded input and
+no-clobber publication failures. These are bounded correctness checks, not a
+paper-scale performance campaign. `FileTask::inspect_stream` provides metadata
+using stream-specific retention admission without compilation or callbacks.
+
 ## Restoring cumulative execution budgets
 
 `ExecutionMeter::checkpoint` captures an `ExecutionMeterCheckpoint` containing

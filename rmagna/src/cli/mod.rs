@@ -1,5 +1,6 @@
 mod args;
 mod output;
+mod stream;
 
 use args::{Args, Mode};
 use rmagna::file_api::{FileSamplerComparisonOptions, FileTask};
@@ -13,7 +14,7 @@ use std::{
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-fn execute(args: &Args) -> Result<Value> {
+fn load_task(args: &Args) -> Result<(FileTask, Option<ControllerProcess>)> {
     let mut registry = ControllerRegistry::default();
     let mut identities = BTreeMap::new();
     // Keep the process alive through execution and serialize its actual manifest
@@ -54,7 +55,15 @@ fn execute(args: &Args) -> Result<Value> {
         &args.load,
         identities,
     )?;
+    Ok((task, worker))
+}
+fn execute(args: &Args) -> Result<Value> {
+    if args.mode == Mode::Stream {
+        return Ok(stream::execute(args));
+    }
+    let (task, worker) = load_task(args)?;
     let mut value = match args.mode {
+        Mode::Stream => unreachable!("stream owns its persistence lifecycle"),
         Mode::Validate => {
             let mut value = task.inspect(&args.run)?;
             value["kind"] = json!("validation");
@@ -130,7 +139,13 @@ pub fn main() -> u8 {
         || (raw.len() == 2
             && matches!(
                 raw[0].as_str(),
-                "run" | "inspect" | "validate" | "enumerate" | "prepare" | "compare-samplers"
+                "run"
+                    | "stream"
+                    | "inspect"
+                    | "validate"
+                    | "enumerate"
+                    | "prepare"
+                    | "compare-samplers"
             )
             && matches!(raw[1].as_str(), "--help" | "-h"));
     if help || raw == ["--version"] {
@@ -179,7 +194,7 @@ pub fn main() -> u8 {
             return 1;
         }
     };
-    let value = execute(&args)
+    let mut value = execute(&args)
         .unwrap_or_else(|error| output::failure("input_or_preparation", error.to_string()));
     if let Some(file) = &mut destination {
         let written = serde_json::to_writer_pretty(&mut *file, &value)
@@ -187,11 +202,15 @@ pub fn main() -> u8 {
             .and_then(|()| file.write_all(b"\n"))
             .and_then(|()| file.flush());
         if let Err(error) = written {
-            let _ = output::print(
-                &output::failure("output", format!("cannot write report: {error}")),
-                args.json,
-            );
-            return 1;
+            if args.mode == Mode::Stream {
+                stream::add_failure(&mut value, "output", error);
+            } else {
+                let _ = output::print(
+                    &output::failure("output", format!("cannot write report: {error}")),
+                    args.json,
+                );
+                return 1;
+            }
         }
     }
     if output::print(&value, args.json).is_err() {

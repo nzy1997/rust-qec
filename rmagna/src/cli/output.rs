@@ -52,7 +52,7 @@ pub fn export_failure(report: &FileRunReport, error: &BatchExportError) -> Value
     value["numeric_export"] = json!({"status":"failed","exact_results_persisted":false});
     value
 }
-fn costs(costs: ExecutionCosts) -> Value {
+pub(super) fn costs(costs: ExecutionCosts) -> Value {
     let row = |c: rmagna::costs::OperationCost| json!({"attempted":c.attempted,"succeeded":c.succeeded,"failed":c.failed,"seconds":c.seconds});
     json!({"scope":"this_call_including_failed_attempts","timing":"inclusive_wall_seconds","compilation":row(costs.compilation),"query":row(costs.query),"decoder":row(costs.decoder),"support":row(costs.support)})
 }
