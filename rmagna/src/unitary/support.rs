@@ -3,7 +3,9 @@ use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::catalogue::PhaseCatalogue;
 use crate::fibers::FiberOptions;
-use crate::phase::{PhaseResourceOptions, PreparedPhaseResource};
+use crate::phase::{
+    NativePhaseOptions, PhaseResourceOptions, PreparedPhaseResource, ResourcePreparation,
+};
 use crate::quadratic::QuadraticForm;
 use crate::stabilizer::{PreparedAffineContraction, PreparedLinearBoundary};
 
@@ -58,6 +60,40 @@ impl CompiledUnitary {
         catalogue: Option<&PhaseCatalogue>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<PreparedProbabilitySupport, UnitaryError> {
+        self.prepare_probability_support_policy(
+            outputs,
+            max_terms,
+            ResourcePreparation::Catalogue(options),
+            catalogue,
+            arithmetic,
+        )
+    }
+    /// Retain a labelled parent with native selection; construction errors are
+    /// terminal and never select a different decomposition strategy.
+    pub fn prepare_probability_support_with_native(
+        &self,
+        outputs: &[BitVector],
+        max_terms: usize,
+        options: NativePhaseOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedProbabilitySupport, UnitaryError> {
+        self.prepare_probability_support_policy(
+            outputs,
+            max_terms,
+            ResourcePreparation::Native(options),
+            catalogue,
+            arithmetic,
+        )
+    }
+    fn prepare_probability_support_policy(
+        &self,
+        outputs: &[BitVector],
+        max_terms: usize,
+        options: ResourcePreparation,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<PreparedProbabilitySupport, UnitaryError> {
         if outputs.iter().any(|row| row.width() != self.width()) {
             return Err(UnitaryError::DimensionMismatch);
         }
@@ -92,8 +128,7 @@ impl CompiledUnitary {
             &[(&empty_phase, false), (phase, false), (phase, true)],
             &BitVector::zeros(keep.len())?,
         )?;
-        let resource =
-            PreparedPhaseResource::new(&phase, max_terms, options, catalogue, arithmetic)?;
+        let resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
         let mut prepared = PreparedProbabilitySupport {
             program: Arc::clone(&self.program),
             projection,

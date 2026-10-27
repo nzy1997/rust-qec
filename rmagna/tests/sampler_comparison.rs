@@ -118,6 +118,7 @@ fn assert_support_cache_transition(
             "terms": terms,
             "phase_variables": phase_variables,
             "resource_kind": "clifford_fibers",
+            "native_routes": {"direct":0,"product":0,"walsh":0,"injected":0,"injection_budget_skips":0},
             "method": "capped_probability_parent_affine_envelope"
         });
     }

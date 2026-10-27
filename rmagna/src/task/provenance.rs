@@ -268,6 +268,28 @@ fn preparation(mode: QueryPreparation) -> Value {
     match mode {
         QueryPreparation::Cold => json!({"mode": "cold"}),
         QueryPreparation::Trace => json!({"mode": "trace"}),
+        QueryPreparation::Native(options) => {
+            let s = options.selection;
+            let c = s.construction;
+            json!({
+                "mode": mode.name(),
+                "selection": {
+                    "max_quotient_rank": s.max_quotient_rank,
+                    "max_core_table_bytes": s.max_core_table_bytes,
+                    "max_signature_work": s.max_signature_work.to_string(),
+                    "max_transform_work": s.max_transform_work.to_string(),
+                    "construction": {"max_json_bytes": c.max_json_bytes, "max_entries": c.max_entries,
+                        "max_dimension": c.max_dimension, "max_table_values": c.max_table_values,
+                        "max_terms": c.max_terms, "max_constraint_rows": c.max_constraint_rows,
+                        "max_parity_rows": c.max_parity_rows, "max_verification_work": c.max_verification_work.to_string()},
+                    "preparation": {"max_terms": s.preparation.max_terms, "max_geometry_words": s.preparation.max_geometry_words,
+                        "core": {"max_dimension": s.preparation.core.max_dimension,
+                            "max_table_values": s.preparation.core.max_table_values,
+                            "max_work": s.preparation.core.max_work.to_string()}},
+                },
+                "injection": options.injection.map(|i| json!({"max_work": i.max_work.to_string(), "max_geometry_words": i.max_geometry_words, "max_terms": i.max_terms})),
+            })
+        }
         QueryPreparation::FixedCatalogue(options) => json!({
             "mode": "catalogue",
             "fibers": {"max_search_rank": options.fibers.max_search_rank, "attempts": options.fibers.attempts},

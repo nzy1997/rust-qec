@@ -107,6 +107,14 @@ impl MomentQueries {
                     });
                 }
                 let plan = match self.mode {
+                    QueryPreparation::Native(options) => state
+                        .prepare_pauli_moment(word, rows, arithmetic)?
+                        .with_native_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     QueryPreparation::Trace => {
                         state.prepare_pauli_moment(word, rows, arithmetic)?
                     }
@@ -182,6 +190,7 @@ mod tests {
                     cached_queries: 1,
                     fixed_resources: 0,
                     catalogue_resources: 0,
+                    native_routes: Default::default(),
                     maximum_quotient_rank: None,
                     maximum_terms: None,
                     maximum_phase_variables: None,
