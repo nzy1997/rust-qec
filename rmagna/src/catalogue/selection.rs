@@ -76,6 +76,7 @@ pub struct FrozenPhasePlan {
     certificate: Arc<CertifiedPhaseDecomposition>,
     prepared: PreparedCataloguePhase,
     receipt: PhaseSelectionReceipt,
+    injection: Option<PhaseInjectionReceipt>,
 }
 impl fmt::Debug for FrozenPhasePlan {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -204,6 +205,29 @@ impl FrozenPhasePlan {
         options: &PhaseSelectionOptions,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, CatalogueError> {
+        Self::select(reference, catalogue, options, None, arithmetic)
+    }
+    /// Attempt bounded optional T-pair injection before applying final transport
+    /// limits. Construction storage is bounded by `options.construction`;
+    /// `options.preparation.max_terms` applies to the final selected certificate.
+    /// Only explicit candidate budgets permit a skip. Arithmetic and certificate
+    /// failures remain errors. Existing plans and catalogues remain immutable.
+    pub fn new_with_injection(
+        reference: &ParityPhase,
+        catalogue: Option<&PhaseCatalogue>,
+        options: &PhaseSelectionOptions,
+        injection: &PhaseInjectionOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, CatalogueError> {
+        Self::select(reference, catalogue, options, Some(injection), arithmetic)
+    }
+    fn select(
+        reference: &ParityPhase,
+        catalogue: Option<&PhaseCatalogue>,
+        options: &PhaseSelectionOptions,
+        injection: Option<&PhaseInjectionOptions>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, CatalogueError> {
         let (axes, signature_work_bound, scan_geometry) = native_axes(reference, options)?;
         let rank = axes.len();
         let values = u32::try_from(rank)
@@ -290,7 +314,7 @@ impl FrozenPhasePlan {
                 selected(walsh(), PhaseSelectionRoute::Walsh)?,
             )
         };
-        let certificate = selected_catalogue
+        let mut certificate = selected_catalogue
             .shared_entry(rank, core.phase_table())
             .ok_or_else(|| {
                 error(
@@ -298,6 +322,31 @@ impl FrozenPhasePlan {
                     "selected constructor did not return the requested core",
                 )
             })?;
+        let mut certification = selected_catalogue.usage();
+        let injection = if let Some(injection) = injection {
+            let (candidate, receipt) = super::injection::attempt(
+                &certificate,
+                catalogue,
+                route,
+                injection,
+                &options.construction,
+                arithmetic,
+            )?;
+            if let Some(candidate) = candidate {
+                certificate = candidate
+                    .shared_entry(rank, core.phase_table())
+                    .ok_or_else(|| {
+                        error(
+                            "phase_injection.certificate",
+                            "candidate lost its certified core",
+                        )
+                    })?;
+                certification = candidate.usage();
+            }
+            Some(receipt)
+        } else {
+            None
+        };
         let core_construction_work = core.work_units();
         let transform_work = if route == PhaseSelectionRoute::Walsh {
             rank as u128 * values
@@ -326,7 +375,7 @@ impl FrozenPhasePlan {
             signature_work_bound,
             core_construction_work,
             transform_work,
-            certification: selected_catalogue.usage(),
+            certification,
             geometry_words,
         };
         Ok(Self {
@@ -334,10 +383,15 @@ impl FrozenPhasePlan {
             certificate,
             prepared,
             receipt,
+            injection,
         })
     }
     pub fn receipt(&self) -> &PhaseSelectionReceipt {
         &self.receipt
+    }
+    /// Candidate diagnostics; `receipt().route` records the original selection.
+    pub fn injection_receipt(&self) -> Option<&PhaseInjectionReceipt> {
+        self.injection.as_ref()
     }
     pub fn signature_axes(&self) -> &[BitVector] {
         &self.axes
