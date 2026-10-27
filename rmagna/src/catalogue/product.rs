@@ -16,10 +16,6 @@ fn checked(value: Option<u128>) -> Result<u128, CatalogueError> {
 fn product_rows(a: u128, b: u128, c: u128, d: u128) -> Result<u128, CatalogueError> {
     checked(checked(a.checked_mul(b))?.checked_add(checked(c.checked_mul(d))?))
 }
-fn vector_capacity<T>(field: &str, count: u128) -> Result<(), CatalogueError> {
-    let capacity = (isize::MAX as usize / std::mem::size_of::<T>()) as u128;
-    limit(field, count, capacity)
-}
 impl PhaseCatalogue {
     /// Construct a separate, single-entry catalogue for `sum_j x_j (mod 8)`.
     /// Consecutive pairs use the certified two-T core; an odd last coordinate

@@ -3,6 +3,7 @@ mod builtin;
 mod json;
 mod product;
 mod resource;
+mod walsh;
 use crate::gf2::BitVector;
 use crate::phase::ParityPhase;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
@@ -125,6 +126,10 @@ fn assignments(dimension: usize, limits: &CatalogueLimits) -> Result<usize, Cata
         limits.max_table_values as u128,
     )?;
     Ok(count)
+}
+fn vector_capacity<T>(field: &str, count: u128) -> Result<(), CatalogueError> {
+    let capacity = (isize::MAX as usize / std::mem::size_of::<T>()) as u128;
+    limit(field, count, capacity)
 }
 /// A complete-table lookup whose entries have been reconstructed exactly.
 /// Clones share certified immutable entries; insertion commits only on success.
