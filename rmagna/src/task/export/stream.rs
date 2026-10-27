@@ -87,9 +87,11 @@ fn validate(report: &TaskStreamReport) -> Result<(), StreamExportError> {
                 "completed resources require at least one completed draw",
             ));
         }
-        if !matches!(report.statistics, Ok(None)) || report.efficiency.is_err() {
+        if !matches!(report.statistics, Ok(None))
+            || !matches!(report.efficiency.as_ref(), Ok(e) if e.status == crate::statistics::EfficiencyStatus::InsufficientSamples)
+        {
             return Err(invalid(
-                "an empty prefix requires absent statistics and a valid empty efficiency summary",
+                "an empty prefix requires absent statistics and efficiency.status = insufficient_samples",
             ));
         }
         if report.failed == 0

@@ -4253,6 +4253,9 @@ summary availability, record shape, cost counts and timings. Committed network
 compilations cannot exceed successful measured compilation work; committed history
 groups cannot exceed successful query and support work combined. Invalid reports
 and numeric-work failures return contextual `StreamExportError` values.
+An empty prefix requires `insufficient_samples` efficiency, even when its task
+has no error metric. After committed no-error observations, `no_error_metric`
+remains a valid diagnostic status.
 Terminal failure messages must be nonempty; nonempty whitespace and all other
 message bytes are preserved, matching checkpoint restoration.
 Each operation must have zero measured seconds when it has no attempts.

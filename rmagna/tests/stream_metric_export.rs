@@ -1120,3 +1120,88 @@ fn terminal_failure_messages_reject_empty_and_preserve_nonempty_bytes() {
         }
     }
 }
+
+#[test]
+fn empty_efficiency_status_requires_insufficient_samples_but_nonempty_no_error_is_valid() {
+    use rmagna::statistics::EfficiencyStatus;
+    let owner = HistoryEfficiency::new(FieldArithmetic::default()).unwrap();
+    let summary = owner.summarize().unwrap();
+    assert_eq!(summary.completed, 0);
+    assert_eq!(summary.status, EfficiencyStatus::InsufficientSamples);
+    let mut prefixes = vec![literal(0, 7)];
+    for phase in [RunPhase::Sampling, RunPhase::Accumulation] {
+        for kind in ["TaskError", "Unwind"] {
+            let mut failed = literal(0, 7);
+            failed.status = TaskStreamStatus::Failed;
+            failed.failed = 1;
+            failed.not_attempted = 6;
+            failed.failure = Some(RunFailure {
+                phase,
+                shot: Some(0),
+                kind,
+                message: "empty prefix failure fixture".to_owned(),
+            });
+            prefixes.push(failed);
+        }
+    }
+    for report in prefixes {
+        assert_eq!(report.efficiency.as_ref().unwrap(), &summary);
+        let before = report.clone();
+        let value = export(&report);
+        assert_eq!(value["efficiency"]["status"], "insufficient_samples");
+        assert_eq!(value["estimation_status"], "empty");
+        assert_eq!(report, before);
+        for status in [
+            EfficiencyStatus::Available,
+            EfficiencyStatus::NoErrorMetric,
+            EfficiencyStatus::ZeroAcceptance,
+            EfficiencyStatus::ZeroResidualVariance,
+        ] {
+            let mut invalid = report.clone();
+            invalid.efficiency.as_mut().unwrap().status = status;
+            let before = invalid.clone();
+            for options in [
+                NumericOptions::default(),
+                NumericOptions { max_work_bits: 0 },
+            ] {
+                let error = export_stream_metrics(&invalid, options).unwrap_err();
+                assert!(matches!(error, StreamExportError::InvalidState(_)));
+                assert!(error.to_string().contains("efficiency.status"));
+                assert_eq!(invalid, before);
+            }
+        }
+    }
+    // Missing error is learned from committed observations, never an empty owner.
+    let (file, _) = make("I 0", "{}", Default::default(), NoiseSampling::Physical, 0);
+    let compiled = file.compile().unwrap();
+    let mut stream = compiled
+        .start_stream(
+            TaskStreamOptions {
+                run: TaskRunOptions {
+                    shots: 3,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            "nonempty-no-error-status-v1",
+        )
+        .unwrap();
+    for count in 1..=3 {
+        let report = stream.advance(1).unwrap();
+        assert_eq!(report.completed, count);
+        assert_eq!(
+            report.efficiency.as_ref().unwrap().status,
+            EfficiencyStatus::NoErrorMetric
+        );
+        let before = report.clone();
+        let value = export(&report);
+        assert_eq!(value["efficiency"]["status"], "no_error_metric");
+        assert_eq!(value["diagnostics"]["efficiency"]["status"], "available");
+        assert!(value["estimates"]["error"].is_null());
+        assert_eq!(
+            value["status"],
+            if count == 3 { "complete" } else { "running" }
+        );
+        assert_eq!(report, before);
+    }
+}
