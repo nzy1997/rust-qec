@@ -3,6 +3,8 @@
 mod core;
 mod resource;
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
+pub(crate) use resource::ResourcePreparation;
+pub use resource::{NativePhaseOptions, NativeRouteCounts};
 pub use resource::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
 
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
@@ -40,6 +42,7 @@ pub enum PhaseError {
     Quadratic(QuadraticError),
     Scalar(ScalarError),
     Stabilizer(StabilizerError),
+    Catalogue(crate::catalogue::CatalogueError),
 }
 
 impl fmt::Display for PhaseError {
@@ -77,6 +80,7 @@ impl fmt::Display for PhaseError {
             Self::Quadratic(e) => e.fmt(f),
             Self::Scalar(e) => e.fmt(f),
             Self::Stabilizer(e) => e.fmt(f),
+            Self::Catalogue(e) => e.fmt(f),
         }
     }
 }

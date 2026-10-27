@@ -2,7 +2,9 @@
 use super::phase_map::PhaseRestriction;
 use super::*;
 use crate::catalogue::PhaseCatalogue;
-use crate::phase::{PhaseResourceOptions, PreparedPhaseResource};
+use crate::phase::{
+    NativePhaseOptions, PhaseResourceOptions, PreparedPhaseResource, ResourcePreparation,
+};
 use crate::stabilizer::PreparedAffineContraction;
 
 struct FixedResource {
@@ -38,7 +40,7 @@ impl ScalarClosure {
         &mut self,
         phases: &[(&ParityPhase, bool)],
         max_terms: usize,
-        options: PhaseResourceOptions,
+        options: ResourcePreparation,
         catalogue: Option<&PhaseCatalogue>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<(), UnitaryError> {
@@ -46,9 +48,7 @@ impl ScalarClosure {
             PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
         let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
         self.resource = Some(FixedResource {
-            decomposition: PreparedPhaseResource::new(
-                &phase, max_terms, options, catalogue, arithmetic,
-            )?,
+            decomposition: options.prepare(&phase, max_terms, catalogue, arithmetic)?,
             phase_map,
         });
         Ok(())
@@ -101,6 +101,24 @@ pub struct PreparedProbability {
     closure: ScalarClosure,
 }
 impl PreparedProbability {
+    /// Freeze bounded native selection against the original probability family.
+    pub fn with_native_phase_resource(
+        mut self,
+        max_terms: usize,
+        options: NativePhaseOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        let phase = &self.program.query_reference_phase;
+        self.closure.freeze(
+            &[(phase, false), (phase, true)],
+            max_terms,
+            ResourcePreparation::Native(options),
+            catalogue,
+            arithmetic,
+        )?;
+        Ok(self)
+    }
     pub(super) fn prepare(
         state: &CompiledUnitary,
         rows: &[BitVector],
@@ -150,7 +168,7 @@ impl PreparedProbability {
         self.closure.freeze(
             &[(phase, false), (phase, true)],
             max_terms,
-            options,
+            ResourcePreparation::Catalogue(options),
             catalogue,
             arithmetic,
         )?;
@@ -210,6 +228,26 @@ fn moment_joint(
         .tensor(&word.apply(boundary, arithmetic)?, arithmetic)?)
 }
 impl PreparedPauliMoment {
+    /// Certified zero moments retain no resource; other families freeze once.
+    pub fn with_native_phase_resource(
+        mut self,
+        max_terms: usize,
+        options: NativePhaseOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        if let Some(closure) = &mut self.closure {
+            let phase = &self.program.query_reference_phase;
+            closure.freeze(
+                &[(phase, true), (phase, false)],
+                max_terms,
+                ResourcePreparation::Native(options),
+                catalogue,
+                arithmetic,
+            )?;
+        }
+        Ok(self)
+    }
     pub(super) fn prepare(
         state: &CompiledUnitary,
         word: &PauliWord,
@@ -280,7 +318,7 @@ impl PreparedPauliMoment {
             closure.freeze(
                 &[(phase, true), (phase, false)],
                 max_terms,
-                options,
+                ResourcePreparation::Catalogue(options),
                 catalogue,
                 arithmetic,
             )?;
@@ -369,6 +407,25 @@ pub struct PreparedDensityOverlap {
     closure: ScalarClosure,
 }
 impl PreparedDensityOverlap {
+    /// Freeze bounded native selection for the original four-copy family.
+    pub fn with_native_phase_resource(
+        mut self,
+        max_terms: usize,
+        options: NativePhaseOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, UnitaryError> {
+        let l = &self.left.query_reference_phase;
+        let r = &self.right.query_reference_phase;
+        self.closure.freeze(
+            &[(l, false), (l, true), (r, true), (r, false)],
+            max_terms,
+            ResourcePreparation::Native(options),
+            catalogue,
+            arithmetic,
+        )?;
+        Ok(self)
+    }
     pub(super) fn prepare(
         left: &CompiledUnitary,
         boundary: DensityLayout<'_>,
@@ -415,7 +472,7 @@ impl PreparedDensityOverlap {
         self.closure.freeze(
             &[(l, false), (l, true), (r, true), (r, false)],
             max_terms,
-            options,
+            ResourcePreparation::Catalogue(options),
             catalogue,
             arithmetic,
         )?;

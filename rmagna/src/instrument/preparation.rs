@@ -22,7 +22,7 @@ pub enum InstrumentQueryLayout<'a> {
         outputs: &'a [usize],
         word: &'a PauliWord,
     },
-    /// Validate the phase-independent record transport; no numeric family is retained.
+    /// Validate the record transport. Native modes also retain its exact labelled parent.
     ReportedSupport,
 }
 impl InstrumentQueryLayout<'_> {
@@ -120,12 +120,16 @@ impl CompiledInstrument {
                 )
             }
             InstrumentQueryLayout::ReportedSupport => {
-                // Structural support has no phase-resource family to prime. Keep
-                // the existing conservative support path and its resource behavior.
+                // Native mode primes the actual parent used by numeric support.
                 if self.record_wires.iter().any(|&q| q >= self.unitary.width()) {
                     return Err(UnitaryError::DimensionMismatch.into());
                 }
-                Ok(QueryPreparationOutcome::Cold)
+                self.support_queries.prepare(
+                    &self.unitary,
+                    &self.record_wires,
+                    max_terms,
+                    arithmetic,
+                )
             }
         }
     }

@@ -140,6 +140,14 @@ impl DensityQueries {
                     });
                 }
                 let plan = match self.mode {
+                    QueryPreparation::Native(options) => left
+                        .prepare_density_overlap(boundary, right, target, arithmetic)?
+                        .with_native_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     QueryPreparation::Trace => {
                         left.prepare_density_overlap(boundary, right, target, arithmetic)?
                     }

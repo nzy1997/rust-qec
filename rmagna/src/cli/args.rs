@@ -40,9 +40,9 @@ Run configuration:
   --compiler shared|parity_copies      Default shared
   --history-sampler affine_support|exact_marginal   Default affine_support; not enumerate/compare-samplers
   --causal-strategy fixed|cold         Default fixed
-  --probability-preparation cold|trace|fixed|catalogue  Default fixed, on demand
-  --density-preparation cold|trace|fixed|catalogue  Default fixed, on demand
-  --moment-preparation cold|trace|fixed|catalogue  Default fixed, on demand
+  --probability-preparation MODE       cold|trace|fixed|catalogue|native|native_injection; default fixed
+  --density-preparation MODE           Same choices; default fixed, on demand
+  --moment-preparation MODE            Same choices; default fixed, on demand
   --fiber-search-rank N               Fixed/catalogue fallback search rank (default 16)
   --max-prepared-probabilities N       Retained query cap (default 64)
   --max-prepared-densities N           Retained query cap (default 16)
@@ -50,6 +50,30 @@ Run configuration:
   --insertion-preparation direct|prepared           Default direct
   --max-insertion-table-bytes N        Prepared insertion estimate cap (default 67108864)
   --max-insertion-catalog-entries N    Prepared insertion entry cap (default 1000000)
+
+Native selection limits (require native or native_injection in a query family):
+  --native-max-quotient-rank N         Signature rank cap (default 8)
+  --native-max-core-table-bytes N      Logical core table cap (default 67108864)
+  --native-max-signature-work N        Signature scan work cap (default 67108864)
+  --native-max-transform-work N        Walsh work cap (default 67108864)
+  --native-max-construction-terms N    Temporary certificate cap (default 1048576)
+  --native-max-construction-entries N  Temporary entry cap (default 1024)
+  --native-max-construction-dimension N Certificate dimension cap (default 20)
+  --native-max-construction-table-values N Table assignment cap (default 1048576)
+  --native-max-constraint-rows N        Certificate constraint cap (default 1048576)
+  --native-max-parity-rows N            Certificate parity cap (default 1048576)
+  --native-max-verification-work N     Certificate check work (default 16777216)
+  --native-max-geometry-words N        Logical preparation cap (default 16777216)
+  --native-max-terms N                 Final retained cap (default 256; also --max-terms)
+  --native-max-core-dimension N        Preparation core dimension cap (default 20)
+  --native-max-core-table-values N     Preparation table cap (default 1048576)
+  --native-max-core-work N             Preparation core work cap (default 67108864)
+  --injection-max-work N               Optional candidate work (default 67108864)
+  --injection-max-geometry-words N      Optional candidate words (default 8388608)
+  --injection-max-terms N              Optional surviving supports (default 1048576)
+Injection limits require native_injection. Budgets count logical payload/work,
+excluding allocator overhead. Resolved settings are fingerprinted; actual routes
+are in retained diagnostics. Construction failures never silently choose fibers.
 
 Continuous stream only:
   --checkpoint-dir DIR                Required new directory; parent must exist
@@ -159,6 +183,7 @@ fn duration(text: &str, flag: &str) -> Result<Duration, String> {
     }
     Ok(result)
 }
+mod native;
 struct Flags(BTreeMap<String, String>);
 const ENUMERATION_FLAGS: [&str; 12] = [
     "--include-patterns",
@@ -358,7 +383,7 @@ impl Args {
                 .is_fixed()
             {
                 return Err(
-                    "compare-samplers requires --probability-preparation fixed or catalogue".into(),
+                    "compare-samplers requires fixed, catalogue, native or native_injection probability preparation".into(),
                 );
             }
         }
@@ -468,6 +493,7 @@ fn parse_tokens(raw: Vec<String>) -> Result<(Mode, PathBuf, Flags), String> {
             && !PREPARATION_FLAGS.contains(&arg.as_str())
             && !COMPARISON_FLAGS.contains(&arg.as_str())
             && !STREAM_FLAGS.contains(&arg.as_str())
+            && !native::FLAGS.contains(&arg.as_str())
         {
             return Err(format!("unknown option {arg}; use --help"));
         }
@@ -645,17 +671,38 @@ fn configure_queries(
     let probability = flags.choice(
         "--probability-preparation",
         "fixed",
-        &["cold", "trace", "fixed", "catalogue"],
+        &[
+            "cold",
+            "trace",
+            "fixed",
+            "catalogue",
+            "native",
+            "native_injection",
+        ],
     )?;
     let density = flags.choice(
         "--density-preparation",
         "fixed",
-        &["cold", "trace", "fixed", "catalogue"],
+        &[
+            "cold",
+            "trace",
+            "fixed",
+            "catalogue",
+            "native",
+            "native_injection",
+        ],
     )?;
     let moment = flags.choice(
         "--moment-preparation",
         "fixed",
-        &["cold", "trace", "fixed", "catalogue"],
+        &[
+            "cold",
+            "trace",
+            "fixed",
+            "catalogue",
+            "native",
+            "native_injection",
+        ],
     )?;
     if flags.0.contains_key("--fiber-search-rank")
         && ![probability.as_str(), density.as_str(), moment.as_str()]
@@ -669,7 +716,19 @@ fn configure_queries(
     }
     let mut fiber = rmagna::fibers::FiberOptions::default();
     fiber.max_search_rank = flags.number("--fiber-search-rank", fiber.max_search_rank)?;
+    let native_options = native::configure(
+        flags,
+        &[probability.as_str(), density.as_str(), moment.as_str()],
+    )?;
+    let native_policy = |mode: &str| {
+        let mut options = native_options;
+        if mode == "native" {
+            options.injection = None;
+        }
+        QueryPreparation::Native(options)
+    };
     compile.probability_preparation = match probability.as_str() {
+        "native" | "native_injection" => native_policy(probability.as_str()),
         "cold" => ProbabilityPreparation::Cold,
         "trace" => ProbabilityPreparation::Trace,
         "catalogue" => {
@@ -681,6 +740,7 @@ fn configure_queries(
         _ => ProbabilityPreparation::FixedFibers(fiber),
     };
     compile.density_preparation = match density.as_str() {
+        "native" | "native_injection" => native_policy(density.as_str()),
         "cold" => QueryPreparation::Cold,
         "trace" => QueryPreparation::Trace,
         "catalogue" => QueryPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {
@@ -690,6 +750,7 @@ fn configure_queries(
         _ => QueryPreparation::FixedFibers(fiber),
     };
     compile.moment_preparation = match moment.as_str() {
+        "native" | "native_injection" => native_policy(moment.as_str()),
         "cold" => QueryPreparation::Cold,
         "trace" => QueryPreparation::Trace,
         "catalogue" => QueryPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {

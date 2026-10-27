@@ -13,10 +13,15 @@ pub enum QueryPreparation {
     FixedFibers(FiberOptions),
     /// Prefer a matching built-in certificate, otherwise retain fixed fibers.
     FixedCatalogue(crate::phase::PhaseResourceOptions),
+    /// Native direct/product/Walsh selection, with optional bounded injection.
+    Native(crate::phase::NativePhaseOptions),
 }
 impl QueryPreparation {
     pub fn is_fixed(self) -> bool {
-        matches!(self, Self::FixedFibers(_) | Self::FixedCatalogue(_))
+        matches!(
+            self,
+            Self::FixedFibers(_) | Self::FixedCatalogue(_) | Self::Native(_)
+        )
     }
     pub fn name(self) -> &'static str {
         match self {
@@ -24,6 +29,13 @@ impl QueryPreparation {
             Self::Trace => "trace",
             Self::FixedFibers(_) => "fixed",
             Self::FixedCatalogue(_) => "catalogue",
+            Self::Native(options) => {
+                if options.injection.is_some() {
+                    "native_injection"
+                } else {
+                    "native"
+                }
+            }
         }
     }
 }
@@ -33,6 +45,7 @@ pub struct PreparedQueryStatistics {
     pub fixed_resources: usize,
     /// Actual selected catalogue resources; missing keys count as fibers.
     pub catalogue_resources: usize,
+    pub native_routes: crate::phase::NativeRouteCounts,
     /// Independent maxima over retained reference resources, not query quotas.
     pub maximum_quotient_rank: Option<usize>,
     pub maximum_terms: Option<usize>,
@@ -47,11 +60,13 @@ impl PreparedQueryStatistics {
             cached_queries,
             fixed_resources: 0,
             catalogue_resources: 0,
+            native_routes: Default::default(),
             maximum_quotient_rank: None,
             maximum_terms: None,
             maximum_phase_variables: None,
         };
         for resource in resources {
+            statistics.native_routes.record(resource);
             statistics.fixed_resources += 1;
             statistics.catalogue_resources +=
                 usize::from(resource.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue);
@@ -173,6 +188,14 @@ impl ProbabilityQueries {
                     });
                 }
                 let plan = match self.mode {
+                    ProbabilityPreparation::Native(options) => state
+                        .prepare_probability(rows, arithmetic)?
+                        .with_native_phase_resource(
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     ProbabilityPreparation::Trace => state.prepare_probability(rows, arithmetic)?,
                     ProbabilityPreparation::FixedFibers(options) => state
                         .prepare_probability_with_fibers(rows, max_terms, options, arithmetic)?,
@@ -244,6 +267,7 @@ mod tests {
                 cached_queries: 4,
                 fixed_resources: 3,
                 catalogue_resources: 2,
+                native_routes: Default::default(),
                 maximum_quotient_rank: Some(3),
                 maximum_terms: Some(8),
                 maximum_phase_variables: Some(129),
@@ -318,6 +342,7 @@ mod tests {
                 cached_queries: 5,
                 fixed_resources: 4,
                 catalogue_resources: 3,
+                native_routes: Default::default(),
                 maximum_quotient_rank: Some(4),
                 maximum_terms: Some(8),
                 maximum_phase_variables: Some(129),

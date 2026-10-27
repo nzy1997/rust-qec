@@ -1,5 +1,64 @@
 # rmagna
 
+## Native selection in task queries
+
+`QueryPreparation::Native(NativePhaseOptions)` opts cached probability, density
+overlap, Pauli-moment and labelled probability-parent families into the frozen
+native-coordinate selector. Set `injection: Some(PhaseInjectionOptions::default())`
+to attempt exact T-pair injection after the original direct/product/Walsh choice.
+Existing default policies retain their behavior. A native construction failure
+returns an error and publishes no cache entry; it never retries with fibers.
+
+Use `PreparedPhaseResource::new_native` for an explicit owned scalar/labelled
+resource. Probability, density and moment families expose
+`with_native_phase_resource`; labelled parents use
+`CompiledUnitary::prepare_probability_support_with_native`. These entrypoints
+accept an explicit optional database. Instrument families use the built-in
+database. `native_resource()` exposes the actual frozen plan and receipts, which
+remain usable after caller-owned catalogues are dropped. Compatible phase/fault
+updates retain the choice; changed signatures and programs return errors.
+
+The CLI accepts `native` and `native_injection` separately for
+`--probability-preparation`, `--density-preparation` and `--moment-preparation`:
+
+```sh
+cargo run --locked -p rmagna -- run circuit.magna --task task.json --shots 8 \
+  --probability-preparation native_injection \
+  --density-preparation native --moment-preparation native \
+  --native-max-construction-terms 1048576 --native-max-terms 256 \
+  --injection-max-terms 1024 --json
+```
+
+`--help` lists separate rank, core table, signature/transform work, certificate
+construction, preparation geometry and final retained-term limits. Native flags
+require a native query family; injection flags require `native_injection`.
+`--fiber-search-rank` applies to fixed/catalogue policies. Temporary certificate
+bounds permit an original 64-term construction followed by an admitted 8-term
+injected plan; final admission also respects the caller's `--max-terms`.
+An optional candidate budget skip keeps the original choice only if that choice
+fits final admission. Arithmetic and certificate failures remain hard errors.
+
+Retained query/support snapshots include `native_routes`: exclusive actual
+`direct`, `product`, `walsh`, `injected` counts and a separate
+`injection_budget_skips` count. A requested policy does not increment a route
+counter. Native support snapshots report `resource_kind: native_selection`.
+Legacy `catalogue_resources` counts legacy catalogue resources only. Native eager
+`ReportedSupport` preparation retains the actual labelled parent subsequently used
+by support queries; older policies retain their structural preparation contract.
+Certified anticommutation-zero moments retain no phase resource.
+
+All resolved native options, including nested certificate and canonical-core
+limits and optional injection settings, enter task/stream fingerprints. Wide
+work limits are exact decimal strings. A foreign configuration cannot resume a
+checkpoint. Tests compare faulted projected queries with literal complex state
+vectors, output-permuted reduced density matrices and dependent label masses;
+they cover every native resource route, final/optional admission and CLI option
+identity. These checks establish bounded correctness. Logical budgets exclude
+allocator overhead, and this integration establishes neither prepared Gaussian
+reuse nor paper throughput or rare-event precision.
+
+## Standalone exact T-pair injection
+
 Optional exact T-pair injection is available through
 `FrozenPhasePlan::new_with_injection`. It uses the frozen native signature
 coordinates and the canonical core's odd parity rotations. Certified one-/two-T
@@ -89,8 +148,8 @@ The CLI defaults to the shared commuting-layer compiler, affine-support history
 sampling, fixed causal templates, fixed probability/density/moment preparation on
 demand, and direct Pauli insertions. Library defaults remain as documented below.
 For sampling, use `--history-sampler exact_marginal`. Use `--compiler parity_copies`,
-`--probability-preparation cold|trace|fixed`, `--density-preparation cold|trace|fixed`,
-`--moment-preparation cold|trace|fixed`
+`--probability-preparation MODE`, `--density-preparation MODE`,
+`--moment-preparation MODE` with `cold|trace|fixed|catalogue|native|native_injection`
 and `--causal-strategy fixed|cold` to select alternatives. Prepared insertion
 catalogs require `--insertion-preparation prepared`; their entry/byte limits are
 explicit options and bound the catalog estimate rather than process memory.
@@ -3874,8 +3933,9 @@ budget is encoded as an exact decimal string. Tests vary all bounds for all
 three query families, compare seeded fresh/reused/prepared runs in both
 compilers and samplers with nonlinear callbacks, verify saved CLI JSON and
 pilots, and exercise explicit cache failures, retries and real missing-key
-fallback. Formal paper benchmarks and injection remain subsequent work;
-standalone paired-T certificates are described below.
+fallback. Native selection and optional injection are documented above;
+formal paper benchmarks remain subsequent work. Standalone paired-T certificates
+are described below.
 
 ## Retained query resource sizes
 
@@ -4482,9 +4542,9 @@ updates, and reject changed non-Clifford signatures.
 Run `cargo run --locked -p rmagna --example walsh_phase_catalogue` for the complete
 public construction example. The owning tests compare 4,232 tables against
 literal integer character sums and verify actual prepared scalar/labelled
-contractions, sparse spectra, ownership and resource endpoints. Runtime
-direct/product/Walsh selection and optional phase injection remain subsequent
-increments; this constructor leaves existing preparation defaults unchanged.
+contractions, sparse spectra, ownership and resource endpoints. Opt-in runtime
+direct/product/Walsh selection and optional phase injection are documented above;
+this constructor leaves existing preparation defaults unchanged.
 
 ## Frozen native-coordinate phase selection
 
@@ -4561,8 +4621,8 @@ python3.12 -I -B benchmarks/magna_reproduction/capture_phase_selection.py \
 
 The generator refuses existing output paths and binds its source, the pinned
 manifest and the actual native extension. The checked-in witness is correctness
-evidence; optional injection, runtime strategy wiring and paper-scale timing
-campaigns remain separate increments.
+evidence. Optional injection and runtime wiring are documented above;
+paper-scale timing campaigns remain separate work.
 
 An additional native-calibrated coordinate case keeps an original signature row
 whose reduced representative differs after independence elimination. It checks

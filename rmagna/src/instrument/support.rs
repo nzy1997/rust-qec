@@ -12,6 +12,7 @@ pub struct PreparedSupportStatistics {
     pub terms: usize,
     pub resource_kind: crate::phase::PhaseResourceKind,
     pub phase_variables: usize,
+    pub native_routes: crate::phase::NativeRouteCounts,
 }
 pub(super) struct SupportQueries {
     mode: QueryPreparation,
@@ -87,12 +88,15 @@ impl SupportQueries {
             .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
         Ok(plan.as_ref().map(|plan| {
             let resource = plan.fixed_phase_resource();
+            let mut native_routes = crate::phase::NativeRouteCounts::default();
+            native_routes.record(resource);
             PreparedSupportStatistics {
                 labels: self.transport.as_ref().map_or(labels, Vec::len),
                 quotient_rank: resource.quotient_rank(),
                 terms: resource.num_terms(),
                 resource_kind: resource.kind(),
                 phase_variables: resource.num_variables(),
+                native_routes,
             }
         }))
     }
@@ -103,11 +107,42 @@ impl SupportQueries {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Vec<AffineKet>, InstrumentError> {
+        let (plan, _) = self.plan(state, records, max_terms, arithmetic)?;
+        Ok(plan.evaluate(state, max_terms, arithmetic)?)
+    }
+    pub(super) fn prepare(
+        &self,
+        state: &CompiledUnitary,
+        records: &[usize],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<QueryPreparationOutcome, InstrumentError> {
+        if !matches!(self.mode, QueryPreparation::Native(_)) {
+            return Ok(QueryPreparationOutcome::Cold);
+        }
+        let (plan, outcome) = self.plan(state, records, max_terms, arithmetic)?;
+        plan.fixed_phase_resource()
+            .check_term_limit(max_terms)
+            .map_err(UnitaryError::from)?;
+        Ok(outcome)
+    }
+    fn plan(
+        &self,
+        state: &CompiledUnitary,
+        records: &[usize],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<(Arc<PreparedProbabilitySupport>, QueryPreparationOutcome), InstrumentError> {
         let plan = {
             let mut slot = self
                 .plan
                 .lock()
                 .map_err(|_| InstrumentError::PreparedQueryCacheUnavailable)?;
+            let outcome = if slot.is_none() {
+                QueryPreparationOutcome::Created
+            } else {
+                QueryPreparationOutcome::Reused
+            };
             if slot.is_none() {
                 // Publish only complete successful preparation; a low-budget
                 // failure must not poison a later adequately budgeted call.
@@ -124,6 +159,14 @@ impl SupportQueries {
                         .collect::<Result<Vec<_>, _>>()?,
                 };
                 let plan = match self.mode {
+                    QueryPreparation::Native(options) => state
+                        .prepare_probability_support_with_native(
+                            &rows,
+                            max_terms,
+                            options,
+                            Some(crate::catalogue::builtin_phase_catalogue()?),
+                            arithmetic,
+                        )?,
                     QueryPreparation::FixedCatalogue(options) => state
                         .prepare_probability_support_with_resource(
                             &rows,
@@ -144,9 +187,12 @@ impl SupportQueries {
                 };
                 *slot = Some(Arc::new(plan));
             }
-            Arc::clone(slot.as_ref().expect("prepared support"))
+            (
+                Arc::clone(slot.as_ref().expect("prepared support")),
+                outcome,
+            )
         };
-        Ok(plan.evaluate(state, max_terms, arithmetic)?)
+        Ok(plan)
     }
 }
 use crate::stabilizer::AffineKet;
