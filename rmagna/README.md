@@ -57,6 +57,71 @@ identity. These checks establish bounded correctness. Logical budgets exclude
 allocator overhead, and this integration establishes neither prepared Gaussian
 reuse nor paper throughput or rare-event precision.
 
+## Shared constrained catalogue boundary transport
+
+`FrozenPhasePlan::prepare_boundary` freezes the actual original label columns for
+an already selected resource. `Arc<PreparedCataloguePhase>::prepare_boundary`
+provides the same primitive for a directly prepared catalogue. The returned
+`PreparedCatalogueBoundary` owns shared immutable resource data after source
+handles are dropped. Existing generic `evaluate` and `expand` APIs stay available.
+
+Distinct indicator shifts with identical support-direction maps share one
+pullback of the changing Clifford quadratic. Fixed shift images and reference
+term quadratics are retained. Each consistent term has its own
+`PreparedAffineContraction`: compatible constant/even-linear updates replay its
+recorded steps; changed cross terms or linear parity use exact Gaussian
+elimination in the retained pivot/kernel basis. Zero coefficients and cancelling
+reference Gaussians retain the structure needed by later nonzero queries.
+
+```rust
+use rmagna::catalogue::{builtin_phase_catalogue, CatalogueBoundaryOptions,
+    FrozenPhasePlan, PhaseSelectionOptions};
+use rmagna::gf2::BitVector;
+use rmagna::phase::ParityPhase;
+use rmagna::quadratic::QuadraticForm;
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+use rmagna::stabilizer::AffineKet;
+
+let arithmetic = ScalarArithmetic::default();
+let database = (*builtin_phase_catalogue()?).clone();
+let phase = ParityPhase::new(2, 0, [
+    (BitVector::from_indices(2, [0])?, 1),
+    (BitVector::from_indices(2, [1])?, 1),
+])?;
+let selected = FrozenPhasePlan::new(&phase, Some(&database),
+    &PhaseSelectionOptions::default(), &arithmetic)?;
+let boundary = AffineKet::new(BitVector::zeros(1)?,
+    vec![BitVector::from_indices(1, [0])?; 2],
+    QuadraticForm::new(0, vec![0; 2], vec![BitVector::zeros(2)?; 2])?,
+    ExactScalar::one())?;
+let transport = selected.prepare_boundary(&phase, &boundary,
+    &CatalogueBoundaryOptions::default(), &arithmetic)?;
+drop(selected);
+drop(database);
+let expanded = transport.expand(&phase, &boundary, &arithmetic)?;
+assert_eq!(transport.usage().shared_maps, 1);
+assert_eq!(expanded.statistics.map_pullbacks, 1);
+assert_eq!(expanded.statistics.gaussian_reuses, 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`CatalogueBoundaryOptions` separately bounds selected terms, conservative logical
+geometry words and construction work. Admission charges every selected term
+before grouping, cloning geometry, restriction or elimination. `usage()` exposes
+these admitted estimates and actual shared-map/consistent-term counts. Geometry
+includes the selected resource, packed vectors, quadratic bytes, index lists and
+temporary-workspace allowance; scalar limbs and allocator overhead are excluded.
+Construction work is a conservative polynomial estimate, not measured CPU work.
+
+Each expansion returns its actual map pullbacks, shifted terms, Gaussian replays,
+Gaussian recomputations and discarded terms. Statistics belong to that call;
+immutable plans support concurrent queries. Offsets, coefficients and arbitrary
+Clifford updates may change. Different original label columns, width or
+non-Clifford signature fail even for a zero coefficient. Callers must sum the
+complete expansion to preserve overlaps, cancellation and dependent labels.
+This standalone primitive has bounded exact-amplitude evidence; task-family
+wiring, throughput and paper precision campaigns require separate work.
+
 ## Standalone exact T-pair injection
 
 Optional exact T-pair injection is available through

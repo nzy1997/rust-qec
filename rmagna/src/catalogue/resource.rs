@@ -1,4 +1,5 @@
 //! Frozen affine indicators in one fixed Clifford-quotient coordinate basis.
+mod transport;
 use super::{CertifiedPhaseDecomposition, PhaseCatalogue};
 use crate::gf2::{BitVector, LinearFactorization};
 use crate::phase::{
@@ -7,6 +8,10 @@ use crate::phase::{
 use crate::quadratic::QuadraticForm;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::stabilizer::AffineKet;
+pub use transport::{
+    CatalogueBoundaryExpansion, CatalogueBoundaryOptions, CatalogueBoundaryStatistics,
+    CatalogueBoundaryUsage, PreparedCatalogueBoundary,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct CataloguePreparationOptions {

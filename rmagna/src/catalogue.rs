@@ -11,7 +11,11 @@ use crate::phase::ParityPhase;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 pub use builtin::builtin_phase_catalogue;
 pub use injection::{PhaseInjectionOptions, PhaseInjectionReceipt};
-pub use resource::{CataloguePreparationOptions, PreparedCataloguePhase};
+pub use resource::{
+    CatalogueBoundaryExpansion, CatalogueBoundaryOptions, CatalogueBoundaryStatistics,
+    CatalogueBoundaryUsage, CataloguePreparationOptions, PreparedCatalogueBoundary,
+    PreparedCataloguePhase,
+};
 pub use selection::{
     FrozenPhasePlan, PhaseSelectionOptions, PhaseSelectionReceipt, PhaseSelectionRoute,
 };

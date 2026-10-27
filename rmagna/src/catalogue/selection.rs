@@ -74,7 +74,7 @@ pub struct PhaseSelectionReceipt {
 pub struct FrozenPhasePlan {
     axes: Vec<BitVector>,
     certificate: Arc<CertifiedPhaseDecomposition>,
-    prepared: PreparedCataloguePhase,
+    prepared: Arc<PreparedCataloguePhase>,
     receipt: PhaseSelectionReceipt,
     injection: Option<PhaseInjectionReceipt>,
 }
@@ -381,7 +381,7 @@ impl FrozenPhasePlan {
         Ok(Self {
             axes,
             certificate,
-            prepared,
+            prepared: Arc::new(prepared),
             receipt,
             injection,
         })
@@ -428,5 +428,18 @@ impl FrozenPhasePlan {
         arithmetic: &ScalarArithmetic,
     ) -> Result<Vec<AffineKet>, PhaseError> {
         self.prepared.expand(updated, boundary, arithmetic)
+    }
+
+    /// Freeze a separately bounded labelled transport for this selected resource.
+    /// The returned plan shares immutable owned data and does not reselect a core.
+    pub fn prepare_boundary(
+        &self,
+        reference: &ParityPhase,
+        boundary: &AffineKet,
+        options: &super::CatalogueBoundaryOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<super::PreparedCatalogueBoundary, PhaseError> {
+        self.prepared
+            .prepare_boundary(reference, boundary, options, arithmetic)
     }
 }
