@@ -4399,3 +4399,55 @@ identities and cursor/statistical states in addition to restoring the meter.
 
 Checkpoint validation uses `CostError::InvalidCheckpoint { operation, reason }`.
 Code that exhaustively matches `CostError` must handle this new variant.
+
+## Exact Walsh phase certificates
+
+`PhaseCatalogue::from_walsh_table` constructs an owned, separately certified
+catalogue from a complete mod-eight phase table. Coordinate zero is the least
+significant assignment bit. For dimension `d`, its coefficient at character `s`
+is the exact complex value `2^-d * sum_x (-1)^(s.x) omega^table[x]`. The associated
+Clifford phase is `4 * parity(s)`, with no support constraints. Exact zero
+coefficients are omitted, including from retained term and parity-row quotas.
+The zero character requires no parity row; dimension zero has one coefficient.
+
+```rust
+use rmagna::catalogue::{CatalogueLimits, PhaseCatalogue};
+use rmagna::scalar::ScalarArithmetic;
+
+let arithmetic = ScalarArithmetic::default();
+let catalogue = PhaseCatalogue::from_walsh_table(
+    1, &[0, 1], 2, &CatalogueLimits::default(), &arithmetic,
+)?;
+let terms = catalogue.get(1, &[0, 1]).unwrap().terms();
+assert_eq!(terms.len(), 2);
+assert_eq!(terms[0].coefficient,
+    arithmetic.scalar([1.into(), 1.into(), 0.into(), 0.into()], -1)?);
+assert_eq!(terms[1].coefficient,
+    arithmetic.scalar([1.into(), (-1).into(), 0.into(), 0.into()], -1)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The explicit transform-work cap counts `d * 2^d` scalar additions/subtractions.
+Root construction and coefficient normalization take additional linear table
+work bounded by `CatalogueLimits::max_table_values`. The returned certificate's
+full pointwise reconstruction uses the independent `max_verification_work`
+limit. Dimension, table shape/values, transform work and vector capacities are
+checked before their corresponding allocations; surviving term/parity and
+reconstruction limits are checked before indicator construction. Scalar
+arithmetic limits apply throughout. These logical limits exclude allocator
+overhead and do not guarantee available process memory.
+
+The constructor borrows the input table and returns independently owned data.
+It preserves existing catalogues and returns contextual errors for malformed
+tables or exhausted bounds. A caller preparing `PreparedCataloguePhase` must
+supply the table in that resource's canonical quotient coordinates; its existing
+term and geometry limits apply separately. Prepared resources preserve exact
+scalar and dependent labelled amplitudes under compatible global/Clifford
+updates, and reject changed non-Clifford signatures.
+
+Run `cargo run --locked -p rmagna --example walsh_phase_catalogue` for the complete
+public construction example. The owning tests compare 4,232 tables against
+literal integer character sums and verify actual prepared scalar/labelled
+contractions, sparse spectra, ownership and resource endpoints. Runtime
+direct/product/Walsh selection and optional phase injection remain subsequent
+increments; this constructor leaves existing preparation defaults unchanged.
