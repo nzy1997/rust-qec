@@ -392,7 +392,7 @@ pub fn execute(args: &Args) -> Value {
             return value;
         }
     };
-    let mut value = json!({"schema_version":1,"kind":"stream","status":"running","failures":[]});
+    let mut value = json!({"schema_version":2,"software_version":concat!("rmagna-",env!("CARGO_PKG_VERSION")),"kind":"stream","status":"running","failures":[]});
     if let Err(e) = run(args, &mut context, &mut value) {
         add_failure(&mut value, "input_or_preparation", e);
     }

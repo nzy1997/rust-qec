@@ -692,6 +692,40 @@ fn extreme_input_byte_caps_preserve_bounded_reads_without_overflow_or_callbacks(
     assert!(!f.0.join("invalid-cap").exists());
 }
 
+#[test]
+fn input_load_failures_use_the_same_report_schema_and_software_identity_as_other_paths() {
+    let f = Files::new();
+    let success = value(f.stream("valid", &["--stop-after", "0"]), 0);
+    let preflight = value(f.stream("valid", &[]), 1);
+    std::fs::remove_file(f.0.join("circuit.magna")).unwrap();
+    let load = value(f.stream("missing", &[]), 1);
+    for report in [&success, &preflight, &load] {
+        assert_eq!(report["schema_version"], 2);
+        assert_eq!(
+            report["software_version"],
+            concat!("rmagna-", env!("CARGO_PKG_VERSION"))
+        );
+        assert_eq!(report["kind"], "stream");
+    }
+    assert_eq!(load["status"], "failed");
+    assert_eq!(load["failures"][0]["phase"], "input_or_preparation");
+    assert!(
+        load["failures"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("circuit")
+    );
+    for phase in [
+        "draw_outcome",
+        "diagnostic_outcome",
+        "persistence_outcome",
+        "export_outcome",
+    ] {
+        assert_eq!(load[phase]["status"], "not_started");
+    }
+    assert!(load["checkpoint"]["latest_committed"].is_null());
+}
+
 #[cfg(unix)]
 #[test]
 fn nonregular_resume_files_fail_before_waiting_for_a_writer_or_importing_decoders() {
