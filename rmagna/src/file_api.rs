@@ -8,6 +8,7 @@ mod progress;
 pub use progress::export_progress;
 mod enumeration;
 mod preparation;
+mod stream;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};
 use crate::costs::{ExecutionCosts, ExecutionLimits, ExecutionMeter, OperationCost};
 use crate::noise::NoiseSampling;
@@ -24,6 +25,7 @@ pub use enumeration::{FileEnumerationOptions, FileEnumerationReport};
 pub use preparation::{FilePreparationOptions, FilePreparationReport, PreparedFileTask};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fmt, io::Read, path::Path, sync::Arc, time::Instant};
+pub use stream::FileTaskStream;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FileTaskOptions {

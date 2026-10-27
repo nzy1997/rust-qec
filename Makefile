@@ -65,10 +65,10 @@ test-magna-catalogue-json:
 	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test phase_catalogue
 
 test-magna-checkpoint-json:
-	cargo test --locked -p rmagna --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
-	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
-	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
-	cargo test --locked -p rmagna --features serde_json/arbitrary_precision,serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
+	cargo test --locked -p rmagna --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint --test file_stream
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint --test file_stream
+	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint --test file_stream
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision,serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint --test file_stream
 
 check:
 	cargo check --locked --workspace

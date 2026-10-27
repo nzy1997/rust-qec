@@ -4140,6 +4140,65 @@ all non-time checkpoint fields and nonlinear callback traces, and include both
 samplers/compilers, importance proposals, zero-weight affine histories,
 discarded/retained records, cumulative quota exhaustion and caught unwinds.
 
+## File streams bound to loaded snapshots
+
+`CompiledFileTask::start_stream` and `restore_stream_json` return a
+`FileTaskStream`. The wrapper derives all seven content/configuration fingerprints
+from the immutable `FileTask` used for compilation. Callers supply only an explicit
+nonempty implementation label. `FileTask::stream_identity` exposes those identities
+without compiling, sampling, querying or calling controllers.
+
+```rust
+use rmagna::file_api::FileTask;
+use rmagna::statistics::CheckpointOptions;
+use rmagna::task::{StreamRecordRetention, TaskRunOptions, TaskStreamOptions};
+
+# fn resume(task: &FileTask) -> Result<(), Box<dyn std::error::Error>> {
+let options = TaskStreamOptions {
+    run: TaskRunOptions { shots: 4, seed: 91, ..Default::default() },
+    records: StreamRecordRetention::Retain,
+};
+let compiled = task.compile()?;
+let mut prefix = compiled.start_stream(options, "my-controller-and-build-v1")?;
+prefix.advance(2)?;
+let checkpoint = prefix.checkpoint_json(CheckpointOptions::default())?;
+let replacement = task.clone().compile()?;
+let mut restored = replacement.restore_stream_json(
+    &checkpoint, options, "my-controller-and-build-v1", CheckpointOptions::default())?;
+assert_eq!(restored.identity(), prefix.identity());
+assert_eq!(restored.advance(99)?.completed, 4);
+# Ok(())
+# }
+```
+
+Stream operations never reopen physical/task/target/recovery source files; changing
+or removing them leaves the loaded snapshot usable. Loading changed canonical
+content, controller declarations, options or implementation labels rejects an old
+checkpoint before sampling. These are the existing canonical loaded-content
+identities, rather than hashes of paths or arbitrary original task JSON whitespace.
+The stream-specific options fingerprint also binds the actual retained/discarded
+record policy. Existing batch fingerprints and batch retention admission are
+unchanged. A discarding stream can request `u64::MAX` draws with a zero record-storage
+cap and advance by bounded chunks; a retaining stream must admit its entire requested
+record allocation before its first draw.
+
+Implementation labels and registered controller versions/identity declarations are
+caller-declared and unverified: this API does not authenticate an executable or
+callback code. Controllers must remain deterministic functions of explicit inputs;
+hidden mutable controller state is not captured. Compilation/preparation and rebuilt
+caches remain separate from the restored cumulative sampling budget. The wrapper
+preserves running, draws-complete and terminal failure/unwind states, and exposes
+typed prefix reports, RNG state and bounded exact checkpoint encoding. Numerical
+prefix export, checkpoint-file publication and CLI resume commands are separate
+deliverables.
+
+`cargo test --locked -p rmagna --test file_stream` compares all non-time checkpoint
+fields and nonlinear callback traces across both samplers, compilers, causal
+strategies, physical/importance proposals and record policies, including restoration
+after all source files disappear. It also checks changed identities, cumulative
+quota failures, terminal callback failures/unwinds, invalid labels/byte budgets,
+and the discarded `u64::MAX` endpoint without weakening batch behavior.
+
 ## Restoring cumulative execution budgets
 
 `ExecutionMeter::checkpoint` captures an `ExecutionMeterCheckpoint` containing
