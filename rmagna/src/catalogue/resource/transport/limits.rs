@@ -4,7 +4,7 @@ use super::*;
 pub struct CatalogueBoundaryOptions {
     pub max_terms: usize,
     /// Conservative logical geometry, including the retained selected resource,
-    /// word-sized indices, packed vectors and rounded quadratic linear bytes.
+    /// indices (one word each), packed vectors and rounded quadratic linear bytes.
     /// Includes a temporary-workspace allowance; excludes scalar limbs and
     /// allocator overhead. This is not a process-memory bound.
     pub max_geometry_words: usize,
@@ -79,9 +79,17 @@ pub(super) fn admission(
             .and_then(|v| v.checked_mul(n + 4 * nw + 2 * bw + linear + 8)),
         "catalogue_boundary.max_geometry_words",
     )?;
+    // Affine contraction factors a transpose with b rows, even for n=0.
+    // Charge input/reduced/original rows, dense-or-compressed provenance and
+    // origins indices separately; packed label-image words alone are too small.
+    let row_geometry = checked(
+        b.checked_mul(4 * nw + 8).and_then(|v| v.checked_mul(t + 1)),
+        "catalogue_boundary.max_geometry_words",
+    )?;
     let geometry = checked(
         per_term
             .checked_mul(t + 1)
+            .and_then(|v| v.checked_add(row_geometry))
             .and_then(|v| v.checked_add(resource.geometry_words() as u128)),
         "catalogue_boundary.max_geometry_words",
     )?;
@@ -114,10 +122,20 @@ pub(super) fn admission(
             .and_then(|v| v.checked_mul(nw + 1)),
         "catalogue_boundary.max_construction_work",
     )?;
+    // Tall transpose rows and their index/provenance construction remain real
+    // work when there are no path coordinates to eliminate.
+    let row_work = checked(
+        (b + 1)
+            .checked_mul(n + 1)
+            .and_then(|v| v.checked_mul(nw + 1))
+            .and_then(|v| v.checked_mul(t + 1)),
+        "catalogue_boundary.max_construction_work",
+    )?;
     let work = checked(
         matrix
             .checked_add(parities)
             .and_then(|v| v.checked_add(grouping))
+            .and_then(|v| v.checked_add(row_work))
             .and_then(|v| v.checked_mul(64)),
         "catalogue_boundary.max_construction_work",
     )?;

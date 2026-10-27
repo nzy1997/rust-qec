@@ -111,6 +111,7 @@ before grouping, cloning geometry, restriction or elimination. `usage()` exposes
 these admitted estimates and actual shared-map/consistent-term counts. Geometry
 includes the selected resource, packed vectors, quadratic bytes, index lists and
 temporary-workspace allowance; scalar limbs and allocator overhead are excluded.
+Tall label rows and their index arrays are charged even with zero path variables.
 Construction work is a conservative polynomial estimate, not measured CPU work.
 
 Each expansion returns its actual map pullbacks, shifted terms, Gaussian replays,

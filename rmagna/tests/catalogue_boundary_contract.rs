@@ -249,3 +249,84 @@ fn owned_transport_accepts_concurrent_queries_after_all_source_handles_drop() {
         assert_eq!(actual.statistics, expected.statistics);
     }
 }
+
+#[test]
+fn tall_label_rows_and_indices_are_admitted_before_factorization() {
+    let a = ScalarArithmetic::new(512).unwrap();
+    for (variables, width, minimum_words) in [(0, 4097, 4097), (1, 257, 4 * 257)] {
+        let phase = ParityPhase::new(variables, 0, []).unwrap();
+        let selected =
+            FrozenPhasePlan::new(&phase, None, &PhaseSelectionOptions::default(), &a).unwrap();
+        let origin = BitVector::from_indices(width, [width - 1]).unwrap();
+        let columns = (0..variables)
+            .map(|_| BitVector::from_indices(width, 0..width).unwrap())
+            .collect::<Vec<_>>();
+        let boundary = AffineKet::new(
+            origin.clone(),
+            columns.clone(),
+            QuadraticForm::new(
+                0,
+                vec![0; variables],
+                (0..variables)
+                    .map(|_| BitVector::zeros(variables).unwrap())
+                    .collect(),
+            )
+            .unwrap(),
+            a.omega(3, -4).unwrap(),
+        )
+        .unwrap();
+        let prepared = selected
+            .prepare_boundary(&phase, &boundary, &CatalogueBoundaryOptions::default(), &a)
+            .unwrap();
+        let usage = prepared.usage();
+        // The zero-path case still constructs width origin indices. With one
+        // path, three packed row sets and the origin indices coexist.
+        assert!(usage.geometry_words >= minimum_words);
+        assert_limit(
+            selected.prepare_boundary(
+                &phase,
+                &boundary,
+                &CatalogueBoundaryOptions {
+                    max_geometry_words: minimum_words - 1,
+                    ..CatalogueBoundaryOptions::default()
+                },
+                &a,
+            ),
+            "catalogue_boundary.max_geometry_words",
+            usage.geometry_words as u128,
+        );
+        if variables == 0 {
+            assert_limit(
+                selected.prepare_boundary(
+                    &phase,
+                    &boundary,
+                    &CatalogueBoundaryOptions {
+                        max_construction_work: 3 * width as u128,
+                        ..CatalogueBoundaryOptions::default()
+                    },
+                    &a,
+                ),
+                "catalogue_boundary.max_construction_work",
+                usage.construction_work,
+            );
+        }
+        let output = prepared.expand(&phase, &boundary, &a).unwrap();
+        assert_eq!(output.states.len(), 1);
+        let state = output.states[0].prepare().unwrap();
+        assert_eq!(
+            state.amplitude(&origin, &a).unwrap(),
+            *boundary.coefficient()
+        );
+        let mut absent = origin.clone();
+        absent.set(0, true).unwrap();
+        assert_eq!(state.amplitude(&absent, &a).unwrap(), ExactScalar::zero());
+        if let Some(column) = columns.first() {
+            let mut other = origin;
+            other.xor_assign(column).unwrap();
+            assert_eq!(
+                state.amplitude(&other, &a).unwrap(),
+                *boundary.coefficient()
+            );
+        }
+    }
+}
