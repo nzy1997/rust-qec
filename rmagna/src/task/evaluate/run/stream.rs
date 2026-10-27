@@ -1,6 +1,8 @@
 //! One RNG and atomic exact accumulator across bounded in-memory advances.
 use super::*;
 use crate::statistics::StatisticsError;
+mod checkpoint;
+pub use checkpoint::TaskStreamIdentity;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum StreamRecordRetention {
@@ -45,7 +47,8 @@ pub struct TaskStreamReport {
 }
 /// Borrowed evaluator, continuous SplitMix64, exact totals and shared quotas.
 /// The continuously owned deadline includes pauses between advance calls.
-/// This type is not a persistent checkpoint and cannot restore an old session.
+/// Versioned checkpoints preserve the exact stream under explicit caller-declared
+/// identities; derived evaluator resources are prepared separately on restoration.
 pub struct TaskStream<'a> {
     evaluator: &'a TaskEvaluator,
     options: TaskStreamOptions,
@@ -55,7 +58,9 @@ pub struct TaskStream<'a> {
     meter: ExecutionMeter,
     started: Instant,
     sampling_seconds: f64,
+    total_seconds_offset: f64,
     failure: Option<RunFailure>,
+    declared_identity: Option<TaskStreamIdentity>,
 }
 struct SamplingTimer<'a> {
     started: Instant,
@@ -89,7 +94,9 @@ impl TaskEvaluator {
             meter: ExecutionMeter::new(options.run.execution_limits),
             started: Instant::now(),
             sampling_seconds: 0.0,
+            total_seconds_offset: 0.0,
             failure: None,
+            declared_identity: None,
         })
     }
 }
@@ -128,7 +135,7 @@ impl TaskStream<'_> {
             timings: RunTimings {
                 preparation_seconds: None,
                 sampling_seconds: self.sampling_seconds,
-                total_seconds: self.started.elapsed().as_secs_f64(),
+                total_seconds: self.total_seconds_offset + self.started.elapsed().as_secs_f64(),
             },
             completed_network_compilations: self.accumulator.compilations,
             completed_history_groups: self.accumulator.groups,

@@ -60,6 +60,16 @@ impl HistoryEfficiency {
     pub fn count(&self) -> u64 {
         self.statistics.count()
     }
+    pub(crate) fn consistent_with(&self, other: &ExactStatistics, has_error: bool) -> bool {
+        let state = &self.statistics;
+        other.dimensions >= 2
+            && state.count == other.count
+            && state.sums == other.sums[..2]
+            && state.products == other.products[..3]
+            && state.weight == other.weight
+            && state.weight_squared == other.weight_squared
+            && self.missing_error == (state.count > 0 && !has_error)
+    }
     /// A and E are already weighted contributions; W is the complete
     /// noise/history weight and L the noise-only likelihood. No weight is
     /// applied to A or E again. Missing error metrics remain unavailable.

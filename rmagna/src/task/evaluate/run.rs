@@ -8,7 +8,8 @@ use crate::statistics::{EfficiencySummary, ExactStatistics, HistoryEfficiency, S
 pub use progress::{BatchProgress, ProgressObserver, ProgressReceipt};
 use std::time::Instant;
 pub use stream::{
-    StreamRecordRetention, TaskStream, TaskStreamOptions, TaskStreamReport, TaskStreamStatus,
+    StreamRecordRetention, TaskStream, TaskStreamIdentity, TaskStreamOptions, TaskStreamReport,
+    TaskStreamStatus,
 };
 
 pub(crate) struct RunHooks<'run, 'callback, I> {

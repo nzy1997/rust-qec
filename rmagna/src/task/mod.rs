@@ -8,8 +8,9 @@ pub use evaluate::{
     ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
     SamplingPreparationOptions, SamplingPreparationReport, StreamRecordRetention, TaskEnumeration,
     TaskEnumerationOptions, TaskEvaluation, TaskEvaluator, TaskPatternResponse, TaskRunOptions,
-    TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskStream, TaskStreamOptions,
-    TaskStreamReport, TaskStreamStatus, TaskVariances, TaskWeightSector, run_task_batch,
+    TaskRunResult, TaskRunStatistics, TaskSectorMasses, TaskStream, TaskStreamIdentity,
+    TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances, TaskWeightSector,
+    run_task_batch,
 };
 pub(crate) use evaluate::{RunHooks, run_task_batch_inspected};
 mod parse;
@@ -25,8 +26,8 @@ pub use provenance::{
     canonical_fingerprint, canonical_raw_fingerprint, fingerprint_content,
 };
 pub(crate) use provenance::{
-    fingerprint_with_configuration, resolved_options, sampling_configuration,
-    validate_snapshot_fingerprints,
+    execution_configuration, fingerprint_with_configuration, resolved_options,
+    sampling_configuration, validate_snapshot_fingerprints,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},

@@ -6,7 +6,7 @@
 use crate::field::{ExactField, FieldArithmetic, FieldError};
 use num_rational::BigRational;
 use std::{cmp::Ordering, fmt};
-mod checkpoint;
+pub(crate) mod checkpoint;
 mod efficiency;
 pub use checkpoint::{CheckpointError, CheckpointOptions};
 pub use efficiency::{EfficiencyStatus, EfficiencySummary, HistoryEfficiency};

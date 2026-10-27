@@ -22,7 +22,7 @@ help:
 	@echo "Available targets:"
 	@echo "  test                 - Run workspace tests"
 	@echo "  test-magna-catalogue-json - Check exact catalogue JSON across serde features"
-	@echo "  test-magna-checkpoint-json - Check exact statistics checkpoints across serde features"
+	@echo "  test-magna-checkpoint-json - Check statistics and task-stream checkpoints across serde features"
 	@echo "  check                - Run cargo check for the workspace"
 	@echo "  test-magna-task-json - Check strict task JSON types across serde feature combinations"
 	@echo "  test-magna-controller-json - Check strict controller wire types across serde features"
@@ -65,10 +65,10 @@ test-magna-catalogue-json:
 	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test phase_catalogue
 
 test-magna-checkpoint-json:
-	cargo test --locked -p rmagna --test statistics_checkpoint --test statistics_checkpoint_shape
-	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test statistics_checkpoint --test statistics_checkpoint_shape
-	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape
-	cargo test --locked -p rmagna --features serde_json/arbitrary_precision,serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape
+	cargo test --locked -p rmagna --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
+	cargo test --locked -p rmagna --features serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
+	cargo test --locked -p rmagna --features serde_json/arbitrary_precision,serde_json/float_roundtrip --test statistics_checkpoint --test statistics_checkpoint_shape --test task_stream_checkpoint
 
 check:
 	cargo check --locked --workspace
