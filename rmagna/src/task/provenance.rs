@@ -281,7 +281,12 @@ fn preparation(mode: QueryPreparation) -> Value {
     }
 }
 pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
-    let runtime = input.evaluation.runtime;
+    let mut options = execution_configuration(input.evaluation, input.run);
+    options["numeric_work_bits"] = json!(input.numeric.max_work_bits);
+    options
+}
+pub(crate) fn execution_configuration(evaluation: EvaluationOptions, run: TaskRunOptions) -> Value {
+    let runtime = evaluation.runtime;
     let compile = runtime.compile;
     let options = json!({
         "history_sampler": match runtime.history_sampler { HistorySampler::ExactMarginal => "exact_marginal", HistorySampler::AffineSupport => "affine_support" },
@@ -305,15 +310,14 @@ pub(crate) fn resolved_options(input: &FingerprintInputs<'_>) -> Value {
         },
         "noise": {"max_denominator_bits": runtime.noise.max_denominator_bits, "max_entropy_words": runtime.noise.max_entropy_words},
         "records": {"max_terms": runtime.sampling.max_terms, "max_entropy_words": runtime.sampling.max_entropy_words},
-        "scalar_coefficient_bits": input.evaluation.scalars.max_coefficient_bits(),
-        "field_coefficient_bits": input.evaluation.fields.max_coefficient_bits(),
+        "scalar_coefficient_bits": evaluation.scalars.max_coefficient_bits(),
+        "field_coefficient_bits": evaluation.fields.max_coefficient_bits(),
         "run": {
-            "execution_limits": input.run.execution_limits.to_json(),
-            "shots": input.run.shots, "seed": input.run.seed,
-            "max_retained_record_values": input.run.max_retained_record_values,
-            "statistics": {"max_dimensions": input.run.statistics.max_dimensions, "coefficient_bits": input.run.statistics.arithmetic.max_coefficient_bits()},
+            "execution_limits": run.execution_limits.to_json(),
+            "shots": run.shots, "seed": run.seed,
+            "max_retained_record_values": run.max_retained_record_values,
+            "statistics": {"max_dimensions": run.statistics.max_dimensions, "coefficient_bits": run.statistics.arithmetic.max_coefficient_bits()},
         },
-        "numeric_work_bits": input.numeric.max_work_bits,
     });
     options
 }

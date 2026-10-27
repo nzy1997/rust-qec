@@ -3976,7 +3976,7 @@ process. A two-draw example verifies low bits above 512 bits and a literal unit
 variance; malformed inputs, arithmetic limits, byte endpoints and count overflow
 are also covered.
 
-`make test-magna-checkpoint-json` runs the same integration tests under default,
+`make test-magna-checkpoint-json` runs statistics and task-stream checkpoint integration tests under default,
 `serde_json/arbitrary_precision`, `serde_json/float_roundtrip` and their combined
 configuration. CI invokes this documented command. Serde derive support uses the
 existing locked dependencies and does not enable a global JSON numeric feature.
@@ -4047,9 +4047,98 @@ strategies, nonlinear callbacks and importance sampling. They also cover genuine
 zero-weight affine histories, cumulative quota/deadline failures, record bounds,
 summary errors, elapsed idle deadlines, atomic accumulation failures and caught
 controller unwinds.
-This core has no persistent sampling-session restore, durable task/controller
-identity binding or file/CLI stream command; exact statistics checkpoints remain
-the separate layer described above.
+Generic persistent recovery is described in
+[Recovering generic task streams](#recovering-generic-task-streams). File/CLI
+resume commands and automatic source/controller identity capture are separate
+interfaces.
+
+## Recovering generic task streams
+
+`TaskStream::checkpoint_json` captures original/current SplitMix64 state, raw
+exact statistics and efficiency, requested/committed/failed cursors, retained
+records, committed resource counts, execution-meter state and prefix timings.
+`TaskEvaluator::restore_stream_json` returns an owned continuation borrowing a
+separately constructed evaluator. Empty, interior, draws-complete and terminal
+failed/unwound prefixes are preserved. A terminal failure cannot advance.
+
+```rust
+use std::{collections::BTreeMap, path::Path};
+use rmagna::circuit::{parse_circuit, ParseOptions};
+use rmagna::noise::NoiseSampling;
+use rmagna::numeric::NumericOptions;
+use rmagna::runtime::ControllerRegistry;
+use rmagna::statistics::CheckpointOptions;
+use rmagna::task::{parse_task, fingerprint_content, EvaluationOptions,
+    FingerprintInputs, FingerprintOptions, TaskEvaluator, TaskOptions,
+    TaskRunOptions, TaskStreamIdentity, TaskStreamOptions};
+let parse = ParseOptions::default();
+let physical = parse_circuit("H 0\nM 0", &parse)?;
+let modules = parse_task("{}", Path::new("."), &TaskOptions::default())?
+    .load_modules(&physical, &parse)?;
+let controllers = ControllerRegistry::default();
+let declarations = BTreeMap::new();
+let evaluation = EvaluationOptions::default();
+let sampling = NoiseSampling::Physical;
+let run = TaskRunOptions { shots: 4, seed: 9, ..Default::default() };
+let identity = TaskStreamIdentity {
+    content: fingerprint_content(&FingerprintInputs {
+        physical: &physical, modules: &modules, controllers: &controllers,
+        controller_identities: &declarations, evaluation, run,
+        sampling: &sampling, numeric: NumericOptions::default(),
+    }, FingerprintOptions::default())?,
+    implementation: "my-application/rmagna-controller-v1".to_owned(),
+};
+let options = TaskStreamOptions { run, ..Default::default() };
+let first = TaskEvaluator::new_with_sampling(&physical, &modules,
+    &controllers, evaluation, &sampling)?;
+let mut prefix = first.start_stream(options)?;
+prefix.advance(2)?;
+let saved = prefix.checkpoint_json(&identity, CheckpointOptions::default())?;
+// A new process can persist/read `saved` and reconstruct these resources.
+let replacement = TaskEvaluator::new_with_sampling(&physical, &modules,
+    &controllers, evaluation, &sampling)?;
+let mut resumed = replacement.restore_stream_json(&saved, options,
+    &identity, CheckpointOptions::default())?;
+assert_eq!(resumed.declared_checkpoint_identity(), Some(&identity));
+assert_eq!(resumed.advance(99)?.completed, 4);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+All seven loaded-content/controller fingerprints and a nonempty implementation
+identity are explicit caller declarations. The JSON retains
+`caller_declared_unverified`: the generic evaluator cannot authenticate the old
+source snapshot, controller implementation or those labels. Restored streams
+retain the declarations and reject relabeling. Controllers must be deterministic
+functions of their explicit inputs/configuration; hidden mutable controller
+state is not serialized.
+
+The checkpoint also automatically binds the actual evaluator/runtime/compiler,
+history and noise-proposal settings, run limits, seed, requested draws, arithmetic
+budgets, task masks/quantities and record-retention policy. Reusing stale caller
+labels cannot change these settings during restoration. Derived compiler/cache
+resources are reconstructed separately, with their preparation costs accounted
+for by the caller. Saved stream quotas remain cumulative, new owned lifetime is
+charged, and downtime after capture is excluded.
+
+Schema 1 uses strict typed JSON objects, canonical unsigned decimal strings for
+counters/seeds/durations, and exact 16-digit lowercase binary64 bit strings for
+diagnostic times. Raw statistics and efficiency use their existing bounded exact
+checkpoint encodings inside JSON strings. Restoration rejects duplicate,
+unknown/missing fields, positional object substitutions, malformed/private serde
+tags and inconsistent cursors, failure phases, record policies, shared exact
+totals or execution-meter state before any draw, query or callback. Diagnostics
+that exceed an arithmetic budget remain explicit errors without invalidating an
+otherwise valid raw prefix. These consistency checks do not prove that supplied
+moments came from the declared observations.
+
+`CheckpointOptions::max_json_bytes` bounds input before decoding and output while
+writing; arithmetic/dimension and whole-run retention budgets are reapplied.
+This is an encoded-byte bound, not a total process-memory limit. The
+`test-magna-checkpoint-json` gate exercises all four serde numeric feature
+configurations. Tests continue actual saved prefixes in fresh processes, compare
+all non-time checkpoint fields and nonlinear callback traces, and include both
+samplers/compilers, importance proposals, zero-weight affine histories,
+discarded/retained records, cumulative quota exhaustion and caught unwinds.
 
 ## Restoring cumulative execution budgets
 

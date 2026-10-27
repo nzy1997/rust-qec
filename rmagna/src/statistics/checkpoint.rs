@@ -105,7 +105,10 @@ impl Write for Output {
         Ok(())
     }
 }
-fn encode(value: &impl Serialize, options: CheckpointOptions) -> Result<String, CheckpointError> {
+pub(crate) fn encode(
+    value: &impl Serialize,
+    options: CheckpointOptions,
+) -> Result<String, CheckpointError> {
     let mut output = Output {
         bytes: Vec::new(),
         limit: options.max_json_bytes,
@@ -113,7 +116,7 @@ fn encode(value: &impl Serialize, options: CheckpointOptions) -> Result<String, 
     serde_json::to_writer(&mut output, value).map_err(|e| error("max_json_bytes", e))?;
     Ok(String::from_utf8(output.bytes).expect("JSON serialization is UTF-8"))
 }
-fn object<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+pub(crate) fn object<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: Deserialize<'de>,
@@ -130,7 +133,7 @@ where
     }
     deserializer.deserialize_map(ObjectVisitor(std::marker::PhantomData))
 }
-fn decode<'a, T: Deserialize<'a>>(
+pub(crate) fn decode<'a, T: Deserialize<'a>>(
     text: &'a str,
     options: CheckpointOptions,
 ) -> Result<T, CheckpointError> {

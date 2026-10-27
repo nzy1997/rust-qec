@@ -24,7 +24,8 @@ pub use enumeration::{
 pub use run::{
     BatchProgress, ProgressObserver, ProgressReceipt, RunFailure, RunPhase, RunStatus, RunTimings,
     StreamRecordRetention, TaskRunOptions, TaskRunResult, TaskRunStatistics, TaskStream,
-    TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances, run_task_batch,
+    TaskStreamIdentity, TaskStreamOptions, TaskStreamReport, TaskStreamStatus, TaskVariances,
+    run_task_batch,
 };
 pub(crate) use run::{RunHooks, run_task_batch_inspected};
 
@@ -56,6 +57,7 @@ pub struct TaskEvaluator {
     requested: Vec<BitExpr>,
     execution: Execution,
     options: EvaluationOptions,
+    sampling: NoiseSampling,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ContractionResources {
@@ -270,6 +272,7 @@ impl TaskEvaluator {
             requested,
             execution,
             options,
+            sampling: sampling.clone(),
         })
     }
     pub fn scaled_proposal_summary(&self) -> Option<&ScaledProposalSummary> {
