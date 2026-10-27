@@ -270,7 +270,7 @@ impl ParityPhase {
         Ok(result)
     }
 
-    fn signature_slice(&self, i: usize, j: usize) -> Result<BitVector, PhaseError> {
+    pub(crate) fn signature_slice(&self, i: usize, j: usize) -> Result<BitVector, PhaseError> {
         let mut row = BitVector::zeros(self.width)?;
         for (axis, coefficient) in &self.terms {
             if coefficient & 1 != 0 && axis.get(i)? && axis.get(j)? {
@@ -440,6 +440,22 @@ pub struct CliffordQuotient {
     basis: Vec<BitVector>,
 }
 impl CliffordQuotient {
+    pub(crate) fn from_dual_axes(width: usize, axes: &[BitVector]) -> Result<Self, PhaseError> {
+        let factor = LinearFactorization::new(width, axes)?;
+        let rank = factor.rank();
+        if rank != axes.len() {
+            return Err(PhaseError::DimensionMismatch);
+        }
+        let mut basis = (0..rank)
+            .map(|j| {
+                factor
+                    .solve(&BitVector::from_indices(rank, [j])?)?
+                    .ok_or(PhaseError::DimensionMismatch)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        basis.extend(factor.nullspace()?);
+        Ok(Self { width, rank, basis })
+    }
     pub fn num_variables(&self) -> usize {
         self.width
     }

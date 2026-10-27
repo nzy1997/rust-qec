@@ -1,5 +1,5 @@
 //! Frozen affine indicators in one fixed Clifford-quotient coordinate basis.
-use super::PhaseCatalogue;
+use super::{CertifiedPhaseDecomposition, PhaseCatalogue};
 use crate::gf2::{BitVector, LinearFactorization};
 use crate::phase::{
     CanonicalPhaseCore, CliffordQuotient, ParityPhase, PhaseCoreLimits, PhaseError, add_quadratic,
@@ -101,8 +101,7 @@ impl PreparedCataloguePhase {
         }
         let width = reference.num_variables();
         let words = (width as u128).div_ceil(64);
-        let linear_words = (width as u128).div_ceil(8);
-        let mut geometry_words = width as u128 * words;
+        let geometry_words = width as u128 * words;
         check(
             "catalogue_preparation.max_geometry_words",
             geometry_words,
@@ -118,6 +117,31 @@ impl PreparedCataloguePhase {
         let Some(entry) = catalogue.get(rank, core.phase_table()) else {
             return Ok(None);
         };
+        Self::from_core(quotient, resource, core, entry, options, arithmetic, 0).map(Some)
+    }
+    pub(crate) fn from_core(
+        quotient: CliffordQuotient,
+        resource: ParityPhase,
+        core: CanonicalPhaseCore,
+        entry: &CertifiedPhaseDecomposition,
+        options: &CataloguePreparationOptions,
+        arithmetic: &ScalarArithmetic,
+        extra_geometry_words: usize,
+    ) -> Result<Self, PhaseError> {
+        let width = quotient.num_variables();
+        let rank = quotient.rank();
+        if resource.num_variables() != rank || core.dimension() != rank || entry.dimension() != rank
+        {
+            return Err(PhaseError::DimensionMismatch);
+        }
+        let words = (width as u128).div_ceil(64);
+        let linear_words = (width as u128).div_ceil(8);
+        let mut geometry_words = extra_geometry_words as u128 + width as u128 * words;
+        check(
+            "catalogue_preparation.max_geometry_words",
+            geometry_words,
+            options.max_geometry_words,
+        )?;
         check(
             "catalogue_preparation.max_terms",
             entry.terms().len() as u128,
@@ -210,16 +234,19 @@ impl PreparedCataloguePhase {
                 support,
             });
         }
-        Ok(Some(Self {
+        Ok(Self {
             quotient,
             reference_resource,
             core_table: core.phase_table().to_vec(),
             terms,
             geometry_words: geometry_words as usize,
-        }))
+        })
     }
     pub fn num_variables(&self) -> usize {
         self.quotient.num_variables()
+    }
+    pub(super) fn quotient(&self) -> &CliffordQuotient {
+        &self.quotient
     }
     pub fn quotient_rank(&self) -> usize {
         self.quotient.rank()

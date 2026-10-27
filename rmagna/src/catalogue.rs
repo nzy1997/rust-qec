@@ -3,12 +3,16 @@ mod builtin;
 mod json;
 mod product;
 mod resource;
+mod selection;
 mod walsh;
 use crate::gf2::BitVector;
 use crate::phase::ParityPhase;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 pub use builtin::builtin_phase_catalogue;
 pub use resource::{CataloguePreparationOptions, PreparedCataloguePhase};
+pub use selection::{
+    FrozenPhasePlan, PhaseSelectionOptions, PhaseSelectionReceipt, PhaseSelectionRoute,
+};
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
 /// One coefficient times a Clifford phase and an affine support indicator.
@@ -210,6 +214,21 @@ impl PhaseCatalogue {
         arithmetic: &ScalarArithmetic,
         entry_index: usize,
     ) -> Result<(), CatalogueError> {
+        let usage = self.validate_at(&input, limits, arithmetic, entry_index)?;
+        self.entries.entry(input.dimension).or_default().insert(
+            input.phase_table.clone(),
+            Arc::new(CertifiedPhaseDecomposition { input }),
+        );
+        self.usage = usage;
+        Ok(())
+    }
+    fn validate_at(
+        &self,
+        input: &PhaseDecompositionInput,
+        limits: &CatalogueLimits,
+        arithmetic: &ScalarArithmetic,
+        entry_index: usize,
+    ) -> Result<CatalogueUsage, CatalogueError> {
         self.check_existing(limits)?;
         let prefix = format!("catalogue.entries.{entry_index}");
         let count = assignments(input.dimension, limits)?;
@@ -352,19 +371,35 @@ impl PhaseCatalogue {
                 ));
             }
         }
-        let usage = CatalogueUsage {
+        Ok(CatalogueUsage {
             entries: self.usage.entries + 1,
             table_values: self.usage.table_values + count,
             terms: self.usage.terms + input.terms.len(),
             constraint_rows: self.usage.constraint_rows + constraints as usize,
             parity_rows: self.usage.parity_rows + parities as usize,
             verification_work: total_work,
-        };
-        self.entries.entry(input.dimension).or_default().insert(
-            input.phase_table.clone(),
-            Arc::new(CertifiedPhaseDecomposition { input }),
-        );
-        self.usage = usage;
-        Ok(())
+        })
+    }
+    fn shared_entry(
+        &self,
+        dimension: usize,
+        phase_table: &[u8],
+    ) -> Option<Arc<CertifiedPhaseDecomposition>> {
+        self.entries.get(&dimension)?.get(phase_table).cloned()
+    }
+    fn from_shared(
+        entry: Arc<CertifiedPhaseDecomposition>,
+        limits: &CatalogueLimits,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, CatalogueError> {
+        let mut result = Self::new();
+        let usage = result.validate_at(&entry.input, limits, arithmetic, 0)?;
+        result
+            .entries
+            .entry(entry.dimension())
+            .or_default()
+            .insert(entry.phase_table().to_vec(), entry);
+        result.usage = usage;
+        Ok(result)
     }
 }
