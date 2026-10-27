@@ -126,6 +126,16 @@ fn validate(report: &TaskStreamReport) -> Result<(), StreamExportError> {
         report.efficiency.as_ref().ok(),
     )?;
     validate_records(report.completed, report.sampled_records.as_deref())?;
+    if report.completed > 0
+        && report
+            .sampled_records
+            .as_ref()
+            .is_some_and(|rows| rows.first().is_some_and(|row| row.is_empty()))
+    {
+        return Err(invalid(
+            "sampled_records must have positive row width for a nonempty stream prefix",
+        ));
+    }
     validate_execution(
         report.execution_limits,
         report.execution_costs,

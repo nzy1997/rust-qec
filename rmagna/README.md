@@ -4256,6 +4256,9 @@ and numeric-work failures return contextual `StreamExportError` values.
 An empty prefix requires `insufficient_samples` efficiency, even when its task
 has no error metric. After committed no-error observations, `no_error_metric`
 remains a valid diagnostic status.
+Retained rows in a nonempty prefix must have positive uniform width. Empty
+prefixes can retain an empty row list, and absent rows remain valid. The report
+does not identify the task's exact original positive requested width.
 Terminal failure messages must be nonempty; nonempty whitespace and all other
 message bytes are preserved, matching checkpoint restoration.
 Each operation must have zero measured seconds when it has no attempts.

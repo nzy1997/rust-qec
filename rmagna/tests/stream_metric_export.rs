@@ -1205,3 +1205,119 @@ fn empty_efficiency_status_requires_insufficient_samples_but_nonempty_no_error_i
         assert_eq!(report, before);
     }
 }
+
+#[test]
+fn retained_nonempty_prefixes_require_positive_row_width_without_inventing_requested_width() {
+    let unavailable = ExactStatistics::new(
+        2,
+        StatisticsOptions {
+            max_dimensions: 1,
+            ..Default::default()
+        },
+    )
+    .err()
+    .unwrap();
+    for count in [1, 4] {
+        for status in [
+            TaskStreamStatus::Running,
+            TaskStreamStatus::DrawsComplete,
+            TaskStreamStatus::Failed,
+        ] {
+            let mut original = literal(count, 9);
+            original.status = status;
+            match status {
+                TaskStreamStatus::DrawsComplete => {
+                    original.requested = count as u64;
+                    original.not_attempted = 0;
+                }
+                TaskStreamStatus::Failed => {
+                    original.failed = 1;
+                    original.not_attempted -= 1;
+                    original.failure = Some(RunFailure {
+                        phase: RunPhase::Sampling,
+                        shot: Some(count as u64),
+                        kind: "TaskError",
+                        message: "record width fixture failure".to_owned(),
+                    });
+                }
+                TaskStreamStatus::Running => {}
+            }
+            for mask in 0..4 {
+                let mut report = original.clone();
+                if mask & 1 != 0 {
+                    report.statistics = Err(rmagna::task::TaskError {
+                        field: "statistics".to_owned(),
+                        message: "unavailable fixture".to_owned(),
+                    });
+                }
+                if mask & 2 != 0 {
+                    report.efficiency = Err(unavailable.clone());
+                }
+                let before = report.clone();
+                let mut baseline = export(&report);
+                baseline.as_object_mut().unwrap().remove("sampled_records");
+                assert_eq!(report, before);
+                let mut invalid = report.clone();
+                invalid
+                    .sampled_records
+                    .as_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .for_each(Vec::clear);
+                let before = invalid.clone();
+                for options in [
+                    NumericOptions::default(),
+                    NumericOptions { max_work_bits: 0 },
+                ] {
+                    let error = export_stream_metrics(&invalid, options).unwrap_err();
+                    assert!(matches!(error, StreamExportError::InvalidState(_)));
+                    assert!(error.to_string().contains("sampled_records"));
+                    assert_eq!(invalid, before);
+                }
+                // The report exposes only a lower bound, not its task's original width.
+                for width in [1, 2, 5] {
+                    let mut valid = report.clone();
+                    let rows: Vec<Vec<bool>> = (0..count)
+                        .map(|i| (0..width).map(|j| (i + j) % 2 == 0).collect())
+                        .collect();
+                    valid.sampled_records = Some(rows.clone());
+                    let before = valid.clone();
+                    let mut value = export(&valid);
+                    assert_eq!(value["sampled_records"], json!(rows));
+                    assert_eq!(valid, before);
+                    value.as_object_mut().unwrap().remove("sampled_records");
+                    assert_eq!(value, baseline);
+                }
+                let mut discarded = report.clone();
+                discarded.sampled_records = None;
+                let before = discarded.clone();
+                let mut value = export(&discarded);
+                assert!(value["sampled_records"].is_null());
+                assert_eq!(discarded, before);
+                value.as_object_mut().unwrap().remove("sampled_records");
+                assert_eq!(value, baseline);
+            }
+        }
+    }
+    for failed in [false, true] {
+        let mut empty = literal(0, 2);
+        if failed {
+            empty.status = TaskStreamStatus::Failed;
+            empty.failed = 1;
+            empty.not_attempted = 1;
+            empty.failure = Some(RunFailure {
+                phase: RunPhase::Sampling,
+                shot: Some(0),
+                kind: "TaskError",
+                message: "empty retained prefix fixture".to_owned(),
+            });
+        }
+        let before = empty.clone();
+        assert_eq!(export(&empty)["sampled_records"], json!([]));
+        assert_eq!(empty, before);
+        empty.sampled_records = None;
+        let before = empty.clone();
+        assert!(export(&empty)["sampled_records"].is_null());
+        assert_eq!(empty, before);
+    }
+}
