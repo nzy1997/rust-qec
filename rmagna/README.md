@@ -4451,3 +4451,85 @@ literal integer character sums and verify actual prepared scalar/labelled
 contractions, sparse spectra, ownership and resource endpoints. Runtime
 direct/product/Walsh selection and optional phase injection remain subsequent
 increments; this constructor leaves existing preparation defaults unchanged.
+
+## Frozen native-coordinate phase selection
+
+`FrozenPhasePlan::new` provides an explicit standalone selection order: a complete
+certified table match wins, followed by the consecutive one-/two-T product for
+exactly the independent positive-T popcount core, followed by exact Walsh
+characters. A missing product factor permits Walsh. Exhausting a supported
+selected route's bounds returns an error naming that route; it cannot choose a
+different decomposition. A direct entry wins even if another route has fewer
+indicators. `None` means no database; `Some(empty)` also admits the rank-zero
+product unit. The source catalogue is immutable and may be dropped after selection.
+
+The opt-in coordinates match pinned Magna's first independent original
+trilinear rows in lexicographic `(i,j)` order, with highest-bit independence
+elimination. Unit right-hand sides use the section with all free variables zero.
+These coordinates matter for complete-table catalogue keys. The existing
+`ParityPhase::quotient`, `PreparedPhaseResource` and runtime defaults keep their
+current conventions.
+
+```rust
+use rmagna::catalogue::{FrozenPhasePlan, PhaseSelectionOptions, PhaseSelectionRoute};
+use rmagna::gf2::BitVector;
+use rmagna::phase::ParityPhase;
+use rmagna::scalar::ScalarArithmetic;
+
+let arithmetic = ScalarArithmetic::default();
+let phase = ParityPhase::new(1, 0, [(BitVector::from_indices(1, [0])?, 1)])?;
+let plan = FrozenPhasePlan::new(&phase, None, &PhaseSelectionOptions::default(), &arithmetic)?;
+assert_eq!(plan.receipt().route, PhaseSelectionRoute::Walsh);
+assert_eq!(plan.receipt().logical_core_table_bytes, 8);
+assert_eq!(plan.num_terms(), 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The plan owns its selected certificate, signature axes and prepared supports.
+`certificate`, `signature_axes`, `section_lifts` and `receipt` expose the actual
+selection and its exact indicators. `evaluate` and `expand` reuse the certified
+transport path for global and Clifford updates, including complex coefficients
+and dependent output labels. A changed non-Clifford signature fails even with a
+zero scalar or boundary coefficient.
+
+`PhaseSelectionOptions` keeps separate rank, signature scan, logical native
+core-table, transform, certification and preparation limits. The native table
+admission checks `4 * 2^rank` logical bytes before allocating a core table;
+unrepresentable ranks fail before exponential allocation. Signature scanning
+has the receipt's explicit word-work upper bound. Geometry admission covers
+the signature-row workspace, a conservative factorization workspace bound and
+retained prepared geometry, including the stored original signature axes. The
+receipt records the maximum of these logical word bounds. Allocator overhead,
+input data and scalar arithmetic temporaries are excluded; these are not native
+memory-layout or process-memory equivalence claims.
+
+`construction` applies to the selected certificate independently of unrelated
+source entries. Direct entries share immutable indicator data and are reverified
+pointwise under the current construction and scalar arithmetic bounds. The
+receipt's certification usage records this reconstruction work. Product and
+Walsh constructors keep their own row, term, reconstruction and transform checks;
+`preparation` additionally bounds core construction, terms and transport geometry.
+Retained indicators can contain supplied cancelling terms; their number does not
+claim minimum stabilizer rank or a minimum expansion after a particular boundary.
+
+Run `cargo run --locked -p rmagna --example phase_resource_selection` for actual
+selection and exact evaluation. The owning `phase_selection` tests compare 60
+pinned native cases, all coefficient/support/phase terms and the selected routes,
+then verify 240 complex scalar sums and 1,920 dependent labelled amplitudes by
+literal original-domain summation. The database factors use four computational
+two-T indicators, making native optional injection ineligible. Regenerate a new
+witness file in a verified native environment with:
+
+```sh
+python3.12 -I -B benchmarks/magna_reproduction/capture_phase_selection.py \
+  --upstream /path/to/pinned-magna --out /path/to/new-witness.json
+```
+
+The generator refuses existing output paths and binds its source, the pinned
+manifest and the actual native extension. The checked-in witness is correctness
+evidence; optional injection, runtime strategy wiring and paper-scale timing
+campaigns remain separate increments.
+
+An additional native-calibrated coordinate case keeps an original signature row
+whose reduced representative differs after independence elimination. It checks
+the resulting section, catalogue key, exact Walsh coefficients and transport.
