@@ -4253,6 +4253,8 @@ summary availability, record shape, cost counts and timings. Committed network
 compilations cannot exceed successful measured compilation work; committed history
 groups cannot exceed successful query and support work combined. Invalid reports
 and numeric-work failures return contextual `StreamExportError` values.
+Terminal failure messages must be nonempty; nonempty whitespace and all other
+message bytes are preserved, matching checkpoint restoration.
 Each operation must have zero measured seconds when it has no attempts.
 Operation times remain inclusive and may overlap; they are not added into a
 partition of the sampling wall time.

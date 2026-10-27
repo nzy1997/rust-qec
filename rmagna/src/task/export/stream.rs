@@ -74,6 +74,13 @@ fn validate(report: &TaskStreamReport) -> Result<(), StreamExportError> {
             "terminal stream failure must describe the first uncompleted sampling/accumulation attempt",
         ));
     }
+    if report
+        .failure
+        .as_ref()
+        .is_some_and(|failure| failure.message.is_empty())
+    {
+        return Err(invalid("terminal failure.message must be nonempty"));
+    }
     if report.completed == 0 {
         if report.completed_network_compilations != 0 || report.completed_history_groups != 0 {
             return Err(invalid(

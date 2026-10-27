@@ -1042,3 +1042,81 @@ fn operation_seconds_require_attempts_across_draw_and_diagnostic_states() {
     assert_eq!(value["estimation_status"], "empty");
     assert!(value["estimates"].is_null());
 }
+
+#[test]
+fn terminal_failure_messages_reject_empty_and_preserve_nonempty_bytes() {
+    let unavailable = ExactStatistics::new(
+        2,
+        StatisticsOptions {
+            max_dimensions: 1,
+            ..Default::default()
+        },
+    )
+    .err()
+    .unwrap();
+    for count in [0, 4] {
+        for phase in [RunPhase::Sampling, RunPhase::Accumulation] {
+            for kind in ["TaskError", "Unwind"] {
+                for mask in 0..if count == 0 { 1 } else { 4 } {
+                    let mut report = literal(count, 9);
+                    report.status = TaskStreamStatus::Failed;
+                    report.failed = 1;
+                    report.not_attempted -= 1;
+                    report.failure = Some(RunFailure {
+                        phase,
+                        shot: Some(count as u64),
+                        kind,
+                        message: "failure fixture".to_owned(),
+                    });
+                    if mask & 1 != 0 {
+                        report.statistics = Err(rmagna::task::TaskError {
+                            field: "statistics".to_owned(),
+                            message: "unavailable fixture".to_owned(),
+                        });
+                    }
+                    if mask & 2 != 0 {
+                        report.efficiency = Err(unavailable.clone());
+                    }
+                    let baseline = export(&report);
+                    report.failure.as_mut().unwrap().message.clear();
+                    let before = report.clone();
+                    for options in [
+                        NumericOptions::default(),
+                        NumericOptions { max_work_bits: 0 },
+                    ] {
+                        let error = export_stream_metrics(&report, options).unwrap_err();
+                        assert!(matches!(error, StreamExportError::InvalidState(_)));
+                        assert!(error.to_string().contains("failure.message"));
+                        assert_eq!(report, before);
+                    }
+                    for message in ["failure", " ", "\t\n", "λ failure\n", "\0", "a\0b"] {
+                        report.failure.as_mut().unwrap().message = message.to_owned();
+                        let before = report.clone();
+                        let result = export_stream_metrics(&report, NumericOptions::default());
+                        assert!(result.is_ok());
+                        let value = result.unwrap();
+                        assert_eq!(report, before);
+                        assert_eq!(value["failure"]["message"], message);
+                        assert_eq!(value["failure"]["type"], kind);
+                        assert_eq!(value["failure"]["shot"], count);
+                        let roundtrip: Value =
+                            serde_json::from_str(&serde_json::to_string(&value).unwrap()).unwrap();
+                        assert_eq!(roundtrip["failure"]["message"], message);
+                        for key in [
+                            "draw_status",
+                            "status",
+                            "estimation_status",
+                            "diagnostics",
+                            "estimates",
+                            "efficiency",
+                            "weights",
+                            "random_state",
+                        ] {
+                            assert_eq!(value[key], baseline[key]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
