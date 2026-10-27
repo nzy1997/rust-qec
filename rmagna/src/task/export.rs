@@ -1,10 +1,12 @@
 //! Numerical result payloads; execution identities and file schemas are separate.
+mod stream;
 use super::{RunPhase, RunStatus, TaskRunResult, TaskRunStatistics};
 use crate::field::ExactField;
 use crate::numeric::{Binary64, NumericError, NumericOptions, approximate_real, approximate_sqrt};
 use crate::statistics::{EfficiencyStatus, EfficiencySummary};
 use serde_json::{Value, json};
 use std::fmt;
+pub use stream::{StreamExportError, export_stream_metrics};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BatchExportError {
@@ -139,6 +141,18 @@ impl Encoder {
         error_scientific.insert("moments".to_owned(), json!(se_scaled));
         Ok(
             json!({"estimates":estimates,"estimates_scientific":scientific,"standard_errors":errors,"standard_errors_scientific":error_scientific}),
+        )
+    }
+    fn weights(
+        &mut self,
+        completed: u64,
+        mean_weight: Option<&ExactField>,
+        ess: &ExactField,
+    ) -> Result<Value, BatchExportError> {
+        let (mean, mean_scientific) = self.number("weights.mean", mean_weight, false)?;
+        let (ess, ess_scientific) = self.number("weights.ess", Some(ess), false)?;
+        Ok(
+            json!({"completed":completed,"mean":mean,"mean_scientific":mean_scientific,"ess":ess,"ess_scientific":ess_scientific,"convention":"complete noise likelihood times history mass / history proposal; no history factor for exact_marginal","ess_scope":"complete importance weights; not a guarantee of error-rate precision"}),
         )
     }
     pub(crate) fn efficiency(&mut self, s: &EfficiencySummary) -> Result<Value, BatchExportError> {
@@ -290,11 +304,23 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             ));
         }
     }
-    for s in [&result.statistics, &result.partial_statistics]
-        .into_iter()
-        .flatten()
-    {
-        if s.completed != result.completed || s.completed == 0 {
+    validate_summaries(result.completed, summary, result.efficiency.as_ref())?;
+    validate_records(result.completed, result.sampled_records.as_deref())?;
+    validate_execution(
+        result.execution_limits,
+        result.execution_costs,
+        &result.timings,
+    )?;
+    Ok(())
+}
+
+fn validate_summaries(
+    completed: u64,
+    summary: Option<&TaskRunStatistics>,
+    efficiency: Option<&EfficiencySummary>,
+) -> Result<(), BatchExportError> {
+    if let Some(s) = summary {
+        if s.completed != completed || s.completed == 0 {
             return Err(invalid(
                 "statistics must describe exactly the positive completed count",
             ));
@@ -318,8 +344,8 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             ));
         }
     }
-    if let Some(e) = &result.efficiency {
-        if e.completed != result.completed || e.zero_weights > e.completed {
+    if let Some(e) = efficiency {
+        if e.completed != completed || e.zero_weights > e.completed {
             return Err(invalid("efficiency counters disagree with completed draws"));
         }
         // Complete weights are nonnegative. Their sum and sum of squares
@@ -398,53 +424,52 @@ fn validate(result: &TaskRunResult) -> Result<(), BatchExportError> {
             }
         }
     }
-    if result
-        .sampled_records
-        .as_ref()
-        .is_some_and(|rows| rows.len() as u128 != result.completed as u128)
-    {
+    Ok(())
+}
+fn validate_records(completed: u64, records: Option<&[Vec<bool>]>) -> Result<(), BatchExportError> {
+    if records.is_some_and(|rows| rows.len() as u128 != completed as u128) {
         return Err(invalid(
             "retained record count disagrees with completed draws",
         ));
     }
-    if let Some(rows) = &result.sampled_records
+    if let Some(rows) = records
         && let Some(first) = rows.first()
         && rows.iter().any(|row| row.len() != first.len())
     {
         return Err(invalid("retained record rows must have a common width"));
     }
-    if !result.timings.sampling_seconds.is_finite()
-        || result.timings.sampling_seconds < 0.0
-        || !result.timings.total_seconds.is_finite()
-        || result.timings.total_seconds < 0.0
-        || result
-            .timings
+    Ok(())
+}
+fn validate_execution(
+    limits: crate::costs::ExecutionLimits,
+    costs: crate::costs::ExecutionCosts,
+    timings: &super::RunTimings,
+) -> Result<(), BatchExportError> {
+    if !timings.sampling_seconds.is_finite()
+        || timings.sampling_seconds < 0.0
+        || !timings.total_seconds.is_finite()
+        || timings.total_seconds < 0.0
+        || timings
             .preparation_seconds
             .is_some_and(|s| !s.is_finite() || s < 0.0)
     {
         return Err(invalid("timings must be finite and nonnegative"));
     }
-    if result.timings.sampling_seconds > result.timings.total_seconds
-        || result
-            .timings
+    if timings.sampling_seconds > timings.total_seconds
+        || timings
             .preparation_seconds
-            .is_some_and(|s| s > result.timings.total_seconds)
+            .is_some_and(|s| s > timings.total_seconds)
     {
         return Err(invalid(
             "total timing cannot be smaller than a measured component",
         ));
     }
-    if result.execution_costs.query.attempted > result.execution_limits.max_queries {
+    if costs.query.attempted > limits.max_queries {
         return Err(invalid(
             "attempted queries exceed the declared execution limit",
         ));
     }
-    for cost in [
-        result.execution_costs.compilation,
-        result.execution_costs.query,
-        result.execution_costs.decoder,
-        result.execution_costs.support,
-    ] {
+    for cost in [costs.compilation, costs.query, costs.decoder, costs.support] {
         if cost.succeeded.checked_add(cost.failed) != Some(cost.attempted)
             || !cost.seconds.is_finite()
             || cost.seconds < 0.0
@@ -501,15 +526,18 @@ pub fn export_batch_metrics(
         .transpose()?
         .unwrap_or(Value::Null);
     output.insert("efficiency".to_owned(), efficiency);
-    let weights = if let Some(s) = &result.efficiency {
-        let (mean, mean_scientific) =
-            encoder.number("weights.mean", s.mean_weight.as_ref(), false)?;
-        let (ess, ess_scientific) =
-            encoder.number("weights.ess", Some(&s.effective_sample_size), false)?;
-        json!({"completed":s.completed,"mean":mean,"mean_scientific":mean_scientific,"ess":ess,"ess_scientific":ess_scientific,"convention":"complete noise likelihood times history mass / history proposal; no history factor for exact_marginal","ess_scope":"complete importance weights; not a guarantee of error-rate precision"})
-    } else {
-        Value::Null
-    };
+    let weights = result
+        .efficiency
+        .as_ref()
+        .map(|s| {
+            encoder.weights(
+                s.completed,
+                s.mean_weight.as_ref(),
+                &s.effective_sample_size,
+            )
+        })
+        .transpose()?
+        .unwrap_or(Value::Null);
     output.insert("weights".to_owned(), weights);
     output.insert(
         "status".to_owned(),

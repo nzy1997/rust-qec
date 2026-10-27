@@ -4199,6 +4199,71 @@ after all source files disappear. It also checks changed identities, cumulative
 quota failures, terminal callback failures/unwinds, invalid labels/byte budgets,
 and the discarded `u64::MAX` endpoint without weakening batch behavior.
 
+## Numerical stream-prefix payloads
+
+`export_stream_metrics(&TaskStreamReport, NumericOptions)` exports a typed
+continuous prefix using the batch exporter's scientific-number, standard-error,
+weight and efficiency encodings. The report remains owned by the caller on both
+success and error; export performs no sampling, callbacks or quantum queries.
+
+```rust
+use rmagna::numeric::NumericOptions;
+use rmagna::task::{TaskEvaluator, TaskRunOptions, TaskStreamOptions, export_stream_metrics};
+
+# fn observe(evaluator: &TaskEvaluator) -> Result<(), Box<dyn std::error::Error>> {
+let mut stream = evaluator.start_stream(TaskStreamOptions {
+    run: TaskRunOptions { shots: 4, seed: 91, ..Default::default() },
+    ..Default::default()
+})?;
+let prefix = stream.advance(2)?;
+let payload = export_stream_metrics(&prefix, NumericOptions::default())?;
+assert_eq!(payload["draw_status"], "running");
+assert_eq!(payload["estimation_status"], "provisional");
+let final_report = stream.advance(2)?;
+let final_payload = export_stream_metrics(&final_report, NumericOptions::default())?;
+assert_eq!(final_payload["status"], "complete");
+assert_eq!(final_payload["estimation_status"], "final");
+# Ok(())
+# }
+```
+
+Three fields preserve distinct outcomes:
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `draw_status` | `running`, `draws_complete`, `failed` | Sampling state and committed prefix. |
+| `status` | `running`, `complete`, `failed`, `diagnostic_failed` | Overall observation; `complete` requires all requested draws and successful statistics/efficiency computations. |
+| `estimation_status` | `empty`, `provisional`, `final`, `unavailable` | Availability and validity of the exported statistics. |
+
+`diagnostics.statistics` and `diagnostics.efficiency` each retain their own
+computation status and error. Available statistics remain provisional when draws
+failed, are unfinished, or an efficiency computation failed. Undefined quantities
+remain null, including conditional error at zero acceptance and uncertainty with
+fewer than two draws. Normal efficiency states such as `no_error_metric` or
+`insufficient_samples` describe defined diagnostic boundaries; they do not mean
+the computation itself failed. Weight summaries can still be exported from valid
+statistics if efficiency computation failed.
+
+The payload includes counters, original seed/current RNG state, retained record
+rows, committed resources, exact execution limits, cumulative sampling costs and
+prefix timings. Counts and RNG use JSON integer tokens. The cost scope is
+`cumulative_stream_including_failed_attempts`; preparation and rebuilt caches are
+separate. Supplied public reports must have consistent cursors, terminal failures,
+summary availability, record shape, cost counts and timings. Invalid reports and
+numeric-work failures return contextual `StreamExportError` values.
+
+Finite values use the existing ordinary/scientific convention. Ordinary underflow
+or overflow produces null with the scientific value retained and its field listed
+in `numerics`; a numerical-work error returns no fabricated estimate. Exact
+recovery uses the checkpoint API. Loaded-input metadata and durable file/CLI
+publication remain responsibilities of their owning layers.
+
+`cargo test --locked -p rmagna --test stream_metric_export` checks literal paired
+statistics and efficiency, all sampler/compiler/causal/proposal/retention
+combinations, restored and uninterrupted payloads, completed batch agreement,
+real zero weights, undefined metrics, diagnostic failures, terminal callback
+errors/unwinds, numeric range/work limits and malformed public reports.
+
 ## Restoring cumulative execution budgets
 
 `ExecutionMeter::checkpoint` captures an `ExecutionMeterCheckpoint` containing
