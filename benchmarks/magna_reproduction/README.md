@@ -102,6 +102,77 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 
 ## Observed upstream test boundary
 
+### Source-bound Rust coverage ledger
+
+`coverage.json` enumerates every canonical `module.Class.test_method` from the
+pinned 57 core modules (352 cases). Its initial assertion mappings cover two
+native circuit cases with three Rust witness tests; the other 350 cases remain
+explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
+not a claim that a similarly named Rust test proves every native assertion.
+The three RM15 example-fixture tests are listed separately with their source
+hashes and reasons; they never reduce the core denominator.
+
+```sh
+python3 -I benchmarks/magna_reproduction/coverage_ledger.py \
+  --upstream /absolute/path/to/pinned/magna \
+  --ledger benchmarks/magna_reproduction/coverage.json \
+  --out /absolute/path/to/new-coverage-report.json
+```
+
+Inventory mode returns zero for this honestly incomplete ledger. The report
+separates `inventory_valid` from `parity_complete`, includes per-module and
+per-status counts, source hashes and declaration lines, and lists exact missing,
+duplicate or unknown IDs on an inventory error. It verifies all pinned source
+files before enumerating declarations without importing Magna. Unknown input
+fields, duplicate JSON keys, changed hashes and invented completion flags are
+rejected, including with Python `-O`. Reports require a new output path.
+
+Use `--complete-parity` as a strict gate. It returns nonzero until every core case
+is mapped and all referenced Rust tests have successful source-bound execution
+evidence. `architecture_specific` entries require a platform, concrete contract
+and reviewed reason and still block full parity. Skipped and ignored cases do
+not count as executed passes. The original 12 installed-wheel skips remain
+unmapped requirements, not successful reproduction evidence.
+
+Optional `--rust-run /absolute/path/to/run.json` accepts schema
+`rstim.magna-rust-tests.v1` with exactly these fields:
+
+```json
+{
+  "schema": "rstim.magna-rust-tests.v1",
+  "source_files": {"Cargo.lock": "sha256", "Cargo.toml": "sha256", "rmagna/...": "sha256"},
+  "targets": [{
+    "package": "rmagna",
+    "target": "circuit",
+    "binary": {"path": "/absolute/path/to/retained-test-binary", "sha256": "sha256"},
+    "list": {"stdout": "complete --list output", "stderr": "", "exit_code": 0},
+    "run": {"stdout": "complete --format pretty output", "stderr": "", "exit_code": 0}
+  }]
+}
+```
+
+`source_files` must equal `coverage_rust.source_identity(repository_root)`: all
+files under `rmagna`, the root Cargo manifest/lockfile and any `.cargo` files.
+Capture it before compilation, verify it again after running, and retain the
+compiler and process receipts with the artifact. Use default features, build
+with `cargo test --locked -p rmagna --test <target> --no-run`, then run the actual
+compiler-reported binary with `--list` and `--format pretty`; store the complete
+raw streams and actual exit codes. The validator checks retained binary bytes,
+source identity, test names, summary counts and outcomes. It preserves supplied
+raw evidence and diagnostics for failed or missing executions. Evidence is an
+auditable producer attestation: JSON and hashes cannot authenticate that a
+process actually ran, so original compiler/run receipts require independent
+review. The synthetic run strings in unit tests are parser fixtures only.
+
+Current declaration validation deliberately accepts only explicit unconditional
+top-level `#[test]` functions with ordinary ASCII identifiers in
+`rmagna/tests/<target>.rs`. Raw identifiers (including `r#name`), non-ASCII names,
+nested, macro-generated, configured, ignored or otherwise unsupported declarations
+need an explicit validator extension before becoming coverage witnesses.
+Unsupported identifier prefixes never qualify as shorter test names. This restriction avoids
+inferring test existence from a string or comment. Source declarations establish
+existence; only matching actual execution establishes a pass.
+
 At the pinned revision the source-tree runner discovers 352 tests: 340 pass and
 12 installed-wheel tests are skipped without `MAGNA_INSTALLED_PYTHON`. Running
 those 12 against a separately built wheel gives 9 passes and 3 failures:
