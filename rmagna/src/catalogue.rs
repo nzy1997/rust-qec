@@ -5,6 +5,7 @@ mod json;
 mod product;
 mod resource;
 mod selection;
+mod verification;
 mod walsh;
 use crate::gf2::BitVector;
 use crate::phase::ParityPhase;
@@ -20,6 +21,7 @@ pub use selection::{
     FrozenPhasePlan, PhaseSelectionOptions, PhaseSelectionReceipt, PhaseSelectionRoute,
 };
 use std::{collections::BTreeMap, fmt, sync::Arc};
+pub use verification::{CertificateVerification, CertificateVerificationMethod};
 
 /// One coefficient times a Clifford phase and an affine support indicator.
 /// Supports may overlap, be inconsistent, or cancel against other terms.
@@ -39,6 +41,7 @@ pub struct PhaseDecompositionInput {
 #[derive(Clone, Debug)]
 pub struct CertifiedPhaseDecomposition {
     input: PhaseDecompositionInput,
+    verification: CertificateVerification,
 }
 impl CertifiedPhaseDecomposition {
     pub fn dimension(&self) -> usize {
@@ -49,6 +52,10 @@ impl CertifiedPhaseDecomposition {
     }
     pub fn terms(&self) -> &[CliffordIndicator] {
         &self.input.terms
+    }
+    /// Actual complete proof method and admitted cost of these immutable terms.
+    pub fn verification(&self) -> CertificateVerification {
+        self.verification
     }
 }
 #[derive(Clone, Copy, Debug)]
@@ -62,7 +69,7 @@ pub struct CatalogueLimits {
     /// Stored normalized rows. JSON raw rows must also fit the remaining
     /// capacity before an entry's phases are normalized.
     pub max_parity_rows: usize,
-    /// Assignment comparisons plus indicator and constraint/parity checks.
+    /// Cumulative complete proof work; see [`CertificateVerification`].
     pub max_verification_work: u128,
 }
 impl Default for CatalogueLimits {
@@ -220,10 +227,14 @@ impl PhaseCatalogue {
         arithmetic: &ScalarArithmetic,
         entry_index: usize,
     ) -> Result<(), CatalogueError> {
-        let usage = self.validate_at(&input, limits, arithmetic, entry_index)?;
+        let (usage, verification) =
+            self.validate_at(&input, limits, arithmetic, entry_index, None)?;
         self.entries.entry(input.dimension).or_default().insert(
             input.phase_table.clone(),
-            Arc::new(CertifiedPhaseDecomposition { input }),
+            Arc::new(CertifiedPhaseDecomposition {
+                input,
+                verification,
+            }),
         );
         self.usage = usage;
         Ok(())
@@ -234,7 +245,8 @@ impl PhaseCatalogue {
         limits: &CatalogueLimits,
         arithmetic: &ScalarArithmetic,
         entry_index: usize,
-    ) -> Result<CatalogueUsage, CatalogueError> {
+        saved_proof: Option<CertificateVerification>,
+    ) -> Result<(CatalogueUsage, CertificateVerification), CatalogueError> {
         self.check_existing(limits)?;
         let prefix = format!("catalogue.entries.{entry_index}");
         let count = assignments(input.dimension, limits)?;
@@ -297,11 +309,22 @@ impl PhaseCatalogue {
         for (name, required, configured) in totals {
             limit(name, required, configured as u128)?;
         }
-        let work = (count as u128) * (1 + input.terms.len() as u128 + constraints + parities);
+        let character_only = verification::characters(&input.terms);
+        let proof = match saved_proof {
+            Some(proof) => proof,
+            None => verification::plan(
+                input.dimension,
+                count,
+                input.terms.len() as u128,
+                constraints,
+                parities,
+                character_only,
+            )?,
+        };
         let total_work = self
             .usage
             .verification_work
-            .checked_add(work)
+            .checked_add(proof.work)
             .ok_or_else(|| {
                 error(
                     "catalogue.max_verification_work",
@@ -326,65 +349,27 @@ impl PhaseCatalogue {
                     "constraint or Clifford phase dimension differs from entry dimension",
                 ));
             }
-            term.phase
-                .clifford()
-                .map_err(|e| error(format!("{field}.clifford_parities"), e))?;
+            if !character_only {
+                term.phase
+                    .clifford()
+                    .map_err(|e| error(format!("{field}.clifford_parities"), e))?;
+            }
             arithmetic
                 .multiply(&term.coefficient, &ExactScalar::one())
                 .map_err(|e| error(format!("{field}.coefficient"), e))?;
         }
-        for word in 0..count {
-            let x = BitVector::from_indices(
-                input.dimension,
-                (0..input.dimension).filter(|j| word >> j & 1 != 0),
-            )
-            .map_err(|e| error(&prefix, e))?;
-            let mut actual = ExactScalar::zero();
-            for (j, term) in input.terms.iter().enumerate() {
-                let field = format!("{prefix}.terms.{j}.assignment.{word}");
-                let present = term
-                    .constraints
-                    .iter()
-                    .try_fold(true, |present, (row, bit)| {
-                        row.dot(&x).map(|v| present && (v == *bit))
-                    })
-                    .map_err(|e| error(&field, e))?;
-                if present {
-                    let phase = term.phase.evaluate(&x).map_err(|e| error(&field, e))?;
-                    let value = arithmetic
-                        .multiply(
-                            &term.coefficient,
-                            &arithmetic
-                                .omega(i64::from(phase), 0)
-                                .map_err(|e| error(&field, e))?,
-                        )
-                        .map_err(|e| error(&field, e))?;
-                    actual = arithmetic
-                        .add(&actual, &value)
-                        .map_err(|e| error(&field, e))?;
-                }
-            }
-            let expected = arithmetic
-                .omega(i64::from(input.phase_table[word]), 0)
-                .map_err(|e| error(&prefix, e))?;
-            if actual != expected {
-                return Err(error(
-                    format!("{prefix}.assignment.{word}"),
-                    format!(
-                        "decomposition does not reconstruct omega^{}; actual {actual:?}",
-                        input.phase_table[word]
-                    ),
-                ));
-            }
-        }
-        Ok(CatalogueUsage {
-            entries: self.usage.entries + 1,
-            table_values: self.usage.table_values + count,
-            terms: self.usage.terms + input.terms.len(),
-            constraint_rows: self.usage.constraint_rows + constraints as usize,
-            parity_rows: self.usage.parity_rows + parities as usize,
-            verification_work: total_work,
-        })
+        verification::verify(input, proof, arithmetic, &prefix)?;
+        Ok((
+            CatalogueUsage {
+                entries: self.usage.entries + 1,
+                table_values: self.usage.table_values + count,
+                terms: self.usage.terms + input.terms.len(),
+                constraint_rows: self.usage.constraint_rows + constraints as usize,
+                parity_rows: self.usage.parity_rows + parities as usize,
+                verification_work: total_work,
+            },
+            proof,
+        ))
     }
     fn shared_entry(
         &self,
@@ -399,7 +384,15 @@ impl PhaseCatalogue {
         arithmetic: &ScalarArithmetic,
     ) -> Result<Self, CatalogueError> {
         let mut result = Self::new();
-        let usage = result.validate_at(&entry.input, limits, arithmetic, 0)?;
+        // Re-admit and reverify the same immutable proof, including under a
+        // tighter arithmetic budget. Its saved cost is the source of usage.
+        let (usage, _) = result.validate_at(
+            &entry.input,
+            limits,
+            arithmetic,
+            0,
+            Some(entry.verification),
+        )?;
         result
             .entries
             .entry(entry.dimension())
