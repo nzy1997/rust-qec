@@ -1243,28 +1243,68 @@
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_complete_small_signatures_include_repeated_indices",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 139 original degree-one/two/three signature selections through three variables reconstruct every literal phase value in Rust quotient coordinates with an exact Clifford correction. Literal finite-difference radicals agree as complete sets, including repeated directions. Coordinate gauge follows the independent Rust quotient; no C++ tuple ABI is claimed. The quotient-coordinate images must be a permutation of the complete physical input domain.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_139_small_signatures_reconstruct_literal_values_and_radicals",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ]
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_dimension_key_eviction_and_thread_ownership",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Retain the width-3 preparation while constructing widths 4 through 14 and width 3 again. Original low-rank terms have literal exact sum (1+i)*2^(n-2) at widths 3,4,65,129. Concurrent shared immutable preparations and fresh dimension-separated constructions agree. Rust ownership replaces the native eight-entry mutable-cache eviction mechanism; no eviction behavior or counter is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_dimension_churn_and_concurrent_queries_preserve_owned_values",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ]
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_invalid_dimension_cannot_use_cached_key",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "After a valid width-3 preparation, reject the original axis-8 input patterns at packed-vector or typed phase construction. Also reject incompatible query dimensions and changed signatures, then re-evaluate the unchanged old preparation. Rust validates axes before preparation; it does not emulate a native cached-key error path.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_invalid_axes_fail_before_reusing_a_valid_owned_preparation",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ]
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_sign_even_and_duplicate_updates_do_not_contaminate_template",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Replay both original passes over all 16 four-variable sign words, even-only axis 10 and cancelling duplicate axis 3. Every literal truth value, quotient basis, canonical signature geometry and prepared exact sum agrees. The fully cancelled odd pair is Clifford with rank zero. Owned reference objects remain unchanged; no process-global cache counter is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_signed_even_duplicate_updates_reuse_owned_preparation",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ]
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_sparse_quotient_coordinates_cross_machine_word",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All 70 singleton quotient representatives and their dual axes have literal identity pairing, rank 70 and no radical. Removing the odd unit singleton core leaves exact Clifford linear coefficients j mod 4 and zero upper terms, checked without a 2^70 table. The explicit computational expansion refuses rank 70 under its small term budget.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "phase_quotient_contracts",
+          "test": "original_70_singletons_keep_identity_lifts_and_exact_clifford_remainder",
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
+        }
+      ]
     },
     {
       "id": "test_quantum_output.QuantumOutputTests.test_annotations_manual_faults_and_source_snapshot",
