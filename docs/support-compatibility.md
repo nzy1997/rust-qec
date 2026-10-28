@@ -40,6 +40,13 @@ evidence; verification procedures are in the [maintainer reference](maintainer-r
 
 ### MLE Supported scope
 
+Native timed atom circuits can opt into
+[loss-visible circuit subset v2](specs/loss-visible-circuit-subset-v2.md)
+using `--circuit-subset v2` on both `dataset import` and `decode`.
+This experimental input extension preserves the original native pulse and
+dephasing locations. It does not expand the measured decoder performance or
+Supported workload promises below. Omitting the option keeps subset v1.
+
 The [MLE scope plan](envelope-mle-scope.json) covers Mid-SWAP distance 3:
 
 | Rounds | Loss parameter | Batch shots |

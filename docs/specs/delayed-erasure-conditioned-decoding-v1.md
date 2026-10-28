@@ -129,8 +129,12 @@ placeholder and is not represented as a sampled physical error.
 
 - The public file format is unchanged; conditioned graphs and models are
   internal decoder artifacts.
-- The v1 native compiler supports the documented flat Mid-SWAP subset and
-  rejects unsupported gates or `REPEAT` blocks before envelope expansion.
+- The default native compiler supports the documented
+  [v1 subset](loss-visible-circuit-subset-v1.md). Selecting
+  [circuit subset v2](loss-visible-circuit-subset-v2.md) adds native
+  `Z`, `SQRT_Y`, `CZ`, and `Z_ERROR` without changing this conditioned
+  decoding contract. Both versions reject unsupported gates or `REPEAT`
+  blocks before envelope expansion.
 - Generic hypergraph matching is not synthesized by splitting a correlated
   effect. Use envelope MLE or add a decoder with native hyperedge support.
 - Learned decoders should still consume separate measurement-value and loss

@@ -1,0 +1,23 @@
+# Ideal H/CX reference, retaining the dephasing at its physical location.
+# H X_ERROR(p) H is the same channel as Z_ERROR(p).
+QUBIT_COORDS(0,0) 0
+QUBIT_COORDS(1,0) 1
+QUBIT_COORDS(2,0) 2
+R 0 1 2
+X_ERROR(0.1) 0
+X_ERROR(0.01) 1
+X_ERROR(0.03) 2
+LOSS(0.1) 0
+H 0
+H 0
+X_ERROR(0.07) 0
+H 0
+H 0
+CX 0 1
+X_ERROR(0.02) 0
+LOSS(0.1) 1 2
+ML 0 1 2
+DETECTOR(0,0,0) rec[-5]
+DETECTOR(1,0,0) rec[-3]
+DETECTOR(2,0,0) rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-5]

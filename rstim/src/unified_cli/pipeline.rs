@@ -124,6 +124,7 @@ pub struct DemResult {
 #[derive(Debug)]
 pub struct DatasetImportOptions {
     pub circuit: PathBuf,
+    pub circuit_subset: super::decode::CircuitSubset,
     pub shots: PathBuf,
     pub shots_format: String,
     pub out: PathBuf,
@@ -210,9 +211,10 @@ pub fn run_dataset_import(
         super::decode::write_public_bundle(&staging, &text, &shots_b8, shots).map_err(
             |failure| command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json),
         )?;
-        let loss_flags = super::decode::validate_public_bundle(&staging).map_err(|failure| {
-            command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json)
-        })?;
+        let loss_flags = super::decode::validate_public_bundle(&staging, options.circuit_subset)
+            .map_err(|failure| {
+                command_error(DATASET_IMPORT_COMMAND, failure.code, failure.message, json)
+            })?;
         if let Some(loss_log) = &options.loss_log {
             check_loss_log(loss_log, &loss_flags, &shots_b8, row_bits, shots, json)?;
         }
