@@ -9,8 +9,8 @@ use rstim::sim::bit_table::BitTable;
 use super::dataset::Dataset;
 use super::matching::{EdgeKind, GraphEdge};
 use super::{
-    CompiledCircuit, DecodeFailure, DecoderKind, Effect, LossEnvelope, MAX_ENVELOPE_CANDIDATES,
-    MAX_PRIMITIVE_PROBES, MAX_PRIMITIVE_SYMPTOM_TERMS,
+    CircuitSubset, CompiledCircuit, DecodeFailure, DecoderKind, Effect, LossEnvelope,
+    MAX_ENVELOPE_CANDIDATES, MAX_PRIMITIVE_PROBES, MAX_PRIMITIVE_SYMPTOM_TERMS,
 };
 
 type PrimitiveKey = (usize, u32, &'static str);
@@ -18,6 +18,7 @@ type PrimitiveKey = (usize, u32, &'static str);
 pub(super) fn compile_circuit(
     dataset: &Dataset,
     decoder: DecoderKind,
+    subset: CircuitSubset,
 ) -> Result<CompiledCircuit, DecodeFailure> {
     let instrs = rstim::validation::parse_and_validate(&dataset.circuit_text)
         .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
@@ -49,7 +50,7 @@ pub(super) fn compile_circuit(
             "decode requires 1..=64 observables and no sweep bits",
         ));
     }
-    let normalized = normalize_supported_circuit(&instrs)?;
+    let normalized = normalize_supported_circuit(&instrs, subset)?;
     let loss_aware_m2d = CompiledLossAwareM2d::new(&instrs)
         .map_err(|error| DecodeFailure::new("unsupported_circuit", error))?;
     let layout = loss_aware_m2d.layout();
@@ -121,6 +122,7 @@ pub(super) struct NormalizedLossCircuit {
 
 pub(super) fn normalize_supported_circuit(
     flat: &[StimInstr],
+    subset: CircuitSubset,
 ) -> Result<NormalizedLossCircuit, DecodeFailure> {
     let mut normalized = Vec::new();
     let mut noiseless = Vec::new();
@@ -211,29 +213,21 @@ pub(super) fn normalize_supported_circuit(
                     format!("unsupported loss-visible readout instruction {name}"),
                 ));
             }
-            "H" => {
+            "H" | "SQRT_Y" if name == "H" || subset == CircuitSubset::V2 => {
+                if name == "SQRT_Y" {
+                    distinct_qubit_targets(name, targets)?;
+                }
                 normalized.push(instruction.clone());
                 noiseless.push(instruction.clone());
+                // SQRT_Y swaps unsigned X/Z sensitivities like H. Keep the
+                // actual signed pulse in both circuits and probe after it.
                 let site = noiseless.len();
                 for qubit in qubit_targets(targets)? {
                     basis_sites.entry(qubit).or_default().push(site);
                 }
             }
             "CX" | "CNOT" | "ZCX" => {
-                let qubits = qubit_targets(targets)?;
-                if qubits.len() % 2 != 0 {
-                    return Err(DecodeFailure::new(
-                        "unsupported_circuit",
-                        "CX requires complete qubit pairs",
-                    ));
-                }
-                let mut used = HashSet::new();
-                if qubits.iter().any(|&qubit| !used.insert(qubit)) {
-                    return Err(DecodeFailure::new(
-                        "unsupported_circuit",
-                        "parallel CX pairs must use disjoint qubits",
-                    ));
-                }
+                let qubits = disjoint_qubit_pairs("CX", targets)?;
                 let controls: Vec<_> = qubits.chunks_exact(2).map(|pair| pair[0]).collect();
                 let targets: Vec<_> = qubits.chunks_exact(2).map(|pair| pair[1]).collect();
                 let h_targets: Vec<_> = targets.iter().copied().map(StimTarget::Qubit).collect();
@@ -259,6 +253,22 @@ pub(super) fn normalize_supported_circuit(
                     }
                 }
             }
+            "CZ" if subset == CircuitSubset::V2 => {
+                disjoint_qubit_pairs(name, targets)?;
+                // Native CZ propagates probes directly, without synthetic
+                // basis sites that could change the delayed-loss history.
+                normalized.push(instruction.clone());
+                noiseless.push(instruction.clone());
+            }
+            "Z" if subset == CircuitSubset::V2 => {
+                distinct_qubit_targets(name, targets)?;
+                normalized.push(instruction.clone());
+                noiseless.push(instruction.clone());
+            }
+            "Z_ERROR" if subset == CircuitSubset::V2 => {
+                distinct_qubit_targets(name, targets)?;
+                normalized.push(instruction.clone());
+            }
             "R" | "RZ" => {
                 normalized.push(instruction.clone());
                 noiseless.push(instruction.clone());
@@ -277,7 +287,10 @@ pub(super) fn normalize_supported_circuit(
             _ => {
                 return Err(DecodeFailure::new(
                     "unsupported_circuit",
-                    format!("instruction {name} is outside the supported Mid-SWAP subset"),
+                    format!(
+                        "instruction {name} is outside the supported Mid-SWAP subset {}",
+                        subset.name()
+                    ),
                 ));
             }
         }
@@ -325,6 +338,34 @@ fn qubit_targets(targets: &[StimTarget]) -> Result<Vec<u32>, DecodeFailure> {
             )),
         })
         .collect()
+}
+
+fn distinct_qubit_targets(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, DecodeFailure> {
+    let qubits = qubit_targets(targets)?;
+    let mut used = HashSet::new();
+    if qubits.iter().any(|&qubit| !used.insert(qubit)) {
+        return Err(DecodeFailure::new(
+            "unsupported_circuit",
+            format!("{name} targets must use disjoint qubits"),
+        ));
+    }
+    Ok(qubits)
+}
+
+fn disjoint_qubit_pairs(name: &str, targets: &[StimTarget]) -> Result<Vec<u32>, DecodeFailure> {
+    let qubits = qubit_targets(targets)?;
+    if qubits.len() % 2 != 0 {
+        return Err(DecodeFailure::new(
+            "unsupported_circuit",
+            format!("{name} requires complete qubit pairs"),
+        ));
+    }
+    distinct_qubit_targets(name, targets).map_err(|_| {
+        DecodeFailure::new(
+            "unsupported_circuit",
+            format!("parallel {name} pairs must use disjoint qubits"),
+        )
+    })
 }
 
 fn effects_and_edges_from_dem(
@@ -887,18 +928,30 @@ mod tests {
     #[test]
     fn normalization_rejects_invalid_loss_windows_and_targets() {
         let inline_noise = [StimInstr::new("ML", vec![0.1], vec![StimTarget::Qubit(0)])];
-        assert!(error_message(normalize_supported_circuit(&inline_noise)).contains("inline noise"));
+        assert!(
+            error_message(normalize_supported_circuit(
+                &inline_noise,
+                CircuitSubset::V1
+            ))
+            .contains("inline noise")
+        );
 
         let missing_loss = [StimInstr::new("ML", Vec::new(), vec![StimTarget::Qubit(0)])];
         assert!(
-            error_message(normalize_supported_circuit(&missing_loss))
-                .contains("no LOSS opportunity")
+            error_message(normalize_supported_circuit(
+                &missing_loss,
+                CircuitSubset::V1
+            ))
+            .contains("no LOSS opportunity")
         );
 
         let incomplete_cx = [StimInstr::new("CX", Vec::new(), vec![StimTarget::Qubit(0)])];
         assert!(
-            error_message(normalize_supported_circuit(&incomplete_cx))
-                .contains("complete qubit pairs")
+            error_message(normalize_supported_circuit(
+                &incomplete_cx,
+                CircuitSubset::V1
+            ))
+            .contains("complete qubit pairs")
         );
 
         let invalid_target = [StimInstr::new(
@@ -907,13 +960,16 @@ mod tests {
             vec![StimTarget::Sweep(0)],
         )];
         assert!(
-            error_message(normalize_supported_circuit(&invalid_target))
-                .contains("non-inverted qubits")
+            error_message(normalize_supported_circuit(
+                &invalid_target,
+                CircuitSubset::V1
+            ))
+            .contains("non-inverted qubits")
         );
 
         let no_readout = [StimInstr::new("R", Vec::new(), vec![StimTarget::Qubit(0)])];
         assert!(
-            error_message(normalize_supported_circuit(&no_readout))
+            error_message(normalize_supported_circuit(&no_readout, CircuitSubset::V1))
                 .contains("no supported loss-visible measurements")
         );
     }
@@ -1167,3 +1223,7 @@ mod tests {
         assert_eq!(sites, BTreeSet::from([2, 3, 5, 7, 10]));
     }
 }
+
+#[cfg(test)]
+#[path = "native_v2_tests.rs"]
+mod native_v2_tests;

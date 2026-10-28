@@ -57,6 +57,22 @@ pub enum DecoderKind {
     EnvelopeMle,
 }
 
+/// Version of the physical circuit subset accepted by the loss compiler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum CircuitSubset {
+    V1,
+    V2,
+}
+
+impl CircuitSubset {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::V1 => "v1",
+            Self::V2 => "v2",
+        }
+    }
+}
+
 impl DecoderKind {
     pub fn name(self) -> &'static str {
         match self {
@@ -69,6 +85,7 @@ impl DecoderKind {
 #[derive(Debug)]
 pub struct DecodeOptions {
     pub decoder: DecoderKind,
+    pub circuit_subset: CircuitSubset,
     pub dataset: PathBuf,
     pub predictions_out: PathBuf,
     pub stats_out: PathBuf,
@@ -108,6 +125,7 @@ fn conditioned_cache_needs_eviction(
 #[derive(Debug, Serialize, PartialEq)]
 pub struct DecodeStats {
     pub schema_version: &'static str,
+    pub circuit_subset: &'static str,
     pub decoder: String,
     pub circuit_sha256: String,
     pub shot_count: usize,
@@ -290,7 +308,7 @@ pub fn run(options: &DecodeOptions) -> Result<DecodeStats, DecodeFailure> {
     validate_output_paths(options)?;
     let dataset = read_dataset(&options.dataset)?;
     let compile_started = Instant::now();
-    let circuit = compile_circuit(&dataset, options.decoder)?;
+    let circuit = compile_circuit(&dataset, options.decoder, options.circuit_subset)?;
     let mut decoder = match options.decoder {
         DecoderKind::EnvelopeMatching => DecoderState::Matching(CompiledMatching::new(&circuit)?),
         #[cfg(feature = "ilp")]
@@ -459,6 +477,7 @@ fn build_stats(
 ) -> DecodeStats {
     DecodeStats {
         schema_version: STATS_SCHEMA_VERSION,
+        circuit_subset: options.circuit_subset.name(),
         decoder: options.decoder.name().to_string(),
         circuit_sha256: dataset.manifest.circuit.sha256.clone(),
         shot_count: dataset.manifest.shots,
@@ -598,9 +617,12 @@ fn parent_dir(path: &Path) -> &Path {
 /// structure, hashes, row widths, and the full loss-visible circuit subset
 /// compilation. Returns the flag-record measurement indices on success so
 /// callers (for example `dataset import`) can cross-check loss sidecars.
-pub(crate) fn validate_public_bundle(dir: &Path) -> Result<Vec<usize>, DecodeFailure> {
+pub(crate) fn validate_public_bundle(
+    dir: &Path,
+    subset: CircuitSubset,
+) -> Result<Vec<usize>, DecodeFailure> {
     let dataset = read_dataset(dir)?;
-    let compiled = compile_circuit(&dataset, DecoderKind::EnvelopeMatching)?;
+    let compiled = compile_circuit(&dataset, DecoderKind::EnvelopeMatching, subset)?;
     Ok(compiled.loss_flags)
 }
 
@@ -695,7 +717,7 @@ mod tests {
         assert_eq!(registers.len(), LOSS_PATTERN_HLL_REGISTERS);
     }
 
-    fn dataset_for(circuit_text: &str) -> Dataset {
+    pub(super) fn dataset_for(circuit_text: &str) -> Dataset {
         let instrs = rstim::validation::parse_and_validate(circuit_text).unwrap();
         let stats = rstim::stats::summarize(&instrs);
         Dataset {
@@ -732,7 +754,12 @@ mod tests {
     }
 
     fn compiled(circuit_text: &str) -> CompiledCircuit {
-        compile_circuit(&dataset_for(circuit_text), DecoderKind::EnvelopeMle).unwrap()
+        compile_circuit(
+            &dataset_for(circuit_text),
+            DecoderKind::EnvelopeMle,
+            CircuitSubset::V1,
+        )
+        .unwrap()
     }
 
     #[cfg(feature = "ilp")]
@@ -748,7 +775,7 @@ mod tests {
         indices.iter().fold(0, |value, &index| value | (1 << index))
     }
 
-    fn singleton_syndrome(bits: &[u8]) -> LossAwareDetectorShot {
+    pub(super) fn singleton_syndrome(bits: &[u8]) -> LossAwareDetectorShot {
         LossAwareDetectorShot {
             lost_measurements: Vec::new(),
             detector_valid: vec![true; bits.len()],
@@ -805,7 +832,11 @@ mod tests {
     }
 
     #[cfg(feature = "ilp")]
-    fn reference_mle(circuit: &CompiledCircuit, syndrome: &[u8], losses: &[usize]) -> u64 {
+    pub(super) fn reference_mle(
+        circuit: &CompiledCircuit,
+        syndrome: &[u8],
+        losses: &[usize],
+    ) -> u64 {
         let case = reference_case(circuit, observed(syndrome), losses);
         match decode_reference_mle(&case).unwrap() {
             DecodeOutcome::Optimal(result) => mask(&result.predicted_observables),
@@ -879,7 +910,8 @@ mod tests {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/current_rstim_atom_loss/midswap_canonical_mle");
         let dataset = read_dataset(&fixture).unwrap();
-        let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMle).unwrap();
+        let circuit =
+            compile_circuit(&dataset, DecoderKind::EnvelopeMle, CircuitSubset::V1).unwrap();
         let shots = File::open(&dataset.shots_path).unwrap();
         let mut reader = ResultBlockReader::new(
             BufReader::new(shots),
@@ -929,7 +961,10 @@ mod tests {
     }
 
     #[cfg(feature = "ilp")]
-    fn reference_matching(circuit: &CompiledCircuit, shots: &[(&[u8], &[usize])]) -> Vec<u64> {
+    pub(super) fn reference_matching(
+        circuit: &CompiledCircuit,
+        shots: &[(&[u8], &[usize])],
+    ) -> Vec<u64> {
         let edge_ids: Vec<_> = (0..circuit.graph_edges.len())
             .map(|index| format!("edge-{index}"))
             .collect();
@@ -1223,7 +1258,7 @@ mod tests {
         let instrs =
             rstim::validation::parse_and_validate("R 0 1\nLOSS(0.1) 1\nCX 0 1\nML 1\n").unwrap();
         let flat = rstim::transforms::flattened(&instrs);
-        let normalized = normalize_supported_circuit(&flat).unwrap();
+        let normalized = normalize_supported_circuit(&flat, CircuitSubset::V1).unwrap();
         assert_eq!(normalized.probes[0].basis_sites.len(), 2);
 
         let mut matching = CompiledMatching {
@@ -1263,7 +1298,7 @@ mod tests {
         ))
         .unwrap();
         let flat = rstim::transforms::flattened(&instrs);
-        let normalized = normalize_supported_circuit(&flat).unwrap();
+        let normalized = normalize_supported_circuit(&flat, CircuitSubset::V1).unwrap();
         assert_eq!(normalized.loss_flags, [0, 2, 4, 6]);
         assert_eq!(
             normalized
@@ -1396,9 +1431,13 @@ mod tests {
     fn compile_and_decode_boundaries_report_structured_errors() {
         let mut mismatched = dataset_for(PERSISTENT_CIRCUIT);
         mismatched.manifest.circuit.detectors += 1;
-        let error = compile_circuit(&mismatched, DecoderKind::EnvelopeMatching)
-            .err()
-            .unwrap();
+        let error = compile_circuit(
+            &mismatched,
+            DecoderKind::EnvelopeMatching,
+            CircuitSubset::V1,
+        )
+        .err()
+        .unwrap();
         assert_eq!(error.code, "invalid_dataset");
         assert!(error.message.contains("circuit counts"));
 
@@ -1409,9 +1448,13 @@ mod tests {
             "ML 0\n",
             "DETECTOR(0,0,0) rec[-1]\n",
         ));
-        let error = compile_circuit(&no_observable, DecoderKind::EnvelopeMatching)
-            .err()
-            .unwrap();
+        let error = compile_circuit(
+            &no_observable,
+            DecoderKind::EnvelopeMatching,
+            CircuitSubset::V1,
+        )
+        .err()
+        .unwrap();
         assert_eq!(error.code, "unsupported_circuit");
         assert!(error.message.contains("1..=64 observables"));
 
@@ -1428,6 +1471,7 @@ mod tests {
         let shared = root.path().join("shared");
         let mut options = DecodeOptions {
             decoder: DecoderKind::EnvelopeMatching,
+            circuit_subset: CircuitSubset::V1,
             dataset: root.path().join("dataset"),
             predictions_out: shared.clone(),
             stats_out: shared,

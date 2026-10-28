@@ -13,6 +13,10 @@ The reference implementation is
 ## 1. Scope and versioning
 
 - Subset version: **v1**.
+- Selected by default, or explicitly with `--circuit-subset v1`, on
+  `rstim decode` and `rstim dataset import`. The opt-in
+  [v2 subset](loss-visible-circuit-subset-v2.md) adds native Clifford pulses
+  and dephasing; it does not change v1 acceptance.
 - The decoder accepts exactly one circuit per dataset, stored as
   `circuit.stim` inside a public dataset bundle (see §7).
 - Any circuit meeting every requirement in §2–§6 is accepted, regardless of

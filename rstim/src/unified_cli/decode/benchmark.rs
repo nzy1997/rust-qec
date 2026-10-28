@@ -6,7 +6,7 @@ use serde_json::json;
 pub fn export_matching_dataset(path: &Path) -> Result<serde_json::Value, DecodeFailure> {
     let dataset = read_dataset(path)?;
     let started = Instant::now();
-    let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMatching)?;
+    let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMatching, CircuitSubset::V1)?;
     let matching = CompiledMatching::new(&circuit)?;
     let compile_seconds = started.elapsed().as_secs_f64();
     let mut reader = ResultBlockReader::new(
@@ -59,7 +59,7 @@ pub fn export_matching_dataset(path: &Path) -> Result<serde_json::Value, DecodeF
 /// Validate its physical model independently before testing its MLE representation.
 pub fn export_decoder_oracle_dataset(path: &Path) -> Result<serde_json::Value, DecodeFailure> {
     let dataset = read_dataset(path)?;
-    let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMle)?;
+    let circuit = compile_circuit(&dataset, DecoderKind::EnvelopeMle, CircuitSubset::V1)?;
     let effect =
         |e: &Effect| json!({"detectors":e.detectors,"observables":e.observables,"weight":e.weight});
     Ok(json!({
