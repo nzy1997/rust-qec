@@ -86,6 +86,7 @@ fn check_values(row: &Value) {
     .unwrap();
     let transformed = p.restrict(&bits(n, 0), q.basis()).unwrap();
     let (global, correction) = transformed.subtract(&lifted).unwrap().clifford().unwrap();
+    let mut physical_images = Vec::with_capacity(values.len());
     for (x, value) in values.iter().enumerate() {
         assert_eq!(
             p.evaluate(&bits(n, x)).unwrap(),
@@ -96,6 +97,7 @@ fn check_values(row: &Value) {
             image.xor_assign(&q.basis()[j]).unwrap();
         }
         let physical = image.ones().fold(0, |a, j| a | (1 << j));
+        physical_images.push(physical);
         let core_value = resource
             .evaluate(&bits(q.rank(), x & ((1 << q.rank()) - 1)))
             .unwrap();
@@ -104,6 +106,12 @@ fn check_values(row: &Value) {
             values[physical].as_u64().unwrap() as u8
         );
     }
+    physical_images.sort_unstable();
+    assert_eq!(
+        physical_images,
+        (0..values.len()).collect::<Vec<_>>(),
+        "quotient reconstruction must cover every physical input"
+    );
 }
 
 #[test]

@@ -311,9 +311,10 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The seven
-mapped Rust witnesses must execute successfully, while the overall gate must
-still return nonzero because 346 core contracts remain unmapped. These finite
+`--rust-run <run.json> --complete-parity` flags documented above. The 12 mapped
+Rust witnesses for 11 verified upstream cases must execute successfully, while
+the overall gate must still return nonzero because 341 core contracts remain
+unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
 
@@ -335,6 +336,9 @@ The producer never imports the upstream module or invokes its source-mutating
 test-only native builder. Repeat with `-O` into a new path: the bytes must agree.
 Changed module bytes and existing output paths are rejected in both modes.
 The committed fixture binds the module, producer and source revision identities.
+
+Every quotient-basis image is checked to form the complete physical input domain,
+so reconstruction covers every physical input.
 
 The tests reconstruct all values for 139 small signatures and both original
 passes over 16 four-variable sign updates, including even and cancelling axes.

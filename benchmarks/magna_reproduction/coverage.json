@@ -1244,13 +1244,13 @@
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_complete_small_signatures_include_repeated_indices",
       "status": "verified",
-      "contract": "All 139 original degree-one/two/three signature selections through three variables reconstruct every literal phase value in Rust quotient coordinates with an exact Clifford correction. Literal finite-difference radicals agree as complete sets, including repeated directions. Coordinate gauge follows the independent Rust quotient; no C++ tuple ABI is claimed.",
+      "contract": "All 139 original degree-one/two/three signature selections through three variables reconstruct every literal phase value in Rust quotient coordinates with an exact Clifford correction. Literal finite-difference radicals agree as complete sets, including repeated directions. Coordinate gauge follows the independent Rust quotient; no C++ tuple ABI is claimed. The quotient-coordinate images must be a permutation of the complete physical input domain.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "phase_quotient_contracts",
           "test": "original_139_small_signatures_reconstruct_literal_values_and_radicals",
-          "source_sha256": "0363f6838e634872b0b140d9657018e24047f79f62e844f2135e0166fd571bf2"
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
         }
       ]
     },
@@ -1263,7 +1263,7 @@
           "package": "rmagna",
           "target": "phase_quotient_contracts",
           "test": "original_dimension_churn_and_concurrent_queries_preserve_owned_values",
-          "source_sha256": "0363f6838e634872b0b140d9657018e24047f79f62e844f2135e0166fd571bf2"
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
         }
       ]
     },
@@ -1276,7 +1276,7 @@
           "package": "rmagna",
           "target": "phase_quotient_contracts",
           "test": "original_invalid_axes_fail_before_reusing_a_valid_owned_preparation",
-          "source_sha256": "0363f6838e634872b0b140d9657018e24047f79f62e844f2135e0166fd571bf2"
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
         }
       ]
     },
@@ -1289,7 +1289,7 @@
           "package": "rmagna",
           "target": "phase_quotient_contracts",
           "test": "original_signed_even_duplicate_updates_reuse_owned_preparation",
-          "source_sha256": "0363f6838e634872b0b140d9657018e24047f79f62e844f2135e0166fd571bf2"
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
         }
       ]
     },
@@ -1302,7 +1302,7 @@
           "package": "rmagna",
           "target": "phase_quotient_contracts",
           "test": "original_70_singletons_keep_identity_lifts_and_exact_clifford_remainder",
-          "source_sha256": "0363f6838e634872b0b140d9657018e24047f79f62e844f2135e0166fd571bf2"
+          "source_sha256": "051e7f8787f8bc54af5a845f32f83d9be96f7d038f62f0bbf55335e49680ded9"
         }
       ]
     },
