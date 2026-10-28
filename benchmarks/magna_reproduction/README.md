@@ -107,7 +107,8 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 `coverage.json` enumerates every canonical `module.Class.test_method` from the
 pinned 57 core modules (352 cases). Its current assertion mappings cover two
 native circuit cases with three Rust witness tests and all four native-core
-primitive cases with four additional Rust witness tests; the other 346 cases
+primitive cases with four additional Rust witness tests and all five phase-quotient
+optimization cases with five owning Rust witnesses; the other 341 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -315,3 +316,38 @@ mapped Rust witnesses must execute successfully, while the overall gate must
 still return nonzero because 346 core contracts remain unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
+
+## Original phase-quotient assertion contracts
+
+`rmagna/tests/phase_quotient_contracts.rs` translates the five methods in pinned
+`tests/core/test_phase_quotient_optimization.py`. Its literal fixture is produced
+by compiling only that hash-checked module's pure integer `phase` and `normalize`
+functions, with independent finite differences for the small radical ranks:
+
+```sh
+python3 -I -B benchmarks/magna_reproduction/phase_quotient_reference.py \
+  --upstream /absolute/path/to/pinned/magna \
+  --out /absolute/path/to/new-phase-quotient-literals.json
+cargo test --locked -p rmagna --test phase_quotient_contracts
+```
+
+The producer never imports the upstream module or invokes its source-mutating
+test-only native builder. Repeat with `-O` into a new path: the bytes must agree.
+Changed module bytes and existing output paths are rejected in both modes.
+The committed fixture binds the module, producer and source revision identities.
+
+The tests reconstruct all values for 139 small signatures and both original
+passes over 16 four-variable sign updates, including even and cancelling axes.
+They check exact prepared sums, the entire finite radical sets, all 70 singleton
+axes/lifts and their Clifford remainder without exponential expansion, and
+retention after invalid inputs. Original low-rank terms have sum
+`(1+i)*2^(n-2)`; dimensions 3 through 14, then 3 again, and concurrent shared
+queries at widths 3,4,65,129 check dimension separation and owned immutability.
+
+Rust's quotient coordinate convention and immutable preparations replace the
+native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
+cache hits or evictions. Only the singleton identity gauge is compared directly.
+The five assertion-specific ledger mappings leave 341 cases unmapped, so the
+actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
+nonzero incomplete result. These finite contracts establish no paper precision
+or performance result.
