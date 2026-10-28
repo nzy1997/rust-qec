@@ -632,6 +632,92 @@ fn stream_options(retain: bool) -> TaskStreamOptions {
         },
     }
 }
+
+#[test]
+fn native_transport_settings_gate_restore_before_any_controller_callback() {
+    use rmagna::{
+        instrument::QueryPreparation,
+        phase::{NativePhaseOptions, NativeTransportMode},
+    };
+    let calls = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&calls);
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("observe", "transport-v1", move |bits: &[bool]| {
+            observed.fetch_add(1, Ordering::Relaxed);
+            Ok(bits.to_vec())
+        })
+        .unwrap();
+    let source =
+        "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[observe] det[0] -> ctrl[0]\nCH ctrl[0] 1";
+    let task = r#"{"sample_records":[0]}"#;
+    let mut native = NativePhaseOptions::default();
+    native.transport.mode = NativeTransportMode::Prepared;
+    let mut base = EvaluationOptions::default();
+    base.runtime.compile.probability_preparation = QueryPreparation::Native(native);
+    base.runtime.compile.density_preparation = QueryPreparation::Native(native);
+    base.runtime.compile.moment_preparation = QueryPreparation::Native(native);
+    let evaluator = make(source, task, &registry, base, &NoiseSampling::Physical);
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        0,
+        "preparation must not invoke a controller"
+    );
+    let options = stream_options(false);
+    let initial = evaluator.start_stream(options).unwrap();
+    let saved = checkpoint(&initial);
+    for family in 0..3 {
+        for setting in 0..4 {
+            let mut changed = native;
+            match setting {
+                0 => changed.transport.mode = NativeTransportMode::Off,
+                1 => changed.transport.limits.max_terms += 1,
+                2 => changed.transport.limits.max_geometry_words += 1,
+                _ => changed.transport.limits.max_construction_work += 1,
+            }
+            let mut config = base;
+            match family {
+                0 => {
+                    config.runtime.compile.probability_preparation =
+                        QueryPreparation::Native(changed)
+                }
+                1 => config.runtime.compile.density_preparation = QueryPreparation::Native(changed),
+                _ => config.runtime.compile.moment_preparation = QueryPreparation::Native(changed),
+            }
+            let other = make(source, task, &registry, config, &NoiseSampling::Physical);
+            let error = other
+                .restore_stream_json(
+                    &saved,
+                    options,
+                    &declared_identity(),
+                    CheckpointOptions::default(),
+                )
+                .err()
+                .unwrap();
+            assert!(error.field.contains("actual_settings"), "{error:?}");
+            assert_eq!(
+                calls.load(Ordering::Relaxed),
+                0,
+                "incompatible restore must precede callbacks"
+            );
+        }
+    }
+    let mut restored = evaluator
+        .restore_stream_json(
+            &saved,
+            options,
+            &declared_identity(),
+            CheckpointOptions::default(),
+        )
+        .unwrap();
+    assert_eq!(calls.load(Ordering::Relaxed), 0);
+    restored.advance(1).unwrap();
+    assert_eq!(
+        calls.load(Ordering::Relaxed),
+        1,
+        "callback fixture must be live"
+    );
+}
 fn plain(value: &str) -> Value {
     let mut v: Value = serde_json::from_str(value).unwrap();
     let o = v.as_object_mut().unwrap();

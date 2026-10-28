@@ -288,6 +288,12 @@ fn preparation(mode: QueryPreparation) -> Value {
                             "max_work": s.preparation.core.max_work.to_string()}},
                 },
                 "injection": options.injection.map(|i| json!({"max_work": i.max_work.to_string(), "max_geometry_words": i.max_geometry_words, "max_terms": i.max_terms})),
+                "transport": {
+                    "mode": options.transport.mode.name(),
+                    "max_terms": options.transport.limits.max_terms,
+                    "max_geometry_words": options.transport.limits.max_geometry_words,
+                    "max_construction_work": options.transport.limits.max_construction_work.to_string(),
+                },
             })
         }
         QueryPreparation::FixedCatalogue(options) => json!({

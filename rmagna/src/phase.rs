@@ -2,10 +2,14 @@
 
 mod core;
 mod resource;
+mod transport;
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
 pub(crate) use resource::ResourcePreparation;
 pub use resource::{NativePhaseOptions, NativeRouteCounts};
 pub use resource::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
+pub use transport::{
+    NativeTransportCounts, NativeTransportMode, NativeTransportOptions, NativeTransportReceipt,
+};
 
 use crate::gf2::{BitVector, Gf2Error, LinearFactorization, transpose_columns};
 use crate::quadratic::{QuadraticError, QuadraticForm};

@@ -10,7 +10,7 @@ mod support;
 pub use prepared::{
     DensityLayout, PreparedDensityOverlap, PreparedPauliMoment, PreparedProbability,
 };
-pub use support::PreparedProbabilitySupport;
+pub use support::{PreparedProbabilitySupport, ProbabilitySupportExpansion};
 
 use crate::clifford::{CliffordCircuit, CliffordError, CliffordGate};
 use crate::gf2::{AffineSupport, BitVector, Gf2Error};
@@ -389,6 +389,8 @@ pub struct NetworkValue {
     pub value: ExactScalar,
     pub quotient_rank: usize,
     pub terms: usize,
+    /// Actual prepared-native work for this query; absent when it was not used.
+    pub native_transport: Option<crate::catalogue::CatalogueBoundaryStatistics>,
 }
 
 /// The Clifford circuit is built once. Queries close the requested boundaries
@@ -758,6 +760,7 @@ impl CompiledUnitary {
                 value: ExactScalar::zero(),
                 quotient_rank: 0,
                 terms: 0,
+                native_transport: None,
             });
         };
         let word = PauliWord::new(
@@ -897,6 +900,7 @@ fn zero_network_value() -> NetworkValue {
         value: ExactScalar::zero(),
         quotient_rank: 0,
         terms: 0,
+        native_transport: None,
     }
 }
 
@@ -986,6 +990,7 @@ fn close_retained(
         value: prepared.evaluate(arithmetic)?,
         quotient_rank: prepared.quotient_rank(),
         terms: prepared.num_terms(),
+        native_transport: None,
     })
 }
 

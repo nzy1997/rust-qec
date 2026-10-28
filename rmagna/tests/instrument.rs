@@ -1258,6 +1258,7 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                         cached_queries,
                         catalogue_resources: 0,
                         native_routes: Default::default(),
+                        native_transports: Default::default(),
                         fixed_resources: if matches!(mode, QueryPreparation::FixedFibers(_)) {
                             cached_queries
                         } else {
@@ -1276,6 +1277,7 @@ fn target_density_cache_keys_both_ordered_output_layouts_and_reuses_each_plan() 
                     fixed_resources: 0,
                     catalogue_resources: 0,
                     native_routes: Default::default(),
+                    native_transports: Default::default(),
                     maximum_quotient_rank: None,
                     maximum_terms: None,
                     maximum_phase_variables: None,

@@ -237,3 +237,222 @@ fn native_stream_resume_rejects_foreign_policy_options_and_keeps_same_policy() {
     );
     assert_ne!(resumed["metrics"]["estimates"], json!(null));
 }
+
+#[test]
+fn native_transport_controls_resolve_fingerprint_and_report_actual_admission() {
+    let f = Files::new();
+    let caps = [
+        ("--native-transport-max-terms", "max_terms"),
+        (
+            "--native-transport-max-geometry-words",
+            "max_geometry_words",
+        ),
+        (
+            "--native-transport-max-construction-work",
+            "max_construction_work",
+        ),
+    ];
+    for preparation in ["native", "native_injection"] {
+        let off = f.json("run", preparation, &["--shots", "3"]);
+        let prepared = f.json(
+            "run",
+            preparation,
+            &["--shots", "3", "--native-transport", "prepared"],
+        );
+        assert_eq!(
+            off["metrics"]["estimates"],
+            prepared["metrics"]["estimates"]
+        );
+        assert_ne!(
+            off["fingerprints"]["options"],
+            prepared["fingerprints"]["options"]
+        );
+        for family in [
+            "probability_preparation",
+            "density_preparation",
+            "moment_preparation",
+        ] {
+            assert_eq!(
+                off["options"]["compile"][family]["transport"]["mode"],
+                "off"
+            );
+            assert_eq!(
+                prepared["options"]["compile"][family]["transport"]["mode"],
+                "prepared"
+            );
+        }
+        for family in ["probability", "density", "moment", "support"] {
+            let old = &off["compilation"]["retained_caches"][family];
+            let new = &prepared["compilation"]["retained_caches"][family];
+            assert_eq!(old["native_routes"], new["native_routes"]);
+            assert_eq!(
+                old["native_transports"],
+                json!({"prepared":0,"budget_skipped":0})
+            );
+            let count = if family == "support" {
+                1
+            } else {
+                new["fixed_resources"].as_u64().unwrap()
+            };
+            assert_eq!(
+                new["native_transports"],
+                json!({"prepared":count,"budget_skipped":0})
+            );
+        }
+        for (flag, key) in caps {
+            let skipped = f.json(
+                "run",
+                preparation,
+                &["--shots", "3", "--native-transport", "prepared", flag, "0"],
+            );
+            assert_eq!(off["metrics"]["estimates"], skipped["metrics"]["estimates"]);
+            assert_ne!(
+                prepared["fingerprints"]["options"], skipped["fingerprints"]["options"],
+                "{flag}"
+            );
+            for family in [
+                "probability_preparation",
+                "density_preparation",
+                "moment_preparation",
+            ] {
+                let expected = if key == "max_construction_work" {
+                    json!("0")
+                } else {
+                    json!(0)
+                };
+                assert_eq!(
+                    skipped["options"]["compile"][family]["transport"][key],
+                    expected
+                );
+            }
+            for family in ["probability", "density", "moment", "support"] {
+                let old = &prepared["compilation"]["retained_caches"][family];
+                let new = &skipped["compilation"]["retained_caches"][family];
+                assert_eq!(old["native_routes"], new["native_routes"]);
+                let count = if family == "support" {
+                    1
+                } else {
+                    new["fixed_resources"].as_u64().unwrap()
+                };
+                assert_eq!(
+                    new["native_transports"],
+                    json!({"prepared":0,"budget_skipped":count})
+                );
+            }
+            for preparation in ["fixed", "native"] {
+                let output = f.run("validate", preparation, &[flag, "0"]);
+                assert!(!output.status.success());
+                let text = format!(
+                    "{} {}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert!(text.contains("requires"), "{text}");
+            }
+        }
+        let output = f.run("validate", "fixed", &["--native-transport", "prepared"]);
+        assert!(!output.status.success());
+        let output = f.run("validate", preparation, &["--native-transport", "unknown"]);
+        assert!(!output.status.success());
+    }
+}
+
+#[test]
+fn native_transport_stream_identity_rejects_each_changed_setting() {
+    let f = Files::new();
+    let first = f.json(
+        "stream",
+        "native",
+        &[
+            "--shots",
+            "4",
+            "--seed",
+            "71",
+            "--native-transport",
+            "prepared",
+            "--checkpoint-dir",
+            "transport-first",
+            "--stop-after",
+            "1",
+        ],
+    );
+    let checkpoint = first["checkpoint"]["latest_committed"].as_str().unwrap();
+    for changed in [
+        vec!["--native-transport", "off"],
+        vec![
+            "--native-transport",
+            "prepared",
+            "--native-transport-max-terms",
+            "257",
+        ],
+        vec![
+            "--native-transport",
+            "prepared",
+            "--native-transport-max-geometry-words",
+            "16777217",
+        ],
+        vec![
+            "--native-transport",
+            "prepared",
+            "--native-transport-max-construction-work",
+            "1099511627777",
+        ],
+    ] {
+        let mut args = vec![
+            "--shots",
+            "4",
+            "--seed",
+            "71",
+            "--checkpoint-dir",
+            "transport-foreign",
+            "--resume",
+            checkpoint,
+        ];
+        args.extend(changed);
+        let output = f.run("stream", "native", &args);
+        assert!(!output.status.success());
+        let text = format!(
+            "{} {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            text.contains("fingerprint") || text.contains("changed"),
+            "{text}"
+        );
+    }
+    let resumed = f.json(
+        "stream",
+        "native",
+        &[
+            "--shots",
+            "4",
+            "--seed",
+            "71",
+            "--native-transport",
+            "prepared",
+            "--checkpoint-dir",
+            "transport-same",
+            "--resume",
+            checkpoint,
+        ],
+    );
+    let full = f.json(
+        "stream",
+        "native",
+        &[
+            "--shots",
+            "4",
+            "--seed",
+            "71",
+            "--native-transport",
+            "prepared",
+            "--checkpoint-dir",
+            "transport-full",
+        ],
+    );
+    assert_eq!(
+        resumed["metrics"]["estimates"],
+        full["metrics"]["estimates"]
+    );
+}

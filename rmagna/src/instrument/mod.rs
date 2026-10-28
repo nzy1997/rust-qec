@@ -26,7 +26,7 @@ use std::{
     fmt,
     sync::Arc,
 };
-pub use support::PreparedSupportStatistics;
+pub use support::{PreparedSupportStatistics, ReportedSupportExpansion};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InstrumentError {
@@ -308,6 +308,19 @@ impl CompiledInstrument {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Vec<AffineSupport>, InstrumentError> {
+        Ok(self
+            .reported_support_terms_with_statistics(parities, faults, max_terms, arithmetic)?
+            .supports)
+    }
+    /// Retain geometric envelope semantics while exposing actual per-query
+    /// prepared Gaussian work separately from construction/route statistics.
+    pub fn reported_support_terms_with_statistics(
+        &self,
+        parities: &[BitExpr],
+        faults: &[FaultSelection],
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ReportedSupportExpansion, InstrumentError> {
         let indices = (0..self.num_records()).collect::<Vec<_>>();
         let rows = parities
             .iter()
@@ -321,13 +334,14 @@ impl CompiledInstrument {
                 .enumerate()
                 .filter_map(|(j, p)| p.constant.then_some(j)),
         )?;
-        let terms = self.support_queries.evaluate(
+        let expansion = self.support_queries.evaluate_with_statistics(
             &self.inserted(faults, arithmetic)?,
             &self.record_wires,
             max_terms,
             arithmetic,
         )?;
-        terms
+        let supports = expansion
+            .states
             .into_iter()
             .map(|term| {
                 Ok(
@@ -336,7 +350,11 @@ impl CompiledInstrument {
                         .translated(&constants)?,
                 )
             })
-            .collect()
+            .collect::<Result<Vec<_>, InstrumentError>>()?;
+        Ok(ReportedSupportExpansion {
+            supports,
+            native_transport: expansion.native_transport,
+        })
     }
     pub fn prepared_insertion_statistics(&self) -> Option<PreparedInsertionStatistics> {
         self.insertion_catalog

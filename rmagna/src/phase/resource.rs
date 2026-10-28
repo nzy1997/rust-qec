@@ -1,8 +1,11 @@
 //! One immutable exact resource with explicit catalogue preference and fallback.
-use super::{ParityPhase, PhaseError};
+use super::{
+    NativeTransportMode, NativeTransportOptions, NativeTransportReceipt, ParityPhase, PhaseError,
+};
 use crate::catalogue::{CataloguePreparationOptions, PhaseCatalogue, PreparedCataloguePhase};
 use crate::catalogue::{
     FrozenPhasePlan, PhaseInjectionOptions, PhaseSelectionOptions, PhaseSelectionRoute,
+    PreparedCatalogueBoundary,
 };
 use crate::fibers::{FiberOptions, PreparedCliffordFibers};
 use crate::quadratic::QuadraticForm;
@@ -21,6 +24,7 @@ pub struct PhaseResourceOptions {
 pub struct NativePhaseOptions {
     pub selection: PhaseSelectionOptions,
     pub injection: Option<PhaseInjectionOptions>,
+    pub transport: NativeTransportOptions,
 }
 /// Counts actual retained routes. An injected resource counts only as injected.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -53,6 +57,8 @@ impl NativeRouteCounts {
     }
 }
 #[derive(Clone, Copy)]
+// Keep the same allocation-free Copy configuration as QueryPreparation.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ResourcePreparation {
     Catalogue(PhaseResourceOptions),
     Native(NativePhaseOptions),
@@ -100,6 +106,8 @@ enum Decomposition {
 /// update errors are returned directly, without attempting another strategy.
 pub struct PreparedPhaseResource {
     decomposition: Decomposition,
+    native_transport_options: Option<NativeTransportOptions>,
+    native_transport_receipt: Option<NativeTransportReceipt>,
 }
 impl PreparedPhaseResource {
     /// Freeze native direct/product/Walsh selection and optional exact injection.
@@ -126,12 +134,66 @@ impl PreparedPhaseResource {
         .map_err(PhaseError::Catalogue)?;
         Ok(Self {
             decomposition: Decomposition::Native(Box::new(plan)),
+            native_transport_options: Some(options.transport),
+            native_transport_receipt: None,
         })
     }
     pub fn native_resource(&self) -> Option<&FrozenPhasePlan> {
         match &self.decomposition {
             Decomposition::Native(plan) => Some(plan),
             _ => None,
+        }
+    }
+    pub fn native_transport_receipt(&self) -> Option<NativeTransportReceipt> {
+        self.native_transport_receipt
+    }
+    pub(crate) fn native_transport_requested(&self) -> bool {
+        self.native_transport_options
+            .is_some_and(|o| o.mode == NativeTransportMode::Prepared)
+    }
+    /// Freeze only the requested acceleration. A quota stop retains this exact
+    /// selected resource; signature, layout and arithmetic errors stay errors.
+    pub(crate) fn prepare_native_transport(
+        &mut self,
+        reference: &ParityPhase,
+        boundary: &AffineKet,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<PreparedCatalogueBoundary>, PhaseError> {
+        let Some(options) = self.native_transport_options else {
+            return Ok(None);
+        };
+        if options.mode == NativeTransportMode::Off {
+            return Ok(None);
+        }
+        let result = self
+            .native_resource()
+            .expect("native transport options belong to a native resource")
+            .prepare_boundary(reference, boundary, &options.limits, arithmetic);
+        match result {
+            Ok(plan) => {
+                self.native_transport_receipt =
+                    Some(NativeTransportReceipt::Prepared(plan.usage()));
+                Ok(Some(plan))
+            }
+            Err(PhaseError::ResourceLimit {
+                option,
+                limit,
+                required,
+            }) if matches!(
+                option,
+                "catalogue_boundary.max_terms"
+                    | "catalogue_boundary.max_geometry_words"
+                    | "catalogue_boundary.max_construction_work"
+            ) =>
+            {
+                self.native_transport_receipt = Some(NativeTransportReceipt::BudgetSkipped {
+                    option,
+                    limit,
+                    required,
+                });
+                Ok(None)
+            }
+            Err(error) => Err(error),
         }
     }
     /// An absent or empty catalogue selects fibers directly. A supplied matching
@@ -152,6 +214,8 @@ impl PreparedPhaseResource {
             {
                 return Ok(Self {
                     decomposition: Decomposition::Catalogue(resource),
+                    native_transport_options: None,
+                    native_transport_receipt: None,
                 });
             }
         }
@@ -161,6 +225,8 @@ impl PreparedPhaseResource {
                 max_terms,
                 options.fibers,
             )?),
+            native_transport_options: None,
+            native_transport_receipt: None,
         })
     }
     pub fn kind(&self) -> PhaseResourceKind {

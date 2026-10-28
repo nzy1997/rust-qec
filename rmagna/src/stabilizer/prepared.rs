@@ -24,7 +24,7 @@ pub struct PreparedAffineContraction {
     steps: Vec<Step>,
     columns: Vec<BitVector>,
     keep: Vec<usize>,
-    upper: Vec<BitVector>,
+    output_phase: QuadraticForm,
 }
 impl PreparedAffineContraction {
     pub fn new(reference: &AffineKet) -> Result<Self, StabilizerError> {
@@ -77,13 +77,23 @@ impl PreparedAffineContraction {
             restricted,
             steps,
             columns,
-            upper: remaining.upper().to_vec(),
+            output_phase: QuadraticForm::new(
+                0,
+                remaining.linear().to_vec(),
+                remaining.upper().to_vec(),
+            )?,
             keep,
         })
     }
 
     pub(crate) fn output_columns(&self) -> &[BitVector] {
         &self.columns
+    }
+
+    /// Structural reference only: no scalar contraction, outcome or entropy.
+    /// It remains useful when the reference Gaussian itself vanishes.
+    pub(crate) fn output_reference_phase(&self) -> &QuadraticForm {
+        &self.output_phase
     }
 
     /// Contract arbitrary quadratic phase updates on the same boundary columns.
@@ -158,7 +168,7 @@ impl PreparedAffineContraction {
         let phase = QuadraticForm::new(
             0,
             self.keep.iter().map(|&j| values.linear[j]).collect(),
-            self.upper.clone(),
+            self.output_phase.upper().to_vec(),
         )?;
         Ok(Some(AffineKet::new(
             offset,

@@ -191,6 +191,7 @@ mod tests {
                     fixed_resources: 0,
                     catalogue_resources: 0,
                     native_routes: Default::default(),
+                    native_transports: Default::default(),
                     maximum_quotient_rank: None,
                     maximum_terms: None,
                     maximum_phase_variables: None,

@@ -1,7 +1,7 @@
 //! Unselected diagonal probability parents retaining computational labels.
 use super::phase_map::PhaseRestriction;
 use super::*;
-use crate::catalogue::PhaseCatalogue;
+use crate::catalogue::{CatalogueBoundaryStatistics, PhaseCatalogue, PreparedCatalogueBoundary};
 use crate::fibers::FiberOptions;
 use crate::phase::{
     NativePhaseOptions, PhaseResourceOptions, PreparedPhaseResource, ResourcePreparation,
@@ -21,7 +21,14 @@ pub struct PreparedProbabilitySupport {
     empty_phase: ParityPhase,
     phase_map: PhaseRestriction,
     resource: PreparedPhaseResource,
+    native_transport: Option<PreparedCatalogueBoundary>,
     clifford: Option<CliffordSupport>,
+}
+/// Exact labelled probability terms and actual per-query native Gaussian work.
+#[derive(Debug)]
+pub struct ProbabilitySupportExpansion {
+    pub states: Vec<AffineKet>,
+    pub native_transport: Option<CatalogueBoundaryStatistics>,
 }
 struct CliffordSupport {
     phase: ParityPhase,
@@ -128,7 +135,20 @@ impl CompiledUnitary {
             &[(&empty_phase, false), (phase, false), (phase, true)],
             &BitVector::zeros(keep.len())?,
         )?;
-        let resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        let mut resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        let transport_requested = resource.native_transport_requested();
+        let native_transport = if transport_requested {
+            let symbolic = AffineKet::new(
+                BitVector::zeros(keep.len())?,
+                contraction.output_columns().to_vec(),
+                contraction.output_reference_phase().clone(),
+                ExactScalar::one(),
+            )?
+            .retain_boundary(&(0..outputs.len()).collect::<Vec<_>>())?;
+            resource.prepare_native_transport(&phase, &symbolic, arithmetic)?
+        } else {
+            None
+        };
         let mut prepared = PreparedProbabilitySupport {
             program: Arc::clone(&self.program),
             projection,
@@ -138,9 +158,14 @@ impl CompiledUnitary {
             empty_phase,
             phase_map,
             resource,
+            native_transport,
             clifford: None,
         };
-        prepared.prepare_clifford(&joint, self.width(), arithmetic)?;
+        // The explicit prepared policy creates a symbolic reference only.
+        // Off and non-native modes retain their existing Clifford convention.
+        if !transport_requested {
+            prepared.prepare_clifford(&joint, self.width(), arithmetic)?;
+        }
         Ok(prepared)
     }
 }
@@ -214,6 +239,16 @@ impl PreparedProbabilitySupport {
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Vec<AffineKet>, UnitaryError> {
+        Ok(self
+            .evaluate_with_statistics(state, max_terms, arithmetic)?
+            .states)
+    }
+    pub fn evaluate_with_statistics(
+        &self,
+        state: &CompiledUnitary,
+        max_terms: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<ProbabilitySupportExpansion, UnitaryError> {
         if !Arc::ptr_eq(&self.program, &state.program) {
             return Err(UnitaryError::IncompatibleProgram);
         }
@@ -225,13 +260,19 @@ impl PreparedProbabilitySupport {
             .projection
             .project(&joint, &BitVector::zeros(state.width())?)?
         else {
-            return Ok(vec![]);
+            return Ok(ProbabilitySupportExpansion {
+                states: vec![],
+                native_transport: None,
+            });
         };
         let Some(ket) = self
             .contraction
             .contract(&self.boundary_map.apply(&ket)?, arithmetic)?
         else {
-            return Ok(vec![]);
+            return Ok(ProbabilitySupportExpansion {
+                states: vec![],
+                native_transport: None,
+            });
         };
         let phase = self.phase_map.apply(
             &[
@@ -242,6 +283,13 @@ impl PreparedProbabilitySupport {
             ket.offset(),
         )?;
         let labelled = ket.retain_boundary(&(0..self.labels).collect::<Vec<_>>())?;
+        if let Some(plan) = &self.native_transport {
+            let expansion = plan.expand(&phase, &labelled, arithmetic)?;
+            return Ok(ProbabilitySupportExpansion {
+                states: expansion.states,
+                native_transport: Some(expansion.statistics),
+            });
+        }
         if let Some(prepared) = &self.clifford {
             // Certify only the changing correction. Common odd-axis terms
             // cancel before Clifford conversion; recertifying the complete
@@ -264,9 +312,15 @@ impl PreparedProbabilitySupport {
                 Err(StabilizerError::IncompatibleContraction) => labelled.contract(arithmetic)?,
                 Err(error) => return Err(error.into()),
             };
-            return Ok(contracted.into_iter().collect());
+            return Ok(ProbabilitySupportExpansion {
+                states: contracted.into_iter().collect(),
+                native_transport: None,
+            });
         }
-        Ok(self.resource.expand(&phase, &labelled, arithmetic)?)
+        Ok(ProbabilitySupportExpansion {
+            states: self.resource.expand(&phase, &labelled, arithmetic)?,
+            native_transport: None,
+        })
     }
 }
 
