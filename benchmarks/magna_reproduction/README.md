@@ -165,9 +165,11 @@ process actually ran, so original compiler/run receipts require independent
 review. The synthetic run strings in unit tests are parser fixtures only.
 
 Current declaration validation deliberately accepts only explicit unconditional
-top-level `#[test]` functions in `rmagna/tests/<target>.rs`. Nested, macro-generated,
-configured, ignored or otherwise unsupported declarations need an explicit
-validator extension before becoming coverage witnesses. This restriction avoids
+top-level `#[test]` functions with ordinary ASCII identifiers in
+`rmagna/tests/<target>.rs`. Raw identifiers (including `r#name`), non-ASCII names,
+nested, macro-generated, configured, ignored or otherwise unsupported declarations
+need an explicit validator extension before becoming coverage witnesses.
+Unsupported identifier prefixes never qualify as shorter test names. This restriction avoids
 inferring test existence from a string or comment. Source declarations establish
 existence; only matching actual execution establishes a pass.
 

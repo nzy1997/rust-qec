@@ -248,6 +248,91 @@ mod nested { #[test] fn inside() {} }
         with self.assertRaises(coverage.CoverageError):
             rust.source_identity(self.repo)
 
+    def test_raw_function_identifiers_do_not_create_shorter_witnesses(self):
+        for declaration, listed_name in (("r#actual_contract", "actual_contract"),
+                                         ("r#match", "r#match"), ("r#fn", "r#fn"), ("r#r", "r")):
+            with self.subTest(declaration=declaration):
+                self.test_source.write_text(f"#[test]\nfn {declaration}() {{ assert_eq!(2 + 3, 5); }}\n")
+                self.assertEqual(rust.flat_tests(self.test_source.read_text()), set())
+                for requested in {listed_name, "r"}:
+                    with self.assertRaises(coverage.CoverageError):
+                        rust.witness(self.repo, {"package": "rmagna", "target": "witness", "test": requested,
+                                                 "source_sha256": rust.sha(self.test_source)})
+
+    def test_non_ascii_function_names_do_not_create_ascii_prefix_witnesses(self):
+        for declaration, prefix in (("check_é", "check_"), ("r#check_é", "r"),
+                                    ("r#é", "r"), ("check_e\u0301", "check_e")):
+            with self.subTest(declaration=declaration):
+                self.test_source.write_text(f"#[test]\nfn {declaration}() {{ assert_eq!(2 + 3, 5); }}\n")
+                self.assertEqual(rust.flat_tests(self.test_source.read_text()), set())
+                with self.assertRaises(coverage.CoverageError):
+                    rust.witness(self.repo, {"package": "rmagna", "target": "witness", "test": prefix,
+                                             "source_sha256": rust.sha(self.test_source)})
+
+    def test_function_pointer_items_do_not_hide_supported_flat_tests(self):
+        source = "type Unary = fn(u8) -> u8;\ntype Binary = fn(u8, u8) -> u8;\n#[test]\nfn checks_contract() { assert_eq!(2 + 3, 5); }\n"
+        self.assertEqual(rust.flat_tests(source), {"checks_contract"})
+
+    def test_mixed_target_failures_preserve_passes_in_both_orders(self):
+        failing_source = self.repo / "rmagna/tests/failing_witness.rs"
+        failing_source.write_text('#[test]\nfn fails_contract() { panic!("synthetic parser fixture"); }\n')
+        self.ledger["cases"][1] = {"id": self.ledger["cases"][1]["id"], "status": "verified",
+                                   "contract": "Observe the synthetic failure contract separately from the passing target.",
+                                   "rust_tests": [{"package": "rmagna", "target": "failing_witness", "test": "fails_contract",
+                                                   "source_sha256": rust.sha(failing_source)}]}
+        failing = copy.deepcopy(self.run["targets"][0])
+        failing["target"] = "failing_witness"
+        failing["list"]["stdout"] = "fails_contract: test\n\n1 test, 0 benchmarks\n"
+        failing["run"] = {"stdout": "running 1 test\ntest fails_contract ... FAILED\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n",
+                          "stderr": "synthetic parser failure", "exit_code": 101}
+        for targets in ([self.run["targets"][0], failing], [failing, self.run["targets"][0]]):
+            with self.subTest(order=[row["target"] for row in targets]):
+                evidence = {"schema": "rstim.magna-rust-tests.v1", "source_files": rust.source_identity(self.repo),
+                            "targets": copy.deepcopy(targets)}
+                report = self.check(run=evidence)
+                self.assertTrue(report["inventory_valid"])
+                self.assertFalse(report["parity_complete"])
+                self.assertEqual(report["rust_execution"]["passed"], ["rmagna::witness::checks_contract"])
+                self.assertEqual(report["rust_execution"]["failed"], ["rmagna::failing_witness::fails_contract"])
+                self.assertEqual(report["rust_execution"]["missing"], [])
+                self.assertTrue(report["rust_execution"]["errors"])
+
+    def test_failed_target_preserves_its_own_observed_passing_tests(self):
+        self.test_source.write_text('#[test]\nfn checks_contract() { assert_eq!(2 + 3, 5); }\n#[test]\nfn fails_contract() { panic!("synthetic parser fixture"); }\n')
+        self.complete_mapping()
+        for row, name in zip(self.ledger["cases"], ("checks_contract", "fails_contract")):
+            row["rust_tests"][0].update(test=name, source_sha256=rust.sha(self.test_source))
+        evidence = copy.deepcopy(self.run)
+        evidence["source_files"] = rust.source_identity(self.repo)
+        evidence["targets"][0]["list"]["stdout"] = "checks_contract: test\nfails_contract: test\n\n2 tests, 0 benchmarks\n"
+        evidence["targets"][0]["run"] = {"stdout": "running 2 tests\ntest checks_contract ... ok\ntest fails_contract ... FAILED\n\ntest result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n",
+                                         "stderr": "synthetic parser failure", "exit_code": 101}
+        report = self.check(run=evidence)
+        self.assertFalse(report["parity_complete"])
+        self.assertEqual(report["rust_execution"]["passed"], ["rmagna::witness::checks_contract"])
+        self.assertEqual(report["rust_execution"]["failed"], ["rmagna::witness::fails_contract"])
+        self.assertEqual(report["rust_execution"]["missing"], [])
+        self.assertTrue(report["rust_execution"]["errors"])
+
+    def test_invalid_observations_never_create_passing_witnesses(self):
+        self.complete_mapping()
+        for kind in ("source", "counts", "exit", "list"):
+            with self.subTest(kind=kind):
+                evidence = copy.deepcopy(self.run)
+                if kind == "source":
+                    evidence["source_files"]["Cargo.lock"] = "0" * 64
+                elif kind == "counts":
+                    evidence["targets"][0]["run"]["stdout"] = evidence["targets"][0]["run"]["stdout"].replace("1 passed", "2 passed")
+                elif kind == "exit":
+                    evidence["targets"][0]["run"]["exit_code"] = 101
+                else:
+                    evidence["targets"][0]["list"]["stdout"] = "invented: test\n\n1 test, 0 benchmarks\n"
+                report = self.check(run=evidence)
+                self.assertTrue(report["inventory_valid"])
+                self.assertFalse(report["parity_complete"])
+                self.assertEqual(report["rust_execution"]["passed"], [])
+                self.assertTrue(report["rust_execution"]["errors"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -93,7 +93,7 @@ def rust_tokens(source: str) -> list[str]:
             i += char.end()
             tokens.append("LITERAL")
             continue
-        word = re.match(r"[A-Za-z_][A-Za-z_0-9]*", source[i:])
+        word = re.match(r"(?:r#)?[A-Za-z_][A-Za-z_0-9]*", source[i:])
         if word:
             tokens.append(word[0])
             i += word.end()
@@ -106,8 +106,9 @@ def rust_tokens(source: str) -> list[str]:
 def flat_tests(source: str) -> set[str]:
     """Only explicit, unconditional, top-level #[test] functions are witnesses.
 
-    Inline modules, macros, cfg/ignore attributes and generated tests require a
-    future explicit extension; a text match inside one is never accepted.
+    Raw/non-ASCII function identifiers, inline modules, macros, cfg/ignore
+    attributes and generated tests require a future explicit extension; an
+    identifier prefix or text match inside one is never accepted.
     """
     tokens = rust_tokens(source)
     delimiters = []
@@ -130,12 +131,17 @@ def flat_tests(source: str) -> set[str]:
             i = end
             continue
         if not delimiters and token == "fn":
-            require(i + 1 < len(tokens), "missing Rust function name")
-            name = tokens[i + 1]
-            require(name not in functions, f"ambiguous Rust function: {name}")
-            functions.add(name)
-            if attributes == [["test"]]:
-                names.add(name)
+            # A complete ordinary ASCII identifier must precede the parameter
+            # list. Raw/Unicode prefixes and function-pointer types are not
+            # supported function declarations and must never invent a name.
+            if (i + 2 < len(tokens)
+                    and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", tokens[i + 1])
+                    and tokens[i + 2] == "("):
+                name = tokens[i + 1]
+                require(name not in functions, f"ambiguous Rust function: {name}")
+                functions.add(name)
+                if attributes == [["test"]]:
+                    names.add(name)
             attributes = []
         elif not delimiters and token not in {"pub", "async", "unsafe", "extern"}:
             attributes = []
@@ -238,7 +244,7 @@ def execution(root: Path, supplied: object, required: set[tuple[str, str]]) -> d
     for target, name in sorted(required):
         label = f"rmagna::{target}::{name}"
         outcome = outcomes.get((target, name))
-        if outcome == "ok" and not result["errors"]:
+        if outcome == "ok":
             result["passed"].append(label)
         elif outcome == "FAILED":
             result["failed"].append(label)
