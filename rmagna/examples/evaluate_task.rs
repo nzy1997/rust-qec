@@ -1,6 +1,9 @@
 //! Evaluate one prescribed no-fault task draw with optional explicit decoder bindings.
 use rmagna::circuit::{ParseOptions, parse_circuit};
 use rmagna::field::ExactField;
+use rmagna::instrument::{PreparedQueryStatistics, QueryPreparation};
+#[path = "../src/cli/args/native.rs"]
+mod native_args;
 use rmagna::noise::{RandomSource, SplitMix64};
 use std::io::Write;
 struct Entropy {
@@ -59,6 +62,8 @@ pub fn run(
     let mut fixed = None;
     let mut probability_mode = "cold".to_owned();
     let mut density_mode = "cold".to_owned();
+    let mut moment_mode = "cold".to_owned();
+    let mut native_flags = std::collections::BTreeMap::new();
     let mut insertion_mode = "direct".to_owned();
     let mut insertion_bytes = None;
     let mut insertion_entries = None;
@@ -68,6 +73,21 @@ pub fn run(
     let mut module_root = None;
     while let Some(argument) = args.next() {
         match argument.as_str() {
+            flag if native_args::FLAGS.contains(&flag) => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| format!("missing value for {flag}"))?;
+                if native_flags.insert(flag.to_owned(), value).is_some() {
+                    return Err(format!("duplicate option {flag}").into());
+                }
+            }
+            "--moment-preparation" => {
+                moment_mode = args.next().ok_or("missing moment preparation mode")?;
+            }
+            "--max-prepared-moments" => {
+                options.runtime.compile.max_prepared_moments =
+                    args.next().ok_or("missing moment query limit")?.parse()?;
+            }
             "--insertion-preparation" => {
                 insertion_mode = args.next().ok_or("missing insertion preparation mode")?
             }
@@ -174,38 +194,46 @@ pub fn run(
         "prepared" => rmagna::instrument::InsertionPreparation::Prepared(insertion_options),
         _ => return Err("insertion preparation must be direct or prepared".into()),
     };
-    options.runtime.compile.probability_preparation = match probability_mode.as_str() {
-        "cold" => rmagna::instrument::ProbabilityPreparation::Cold,
-        "trace" => rmagna::instrument::ProbabilityPreparation::Trace,
-        "fixed" => rmagna::instrument::ProbabilityPreparation::FixedFibers(fiber_options),
-        "catalogue" => rmagna::instrument::ProbabilityPreparation::FixedCatalogue(
-            rmagna::phase::PhaseResourceOptions {
+    let modes = [
+        probability_mode.as_str(),
+        density_mode.as_str(),
+        moment_mode.as_str(),
+    ];
+    let native_options = native_args::configure(&mut native_flags, &modes)?;
+    let preparation = |mode: &str| -> Result<QueryPreparation, String> {
+        Ok(match mode {
+            "cold" => QueryPreparation::Cold,
+            "trace" => QueryPreparation::Trace,
+            "fixed" => QueryPreparation::FixedFibers(fiber_options),
+            "catalogue" => QueryPreparation::FixedCatalogue(rmagna::phase::PhaseResourceOptions {
                 fibers: fiber_options,
                 ..Default::default()
-            },
-        ),
-        _ => return Err("probability preparation must be cold, trace, fixed or catalogue".into()),
+            }),
+            "native" | "native_injection" => {
+                let mut policy = native_options;
+                if mode == "native" {
+                    policy.injection = None;
+                }
+                QueryPreparation::Native(policy)
+            }
+            _ => {
+                return Err(
+                    "preparation must be cold, trace, fixed, catalogue, native or native_injection"
+                        .into(),
+                );
+            }
+        })
     };
-    options.runtime.compile.density_preparation = match density_mode.as_str() {
-        "cold" => rmagna::instrument::QueryPreparation::Cold,
-        "trace" => rmagna::instrument::QueryPreparation::Trace,
-        "fixed" => rmagna::instrument::QueryPreparation::FixedFibers(fiber_options),
-        "catalogue" => rmagna::instrument::QueryPreparation::FixedCatalogue(
-            rmagna::phase::PhaseResourceOptions {
-                fibers: fiber_options,
-                ..Default::default()
-            },
-        ),
-        _ => return Err("density preparation must be cold, trace, fixed or catalogue".into()),
-    };
-    if !matches!(probability_mode.as_str(), "fixed" | "catalogue")
-        && !matches!(density_mode.as_str(), "fixed" | "catalogue")
+    options.runtime.compile.probability_preparation = preparation(&probability_mode)?;
+    options.runtime.compile.density_preparation = preparation(&density_mode)?;
+    options.runtime.compile.moment_preparation = preparation(&moment_mode)?;
+    let uses_fibers = modes
+        .iter()
+        .any(|mode| matches!(*mode, "fixed" | "catalogue"));
+    if !uses_fibers
         && fiber_options.max_search_rank != rmagna::fibers::FiberOptions::default().max_search_rank
     {
-        return Err(
-            "fiber search rank requires fixed or catalogue probability or density preparation"
-                .into(),
-        );
+        return Err("fiber search rank requires fixed or catalogue preparation".into());
     }
     let mut registry = ControllerRegistry::default();
     let worker = if let Some(config) = controllers {
@@ -262,6 +290,7 @@ pub fn run(
         evaluator.prepared_probability_statistics()?,
         evaluator.prepared_density_statistics()?,
         evaluator.prepared_insertion_statistics(),
+        evaluator.prepared_moment_statistics()?,
     );
     let mut replay_ms = Vec::new();
     for _ in 0..warm_replays {
@@ -277,18 +306,32 @@ pub fn run(
             evaluator.prepared_probability_statistics()?,
             evaluator.prepared_density_statistics()?,
             evaluator.prepared_insertion_statistics(),
+            evaluator.prepared_moment_statistics()?,
         ) != first_cache
         {
-            return Err("warm replay changed retained probability or density cache counts".into());
+            return Err("warm replay changed retained query cache counts".into());
         }
         replay_ms.push(elapsed);
     }
     let warm = (warm_replays > 0).then(|| serde_json::json!({"count":warm_replays,"query_ms":replay_ms,
         "cache_unchanged":true,"scope":"same-assignment replay with reset entropy/history; not independent Monte Carlo or formal performance rounds"}));
-    let probability_cache = first_cache.0.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,"maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables}));
-    let density_cache = first_cache.1.map(|s|
-        serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,"maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables}));
+    let cache = |statistics: Option<PreparedQueryStatistics>, mode: QueryPreparation| {
+        statistics.map(|s| {
+        let mut value = serde_json::json!({"cached_queries":s.cached_queries,"fixed_resources":s.fixed_resources,"catalogue_resources":s.catalogue_resources,"maximum_quotient_rank":s.maximum_quotient_rank,"maximum_terms":s.maximum_terms,"maximum_phase_variables":s.maximum_phase_variables});
+        // These are actual retained outcomes, separate from query execution counts.
+        if matches!(mode, QueryPreparation::Native(_)) {
+        value["native_routes"] = serde_json::json!({"direct":s.native_routes.direct,"product":s.native_routes.product,"walsh":s.native_routes.walsh,"injected":s.native_routes.injected,"injection_budget_skips":s.native_routes.injection_budget_skips});
+        value["native_transports"] = serde_json::json!({"prepared":s.native_transports.prepared,"budget_skipped":s.native_transports.budget_skipped});
+        }
+        value
+    })
+    };
+    let probability_cache = cache(
+        first_cache.0,
+        options.runtime.compile.probability_preparation,
+    );
+    let density_cache = cache(first_cache.1, options.runtime.compile.density_preparation);
+    let moment_cache = cache(first_cache.3, options.runtime.compile.moment_preparation);
     let insertion_catalog=first_cache.2.map(|s|serde_json::json!({"catalog_entries":s.catalog_entries,"estimated_peak_bytes":s.estimated_peak_bytes}));
     let compilation_scope = if evaluator.sampled_history() {
         match options.runtime.strategy {
@@ -306,7 +349,7 @@ pub fn run(
     writeln!(
         output,
         "{}",
-        serde_json::json!({"prepared_insertions":insertion_catalog,"compilation":compilation,"prepared_density_cache":density_cache,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"insertion_preparation":insertion_mode,"max_insertion_table_bytes":if insertion_mode=="prepared"{Some(insertion_options.max_table_bytes)}else{None},"max_insertion_catalog_entries":if insertion_mode=="prepared"{Some(insertion_options.max_catalog_entries)}else{None},"density_preparation":options.runtime.compile.density_preparation.name(),"max_prepared_densities":options.runtime.compile.max_prepared_densities,"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if options.runtime.compile.probability_preparation.is_fixed() || options.runtime.compile.density_preparation.is_fixed(){Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
+        serde_json::json!({"prepared_moment_cache":moment_cache,"prepared_insertions":insertion_catalog,"compilation":compilation,"prepared_density_cache":density_cache,"warm_replays":warm,"prepared_probability_cache":probability_cache,"configuration":{"probability_preparation_options":options.runtime.compile.probability_preparation.configuration(),"density_preparation_options":options.runtime.compile.density_preparation.configuration(),"moment_preparation_options":options.runtime.compile.moment_preparation.configuration(),"moment_preparation":options.runtime.compile.moment_preparation.name(),"max_prepared_moments":options.runtime.compile.max_prepared_moments,"insertion_preparation":insertion_mode,"max_insertion_table_bytes":if insertion_mode=="prepared"{Some(insertion_options.max_table_bytes)}else{None},"max_insertion_catalog_entries":if insertion_mode=="prepared"{Some(insertion_options.max_catalog_entries)}else{None},"density_preparation":options.runtime.compile.density_preparation.name(),"max_prepared_densities":options.runtime.compile.max_prepared_densities,"seed":seed,"constant_word":fixed,"warm_replays":warm_replays,"probability_preparation":options.runtime.compile.probability_preparation.name(),"fiber_search_rank":if uses_fibers{Some(fiber_options.max_search_rank)}else{None},"max_prepared_probabilities":options.runtime.compile.max_prepared_probabilities,"max_terms":options.runtime.sampling.max_terms,"causal_strategy":format!("{:?}",options.runtime.strategy),"history_sampler":format!("{:?}",options.runtime.history_sampler)},"network_compilations":draw.network_compilations,"history_queries":draw.history_queries,"decoder_manifest":worker.as_ref().map(ControllerProcess::manifest),"controller_calls":draw.controller_calls.iter().map(|call|serde_json::json!({"name":call.name,"inputs":call.inputs,"outputs":call.outputs})).collect::<Vec<_>>(),"resources":{"acceptance":{"quotient_rank":draw.acceptance_resources.quotient_rank,"terms":draw.acceptance_resources.terms},"target":draw.target_resources.map(|r|serde_json::json!({"quotient_rank":r.quotient_rank,"terms":r.terms}))},"accepted":field(&draw.accepted),"error":field(&draw.error),"target_success":draw.target_success.as_ref().map(field),"moments":draw.moments.iter().map(field).collect::<Vec<_>>(),"history_mass":scalar(&draw.history_mass),"history_proposal_mass":draw.history_proposal_mass.as_ref().map(scalar),"history_weight":field(&draw.history_weight),"raw_acceptance":scalar(&draw.raw_acceptance),"raw_error":scalar(&draw.raw_error),"raw_target_success":draw.raw_target_success.as_ref().map(scalar),"target_normalization":draw.target_normalization.as_ref().map(scalar),"sampled_records":draw.sampled_records,"compile_ms":compile_ms,"query_ms":query_ms})
     )?;
     Ok(())
 }
