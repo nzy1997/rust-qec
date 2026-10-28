@@ -1,0 +1,1868 @@
+{
+  "schema": "rstim.magna-coverage.v1",
+  "reference_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "modules": {
+    "test_boundary_sampling.py": "8b3723d3b9efc6e893289ae9c2d0efa5c16a24fd97e19c1cf5cb4abbf95a494d",
+    "test_capped_affine.py": "5cb6f0e96abcf57308316343178ca3d9cd3e78ff161951615a0e68e2cf58a066",
+    "test_circuit_file.py": "34f45e3399f5d16e3f3aba5db194cd6c254dee1652643ff70228ce39c2fadd4b",
+    "test_conditional_noise.py": "a70fe3b3cbef10b0fe67deb11eb8e8eb53b762d2ecda30b83ff4e5b163262f54",
+    "test_deferred_feedback.py": "e1a29847c59dabfd6b2e79d2f1f6da8b7a4751a29f555dbdbc5993b9050404dd",
+    "test_detector_feedback.py": "e6a6d944726562a5ec7dc5c2c69b5c6b97b8816f467dfd0885a47da7376ba4a9",
+    "test_feedback_incidence.py": "b80facd5d6d066e6d4a0b141cc46c740799e47ea138ceeb8a0d7e66b01f8734e",
+    "test_file_api.py": "03e38048973e84253d6df3f90e8672bb4ae1f07f7f5b0168c3057530e0256e30",
+    "test_file_batch.py": "a61d5af0ef3164b71eb248091b4de41facb2b2abf1b8ec09c32afcdbf74f203d",
+    "test_file_native.py": "b078965d22ae894eb7b1bb9d16000d49ae43f7ccd5727074d05802d7b572e4a1",
+    "test_file_reuse.py": "fc52e7b895ab575d4a7a3a1ccfae6a59071165d144d4b3220368c7bb93eb7037",
+    "test_gf2_kernel.py": "127a6135544447df97286f8b919f270260dd5ae9260011916bee3cfcd44df6f6",
+    "test_global_sampling.py": "1df64a3b5b38185f753e4659dfc90b6757fde1c797020ddea36666cabed2d2b3",
+    "test_history_efficiency.py": "93c03dcd25f3b6e2dea7274ec02babbc3e32b77ebe5abac2a530b110cba98356",
+    "test_importance_sampling.py": "fc24b087ed08c9dcd35a8f6befe373d6b5a23c5709749dae207f2b1a0fe75caf",
+    "test_incremental_history.py": "e1169e3a669fd628fb2f69bccb2a80e8034299b0c9e38ef66443b899ddc1ffb7",
+    "test_installed_interface.py": "d42494ea253a85a4e004eae2d219233caccff004a7e00a9c79a36dbb5323169d",
+    "test_kernel_contract.py": "8118024904c89019028d756dc412974f67347ba7c5809efdfd05b5ac26ec4307",
+    "test_low_weight.py": "e0a2ced00cdbab0aaac430547bfa7131fb7038d9f7a3f263921363d060a05c5f",
+    "test_native_batch.py": "b415b56cfe36c49dd202f3fe04d6261f633d6031af6856e56e5eae5be9bda2f0",
+    "test_native_boundary_service.py": "24959774374e0ea4dab4f102cdfa71f61db9757fce03b800b479866d8e6c1359",
+    "test_native_causal.py": "ed0d2e2d4bcd2d1317be3dd7118bc4dd38d8f6d012bb6f20aff449b1e3268de3",
+    "test_native_compact_suffix.py": "f8089fed9fae7548577daa65a53584fc65ccdd42334bf3c14d1fcdcdba17dd3e",
+    "test_native_core.py": "0e272531ed7b28b1f1ad6369da7864728bec05b1da7e0b34fdd539035943475c",
+    "test_native_global_fastpath.py": "ee4b59147bd36e0bdfd5d871c740c699094bf450324be46313c410f983285ac5",
+    "test_native_global_ownership.py": "51cd28f9cf3d831bfc922feb72891f84e6a40e7f919a71ff46a4e5f7cd63fdf9",
+    "test_native_global_phase.py": "b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50",
+    "test_native_proposals.py": "cb106ec6360b8bdf2d6e6463e98c379731e57049fc9bab692402d72a46377772",
+    "test_native_records.py": "f7b316c528d5c5f886cdbe863ba5f7dde3df9a999a9c7f8528a6de11683fb46f",
+    "test_native_source_tools.py": "d1932aaf901dbbaeac479a53244615995340a303bbe952076ecaf3c0cbaba23e",
+    "test_native_standalone.py": "5bc19e67cdc16a54676a8305390d3009a6228cb1de9c82351a90eb851cd18c06",
+    "test_noise_law_cache.py": "b58c5ad37204102e714db8f6c1e107b92026652c65bcb2adefd903a05646ea5d",
+    "test_noise_numeric_fastpaths.py": "80169c9ceed6deecd8cd81a99d6ccbd9f0aabc0aff13bdfb8f5564ccdb152855",
+    "test_nonlinear_postselection.py": "76becb6b2146a1c7bcee326b3a7daab1aac5de12390f81887175d417d07351e8",
+    "test_packed_noise.py": "b3b66163142530dc2e730d00604e06bd07d723a41dbef719c96b87dd7eef1eb3",
+    "test_pauli_feedback_reuse.py": "ccd1476bda7dbdd7786d18d8defbabc7eb66d07f322571ce1564f4ea5b90fc4d",
+    "test_phase_injection.py": "ae637af10276e84a849b7f9a03122b5f37ed3ab1573dbd79a7b3c6689e03a544",
+    "test_phase_quotient_optimization.py": "77c7db4efbcc00f2026a7df617fd6cfb86d1364b137f374e5f566876f2ce74fc",
+    "test_quantum_output.py": "f41d79a61b192e43fb4558ce0dae5fa66a47fb90836cb8142f4e08d3e5c590fb",
+    "test_query_reuse.py": "4f62065a0e8cf3aca70a30cc484b8bd7d6e67d58d9589304668c96ee603f1f30",
+    "test_reference_layer_compiler.py": "dad69393526c96f1f264e080d9e9b5591a6a79f4c53d256ae83c9fa81564a8c9",
+    "test_reference_networks.py": "c037ae4f9a9b6a0690b7a2386c6f681c4ec2d5fd420f29e375932f608a15e5aa",
+    "test_reference_reuse.py": "caf8f276abfa904aa44b750aed944392163b55b32469fe068ad19c421a72d868",
+    "test_runtime_ownership.py": "f0fe2ffc4f757b48d433c456f9c1194dd8fb9b13461e20f069a50aae14eaf510",
+    "test_selection_syntax.py": "8882897e05716963f770a38ed04e01d40659929ac76b8a5755a4217ec5d78d81",
+    "test_shared_query_preparation.py": "2dfee4fb7adbe9650e6cece36645df7740d516e4b4edeb472aef5a553d4d8142",
+    "test_simulator_optimization.py": "2391f35f00a33244677f0a903bbdb34a0ab4448da7cc454850e2b27e33596d3d",
+    "test_single_trace.py": "3dcbb502019f061474dd4beb2dede81c224d73e417f0f724158d67df0bbfcd58",
+    "test_target_network.py": "effe25b533dfec47ae9f998aed40eb4b999f567f8b08b60de7d094a2b948f943",
+    "test_target_preparation.py": "2947c70f224dced889d3bb1b6f14d349da2102ea9adffdbe5a2ada84660e51b1",
+    "test_terminal_evaluation.py": "f032b79e5a8c306c55a37fed2040ac8a3f2d16fc2f08deaa29eddb16fc10b985",
+    "test_trace_global_phase.py": "0a67701884cc92965e4d3df960ccb82e5fba467045a40dc5c1f95d6db3d6562c",
+    "test_unified_simulator.py": "aa9bf8aaba473d4fc0c8490c99ef6374eff5a81197b7469eaade744c790f704e",
+    "test_user_interface.py": "79384caafc7fafa504e9b6d0f155311f3b37583d810f6a69c008b930a3e8e3c2",
+    "test_virtual_clifford_feedback.py": "775bd9cfeb488d5824b1fcfd39904170e7f63148064b5ca147956d5cc3c2f059",
+    "test_weight_fast_paths.py": "a06bedfdb02387a138e08dcca6a68d505edea4a1b97e07129529d39cd3d29bf4",
+    "test_weighted_noise.py": "d969af56a79655f418fb5d636509b1c2288f3c7ddeb68abed8c4f7b4647b6c69"
+  },
+  "fixture_exclusions": [
+    {
+      "id": "tests.fixtures.distillation15.test_example.DistillationFileTest.test_noiseless_output_target",
+      "path": "tests/fixtures/distillation15/test_example.py",
+      "source_sha256": "0ae0587e2433c26ce819c9e36c7682323d2a47cae45976e7446616db6ae82604",
+      "reason": "RM15 example fixture outside the pinned tests/core inventory; excluded only from the 352 core-test denominator. Task and paper validation remain required separately."
+    },
+    {
+      "id": "tests.fixtures.distillation15.test_example.DistillationFileTest.test_every_single_resource_z_is_rejected",
+      "path": "tests/fixtures/distillation15/test_example.py",
+      "source_sha256": "0ae0587e2433c26ce819c9e36c7682323d2a47cae45976e7446616db6ae82604",
+      "reason": "RM15 example fixture outside the pinned tests/core inventory; excluded only from the 352 core-test denominator. Task and paper validation remain required separately."
+    },
+    {
+      "id": "tests.fixtures.distillation15.test_example.DistillationFileTest.test_undetected_logical_resource_fault",
+      "path": "tests/fixtures/distillation15/test_example.py",
+      "source_sha256": "0ae0587e2433c26ce819c9e36c7682323d2a47cae45976e7446616db6ae82604",
+      "reason": "RM15 example fixture outside the pinned tests/core inventory; excluded only from the 352 core-test denominator. Task and paper validation remain required separately."
+    }
+  ],
+  "cases": [
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_affine_phase_arithmetic_is_direct_and_odd_control_is_complex",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_all_affine_cliffords_keep_exact_acceptance_and_effects",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_commuting_kernel_includes_joint_parities",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_complex_feedback_global_queries_with_future_postselection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_noncommuting_reference_uses_exact_global_queries",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_scalar_residual_and_zero_postselection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_undeclared_callback_and_invalid_family_fail",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_unused_t_subcircuits_trace_before_resource_budget",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_boundary_sampling.BoundarySamplingTests.test_virtual_record_coordinates_and_redundant_postselection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_biased_t_full_support",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_complete_support_weights_and_encoded_target",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_conditional_noise_and_pauli_feedback",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_general_transport_reuse_respects_actual_feedback",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_large_affine_envelope_without_record_enumeration",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_nonaffine_support_keeps_interference_zeros",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_nonuniform_dense_feedback_and_guarded_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_reconfigure_prepares_optional_route",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_capped_affine.CappedAffineTests.test_terminal_recovery_controller_and_target",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_atomic_outputs_and_nonlinear_parity_information",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_bindings_are_versioned_and_config_isolated",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_builtin_not_arity_and_future_inputs_are_rejected",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_builtin_not_is_affine_versioned_and_requires_no_binding",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_correlated_chain_and_conditional_channels",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_cz_allows_classical_endpoint_in_either_position",
+      "status": "verified",
+      "contract": "Parse M followed by CZ with the classical record in the second input position. Canonicalize it to Z on qubit 1 controlled by measurement record 0; the typed Rust gate/control assertion is the semantic counterpart of the native canonical target tuple.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "circuit",
+          "test": "aliases_conditional_gates_annotations_and_constant_controls_are_explicit",
+          "source_sha256": "2367970f9fbc20dc32ede17f0a68a6a7e757ed5b5cdea270c4e548c5ceb82d56"
+        },
+        {
+          "package": "rmagna",
+          "target": "native_coverage_witness",
+          "test": "classical_second_cz_endpoint_keeps_the_original_record_and_quantum_wire",
+          "source_sha256": "8a73a3eee8bc6fff977f55883122dfdc3e51bcb3fdfec8724cdab6d2be273a52"
+        }
+      ]
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_expansion_budget_is_enforced",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_lossless_roundtrip_and_resolved_repeat",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_measurement_record_counts_products_and_exact_probability",
+      "status": "verified",
+      "contract": "Parse MXX/MPP/MRX/MY with six distinct measurement records, exact 1/100 and 1/30 report-flip probabilities, inverted products and final detector record indices 5 and 2. The Rust assertion set also checks reset/inversion flags and observable record 4.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "circuit",
+          "test": "measurement_products_inversion_and_report_flips_preserve_distinct_records",
+          "source_sha256": "2367970f9fbc20dc32ede17f0a68a6a7e757ed5b5cdea270c4e548c5ceb82d56"
+        }
+      ]
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_native_rationals_and_replaced_views",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_s_and_t_are_distinct_and_aliases_are_canonical",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_source_located_rejections",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_stim_subset_matches_record_count",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_two_qubit_classical_controls_are_versioned_and_validate_targets",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_circuit_file.CircuitFileTests.test_xor_cancellation_constants_and_inversion",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_declared_constant_guards_and_channel_endpoints",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_exact_dense_instruments_and_sampling",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_importance_weights_only_tilt_unconditional_channels",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_noncommuting_guard_chain_and_target_route",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_parity_guard_does_not_require_all_raw_records",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_shared_t_tdag_noise_has_no_guarded_route_or_virtual_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_supplied_candidate_respects_guard_and_causal_chain",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_conditional_noise.ConditionalNoiseTests.test_two_qubit_channel_order_and_mutual_exclusion",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeclaredExpressionNativeTests.test_value_conversion_and_inactive_exponent",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeferredFeedbackTests.test_explicit_unsupported_controls",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeferredFeedbackTests.test_literal_joint_events_and_output_observables",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeferredFeedbackTests.test_native_literal_joint_events_and_output_observables",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeferredFeedbackTests.test_native_wide_trace_and_explicit_resource_failure",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_deferred_feedback.DeferredFeedbackTests.test_signed_pauli_products_and_report_fault_anchors",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_future_and_ambiguous_uses_rejected",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_order_duplicates_inversion_reports_and_prior_state",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_repeat_numbering_and_parity_cancellation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_selection_and_target_do_not_bias_earlier_decoder_inputs",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_separate_selection_rows_and_combination",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_detector_feedback.DetectorFeedbackTests.test_wide_history_and_affine_route",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_feedback_incidence.FeedbackIncidenceTest.test_partial_decisions_xors_versions_constants_and_wire_remap",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_compiled_circuit_rejects_use_from_a_second_thread",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_conditional_noise_is_one_physical_channel",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_correlated_alternatives_are_exclusive_and_nonuniform_paulis_have_identity",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_exact_target_and_multibit_readout_decoder",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_joint_error_ratio_zero_acceptance_and_failed_budgets",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_magic_and_controlled_extensions_against_independent_matrices",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_nonlinear_mixed_gates_use_actual_decoder_and_global_conditional_moments",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_only_required_xor_information_is_sampled_and_postselection_is_preserved",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_pauli_products_resets_and_measure_reset_reports",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_removed_effect_and_decoder_output_shape_fail_at_compile",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_report_flip_changes_feedback_and_task_but_not_true_projection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_signal_handlers_run_during_one_long_native_batch",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_supplied_noise_is_validated_against_the_circuit",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_supported_clifford_gates_against_stim",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_tiny_exact_masses_keep_scientific_values_and_conditional_ratio",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_untouched_qubit_indices_add_no_wires",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_api.FileApiTests.test_wide_parity_has_balanced_lowering_and_owned_task",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_batch.NativeBatchTests.test_aggregate_matches_single_draws",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_batch.NativeBatchTests.test_failure_retains_only_completed_prefix",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_affine_mixture_big_boundary_and_reproducibility",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_boundary_rejects_invalid_distribution_and_shape",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_categories_zero_one_residual_and_large_rational_inputs",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_category_rejects_invalid_fraction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_complex_terms_cancel_before_sampling",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_exact_irrational_signed_global_marginal",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_native_summary_matches_paired_delta_method",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_exact_cancellation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_preserve_underflow_and_sign",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_reject_nonreal_and_nonpositive_denominator",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_round_half_even",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_summary_missing_metrics_single_draw_and_zero_acceptance",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_native.NativeFileRuntimeTests.test_summary_rejects_nonfinite_and_inconsistent_metrics",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_batch_failure_keeps_completed_prefix_and_query_budget_contract",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_equivalent_resolved_histories_share_only_preparation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_external_callbacks_guarded_noise_and_eviction_remain_dynamic",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_fixed_preparation_is_reused_for_new_original_faults",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_internal_batch_preserves_samples_weights_and_target_recovery",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_native_budget_identity_and_weak_structure_eviction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_no_noise_does_not_advance_rng_and_batch_matches_single",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_prepared_noise_weights_and_batch_partition",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_prepared_scalar_queries_equal_uncached_queries_including_report_flips",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_file_reuse.FileReuseTests.test_uint64_denominator_boundary_and_reproducibility",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_gf2_kernel.SharedGF2KernelTest.test_byte_oracles_with_undefined_behavior_sanitizer",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_global_sampling.GlobalSamplingTests.test_exact_comparisons_and_extreme_probabilities",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_global_sampling.GlobalSamplingTests.test_many_record_phase_resources_cancel_without_decomposition",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_global_sampling.GlobalSamplingTests.test_trace_before_decomposition_dense_with_output_effect",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_cli_json_and_progress_streams",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_default_progress_preserves_draws_and_manual_born",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_extreme_common_scale_and_zero_cases",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_incomplete_pilot_and_unavailable_metrics",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_invalid_counts_and_native_decision",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_pilot_reports_gamma_without_modifying_options",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_history_efficiency.HistoryEfficiencyTests.test_weighted_residuals_and_noise_correction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_all_fault_configurations_recover_exact_physical_acceptance_and_error",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_channel_proportions_correlations_endpoints_and_guard_policy",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_complex_terminal_recovery_keeps_true_born_sampling",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_huge_and_tiny_weights_remain_range_safe",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_invalid_proposals_and_cli_config",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_native_draws_return_exact_likelihood_products",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_reproducibility_and_physical_mode_unchanged",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_scaled_channel_totals_preserve_full_support_or_fail",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_importance_sampling.ImportanceSamplingTests.test_weighted_summary_uses_joint_means_and_paired_ratio_errors",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_incremental_history.IncrementalHistoryTests.test_complete_draw_rng_and_controller_replay",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_incremental_history.IncrementalHistoryTests.test_interference_zero_prefix_completes_controllers_and_guarded_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_getting_started_python_examples",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_importance_sampling_guide_and_installed_cli",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_conditional_noise_fixed_reference_networks",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_console_commands_and_seed_reproducibility",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_external_decoder_binding",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_history_progress_and_pilot",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_low_weight_enumeration",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_nonlinear_postselection_api_and_console",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_installed_record_success_entry",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_portable_directory_with_local_decoder_and_universal_runner",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_three_file_evaluation_with_installed_native_engine",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_installed_interface.InstalledInterfaceTests.test_wheel_global_query_and_legacy_api_without_protocol_paths",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_legacy_flags_cannot_select_an_old_kernel_and_general_callbacks_work",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_literal_internal_ids_do_not_collide_with_original_ids",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_no_old_probability_entry_in_production_extension",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_options_change_revalidates_resource_budget",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_public_certificate_facades_keep_budgets_and_zero_semantics",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_random_full_records_states_faults_and_moments_against_independent_matrices",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_kernel_contract.KernelContractTests.test_unexpected_kernel_errors_are_never_retried_on_another_backend",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_distinct_sites_and_exact_truncated_mass",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_endpoints_empty_sector_and_zero_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_failure_does_not_return_complete_estimates",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_invalid_budgets_and_cli",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_mandatory_suffix_prunes_impossible_prefixes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_mutually_exclusive_paulis_and_correlated_chain",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_nonlinear_magic_feedback_exactly_sums_irrational_branches",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_report_noise_and_postselection_are_joint_contributions",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_low_weight.LowWeightTests.test_terminal_feedback_and_guarded_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_bad_codes_and_duplicate_report_flips",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_compact_callbacks_execute_and_batch_snapshot",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_immutable_group_with_report_errors_and_mutation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_batch.BatchTests.test_no_probability_fingerprint_without_cache",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_boundary_sum_validates_rows_for_every_term_width",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_causal_controller_order_rng_and_terminal_masses",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_boundary_service.NativeBoundaryServiceTests.test_completed_marginal_rng_and_mass_match_reference_schedule",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_causal.NativeCausalTest.test_online_basis_without_cpython",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_compact_suffix.NativeCompactSuffixTests.test_lossless_storage_and_ordered_faults_without_cpython",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_core.NativeTests.test_malformed_native_data_and_initialization_errors_are_not_fallbacks",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_core.NativeTests.test_overlap_cancellation_complex_phase_and_large_integers",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_core.NativeTests.test_packed_width_boundaries_and_dependent_columns",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_core.NativeTests.test_random_contractions_against_independent_dense_sum",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_mutable_fault_tuple_is_repacked_after_each_yield",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_no_feedback_does_not_retain_consumed_assignments",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_ordinary_record_validation_and_empty_stream",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_original_wire_lifetime_is_still_checked_by_native_kernel",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_shared_immutable_faults_keep_distinct_records_and_batch_scope",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_snapshot_check_precedes_shared_empty_fault_reuse",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_certificate_retains_input_before_native_return",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_compile_counts_preparation_fallback_once",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_native_fallback_retains_values_packed_before_kernel",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_ownership.NativeGlobalOwnershipTests.test_same_immutable_plan_has_independent_concurrent_workspaces",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_absorption_precedes_final_resource_budget",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_actual_absorption_and_decomposition_against_independent_dense_sums",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_database_exact_reconstruction_and_product_identification",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_surrogate_preserves_python_conversion_exception",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_unicode_and_embedded_nul_roundtrip",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_malformed_dimensions_and_zero_phase_conventions",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_original_ir_exceeds_fixed_budget_and_succeeds_after_native_absorption",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_global_phase.NativeGlobalPhaseTests.test_rank_zero_empty_database_identity_obeys_byte_budget",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_proposals.NativeProposalTests.test_estimator_matches_independent_decimal_operations",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_proposals.NativeProposalTests.test_exact_independent_and_affine_rng_streams",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_proposals.NativeProposalTests.test_real_decimal_and_weight_preserve_precision_and_rounding",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_records.NativeRecordTests.test_dense_events_and_hermitian_moments",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_records.NativeRecordTests.test_reject_noncommuting_pauli",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_records.NativeRecordTests.test_sampling_completed_marginal",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_standalone.NativeStandaloneTest.test_foundation_without_cpython",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_native_standalone.NativeStandaloneTest.test_reference_runtime_headers_are_self_contained",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_law_cache.NoiseLawCacheTests.test_cache_eviction_keeps_the_original_channel_order",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_law_cache.NoiseLawCacheTests.test_chain_and_exclusive_probabilities_have_distinct_keys",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_law_cache.NoiseLawCacheTests.test_guards_reuse_physical_laws_without_importance_tilting",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_law_cache.NoiseLawCacheTests.test_long_chains_large_rationals_and_unreachable_tails",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_law_cache.NoiseLawCacheTests.test_repeated_laws_keep_location_actions_report_flips_and_order",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_depolarizing_and_nonuniform_channels_match_declared_law",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_finite_noise_thresholds_and_general_conversion_in_native_module",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_identical_irrational_coefficients_and_invalid_denominators",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_rational_ratios_against_python_fraction_rounding",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_affine_not_selection_and_terminal_feedback",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_dense_noncommuting_magic_instrument_with_report_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_exact_symbol_cancellation_keeps_affine_path",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_fixed_template_assignments_and_private_boundaries",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_full_history_final_readout_and_explicit_state",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_importance_weights_rejected_draws_and_aggregate_ratio",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_joint_duplicate_conflicting_detector_and_task_conditions",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_mixed_affine_selector_integrates_unobserved_record",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_no_future_selection_bias_and_replay_with_recovery",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_noncommuting_readout_truth_table_and_target",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_and_xor_constant_use_zero_projection_template",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_on_accept_bit_matches_truth_table_and_preserves_feedback",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_report_flips_select_reported_bits_and_preserve_true_output",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_selection_distinct_from_each_error_definition",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_validation_format_version_and_module_boundaries",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_versions_overwrites_repeat_and_explicit_prior_decisions",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_zero_acceptance_and_callback_failure_are_not_filtered",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_packed_noise.PackedNoiseTests.test_guarded_sites_share_a_group_but_wait_for_their_causal_instruction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_packed_noise.PackedNoiseTests.test_large_weight_group_without_count_table",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_packed_noise.PackedNoiseTests.test_marginals_and_joint_law_across_lanes_and_blocks",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_packed_noise.PackedNoiseTests.test_sparse_actions_weights_and_partitioning",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_all_paulis_mixed_affine_guards_and_original_faults_share_one_plan",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_no_decoder_value_cache_and_clifford_template_reuse",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_physical_and_recovery_callbacks_match_literal_sampling",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_pauli_feedback_reuse.PauliFeedbackReuseTests.test_unreached_mixed_feedback_keeps_earlier_causal_marginal",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_injection.PhaseInjectionTests.test_exact_native_injection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_complete_small_signatures_include_repeated_indices",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_dimension_key_eviction_and_thread_ownership",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_invalid_dimension_cannot_use_cached_key",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_sign_even_and_duplicate_updates_do_not_contaminate_template",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_sparse_quotient_coordinates_cross_machine_word",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_annotations_manual_faults_and_source_snapshot",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_causal_callbacks_and_both_history_methods",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_entry_validation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_public_run_enumeration_and_task_file",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_report_parities_equal_independent_selected_event",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_quantum_output.QuantumOutputTests.test_unsampled_quantum_output_is_terminal_conditional_expectation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_deferred_public_graph_isolation_and_owned_transfer",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_lowered_operations_are_owned_even_for_guarded_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_ordered_distinct_dependencies_keep_callback_duplicates",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.OwnershipAndDependencies.test_public_ir_still_copies_arbitrary_graph_and_prepared_snapshot",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.PreparedBoundaryResources.test_affine_probe_does_not_expand_a_nonaffine_resource",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.PreparedBoundaryResources.test_eager_and_lazy_preparation_match_after_faults",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.PreparedBoundaryResources.test_file_compilation_prepares_all_stages_without_decoders_or_draws",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.PreparedBoundaryResources.test_prepared_entries_and_exact_event_transport",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.PreparedBoundaryResources.test_public_prepared_query_validates_rhs_and_boundary",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.QueryReuse.test_owned_preparation_matches_public_with_actual_controls_and_faults",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.QueryReuse.test_shared_plan_threads_and_batched_paulis",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_query_reuse.QueryReuse.test_traced_network_reuse_matches_fresh_plans_and_event_changes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_clifford_parent_can_select_first_target_layer",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_compact_suffix_preserves_ordered_fault_phases",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_dependent_constant_inverse_and_ccz_phases",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_first_middle_last_and_tie_layers",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_small_ordered_random_circuits",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_layer_compiler.ReferenceLayerCompilerTests.test_target_suffix_preserves_parent_layer_and_prefix",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_affine_batch_reuses_protocol_assignment_without_sampling_parent",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_affine_sector_enumerates_free_coordinates_not_redundant_labels",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_affine_support_offset_and_report_flip",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_affine_task_has_two_parents",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_all_three_nonzero_constrained_domains",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_cancelled_external_symbols_do_not_require_third_parent",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_exact_mass_reuse_skips_terminal_sampling_query",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_number_of_parents_does_not_follow_prefix_count",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_shared_coordinates_preserve_parity_feedback_and_actual_offsets",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_networks.ReferenceNetworkTests.test_three_bit_selection_order",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_reference_reuse.ReferenceReuseTests.test_compiler_continuation_generators",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_cache_bound_and_changed_event_structure",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_execution_and_noise_schedule_have_independent_owner_lifetimes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_reentrant_callbacks_and_exception_leave_fresh_control_values",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_scalar_totals_are_thread_safe_and_reject_bad_outcomes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_sparse_noise_equals_dense_categories_and_isolation",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_runtime_ownership.RuntimeOwnershipTests.test_structure_reuse_changed_rhs_faults_effects_and_uncached",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_complemented_detector_requires_a_one",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_complemented_register_matches_explicit_not",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_decoder_output_in_observable_defines_the_error",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_external_decoders_read_detectors_not_records",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_invalid_targets_name_the_allowed_forms",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_observable_reads_the_register_value_at_its_line",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_selection_syntax.SelectionSyntaxTests.test_removed_task_fields_explain_the_circuit_spelling",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_shared_query_preparation.SharedQueryPreparationTests.test_effect_offsets_events_and_faults_match_independent_branch_sums",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_batched_inverse_same_free_coordinate_convention",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_common_support_overlap_including_affine_shift_and_phase",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_compact_key_noise_reports_weights_and_limits",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_control_callbacks_always_execute_and_new_gate_table_is_used",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_exact_sparse_contraction_with_dependent_boundaries",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_mutable_control_parent_list_updates_ir_certificate",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_packed_pullback_against_direct_quadratic_values",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_prepared_ir_nested_mutation_and_returned_snapshot",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_probability_batch_snapshot_and_zero_cache_budget",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_simulator_optimization.OptimizationTests.test_unbiased_noise_preserves_exact_rng_stream",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_single_trace.SingleTraceTests.test_entangled_trace_and_postselection_are_distinct",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_single_trace.SingleTraceTests.test_random_instruments_exact_marginals_effects_and_basis_changes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_single_trace.SingleTraceTests.test_retained_labels_preserve_inherited_rank_squared_bound",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_single_trace.SingleTraceTests.test_support_cache_offsets_redundancies_and_budget_failures",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_network.TargetNetworkTests.test_linear_scalar_target_prepares_b_and_c",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_network.TargetNetworkTests.test_many_outputs_trace_before_any_resource_expansion",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_network.TargetNetworkTests.test_unit_target_resource_omits_unpaired_construction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_network.WholeTaskRouteTests.test_target_is_unitary_on_selected_outputs_only",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_network.WholeTaskRouteTests.test_terminal_decoder_selects_nonlinear_route",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_cancelled_magic_keeps_one_sided_pauli_updates",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_encoded_target_includes_full_physical_output",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_full_output_target_does_not_change_acceptance",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_invalid_and_zero_target_boundaries",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_quadratic_branches_against_basis_probabilities",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_target_preparation.TargetPreparationTests.test_trace_and_encoded_output_order",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_affine_recovery_integrates_records_and_moments_before_target",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_module_validation_and_mutually_exclusive_metrics",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_nonclifford_terminal_feedback_and_multiple_calls",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_output_mapping_and_unobserved_environment",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_recovery_samples_joint_syndromes_without_acceptance_or_target_bias",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_repetition_recovery_preserves_encoded_magic_and_original_faults",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_t_targets_and_empty_recovery",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_target_inverse_against_independent_dense_amplitudes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_terminal_namespace_report_errors_and_external_decoders",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_three_file_cli_task_relative_paths_and_fingerprints",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_terminal_evaluation.TerminalEvaluationTests.test_wide_clifford_encoded_t_target_uses_compact_native_boundary",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_amplitude_compiler_preserves_the_requested_phase",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_common_phase_with_faults_events_reset_and_retained_labels",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_paired_sign_and_subnormalization_survive",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_causal_callback_and_ir_rejection",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_fixed_input_absorption_and_noise",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_gaussian_internal_contraction",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_initial_path_budget_and_invalid_gate_lifetimes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_output_environment_observables",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_random_noncommuting_networks",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_small_instruments_all_records",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_unified_simulator.UnifiedTests.test_zero_limits_cache_and_proposal_statistics",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_budget_failure_is_a_failed_command_not_invalid_input",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_each_command_summarizes_and_accepts_only_its_options",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_invalid_input_reports_on_stderr_or_as_json",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_summary_by_default_and_full_json_on_request",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_unimportable_decoder_binding_is_invalid_input",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CommandLineTests.test_version_and_command_help",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_budgets_count_from_the_start_of_each_run",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_compiled_circuits_are_not_compiled_again",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_compiled_run_rejects_settings_it_already_fixes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_compiled_runs_match_fresh_runs_and_report_their_own_work",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.CompiledRunTests.test_option_and_task_errors_name_the_key_and_suggest_a_fix",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.MissingExtensionTests.test_import_without_native_extension_explains_how_to_build",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.NamespaceTests.test_first_parameters_have_their_documented_names",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_user_interface.NamespaceTests.test_top_level_is_the_file_interface_and_operations_is_separate",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_composed_control_simplification_and_versions_determine_route",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_direct_and_xor_cliffords_keep_one_template_and_match_dense_states",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_guarded_pauli_noise_uses_causal_assignments_only",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_linear_clifford_feedback_stays_coherent_and_enumeration_preserves_mass",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_protocol_and_terminal_virtual_wires_do_not_alias_outputs_or_each_other",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_two_qubit_clifford_controls_match_dense_states_and_reuse_template",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_virtual_clifford_feedback.VirtualCliffordFeedbackTests.test_virtual_trace_future_completion_reports_faults_and_reset_match_literal",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weight_fast_paths.WeightFastPathTests.test_count_weights_match_independent_products_across_group_sizes",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weight_fast_paths.WeightFastPathTests.test_grouped_factors_preserve_choices_and_unreduced_weights",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weight_fast_paths.WeightFastPathTests.test_large_rational_rounding_and_extreme_exponents",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.NativeNoiseStreamTests.test_original_randrange_stream_and_exact_weights",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.WeightedNoiseTests.test_deterministic_nonuniform_and_importance",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_scales_and_scaled_support",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_weights",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.WeightedNoiseTests.test_unit_scale_and_effective_deterministic_endpoints",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    },
+    {
+      "id": "test_weighted_noise.WeightedNoiseTests.test_zero_and_identity",
+      "status": "unmapped",
+      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+    }
+  ]
+}
