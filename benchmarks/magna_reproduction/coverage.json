@@ -881,23 +881,55 @@
     },
     {
       "id": "test_native_core.NativeTests.test_malformed_native_data_and_initialization_errors_are_not_fallbacks",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Out-of-width columns, quadratic diagonal bits and path/phase dimension mismatches are constructor errors. The negative Python tuple base is statically unrepresentable by unsigned Rust words, with no tuple compatibility/fallback API. Original native ValueError roles are captured explicitly.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "native_core",
+          "test": "original_malformed_roles_are_rust_constructor_errors_or_unsigned_unrepresentable",
+          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+        }
+      ]
     },
     {
       "id": "test_native_core.NativeTests.test_overlap_cancellation_complex_phase_and_large_integers",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "92 retained original-seed overlap pairs with literal independent dense expectations; all eight zero-contraction skips and early RNG breaks; 28 finite closed-product Gauss sums through 257 paths; 100 signed 300-bit scalar pairs continuing the exact original RNG stream. Production native scalar/contraction cross-checks; internal test-only overlap/scalar helpers are not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "native_core",
+          "test": "original_overlap_gauss_cancellation_and_300_bit_scalar_contracts",
+          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+        }
+      ]
     },
     {
       "id": "test_native_core.NativeTests.test_packed_width_boundaries_and_dependent_columns",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "90 exact original-seed dependent/zero-column inputs across widths 0/1/63/64/65/127/128/129/257. Every finite image amplitude, one absent support probe, contraction zero/cancellation and literal exact norm are asserted without enumerating the large boundary.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "native_core",
+          "test": "original_packed_width_boundaries_preserve_dependent_column_amplitudes",
+          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+        }
+      ]
     },
     {
       "id": "test_native_core.NativeTests.test_random_contractions_against_independent_dense_sum",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "162 exact original-seed raw inputs, every small-boundary basis amplitude before/after contraction, explicit zero decisions and exact norms. Literal independent Python dense expectations; production native contraction/norm cross-checks.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "native_core",
+          "test": "original_random_contractions_preserve_every_dense_amplitude_and_norm",
+          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+        }
+      ]
     },
     {
       "id": "test_native_global_fastpath.NativeGlobalFastpathTests.test_mutable_fault_tuple_is_repacked_after_each_yield",

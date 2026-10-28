@@ -105,9 +105,10 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 ### Source-bound Rust coverage ledger
 
 `coverage.json` enumerates every canonical `module.Class.test_method` from the
-pinned 57 core modules (352 cases). Its initial assertion mappings cover two
-native circuit cases with three Rust witness tests; the other 350 cases remain
-explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
+pinned 57 core modules (352 cases). Its current assertion mappings cover two
+native circuit cases with three Rust witness tests and all four native-core
+primitive cases with four additional Rust witness tests; the other 346 cases
+remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
 hashes and reasons; they never reduce the core denominator.
@@ -275,3 +276,42 @@ count witness stays within the native Python binding's signed-size input range;
 Rust pilot shot counts remain `u64`. The capture checks the strict `Gamma > 1`
 exact-marginal recommendation, including the affine-support tie rule and the
 native multiplication/division order at floating-point limits.
+
+## Native core primitive contracts
+
+`rmagna/tests/fixtures/native_core.json` binds the pinned source/manifest,
+production native extension and capture producer identities. Regenerate it with
+the pinned Python environment:
+
+```sh
+python3 -I -B benchmarks/magna_reproduction/native_core_reference.py \
+  --upstream /absolute/path/to/pinned/magna \
+  --manifest benchmarks/magna_reproduction/reference.json \
+  --out /absolute/path/to/new-native-core.json
+cargo test --locked -p rmagna --test native_core
+```
+
+Repeated captures, including Python `-O`, must be byte-identical for the same
+source/native environment. The capture reproduces the original Python seeds
+26091461/26091462/26091463, including all early breaks before continuing the
+second stream into the 300-bit scalar inputs. It retains 162 contraction cases,
+92 overlap pairs, eight explicit zero-contraction skips from 100 attempts,
+28 closed-product Gaussian sums, 100 scalar pairs and 90 packed-width cases.
+All small-boundary amplitudes and every finite large-boundary image are retained
+with exact cyclotomic coefficients and binary powers. Gaussian expectations use
+a finite closed product through 257 paths, never a 2^257 enumeration.
+
+The expected values come from the pinned independent Python dense/scalar oracle;
+production native contraction, norm and scalar APIs cross-check them. The
+internal test-only overlap and scalar helpers are not called. Their mathematical
+assertion roles are translated to Rust with literal expected values. Malformed
+column/diagonal/dimension roles become Rust constructor failures; a negative
+Python tuple base has no representation in unsigned Rust words and does not
+justify a tuple compatibility API.
+
+Run the source-frozen coverage gate with real binary evidence using the current
+`--rust-run <run.json> --complete-parity` flags documented above. The seven
+mapped Rust witnesses must execute successfully, while the overall gate must
+still return nonzero because 346 core contracts remain unmapped. These finite
+primitive witnesses establish neither full interface parity nor paper precision
+or performance.
