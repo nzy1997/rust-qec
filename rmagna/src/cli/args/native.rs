@@ -1,7 +1,11 @@
 //! Explicit native policy limits, shared by the selected query families.
 use super::Flags;
-use rmagna::phase::NativePhaseOptions;
+use rmagna::phase::{NativePhaseOptions, NativeTransportMode};
 pub(super) const FLAGS: &[&str] = &[
+    "--native-transport",
+    "--native-transport-max-terms",
+    "--native-transport-max-geometry-words",
+    "--native-transport-max-construction-work",
     "--native-max-quotient-rank",
     "--native-max-core-table-bytes",
     "--native-max-signature-work",
@@ -42,6 +46,33 @@ pub(super) fn configure(flags: &mut Flags, modes: &[&str]) -> Result<NativePhase
         }
     }
     let mut options = NativePhaseOptions::default();
+    let transport = flags.choice("--native-transport", "off", &["off", "prepared"])?;
+    if transport == "off"
+        && let Some(flag) = [
+            "--native-transport-max-terms",
+            "--native-transport-max-geometry-words",
+            "--native-transport-max-construction-work",
+        ]
+        .iter()
+        .find(|flag| flags.0.contains_key(**flag))
+    {
+        return Err(format!("{flag} requires --native-transport prepared"));
+    }
+    options.transport.mode = if transport == "prepared" {
+        NativeTransportMode::Prepared
+    } else {
+        NativeTransportMode::Off
+    };
+    let t = &mut options.transport.limits;
+    t.max_terms = flags.number("--native-transport-max-terms", t.max_terms)?;
+    t.max_geometry_words = flags.number(
+        "--native-transport-max-geometry-words",
+        t.max_geometry_words,
+    )?;
+    t.max_construction_work = flags.number(
+        "--native-transport-max-construction-work",
+        t.max_construction_work,
+    )?;
     let s = &mut options.selection;
     s.max_quotient_rank = flags.number("--native-max-quotient-rank", s.max_quotient_rank)?;
     s.max_core_table_bytes =

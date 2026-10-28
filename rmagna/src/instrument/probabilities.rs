@@ -6,6 +6,9 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 #[derive(Clone, Copy, Debug, Default)]
+// Preserve the public Copy policy: native bounds are fixed-size configuration,
+// and boxing this variant would require allocations and change caller semantics.
+#[allow(clippy::large_enum_variant)]
 pub enum QueryPreparation {
     #[default]
     Cold,
@@ -46,6 +49,7 @@ pub struct PreparedQueryStatistics {
     /// Actual selected catalogue resources; missing keys count as fibers.
     pub catalogue_resources: usize,
     pub native_routes: crate::phase::NativeRouteCounts,
+    pub native_transports: crate::phase::NativeTransportCounts,
     /// Independent maxima over retained reference resources, not query quotas.
     pub maximum_quotient_rank: Option<usize>,
     pub maximum_terms: Option<usize>,
@@ -61,12 +65,14 @@ impl PreparedQueryStatistics {
             fixed_resources: 0,
             catalogue_resources: 0,
             native_routes: Default::default(),
+            native_transports: Default::default(),
             maximum_quotient_rank: None,
             maximum_terms: None,
             maximum_phase_variables: None,
         };
         for resource in resources {
             statistics.native_routes.record(resource);
+            statistics.native_transports.record(resource);
             statistics.fixed_resources += 1;
             statistics.catalogue_resources +=
                 usize::from(resource.kind() == crate::phase::PhaseResourceKind::CertifiedCatalogue);
@@ -268,6 +274,7 @@ mod tests {
                 fixed_resources: 3,
                 catalogue_resources: 2,
                 native_routes: Default::default(),
+                native_transports: Default::default(),
                 maximum_quotient_rank: Some(3),
                 maximum_terms: Some(8),
                 maximum_phase_variables: Some(129),
@@ -343,6 +350,7 @@ mod tests {
                 fixed_resources: 4,
                 catalogue_resources: 3,
                 native_routes: Default::default(),
+                native_transports: Default::default(),
                 maximum_quotient_rank: Some(4),
                 maximum_terms: Some(8),
                 maximum_phase_variables: Some(129),

@@ -54,8 +54,58 @@ checkpoint. Tests compare faulted projected queries with literal complex state
 vectors, output-permuted reduced density matrices and dependent label masses;
 they cover every native resource route, final/optional admission and CLI option
 identity. These checks establish bounded correctness. Logical budgets exclude
-allocator overhead, and this integration establishes neither prepared Gaussian
-reuse nor paper throughput or rare-event precision.
+allocator overhead. These checks do not establish paper throughput or rare-event
+precision.
+
+### Optional prepared native transports
+
+Set `NativePhaseOptions.transport.mode = NativeTransportMode::Prepared` to retain
+the shared constrained catalogue boundary transport in probability, density,
+Pauli-moment and reported-support query families. The default is `Off`. This
+choice applies after native selection and optional injection, so transport
+admission never changes the selected decomposition. Preparation uses symbolic
+boundary geometry without choosing outcomes, evaluating a quantum scalar query,
+drawing entropy or invoking controllers. The owned transport survives dropping
+the source circuit and catalogue.
+
+```sh
+cargo run --locked -p rmagna -- run circuit.magna --task task.json --shots 8 \
+  --probability-preparation native_injection \
+  --density-preparation native --moment-preparation native \
+  --native-transport prepared --native-transport-max-terms 256 \
+  --native-transport-max-geometry-words 16777216 \
+  --native-transport-max-construction-work 1099511627776 --json
+```
+
+The three transport bounds are independent of selection, final query terms and
+scalar arithmetic limits. A transport term, geometry or construction-work budget
+stop skips only this optional acceleration and evaluates the same frozen
+resource. Arithmetic, changed-signature, layout and incompatible-program errors
+propagate. Logical geometry bounds count retained boundary rows and Gaussian
+plans; they exclude allocator overhead and arbitrary-precision scalar limbs.
+Construction-work limits are conservative logical bounds, not elapsed-time
+limits. Transport caps require explicit `--native-transport prepared`, and all
+transport flags require at least one native query family.
+
+`native_transport_receipt()` exposes actual construction or budget-skip details.
+Retained cache JSON and typed preparation statistics separately report
+`native_transports: {prepared, budget_skipped}`; these count retained
+constructions, not queries. `native_routes` continues to describe the selected
+decomposition. Actual query Gaussian replay/recomputation counts appear in
+`NetworkValue.native_transport`, `ProbabilitySupportExpansion.native_transport`
+and `ReportedSupportExpansion.native_transport`. Use
+`evaluate_with_statistics` or `reported_support_terms_with_statistics` for the
+labelled interfaces. Existing wrappers retain their return types. Reported
+instrument support terms are geometric envelopes and may include interference
+zeros; unitary labelled probability terms carry exact coefficients.
+
+Mode and all three resolved limits enter every applicable family fingerprint.
+Checkpoint restoration rejects changed settings before controller callbacks.
+Regression tests compare all eight fault masks on three observed wires against
+literal integer phase sums, including complex moments, dependent labels, density
+events, separately exhausted budgets and actual selected injected resources.
+They require actual per-family transport use and Gaussian replay. They provide
+correctness and reuse evidence, without a throughput or process-memory claim.
 
 ## Shared constrained catalogue boundary transport
 

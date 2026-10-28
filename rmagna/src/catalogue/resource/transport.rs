@@ -97,6 +97,18 @@ fn shifted(
     )?)
 }
 impl PreparedCataloguePhase {
+    /// Admit transport and its still-unconstructed symbolic input together.
+    pub(crate) fn admit_symbolic_boundary(
+        &self,
+        reference: &ParityPhase,
+        width: usize,
+        options: &CatalogueBoundaryOptions,
+    ) -> Result<CatalogueBoundaryUsage, PhaseError> {
+        if reference.num_variables() != self.num_variables() {
+            return Err(PhaseError::DimensionMismatch);
+        }
+        limits::admission(self, reference, width, options, true)
+    }
     /// Freeze labelled transport while sharing this immutable selected resource.
     /// Construction limits are independent of resource selection/preparation.
     pub fn prepare_boundary(
@@ -121,7 +133,7 @@ impl PreparedCatalogueBoundary {
         if reference.num_variables() != n || boundary.columns().len() != n {
             return Err(PhaseError::DimensionMismatch);
         }
-        let mut usage = limits::admission(resource, reference, boundary.width(), options)?;
+        let mut usage = limits::admission(resource, reference, boundary.width(), options, false)?;
         arithmetic.multiply(boundary.coefficient(), &ExactScalar::one())?;
         for term in &resource.terms {
             arithmetic.multiply(&term.coefficient, &ExactScalar::one())?;

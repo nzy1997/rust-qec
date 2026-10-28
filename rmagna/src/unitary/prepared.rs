@@ -1,7 +1,7 @@
 //! Fixed scalar closure for probability, Pauli moments and density overlaps.
 use super::phase_map::PhaseRestriction;
 use super::*;
-use crate::catalogue::PhaseCatalogue;
+use crate::catalogue::{PhaseCatalogue, PreparedCatalogueBoundary};
 use crate::phase::{
     NativePhaseOptions, PhaseResourceOptions, PreparedPhaseResource, ResourcePreparation,
 };
@@ -10,6 +10,7 @@ use crate::stabilizer::PreparedAffineContraction;
 struct FixedResource {
     decomposition: PreparedPhaseResource,
     phase_map: PhaseRestriction,
+    transport: Option<PreparedCatalogueBoundary>,
 }
 
 struct ScalarClosure {
@@ -47,9 +48,17 @@ impl ScalarClosure {
         let phase_map =
             PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
         let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
+        let mut decomposition = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
+        let transport = decomposition.prepare_native_transport(
+            &phase,
+            0,
+            || Ok(self.contraction.symbolic_boundary(0)?),
+            arithmetic,
+        )?;
         self.resource = Some(FixedResource {
-            decomposition: options.prepare(&phase, max_terms, catalogue, arithmetic)?,
+            decomposition,
             phase_map,
+            transport,
         });
         Ok(())
     }
@@ -79,15 +88,40 @@ impl ScalarClosure {
         resource.decomposition.check_term_limit(max_terms)?;
         debug_assert_eq!(ket.columns(), self.contraction.output_columns());
         let phase = resource.phase_map.apply(phases, ket.offset())?;
+        let (value, native_transport) = match &resource.transport {
+            Some(plan) => {
+                let scalar = AffineKet::new(
+                    BitVector::zeros(0)?,
+                    vec![BitVector::zeros(0)?; ket.phase().num_variables()],
+                    ket.phase().clone(),
+                    ket.coefficient().clone(),
+                )?;
+                let expanded = plan.expand(&phase, &scalar, arithmetic)?;
+                let mut value = ExactScalar::zero();
+                for term in expanded.states {
+                    debug_assert_eq!(term.width(), 0);
+                    debug_assert!(term.columns().is_empty());
+                    let global = arithmetic.omega(2 * i64::from(term.phase().constant()), 0)?;
+                    let weighted = arithmetic.multiply(term.coefficient(), &global)?;
+                    value = arithmetic.add(&value, &weighted)?;
+                }
+                (value, Some(expanded.statistics))
+            }
+            None => (
+                resource.decomposition.evaluate(
+                    &phase,
+                    ket.phase(),
+                    ket.coefficient(),
+                    arithmetic,
+                )?,
+                None,
+            ),
+        };
         Ok(NetworkValue {
-            value: resource.decomposition.evaluate(
-                &phase,
-                ket.phase(),
-                ket.coefficient(),
-                arithmetic,
-            )?,
+            value,
             quotient_rank: resource.decomposition.quotient_rank(),
             terms: resource.decomposition.num_terms(),
+            native_transport,
         })
     }
 }

@@ -5,6 +5,14 @@ use crate::unitary::PreparedProbabilitySupport;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+/// Geometric reported-label envelopes and the actual native work of this query.
+/// Envelopes may still contain residual interference zeros.
+#[derive(Debug)]
+pub struct ReportedSupportExpansion {
+    pub supports: Vec<crate::gf2::AffineSupport>,
+    pub native_transport: Option<crate::catalogue::CatalogueBoundaryStatistics>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PreparedSupportStatistics {
     pub labels: usize,
@@ -13,6 +21,7 @@ pub struct PreparedSupportStatistics {
     pub resource_kind: crate::phase::PhaseResourceKind,
     pub phase_variables: usize,
     pub native_routes: crate::phase::NativeRouteCounts,
+    pub native_transports: crate::phase::NativeTransportCounts,
 }
 pub(super) struct SupportQueries {
     mode: QueryPreparation,
@@ -90,6 +99,8 @@ impl SupportQueries {
             let resource = plan.fixed_phase_resource();
             let mut native_routes = crate::phase::NativeRouteCounts::default();
             native_routes.record(resource);
+            let mut native_transports = crate::phase::NativeTransportCounts::default();
+            native_transports.record(resource);
             PreparedSupportStatistics {
                 labels: self.transport.as_ref().map_or(labels, Vec::len),
                 quotient_rank: resource.quotient_rank(),
@@ -97,18 +108,19 @@ impl SupportQueries {
                 resource_kind: resource.kind(),
                 phase_variables: resource.num_variables(),
                 native_routes,
+                native_transports,
             }
         }))
     }
-    pub(super) fn evaluate(
+    pub(super) fn evaluate_with_statistics(
         &self,
         state: &CompiledUnitary,
         records: &[usize],
         max_terms: usize,
         arithmetic: &ScalarArithmetic,
-    ) -> Result<Vec<AffineKet>, InstrumentError> {
+    ) -> Result<crate::unitary::ProbabilitySupportExpansion, InstrumentError> {
         let (plan, _) = self.plan(state, records, max_terms, arithmetic)?;
-        Ok(plan.evaluate(state, max_terms, arithmetic)?)
+        Ok(plan.evaluate_with_statistics(state, max_terms, arithmetic)?)
     }
     pub(super) fn prepare(
         &self,
@@ -195,4 +207,3 @@ impl SupportQueries {
         Ok(plan)
     }
 }
-use crate::stabilizer::AffineKet;

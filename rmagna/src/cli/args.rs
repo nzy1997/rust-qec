@@ -75,6 +75,14 @@ Injection limits require native_injection. Budgets count logical payload/work,
 excluding allocator overhead. Resolved settings are fingerprinted; actual routes
 are in retained diagnostics. Construction failures never silently choose fibers.
 
+Optional native boundary transport (requires a native query family):
+  --native-transport off|prepared     Default off; selected resource stays fixed
+  --native-transport-max-terms N      Independent transport term cap (default 256)
+  --native-transport-max-geometry-words N Logical words (default 16777216)
+  --native-transport-max-construction-work N Logical work (default 1099511627776)
+Transport caps require prepared. An optional quota stop reports a skipped
+acceleration and evaluates the same exact resource. Hard errors propagate.
+
 Continuous stream only:
   --checkpoint-dir DIR                Required new directory; parent must exist
   --resume FILE                       Previous CLI checkpoint; original options required
