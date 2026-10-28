@@ -15,6 +15,7 @@ use crate::gf2::{AffineSupport, BitVector, Gf2Error};
 use crate::pauli::{PauliError, PauliWord};
 use crate::probability::{Probability, ProbabilityError};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
+use crate::stabilizer::AffineKet;
 use crate::unitary::{CompiledUnitary, NetworkValue, PauliInsertion, UnitaryError};
 use num_rational::BigRational;
 pub use probabilities::{
@@ -167,7 +168,8 @@ pub struct CompileOptions {
     pub moment_preparation: QueryPreparation,
     pub max_prepared_moments: usize,
     pub max_coherent_qubits: usize,
-    /// Raw paths in the chosen Clifford lowering, before local contraction.
+    /// Initial support rank plus raw paths in the chosen Clifford lowering,
+    /// before local contraction.
     pub max_path_bits: usize,
     pub max_gates: usize,
     pub max_noise_sites: usize,
@@ -251,19 +253,58 @@ pub struct ExactMasses {
     pub error: ExactScalar,
 }
 
+/// Compile the all-zero physical input. For an explicit normalized initial
+/// state, use `compile_affine_stabilizer`.
 pub fn compile_affine(
     circuit: &Circuit,
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    lower::compile(circuit, options, arithmetic, false)
+    compile_affine_stabilizer(
+        circuit,
+        &zero_input(circuit.num_qubits(), options)?,
+        options,
+        arithmetic,
+    )
 }
-pub(crate) fn compile_causal(
+/// Compile a normalized independent stabilizer input in physical wire order.
+/// Initial support and all lowered Hadamards count toward `max_path_bits`.
+/// Reset, record, control and phase ancillas start in zero; the input's affine
+/// coordinates, quadratic phases and global coefficient are preserved.
+/// Invalid inputs are rejected explicitly, without normalization or fallback.
+pub fn compile_affine_stabilizer(
     circuit: &Circuit,
+    input: &AffineKet,
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
 ) -> Result<CompiledInstrument, InstrumentError> {
-    lower::compile(circuit, options, arithmetic, true)
+    lower::compile(circuit, input, options, arithmetic, false)
+}
+
+pub(crate) fn zero_input(
+    width: usize,
+    options: &CompileOptions,
+) -> Result<AffineKet, InstrumentError> {
+    if width > options.max_coherent_qubits {
+        return Err(InstrumentError::ResourceLimit {
+            option: "max_coherent_qubits",
+            limit: options.max_coherent_qubits,
+            required: width,
+        });
+    }
+    Ok(
+        crate::clifford::CliffordCircuit::computational(BitVector::zeros(width)?)
+            .map_err(UnitaryError::from)?,
+    )
+}
+
+pub(crate) fn compile_causal_stabilizer(
+    circuit: &Circuit,
+    input: &AffineKet,
+    options: &CompileOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<CompiledInstrument, InstrumentError> {
+    lower::compile(circuit, input, options, arithmetic, true)
 }
 /// Compile a measurement-free pure target from its text frontend. Gate phases
 /// follow the standard matrices. Instrument operations are rejected explicitly.

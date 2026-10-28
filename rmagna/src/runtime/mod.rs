@@ -12,7 +12,7 @@ use crate::costs::{CostError, ExecutionMeter, OperationKind, observe};
 use crate::gf2::BitVector;
 use crate::instrument::{
     CompileOptions, CompiledInstrument, ExactMasses, FaultSelection, InstrumentError,
-    compile_affine, compile_causal,
+    compile_affine_stabilizer, compile_causal_stabilizer,
 };
 use crate::noise::{
     NoiseDraw, NoiseError, NoiseModel, NoiseOptions, NoiseSampler, NoiseSampling, RandomSource,
@@ -23,6 +23,7 @@ use crate::records::{
     sample_reported_conditioned_observed,
 };
 use crate::scalar::{ExactScalar, ScalarArithmetic};
+use crate::stabilizer::AffineKet;
 use crate::unitary::CompiledUnitary;
 use num_rational::BigRational;
 use num_traits::One;
@@ -302,6 +303,7 @@ impl ResolvedHistory {
 }
 pub struct CausalProgram {
     circuit: Circuit,
+    initial: AffineKet,
     model: NoiseModel,
     sampler: NoiseSampler,
     registry: ControllerRegistry,
@@ -382,6 +384,58 @@ impl CausalProgram {
         sampling: &NoiseSampling,
         meter: Option<&ExecutionMeter>,
     ) -> Result<Self, RuntimeError> {
+        Self::new_stabilizer_observed(
+            circuit, None, registry, options, arithmetic, sampling, meter,
+        )
+    }
+    /// Own a normalized independent initial stabilizer state for every history.
+    /// Construction checks bindings and compiles the reference without invoking
+    /// controller callbacks. Both causal strategies preserve the same input.
+    pub fn new_stabilizer(
+        circuit: &Circuit,
+        input: &AffineKet,
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Self, RuntimeError> {
+        Self::new_stabilizer_with_sampling(
+            circuit,
+            input,
+            registry,
+            options,
+            arithmetic,
+            &NoiseSampling::Physical,
+        )
+    }
+    /// Use the same owned stabilizer input with an explicit physical-noise
+    /// proposal. Guarded categories retain the existing physical policy.
+    pub fn new_stabilizer_with_sampling(
+        circuit: &Circuit,
+        input: &AffineKet,
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+        sampling: &NoiseSampling,
+    ) -> Result<Self, RuntimeError> {
+        Self::new_stabilizer_observed(
+            circuit,
+            Some(input),
+            registry,
+            options,
+            arithmetic,
+            sampling,
+            None,
+        )
+    }
+    fn new_stabilizer_observed(
+        circuit: &Circuit,
+        input: Option<&AffineKet>,
+        registry: &ControllerRegistry,
+        options: RuntimeOptions,
+        arithmetic: &ScalarArithmetic,
+        sampling: &NoiseSampling,
+        meter: Option<&ExecutionMeter>,
+    ) -> Result<Self, RuntimeError> {
         let names = registry.names();
         for op in circuit.operations() {
             if let Operation::Control {
@@ -394,16 +448,26 @@ impl CausalProgram {
                 return Err(RuntimeError::MissingBinding { name: name.clone() });
             }
         }
+        let zero;
+        let input = if let Some(input) = input {
+            input
+        } else {
+            zero = crate::instrument::zero_input(circuit.num_qubits(), &options.compile)?;
+            &zero
+        };
         let reference = observe(meter, OperationKind::Compilation, || {
             match options.strategy {
                 CausalStrategy::FixedTemplate => {
-                    compile_causal(circuit, &options.compile, arithmetic)
+                    compile_causal_stabilizer(circuit, input, &options.compile, arithmetic)
                         .map_err(RuntimeError::from)
                 }
-                CausalStrategy::ColdPrefix => {
-                    compile_affine(&resolve::potential(circuit), &options.compile, arithmetic)
-                        .map_err(RuntimeError::from)
-                }
+                CausalStrategy::ColdPrefix => compile_affine_stabilizer(
+                    &resolve::potential(circuit),
+                    input,
+                    &options.compile,
+                    arithmetic,
+                )
+                .map_err(RuntimeError::from),
             }
         })?;
         let model = NoiseModel::physical(&reference, &options.noise)?;
@@ -426,6 +490,7 @@ impl CausalProgram {
             reference: (options.strategy == CausalStrategy::FixedTemplate).then_some(reference),
             guarded_sites,
             circuit: circuit.clone(),
+            initial: input.clone(),
             sampler,
             model,
             registry: registry.clone(),
@@ -899,8 +964,13 @@ impl PathState<'_> {
             let prefix = self.program.circuit.runtime_view(self.resolved(end)?);
             self.mode.compilation()?;
             let instrument = observe(self.meter, OperationKind::Compilation, || {
-                compile_affine(&prefix, &self.program.options.compile, arithmetic)
-                    .map_err(RuntimeError::from)
+                compile_affine_stabilizer(
+                    &prefix,
+                    &self.program.initial,
+                    &self.program.options.compile,
+                    arithmetic,
+                )
+                .map_err(RuntimeError::from)
             })?;
             self.network_compilations += 1;
             Ok(instrument)
