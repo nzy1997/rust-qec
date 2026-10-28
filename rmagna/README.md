@@ -3599,14 +3599,14 @@ consumes no entropy and invokes no extra decoder callbacks.
 ## Raw Clifford path limits
 
 `instrument::CompileOptions::max_path_bits` bounds the raw path-variable count
-of the selected lowered Clifford network before its first contraction. Current
-unitary inputs are computational states with zero support variables, so each
-lowered Hadamard contributes one raw variable. This includes Hadamards used to
-copy shared commuting observations. The default is 1,000,000 for library and
-CLI compilation, matching the existing source gate-cap scale; it does not adopt
-the native engine's smaller default. Zero permits networks with no raw paths.
-The cap applies to physical instruments, measurement/reset dilations, targets,
-fixed causal templates and cold replay compilations.
+of the selected lowered Clifford network before its first contraction.
+Computational unitary inputs contribute no initial support variables; each
+lowered Hadamard contributes one raw variable, including shared observation
+copies. The default is 1,000,000 for instrument and CLI compilation, matching
+the existing source gate-cap scale; it does not adopt the native engine's
+smaller default. Zero permits networks with no raw paths. The cap applies to
+physical instruments, measurement/reset dilations, targets, fixed causal
+templates and cold replay compilations.
 
 `UnitaryCircuit::compile_with_path_limit(input, arithmetic, strategy, cap)`
 provides the same bounded lowering directly. Existing `compile` and
@@ -3618,6 +3618,12 @@ its ordinary gate/width resources; a path cap is not a general allocation cap.
 `path_variables` continues to record retained variables after local contraction.
 For example, eight consecutive H gates need eight raw paths even though their
 final computational boundary retains none.
+
+`UnitaryCircuit::compile_stabilizer_with_path_limit(input, arithmetic, strategy, cap)`
+also charges the input support rank before contraction. For example, a rank-two
+stabilizer input on an empty circuit requires two raw paths, so a zero cap
+rejects it. `compile_stabilizer` and `compile_stabilizer_with_strategy` have no
+raw-path cap. See [Normalized stabilizer inputs](#normalized-stabilizer-inputs).
 
 Use `--max-path-bits N` to configure file-based CLI execution or inspection. The
 resolved cap is in `options.compile` and its options fingerprint, while captured
