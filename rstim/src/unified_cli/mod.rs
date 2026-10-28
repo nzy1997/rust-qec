@@ -49,6 +49,9 @@ enum Command {
         /// Loss-aware decoder implementation
         #[arg(long, value_enum)]
         decoder: DecodeDecoder,
+        /// Versioned loss-visible circuit subset
+        #[arg(long, value_enum, default_value = "v1")]
+        circuit_subset: decode::CircuitSubset,
         /// Directory containing manifest.json, circuit.stim, and shots.b8
         #[arg(long)]
         dataset: PathBuf,
@@ -124,9 +127,12 @@ enum DatasetCommand {
     },
     /// Package a third-party circuit and shot payload into a public dataset
     Import {
-        /// Loss-visible circuit file (must satisfy subset v1)
+        /// Loss-visible circuit file (must satisfy the selected subset)
         #[arg(long)]
         circuit: PathBuf,
+        /// Versioned loss-visible circuit subset
+        #[arg(long, value_enum, default_value = "v1")]
+        circuit_subset: decode::CircuitSubset,
         /// Shot payload file produced by an external sampler
         #[arg(long)]
         shots: PathBuf,
@@ -795,6 +801,7 @@ where
             command:
                 DatasetCommand::Import {
                     circuit,
+                    circuit_subset,
                     shots,
                     shots_format,
                     out,
@@ -805,6 +812,7 @@ where
             let artifacts = vec![out.display().to_string()];
             let options = pipeline::DatasetImportOptions {
                 circuit,
+                circuit_subset,
                 shots,
                 shots_format,
                 out,
@@ -869,12 +877,14 @@ where
         }
         Command::Decode {
             decoder,
+            circuit_subset,
             dataset,
             out,
             stats_out,
             shot_timeout_ms,
         } => decode::run(&decode::DecodeOptions {
             decoder: decoder.into(),
+            circuit_subset,
             dataset,
             predictions_out: out,
             stats_out,
@@ -1915,6 +1925,13 @@ fn write_capabilities(
                     output_schema: SCHEMA_VERSION,
                     arguments: vec![
                         ArgumentCapability {
+                            name: "circuit_subset",
+                            flag: "--circuit-subset",
+                            required: false,
+                            values: vec!["v1", "v2"],
+                            default: Some("v1"),
+                        },
+                        ArgumentCapability {
                             name: "circuit",
                             flag: "--circuit",
                             required: true,
@@ -2077,6 +2094,13 @@ fn write_capabilities(
                     formats: vec!["b8", "json"],
                     output_schema: decode::STATS_SCHEMA_VERSION,
                     arguments: vec![
+                        ArgumentCapability {
+                            name: "circuit_subset",
+                            flag: "--circuit-subset",
+                            required: false,
+                            values: vec!["v1", "v2"],
+                            default: Some("v1"),
+                        },
                         ArgumentCapability {
                             name: "decoder",
                             flag: "--decoder",
@@ -2284,6 +2308,9 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
     let is_dataset_export = command_words
         .windows(2)
         .any(|pair| pair[0] == "dataset" && pair[1] == "export");
+    let is_dataset_import = command_words
+        .windows(2)
+        .any(|pair| pair[0] == "dataset" && pair[1] == "import");
     let is_dataset_score = command_words
         .windows(2)
         .any(|pair| pair[0] == "dataset" && pair[1] == "score");
@@ -2297,6 +2324,8 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         pipeline_command
     } else if is_dataset_export {
         pipeline::DATASET_EXPORT_COMMAND
+    } else if is_dataset_import {
+        pipeline::DATASET_IMPORT_COMMAND
     } else if is_dataset_score {
         decode::score::COMMAND
     } else if is_capabilities {
@@ -2314,7 +2343,11 @@ fn parse_error_context(args: &[OsString]) -> (&'static str, bool) {
         Some(_) => true,
         None if is_capabilities || is_decode => true,
         None if is_dataset_score => matches!(explicit_output_format, Some(Some("json"))),
-        None if pipeline_command.is_some() || qasm_command.is_some() || is_dataset_export => {
+        None if pipeline_command.is_some()
+            || qasm_command.is_some()
+            || is_dataset_export
+            || is_dataset_import =>
+        {
             !matches!(explicit_output_format, Some(Some("human")))
         }
         None if is_stats => match explicit_output_format {
