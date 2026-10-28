@@ -1,5 +1,24 @@
 # rmagna
 
+## Normalized stabilizer inputs
+
+`UnitaryCircuit::compile_stabilizer`, `compile_stabilizer_with_strategy` and
+`compile_stabilizer_with_path_limit` accept caller-owned `AffineKet` inputs with
+independent columns and exact unit norm. Both parity-copy and shared-commuting
+lowerings preserve entangled affine support, nonzero offsets, quadratic and
+linear Clifford phases and the exact global coefficient. Invalid width, zero,
+dependent and unnormalized inputs return explicit errors before lowering.
+Checked scalar arithmetic errors propagate; inputs are never repaired by
+contracting dependent paths or renormalizing them.
+
+The raw-path budget counts the initial support rank plus every lowered
+Hadamard before local contraction, including shared observation copies. The
+existing computational-input methods agree with the new methods on basis states
+and retain zero initial support cost. Prepared probability/density/moment plans
+and Pauli insertion views retain their existing ownership and program identity
+rules. This extends the unitary compiler; programmatic InstrumentIR construction
+and full native-interface parity remain separate work.
+
 ## Native selection in task queries
 
 `QueryPreparation::Native(NativePhaseOptions)` opts cached probability, density
