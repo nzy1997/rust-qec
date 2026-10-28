@@ -1,5 +1,6 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod input;
 mod insertions;
 mod observations;
 mod phase_map;
@@ -26,6 +27,9 @@ use std::sync::Arc;
 pub enum UnitaryError {
     DimensionMismatch,
     DimensionOverflow,
+    ZeroStabilizerInput,
+    DependentStabilizerInput,
+    UnnormalizedStabilizerInput,
     InvalidTurns,
     RawPathLimit {
         limit: usize,
@@ -67,6 +71,13 @@ impl fmt::Display for UnitaryError {
                 f,
                 "max_path_bits = {limit} is insufficient; raw Clifford network needs {required}"
             ),
+            Self::ZeroStabilizerInput => write!(f, "unitary stabilizer input must be nonzero"),
+            Self::DependentStabilizerInput => {
+                write!(f, "unitary stabilizer input columns must be independent")
+            }
+            Self::UnnormalizedStabilizerInput => {
+                write!(f, "unitary stabilizer input must have exact unit norm")
+            }
             Self::InvalidTurns => write!(
                 f,
                 "T turns must be below eight and controlled-S turns below four"
@@ -157,7 +168,7 @@ pub struct CompilationDiagnostics {
     pub clifford_gates: usize,
     /// Variables retained after local Hadamard contraction.
     pub path_variables: usize,
-    /// Computational input support plus Hadamards before any contraction.
+    /// Initial support rank plus lowered Hadamards before any contraction.
     pub raw_path_variables: usize,
 }
 
@@ -238,12 +249,11 @@ impl UnitaryCircuit {
         strategy: CompilerStrategy,
         max_path_bits: usize,
     ) -> Result<CompiledUnitary, UnitaryError> {
-        match strategy {
-            CompilerStrategy::ParityCopies => self.compile_parity(input, arithmetic, max_path_bits),
-            CompilerStrategy::SharedCommutingLayer => {
-                shared::compile(self, input, arithmetic, max_path_bits)
-            }
+        if input.width() != self.width {
+            return Err(UnitaryError::DimensionMismatch);
         }
+        let input = CliffordCircuit::computational(input.clone())?;
+        self.compile_stabilizer_with_path_limit(&input, arithmetic, strategy, max_path_bits)
     }
 
     /// Copy each diagonal parity to a fresh |0> ancilla using CNOTs. Its phase
@@ -255,12 +265,17 @@ impl UnitaryCircuit {
         input: &BitVector,
         arithmetic: &ScalarArithmetic,
     ) -> Result<CompiledUnitary, UnitaryError> {
-        self.compile_parity(input, arithmetic, usize::MAX)
+        self.compile_with_path_limit(
+            input,
+            arithmetic,
+            CompilerStrategy::ParityCopies,
+            usize::MAX,
+        )
     }
 
     fn compile_parity(
         &self,
-        input: &BitVector,
+        input: &AffineKet,
         arithmetic: &ScalarArithmetic,
         max_path_bits: usize,
     ) -> Result<CompiledUnitary, UnitaryError> {
@@ -310,14 +325,13 @@ impl UnitaryCircuit {
             .width
             .checked_add(coefficients.len())
             .ok_or(UnitaryError::DimensionOverflow)?;
-        let raw_path_variables = check_raw_paths(&lowered, max_path_bits)?;
-        let initial =
-            CliffordCircuit::computational(BitVector::from_indices(width, input.ones())?)?;
+        let raw_path_variables = check_raw_paths(&lowered, input.columns().len(), max_path_bits)?;
+        let initial = input::with_zero_ancillas(input, width)?;
         let circuit = CliffordCircuit::new(width, lowered)?;
         let boundary = Arc::new(
             circuit
                 .evolve(&initial, arithmetic)?
-                .expect("unitary Clifford gates preserve a nonzero basis input"),
+                .expect("unitary Clifford gates preserve a normalized stabilizer input"),
         );
         let phase = Arc::new(ParityPhase::new(
             coefficients.len(),
@@ -995,11 +1009,18 @@ fn close_retained(
 }
 
 // Check before Clifford evolution, which deliberately contracts paths at each H.
-fn check_raw_paths(gates: &[CliffordGate], limit: usize) -> Result<usize, UnitaryError> {
-    let required = gates
+fn check_raw_paths(
+    gates: &[CliffordGate],
+    initial_rank: usize,
+    limit: usize,
+) -> Result<usize, UnitaryError> {
+    let hadamards = gates
         .iter()
         .filter(|gate| matches!(gate, CliffordGate::H(_)))
         .count();
+    let required = initial_rank
+        .checked_add(hadamards)
+        .ok_or(UnitaryError::DimensionOverflow)?;
     if required > limit {
         return Err(UnitaryError::RawPathLimit { limit, required });
     }

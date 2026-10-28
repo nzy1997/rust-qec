@@ -266,7 +266,7 @@ fn copy_observation(gates: &mut Vec<CliffordGate>, word: &PauliWord, ancilla: us
 
 pub(super) fn compile(
     source: &UnitaryCircuit,
-    input: &BitVector,
+    input: &AffineKet,
     arithmetic: &ScalarArithmetic,
     max_path_bits: usize,
 ) -> Result<CompiledUnitary, UnitaryError> {
@@ -442,9 +442,8 @@ pub(super) fn compile(
         coordinates: phase_width,
     };
     let phase = Arc::new(updates.phase(&BTreeMap::new())?);
-    let raw_path_variables = check_raw_paths(&gates, max_path_bits)?;
-    let initial =
-        CliffordCircuit::computational(BitVector::from_indices(coherent_width, input.ones())?)?;
+    let raw_path_variables = check_raw_paths(&gates, input.columns().len(), max_path_bits)?;
+    let initial = input::with_zero_ancillas(input, coherent_width)?;
     let circuit = CliffordCircuit::new(coherent_width, gates)?;
     let boundary = Arc::new(
         circuit
