@@ -72,10 +72,12 @@ fn verify_table(dimension: usize, table: &[u8]) {
     assert_eq!(usage.terms, expected.len());
     assert_eq!(usage.constraint_rows, 0);
     assert_eq!(usage.parity_rows, parities);
-    assert_eq!(
-        usage.verification_work,
-        table.len() as u128 * (1 + expected.len() + parities) as u128
-    );
+    let pointwise = table.len() as u128 * (1 + expected.len() + parities) as u128;
+    let inverse = table.len() as u128 * (dimension + 2) as u128
+        + 4 * expected.len() as u128
+        + parities as u128;
+    assert_eq!(usage.verification_work, pointwise.min(inverse));
+    assert_eq!(entry.verification().work, usage.verification_work);
 }
 
 #[test]

@@ -92,12 +92,12 @@ impl PhaseCatalogue {
             parities as u128,
             limits.max_parity_rows as u128,
         )?;
-        let verification_work = (count as u128)
-            .checked_mul(1 + terms as u128 + parities as u128)
-            .ok_or_else(|| error("catalogue.max_verification_work", "work exceeds u128"))?;
+        // Use the same planner as insertion, which independently reconstructs
+        // from the returned indicators rather than this forward scratch buffer.
+        let proof = verification::plan(dimension, count, terms as u128, 0, parities as u128, true)?;
         limit(
             "catalogue.max_verification_work",
-            verification_work,
+            proof.work,
             limits.max_verification_work,
         )?;
         vector_capacity::<CliffordIndicator>("catalogue.walsh.terms_capacity", terms as u128)?;

@@ -205,7 +205,18 @@ fn entry(
         usage.terms as u128 + terms.len() as u128,
         limits.max_terms as u128,
     )?;
-    let minimum_work = usage.verification_work + count as u128 * (1 + terms.len() as u128);
+    // Before decoding, either proof may be eligible. Admit a lower bound for
+    // both; insertion checks the actual normalized rows and exact chosen cost.
+    let minimum = verification::plan(dimension, count, terms.len() as u128, 0, 0, true)?;
+    let minimum_work = usage
+        .verification_work
+        .checked_add(minimum.work)
+        .ok_or_else(|| {
+            error(
+                "catalogue.max_verification_work",
+                "verification work exceeds u128",
+            )
+        })?;
     limit(
         "catalogue.max_verification_work",
         minimum_work,

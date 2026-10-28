@@ -100,14 +100,20 @@ impl PhaseCatalogue {
         }
         limit("catalogue.max_entries", 1, limits.max_entries as u128)?;
         limit("catalogue.max_terms", terms, limits.max_terms as u128)?;
-        let rows = checked(
-            checked(checked(1_u128.checked_add(terms))?.checked_add(constraints))?
-                .checked_add(parities),
+        let character_only = factors
+            .iter()
+            .all(|(_, entry)| verification::characters(entry.terms()));
+        let proof = verification::plan(
+            dimension,
+            count,
+            terms,
+            constraints,
+            parities,
+            character_only,
         )?;
-        let work = checked((count as u128).checked_mul(rows))?;
         limit(
             "catalogue.max_verification_work",
-            work,
+            proof.work,
             limits.max_verification_work,
         )?;
         vector_capacity::<CliffordIndicator>("catalogue.product.terms_capacity", terms)?;

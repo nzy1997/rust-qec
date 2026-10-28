@@ -4640,7 +4640,7 @@ assert_eq!(terms[1].coefficient,
 The explicit transform-work cap counts `d * 2^d` scalar additions/subtractions.
 Root construction and coefficient normalization take additional linear table
 work bounded by `CatalogueLimits::max_table_values`. The returned certificate's
-full pointwise reconstruction uses the independent `max_verification_work`
+complete reconstruction uses the independent `max_verification_work`
 limit. Dimension, table shape/values, transform work and vector capacities are
 checked before their corresponding allocations; surviving term/parity and
 reconstruction limits are checked before indicator construction. Scalar
@@ -4661,6 +4661,46 @@ literal integer character sums and verify actual prepared scalar/labelled
 contractions, sparse spectra, ownership and resource endpoints. Opt-in runtime
 direct/product/Walsh selection and optional phase injection are documented above;
 this constructor leaves existing preparation defaults unchanged.
+
+### Bounded character certificate verification
+
+Insertion verifies the actual supplied `PhaseDecompositionInput::terms` over the
+entire table. Unconstrained terms whose normalized parity coefficients are all
+four are characters; their global constants are folded into their exact scalar
+coefficients. Duplicate masks, cancellation, zero coefficients and term order
+are preserved. An independent inverse Walsh transform reconstructs the table
+from those supplied terms when its logical work bound is lower than pointwise
+verification. General Clifford phases and constrained indicators use pointwise
+verification. Ties and cheaper single-term constants also keep pointwise proofs.
+
+For `N = 2^d` assignments, `T` terms, `C` constraint rows and `P` normalized parity
+rows, pointwise work remains `N*(1+T+C+P)`. Character inverse work is
+`N*(d+2)+4*T+P`, charging dense initialization/comparison, butterfly arithmetic,
+per-term scalar validation/root/multiply/add and per-row packed-axis XOR. These
+are logical accounting units, excluding allocator overhead and integer bit cost.
+The input dimension must fit the complete-table platform index range.
+
+`certificate.verification()` exposes the actual `CertificateVerificationMethod`
+and `work`. Cumulative `CatalogueUsage::verification_work` and direct-source
+re-admission charge that saved immutable proof cost. Insertion admits the full
+cumulative cost before allocating dense proof scratch. Forward Walsh, JSON
+admission and character-product construction use compatible bounds; the forward
+transform buffer is never treated as a certificate of the returned terms.
+
+The twelve-variable positive-T test obtains all 4,096 coefficients independently
+from products of `(1 +/- omega)/2` and checks every assignment by literal integer
+character sums. Its inverse proof costs 77,823 units, compared with 33,554,432
+pointwise units. A budget of 77,822 is rejected before dense proof allocation;
+an allocation observation control confirms the admitted path uses that scratch.
+Corrupted actual coefficients/axes, malformed dimensions, arithmetic exhaustion,
+cumulative limits and tighter direct-source bounds are also tested. Run:
+
+```sh
+cargo test --locked -p rmagna --test walsh_catalogue --test character_certification
+```
+
+This improves certificate verification; it does not establish full task
+throughput, rare-event precision, complete native-suite parity or paper results.
 
 ## Frozen native-coordinate phase selection
 
@@ -4715,7 +4755,7 @@ memory-layout or process-memory equivalence claims.
 
 `construction` applies to the selected certificate independently of unrelated
 source entries. Direct entries share immutable indicator data and are reverified
-pointwise under the current construction and scalar arithmetic bounds. The
+with their saved proof method under current construction and arithmetic bounds. The
 receipt's certification usage records this reconstruction work. Product and
 Walsh constructors keep their own row, term, reconstruction and transform checks;
 `preparation` additionally bounds core construction, terms and transport geometry.
