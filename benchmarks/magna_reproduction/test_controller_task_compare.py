@@ -169,7 +169,8 @@ class ControllerComparisonTests(unittest.TestCase):
                              probability_preparation=None, density_preparation=None,
                              fiber_search_rank=16, warm_replays=0, insertion_preparation="direct",
                              max_insertion_table_bytes=None, max_insertion_catalog_entries=None)
-            for broken, malformed_kind in [(i, kind) for i in [0, 1] for kind in ["schema", "warm", "insertion"]]:
+            for broken, malformed_kind in [(i, kind) for i in [0, 1] for kind in ["schema", "warm", "insertion", "native", "timeout"]]:
+                args.moment_preparation = "native" if malformed_kind == "native" else None
                 calls = []
                 def rust(command, **kwargs):
                     history = json.loads(Path(command[command.index("--history") + 1]).read_text())
@@ -177,6 +178,15 @@ class ControllerComparisonTests(unittest.TestCase):
                     calls.append(history)
                     self.assertEqual(command[command.index("--warm-replays") + 1], "0")
                     actual = valid(bool(index))
+                    if malformed_kind == "native":
+                        from test_native_options import receipt
+                        actual.update(receipt(args))
+                        actual.update(expected(bool(index)))
+                        if index == broken:
+                            actual["prepared_moment_cache"]["native_routes"]["direct"] = True
+                    if index == broken and malformed_kind == "timeout":
+                        raise subprocess.TimeoutExpired(command, args.timeout,
+                            output=f"unique-malformed-history-{index}".encode(), stderr=f"stderr-{index}".encode())
                     actual["unique_marker"] = f"unique-malformed-history-{index}"
                     if index == broken and malformed_kind == "insertion":
                         actual["configuration"]["insertion_preparation"] = "prepared"
@@ -197,7 +207,7 @@ class ControllerComparisonTests(unittest.TestCase):
                 self.assertEqual(len(row["cases"]), 2)
                 for index, case in enumerate(row["cases"]):
                     self.assertEqual(case["reference"], expected(bool(index)))
-                    self.assertEqual(case["status"], "failed" if index == broken else "matched")
+                    self.assertEqual(case["status"], ("timeout" if malformed_kind == "timeout" else "failed") if index == broken else "matched")
                 self.assertIn(f"unique-malformed-history-{broken}", row["cases"][broken]["stdout"])
                 self.assertEqual(row["cases"][broken]["stderr"], f"stderr-{broken}")
 

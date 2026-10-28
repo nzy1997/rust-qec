@@ -725,7 +725,7 @@ fn configure_queries(
     let mut fiber = rmagna::fibers::FiberOptions::default();
     fiber.max_search_rank = flags.number("--fiber-search-rank", fiber.max_search_rank)?;
     let native_options = native::configure(
-        flags,
+        &mut flags.0,
         &[probability.as_str(), density.as_str(), moment.as_str()],
     )?;
     let native_policy = |mode: &str| {

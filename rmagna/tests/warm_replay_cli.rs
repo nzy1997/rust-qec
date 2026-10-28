@@ -242,6 +242,209 @@ fn check_cache(value: &Value) {
         }
     }
 }
+
+#[test]
+fn native_diagnostics_replay_t_and_ccz_with_actual_retained_transport_outcomes() {
+    for ccz in [false, true] {
+        for bit in [false, true] {
+            let fixture = Fixture::new(false);
+            fixture.put("history.json", if bit { "[[true]]" } else { "[[false]]" });
+            fixture.put("physical.magna", if ccz {
+                "H 0\nH 1\nH 2\nCCZ 0 1 2\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCX ctrl[0] 1\n"
+            } else {
+                "H 0\nT 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[copy] det[0] -> ctrl[0]\nCX ctrl[0] 1\nH 2\nT 2\n"
+            });
+            fixture.put(
+                "ideal.magna",
+                if ccz { "H 0\nH 1\n" } else { "I 0\nH 1\nT 1\n" },
+            );
+            fixture.put("task.json", if ccz {
+                r#"{"outputs":[1,2],"ideal_state":"ideal.magna","observables":[[0,1],[0,2],[0,3],[1,0],[2,0],[3,0],[3,3]]}"#
+            } else {
+                r#"{"outputs":[1,2],"ideal_state":"ideal.magna","observables":[[0,1],[2,0],[2,2],[2,1]]}"#
+            });
+            let history = fixture.path("history.json").display().to_string();
+            let baseline =
+                fixture.success(&["--history", &history, "--history-sampler", "exact_marginal"]);
+            if ccz {
+                let a = ScalarArithmetic::default();
+                assert_eq!(
+                    scalar(&baseline["history_mass"]),
+                    a.scalar(
+                        [if bit { 1 } else { 3 }.into(), 0.into(), 0.into(), 0.into()],
+                        -2
+                    )
+                    .unwrap()
+                );
+                assert_eq!(
+                    scalar(&baseline["raw_target_success"]),
+                    a.scalar(
+                        [if bit { 1 } else { 9 }.into(), 0.into(), 0.into(), 0.into()],
+                        -4
+                    )
+                    .unwrap()
+                );
+                assert_eq!(
+                    scalar(&baseline["raw_error"]),
+                    a.scalar([3.into(), 0.into(), 0.into(), 0.into()], -4)
+                        .unwrap()
+                );
+                let moments = if bit {
+                    vec!["1", "-1", "-1", "0", "0", "0", "0"]
+                } else {
+                    vec!["1/3", "1/3", "-1/3", "2/3", "2/3", "2/3", "2/3"]
+                };
+                assert_eq!(
+                    baseline["moments"],
+                    json!(
+                        moments
+                            .iter()
+                            .map(|x| vec![*x, "0", "0", "0"])
+                            .collect::<Vec<_>>()
+                    )
+                );
+            } else {
+                check_masses(&baseline, bit);
+                let sign = if bit { "-1" } else { "1" };
+                let half = if bit { "-1/2" } else { "1/2" };
+                let minus_half = if bit { "1/2" } else { "-1/2" };
+                assert_eq!(
+                    baseline["moments"],
+                    json!([
+                        [sign, "0", "0", "0"],
+                        ["0", "1/2", "0", "-1/2"],
+                        ["0", "1/2", "0", "-1/2"],
+                        ["0", half, "0", minus_half]
+                    ])
+                );
+            }
+            for compiler in ["shared", "parity_copies"] {
+                for mode in ["fixed", "native", "native_injection"] {
+                    for cap in [
+                        None,
+                        Some("prepared"),
+                        Some("--native-transport-max-terms"),
+                        Some("--native-transport-max-geometry-words"),
+                        Some("--native-transport-max-construction-work"),
+                    ] {
+                        if mode == "fixed" && cap.is_some() {
+                            continue;
+                        }
+                        let mut flags = vec![
+                            "--history",
+                            &history,
+                            "--history-sampler",
+                            "exact_marginal",
+                            "--compiler",
+                            compiler,
+                            "--probability-preparation",
+                            mode,
+                            "--density-preparation",
+                            mode,
+                            "--moment-preparation",
+                            mode,
+                            "--warm-replays",
+                            "1",
+                        ];
+                        if let Some(cap) = cap {
+                            flags.extend(["--native-transport", "prepared"]);
+                            if cap != "prepared" {
+                                flags.extend([cap, "0"]);
+                            }
+                        }
+                        let actual = fixture.success(&flags);
+                        for key in [
+                            "history_mass",
+                            "raw_acceptance",
+                            "raw_error",
+                            "raw_target_success",
+                            "target_normalization",
+                            "moments",
+                            "controller_calls",
+                        ] {
+                            assert_eq!(
+                                actual[key], baseline[key],
+                                "{ccz} {bit} {compiler} {mode} {cap:?} {key}"
+                            );
+                        }
+                        assert_eq!(actual["warm_replays"]["cache_unchanged"], true);
+                        if mode == "fixed" {
+                            continue;
+                        }
+                        let mut prepared = 0;
+                        let mut skipped = 0;
+                        for family in ["probability", "density", "moment"] {
+                            assert_eq!(
+                                actual["configuration"][format!("{family}_preparation")],
+                                mode
+                            );
+                            assert_eq!(
+                                actual["configuration"][format!("{family}_preparation_options")]["mode"],
+                                mode
+                            );
+                            let cache = &actual[format!("prepared_{family}_cache")];
+                            let routes = &cache["native_routes"];
+                            let total: u64 = ["direct", "product", "walsh", "injected"]
+                                .into_iter()
+                                .map(|key| routes[key].as_u64().unwrap())
+                                .sum();
+                            assert_eq!(total, cache["fixed_resources"].as_u64().unwrap());
+                            assert!(total > 0);
+                            prepared += cache["native_transports"]["prepared"].as_u64().unwrap();
+                            skipped += cache["native_transports"]["budget_skipped"]
+                                .as_u64()
+                                .unwrap();
+                        }
+                        match cap {
+                            None => assert_eq!((prepared, skipped), (0, 0)),
+                            Some("prepared") => {
+                                assert!(prepared > 0);
+                                assert_eq!(skipped, 0);
+                            }
+                            Some(_) => {
+                                assert_eq!(prepared, 0);
+                                assert!(skipped > 0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn native_orphan_limits_fail_before_loading_a_decoder() {
+    let fixture = Fixture::new(false);
+    for flag in [
+        "--native-max-terms",
+        "--native-max-signature-work",
+        "--injection-max-work",
+        "--native-transport-max-terms",
+    ] {
+        let (result, output) = fixture.execute(&[flag, "0"]);
+        assert!(result.unwrap_err().contains("requires"));
+        assert!(output.is_empty());
+    }
+    for flags in [
+        vec![
+            "--moment-preparation",
+            "native",
+            "--injection-max-work",
+            "0",
+        ],
+        vec![
+            "--moment-preparation",
+            "native",
+            "--native-transport-max-terms",
+            "0",
+        ],
+        vec!["--moment-preparation", "native", "--native-max-terms", "-1"],
+    ] {
+        assert!(fixture.execute(&flags).0.is_err());
+    }
+    assert!(!fixture.path("plugin.imported").exists());
+}
 #[test]
 fn actual_warm_replays_preserve_irrational_masses_inputs_process_and_cache_modes() {
     for compiler in ["parity_copies", "shared"] {

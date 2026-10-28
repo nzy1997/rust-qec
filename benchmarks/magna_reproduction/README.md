@@ -134,6 +134,43 @@ python3 benchmarks/magna_reproduction/controller_task_compare.py \
   --warm-replays 2 --timeout 600 --out /absolute/path/to/new-controller-results.json
 ```
 
+The controller driver also accepts `native` and `native_injection` independently
+for `--probability-preparation`, `--density-preparation` and
+`--moment-preparation`. For a bounded diagnostic of all five packaged tasks:
+
+```sh
+python3 benchmarks/magna_reproduction/controller_task_compare.py \
+  --upstream /absolute/path/to/pinned/magna \
+  --rust-example /absolute/path/to/fresh/evaluate_task \
+  --probability-preparation native --density-preparation native \
+  --moment-preparation native --timeout 20 \
+  --out /absolute/path/to/new-native-controller-results.json
+```
+
+Use `--native-transport prepared` to request retained boundary geometry. Its
+`--native-transport-max-terms`, `--native-transport-max-geometry-words` and
+`--native-transport-max-construction-work` bounds can independently force an
+optional preparation skip; exact evaluation then recomputes the boundary.
+Selection/construction/core limits use the same `--native-*` flags as the main
+CLI; `--injection-*` limits require at least one `native_injection` family.
+`--help` lists the complete set. Orphan limits are rejected before decoder import.
+
+The diagnostic reports each family's effective policy in
+`configuration.<family>_preparation_options`. Work limits wider than 64 bits are
+decimal strings. Native caches report actual retained `native_routes`
+(direct/product/Walsh/injected and injection budget skips) and
+`native_transports` (prepared/budget skipped). Warm replay checks retained moment
+caches along with probability, density and insertion caches. These are preparation
+counts, not counts of transport queries or speedup measurements.
+
+The two native uint64 seed endpoints may produce the same history. Each actual
+controller history is replayed explicitly in Rust, without assuming identical
+random trajectories. Both cases and source provenance survive result-validation
+failures; failed or timed-out children retain stdout/stderr. Budget failures and
+timeouts produce partial receipts and nonzero exit status. A 20-second capture
+does not require every large task to finish and does not establish paper-scale
+Monte Carlo or performance results.
+
 Use the pinned reference Python environment to run these commands. Keep the
 binary unchanged during a capture; its receipt binds its content hash. The
 drivers validate the applied mode, effective limits and retained catalog size;

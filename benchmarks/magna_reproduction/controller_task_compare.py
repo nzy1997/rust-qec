@@ -18,25 +18,26 @@ TASKS = ["dk", "logical-distillation", "tqd3", "tqd4", "tqd5"]
 def main():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import insertion_options
+    import native_options
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
     parser.add_argument("--rust-example", type=Path, required=True)
     parser.add_argument("--compiler", choices=["shared", "parity_copies"])
-    parser.add_argument("--probability-preparation", choices=["cold", "trace", "fixed"])
-    parser.add_argument("--density-preparation", choices=["cold", "trace", "fixed"])
     parser.add_argument("--fiber-search-rank", type=int, default=16)
     parser.add_argument("--warm-replays", type=int, default=0)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--tasks", nargs="+", choices=TASKS, default=TASKS)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--one", choices=TASKS, help=argparse.SUPPRESS)
+    native_options.add_arguments(parser)
     insertion_options.add_arguments(parser)
     args = parser.parse_args()
     insertion_options.validate(args, parser)
+    native_options.validate(args, parser)
     if not 0 <= args.warm_replays <= 16:
         parser.error("warm replay count must be between zero and 16")
-    if args.fiber_search_rank < 0 or (args.probability_preparation != "fixed" and args.density_preparation != "fixed" and args.fiber_search_rank != 16):
-        parser.error("a custom nonnegative fiber search rank requires fixed preparation")
+    if args.fiber_search_rank < 0 or (not native_options.uses_fibers(args) and args.fiber_search_rank != 16):
+        parser.error("a custom nonnegative fiber search rank requires fixed or catalogue preparation")
     if args.timeout <= 0:
         parser.error("timeout must be positive")
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -50,10 +51,10 @@ def main():
         parser.error("--out is required")
     rows = []
     document = dict(schema="rmagna.controller-task-comparison.v1", status="running",
-        scope="prescribed no-fault observations from two native entropy endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
+        scope="prescribed no-fault observations from two native uint64 seed endpoints, replayed explicitly in Rust; not Monte Carlo or performance evidence",
         rust_binary_sha256=before, compiler=args.compiler, probability_preparation=args.probability_preparation,
-        density_preparation=args.density_preparation, warm_replays=args.warm_replays, **insertion_options.resolved(args),
-        fiber_search_rank=args.fiber_search_rank if "fixed" in (args.probability_preparation, args.density_preparation) else None, tasks=args.tasks, cases=rows)
+        density_preparation=args.density_preparation, moment_preparation=getattr(args, "moment_preparation", None), native_policies=native_options.resolved(args), warm_replays=args.warm_replays, **insertion_options.resolved(args),
+        fiber_search_rank=args.fiber_search_rank if native_options.uses_fibers(args) else None, tasks=args.tasks, cases=rows)
     with args.out.open("x", encoding="utf-8") as output:
         output.write(json.dumps(document, indent=2, sort_keys=True) + "\n")
     def checkpoint():
@@ -68,11 +69,8 @@ def main():
         command += insertion_options.command(args)
         if args.compiler:
             command += ["--compiler", args.compiler]
-        if args.probability_preparation:
-            command += ["--probability-preparation", args.probability_preparation]
-        if args.density_preparation:
-            command += ["--density-preparation", args.density_preparation]
-        if "fixed" in (args.probability_preparation, args.density_preparation):
+        command += native_options.command(args)
+        if native_options.uses_fibers(args):
             command += ["--fiber-search-rank", str(args.fiber_search_rank)]
         process = subprocess.Popen(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                    start_new_session=os.name == "posix")
@@ -148,7 +146,8 @@ def validate_warm_result(actual, count):
 
 def compare_result(result, expected, word, max_terms, classical, compiler=None,
                    probability_preparation=None, fiber_search_rank=16, warm_replays=None,
-                          density_preparation=None, insertion_args=None):
+                          density_preparation=None, insertion_args=None,
+                   moment_preparation=None, native_args=None):
     """Retain one history's raw output even when a successful child is malformed."""
     try:
         actual = json.loads(result.stdout)
@@ -161,13 +160,17 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
         if insertion_args is not None:
             import insertion_options
             insertion_options.verify(actual, insertion_args)
+        if native_args is not None:
+            import native_options
+            native_options.verify(actual, native_args)
         validate_warm_result(actual, warm_replays)
         for key, mode in [("probability_preparation", probability_preparation),
-                          ("density_preparation", density_preparation)]:
+                          ("density_preparation", density_preparation),
+                          ("moment_preparation", moment_preparation)]:
             if mode is not None and config.get(key) != mode:
                 raise ValueError(f"Rust example did not apply the declared {key.replace('_', ' ')}")
-        if probability_preparation is not None or density_preparation is not None:
-            fixed = "fixed" in (probability_preparation, density_preparation)
+        if any(value is not None for value in (probability_preparation, density_preparation, moment_preparation)):
+            fixed = any(value in ("fixed", "catalogue") for value in (probability_preparation, density_preparation, moment_preparation))
             rank = config.get("fiber_search_rank")
             if ((fixed and (type(rank) is not int or rank != fiber_search_rank))
                     or (not fixed and rank is not None)):
@@ -209,7 +212,8 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
         if compared["target_normalization"] is None:
             compared["target_normalization"] = dict(coefficients=["1", "0", "0", "0"], power=0)
         return dict(constant_word=word, status="matched" if compared == expected else "mismatch",
-                    reference=expected, compared=compared, rust=actual)
+                    reference=expected, compared=compared, rust=actual,
+                    stdout=result.stdout, stderr=result.stderr)
     except Exception as error:
         # Processing external output is part of the comparison. Fail this case
         # explicitly and continue so previous/later evidence and provenance survive.
@@ -221,6 +225,7 @@ def compare_result(result, expected, word, max_terms, classical, compiler=None,
 def one(args, binary):
     import reference
     import insertion_options
+    import native_options
     from witness_environment import native_reference
     root = args.upstream.resolve() / "examples" / args.one
     config_path = root / "controllers.json"
@@ -270,19 +275,19 @@ def one(args, binary):
             command += insertion_options.command(args)
             if args.compiler:
                 command += ["--compiler", args.compiler]
-            if args.probability_preparation:
-                command += ["--probability-preparation", args.probability_preparation]
-            if args.density_preparation:
-                command += ["--density-preparation", args.density_preparation]
-            if "fixed" in (args.probability_preparation, args.density_preparation):
+            command += native_options.command(args)
+            if native_options.uses_fibers(args):
                 command += ["--fiber-search-rank", str(args.fiber_search_rank)]
             try:
                 with tempfile.TemporaryDirectory(prefix="rmagna-prescribed-decoder-") as directory:
                     history = Path(directory) / "history.json"
                     history.write_text(json.dumps([call["inputs"] for call in calls]))
                     result = subprocess.run(command + ["--history", str(history)], text=True, capture_output=True, timeout=args.timeout)
-            except subprocess.TimeoutExpired:
-                cases.append(dict(constant_word=word, status="timeout", limit_seconds=args.timeout, reference=expected))
+            except subprocess.TimeoutExpired as error:
+                def text(value):
+                    return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
+                cases.append(dict(constant_word=word, status="timeout", limit_seconds=args.timeout,
+                                  stdout=text(error.stdout), stderr=text(error.stderr), reference=expected))
                 continue
             if result.returncode:
                 cases.append(dict(constant_word=word, status="failed", returncode=result.returncode,
@@ -292,15 +297,16 @@ def one(args, binary):
                                         "error_observables" in compiled.task["raw"], compiler=args.compiler,
                                         probability_preparation=args.probability_preparation,
                                         fiber_search_rank=args.fiber_search_rank, warm_replays=args.warm_replays,
-                                        density_preparation=args.density_preparation, insertion_args=args))
+                                        density_preparation=args.density_preparation, insertion_args=args,
+                                         moment_preparation=getattr(args, "moment_preparation", None), native_args=args))
         if reference.digest(binary) != binary_hash:
             raise RuntimeError("Rust binary changed during comparison")
         return dict(task=args.one, status="matched" if all(c["status"] == "matched" for c in cases) else "failed",
                     upstream_commit=captured.manifest["upstream"]["commit"], native_sha256=captured.native_sha256,
                     reference_manifest_sha256=captured.manifest_sha256, rust_binary_sha256=binary_hash,
                     compiler=args.compiler, probability_preparation=args.probability_preparation,
-                    density_preparation=args.density_preparation, warm_replays=args.warm_replays, **insertion_options.resolved(args),
-        fiber_search_rank=args.fiber_search_rank if "fixed" in (args.probability_preparation, args.density_preparation) else None, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
+                    density_preparation=args.density_preparation, moment_preparation=getattr(args, "moment_preparation", None), native_policies=native_options.resolved(args), warm_replays=args.warm_replays, **insertion_options.resolved(args),
+        fiber_search_rank=args.fiber_search_rank if native_options.uses_fibers(args) else None, inputs={p.relative_to(args.upstream.resolve()).as_posix(): reference.digest(p)
                             for p in (config_path, root / "run.json", root / run["circuit"], root / run["task"])}, cases=cases)
 
 

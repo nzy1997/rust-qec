@@ -1,6 +1,26 @@
 //! Explicit native policy limits, shared by the selected query families.
-use super::Flags;
 use rmagna::phase::{NativePhaseOptions, NativeTransportMode};
+use std::collections::BTreeMap;
+
+// Keep the executable and diagnostic example on the same admission path.
+struct Flags<'a>(&'a mut BTreeMap<String, String>);
+impl Flags<'_> {
+    fn number<T: std::str::FromStr>(&mut self, flag: &str, default: T) -> Result<T, String> {
+        self.0.remove(flag).map_or(Ok(default), |value| {
+            value
+                .parse()
+                .map_err(|_| format!("{flag} needs a nonnegative integer in range"))
+        })
+    }
+    fn choice(&mut self, flag: &str, default: &str, choices: &[&str]) -> Result<String, String> {
+        let value = self.0.remove(flag).unwrap_or_else(|| default.to_owned());
+        if choices.contains(&value.as_str()) {
+            Ok(value)
+        } else {
+            Err(format!("{flag} must be {}", choices.join(" or ")))
+        }
+    }
+}
 pub(super) const FLAGS: &[&str] = &[
     "--native-transport",
     "--native-transport-max-terms",
@@ -26,7 +46,11 @@ pub(super) const FLAGS: &[&str] = &[
     "--injection-max-geometry-words",
     "--injection-max-terms",
 ];
-pub(super) fn configure(flags: &mut Flags, modes: &[&str]) -> Result<NativePhaseOptions, String> {
+pub(super) fn configure(
+    input: &mut BTreeMap<String, String>,
+    modes: &[&str],
+) -> Result<NativePhaseOptions, String> {
+    let mut flags = Flags(input);
     let enabled = modes
         .iter()
         .any(|m| matches!(*m, "native" | "native_injection"));
