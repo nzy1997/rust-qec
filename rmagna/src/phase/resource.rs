@@ -12,6 +12,9 @@ use crate::quadratic::QuadraticForm;
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::stabilizer::AffineKet;
 
+#[cfg(test)]
+mod transport_admission_tests;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PhaseResourceOptions {
     pub fibers: FiberOptions,
@@ -156,7 +159,8 @@ impl PreparedPhaseResource {
     pub(crate) fn prepare_native_transport(
         &mut self,
         reference: &ParityPhase,
-        boundary: &AffineKet,
+        width: usize,
+        boundary: impl FnOnce() -> Result<AffineKet, PhaseError>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<Option<PreparedCatalogueBoundary>, PhaseError> {
         let Some(options) = self.native_transport_options else {
@@ -165,14 +169,26 @@ impl PreparedPhaseResource {
         if options.mode == NativeTransportMode::Off {
             return Ok(None);
         }
-        let result = self
+        let native = self
             .native_resource()
-            .expect("native transport options belong to a native resource")
-            .prepare_boundary(reference, boundary, &options.limits, arithmetic);
+            .expect("native transport options belong to a native resource");
+        let result = (|| {
+            // Neither the input factory nor lower transport construction may
+            // run until their combined storage and work bounds are admitted.
+            let mut usage = native.admit_symbolic_boundary(reference, width, &options.limits)?;
+            let boundary = boundary()?;
+            if boundary.width() != width {
+                return Err(PhaseError::DimensionMismatch);
+            }
+            let plan =
+                native.prepare_boundary(reference, &boundary, &options.limits, arithmetic)?;
+            usage.consistent_terms = plan.usage().consistent_terms;
+            usage.shared_maps = plan.usage().shared_maps;
+            Ok((plan, usage))
+        })();
         match result {
-            Ok(plan) => {
-                self.native_transport_receipt =
-                    Some(NativeTransportReceipt::Prepared(plan.usage()));
+            Ok((plan, usage)) => {
+                self.native_transport_receipt = Some(NativeTransportReceipt::Prepared(usage));
                 Ok(Some(plan))
             }
             Err(PhaseError::ResourceLimit {

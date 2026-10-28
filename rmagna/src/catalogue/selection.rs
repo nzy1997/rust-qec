@@ -430,6 +430,16 @@ impl FrozenPhasePlan {
         self.prepared.expand(updated, boundary, arithmetic)
     }
 
+    pub(crate) fn admit_symbolic_boundary(
+        &self,
+        reference: &ParityPhase,
+        width: usize,
+        options: &super::CatalogueBoundaryOptions,
+    ) -> Result<super::CatalogueBoundaryUsage, PhaseError> {
+        self.prepared
+            .admit_symbolic_boundary(reference, width, options)
+    }
+
     /// Freeze a separately bounded labelled transport for this selected resource.
     /// The returned plan shares immutable owned data and does not reselect a core.
     pub fn prepare_boundary(

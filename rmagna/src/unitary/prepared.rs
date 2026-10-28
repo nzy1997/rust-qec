@@ -49,20 +49,12 @@ impl ScalarClosure {
             PhaseRestriction::new(&self.widths, phases, self.contraction.output_columns())?;
         let phase = phase_map.apply(phases, &BitVector::zeros(self.keep.len())?)?;
         let mut decomposition = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
-        let transport = if decomposition.native_transport_requested() {
-            // The Gaussian plan already records this remaining form. Keeping
-            // an empty scalar boundary needs no outcome or scalar contraction,
-            // including when the actual reference Gaussian is zero.
-            let symbolic = AffineKet::new(
-                BitVector::zeros(0)?,
-                vec![BitVector::zeros(0)?; self.contraction.output_columns().len()],
-                self.contraction.output_reference_phase().clone(),
-                ExactScalar::one(),
-            )?;
-            decomposition.prepare_native_transport(&phase, &symbolic, arithmetic)?
-        } else {
-            None
-        };
+        let transport = decomposition.prepare_native_transport(
+            &phase,
+            0,
+            || Ok(self.contraction.symbolic_boundary(0)?),
+            arithmetic,
+        )?;
         self.resource = Some(FixedResource {
             decomposition,
             phase_map,

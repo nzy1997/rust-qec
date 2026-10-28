@@ -2,6 +2,9 @@
 use super::*;
 use crate::quadratic::{QuadraticAction, QuadraticValues};
 
+#[cfg(test)]
+mod symbolic_tests;
+
 struct Step {
     action: QuadraticAction,
     offset_column: Option<BitVector>,
@@ -94,6 +97,33 @@ impl PreparedAffineContraction {
     /// It remains useful when the reference Gaussian itself vanishes.
     pub(crate) fn output_reference_phase(&self) -> &QuadraticForm {
         &self.output_phase
+    }
+
+    /// Direct final-width symbolic input, constructed only after admission.
+    /// Discarded label words are never cloned or scanned.
+    pub(crate) fn symbolic_boundary(&self, width: usize) -> Result<AffineKet, StabilizerError> {
+        if width > self.reference.width() {
+            return Err(StabilizerError::IncompatibleBoundaryMap);
+        }
+        let words = width.div_ceil(64);
+        let columns = self
+            .columns
+            .iter()
+            .map(|column| {
+                let mut prefix = column.words()[..words].to_vec();
+                if !width.is_multiple_of(64) {
+                    *prefix.last_mut().expect("nonempty partial prefix") &=
+                        (1_u64 << (width % 64)) - 1;
+                }
+                BitVector::from_words(width, prefix)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        AffineKet::new(
+            BitVector::zeros(width)?,
+            columns,
+            self.output_reference_phase().clone(),
+            ExactScalar::one(),
+        )
     }
 
     /// Contract arbitrary quadratic phase updates on the same boundary columns.

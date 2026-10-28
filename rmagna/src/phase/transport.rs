@@ -20,6 +20,9 @@ impl NativeTransportMode {
 }
 /// Bounds apply independently of decomposition selection and arithmetic limits.
 /// Off is the default, including for existing explicit native callers.
+/// Native families charge symbolic input construction together with retained
+/// transport geometry and work, before either is constructed. Prepared receipts
+/// include this input allowance; standalone caller-owned boundaries do not.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NativeTransportOptions {
     pub mode: NativeTransportMode,

@@ -137,18 +137,12 @@ impl CompiledUnitary {
         )?;
         let mut resource = options.prepare(&phase, max_terms, catalogue, arithmetic)?;
         let transport_requested = resource.native_transport_requested();
-        let native_transport = if transport_requested {
-            let symbolic = AffineKet::new(
-                BitVector::zeros(keep.len())?,
-                contraction.output_columns().to_vec(),
-                contraction.output_reference_phase().clone(),
-                ExactScalar::one(),
-            )?
-            .retain_boundary(&(0..outputs.len()).collect::<Vec<_>>())?;
-            resource.prepare_native_transport(&phase, &symbolic, arithmetic)?
-        } else {
-            None
-        };
+        let native_transport = resource.prepare_native_transport(
+            &phase,
+            outputs.len(),
+            || Ok(contraction.symbolic_boundary(outputs.len())?),
+            arithmetic,
+        )?;
         let mut prepared = PreparedProbabilitySupport {
             program: Arc::clone(&self.program),
             projection,

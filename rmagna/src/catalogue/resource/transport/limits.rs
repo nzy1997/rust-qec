@@ -56,6 +56,7 @@ pub(super) fn admission(
     reference: &ParityPhase,
     width: usize,
     options: &CatalogueBoundaryOptions,
+    include_symbolic_input: bool,
 ) -> Result<CatalogueBoundaryUsage, PhaseError> {
     let terms = resource.num_terms();
     admit(
@@ -86,11 +87,25 @@ pub(super) fn admission(
         b.checked_mul(4 * nw + 8).and_then(|v| v.checked_mul(t + 1)),
         "catalogue_boundary.max_geometry_words",
     )?;
+    let symbolic_geometry = if include_symbolic_input {
+        // Affine/scalar headers, rounded linear bytes, vector headers and
+        // packed quadratic/label buffers, including collection workspace.
+        checked(
+            2_u128
+                .checked_mul(n)
+                .and_then(|v| v.checked_mul(nw + bw + 8))
+                .and_then(|v| v.checked_add(64 + 4 * bw + linear)),
+            "catalogue_boundary.max_geometry_words",
+        )?
+    } else {
+        0
+    };
     let geometry = checked(
         per_term
             .checked_mul(t + 1)
             .and_then(|v| v.checked_add(row_geometry))
-            .and_then(|v| v.checked_add(resource.geometry_words() as u128)),
+            .and_then(|v| v.checked_add(resource.geometry_words() as u128))
+            .and_then(|v| v.checked_add(symbolic_geometry)),
         "catalogue_boundary.max_geometry_words",
     )?;
     admit(
@@ -131,12 +146,25 @@ pub(super) fn admission(
             .and_then(|v| v.checked_mul(t + 1)),
         "catalogue_boundary.max_construction_work",
     )?;
+    let symbolic_work = if include_symbolic_input {
+        // Direct packed prefixes and the quadratic clone, without elimination
+        // or scalar arithmetic. This is logical work, not elapsed time.
+        checked(
+            512_u128
+                .checked_mul(n + 1)
+                .and_then(|v| v.checked_mul(nw + bw + 1)),
+            "catalogue_boundary.max_construction_work",
+        )?
+    } else {
+        0
+    };
     let work = checked(
         matrix
             .checked_add(parities)
             .and_then(|v| v.checked_add(grouping))
             .and_then(|v| v.checked_add(row_work))
-            .and_then(|v| v.checked_mul(64)),
+            .and_then(|v| v.checked_mul(64))
+            .and_then(|v| v.checked_add(symbolic_work)),
         "catalogue_boundary.max_construction_work",
     )?;
     admit(
