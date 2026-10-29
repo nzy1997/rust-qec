@@ -111,7 +111,9 @@ primitive cases with four additional Rust witness tests and all five phase-quoti
 optimization cases with five owning Rust witnesses, plus two finite history-efficiency
 arithmetic cases with two owning Rust witnesses and one original progress case
 with two owning Rust witnesses, plus three original pilot/CLI entry-point cases
-with four owning Rust witnesses; the other 335 cases
+with four owning Rust witnesses. One further method is explicitly `partial`,
+with two required finite witnesses and a remaining native range-status gap;
+the other 334 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -138,6 +140,11 @@ evidence. `architecture_specific` entries require a platform, concrete contract
 and reviewed reason and still block full parity. Skipped and ignored cases do
 not count as executed passes. The original 12 installed-wheel skips remain
 unmapped requirements, not successful reproduction evidence.
+
+`partial` entries require a concrete `contract`, nonempty `rust_tests`, and a
+nonempty `remaining_gap`. Their source-bound witnesses must execute just like
+verified witnesses, but a partial entry never counts as verified or complete
+parity. Missing, failed or ignored partial witnesses remain execution failures.
 
 Optional `--rust-run /absolute/path/to/run.json` accepts schema
 `rstim.magna-rust-tests.v1` with exactly these fields:
@@ -314,10 +321,10 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 20 mapped
-Rust witnesses for 17 verified upstream cases must execute successfully, while
-the overall gate must still return nonzero because 335 core contracts remain
-unmapped. These finite
+`--rust-run <run.json> --complete-parity` flags documented above. The 22 mapped
+Rust witnesses for 17 verified and one partial upstream case must execute successfully,
+while the overall gate must still return nonzero because 334 core contracts remain
+unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
 
@@ -354,7 +361,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 335 cases unmapped, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 334 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -374,10 +381,10 @@ exponent to reach those actual binary endpoints.
 
 These tests import no upstream test module and invoke no native test-only builder.
 The progress contract below adds one mapping and the pilot/CLI contracts add
-three more. The separate incomplete-pilot/native floating-range method remains
-unmapped. The current ledger contains
-17 verified, 335 unmapped and zero architecture-specific core cases, backed by
-20 Rust witnesses; the strict `--rust-run <run.json>
+three more. The separate incomplete-pilot/native floating-range method is
+partial, with the numerical gap described below. The current ledger contains
+17 verified, one partial, 334 unmapped and zero architecture-specific core cases,
+backed by 22 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -434,9 +441,31 @@ observed totals, and makes no automatic switch or confidence guarantee. The
 unchanged library comparison fixture additionally checks all 24 pinned native
 binary64 decision cases.
 
-All four new witnesses are required by the source-bound coverage gate, alongside
-the existing sixteen. The ledger now has 17 verified, 335 unmapped and zero
-architecture-specific cases, with 20 required Rust witnesses. Strict complete
-parity still exits 2. The entire separate incomplete-pilot/native floating-range
-method remains unmapped; these finite checks establish no full M6 or paper
-performance result.
+All four pilot/CLI witnesses are required by the source-bound coverage gate,
+alongside the existing sixteen and the two partial witnesses below. The ledger
+has 17 verified, one partial, 334 unmapped and zero architecture-specific cases,
+with 22 required Rust witnesses. Strict complete parity still exits 2. These
+finite checks establish no full M6 or paper-performance result.
+
+### Partial original incomplete-pilot and tiny-error contract
+
+`history_incomplete_contracts` witnesses the original `H 0; T 0; MX 0` circuit,
+`H 0` target, record 0, four pilot draws and one-query cap. Explicit prepared
+families preserve the Rust preparation role. The failed comparison retains both
+named pilot receipts, without Gamma, recommendation, automatic switching or a
+production run. An `I 0` run of two draws without a target/error metric reports
+`no_error_metric` and absent kappa.
+
+The native scientific tuple `(.5, -100000)` represents `2^-100001`. Independent
+BigInt rational arithmetic checks this identity and the centered residuals.
+Two identical tiny errors have exactly zero residual variance, so Rust reports
+`zero_residual_variance`. The native method instead expects
+`diagnostic_range_exceeded` from its host-long-double guard. This diagnostic-status
+compatibility gap remains explicit in `remaining_gap`; the method is partial,
+never verified or architecture-excluded. No host exponent limit or tuple ABI is
+guessed and exact statistics are unchanged.
+
+A distinct zero/tiny pair retains strictly positive exact variance coefficient
+`2^-200004` and kappa one. This control detects accidental clamping or fabricated
+unavailability. Both finite witnesses are required by the source-bound audit;
+the unresolved native status still blocks full parity.

@@ -75,7 +75,7 @@ class CoverageLedgerTests(unittest.TestCase):
         report = self.check(run=self.run)
         self.assertTrue(report["inventory_valid"])
         self.assertFalse(report["parity_complete"])
-        self.assertEqual(report["status_counts"], {"verified": 1, "unmapped": 1, "architecture_specific": 0})
+        self.assertEqual(report["status_counts"], {"verified": 1, "partial": 0, "unmapped": 1, "architecture_specific": 0})
         self.assertEqual(report["core_cases"], 2)
         self.assertEqual(len(report["fixture_exclusions"]), 1)
         self.assertEqual(report["modules"]["test_example.py"]["total"], 2)
@@ -84,6 +84,50 @@ class CoverageLedgerTests(unittest.TestCase):
         self.complete_mapping()
         self.assertFalse(self.check()["parity_complete"])
         self.assertTrue(self.check(run=self.run)["parity_complete"])
+
+    def test_partial_witnesses_execute_but_never_complete_parity(self):
+        self.complete_mapping()
+        self.ledger["cases"][0].update(status="partial", remaining_gap="The native range-status assertion remains unresolved.")
+        report = self.check(run=self.run)
+        self.assertTrue(report["inventory_valid"])
+        self.assertFalse(report["parity_complete"])
+        self.assertEqual(report["status_counts"], {"verified": 1, "partial": 1, "unmapped": 0, "architecture_specific": 0})
+        self.assertEqual(report["modules"]["test_example.py"]["partial"], 1)
+        self.assertEqual(report["rust_execution"]["passed"], ["rmagna::witness::checks_contract"])
+        self.assertEqual(self.check()["rust_execution"]["missing"], ["rmagna::witness::checks_contract"])
+
+    def test_partial_requires_gap_contract_and_source_bound_witness(self):
+        baseline = copy.deepcopy(self.ledger)
+        baseline["cases"][0].update(status="partial", remaining_gap="The native range-status assertion remains unresolved.")
+        for key, value in (("remaining_gap", None), ("remaining_gap", " "),
+                           ("contract", ""), ("rust_tests", [])):
+            with self.subTest(key=key, value=value):
+                ledger = copy.deepcopy(baseline)
+                ledger["cases"][0][key] = value
+                self.assertFalse(self.check(ledger, self.run)["inventory_valid"])
+        ledger = copy.deepcopy(baseline)
+        del ledger["cases"][0]["remaining_gap"]
+        self.assertFalse(self.check(ledger, self.run)["inventory_valid"])
+        ledger = copy.deepcopy(baseline)
+        ledger["cases"][0]["rust_tests"][0]["source_sha256"] = "0" * 64
+        self.assertFalse(self.check(ledger, self.run)["inventory_valid"])
+        ledger = copy.deepcopy(baseline)
+        ledger["cases"][0]["status"] = "verified"
+        self.assertFalse(self.check(ledger, self.run)["inventory_valid"])
+
+    def test_partial_failed_or_ignored_witnesses_are_not_silently_skipped(self):
+        self.ledger["cases"][0].update(status="partial", remaining_gap="The native range-status assertion remains unresolved.")
+        for outcome in ("FAILED", "ignored"):
+            with self.subTest(outcome=outcome):
+                evidence = copy.deepcopy(self.run)
+                observed = evidence["targets"][0]["run"]
+                observed["stdout"] = f"running 1 test\ntest checks_contract ... {outcome}\n\ntest result: {'FAILED' if outcome == 'FAILED' else 'ok'}. 0 passed; {int(outcome == 'FAILED')} failed; {int(outcome == 'ignored')} ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+                observed["exit_code"] = 101 if outcome == "FAILED" else 0
+                report = self.check(run=evidence)
+                self.assertTrue(report["inventory_valid"])
+                self.assertFalse(report["parity_complete"])
+                key = "failed" if outcome == "FAILED" else "missing"
+                self.assertEqual(report["rust_execution"][key], ["rmagna::witness::checks_contract"])
 
     def test_missing_duplicate_and_invented_ids_are_reported_exactly(self):
         for kind in ("missing", "duplicate", "invented", "nested"):

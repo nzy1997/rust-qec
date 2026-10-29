@@ -151,10 +151,13 @@ def validate(upstream: Path, ledger: object, run: object = None, *, root: Path =
         for row in ledger["cases"]:
             case = row["id"]
             status = row.get("status")
-            require(isinstance(status, str) and status in {"verified", "unmapped", "architecture_specific"},
+            require(isinstance(status, str) and status in {"verified", "partial", "unmapped", "architecture_specific"},
                     f"invalid coverage status: {case}")
-            if status == "verified":
-                rust.fields(row, {"id", "status", "contract", "rust_tests"}, case)
+            if status in {"verified", "partial"}:
+                rust.fields(row, {"id", "status", "contract", "rust_tests"}
+                            | ({"remaining_gap"} if status == "partial" else set()), case)
+                if status == "partial":
+                    rust.text(row["remaining_gap"], f"unresolved compatibility gap for {case}")
                 rust.text(row["contract"], f"concrete semantic contract for {case}")
                 require(isinstance(row["rust_tests"], list) and bool(row["rust_tests"]),
                         f"missing Rust witnesses: {case}")
@@ -171,7 +174,7 @@ def validate(upstream: Path, ledger: object, run: object = None, *, root: Path =
             status_counts[status] += 1
             per_module[case.split(".", 1)[0] + ".py"][status] += 1
         report["cases"] = ledger["cases"]
-        report["status_counts"] = {k: status_counts[k] for k in ("verified", "unmapped", "architecture_specific")}
+        report["status_counts"] = {k: status_counts[k] for k in ("verified", "partial", "unmapped", "architecture_specific")}
         report["modules"] = {name: {"source_sha256": modules[name], "total": sum(counts.values()),
                                    **{k: counts[k] for k in report["status_counts"]}}
                              for name, counts in per_module.items()}
