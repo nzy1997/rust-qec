@@ -319,7 +319,10 @@ including values larger than machine integers; such ceilings select the same
 finite full sector, while every storage and work quota still applies. It reports
 unconditional covered acceptance/error
 masses, exact covered and omitted probability, and rigorous full-distribution
-intervals, including a conditional-error interval. It does not renormalize the
+intervals, including a conditional-error interval. The typed and JSON
+`conditional_error_within_enumerated_sector` is the exact covered error divided
+by covered acceptance; it is null when covered acceptance is zero or no error
+metric is defined. This point excludes omitted noise mass. It does not renormalize the
 covered sector or invent Monte Carlo uncertainty. Human summaries distinguish
 these masses and bounds, display scientific values when ordinary floats
 underflow, and use `n/a` for undefined quantities.
@@ -3358,7 +3361,10 @@ exact result, available through `raw_result` or `into_raw_result`.
 
 Successful JSON reports contain exact rational covered/omitted noise probability,
 per-weight sectors, unconditional covered response masses and full-distribution
-acceptance/error/conditional-error intervals. Covered masses are never divided
+acceptance/error/conditional-error intervals. The separate optional exact
+`conditional_error_within_enumerated_sector` point is computed once using the
+evaluator's field-arithmetic budget; arithmetic failures propagate instead of
+returning a fabricated zero or null. Covered masses are never divided
 by covered probability or acceptance. Each real response/interval endpoint has
 `value`, `scientific` and exact rational cyclotomic `coefficients` in the stated
 four-element omega basis. Underflow and overflow use null ordinary values with

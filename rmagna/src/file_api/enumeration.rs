@@ -327,6 +327,7 @@ impl FileEnumerationReport {
                 "network_compilations":result.network_compilations,
                 "full_acceptance":interval(Some(&result.full_acceptance),"result.full_acceptance",&mut encoder)?,
                 "full_error":interval(error_defined.then_some(&result.full_error),"result.full_error",&mut encoder)?,
+                "conditional_error_within_enumerated_sector":number(result.conditional_error_within_enumerated_sector.as_ref(),"result.conditional_error_within_enumerated_sector",&mut encoder)?,
                 "conditional_error":interval(result.conditional_error.as_ref().filter(|_|error_defined),"result.conditional_error",&mut encoder)?,
             });
         }

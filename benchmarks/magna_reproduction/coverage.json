@@ -917,8 +917,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_report_noise_and_postselection_are_joint_contributions",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal X_ERROR(1/10), M(1/5), detector-zero postselection, I0 target and Z moment, full max_weight2 sector: complete acceptance37/50,error1/50,covered-sector conditional error1/37,moment7/10. Fresh/reused owned reports and actual CLI preserve exact,scientific and ordinary JSON; independent accepted branches36/50 and1/50 fix the expected result.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "enumeration_conditional_point",
+          "test": "original_report_noise_postselection_retains_exact_covered_conditional_point",
+          "source_sha256": "ac4a74586011d46139defce816b87078c1d8e6cdb8de3d7bfa576451baac22db"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_terminal_feedback_and_guarded_noise",

@@ -113,6 +113,9 @@ pub struct TaskEnumeration {
     pub network_compilations: usize,
     pub full_acceptance: ExactInterval,
     pub full_error: ExactInterval,
+    /// Covered error divided by covered acceptance, without omitted noise mass.
+    /// Absent for zero covered acceptance or an undefined error metric.
+    pub conditional_error_within_enumerated_sector: Option<ExactField>,
     /// Undefined only when covered acceptance plus omitted mass is zero.
     pub conditional_error: Option<ExactInterval>,
 }
@@ -402,6 +405,21 @@ impl TaskEvaluator {
             sector.omitted_probability(),
             &self.options.fields,
         )?;
+        let conditional_error_within_enumerated_sector = if (self.target.is_some()
+            || self.error_parities.is_some())
+            && !masses.accepted.is_zero()
+        {
+            Some(
+                self.options
+                    .fields
+                    .divide(&masses.error, &masses.accepted)
+                    .map_err(|e| {
+                        error("enumeration.conditional_error_within_enumerated_sector", e)
+                    })?,
+            )
+        } else {
+            None
+        };
         if let Some(meter) = meter {
             meter.check_time()?;
         }
@@ -419,6 +437,7 @@ impl TaskEvaluator {
             network_compilations: compilations,
             full_acceptance,
             full_error,
+            conditional_error_within_enumerated_sector,
             conditional_error,
         })
     }
