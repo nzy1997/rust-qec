@@ -3573,6 +3573,22 @@ times produce no recommendation. Inspect preparation and resource costs
 separately. The JSON report always states `automatic_switching: false` and
 `production_started: false`; no production run occurs.
 
+`SamplerDecision::from_pilot_totals(kappa, affine_seconds, exact_seconds, count)`
+exposes the same stateless point calculation for already observed matched
+pilots. Times must exclude preparation and be positive and finite; kappa must
+be finite and nonnegative, and the common completed count must be positive.
+The method neither samples nor changes a file task. It rejects a nonfinite
+Gamma and retains the native tie rule.
+
+```rust
+use rmagna::file_api::SamplerDecision;
+use rmagna::runtime::HistorySampler;
+let decision = SamplerDecision::from_pilot_totals(4.0, 2.0, 4.0, 10)?;
+assert_eq!(decision.gamma, 2.0);
+assert_eq!(decision.recommended_sampler, HistorySampler::ExactMarginal);
+# Ok::<(), &'static str>(())
+```
+
 ```rust
 use rmagna::file_api::{FileApiError, FileSamplerComparisonOptions, FileTask};
 # fn compare(task: &FileTask) -> Result<(), FileApiError> {
@@ -3605,6 +3621,9 @@ apply across compilation, target normalization and static family preparation.
 `rmagna compare-samplers CIRCUIT --task TASK --pilot-shots 32 --seed 7 --json`
 runs the two independent explicitly prepared pilots. `--pilot-shots` defaults
 to two and must be at least two; exact-marginal uses checked `seed + 1`.
+An explicitly supplied count needs an integer payload: boolean/fractional
+strings and a missing `--pilot-shots` value are argument errors before decoder
+imports. Omitting the whole option keeps the documented two-draw default.
 `--max-queries`, `--max-seconds` and `--max-record-values` bound each sampling
 pilot. Separate `--max-preparation-queries` and `--max-preparation-seconds` bound
 each channel's compilation/target/family preparation. Preparation defaults to
