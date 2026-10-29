@@ -1,4 +1,11 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
+mod original;
+pub use original::{
+    OriginalNoiseAction, OriginalNoiseAnchor, OriginalNoiseCategory, OriginalNoiseChannel,
+    OriginalNoiseError, OriginalNoiseOptions, original_noise_categories,
+};
+pub(crate) use original::{correlated_channel, pauli_channels};
+
 use crate::instrument::{CompiledInstrument, FaultSelection};
 use crate::probability::Probability;
 use num_bigint::BigUint;

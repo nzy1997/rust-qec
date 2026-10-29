@@ -224,59 +224,16 @@ impl Lowering<'_> {
             } else {
                 let index = self.chains[chain];
                 let site = &mut self.sites[index];
-                let probability =
-                    Probability::from_rational(site.identity.value() * probabilities[0].value())?;
-                site.identity = Probability::from_rational(
-                    site.identity.value() * probabilities[0].complement().value(),
-                )?;
+                let (probability, remaining) =
+                    crate::noise::correlated_channel(&site.identity, &probabilities[0])?;
+                site.identity = remaining;
                 site.source_operations.push(source);
                 site.alternatives.push((probability, factors));
             }
             return Ok(());
         }
-        let wire = |index| self.live[qubits[index]];
-        let alternatives = match kind {
-            NoiseKind::X => vec![(probabilities[0].clone(), vec![(wire(0), Basis::X)])],
-            NoiseKind::Y => vec![(probabilities[0].clone(), vec![(wire(0), Basis::Y)])],
-            NoiseKind::Z => vec![(probabilities[0].clone(), vec![(wire(0), Basis::Z)])],
-            NoiseKind::Depolarize1 | NoiseKind::Pauli1 => {
-                let mut alternatives = Vec::new();
-                for (j, basis) in [Basis::X, Basis::Y, Basis::Z].into_iter().enumerate() {
-                    let probability = if matches!(kind, NoiseKind::Depolarize1) {
-                        Probability::from_rational(
-                            probabilities[0].value() / BigRational::from_integer(3.into()),
-                        )?
-                    } else {
-                        probabilities[j].clone()
-                    };
-                    alternatives.push((probability, vec![(wire(0), basis)]));
-                }
-                alternatives
-            }
-            NoiseKind::Depolarize2 | NoiseKind::Pauli2 => {
-                let bases = [None, Some(Basis::X), Some(Basis::Y), Some(Basis::Z)];
-                let mut alternatives = Vec::new();
-                for index in 1..16 {
-                    let probability = if matches!(kind, NoiseKind::Depolarize2) {
-                        Probability::from_rational(
-                            probabilities[0].value() / BigRational::from_integer(15.into()),
-                        )?
-                    } else {
-                        probabilities[index - 1].clone()
-                    };
-                    let mut factors = Vec::new();
-                    if let Some(basis) = bases[index / 4] {
-                        factors.push((wire(0), basis));
-                    }
-                    if let Some(basis) = bases[index % 4] {
-                        factors.push((wire(1), basis));
-                    }
-                    alternatives.push((probability, factors));
-                }
-                alternatives
-            }
-            NoiseKind::Correlated { .. } => unreachable!(),
-        };
+        let live_qubits = qubits.iter().map(|&q| self.live[q]).collect::<Vec<_>>();
+        let alternatives = crate::noise::pauli_channels(kind, probabilities, &live_qubits)?;
         self.site(source, alternatives)?;
         Ok(())
     }

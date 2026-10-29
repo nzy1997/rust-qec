@@ -1,0 +1,3879 @@
+{
+  "attribution": "Captured from pinned itpyi/magna original circuit parser and noise-category metadata; no quantum probability or sampling execution.",
+  "callback_calls": 0,
+  "cases": [
+    {
+      "action_count": 0,
+      "actions": [],
+      "categories": 0,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "60709af532cde5db31bf671974c858c4a7b5f55af14964f61be9390036e8866b",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "m-implicit",
+      "probabilities": [],
+      "text": "M 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "6da172028b560f8868ad4c1198d96bf7c384619391eb4d08e3094253ddd13b87",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "m-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "M(0) 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "5d8208981b3b0f07d3258bf3d3634759682ac5efdcc97c316c241e880db51bba",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "m-one",
+      "probabilities": [
+        [
+          [
+            1,
+            1
+          ]
+        ]
+      ],
+      "text": "M(1) 0"
+    },
+    {
+      "action_count": 0,
+      "actions": [],
+      "categories": 0,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "2c7ce0791562a9422efcaee193bedab0218a2b12673bb86f077f0ac141b0e17d",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "mr-implicit",
+      "probabilities": [],
+      "text": "MR 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "1bca73fedd77169e8ed4679053a53d5fc5c4409a538a708db4c65f18de77c036",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "mr-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "MR(0) 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "78d696d1244d1d5c58e4550a9af7e47584922ce2d6bfc8819a5793f9e5f3d7f2",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "mr-one",
+      "probabilities": [
+        [
+          [
+            1,
+            1
+          ]
+        ]
+      ],
+      "text": "MR(1) 0"
+    },
+    {
+      "action_count": 0,
+      "actions": [],
+      "categories": 0,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "a7646f59f069d8bacf03e8312a3d6b733e9bfbc2d62bc8ef3fe0b8aa2df6d31b",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MPP",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "mpp-implicit",
+      "probabilities": [],
+      "text": "MPP X0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "d5bef8af7372460b52d2a47a23e6a253c5edfbb657a60996ad6ea8019a0fabca",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MPP",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "mpp-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "MPP(0) X0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "262bcce62d5655aadb692b4eed5a89c38a7a7bf5bdbcb71fd7a2f0ba61bae93f",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MPP",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "mpp-one",
+      "probabilities": [
+        [
+          [
+            1,
+            1
+          ]
+        ]
+      ],
+      "text": "MPP(1) X0"
+    },
+    {
+      "error": "metadata-input.magna:1:1: arguments must be finite decimal or rational numbers",
+      "name": "m-empty",
+      "rejected": true,
+      "text": "M() 0"
+    },
+    {
+      "error": "metadata-input.magna:1:1: arguments must be finite decimal or rational numbers",
+      "name": "mr-empty",
+      "rejected": true,
+      "text": "MR() 0"
+    },
+    {
+      "error": "metadata-input.magna:1:1: arguments must be finite decimal or rational numbers",
+      "name": "mpp-empty",
+      "rejected": true,
+      "text": "MPP() X0"
+    },
+    {
+      "action_count": 2,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ],
+        [
+          [
+            "report",
+            "m1"
+          ]
+        ]
+      ],
+      "categories": 2,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "bf84d99af331a6bb6b9aba36d6bc5f2d91a84ca2ed490eefee02c06dfb8c7977",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ],
+              [
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0,
+              1
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 2,
+        "route": "linear"
+      },
+      "deterministic": 2,
+      "guarded": 0,
+      "name": "m-multiple",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "M(0) 0 1"
+    },
+    {
+      "action_count": 2,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ],
+        [
+          [
+            "report",
+            "m1"
+          ]
+        ]
+      ],
+      "categories": 2,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "e013130a7d4fc253b47056bed00222ed7cec4e48ed48630543c0c775c1d3af04",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "MPP",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                },
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Y",
+                  "version": -1
+                }
+              ],
+              [
+                {
+                  "index": 2,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0,
+              1
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "Y",
+                "version": -1
+              },
+              {
+                "index": 2,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "Z",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 3,
+        "num_records": 2,
+        "route": "linear"
+      },
+      "deterministic": 2,
+      "guarded": 0,
+      "name": "mpp-multiple",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "MPP(0) X0*Y1 Z2"
+    },
+    {
+      "action_count": 4,
+      "actions": [
+        [
+          [
+            "report",
+            "m0"
+          ]
+        ],
+        [
+          [
+            "report",
+            "m1"
+          ]
+        ],
+        [
+          [
+            "report",
+            "m2"
+          ]
+        ],
+        [
+          [
+            "report",
+            "m3"
+          ]
+        ]
+      ],
+      "categories": 4,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "128984c564dbb3a01603fd3c1fefad65ef02c8e44d0ca6948126563c80cf225c",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ],
+              [
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0,
+              1
+            ],
+            "source": {
+              "column": 2,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": [
+                0
+              ]
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ],
+              [
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              2,
+              3
+            ],
+            "source": {
+              "column": 2,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": [
+                1
+              ]
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 4,
+        "route": "linear"
+      },
+      "deterministic": 4,
+      "guarded": 0,
+      "name": "repeated",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            1
+          ]
+        ],
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "REPEAT 2 {\n M(0) 0 1\n}"
+    },
+    {
+      "action_count": 6,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ],
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 2,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "4ac81f6b1627cc0e3af03f0b974a740a19d4ac0835c4c91c7d3ded8d3cda1f93",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "3/5"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "DEPOLARIZE1",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "depolarize1",
+      "probabilities": [
+        [
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            5
+          ]
+        ],
+        [
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            1,
+            5
+          ]
+        ]
+      ],
+      "text": "DEPOLARIZE1(0.6) 0 1"
+    },
+    {
+      "action_count": 15,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "495d1b34528d2cf34d8150cd68586f18951301109e8d4ffcaca2343f152e1914",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "3/10"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "DEPOLARIZE2",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "depolarize2",
+      "probabilities": [
+        [
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ],
+          [
+            1,
+            50
+          ]
+        ]
+      ],
+      "text": "DEPOLARIZE2(0.3) 0 1"
+    },
+    {
+      "action_count": 3,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "1cecc5897c18cf4ebb20292cb0e7a733734c19144c07f7c6b2fa3c3ac4734d07",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1/10",
+              "1/5",
+              "3/10"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "PAULI_CHANNEL_1",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "pauli1",
+      "probabilities": [
+        [
+          [
+            1,
+            10
+          ],
+          [
+            1,
+            5
+          ],
+          [
+            3,
+            10
+          ]
+        ]
+      ],
+      "text": "PAULI_CHANNEL_1(0.1,0.2,0.3) 0"
+    },
+    {
+      "action_count": 15,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "9bb46b13b992d0773cf6b5d37dd95938da28c4c1edb5e891a1a65bfe554823fb",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1/1000",
+              "1/500",
+              "3/1000",
+              "1/250",
+              "1/200",
+              "3/500",
+              "7/1000",
+              "1/125",
+              "9/1000",
+              "1/100",
+              "11/1000",
+              "3/250",
+              "13/1000",
+              "7/500",
+              "3/200"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "PAULI_CHANNEL_2",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "pauli2",
+      "probabilities": [
+        [
+          [
+            1,
+            1000
+          ],
+          [
+            1,
+            500
+          ],
+          [
+            3,
+            1000
+          ],
+          [
+            1,
+            250
+          ],
+          [
+            1,
+            200
+          ],
+          [
+            3,
+            500
+          ],
+          [
+            7,
+            1000
+          ],
+          [
+            1,
+            125
+          ],
+          [
+            9,
+            1000
+          ],
+          [
+            1,
+            100
+          ],
+          [
+            11,
+            1000
+          ],
+          [
+            3,
+            250
+          ],
+          [
+            13,
+            1000
+          ],
+          [
+            7,
+            500
+          ],
+          [
+            3,
+            200
+          ]
+        ]
+      ],
+      "text": "PAULI_CHANNEL_2(0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.011,0.012,0.013,0.014,0.015) 0 1"
+    },
+    {
+      "action_count": 4,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op1",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op2",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  2
+                ]
+              }
+            ]
+          ],
+          [
+            "op3",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  3
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "234efb1f027efc85c874c79144b9e99595a729fd111e8739be2be09f861e4c19",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": "op0",
+            "control_name": null,
+            "guard": null,
+            "name": "CORRELATED_ERROR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1/2"
+            ],
+            "chain_id": "op0",
+            "control_name": null,
+            "guard": null,
+            "name": "ELSE_CORRELATED_ERROR",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Y",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "Y",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": "op0",
+            "control_name": null,
+            "guard": null,
+            "name": "ELSE_CORRELATED_ERROR",
+            "op_id": "op2",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 2,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 3,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 2,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "Z",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": "op0",
+            "control_name": null,
+            "guard": null,
+            "name": "ELSE_CORRELATED_ERROR",
+            "op_id": "op3",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 3,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 4,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 3,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 4,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "correlated",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            8
+          ],
+          [
+            3,
+            8
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "CORRELATED_ERROR(0.25) X0\nELSE_CORRELATED_ERROR(0.5) Y1\nELSE_CORRELATED_ERROR(1) Z2\nELSE_CORRELATED_ERROR(1) X3"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op1",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "bf194a0ad3078d45cc04d2c1558a0eda9ba067cc6856b618fb2e4696d66608a9",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "R",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "X_ERROR",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "after-reset",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ]
+        ]
+      ],
+      "text": "R 0\nX_ERROR(0.25) 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "e9772adf5d8d823ce7e4e7af59251a570bc180f66fb12eaddd4c8378c86d85c5",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "X_ERROR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "x-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "X_ERROR(0) 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "afaf510a312f4076d630e19d5ad308046c83ef1bdac981dfb3704071ae7acb3f",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "1"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "X_ERROR",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "x-one",
+      "probabilities": [
+        [
+          [
+            1,
+            1
+          ]
+        ]
+      ],
+      "text": "X_ERROR(1) 0"
+    },
+    {
+      "action_count": 15,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              },
+              {
+                "kind": "Z",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "0e9cd621438b7504cc11ccac27adc455b2b27f75643aaaa24d7990eea5149d1a",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "DEPOLARIZE2",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              },
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "depolarize2-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "DEPOLARIZE2(0) 0 1"
+    },
+    {
+      "action_count": 3,
+      "actions": [
+        [
+          [
+            "op0",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op0",
+            [
+              {
+                "kind": "Z",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "7fab44021fe90a3238e8b9a097c9bc9e863bba841d12d85ed3272c91e463ef3a",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [
+              "0",
+              "0",
+              "0"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "PAULI_CHANNEL_1",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 1,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 1,
+      "guarded": 0,
+      "name": "pauli1-zero",
+      "probabilities": [
+        [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      ],
+      "text": "PAULI_CHANNEL_1(0,0,0) 0"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op1",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  129
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "d45c1c0a976ac506668a41a54f99c492215b8d2810b645f241e847616d0e06e4",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "R",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 129,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "Y_ERROR",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 129,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 130,
+        "num_records": 0,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 0,
+      "name": "wide",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ]
+        ]
+      ],
+      "text": "R 129\nY_ERROR(0.25) 129"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op2",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [
+            {
+              "expression": {
+                "constant": 0,
+                "terms": [
+                  {
+                    "index": 0,
+                    "inverted": false,
+                    "kind": "rec",
+                    "pauli": "",
+                    "version": -1
+                  }
+                ]
+              },
+              "target": {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            }
+          ],
+          "detectors": [],
+          "external_inputs": [],
+          "reasons": [
+            "all CONTROL functions are built-in XOR or NOT"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "645b45e7b1e0da1b8da20b0cfcbe9ce9c7d0f9c12f07bfa56cc231cdb162769f",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": null,
+            "guard": null,
+            "name": "M",
+            "op_id": "op0",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Z",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [
+              0
+            ],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": "XOR",
+            "guard": null,
+            "name": "CONTROL",
+            "op_id": "op1",
+            "outputs": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            ],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "rec",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": {
+              "index": 0,
+              "inverted": false,
+              "kind": "ctrl",
+              "pauli": "",
+              "version": 0
+            },
+            "name": "X_ERROR",
+            "op_id": "op2",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 3,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 1,
+        "route": "linear"
+      },
+      "deterministic": 0,
+      "guarded": 1,
+      "name": "affine-guard",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ]
+        ]
+      ],
+      "text": "M 0\nCONTROL[XOR] rec[-1] -> ctrl[0]\nX_ERROR(0.25) ctrl[0] 1"
+    },
+    {
+      "action_count": 1,
+      "actions": [
+        [
+          [
+            "op1",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [
+            {
+              "expression": {
+                "constant": 0,
+                "terms": [
+                  {
+                    "index": 0,
+                    "inverted": false,
+                    "kind": "ctrl",
+                    "pauli": "",
+                    "version": 0
+                  }
+                ]
+              },
+              "target": {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            }
+          ],
+          "detectors": [],
+          "external_inputs": [
+            {
+              "controller": "opaque",
+              "inputs": [],
+              "op_id": "op0",
+              "source": "metadata-input.magna:1:1"
+            }
+          ],
+          "reasons": [
+            "external CONTROL functions require actual decoder evaluation"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "80574bae9cf9ac372238c90b748c7eaa22551f5e37bf904c2b6cffb127609598",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": "opaque",
+            "guard": null,
+            "name": "CONTROL",
+            "op_id": "op0",
+            "outputs": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            ],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": []
+          },
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": null,
+            "control_name": null,
+            "guard": {
+              "index": 0,
+              "inverted": false,
+              "kind": "ctrl",
+              "pauli": "",
+              "version": 0
+            },
+            "name": "X_ERROR",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "qubit",
+                "pauli": "",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "nonlinear"
+      },
+      "deterministic": 0,
+      "guarded": 1,
+      "name": "external-guard",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ]
+        ]
+      ],
+      "text": "CONTROL[opaque] -> ctrl[0]\nX_ERROR(0.25) ctrl[0] 1"
+    },
+    {
+      "action_count": 2,
+      "actions": [
+        [
+          [
+            "op1",
+            [
+              {
+                "kind": "X",
+                "qubits": [
+                  0
+                ]
+              }
+            ]
+          ],
+          [
+            "op2",
+            [
+              {
+                "kind": "Y",
+                "qubits": [
+                  1
+                ]
+              }
+            ]
+          ]
+        ]
+      ],
+      "categories": 1,
+      "circuit": {
+        "control_analysis": {
+          "control_writes": [
+            {
+              "expression": {
+                "constant": 0,
+                "terms": [
+                  {
+                    "index": 0,
+                    "inverted": false,
+                    "kind": "ctrl",
+                    "pauli": "",
+                    "version": 0
+                  }
+                ]
+              },
+              "target": {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            }
+          ],
+          "detectors": [],
+          "external_inputs": [
+            {
+              "controller": "opaque",
+              "inputs": [],
+              "op_id": "op0",
+              "source": "metadata-input.magna:1:1"
+            }
+          ],
+          "reasons": [
+            "external CONTROL functions require actual decoder evaluation"
+          ],
+          "required_parities": []
+        },
+        "controllers": {
+          "opaque": {
+            "config": {},
+            "version": "metadata-v1"
+          }
+        },
+        "fingerprint": "bb84ac4d1f321122b95a826cb3dc8bc9cb75a6389e2f15982c577e51f2498811",
+        "format": "magna-0.1",
+        "instructions": [
+          {
+            "args": [],
+            "chain_id": null,
+            "control_name": "opaque",
+            "guard": null,
+            "name": "CONTROL",
+            "op_id": "op0",
+            "outputs": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "ctrl",
+                "pauli": "",
+                "version": 0
+              }
+            ],
+            "products": [],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 1,
+              "repeat": []
+            },
+            "targets": []
+          },
+          {
+            "args": [
+              "1/4"
+            ],
+            "chain_id": "op1",
+            "control_name": null,
+            "guard": {
+              "index": 0,
+              "inverted": false,
+              "kind": "ctrl",
+              "pauli": "",
+              "version": 0
+            },
+            "name": "CORRELATED_ERROR",
+            "op_id": "op1",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 0,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "X",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 2,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 0,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "X",
+                "version": -1
+              }
+            ]
+          },
+          {
+            "args": [
+              "1/2"
+            ],
+            "chain_id": "op1",
+            "control_name": null,
+            "guard": {
+              "index": 0,
+              "inverted": false,
+              "kind": "ctrl",
+              "pauli": "",
+              "version": 0
+            },
+            "name": "ELSE_CORRELATED_ERROR",
+            "op_id": "op2",
+            "outputs": [],
+            "products": [
+              [
+                {
+                  "index": 1,
+                  "inverted": false,
+                  "kind": "pauli",
+                  "pauli": "Y",
+                  "version": -1
+                }
+              ]
+            ],
+            "records": [],
+            "source": {
+              "column": 1,
+              "filename": "metadata-input.magna",
+              "line": 3,
+              "repeat": []
+            },
+            "targets": [
+              {
+                "index": 1,
+                "inverted": false,
+                "kind": "pauli",
+                "pauli": "Y",
+                "version": -1
+              }
+            ]
+          }
+        ],
+        "num_qubits": 2,
+        "num_records": 0,
+        "route": "nonlinear"
+      },
+      "deterministic": 0,
+      "guarded": 1,
+      "name": "correlated-guard",
+      "probabilities": [
+        [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            8
+          ]
+        ]
+      ],
+      "text": "CONTROL[opaque] -> ctrl[0]\nCORRELATED_ERROR(0.25) ctrl[0] X0\nELSE_CORRELATED_ERROR(0.5) ctrl[0] Y1"
+    }
+  ],
+  "generator_sha256": "7003eb73e6eb3a5dbb60c1eb1fdc1d6034c0186df4d9e9b90e1a7131be8b671b",
+  "input_seal_sha256": "40760ed496d8c3c68b5ec91df562f3cd22c68464bc392bdb8a1d9c2dae911ce1",
+  "manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "native_capture_sha256": "6114e5ac6bb1589df67f1a1650c56416f6747091f1d5ec00e161929925cd11a1",
+  "native_sha256": "c602a7270cc64c02123c5403147c000c8bf431160a3286fc0b2dca52b27545da",
+  "no_quantum_execution": true,
+  "original_inputs_unchanged": true,
+  "schema": "rstim.magna-original-noise-metadata.v1",
+  "source_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "source_files": 475
+}

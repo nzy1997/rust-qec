@@ -100,6 +100,7 @@ pub fn parse_circuit(source: &str, options: &ParseOptions) -> Result<Circuit, Pa
             external_calls: 0,
             has_guarded_noise: false,
             declarations_with_targets: BTreeSet::new(),
+            declared_readout_noise: BTreeSet::new(),
             source_text: source.to_owned(),
         },
         registers: BTreeMap::new(),
@@ -575,6 +576,7 @@ impl Builder<'_> {
             .unwrap_or(raw.len());
         let head = &raw[..end];
         let mut tail = raw[end..].trim();
+        let has_argument_list = tail.starts_with('(');
         let mut args = Vec::new();
         if let Some(after) = tail.strip_prefix('(') {
             let end = after
@@ -621,7 +623,16 @@ impl Builder<'_> {
                 }
             }
             "M" | "MZ" | "MX" | "MY" | "MR" | "MRZ" | "MRX" | "MRY" | "MXX" | "MYY" | "MZZ"
-            | "MPP" => self.measure(&name, &args, &targets, text, repeat)?,
+            | "MPP" => {
+                if has_argument_list && args.is_empty() {
+                    return Err(self.fail(
+                        text,
+                        repeat,
+                        "measurement report-flip probability argument cannot be empty",
+                    ));
+                }
+                self.measure(&name, &args, &targets, text, repeat)?;
+            }
             "X_ERROR"
             | "Y_ERROR"
             | "Z_ERROR"
@@ -1041,6 +1052,11 @@ impl Builder<'_> {
         for product in products {
             let record = self.circuit.num_records;
             self.circuit.num_records += 1;
+            if !args.is_empty() {
+                self.circuit
+                    .declared_readout_noise
+                    .insert(self.circuit.operations.len());
+            }
             self.push(
                 text,
                 repeat,
