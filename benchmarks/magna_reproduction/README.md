@@ -111,9 +111,10 @@ primitive cases with four additional Rust witness tests and all five phase-quoti
 optimization cases with five owning Rust witnesses, plus two finite history-efficiency
 arithmetic cases with two owning Rust witnesses and one original progress case
 with two owning Rust witnesses, plus three original pilot/CLI entry-point cases
-with four owning Rust witnesses. One further method is explicitly `partial`,
+with four owning Rust witnesses, plus two capped recovery/guarded-feedback
+methods with two owning Rust witnesses. One further method is explicitly `partial`,
 with two required finite witnesses and a remaining native range-status gap;
-the other 334 cases
+the other 332 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -321,9 +322,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 22 mapped
-Rust witnesses for 17 verified and one partial upstream case must execute successfully,
-while the overall gate must still return nonzero because 334 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 24 mapped
+Rust witnesses for 19 verified and one partial upstream case must execute successfully,
+while the overall gate must still return nonzero because 332 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -361,7 +362,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 334 cases unmapped and one partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 332 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -383,8 +384,8 @@ These tests import no upstream test module and invoke no native test-only builde
 The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/native floating-range method is
 partial, with the numerical gap described below. The current ledger contains
-17 verified, one partial, 334 unmapped and zero architecture-specific core cases,
-backed by 22 Rust witnesses; the strict `--rust-run <run.json>
+19 verified, one partial, 332 unmapped and zero architecture-specific core cases,
+backed by 24 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -442,9 +443,10 @@ unchanged library comparison fixture additionally checks all 24 pinned native
 binary64 decision cases.
 
 All four pilot/CLI witnesses are required by the source-bound coverage gate,
-alongside the existing sixteen and the two partial witnesses below. The ledger
-has 17 verified, one partial, 334 unmapped and zero architecture-specific cases,
-with 22 required Rust witnesses. Strict complete parity still exits 2. These
+alongside the existing sixteen, the two partial witnesses below and the two
+capped recovery/feedback witnesses. The ledger
+has 19 verified, one partial, 332 unmapped and zero architecture-specific cases,
+with 24 required Rust witnesses. Strict complete parity still exits 2. These
 finite checks establish no full M6 or paper-performance result.
 
 ### Partial original incomplete-pilot and tiny-error contract
@@ -469,3 +471,39 @@ A distinct zero/tiny pair retains strictly positive exact variance coefficient
 `2^-200004` and kappa one. This control detects accidental clamping or fabricated
 unavailability. Both finite witnesses are required by the source-bound audit;
 the unresolved native status still blocks full parity.
+
+### Original capped recovery and guarded-feedback contracts
+
+`capped_affine_contracts` maps only the original terminal-recovery and conditional
+noise/Pauli-feedback methods from `test_capped_affine.py`; its other seven methods
+remain unmapped. Both compiler strategies and fixed-template/cold-prefix causal
+configurations exercise the finite contracts.
+
+For physical `H 0`, the original `M 0; DETECTOR rec[-1]; CONTROL[echo] det[-1] ->
+ctrl[0]; CX ctrl[0] 0` recovery and `I 0` target retain acceptance one, error zero,
+one actual recovery controller call, proposal probability one half and exact
+target normalization one on all sixteen draws with seed nine. Both prescribed
+measurement branches independently have mass one half and recover to the target.
+
+The original guarded-feedback circuit uses output 3, records 0/1/2 and an `I 0`
+target. The independent Clifford/conditional-noise calculation gives:
+
+| Records [M0, MX1, M2] | Physical probability | Output error |
+| --- | --- | --- |
+| [0, 0, 0] | 1/2 | 0 |
+| [1, 0, 0] | 1/4 | 0 |
+| [1, 1, 0] | 1/6 | 0 |
+| [1, 1, 1] | 1/12 | 1 |
+
+Prescribed evaluations reproduce all four masses and actual echo inputs. Exact
+enumeration independently gives acceptance one, error 1/12 and target success
+11/12, with no omitted physical probability. Each 512-draw seed-100 batch has
+acceptance one and error within the original 0.04 tolerance; retained records
+check controller inputs and the exact empirical error contribution. Rust uses
+its own SplitMix64 stream, without a Python Random trajectory claim.
+
+The audit requires these two witnesses in addition to the previous twenty-two.
+It has 19 verified, one partial, 332 unmapped and zero architecture-specific
+core cases, with 24 required witnesses and strict complete-parity exit 2. The
+separate native diagnostic-status gap remains partial. No native tensor/cache
+counter ABI, full M6 completion or paper-performance result is claimed.
