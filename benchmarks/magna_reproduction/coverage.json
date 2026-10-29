@@ -606,8 +606,16 @@
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_cli_json_and_progress_streams",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original X_ERROR(1/2) circuit and I target: CLI run of eight draws emits one parseable final JSON with affine metadata and exactly two kappa stderr events at4/8 and8/8. CLI comparison completes16 draws per named sampler, emits one JSON without progress, and keeps automatic switching and production false. Native target input is expressed using the Rust task JSON.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_pilot_cli_contracts",
+          "test": "original_eight_draw_progress_and_sixteen_draw_comparison_keep_json_streams_separate",
+          "source_sha256": "b788a381458009773d5e9f1e9d4d81f773d9b35c19bb3e0a53e29a7cd7cc0a44"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_default_progress_preserves_draws_and_manual_born",
@@ -648,13 +656,35 @@
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_invalid_counts_and_native_decision",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original invalid progress0/negative/boolean/fraction and pilot0/1/absent-value/negative/boolean/fraction plus retired capped/capped_affine/born modes reject before decoder import, with an import-reachability canary. Rust static u64/nonzero types replace Python object inputs; typed pilot0/1 reject before deliberately impossible preparation or callbacks. Missing CLI payload represents Python None, while an omitted option retains its valid default. The actual stateless native decision helper examples(4,2,4,10) and(1,2,4,10) return Gamma2/exact and Gamma1/2/affine, with per-draw point times1/5 and2/5. Retired-mode errors name both allowed sampler choices.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_pilot_contracts",
+          "test": "original_typed_count_rejections_and_literal_native_decisions_are_witnessed",
+          "source_sha256": "033ab71ef8f25903988d3ea99a19f6cd2b42c7335a2ccd8a3746d560b4b70acc"
+        },
+        {
+          "package": "rmagna",
+          "target": "history_pilot_cli_contracts",
+          "test": "original_invalid_counts_and_retired_modes_reject_before_decoder_import",
+          "source_sha256": "b788a381458009773d5e9f1e9d4d81f773d9b35c19bb3e0a53e29a7cd7cc0a44"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_pilot_reports_gamma_without_modifying_options",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Original X_ERROR(1/2) circuit with I target, explicit exact-marginal caller and fixed prepared scalar families: independent 32-draw seed13/14 pilots complete under their named sampler with positive preparation time, kappa1 and Gamma equal to the observed per-draw sampling-time ratio. Caller and inspection remain unchanged; no automatic switch or production run. I-target identity pilots of two draws are inconclusive with absent Gamma and recommendation. Fixed-family roles do not assert identical planner defaults or performance. Inconclusive status is checked in both the typed result and exported JSON.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_pilot_contracts",
+          "test": "original_thirty_two_draw_pilots_keep_configuration_and_report_point_gamma",
+          "source_sha256": "033ab71ef8f25903988d3ea99a19f6cd2b42c7335a2ccd8a3746d560b4b70acc"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_weighted_residuals_and_noise_correction",

@@ -110,7 +110,8 @@ native circuit cases with three Rust witness tests and all four native-core
 primitive cases with four additional Rust witness tests and all five phase-quotient
 optimization cases with five owning Rust witnesses, plus two finite history-efficiency
 arithmetic cases with two owning Rust witnesses and one original progress case
-with two owning Rust witnesses; the other 338 cases
+with two owning Rust witnesses, plus three original pilot/CLI entry-point cases
+with four owning Rust witnesses; the other 335 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -313,9 +314,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 16 mapped
-Rust witnesses for 14 verified upstream cases must execute successfully, while
-the overall gate must still return nonzero because 338 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 20 mapped
+Rust witnesses for 17 verified upstream cases must execute successfully, while
+the overall gate must still return nonzero because 335 core contracts remain
 unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -353,7 +354,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 338 cases unmapped, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 335 cases unmapped, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -372,10 +373,11 @@ The broader existing scale-invariance test also doubles the scalar sqrt(2)
 exponent to reach those actual binary endpoints.
 
 These tests import no upstream test module and invoke no native test-only builder.
-The separate progress contract below adds one mapping. The other four original
-history-efficiency methods remain unmapped. The current ledger contains
-14 verified, 338 unmapped and zero architecture-specific core cases, backed by
-16 Rust witnesses; the strict `--rust-run <run.json>
+The progress contract below adds one mapping and the pilot/CLI contracts add
+three more. The separate incomplete-pilot/native floating-range method remains
+unmapped. The current ledger contains
+17 verified, 335 unmapped and zero architecture-specific core cases, backed by
+20 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -402,3 +404,39 @@ Existing callback and malformed
 argument controls remain in place. Exact enumeration retains its integrated
 history description and has no sampled-record claim. These finite contracts
 add no pilot, native floating-range or paper-performance coverage.
+
+### Original sampler pilot and CLI entry-point contracts
+
+`history_pilot_contracts` and `history_pilot_cli_contracts` map only the three
+original pilot/configuration, CLI JSON/progress, and invalid-count/native-decision
+methods. The `X_ERROR(1/2) 0` circuit with `I 0` target uses 32 draws and seed 13
+for the immutable caller test. Both independent channels complete with kappa 1,
+positive preparation time, and Gamma matching their per-draw sampling-time ratio.
+The file task explicitly uses fixed scalar families for the prepared-family
+role; this does not equate the two implementations' planner defaults. Identity
+pilots of two draws are inconclusive, without Gamma or a recommendation.
+
+The CLI witness checks eight draws with progress every four and a sixteen-draw
+comparison. Complete stdout JSON and stderr progress are separately asserted.
+Invalid counts, boolean/fractional strings, missing payloads, and retired sampler
+names fail before decoder imports; a valid-argument canary proves the decoder
+would otherwise import. An absent payload represents Python `None`; omitting the
+entire CLI option retains Rust's documented two-draw default. Rust static
+integer/nonzero types and early typed count admission replace Python object
+validation. A zero-preparation-budget canary separates count rejection from
+quantum preparation and callback failures.
+
+The invalid-input mapping also executes `SamplerDecision::from_pilot_totals`
+against the original literal native examples: `(4,2,4,10)` gives Gamma 2 and
+exact marginal; `(1,2,4,10)` gives Gamma 1/2 and affine support. Both have per-draw
+point times 1/5 and 2/5. This is the existing stateless calculation, exposed for
+observed totals, and makes no automatic switch or confidence guarantee. The
+unchanged library comparison fixture additionally checks all 24 pinned native
+binary64 decision cases.
+
+All four new witnesses are required by the source-bound coverage gate, alongside
+the existing sixteen. The ledger now has 17 verified, 335 unmapped and zero
+architecture-specific cases, with 20 required Rust witnesses. Strict complete
+parity still exits 2. The entire separate incomplete-pilot/native floating-range
+method remains unmapped; these finite checks establish no full M6 or paper
+performance result.

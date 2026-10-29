@@ -32,6 +32,34 @@ pub struct SamplerDecision {
     pub exact_marginal_seconds_per_draw: f64,
     pub recommended_sampler: HistorySampler,
 }
+impl SamplerDecision {
+    /// Compute the native point decision from matched pilot sampling totals.
+    ///
+    /// Times exclude preparation. Kappa must be finite and nonnegative; both
+    /// times and the common completed-draw count must be positive. This pure
+    /// calculation neither runs a pilot nor changes a configured sampler, and
+    /// carries no confidence guarantee.
+    ///
+    /// ```
+    /// use rmagna::file_api::SamplerDecision;
+    /// let decision = SamplerDecision::from_pilot_totals(4.0, 2.0, 4.0, 10)?;
+    /// assert_eq!(decision.gamma, 2.0);
+    /// # Ok::<(), &'static str>(())
+    /// ```
+    pub fn from_pilot_totals(
+        kappa: f64,
+        affine_support_seconds: f64,
+        exact_marginal_seconds: f64,
+        completed_per_channel: u64,
+    ) -> Result<Self, &'static str> {
+        decide(
+            kappa,
+            affine_support_seconds,
+            exact_marginal_seconds,
+            completed_per_channel,
+        )
+    }
+}
 fn decide(
     kappa: f64,
     affine: f64,
