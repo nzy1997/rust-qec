@@ -210,6 +210,9 @@ fn every_mode_mismatch_and_malformed_flag_rejects_before_decoder_import() {
     let files = Files::new();
     files.decoder("from pathlib import Path\nPath('imported').touch()\ndef decode(bits,config): return bits\n");
     let flags = [
+        "--max-original-categories",
+        "--max-original-channels",
+        "--max-original-probability-bits",
         "--max-weight",
         "--max-patterns",
         "--max-fault-entries",
@@ -291,6 +294,135 @@ fn every_mode_mismatch_and_malformed_flag_rejects_before_decoder_import() {
     let text = String::from_utf8(help.stdout).unwrap();
     assert!(text.contains("--max-weight"));
     assert!(text.contains("all positive histories"));
+}
+
+#[test]
+fn physical_category_limits_resolve_and_export_choices_without_changing_internal_addresses() {
+    let files = Files::new();
+    files.put("circuit.magna", "M 0\nX_ERROR(1/3) 0");
+    let args = [
+        "enumerate",
+        "circuit.magna",
+        "--include-patterns",
+        "--max-original-categories",
+        "1",
+        "--max-original-channels",
+        "1",
+        "--max-original-probability-bits",
+        "2",
+        "--json",
+    ];
+    let value = files.json(&args, 0);
+    assert_eq!(value["original_noise_categories"][0]["internal_site"], 1);
+    assert_eq!(
+        value["original_noise_categories"][0]["channels"][0]["action"],
+        json!({"kind":"pauli","factors":[{"qubit":0,"basis":"X"}]})
+    );
+    assert_eq!(
+        value["result"]["pattern_responses"][1]["choices"],
+        json!([{"category":1,"channel":0,"original_category":0}])
+    );
+    assert_eq!(
+        value["options"]["enumeration"]["original_noise"],
+        json!({"max_categories":1,"max_channels":1,"max_probability_bits":2})
+    );
+    let disabled = files.json(
+        &[
+            "enumerate",
+            "circuit.magna",
+            "--max-original-categories",
+            "0",
+            "--max-original-channels",
+            "0",
+            "--max-original-probability-bits",
+            "0",
+            "--json",
+        ],
+        0,
+    );
+    assert!(disabled["original_noise_categories"].is_null());
+    assert!(disabled["result"]["pattern_responses"].is_null());
+    assert_eq!(disabled["result"]["masses"], value["result"]["masses"]);
+    assert_eq!(
+        disabled["result"]["by_weight"],
+        value["result"]["by_weight"]
+    );
+    for (flag, bound) in [
+        ("--max-original-categories", "0"),
+        ("--max-original-channels", "0"),
+        ("--max-original-probability-bits", "1"),
+    ] {
+        let failed = files.json(
+            &[
+                "enumerate",
+                "circuit.magna",
+                "--include-patterns",
+                flag,
+                bound,
+                "--json",
+            ],
+            1,
+        );
+        assert!(
+            failed["failures"][0]["message"]
+                .as_str()
+                .unwrap()
+                .contains("enumeration.original_noise")
+        );
+    }
+}
+
+#[test]
+fn malformed_or_boolean_physical_metadata_limits_fail_before_controller_import() {
+    let files = Files::new();
+    files.decoder("from pathlib import Path\nPath('imported').touch()\ndef decode(bits,config): return bits\n");
+    for flag in [
+        "--max-original-categories",
+        "--max-original-channels",
+        "--max-original-probability-bits",
+    ] {
+        for invalid in [
+            "true",
+            "false",
+            "-1",
+            "1.0",
+            "oops",
+            "184467440737095516160",
+        ] {
+            let value = files.json(
+                &[
+                    "enumerate",
+                    "circuit.magna",
+                    "--controllers",
+                    "controllers.json",
+                    "--include-patterns",
+                    flag,
+                    invalid,
+                    "--json",
+                ],
+                2,
+            );
+            assert!(
+                value["failures"][0]["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains(flag)
+            );
+            assert!(!files.0.join("imported").exists());
+        }
+        files.json(
+            &[
+                "enumerate",
+                "circuit.magna",
+                "--controllers",
+                "controllers.json",
+                flag,
+                "--json",
+            ],
+            2,
+        );
+        assert!(!files.0.join("imported").exists());
+    }
 }
 #[test]
 fn noise_budgets_and_numeric_export_failures_preserve_receipts() {

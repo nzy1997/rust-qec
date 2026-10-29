@@ -1,16 +1,34 @@
 //! Exact sector reports with captured identities and call-local failure costs.
+use super::enumeration_categories::category_table;
 use super::*;
 use crate::field::ExactField;
+use crate::instrument::FaultSelection;
+use crate::noise::OriginalNoiseOptions;
 use crate::probability::Probability;
 use crate::task::{
     ExactInterval, NumericEncoder, TaskEnumeration, TaskEnumerationOptions, TaskSectorMasses,
     fingerprint_with_configuration,
 };
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct FileEnumerationOptions {
     pub enumeration: TaskEnumerationOptions,
     pub execution_limits: ExecutionLimits,
+    /// Physical-source description budgets, used only with retained patterns.
+    pub original_noise: OriginalNoiseOptions,
+    /// Maximum numerator/denominator bits in each exported category/channel
+    /// probability. This does not bound intermediate exact arithmetic.
+    pub max_original_probability_bits: u64,
+}
+impl Default for FileEnumerationOptions {
+    fn default() -> Self {
+        Self {
+            enumeration: TaskEnumerationOptions::default(),
+            execution_limits: ExecutionLimits::default(),
+            original_noise: OriginalNoiseOptions::default(),
+            max_original_probability_bits: 1 << 20,
+        }
+    }
 }
 impl FileEnumerationOptions {
     fn to_json(self) -> Value {
@@ -23,14 +41,21 @@ impl FileEnumerationOptions {
                 "max_marginal_queries":h.max_marginal_queries,"max_replay_attempts":h.max_replay_attempts},
             "include_patterns":self.enumeration.include_patterns,
             "max_retained_response_values":self.enumeration.max_retained_response_values,
+            "original_noise":{"max_categories":self.original_noise.max_categories,
+                "max_channels":self.original_noise.max_channels,
+                "max_probability_bits":self.max_original_probability_bits},
             "execution_limits":self.execution_limits.to_json()})
     }
+}
+struct EnumerationDescriptor {
+    metadata: Value,
+    original_sites: Option<BTreeMap<usize, usize>>,
 }
 impl FileTask {
     fn enumeration_descriptor(
         &self,
         options: &FileEnumerationOptions,
-    ) -> Result<Value, FileApiError> {
+    ) -> Result<EnumerationDescriptor, FileApiError> {
         let i = &self.inputs;
         if !matches!(i.sampling, NoiseSampling::Physical) {
             return Err(input_error(
@@ -67,7 +92,22 @@ impl FileTask {
             .expect("descriptor object")
             .remove("history_sampler");
         value["sampling"] = sampling;
-        Ok(value)
+        let original_sites = if options.enumeration.include_patterns {
+            let table = category_table(
+                &i.physical,
+                &options.original_noise,
+                options.max_original_probability_bits,
+            )?;
+            value["original_noise_categories"] = table.value;
+            Some(table.internal_to_original)
+        } else {
+            value["original_noise_categories"] = Value::Null;
+            None
+        };
+        Ok(EnumerationDescriptor {
+            metadata: value,
+            original_sites,
+        })
     }
     /// Fresh exact integration shares preparation and traversal quotas. Invalid
     /// sampling/record requests fail before quantum preparation or callbacks.
@@ -75,7 +115,10 @@ impl FileTask {
         &self,
         options: &FileEnumerationOptions,
     ) -> Result<FileEnumerationReport, FileApiError> {
-        let metadata = self.enumeration_descriptor(options)?;
+        let EnumerationDescriptor {
+            metadata,
+            original_sites,
+        } = self.enumeration_descriptor(options)?;
         let started = Instant::now();
         let meter = ExecutionMeter::new(options.execution_limits);
         let i = &self.inputs;
@@ -98,7 +141,7 @@ impl FileTask {
                 evaluator,
                 preparation,
             }
-            .enumerate_report(metadata, options, &meter, started, true),
+            .enumerate_report(metadata, original_sites, options, &meter, started, true),
             Err(error) => {
                 let mut metadata = metadata;
                 metadata["route"] = json!("unavailable");
@@ -106,6 +149,7 @@ impl FileTask {
                 FileEnumerationReport {
                     result: Err(error),
                     metadata,
+                    original_sites,
                     numeric: i.options.numeric,
                     execution_costs: meter.snapshot(),
                     seconds: started.elapsed().as_secs_f64(),
@@ -123,14 +167,18 @@ impl CompiledFileTask {
         &self,
         options: &FileEnumerationOptions,
     ) -> Result<FileEnumerationReport, FileApiError> {
-        let metadata = self.task.enumeration_descriptor(options)?;
+        let EnumerationDescriptor {
+            metadata,
+            original_sites,
+        } = self.task.enumeration_descriptor(options)?;
         let started = Instant::now();
         let meter = ExecutionMeter::new(options.execution_limits);
-        Ok(self.enumerate_report(metadata, options, &meter, started, false))
+        Ok(self.enumerate_report(metadata, original_sites, options, &meter, started, false))
     }
     fn enumerate_report(
         &self,
         mut metadata: Value,
+        original_sites: Option<BTreeMap<usize, usize>>,
         options: &FileEnumerationOptions,
         meter: &ExecutionMeter,
         started: Instant,
@@ -157,6 +205,7 @@ impl CompiledFileTask {
         FileEnumerationReport {
             result,
             metadata,
+            original_sites,
             numeric: self.task.inputs.options.numeric,
             execution_costs: meter.snapshot(),
             seconds: started.elapsed().as_secs_f64(),
@@ -172,6 +221,7 @@ impl CompiledFileTask {
 pub struct FileEnumerationReport {
     result: Result<TaskEnumeration, TaskError>,
     metadata: Value,
+    original_sites: Option<BTreeMap<usize, usize>>,
     numeric: NumericOptions,
     execution_costs: ExecutionCosts,
     seconds: f64,
@@ -179,6 +229,33 @@ pub struct FileEnumerationReport {
     metadata_failure: Option<TaskError>,
 }
 impl FileEnumerationReport {
+    fn choice_json(&self, choice: &FaultSelection) -> Result<Value, BatchExportError> {
+        let inconsistent = || {
+            BatchExportError::InvalidState(format!(
+                "pattern choice at internal category {}, channel {} has no original physical category mapping",
+                choice.site, choice.alternative,
+            ))
+        };
+        let original = self
+            .original_sites
+            .as_ref()
+            .and_then(|sites| sites.get(&choice.site))
+            .copied()
+            .ok_or_else(inconsistent)?;
+        let category = &self.metadata["original_noise_categories"][original];
+        if category["internal_site"].as_u64() != Some(choice.site as u64)
+            || category["original_category"].as_u64() != Some(original as u64)
+            || category["channels"]
+                .as_array()
+                .and_then(|c| c.get(choice.alternative))
+                .is_none()
+        {
+            return Err(inconsistent());
+        }
+        Ok(
+            json!({"category":choice.site,"channel":choice.alternative,"original_category":original}),
+        )
+    }
     pub fn metadata(&self) -> &Value {
         &self.metadata
     }
@@ -231,7 +308,7 @@ impl FileEnumerationReport {
                     "masses":masses(&sector.masses, error_defined, &format!("result.by_weight.{j}.masses"), &mut encoder)?}));
             }
             let patterns = result.pattern_responses.as_ref().map(|patterns| patterns.iter().enumerate().map(|(j, p)| {
-                Ok(json!({"weight":p.choices.len(),"choices":p.choices.iter().map(|c|json!({"category":c.site,"channel":c.alternative})).collect::<Vec<_>>(),
+                Ok(json!({"weight":p.choices.len(),"choices":p.choices.iter().map(|c|self.choice_json(c)).collect::<Result<Vec<_>,_>>()?,
                     "probability":probability(&p.probability),"histories":p.histories,
                     "response":masses(&p.response,error_defined,&format!("result.pattern_responses.{j}.response"),&mut encoder)?}))
             }).collect::<Result<Vec<_>,BatchExportError>>()).transpose()?;
@@ -306,5 +383,57 @@ fn interval(
         Some(i) => Ok(
             json!({"lower":number(Some(&i.lower),&format!("{path}.lower"),encoder)?,"upper":number(Some(&i.upper),&format!("{path}.upper"),encoder)?}),
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_or_inconsistent_physical_addresses_cannot_be_exported() {
+        let parse = ParseOptions::default();
+        let circuit = parse_circuit("M 0\nX_ERROR(1/3) 0", &parse).unwrap();
+        let modules = parse_task("{}", Path::new("."), &TaskOptions::default())
+            .unwrap()
+            .load_modules(&circuit, &parse)
+            .unwrap();
+        let file = FileTask::from_loaded(
+            circuit,
+            modules,
+            &ControllerRegistry::default(),
+            NoiseSampling::Physical,
+            FileTaskOptions::default(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        let mut options = FileEnumerationOptions::default();
+        options.enumeration.include_patterns = true;
+        let mut report = file.enumerate(&options).unwrap();
+        assert!(report.to_json().is_ok());
+        // A lost join must be rejected, never guessed from a site number.
+        report.original_sites.as_mut().unwrap().remove(&1);
+        assert!(matches!(
+            report.to_json(),
+            Err(BatchExportError::InvalidState(_))
+        ));
+        report.original_sites.as_mut().unwrap().insert(1, 1);
+        assert!(matches!(
+            report.to_json(),
+            Err(BatchExportError::InvalidState(_))
+        ));
+        report.original_sites.as_mut().unwrap().insert(1, 0);
+        report.metadata["original_noise_categories"][0]["internal_site"] = json!(0);
+        assert!(matches!(
+            report.to_json(),
+            Err(BatchExportError::InvalidState(_))
+        ));
+        report.metadata["original_noise_categories"][0]["internal_site"] = json!(1);
+        report.metadata["original_noise_categories"][0]["channels"] = json!([]);
+        assert!(matches!(
+            report.to_json(),
+            Err(BatchExportError::InvalidState(_))
+        ));
+        assert!(report.raw_result().is_ok());
     }
 }

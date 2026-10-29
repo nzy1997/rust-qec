@@ -7,6 +7,7 @@ pub use comparison::{
 mod progress;
 pub use progress::export_progress;
 mod enumeration;
+mod enumeration_categories;
 mod preparation;
 mod stream;
 use crate::circuit::{Circuit, ParseOptions, parse_circuit};

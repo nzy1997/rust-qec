@@ -933,8 +933,9 @@ are checked before allocating descriptions. These logical limits do not bound
 all process memory. Extracting this table preserves ordinary measurement-site
 selection, physical masses and seeded entropy use. Category counts describe
 these declarations; they do not determine a universal paper proposal size.
-File/enumeration JSON and specialized rare-event proposals remain separate
-interfaces.
+File enumeration exports the captured physical table when retaining pattern
+responses, as described below. Specialized rare-event proposals remain a
+separate interface.
 
 ## Exact categorical noise draws
 
@@ -3779,23 +3780,56 @@ can occur before this traversal preflight and keeps its actual query cost.
 
 File reports keep the numeric `result.patterns` count and place optional records
 in `result.pattern_responses`, including exact and scientific responses. Their
-configuration and cap participate in the options fingerprint. Category/channel
-indices belong to the captured Rust noise model; compare another implementation
-through original source-operation identities, since zero-probability category
-placeholders can change numbering. Correlated chains remain one category, and
-inactive guarded selections remain distinct latent physical patterns.
+configuration and caps participate in the options fingerprint. Each JSON choice
+keeps its existing internal `category` and `channel`, adding `original_category`
+as an index into top-level `original_noise_categories`. For `M 0` followed by
+`X_ERROR(1/3) 0`, the nonidentity choice is
+`{"category":1,"channel":0,"original_category":0}`. Missing or inconsistent
+physical mappings fail export instead of guessing an index. Correlated chains
+remain one category, and inactive guarded selections remain distinct latent
+physical patterns.
+
+The owned physical table comes from the captured original circuit, before
+appending recovery or target modules. Output remapping does not rewrite its
+physical wire labels. Its entries contain `original_category`, `internal_site`,
+`source_operations`, `guard`, `identity_probability` and ordered `channels`.
+Each channel has its zero-based `channel`, exact `probability`, source anchor
+and `action`. A report-flip action is `{"kind":"report_flip","record":0}`;
+a Pauli action is `{"kind":"pauli","factors":[{"qubit":0,"basis":"X"}]}`.
+Probability numerators and denominators are decimal strings. Anchors contain
+expanded Rust `operation`, optional `source`, one-based `line`/`column` and the
+`repeat` address. Native string operation IDs require explicit source/record
+translation. Guards are null or canonical XOR objects with a Boolean `constant`
+and ordered `terms`: `{"kind":"record","record":0}` or
+`{"kind":"decision","call":0,"bit":0}`. Zero-mass channels and declared
+readout endpoints remain in the table even when absent from positive patterns.
+
+`FileEnumerationOptions.original_noise` accepts `OriginalNoiseOptions` with
+category and total channel caps, each defaulting to 1,000,000.
+`max_original_probability_bits` defaults to 1,048,576 and bounds each exported
+identity/channel probability's numerator and denominator before decimal
+conversion. It bounds final integers, not intermediate arithmetic or all
+process memory. All three metadata limits are checked before fresh quantum
+preparation and callbacks; reused reports apply them before traversal. They
+are recorded under `options.enumeration.original_noise`, independently of the
+sector enumeration probability budget. With patterns disabled, the physical
+table is not constructed and `original_noise_categories` is null; zero metadata
+caps are then allowed even with declared noise. Captured metadata remains
+available after source/module deletion or execution failure.
 
 ```text
 rmagna enumerate physical.magna --task task.json --max-weight 2 \
-  --include-patterns --max-pattern-response-values 1000000 --json --output sectors.json
+  --include-patterns --max-pattern-response-values 1000000 \
+  --max-original-categories 1000000 --max-original-channels 1000000 \
+  --max-original-probability-bits 1048576 --json --output sectors.json
 ```
 
 Retention flags apply only to `enumerate` and are validated before decoder
 imports. Enabling retention adds no quantum queries, decoder calls or entropy.
 Failures retain actual costs and do not publish complete estimates. Numerical
 export failure leaves all owned exact records in the Rust report; the CLI keeps
-its ordinary explicit non-persistence receipt. This feature does not add
-category action definitions or resume a failed enumeration cursor.
+its ordinary explicit non-persistence receipt. Failed enumeration cursor
+retention and specialized rare-event proposals remain outside this interface.
 
 The six pinned-native pattern-response witnesses cover joint report selection,
 mutually exclusive Pauli/correlated channels, forced empty/full sectors,
