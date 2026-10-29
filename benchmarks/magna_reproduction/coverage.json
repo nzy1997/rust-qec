@@ -900,8 +900,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_failure_does_not_return_complete_estimates",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal twoX_ERROR(1/10)sites at maxweight2,maxpatterns3 fail without any raw TaskEnumeration or JSONresult; typed/JSONphase/status identifyfailure and never expose a partial pattern/mass estimate (native zero-completed-pattern cursor is represented by no result, not binding/cursorABI). LiteralH0,M0,detector,echo,controlledX0 at maxbranches1 likewise fails without estimates. Same prepared plan then succeeds with adequatebudget: four physicalpatterns,error9/50,success41/50,or twofeedbackhistories,error0,success1. Both compilers/causal strategies and fresh/reused failure paths.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_feedback_contracts",
+          "test": "original_pattern_and_branch_caps_fail_without_estimates_and_allow_prepared_retry",
+          "source_sha256": "31a584f35621d2f7e67a329c37f38d0715a55f4f31b7ccb000447b7a5540c4fa"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_invalid_budgets_and_cli",
@@ -936,8 +944,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_nonlinear_magic_feedback_exactly_sums_irrational_branches",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal H0,T0,H0,CX01,M01,detectors,and-controller,controlledX2 with output2 and I0 target: complete1physicalpattern,2positivecausalhistories,actual controller inputs exactly00and11,covered1,acceptance1,error(2-sqrt2)/4,targetsuccess(2+sqrt2)/4 and matching ordinary/exactJSON. Independent literal omega coefficients; both compiler/causal strategies and fresh/reused owned reports.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_feedback_contracts",
+          "test": "original_nonlinear_magic_feedback_integrates_both_irrational_positive_branches",
+          "source_sha256": "31a584f35621d2f7e67a329c37f38d0715a55f4f31b7ccb000447b7a5540c4fa"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_report_noise_and_postselection_are_joint_contributions",
@@ -954,8 +970,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_terminal_feedback_and_guarded_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal physicalX_ERROR(1/10)0 plus terminal H1,M1,detector,echo,CXctrl->0 gives complete exacterror1/2; literalH1,M1,guardedX_ERROR(1/5)rec[-1]0 gives exacterror1/10. Both cover1/accept1 with complementary targetsuccess; original physical category/channel/guard/source metadata and latent pattern probabilities preserved. Both positive measurement histories per pattern are integrated, with only terminal echo invokingcallbacks. Both compiler/causal strategies, fresh/reused plans.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_feedback_contracts",
+          "test": "original_terminal_feedback_and_guarded_noise_preserve_physical_weights",
+          "source_sha256": "31a584f35621d2f7e67a329c37f38d0715a55f4f31b7ccb000447b7a5540c4fa"
+        }
+      ]
     },
     {
       "id": "test_native_batch.BatchTests.test_bad_codes_and_duplicate_report_flips",
