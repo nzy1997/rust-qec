@@ -612,13 +612,19 @@
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_default_progress_preserves_draws_and_manual_born",
       "status": "verified",
-      "contract": "Original H;T;MX circuit with H target, sampled record0,21draws,seed42 and interval8: default affine sampler; present null/conditional record semantics in fresh/compiled/prepared inspection and reports; identical complete statistics,records,efficiency and operation counts with progress; events8,16,21; manual exact-marginal kappa1. Independent affine weight first/second moments reject an unreported switch.",
+      "contract": "Original H;T;MX circuit with H target, sampled record 0, 21 draws, seed 42 and interval 8: default affine sampler; present null/conditional record semantics in fresh/compiled/prepared inspection and reports; identical complete statistics, records, efficiency and operation counts with progress; events 8,16,21; manual exact-marginal kappa 1. Independent affine weight first/second moments reject an unreported switch. The CLI emits one final stdout JSON and exactly three stderr events containing the explicit manual --history-sampler exact_marginal flag and variance/cost caveat.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "history_progress_contracts",
           "test": "original_default_progress_and_manual_born_preserve_draws_and_record_semantics",
           "source_sha256": "abf368f45fac60896a8275a98a4e7d0d63979861c83b79ac6bc902dc400aa711"
+        },
+        {
+          "package": "rmagna",
+          "target": "cli_progress",
+          "test": "original_twenty_one_draws_keep_one_stdout_report_and_three_manual_hint_lines",
+          "source_sha256": "474def3de6a1e6ba8c4c686caf949c5d70562eebaa8026e35294163c05ffbe2a"
         }
       ]
     },
