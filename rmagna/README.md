@@ -339,8 +339,10 @@ Enumeration rejects `--shots`, `--seed`, `--noise-proposal-scale`,
 
 The CLI defaults to the shared commuting-layer compiler, affine-support history
 sampling, fixed causal templates, fixed probability/density/moment preparation on
-demand, and direct Pauli insertions. Library defaults remain as documented below.
-For sampling, use `--history-sampler exact_marginal`. Use `--compiler parity_copies`,
+demand, and direct Pauli insertions. The owned file API also defaults to
+affine-support history sampling; other library policies are documented below.
+For true conditional quantum record sampling, use `--history-sampler exact_marginal`.
+Use `--compiler parity_copies`,
 `--probability-preparation MODE`, `--density-preparation MODE`,
 `--moment-preparation MODE` with `cold|trace|fixed|catalogue|native|native_injection`
 and `--causal-strategy fixed|cold` to select alternatives. Prepared insertion
@@ -3221,6 +3223,17 @@ configuration. `FileTask::load` bounds circuit and task reads with
 deleted module files and additions to the caller's registry do not alter the
 captured task. Cloning a `FileTask` shares that immutable snapshot.
 
+`FileTaskOptions::default()` selects `affine_support`, matching the native file
+interface and CLI. Inspection and ordinary fresh, compiled and prepared reports
+include a present `sampling.exact_marginal_records` field. Its value is null for
+affine-support proposal records, whose estimates require their history weights,
+or `"true conditional distribution"` for an explicitly selected `exact_marginal`
+sampler. The description concerns quantum record sampling conditioned on sampled
+noise and preceding history; importance-noise weights apply to either mode.
+Exact enumeration reports
+`sampling.histories = "all_positive_causal_histories"` separately and omits the
+sampled-record field.
+
 Snapshot admission validates captured content and controller identities without
 assuming a future run. Statistics, record-retention and run-dependent fingerprint
 budgets are checked by `fingerprints`, `inspect` and `run` against the supplied
@@ -3643,6 +3656,12 @@ statistics/records remain a failed report's prefix, including when the observer
 fails after the final completed draw. Actual compiler/query/decoder/support
 counters keep their existing meanings. An individual callback is not preempted.
 Progress observations do not add checkpointing or launch a production campaign.
+
+CLI affine-support progress lines include the manual alternative
+`--history-sampler exact_marginal`, with a variance/cost-per-draw caveat. The hint
+does not select or change a sampler. Progress retains one stderr line per event
+and one final stdout report, using the same entropy, records, estimates,
+efficiency and decoder calls as the corresponding unobserved run.
 
 ```rust
 use std::num::NonZeroU64;

@@ -286,7 +286,13 @@ fn changed_loaded_content_and_declarations_reject_before_callbacks() {
         let mut sampling = NoiseSampling::Physical;
         match change {
             0 => configuration.numeric.max_work_bits += 1,
-            1 => configuration.evaluation.runtime.history_sampler = HistorySampler::AffineSupport,
+            1 => {
+                configuration.evaluation.runtime.history_sampler =
+                    match configuration.evaluation.runtime.history_sampler {
+                        HistorySampler::AffineSupport => HistorySampler::ExactMarginal,
+                        HistorySampler::ExactMarginal => HistorySampler::AffineSupport,
+                    }
+            }
             2 => {
                 configuration.evaluation.runtime.compile.compiler_strategy =
                     CompilerStrategy::SharedCommutingLayer
@@ -298,6 +304,12 @@ fn changed_loaded_content_and_declarations_reject_before_callbacks() {
             }
         }
         let (changed, calls) = files.load(configuration, sampling, "v1", "one", 0);
+        let identity = changed.stream_identity(options, IMPLEMENTATION).unwrap();
+        if change < 3 {
+            assert_ne!(identity.content.options, original.content.options);
+        } else {
+            assert_ne!(identity.content.sampling, original.content.sampling);
+        }
         assert!(
             changed
                 .compile()
@@ -545,49 +557,58 @@ fn ordinary_failure_and_caught_unwind_restore_as_terminal() {
 
 #[test]
 fn restored_sampling_quota_is_cumulative_and_excludes_repreparation() {
-    let files = Files::new();
-    let (task, trace) = files.load(Default::default(), NoiseSampling::Physical, "v1", "one", 0);
-    let compiled = task.compile().unwrap();
-    let mut probe = compiled
-        .start_stream(options(true), IMPLEMENTATION)
-        .unwrap();
-    let first = probe.advance(1).unwrap();
-    let queries = first.execution_costs.query.attempted;
-    assert!(queries > 0);
-    trace.lock().unwrap().clear();
-    let mut options = options(true);
-    options.run.execution_limits.max_queries = queries;
-    let mut prefix = compiled.start_stream(options, IMPLEMENTATION).unwrap();
-    assert_eq!(prefix.advance(1).unwrap().completed, 1);
-    let checkpoint = saved(&prefix);
-    let replacement = task.compile().unwrap();
-    let mut restored = replacement
-        .restore_stream_json(
-            &checkpoint,
-            options,
-            IMPLEMENTATION,
-            CheckpointOptions::default(),
-        )
-        .unwrap();
-    assert_eq!(scientific(&saved(&restored)), scientific(&checkpoint));
-    let report = restored.advance(1).unwrap();
-    assert_eq!(report.status, TaskStreamStatus::Failed);
-    assert_eq!(
-        (report.completed, report.failed, report.not_attempted),
-        (1, 1, 5)
-    );
-    assert_eq!(report.execution_costs.query.attempted, queries);
-    assert!(report.failure.unwrap().message.contains("query"));
-    assert_eq!(trace.lock().unwrap().len(), 1);
-    let terminal = saved(&restored);
-    let mut restored = replacement
-        .restore_stream_json(
-            &terminal,
-            options,
-            IMPLEMENTATION,
-            CheckpointOptions::default(),
-        )
-        .unwrap();
-    assert!(restored.advance(1).is_err());
-    assert_eq!(scientific(&saved(&restored)), scientific(&terminal));
+    for (sampler, callback_count) in [
+        (HistorySampler::AffineSupport, 2),
+        (HistorySampler::ExactMarginal, 1),
+    ] {
+        let files = Files::new();
+        let mut configuration = FileTaskOptions::default();
+        configuration.evaluation.runtime.history_sampler = sampler;
+        let (task, trace) = files.load(configuration, NoiseSampling::Physical, "v1", "one", 0);
+        let compiled = task.compile().unwrap();
+        let mut probe = compiled
+            .start_stream(options(true), IMPLEMENTATION)
+            .unwrap();
+        let first = probe.advance(1).unwrap();
+        let queries = first.execution_costs.query.attempted;
+        assert!(queries > 0);
+        trace.lock().unwrap().clear();
+        let mut options = options(true);
+        options.run.execution_limits.max_queries = queries;
+        let mut prefix = compiled.start_stream(options, IMPLEMENTATION).unwrap();
+        assert_eq!(prefix.advance(1).unwrap().completed, 1);
+        let checkpoint = saved(&prefix);
+        let replacement = task.compile().unwrap();
+        let mut restored = replacement
+            .restore_stream_json(
+                &checkpoint,
+                options,
+                IMPLEMENTATION,
+                CheckpointOptions::default(),
+            )
+            .unwrap();
+        assert_eq!(scientific(&saved(&restored)), scientific(&checkpoint));
+        let report = restored.advance(1).unwrap();
+        assert_eq!(report.status, TaskStreamStatus::Failed);
+        assert_eq!(
+            (report.completed, report.failed, report.not_attempted),
+            (1, 1, 5)
+        );
+        assert_eq!(report.execution_costs.query.attempted, queries);
+        assert!(report.failure.unwrap().message.contains("query"));
+        // Affine proposals reach the decoder before the final scalar query;
+        // exact-marginal prefix queries encounter the exhausted quota earlier.
+        assert_eq!(trace.lock().unwrap().len(), callback_count);
+        let terminal = saved(&restored);
+        let mut restored = replacement
+            .restore_stream_json(
+                &terminal,
+                options,
+                IMPLEMENTATION,
+                CheckpointOptions::default(),
+            )
+            .unwrap();
+        assert!(restored.advance(1).is_err());
+        assert_eq!(scientific(&saved(&restored)), scientific(&terminal));
+    }
 }

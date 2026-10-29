@@ -109,7 +109,8 @@ pinned 57 core modules (352 cases). Its current assertion mappings cover two
 native circuit cases with three Rust witness tests and all four native-core
 primitive cases with four additional Rust witness tests and all five phase-quotient
 optimization cases with five owning Rust witnesses, plus two finite history-efficiency
-arithmetic cases with two owning Rust witnesses; the other 339 cases
+arithmetic cases with two owning Rust witnesses and one original progress case
+with two owning Rust witnesses; the other 338 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -312,9 +313,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 14 mapped
-Rust witnesses for 13 verified upstream cases must execute successfully, while
-the overall gate must still return nonzero because 339 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 16 mapped
+Rust witnesses for 14 verified upstream cases must execute successfully, while
+the overall gate must still return nonzero because 338 core contracts remain
 unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -352,7 +353,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 339 cases unmapped, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 338 cases unmapped, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -371,9 +372,33 @@ The broader existing scale-invariance test also doubles the scalar sqrt(2)
 exponent to reach those actual binary endpoints.
 
 These tests import no upstream test module and invoke no native test-only builder.
-The other five original history-efficiency methods remain unmapped. The current
-ledger therefore contains 13 verified, 339 unmapped and zero architecture-specific
-core cases, backed by 14 Rust witnesses; the strict `--rust-run <run.json>
+The separate progress contract below adds one mapping. The other four original
+history-efficiency methods remain unmapped. The current ledger contains
+14 verified, 338 unmapped and zero architecture-specific core cases, backed by
+16 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
+
+### Original progress and record-sampling semantics
+
+The owning `history_progress_contracts` witness maps only
+`test_default_progress_preserves_draws_and_manual_born`. It uses the original
+`H 0; T 0; MX 0` circuit, `H 0` target, sampled record 0, 21 draws, seed 42,
+and progress interval 8. Fresh, reused and prepared paths retain identical
+complete statistics, records, efficiency and operation counts; events occur
+at exactly 8, 16 and 21 completed draws. The file default is `affine_support`,
+whose present `sampling.exact_marginal_records` value is null. Explicit
+`exact_marginal` reports `true conditional distribution` and kappa 1.
+Independent first/second moments of the affine proposal weights additionally
+detect an unreported change to unit-weight conditional draws.
+
+The same mapping also includes the owning `cli_progress` witness
+`original_twenty_one_draws_keep_one_stdout_report_and_three_manual_hint_lines`.
+It emits one final stdout JSON and three stderr events containing
+the manual sampler flag and variance/cost caveat. Both witnesses are required:
+the typed file observer alone does not exercise printed CLI progress.
+Existing callback and malformed
+argument controls remain in place. Exact enumeration retains its integrated
+history description and has no sampled-record claim. These finite contracts
+add no pilot, native floating-range or paper-performance coverage.

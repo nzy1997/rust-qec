@@ -163,7 +163,15 @@ fn invalid_progress_and_existing_output_are_rejected_before_decoder_import() {
         );
         assert_eq!(v["failures"][0]["phase"], "arguments");
     }
-    for interval in ["0", "-1", "NaN", "1.5", "18446744073709551616"] {
+    for interval in [
+        "0",
+        "-1",
+        "NaN",
+        "1.5",
+        "18446744073709551616",
+        "true",
+        "false",
+    ] {
         let v = value(
             &f.run(&[
                 "run",
@@ -172,6 +180,23 @@ fn invalid_progress_and_existing_output_are_rejected_before_decoder_import() {
                 "controllers.json",
                 "--progress-every",
                 interval,
+                "--json",
+            ]),
+            2,
+        );
+        assert_eq!(v["failures"][0]["phase"], "arguments");
+    }
+    for sampler in ["born", "capped", "capped_affine", "true", "false"] {
+        let v = value(
+            &f.run(&[
+                "run",
+                "circuit.magna",
+                "--controllers",
+                "controllers.json",
+                "--history-sampler",
+                sampler,
+                "--progress-every",
+                "8",
                 "--json",
             ]),
             2,
@@ -212,6 +237,66 @@ fn invalid_progress_and_existing_output_are_rejected_before_decoder_import() {
         std::fs::read_to_string(f.0.join("existing.json")).unwrap(),
         "keep"
     );
+}
+#[test]
+fn original_twenty_one_draws_keep_one_stdout_report_and_three_manual_hint_lines() {
+    let f = Files::new();
+    f.put("circuit.magna", "H 0\nT 0\nMX 0\n");
+    f.put("ideal.magna", "H 0\n");
+    f.put("task.json", r#"{"outputs":[0],"sample_records":[0],"ideal_state":{"circuit":"ideal.magna","outputs":[0]}}"#);
+    let args = [
+        "run",
+        "circuit.magna",
+        "--task",
+        "task.json",
+        "--shots",
+        "21",
+        "--seed",
+        "42",
+        "--json",
+    ];
+    let baseline = value(&f.run(&args), 0);
+    let mut progress = args.to_vec();
+    progress.extend(["--progress-every", "8"]);
+    let out = f.run(&progress);
+    let observed = value(&out, 0);
+    for key in [
+        "estimates",
+        "standard_errors",
+        "efficiency",
+        "weights",
+        "sampled_records",
+        "completed",
+        "failed",
+        "not_attempted",
+    ] {
+        assert_eq!(observed[key], baseline[key], "{key}");
+    }
+    assert_eq!(observed["completed"], 21);
+    assert_eq!(observed["history_sampler"], "affine_support");
+    assert_eq!(
+        observed["sampling"].get("exact_marginal_records"),
+        Some(&Value::Null)
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    let lines = stderr.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len(), 3);
+    for (line, completed) in lines.iter().zip([8, 16, 21]) {
+        assert!(line.starts_with(&format!(
+            "[{completed}/21] history_sampler=affine_support kappa="
+        )));
+        assert!(line.contains("--history-sampler exact_marginal"));
+        assert!(line.contains("variance") && line.contains("cost per draw"));
+    }
+    let mut exact = args.to_vec();
+    exact.extend(["--history-sampler", "exact_marginal"]);
+    let born = value(&f.run(&exact), 0);
+    assert_eq!(born["history_sampler"], "exact_marginal");
+    assert_eq!(
+        born["sampling"].get("exact_marginal_records"),
+        Some(&json!("true conditional distribution"))
+    );
+    assert_eq!(born["efficiency"]["kappa"], 1.0);
 }
 #[test]
 fn numeric_diagnostics_can_fail_while_sampling_completes_with_owned_progress_receipt() {
