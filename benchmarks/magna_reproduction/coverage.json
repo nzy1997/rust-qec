@@ -139,8 +139,16 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_conditional_noise_and_pauli_feedback",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal conditional S/MX/guarded X_ERROR(1/3)/M/CX circuit, output3,records0/1/2,I0 target,affine support:512SplitMix64 draws seed100 per compiler/fixed-or-cold causal route report acceptance1 and error within0.04 of1/12, with actual echo inputs matched to record0. Independent finite four-branch masses1/2,1/4,1/6,1/12,full exact enumeration acceptance1/error1/12/targetsuccess11/12 and exact target normalization preserve guard and feedback semantics. No native RNG trajectory or internal counter ABI identity is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "capped_affine_contracts",
+          "test": "original_guarded_noise_feedback_matches_four_exact_branches_and_seeded_batch",
+          "source_sha256": "44585ef1fa185b6df31b4ef52abe7d6602ed62da93de0a5927d840363b8b815e"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_general_transport_reuse_respects_actual_feedback",
@@ -169,8 +177,16 @@
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_terminal_recovery_controller_and_target",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal H0 physical circuit and M0/DETECTOR/echo/CX terminal recovery, I0 target and affine support:16SplitMix64 draws seed9 per compiler/causal configuration retain acceptance1,error0,one actual recovery controller call,proposal1/2 and target normalization1. Both prescribed measurement branches independently have mass1/2 and recover to the target.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "capped_affine_contracts",
+          "test": "original_terminal_recovery_keeps_one_call_half_proposals_and_zero_error",
+          "source_sha256": "44585ef1fa185b6df31b4ef52abe7d6602ed62da93de0a5927d840363b8b815e"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_atomic_outputs_and_nonlinear_parity_information",
