@@ -882,8 +882,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_distinct_sites_and_exact_truncated_mass",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal sequential X_ERROR(1/10)0,X_ERROR(1/5)0,I0 target: weight1 has3patterns,acceptance49/50,error13/50,fullerrorbounds[13/50,7/25],two retained weight1 patterns; fullweight2 has4patterns,covered1,error13/50. Both original category definitions,literal X0 action and a content-sensitive64hex circuit fingerprint survive fresh/reused owned reports. Independent physical pattern masses18/25,2/25,9/50.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_categories_contracts",
+          "test": "original_distinct_sites_preserve_truncated_masses_patterns_and_metadata",
+          "source_sha256": "e7206a0426dfd63e47458677a6e294d5faf245fc5a87f5f63e5cc2f488fdc84a"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_endpoints_empty_sector_and_zero_noise",
@@ -902,13 +910,29 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_mandatory_suffix_prunes_impossible_prefixes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal200optional[9/10,1/10]categories then4mandatory[0,1],max_patterns1: weight3 is empty,weight4 has one pattern with exact choices(200,0)..(203,0). Independently verify mass9^200/10^200,its complement,and exact by-weight sectors without traversing the Cartesian support.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_categories_contracts",
+          "test": "original_204_categories_prune_mandatory_tail_before_final_pattern_limit",
+          "source_sha256": "e7206a0426dfd63e47458677a6e294d5faf245fc5a87f5f63e5cc2f488fdc84a"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_mutually_exclusive_paulis_and_correlated_chain",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal PAULI_CHANNEL_1(1/10,1/5,3/10)0 has4exclusive patterns,error3/10; CORRELATED_ERROR(1/10)X0,ELSE_CORRELATED_ERROR(2/9)Z0 has3patterns,covered1,error1/10. Independent pattern/channel probabilities are[2/5,1/10,1/5,3/10]and[7/10,1/10,1/5]; no simultaneous alternatives,actual sources/actions and fresh/reused metadata remain bound.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_categories_contracts",
+          "test": "original_pauli_channel_and_else_chain_keep_exclusive_exact_weights",
+          "source_sha256": "e7206a0426dfd63e47458677a6e294d5faf245fc5a87f5f63e5cc2f488fdc84a"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_nonlinear_magic_feedback_exactly_sums_irrational_branches",

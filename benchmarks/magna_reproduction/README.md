@@ -113,9 +113,11 @@ arithmetic cases with two owning Rust witnesses and one original progress case
 with two owning Rust witnesses, plus three original pilot/CLI entry-point cases
 with four owning Rust witnesses, plus two capped recovery/guarded-feedback
 methods with two owning Rust witnesses, plus the original report-noise and
-postselection method with one owning Rust witness. One further method is explicitly `partial`,
+postselection method with one owning Rust witness, plus three original
+low-weight categorical/mandatory-tail methods with three owning Rust witnesses.
+One further method is explicitly `partial`,
 with two required finite witnesses and a remaining native range-status gap;
-the other 331 cases
+the other 328 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -323,9 +325,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 25 mapped
-Rust witnesses for 20 verified and one partial upstream case must execute successfully,
-while the overall gate must still return nonzero because 331 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 28 mapped
+Rust witnesses for 23 verified and one partial upstream case must execute successfully,
+while the overall gate must still return nonzero because 328 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -363,7 +365,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 331 cases unmapped and one partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 328 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -385,8 +387,8 @@ These tests import no upstream test module and invoke no native test-only builde
 The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/native floating-range method is
 partial, with the numerical gap described below. The current ledger contains
-20 verified, one partial, 331 unmapped and zero architecture-specific core cases,
-backed by 25 Rust witnesses; the strict `--rust-run <run.json>
+23 verified, one partial, 328 unmapped and zero architecture-specific core cases,
+backed by 28 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -445,9 +447,10 @@ binary64 decision cases.
 
 All four pilot/CLI witnesses are required by the source-bound coverage gate,
 alongside the existing sixteen, the two partial witnesses below and the two
-capped recovery/feedback witnesses and the report-noise/postselection witness. The ledger
-has 20 verified, one partial, 331 unmapped and zero architecture-specific cases,
-with 25 required Rust witnesses. Strict complete parity still exits 2. These
+capped recovery/feedback witnesses, the report-noise/postselection witness and
+the three categorical/mandatory-tail witnesses below. The ledger
+has 23 verified, one partial, 328 unmapped and zero architecture-specific cases,
+with 28 required Rust witnesses. Strict complete parity still exits 2. These
 finite checks establish no full M6 or paper-performance result.
 
 ### Partial original incomplete-pilot and tiny-error contract
@@ -504,9 +507,9 @@ check controller inputs and the exact empirical error contribution. Rust uses
 its own SplitMix64 stream, without a Python Random trajectory claim.
 
 The audit requires these two witnesses alongside the prior twenty-two and the
-report-noise/postselection witness below.
-It has 20 verified, one partial, 331 unmapped and zero architecture-specific
-core cases, with 25 required witnesses and strict complete-parity exit 2. The
+report-noise/postselection witness and three categorical/mandatory-tail witnesses below.
+It has 23 verified, one partial, 328 unmapped and zero architecture-specific
+core cases, with 28 required witnesses and strict complete-parity exit 2. The
 separate native diagnostic-status gap remains partial. No native tensor/cache
 counter ABI, full M6 completion or paper-performance result is claimed.
 
@@ -532,8 +535,38 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 25 required witnesses support 20 verified, one partial and 331
+The current 28 required witnesses support 23 verified, one partial and 328
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods and the existing partial tiny-error diagnostic-range gap
 remain outside this mapping; no complete M6 or paper-performance claim is made.
+
+### Original low-weight categories and mandatory suffix
+
+`low_weight_categories_contracts` maps three complete original methods, each to
+one owning Rust test. Literal repeated X errors 1/10 and 1/5 on the same output
+remain two distinct physical categories. At weight one the independent pattern
+masses are 18/25, 2/25 and 9/50: acceptance is 49/50, error is 13/50 and full error
+bounds are [13/50,7/25]. Both single-site patterns remain retained; full weight
+two adds the double flip without changing the error mass. Original category
+definitions, exact first X action and a content-sensitive 64-hex circuit
+fingerprint are checked on fresh and reused owned reports.
+
+The literal Pauli channel has exclusive masses [2/5,1/10,1/5,3/10]; only X and Y
+flip the zero target, giving error 3/10. The correlated X/else-Z chain instead has
+exclusive masses [7/10,1/10,1/5]. Its second supplied probability 2/9 is conditional:
+(1-1/10)*(2/9)=1/5. Exact raw pattern responses and exported channel metadata
+independently match these values; they never include simultaneous alternatives.
+
+The final witness uses the original 200 optional [9/10,1/10] categories followed
+by four mandatory [0,1] categories. With max_patterns=1, weight three is empty;
+weight four retains exactly choices [(200,0),(201,0),(202,0),(203,0)]. Its mass is
+9^200/10^200, with the exact complementary omitted mass. The cap bounds retained
+final patterns, permitting mandatory-suffix pruning before optional prefixes can
+exhaust the cap. No native binding ABI or new enumeration algorithm is claimed.
+
+All 28 required Rust witnesses support 23 verified, one partial and 328 unmapped
+core cases, with zero architecture-specific exclusions. The actual source-bound
+strict gate remains incomplete and must exit 2. Other low-weight methods and the
+existing partial tiny-error diagnostic-range gap remain explicitly unverified;
+these finite checks establish neither complete M6 parity nor paper performance.
