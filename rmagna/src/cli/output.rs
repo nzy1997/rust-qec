@@ -359,9 +359,14 @@ pub fn progress(stderr: &mut impl Write, event: &Value) -> io::Result<()> {
                 .unwrap_or("unavailable");
             format!("unavailable ({reason})")
         });
+    let hint = if event["history_sampler"].as_str() == Some("affine_support") {
+        " manual alternative: --history-sampler exact_marginal (variance may improve; cost per draw may increase)"
+    } else {
+        ""
+    };
     writeln!(
         stderr,
-        "[{}/{}] history_sampler={} kappa={kappa}",
+        "[{}/{}] history_sampler={} kappa={kappa}{hint}",
         event["completed"],
         event["requested"],
         event["history_sampler"].as_str().unwrap_or("unavailable")

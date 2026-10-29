@@ -28,11 +28,26 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, fmt, io::Read, path::Path, sync::Arc, time::Instant};
 pub use stream::FileTaskStream;
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct FileTaskOptions {
     pub evaluation: EvaluationOptions,
     pub numeric: NumericOptions,
     pub fingerprints: FingerprintOptions,
+}
+impl Default for FileTaskOptions {
+    fn default() -> Self {
+        Self {
+            evaluation: EvaluationOptions {
+                runtime: crate::runtime::RuntimeOptions {
+                    history_sampler: crate::runtime::HistorySampler::AffineSupport,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            numeric: NumericOptions::default(),
+            fingerprints: FingerprintOptions::default(),
+        }
+    }
 }
 #[derive(Clone, Debug, Default)]
 pub struct FileLoadOptions {
@@ -226,9 +241,11 @@ impl FileTask {
         let t = i.modules.task();
         let target=i.modules.ideal_state().map(|p|json!({"qubits":p.circuit().num_qubits(),"outputs":p.outputs(),"postselection":p.postselection()}));
         let recovery = i.modules.recovery().map(circuit_summary);
-        let history = match i.options.evaluation.runtime.history_sampler {
-            crate::runtime::HistorySampler::ExactMarginal => "exact_marginal",
-            crate::runtime::HistorySampler::AffineSupport => "affine_support",
+        let (history, exact_marginal_records) = match i.options.evaluation.runtime.history_sampler {
+            crate::runtime::HistorySampler::ExactMarginal => {
+                ("exact_marginal", Some("true conditional distribution"))
+            }
+            crate::runtime::HistorySampler::AffineSupport => ("affine_support", None),
         };
         json!({
             "schema_version":2,"software_version":concat!("rmagna-",env!("CARGO_PKG_VERSION")),
@@ -239,7 +256,7 @@ impl FileTask {
             "provenance_limits":{"max_json_bytes":i.options.fingerprints.max_json_bytes,"max_depth":i.options.fingerprints.max_depth},
             "method":match i.sampling {NoiseSampling::Physical=>"global_boundary_with_independent_original_noise",NoiseSampling::Importance{..}=>"global_boundary_with_noise_importance_sampling"},
             "history_sampler":history,
-            "sampling":{"method":match i.sampling {NoiseSampling::Physical=>"physical",NoiseSampling::Importance{..}=>"importance"},"configuration":sampling_configuration(&i.sampling),"history_sampler":history},
+            "sampling":{"method":match i.sampling {NoiseSampling::Physical=>"physical",NoiseSampling::Importance{..}=>"importance"},"configuration":sampling_configuration(&i.sampling),"history_sampler":history,"exact_marginal_records":exact_marginal_records},
             "evaluation":{"ideal_state":target,"recovery":recovery,"output_mapping":t.outputs(),"error_observables":t.error_observables(),"sample_records":t.sample_records(),"moment_count":t.observables().len(),
                 "error_metric":if t.error_observables().is_some(){"wrong when any listed OBSERVABLE_INCLUDE parity is one"}else if target.is_some(){"target infidelity after terminal recovery"}else{"declared output task"},
                 "observables":if recovery.is_some(){"after recovery, before target projection"}else{"physical output"}}
