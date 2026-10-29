@@ -651,8 +651,23 @@
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_incomplete_pilot_and_unavailable_metrics",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Original H/T/MX circuit, H target, record0, four pilot draws and one-query cap retain both failed named pilots without Gamma or recommendation; I0 two-draw sampling without a target/error metric reports no_error_metric and absent kappa. Independent BigInt rational sums identify (.5,-100000) as 2^-100001, retain exact zero residual for two identical tiny errors, and strictly positive 2^-200004 variance with kappa one for distinct zero/tiny draws.",
+      "remaining_gap": "The original native two-identical-tiny-error case expects diagnostic_range_exceeded from its host-long-double range guard. Rust preserves exact arithmetic and reports zero_residual_variance. This native diagnostic-status compatibility gap is unresolved; no host exponent limit, scientific-tuple ABI parity, architecture exclusion or full-method verification is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_incomplete_contracts",
+          "test": "original_one_query_pilots_fail_and_metric_free_identity_has_no_kappa",
+          "source_sha256": "77ecc709819750759f21869f894fa4008512af74a2dc53dbcfef668fb74920b5"
+        },
+        {
+          "package": "rmagna",
+          "target": "history_incomplete_contracts",
+          "test": "original_tiny_errors_retain_exact_zero_and_positive_residuals_without_clamping",
+          "source_sha256": "77ecc709819750759f21869f894fa4008512af74a2dc53dbcfef668fb74920b5"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_invalid_counts_and_native_decision",
