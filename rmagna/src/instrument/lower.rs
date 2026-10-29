@@ -284,10 +284,12 @@ impl Lowering<'_> {
 
 pub(super) fn compile(
     circuit: &Circuit,
+    input: &AffineKet,
     options: &CompileOptions,
     arithmetic: &ScalarArithmetic,
     causal: bool,
 ) -> Result<CompiledInstrument, InstrumentError> {
+    crate::unitary::validate_stabilizer_input(input, circuit.num_qubits(), arithmetic)?;
     if circuit.num_qubits() > options.max_coherent_qubits {
         return Err(InstrumentError::ResourceLimit {
             option: "max_coherent_qubits",
@@ -365,12 +367,13 @@ pub(super) fn compile(
             | Operation::Annotation { .. } => {}
         }
     }
-    let unitary = UnitaryCircuit::new(state.width, state.program)?.compile_with_path_limit(
-        &BitVector::zeros(state.width)?,
-        arithmetic,
-        options.compiler_strategy,
-        options.max_path_bits,
-    )?;
+    let unitary = UnitaryCircuit::new(state.width, state.program)?
+        .compile_stabilizer_with_path_limit(
+            &crate::unitary::with_zero_ancillas(input, state.width)?,
+            arithmetic,
+            options.compiler_strategy,
+            options.max_path_bits,
+        )?;
     let mut rows = Vec::new();
     let mut outcomes = BitVector::zeros(state.selections.len())?;
     for (j, expression) in state.selections.iter().enumerate() {

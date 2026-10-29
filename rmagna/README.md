@@ -16,8 +16,66 @@ Hadamard before local contraction, including shared observation copies. The
 existing computational-input methods agree with the new methods on basis states
 and retain zero initial support cost. Prepared probability/density/moment plans
 and Pauli insertion views retain their existing ownership and program identity
-rules. This extends the unitary compiler; programmatic InstrumentIR construction
-and full native-interface parity remain separate work.
+rules. The explicit initial-state APIs below extend instruments and causal
+histories as well. General programmatic InstrumentIR construction, task/file
+initial-state configuration, Python bindings and full native-interface parity
+remain separate work.
+
+### Initialized instruments and causal histories
+
+`instrument::compile_affine_stabilizer(circuit, input, options, arithmetic)`
+accepts the same normalized independent `AffineKet` in physical wire order.
+`CausalProgram::new_stabilizer` owns that state for both fixed-template and
+cold-prefix histories; `new_stabilizer_with_sampling` also accepts an explicit
+`NoiseSampling` proposal. Construction never invokes controller callbacks.
+Existing `compile_affine`, `new` and `new_with_sampling` start physical wires
+in zero.
+
+Only fresh record, reset, decision, control-work and phase ancillas start in
+zero. Reset discards the old physical wire and changes the live-wire map;
+initial entanglement is preserved until the operation actually discards it.
+Offsets, column order, relative quadratic phases and complex coefficients use
+the same compiler admission contract. Initial rank and all lowered Hadamards
+count toward `CompileOptions::max_path_bits`, including each cold prefix.
+Coherent-width and scalar arithmetic limits still apply. Invalid states are
+rejected explicitly, without normalization or a strategy fallback.
+
+Prepared probability, target-density, Pauli-moment and insertion policies keep
+their existing interfaces. Prescribed history masses remain physical quantum
+masses; proposal likelihoods and postselection remain separate. The example
+measures an initially entangled state without adding preparation gates:
+
+```rust
+use rmagna::circuit::{parse_circuit, BitAtom, BitExpr, ParseOptions};
+use rmagna::gf2::BitVector;
+use rmagna::instrument::{compile_affine_stabilizer, CompileOptions};
+use rmagna::quadratic::QuadraticForm;
+use rmagna::runtime::{CausalProgram, ControllerRegistry, RuntimeOptions};
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::stabilizer::AffineKet;
+
+let a = ScalarArithmetic::default();
+let input = AffineKet::new(
+    BitVector::zeros(2)?,
+    vec![BitVector::from_indices(2, [0, 1])?],
+    QuadraticForm::new(0, vec![1], vec![BitVector::zeros(1)?])?,
+    a.omega(0, -1)?,
+)?;
+let source = parse_circuit("M 0 1", &ParseOptions::default())?;
+let instrument =
+    compile_affine_stabilizer(&source, &input, &CompileOptions::default(), &a)?;
+let records = [BitExpr::atom(BitAtom::Record(0)), BitExpr::atom(BitAtom::Record(1))];
+let ones = BitVector::from_indices(2, [0, 1])?;
+assert_eq!(instrument.reported_probability(&records, &ones, &[], 1, &a)?.value,
+           a.omega(0, -2)?);
+let program = CausalProgram::new_stabilizer(
+    &source, &input, &ControllerRegistry::default(), RuntimeOptions::default(), &a,
+)?;
+let history = program.resolve_prescribed_history(&records, &[], &[vec![true, true]], &a)?;
+assert_eq!(history.history_mass(), &a.omega(0, -2)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 
 ## Native selection in task queries
 
@@ -3622,8 +3680,10 @@ final computational boundary retains none.
 `UnitaryCircuit::compile_stabilizer_with_path_limit(input, arithmetic, strategy, cap)`
 also charges the input support rank before contraction. For example, a rank-two
 stabilizer input on an empty circuit requires two raw paths, so a zero cap
-rejects it. `compile_stabilizer` and `compile_stabilizer_with_strategy` have no
-raw-path cap. See [Normalized stabilizer inputs](#normalized-stabilizer-inputs).
+rejects it. This rank charge also applies to `compile_affine_stabilizer`
+and both initialized causal strategies under `CompileOptions::max_path_bits`.
+The direct unitary methods `compile_stabilizer` and
+`compile_stabilizer_with_strategy` have no raw-path cap. See [Normalized stabilizer inputs](#normalized-stabilizer-inputs).
 
 Use `--max-path-bits N` to configure file-based CLI execution or inspection. The
 resolved cap is in `options.compile` and its options fingerprint, while captured

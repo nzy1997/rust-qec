@@ -1,6 +1,7 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
 mod input;
+pub(crate) use input::{validate_stabilizer_input, with_zero_ancillas};
 mod insertions;
 mod observations;
 mod phase_map;

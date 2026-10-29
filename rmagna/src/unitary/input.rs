@@ -36,31 +36,7 @@ impl UnitaryCircuit {
         strategy: CompilerStrategy,
         max_path_bits: usize,
     ) -> Result<CompiledUnitary, UnitaryError> {
-        if input.width() != self.width {
-            return Err(UnitaryError::DimensionMismatch);
-        }
-        if input.coefficient().is_zero() {
-            return Err(UnitaryError::ZeroStabilizerInput);
-        }
-        let rank = input.columns().len();
-        let factor =
-            LinearFactorization::new(rank, &transpose_columns(input.width(), input.columns())?)?;
-        if factor.rank() != rank {
-            return Err(UnitaryError::DependentStabilizerInput);
-        }
-        // Independence gives one equal-magnitude amplitude per support point.
-        // Scale the exact coefficient norm by 2^rank without enumerating labels
-        // or allocating a coefficient containing that power of two.
-        let coefficient_norm = arithmetic.norm_squared(input.coefficient())?;
-        let support_power = i64::try_from(rank).map_err(|_| UnitaryError::DimensionOverflow)?;
-        let power = coefficient_norm
-            .power()
-            .checked_add(support_power)
-            .ok_or(ScalarError::ExponentOverflow)?;
-        let norm = arithmetic.scalar(coefficient_norm.coefficients().clone(), power)?;
-        if norm != ExactScalar::one() {
-            return Err(UnitaryError::UnnormalizedStabilizerInput);
-        }
+        validate_stabilizer_input(input, self.width, arithmetic)?;
         match strategy {
             CompilerStrategy::ParityCopies => self.compile_parity(input, arithmetic, max_path_bits),
             CompilerStrategy::SharedCommutingLayer => {
@@ -70,8 +46,42 @@ impl UnitaryCircuit {
     }
 }
 
+/// Check the physical input before any coherent ancillas or circuit lowering.
+pub(crate) fn validate_stabilizer_input(
+    input: &AffineKet,
+    width: usize,
+    arithmetic: &ScalarArithmetic,
+) -> Result<(), UnitaryError> {
+    if input.width() != width {
+        return Err(UnitaryError::DimensionMismatch);
+    }
+    if input.coefficient().is_zero() {
+        return Err(UnitaryError::ZeroStabilizerInput);
+    }
+    let rank = input.columns().len();
+    let factor =
+        LinearFactorization::new(rank, &transpose_columns(input.width(), input.columns())?)?;
+    if factor.rank() != rank {
+        return Err(UnitaryError::DependentStabilizerInput);
+    }
+    // Independence gives one equal-magnitude amplitude per support point.
+    // Scale the exact coefficient norm by 2^rank without enumerating labels
+    // or allocating a coefficient containing that power of two.
+    let coefficient_norm = arithmetic.norm_squared(input.coefficient())?;
+    let support_power = i64::try_from(rank).map_err(|_| UnitaryError::DimensionOverflow)?;
+    let power = coefficient_norm
+        .power()
+        .checked_add(support_power)
+        .ok_or(ScalarError::ExponentOverflow)?;
+    let norm = arithmetic.scalar(coefficient_norm.coefficients().clone(), power)?;
+    if norm != ExactScalar::one() {
+        return Err(UnitaryError::UnnormalizedStabilizerInput);
+    }
+    Ok(())
+}
+
 /// Append fresh zero ancillas without changing path coordinates or phases.
-pub(super) fn with_zero_ancillas(
+pub(crate) fn with_zero_ancillas(
     input: &AffineKet,
     width: usize,
 ) -> Result<AffineKet, UnitaryError> {
