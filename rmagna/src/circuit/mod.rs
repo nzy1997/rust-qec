@@ -272,6 +272,8 @@ pub struct Circuit {
     has_guarded_noise: bool,
     // Retain syntax lost when classical expressions cancel or resolve to zero.
     declarations_with_targets: BTreeSet<usize>,
+    // Operation IDs with a declared readout probability, including zero.
+    declared_readout_noise: BTreeSet<usize>,
     source_text: String,
 }
 impl Circuit {
@@ -304,6 +306,11 @@ impl Circuit {
     }
     pub fn needs_history_sampling(&self) -> bool {
         self.external_calls != 0 || self.has_guarded_noise
+    }
+    /// Whether this measurement had an explicit readout probability argument.
+    /// Omitted arguments and non-measurement operation IDs return false.
+    pub fn readout_noise_declared(&self, operation_id: usize) -> bool {
+        self.declared_readout_noise.contains(&operation_id)
     }
     pub(crate) fn declaration_has_targets(&self, operation_id: usize) -> bool {
         self.declarations_with_targets.contains(&operation_id)
@@ -355,6 +362,7 @@ impl Circuit {
             external_calls,
             has_guarded_noise,
             declarations_with_targets: self.declarations_with_targets.clone(),
+            declared_readout_noise: self.declared_readout_noise.clone(),
             source_text: self.source_text.clone(),
         }
     }
@@ -365,5 +373,36 @@ impl Circuit {
         let mut circuit = self.clone();
         circuit.num_qubits = circuit.num_qubits.max(width);
         circuit
+    }
+}
+
+#[cfg(test)]
+mod declaration_metadata_tests {
+    use super::*;
+    use crate::noise::{OriginalNoiseAction, OriginalNoiseOptions, original_noise_categories};
+
+    #[test]
+    fn runtime_view_retains_owned_declarations_and_original_anchors() {
+        let circuit =
+            parse_circuit("M 0\nM(0) 0\nMX 1\nMPP(0) Z0 X1", &ParseOptions::default()).unwrap();
+        let selected = circuit
+            .operations()
+            .iter()
+            .filter(|op| [1, 3, 4].contains(&op.id))
+            .cloned()
+            .collect();
+        let view = circuit.runtime_view(selected);
+        drop(circuit);
+        let table = original_noise_categories(&view, &OriginalNoiseOptions::default()).unwrap();
+        assert_eq!(table.len(), 3);
+        for (site, (category, operation)) in table.iter().zip([1, 3, 4]).enumerate() {
+            assert_eq!(category.internal_site, site);
+            assert_eq!(category.source_operations[0].operation, operation);
+            assert_eq!(
+                category.channels[0].action,
+                OriginalNoiseAction::ReportFlip { record: operation }
+            );
+            assert!(view.readout_noise_declared(operation));
+        }
     }
 }

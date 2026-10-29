@@ -890,6 +890,52 @@ cmp /tmp/instrument-reference.json rmagna/tests/data/instrument-reference.json
 prints a no-fault exact-mass pilot and cold timing diagnostics. It is not a formal
 benchmark or a complete task-file runner.
 
+## Original physical noise categories
+
+`noise::original_noise_categories` describes original physical declarations
+without quantum compilation, callbacks or random draws. Its owned categories
+contain exact identity and exclusive channel probabilities, canonical guards,
+physical Pauli factors or reported-record flips, and source/repeat anchors.
+Correlated alternatives share a category while retaining distinct anchors and
+their conditional-to-exclusive survival weights.
+
+```rust
+use rmagna::circuit::{ParseOptions, parse_circuit};
+use rmagna::noise::{OriginalNoiseOptions, original_noise_categories};
+
+let circuit = parse_circuit("M 0\nM(0) 0\nX_ERROR(1/3) 1", &ParseOptions::default())?;
+let categories = original_noise_categories(&circuit, &OriginalNoiseOptions {
+    max_categories: 2, max_channels: 2,
+})?;
+assert_eq!(categories.len(), 2);
+assert_eq!(categories[0].internal_site, 1);
+assert_eq!(categories[1].internal_site, 2);
+assert_eq!(categories[1].identity_probability.to_string(), "2/3");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+An implicit `M 0` retains its existing internal zero-probability report-flip site,
+but contributes no original category. An explicit `M(0) 0` contributes one,
+including its zero-probability channel. Expanded targets and repeated
+measurements preserve that distinction in the owned circuit and causal views;
+`Circuit::readout_noise_declared` exposes it. Empty measurement argument lists
+such as `M()` are rejected.
+
+`internal_site` maps each category to the unchanged `noise_sites()` index and
+existing fault selections. Physical qubit labels remain logical labels after
+reset; they are distinct from coherent record/reset ancillas. Expanded Rust
+operation integers are translated through captured source/repeat/record
+metadata, rather than equated to native string operation IDs.
+
+Both description limits default to 1,000,000. Category and total nonidentity
+channel counts, including zero-mass channels and every correlated alternative,
+are checked before allocating descriptions. These logical limits do not bound
+all process memory. Extracting this table preserves ordinary measurement-site
+selection, physical masses and seeded entropy use. Category counts describe
+these declarations; they do not determine a universal paper proposal size.
+File/enumeration JSON and specialized rare-event proposals remain separate
+interfaces.
+
 ## Exact categorical noise draws
 
 `noise::NoiseModel::physical` captures an affine instrument's independent noise
