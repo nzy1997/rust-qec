@@ -112,6 +112,9 @@ Standalone prepare releases resources at exit; its receipt is not a reusable cac
 Exact enumeration only:
   --include-patterns                  Retain unweighted per-pattern responses
   --max-pattern-response-values N     Retained scalar response cap (default 1000000)
+  --max-original-categories N         Physical metadata category cap (default 1000000)
+  --max-original-channels N           Physical metadata channel cap (default 1000000)
+  --max-original-probability-bits N    Metadata probability integer bit cap (default 1048576)
   --max-weight N                      Nonnegative decimal category cutoff (default 1; unbounded input)
   --max-patterns N                    Positive pattern cap (default 100000)
   --max-fault-entries N               Stored fault entry cap (default 1000000)
@@ -193,9 +196,12 @@ fn duration(text: &str, flag: &str) -> Result<Duration, String> {
 }
 mod native;
 struct Flags(BTreeMap<String, String>);
-const ENUMERATION_FLAGS: [&str; 12] = [
+const ENUMERATION_FLAGS: [&str; 15] = [
     "--include-patterns",
     "--max-pattern-response-values",
+    "--max-original-categories",
+    "--max-original-channels",
+    "--max-original-probability-bits",
     "--max-weight",
     "--max-patterns",
     "--max-fault-entries",
@@ -554,6 +560,18 @@ fn configure_enumeration(flags: &mut Flags) -> Result<FileEnumerationOptions, St
     options.enumeration.max_retained_response_values = flags.number(
         "--max-pattern-response-values",
         options.enumeration.max_retained_response_values,
+    )?;
+    options.original_noise.max_categories = flags.number(
+        "--max-original-categories",
+        options.original_noise.max_categories,
+    )?;
+    options.original_noise.max_channels = flags.number(
+        "--max-original-channels",
+        options.original_noise.max_channels,
+    )?;
+    options.max_original_probability_bits = flags.number(
+        "--max-original-probability-bits",
+        options.max_original_probability_bits,
     )?;
     let n = &mut options.enumeration.noise;
     if let Some(text) = flags.text("--max-weight") {
