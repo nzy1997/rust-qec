@@ -46,12 +46,13 @@ impl Files {
         self.put("decoder.py","from pathlib import Path\nPath(__file__).with_name('imported.txt').write_text('imported')\nraise RuntimeError('forbidden decoder import')\ndef decode(bits, config):\n return [False]\n");
         self.put("controllers.json",&json!({"schema_version":1,"bindings":{"probe":{"import":"decoder:decode","version":"original-counts-v1","config":{}}}}).to_string());
     }
-    fn rejected(&self, args: &[&str]) {
+    fn rejected(&self, args: &[&str]) -> Value {
         let out = self.run(args);
         let value = value(&out, 2);
         assert_eq!(value["failures"][0]["phase"], "arguments");
         assert!(!value.to_string().contains("forbidden decoder import"));
         assert!(!self.0.join("imported.txt").exists());
+        value
     }
 }
 impl Drop for Files {
@@ -173,7 +174,7 @@ fn original_invalid_counts_and_retired_modes_reject_before_decoder_import() {
     ]);
     for retired in ["capped", "capped_affine", "born"] {
         for mode in ["inspect", "run"] {
-            files.rejected(&[
+            let rejected = files.rejected(&[
                 mode,
                 "physical.magna",
                 "--controllers",
@@ -182,6 +183,11 @@ fn original_invalid_counts_and_retired_modes_reject_before_decoder_import() {
                 retired,
                 "--json",
             ]);
+            assert!(
+                rejected
+                    .to_string()
+                    .contains("affine_support or exact_marginal")
+            );
         }
     }
     // Canary: the same decoder really is importable/reachable with valid args.

@@ -220,8 +220,10 @@ fn original_thirty_two_draw_pilots_keep_configuration_and_report_point_gamma() {
         assert!(pilot.is_complete());
         assert_eq!(pilot.raw_result().unwrap().completed, 2);
     }
-    assert!(inconclusive.to_json()["gamma"].is_null());
-    assert!(inconclusive.to_json()["recommended_sampler"].is_null());
+    let inconclusive_json = inconclusive.to_json();
+    assert_eq!(inconclusive_json["status"], "inconclusive");
+    assert!(inconclusive_json["gamma"].is_null());
+    assert!(inconclusive_json["recommended_sampler"].is_null());
 }
 
 #[test]
