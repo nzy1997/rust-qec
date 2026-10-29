@@ -117,11 +117,12 @@ fn exact_marginal_weights_have_kappa_one_and_common_scale_does_not_change_varian
         baseline.variance_coefficient,
         baseline.exact_marginal_variance_coefficient
     );
-    for exponent in [-10000, 0, 10000] {
+    for binary_exponent in [-10000, 0, 10000] {
         let scale = f
             .from_scalar(
                 &rmagna::scalar::ScalarArithmetic::default()
-                    .omega(0, exponent)
+                    // omega's second exponent is a power of sqrt(2).
+                    .omega(0, 2 * binary_exponent)
                     .unwrap(),
             )
             .unwrap();

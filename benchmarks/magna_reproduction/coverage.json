@@ -616,8 +616,16 @@
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_extreme_common_scale_and_zero_cases",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Both original error/no-error rows at actual binary scales 2^-10000, 1 and 2^10000 retain kappa=1 and variance coefficient=1/4. Two all-zero rows report zero_acceptance, absent kappa/rho and zero effective sample size; exact reference variance and weight diagnostics are also checked.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_efficiency_contracts",
+          "test": "original_binary_extreme_scales_and_two_zero_draws_preserve_diagnostics",
+          "source_sha256": "c7662312afbcc07295eff44a564073081d759f2a1fbf1ba24e16789e8268574e"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_incomplete_pilot_and_unavailable_metrics",
@@ -636,8 +644,16 @@
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_weighted_residuals_and_noise_correction",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four original rational rows, including one zero-weight draw, match independent centered rational residual sums with L/W noise correction, literal exact kappa and both variance coefficients. Omitting L gives a different kappa.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "history_efficiency_contracts",
+          "test": "original_weighted_residuals_include_noise_likelihood_and_zero_draw",
+          "source_sha256": "c7662312afbcc07295eff44a564073081d759f2a1fbf1ba24e16789e8268574e"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_all_fault_configurations_recover_exact_physical_acceptance_and_error",
