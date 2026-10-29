@@ -108,7 +108,8 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 pinned 57 core modules (352 cases). Its current assertion mappings cover two
 native circuit cases with three Rust witness tests and all four native-core
 primitive cases with four additional Rust witness tests and all five phase-quotient
-optimization cases with five owning Rust witnesses; the other 341 cases
+optimization cases with five owning Rust witnesses, plus two finite history-efficiency
+arithmetic cases with two owning Rust witnesses; the other 339 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -311,9 +312,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 12 mapped
-Rust witnesses for 11 verified upstream cases must execute successfully, while
-the overall gate must still return nonzero because 341 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 14 mapped
+Rust witnesses for 13 verified upstream cases must execute successfully, while
+the overall gate must still return nonzero because 339 core contracts remain
 unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -351,7 +352,28 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings leave 341 cases unmapped, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 339 cases unmapped, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
+
+### Finite history-efficiency arithmetic contracts
+
+The two source-bound witnesses in `rmagna/tests/history_efficiency_contracts.rs`
+map only `test_weighted_residuals_and_noise_correction` and
+`test_extreme_common_scale_and_zero_cases`. The four original weighted rows are
+checked with independent centered `BigRational` sums, including the noise
+likelihood correction `L/W`, literal exact results and a negative control that
+omits `L`. The original two error/no-error rows use direct binary scales
+`2^-10000`, `1` and `2^10000`; they retain `kappa = 1` and both variance
+coefficients `1/4`. Two zero draws retain the original unavailable diagnostics.
+The broader existing scale-invariance test also doubles the scalar sqrt(2)
+exponent to reach those actual binary endpoints.
+
+These tests import no upstream test module and invoke no native test-only builder.
+The other five original history-efficiency methods remain unmapped. The current
+ledger therefore contains 13 verified, 339 unmapped and zero architecture-specific
+core cases, backed by 14 Rust witnesses; the strict `--rust-run <run.json>
+--complete-parity` gate must still exit 2 for incomplete parity. These mappings
+establish finite arithmetic contracts, without changing runtime statistics,
+claiming native floating-range behavior or reproducing paper performance.
