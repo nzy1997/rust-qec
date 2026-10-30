@@ -195,8 +195,16 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_bindings_are_versioned_and_config_isolated",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal nested config a:[1], caller value/file mutation after capture, and callback mutation: two real independent Python-process invocations both return one. Captured r1/r2 versions change the separate Rust controllers fingerprint domain while equal circuit text keeps equal circuit fingerprints; native object layout/hash encoding is not claimed. Duplicate decoder registration rejects and preserves r1. Original integer2,float0.0,emptytuple,None callbacks all fail a causal one-output broken binding with its name and actionable reason. Fresh original native method passed ordinary/optimized with unchanged pinned source.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "controller_binding_contracts",
+          "test": "original_bindings_isolate_nested_config_version_identity_and_named_return_errors",
+          "source_sha256": "0ec49c67e0712415136a5de56338b62d9f093ac30765da3241374767fc1ad613"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_builtin_not_arity_and_future_inputs_are_rejected",
