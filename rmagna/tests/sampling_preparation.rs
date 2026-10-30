@@ -185,7 +185,9 @@ fn linear_target_and_error_families_are_prepared_without_fake_execution_work() {
         }
     }
 }
-const SOURCE: &str = "CONTROL[one] -> ctrl[0]\nH 0\nT 0\nH 0\nM(1/7) 0\nDETECTOR rec[-1]\nCONTROL[copy] !det[0] ctrl[0] -> ctrl[1] ctrl[2]\nCH ctrl[1] 1\nE(1/5) ctrl[1] X2\nELSE_CORRELATED_ERROR(1/7) ctrl[1] Z2\nM 1\nDETECTOR rec[-1]\nCONTROL[xor] det[1] ctrl[1] -> ctrl[3]\nCX ctrl[3] 2\nM 2\nDETECTOR rec[-1]\nPOSTSELECT ctrl[3] det[2]\nOBSERVABLE_INCLUDE(0) ctrl[3] det[2]";
+// The final det[2] is exactly the final reported record. Observable targets
+// use that record directly, while selection may use the named detector.
+const SOURCE: &str = "CONTROL[one] -> ctrl[0]\nH 0\nT 0\nH 0\nM(1/7) 0\nDETECTOR rec[-1]\nCONTROL[copy] !det[0] ctrl[0] -> ctrl[1] ctrl[2]\nCH ctrl[1] 1\nE(1/5) ctrl[1] X2\nELSE_CORRELATED_ERROR(1/7) ctrl[1] Z2\nM 1\nDETECTOR rec[-1]\nCONTROL[xor] det[1] ctrl[1] -> ctrl[3]\nCX ctrl[3] 2\nM 2\nDETECTOR rec[-1]\nPOSTSELECT ctrl[3] det[2]\nOBSERVABLE_INCLUDE(0) ctrl[3] rec[-1]";
 fn registry(calls: &Arc<AtomicUsize>) -> ControllerRegistry {
     let mut registry = ControllerRegistry::default();
     let c = calls.clone();

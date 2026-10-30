@@ -17,6 +17,7 @@ pub fn parse_task(
     // independently of additive dependency features; only masks need BigInt.
     let object: Object =
         serde_json::from_str(text).map_err(|e| TaskError::new("<json>", e.to_string()))?;
+    reject_removed_task_fields(&object)?;
     keys(
         &object,
         &[
@@ -97,6 +98,38 @@ pub fn parse_task(
         sample_records,
         observables,
     })
+}
+fn reject_removed_task_fields(data: &Object) -> Result<(), TaskError> {
+    for (field, hint) in [
+        (
+            "detectors",
+            "declare each parity with DETECTOR rec[...] and write POSTSELECT det[...] in the circuit",
+        ),
+        (
+            "postselection",
+            "write POSTSELECT det[...] after a DETECTOR for each parity in the circuit",
+        ),
+        (
+            "outcomes",
+            "write POSTSELECT det[...] for zero or POSTSELECT !det[...] for one in the circuit",
+        ),
+        (
+            "error_checks",
+            "write OBSERVABLE_INCLUDE(index) rec[...] in the circuit and select task.error_observables",
+        ),
+        (
+            "decoded_error",
+            "write CONTROL[name] det[...] -> ctrl[...] and OBSERVABLE_INCLUDE(index) ctrl[...] in the circuit, then select task.error_observables",
+        ),
+    ] {
+        if data.contains_key(field) {
+            return Err(TaskError::new(
+                field,
+                format!("is no longer supported; {hint}"),
+            ));
+        }
+    }
+    Ok(())
 }
 fn target(value: &RawValue, base: &Path, options: &TaskOptions) -> Result<TargetSpec, TaskError> {
     if value.get().starts_with('"') {

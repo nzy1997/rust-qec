@@ -1676,38 +1676,94 @@
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_complemented_detector_requires_a_one",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal H0,T0,H0,X_ERROR(1/10)0,M0,DETECTOR rec[-1],complemented or ordinary detector selection: exact acceptance1/2-sqrt2/5 or1/2+sqrt2/5,complements sum1,covered1,format magna-0.1. Literal omega-field coefficients and ordinary/exactJSON; both compilers/causal strategies,fresh/repeated prepared plans.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_complemented_detector_selects_the_irrational_one_mass",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_complemented_register_matches_explicit_not",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal H0,three M(1/10)0,three detector references and pure majority controller: direct POSTSELECT !ctrl0 and explicit CONTROL[NOT]ctrl0->ctrl1 then POSTSELECT ctrl1 have equal exact acceptance1/2,covered1. Both compilers/causal strategies and fresh/repeated prepared plans.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_complemented_majority_register_equals_explicit_not_at_half_acceptance",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_decoder_output_in_observable_defines_the_error",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal X_ERROR(1/5)0,three M(1/10)0,three detectors,majority ctrl0 and OBSERVABLE_INCLUDE0 ctrl0,error_observables0: exacterror271/1250,acceptance1,covered1 and magna-0.1. Independent majority wrongprobability7/250 yields(243+28)/1250. Both compilers/causal strategies,fresh/repeated prepared plans and ordinary/exactJSON.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_majority_observable_integrates_three_independent_readout_flips",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_external_decoders_read_detectors_not_records",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal registered-majority CONTROL raw rec input rejects with external CONTROL detector/register alternatives and source line; complemented raw input also rejects. Literal built-in XOR raw-record plus record-controlled CX remains valid; built-in NOT and external detector/register/complement combinations also parse. Format and reusable source options preserved.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_external_controls_reject_records_with_detector_register_alternatives",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_invalid_targets_name_the_allowed_forms",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All four literal native malformed forms POSTSELECT rec,POSTSELECT(1)det,observable !ctrl andDETECTORctrl reject with their allowed-form/complement hints. Additionally reject observable !rec,DETECTOR !rec and observable det; preserve source filename/line/column/repeat iteration and valid complemented selection/register-record observable reuse. Empty metadata declarations remain supported by owning task tests.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_invalid_annotation_forms_keep_allowed_form_hints_and_source_locations",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_observable_reads_the_register_value_at_its_line",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal CONTROL[XOR](1)->ctrl0,observable0 ctrl0,overwritectrl0=0 retains error1. Literal X0,M0,copy raw record intoctrl0,observable0 rec[-1]ctrl0 has error0. Inspect captured immutable Boolean expression and exact actual enumeration under both compilers/causal strategies/fresh/reused plans.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_observable_captures_register_before_overwrite_and_cancels_its_record",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_selection_syntax.SelectionSyntaxTests.test_removed_task_fields_explain_the_circuit_spelling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All five literal retired root fields detectors/postselection/outcomes/error_checks/decoded_error retain their native value shapes and reject with fieldname plus actionable POSTSELECT/DETECTOR or OBSERVABLE_INCLUDE hint. Typed parse_task,FileTask load and actualCLI reject before a deliberately missing ideal module is loaded. Valid nested ideal_state.postselection remains supported; no native exception-ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "selection_syntax_contracts",
+          "test": "original_removed_task_fields_name_circuit_migrations_before_module_loading",
+          "source_sha256": "ea11a23465eaf524256b8c103fa651b25d381ae16af486c3cf07716a30f90634"
+        }
+      ]
     },
     {
       "id": "test_shared_query_preparation.SharedQueryPreparationTests.test_effect_offsets_events_and_faults_match_independent_branch_sums",
