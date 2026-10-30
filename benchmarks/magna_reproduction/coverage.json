@@ -1209,18 +1209,42 @@
     },
     {
       "id": "test_native_records.NativeRecordTests.test_dense_events_and_hermitian_moments",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original two complex three-qubit stabilizer terms, both physical event outcomes, all four ordered record words and I/Z/X/Y output moments, exact total and retained-label marginal. Independently enumerated literal amplitudes preserve original phases and normalization. Unchanged original native method also passes ordinary and optimized Python using a freshly built pinned production extension; the build-capable test helper loader is replaced only by an audited read-only Gaussian-scalar constructor. No general instrument or phase-certificate claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "completed_records",
+          "test": "original_dense_events_and_hermitian_moments",
+          "source_sha256": "2e06091caeb05c2db2d63d4ee743c6576fda1cfe7ebf315764fede06fd066f8f"
+        }
+      ]
     },
     {
       "id": "test_native_records.NativeRecordTests.test_reject_noncommuting_pauli",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original one-qubit plus state with Z record rejects X output moment as noncommuting, with typed record-row index0. Unchanged original native method independently passes ordinary and optimized Python using the fresh pinned production extension. Distinct completed probability and signed moment result types expose sampling only for probabilities.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "completed_records",
+          "test": "original_reject_noncommuting_pauli",
+          "source_sha256": "2e06091caeb05c2db2d63d4ee743c6576fda1cfe7ebf315764fede06fd066f8f"
+        }
+      ]
     },
     {
       "id": "test_native_records.NativeRecordTests.test_sampling_completed_marginal",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original plus/minus coherent state with omega relative phase, exact total one, exact analytic record masses and 2048 draws with original seed739 and tolerance0.04. Rust explicitly uses SplitMix64 RandomSource words and exact conditional ratios, not PythonRandom stream identity. Every Rust draw checks joint selected mass, conditioning mass, actual mass queries, Gaussian sums and entropy use. Unchanged original native method also passes ordinary and optimized Python with its original PythonRandom stream and fresh pinned production extension.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "completed_records",
+          "test": "original_sampling_completed_marginal_2048_draws",
+          "source_sha256": "2e06091caeb05c2db2d63d4ee743c6576fda1cfe7ebf315764fede06fd066f8f"
+        }
+      ]
     },
     {
       "id": "test_native_source_tools.NativeSourceToolsTests.test_source_resolution_rejects_absent_and_ambiguous_hooks",
