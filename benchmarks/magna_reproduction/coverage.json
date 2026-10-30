@@ -895,8 +895,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_endpoints_empty_sector_and_zero_noise",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Literal I0 and X_ERROR(0)0 at weight0 each yield1pattern/error0/covered1. Literal forced X_ERROR(1)0 at weight0 yields0patterns/covered0/absent covered-conditional/full conditional[0,1]; weight1 and literal CLI18446744073709551616 yield exacterror1. Both compilers/causal strategies and fresh/reused owned plans; CLI huge decimal/usize boundaries/leadingzeros/plus retain effective ceiling and option fingerprint, while pattern/site/fault-entry caps still fail without result.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_endpoints_contracts",
+          "test": "original_zero_forced_and_empty_sectors_preserve_exact_endpoints_and_large_cutoffs",
+          "source_sha256": "a693e159cdc96c7db79b351e0c3b910c5e38f7af4441b3781b5c08714cc556c0"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_failure_does_not_return_complete_estimates",
@@ -913,8 +921,16 @@
     },
     {
       "id": "test_low_weight.LowWeightTests.test_invalid_budgets_and_cli",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Rust usize excludes native negative/Boolean/fractional/null objects statically; equivalent dynamic CLI tokens -1,true,1.5,null (plus false,None,empty/missing,whitespace,nonASCII,malformed suffix after overflow) reject with max-weight diagnostics before input loading, decoder import or output creation. Literal X_ERROR(1/10)0,M0 with outputs0 and owned I0 ZERO_TARGET equivalent succeeds at maxweight1 with exacterror1/10 and acceptance1. Native object ABI identity not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "low_weight_endpoints_contracts",
+          "test": "original_invalid_weight_types_reject_before_loading_and_literal_cli_has_tenth_error",
+          "source_sha256": "a693e159cdc96c7db79b351e0c3b910c5e38f7af4441b3781b5c08714cc556c0"
+        }
+      ]
     },
     {
       "id": "test_low_weight.LowWeightTests.test_mandatory_suffix_prunes_impossible_prefixes",
