@@ -633,7 +633,7 @@ zero target, weight one and JSON succeeds with exact error 1/10.
 
 All nine original low-weight methods now have source-bound semantic witnesses.
 The complete ledger still has 35 verified, one partial and 316 unmapped core
-methods, requiring 33 successful Rust witnesses and strict complete-parity exit
+methods, requiring 40 successful Rust witnesses and strict complete-parity exit
 2. This does not establish native object-ABI identity, M6 completion or any
 paper-performance result.
 
