@@ -331,7 +331,7 @@ justify a tuple compatibility API.
 Run the source-frozen coverage gate with real binary evidence using the current
 `--rust-run <run.json> --complete-parity` flags documented above. The 41 mapped
 Rust witnesses for 36 verified and one partial upstream case must execute successfully,
-while the overall gate must still return nonzero because 316 core contracts remain
+while the overall gate must still return nonzero because 315 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -369,7 +369,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 316 cases unmapped and one partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 315 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -539,7 +539,7 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 41 required witnesses support 36 verified, one partial and 316
+The current 41 required witnesses support 36 verified, one partial and 315
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods and the existing partial tiny-error diagnostic-range gap
