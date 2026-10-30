@@ -1854,13 +1854,29 @@
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_entangled_trace_and_postselection_are_distinct",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original T0,CX01,destructive-X1 with plus0/zero1 input: total trace one; all X/Y/Z output moments zero without conditioning; both reported-event sectors sum to zero and X/Y conditional moments are nonzero, under both compilers. Fresh unchanged original method executed both Python modes. No prepared Gaussian cache or runtime route claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_trace",
+          "test": "original_entangled_trace_is_distinct_from_postselection",
+          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
+        }
+      ]
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_random_instruments_exact_marginals_effects_and_basis_changes",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original12 trials seeded26092381: all15-operation original lists and both equivalent complex affine inputs are source-bound in original_static_seed26092381.json. Preserve original X/Y/Z faults after g3, report flips, output(1,0), reset environment and destructive readout. All four true assignments have independent exact literal matrix IXYZ tables and all32 output/environment amplitudes; retain a while conditioning a XOR b for both values, all IXYZ moments and both compilers/bases. Actual side certificates count inherited pairs; all three unchanged original SingleTraceTests methods executed against fresh pinned production native in both Python modes. No native cache/rank ABI or complete M6/paper claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_trace",
+          "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
+          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
+        }
+      ]
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_retained_labels_preserve_inherited_rank_squared_bound",
@@ -1872,6 +1888,12 @@
           "target": "inherited_record_expansion",
           "test": "original_retained_labels_preserve_inherited_rank_squared_bound",
           "source_sha256": "1037e352d699f730a5759f04b11d13cc11afe5ae01036a56a7e0050cc5475d7e"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_trace",
+          "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
+          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
         }
       ]
     },
