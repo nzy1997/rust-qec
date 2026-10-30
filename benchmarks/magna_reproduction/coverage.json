@@ -2027,8 +2027,16 @@
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_output_environment_observables",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original zero2 input, H0/CX0to1/RESET_ZERO1 with outputs0/1 then old1 environment. All eight exact coherent amplitudes match literal Bell-dilation amplitudes under both compiler strategies; branch probability is one, physical Z0 moment zero, zero2 target weight1/2, and an output Pauli outside the physical boundary is rejected. Additional coherent target cancellation, subnormalization and plus2 target weight1/4 check the environment trace independently. The unchanged original method independently passed ordinary and optimized Python using the fresh pinned production extension.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_instrument",
+          "test": "original_output_environment_observables",
+          "source_sha256": "8e4351c871d5d53ab843b2b3d021f9d348fda72f93dc8fc2a864864caeccd549"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_random_noncommuting_networks",
@@ -2037,8 +2045,16 @@
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_small_instruments_all_records",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original inputs9/2, output9, complex quadratic/global-phase input, H/T/S-dagger/CX/Y, signed YX record a, fresh T feedback from reported a with its report flip, MZ b, RESET_PLUS2, inverse T and destructive MX c. All eight complete true assignments compare every exact output/environment amplitude against independent literal four-component cyclotomic vectors under both coherent compiler strategies, compare owned side-ket amplitudes and exact branch probabilities, and require total probability one. Chronological reset environment and destructive contraction remain distinct. The unchanged original method independently passed ordinary and optimized Python with a fresh pinned production extension. No native coordinate, cache-counter or runtime ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_instrument",
+          "test": "original_small_instruments_all_records",
+          "source_sha256": "8e4351c871d5d53ab843b2b3d021f9d348fda72f93dc8fc2a864864caeccd549"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_zero_limits_cache_and_proposal_statistics",
