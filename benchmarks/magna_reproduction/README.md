@@ -927,5 +927,5 @@ zero/cancelling sources, and reuse after quota failures.
 This is explicit per-assignment preparation. Automatic eviction/caching,
 cross-assignment decomposition reuse, runtime/Python integration, performance
 campaigns and paper reproduction remain separate work. The ledger now contains
-45 verified, one partial and 306 unmapped core methods, with 51 required Rust
+45 verified, one partial and 306 unmapped core methods, with 52 required Rust
 witnesses. Strict full parity remains incomplete and exits 2.
