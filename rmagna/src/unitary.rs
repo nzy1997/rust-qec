@@ -1,6 +1,11 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
+mod expansion;
 mod input;
+pub use expansion::{
+    ExpansionLimits, ExpansionStatistics, OwnedStabilizerExpansion, RecordExpansionStatistics,
+    RetainedRecordDistribution,
+};
 pub(crate) use input::{validate_stabilizer_input, with_zero_ancillas};
 mod insertions;
 mod observations;
@@ -48,6 +53,11 @@ pub enum UnitaryError {
         count: usize,
     },
     InsertionResourceLimit {
+        option: &'static str,
+        limit: usize,
+        required: u128,
+    },
+    ExpansionResourceLimit {
         option: &'static str,
         limit: usize,
         required: u128,
@@ -100,6 +110,14 @@ impl fmt::Display for UnitaryError {
             } => write!(
                 f,
                 "insertion preparation needs {option} >= {required}; configured limit is {limit}"
+            ),
+            Self::ExpansionResourceLimit {
+                option,
+                limit,
+                required,
+            } => write!(
+                f,
+                "owned expansion needs {option} >= {required}; configured limit is {limit}"
             ),
             Self::InvalidInsertion {
                 position,

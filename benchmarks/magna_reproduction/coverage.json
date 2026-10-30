@@ -1840,8 +1840,16 @@
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_retained_labels_preserve_inherited_rank_squared_bound",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original CCZ on three positive-X stabilizer inputs followed by three X-basis records. The actual owned side expansion has two certified/retained entries; the physically traced ordered conjugate product visits four pairs and retains at most four contributions. Both compiler strategies and report flips none/r1 give exact total one and all eight original 9/16 or 1/16 masses. Rust uses a finite raw-path bound, distinct from the native reduced quotient-rank bound. Fresh unchanged original native method passed ordinary and optimized Python; no general instrument, runtime-routing or full single-trace cache claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "inherited_record_expansion",
+          "test": "original_retained_labels_preserve_inherited_rank_squared_bound",
+          "source_sha256": "1037e352d699f730a5759f04b11d13cc11afe5ae01036a56a7e0050cc5475d7e"
+        }
+      ]
     },
     {
       "id": "test_single_trace.SingleTraceTests.test_support_cache_offsets_redundancies_and_budget_failures",

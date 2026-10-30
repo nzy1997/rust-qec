@@ -1,5 +1,42 @@
 # rmagna
 
+## Owned side expansions and inherited record distributions
+
+`CompiledUnitary::stabilizer_expansion(limits, arithmetic)` explicitly owns the
+exact stabilizer kets of the receiver's current view. Normalized stabilizer
+inputs, frozen phase constants and Pauli insertions all remain in those kets.
+The expansion survives dropping the compiled circuit. This route uses certified
+Clifford fibers; `stabilizer_expansion_with_fibers` accepts explicit search
+options. Errors return directly without selecting another decomposition.
+
+`OwnedStabilizerExpansion::retained_records(rows, report_flips, limits,
+arithmetic)` pairs each actual side ket with every conjugate side ket, enforces
+ket/bra equality on every physical wire, and sums the physical paths. Ordered
+parity rows may repeat or be dependent or zero; flips apply to their reported
+labels. At most `side_entries * side_entries` unnormalized classical
+contributions survive. `statistics()` reports actual source entries, ordered
+pairs visited and nonzero retained contributions. Individual contributions can
+be signed or complex. Sum their amplitudes to obtain mass; do not square or
+renormalize them. `mass(event_rows, outcomes, arithmetic)` returns exact event
+mass, and `total(arithmetic)` sums all records.
+
+`ExpansionLimits` separately bounds raw/canonical paths, geometry, side terms,
+record rows, ordered pairs and event rows. Pair admission precedes construction
+of pair matrices or tensor products. Geometry is a conservative packed storage
+and scratch estimate in eight-byte units; it excludes existing caller/compiled
+storage and scalar limbs, which retain `ScalarArithmetic`'s separate limits.
+Rust's path limit counts raw lowering paths, including phase-coordinate
+Hadamards; it is not the upstream quotient-rank bound.
+
+The complete original CCZ/three-plus/X-record case retains two side entries,
+visits four pairs and returns all eight exact probabilities (9/16 at the
+unflipped zero word, 1/16 elsewhere), with total one under either compiler.
+Additional literal matrix tests check noncommuting H/T/CS/CCZ gates, complex
+stabilizer inputs, all eight common global phases and inserted Y. This opt-in
+unitary API does not provide full NativeInstrumentIR/environment parity,
+general quantum output densities, automatic runtime routing or single-trace
+caching. Event queries currently rebuild their constraint factorizations.
+
 ## Normalized stabilizer inputs
 
 `UnitaryCircuit::compile_stabilizer`, `compile_stabilizer_with_strategy` and
