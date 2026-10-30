@@ -3,6 +3,10 @@ use super::{CompiledUnitary, UnitaryError};
 use crate::fibers::FiberOptions;
 use crate::gf2::BitVector;
 use crate::phase::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
+use crate::records::pair::{
+    MassError, PairGeometry as RecordGeometry, evaluate_mass, pair_geometry_words,
+    traced_record_pair,
+};
 use crate::scalar::{ExactScalar, ScalarArithmetic};
 use crate::stabilizer::{AffineKet, StabilizerError};
 
@@ -84,7 +88,7 @@ impl OwnedStabilizerExpansion {
         report_flips: &BitVector,
         limits: ExpansionLimits,
         arithmetic: &ScalarArithmetic,
-        geometry: impl FnOnce(usize, &[BitVector]) -> Result<RecordGeometry, UnitaryError>,
+        geometry: impl FnOnce(usize, &[BitVector]) -> Result<RecordGeometry, StabilizerError>,
     ) -> Result<RetainedRecordDistribution, UnitaryError> {
         if report_flips.width() != rows.len() || rows.iter().any(|r| r.width() != self.width) {
             return Err(UnitaryError::DimensionMismatch);
@@ -110,30 +114,29 @@ impl OwnedStabilizerExpansion {
             .checked_mul(2)
             .ok_or(UnitaryError::DimensionOverflow)?;
         admit("max_path_bits", limits.max_path_bits, paths as u128)?;
-        let joint_width = self
-            .width
+        self.width
             .checked_mul(2)
             .ok_or(UnitaryError::DimensionOverflow)?;
-        let words = geometry_words(joint_width.max(rows.len()), paths, 0, pairs);
+        let words = pair_geometry_words(self.width, paths, rows.len(), 0, pairs);
         admit("max_geometry_words", limits.max_geometry_words, words)?;
         // In particular, pair admission precedes all equality/retained matrices,
         // conjugated kets, tensor products and retained-output allocations.
         let geometry = geometry(self.width, rows)?;
+        let no_events = BitVector::zeros(0)?;
         let mut contributions = Vec::with_capacity(pairs as usize);
         let mut pair_work = 0;
         for left in &self.entries {
             for right in &self.entries {
                 pair_work += 1;
-                let joint = left.tensor(&right.conjugate(), arithmetic)?;
-                let Some(traced) = joint.constrain_z(&geometry.equalities, &geometry.zeros)? else {
-                    continue;
-                };
-                let mapped = traced.linear_boundary(&geometry.records)?;
-                let (mut offset, columns, phase, coefficient) = mapped.into_parts();
-                offset.xor_assign(report_flips)?;
-                if let Some(term) =
-                    AffineKet::new(offset, columns, phase, coefficient)?.contract(arithmetic)?
-                {
+                if let Some(term) = traced_record_pair(
+                    left,
+                    right,
+                    &geometry,
+                    &[],
+                    &no_events,
+                    report_flips,
+                    arithmetic,
+                )? {
                     contributions.push(term);
                 }
             }
@@ -205,18 +208,18 @@ impl RetainedRecordDistribution {
             self.contributions.len() as u128,
         );
         admit("max_geometry_words", self.limits.max_geometry_words, words)?;
-        let mut total = ExactScalar::zero();
-        for contribution in &self.contributions {
-            if let Some(term) = contribution.constrain_z(event_rows, outcomes)? {
-                let sum = term
-                    .phase()
-                    .gauss_sum(arithmetic)
-                    .map_err(StabilizerError::from)?;
-                let mass = arithmetic.multiply(term.coefficient(), &sum)?;
-                total = arithmetic.add(&total, &mass)?;
-            }
-        }
-        Ok(total)
+        evaluate_mass(
+            self.width,
+            &self.contributions,
+            event_rows,
+            outcomes,
+            arithmetic,
+        )
+        .map(|value| value.value)
+        .map_err(|error| match error {
+            MassError::Stabilizer(e) => UnitaryError::Stabilizer(e),
+            MassError::Scalar(e) => UnitaryError::Scalar(e),
+        })
     }
     pub fn total(&self, arithmetic: &ScalarArithmetic) -> Result<ExactScalar, UnitaryError> {
         self.mass(&[], &BitVector::zeros(0)?, arithmetic)
@@ -320,29 +323,6 @@ fn geometry_words(width: usize, paths: usize, axes: usize, terms: u128) -> u128 
         .saturating_mul((width as u128).div_ceil(64) + (paths as u128).div_ceil(64) + 16);
     64_u128.saturating_mul(matrix.saturating_add(terms.saturating_mul(ket)))
 }
-struct RecordGeometry {
-    equalities: Vec<BitVector>,
-    zeros: BitVector,
-    records: Vec<BitVector>,
-}
-impl RecordGeometry {
-    fn new(width: usize, rows: &[BitVector]) -> Result<Self, UnitaryError> {
-        let joint = width
-            .checked_mul(2)
-            .ok_or(UnitaryError::DimensionOverflow)?;
-        Ok(Self {
-            equalities: (0..width)
-                .map(|q| BitVector::from_indices(joint, [q, width + q]))
-                .collect::<Result<_, _>>()?,
-            zeros: BitVector::zeros(width)?,
-            records: rows
-                .iter()
-                .map(|row| BitVector::from_indices(joint, row.ones()))
-                .collect::<Result<_, _>>()?,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

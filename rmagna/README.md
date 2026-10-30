@@ -1,5 +1,75 @@
 # rmagna
 
+## Completed coherent record marginals
+
+`records::CompletedRecordSpec` owns ordered physical record/event parity rows
+and the event outcomes. `probability(terms, arithmetic)` accepts caller-supplied
+`AffineKet` terms and returns an owned `CompletedProbability`;
+`moment(terms, pauli, arithmetic)` returns a distinct `CompletedMoment` for a
+Hermitian Pauli commuting with every record and event row. Complex coefficients,
+global/relative phases, dependent rows, zero cancellations and subnormalization
+are preserved. No normalization or phase-rank certificate is assigned to supplied
+terms. `OwnedStabilizerExpansion` retains its separate certified statistics.
+
+Both results expose exact `value(word, arithmetic)`, `mass(rows, outcomes,
+arithmetic)` and `total(arithmetic)`. Their contributions are classical mass
+functions: sum their amplitudes, without squaring them again. Signed moments
+can be negative and have no sampling method. Only `CompletedProbability::sample`
+draws conditional record bits, using the existing exact `bernoulli_ratio` and
+the caller's `RandomSource`. Returned `mass` is the selected unnormalized joint
+mass; `condition_mass` is the original event mass. Metadata counts actual mass
+queries, Gaussian sums and entropy words. Deterministic choices consume no
+entropy. `SplitMix64::state()` supports continuation; Python Random stream
+identity is not claimed. Metadata admission precedes draws. A later arithmetic
+or entropy error can advance the stream; the immutable marginal remains reusable.
+
+```rust
+use rmagna::clifford::CliffordGate;
+use rmagna::gf2::BitVector;
+use rmagna::noise::SplitMix64;
+use rmagna::records::{CompletedRecordLimits, CompletedRecordSpec, CompletedSamplingOptions};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+use rmagna::unitary::{ExpansionLimits, UnitaryCircuit, UnitaryGate};
+
+let a = ScalarArithmetic::default();
+let circuit = UnitaryCircuit::new(1, [
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+    UnitaryGate::T { qubit: 0, turns: 1 },
+    UnitaryGate::Clifford(CliffordGate::H(0)),
+])?;
+let side = circuit.compile(&BitVector::zeros(1)?, &a)?
+    .stabilizer_expansion(ExpansionLimits::default(), &a)?;
+let spec = CompletedRecordSpec::new(1, &[BitVector::from_indices(1, [0])?],
+    &[], &BitVector::zeros(0)?, CompletedRecordLimits::default())?;
+let probability = spec.probability(side.entries(), &a)?;
+assert_eq!(probability.total(&a)?, ExactScalar::one());
+let draw = probability.sample(&mut SplitMix64::new(739),
+    &CompletedSamplingOptions::default(), &a)?;
+assert_eq!(draw.mass, probability.value(&draw.values, &a)?);
+assert_eq!(draw.condition_mass, ExactScalar::one());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Finite source-entry, raw joint-path, row, ordered-pair, geometry, structural-work
+and sampling-query/entropy bounds are admitted before their corresponding
+copies or temporary allocations. The shared inherited/completed trace kernel
+forms physical equality equations directly in joint path coordinates: n-by-p
+equations replace n-by-2n physical masks. Owned input parity masks still require
+n times their row count in bits; retained-label query storage has its own bound.
+Geometry counts conservative eight-byte payload/header/scratch units, excluding
+existing caller storage and scalar limbs. Structural work is a conservative
+logical bound, not elapsed time. Arithmetic retains its separate coefficient
+limits, and every failure returns directly without another route.
+
+The original three completed-record methods are checked with a literal exact
+three-qubit vector, all event outcomes and I/Z/X/Y moments, the full 2048-draw
+frequency test under the declared Rust stream, and noncommutation rejection.
+Additional checks cover global and relative complex phases, signed/unnormalized
+contributions, failure recovery and a 16,385-wire fixed-support trace fitting a
+cap smaller than the former square-mask payload. This explicit API has no
+retained Gaussian-plan cache, general original InstrumentIR route, automatic
+runtime integration or paper-throughput claim.
+
 ## Owned side expansions and inherited record distributions
 
 `CompiledUnitary::stabilizer_expansion(limits, arithmetic)` explicitly owns the

@@ -342,8 +342,25 @@ impl AffineKet {
         for (i, row) in rows.iter().enumerate() {
             rhs.set(i, rhs.get(i)? ^ row.dot(&self.offset)?)?;
         }
-        let factor = LinearFactorization::new(self.columns.len(), &equations)?;
-        let Some(shift) = factor.solve(&rhs)? else {
+        self.constrain_paths(&equations, &rhs)
+    }
+
+    /// Restrict the existing path coordinates directly, without materializing
+    /// boundary-width parity masks. Hidden paths remain until final contraction.
+    pub(crate) fn constrain_paths(
+        &self,
+        equations: &[BitVector],
+        rhs: &BitVector,
+    ) -> Result<Option<Self>, StabilizerError> {
+        if equations.len() != rhs.width()
+            || equations
+                .iter()
+                .any(|row| row.width() != self.columns.len())
+        {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        let factor = LinearFactorization::new(self.columns.len(), equations)?;
+        let Some(shift) = factor.solve(rhs)? else {
             return Ok(None);
         };
         let kernel = factor.nullspace()?;

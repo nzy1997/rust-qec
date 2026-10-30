@@ -7,7 +7,14 @@ use crate::noise::RandomSource;
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use num_bigint::BigInt;
 use std::{cmp::Ordering, fmt};
+mod completed;
 mod enumeration;
+pub use completed::{
+    CompletedMoment, CompletedProbability, CompletedRecordDraw, CompletedRecordError,
+    CompletedRecordLimits, CompletedRecordSpec, CompletedRecordStatistics,
+    CompletedSamplingOptions,
+};
+pub(crate) mod pair;
 pub(crate) use enumeration::enumerate_reported_conditioned_observed;
 pub use enumeration::{
     RecordEnumerationOptions, ReportedBranch, ReportedEnumeration, enumerate_reported_conditioned,
