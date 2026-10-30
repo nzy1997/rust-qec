@@ -770,6 +770,16 @@ Overwriting a register cannot change an earlier selection, gate or observable.
 Detectors retain raw parity rather than subtracting a noiseless reference.
 Report-flip probability is stored separately from the quantum measurement.
 
+`DETECTOR` takes only non-complemented `rec[...]` targets. `POSTSELECT` takes
+`det[...]` or `ctrl[...]`; prefix a target with `!` to require one instead of
+zero. `OBSERVABLE_INCLUDE(index)` XORs non-complemented `rec[...]` and
+`ctrl[...]` values captured at that line; detector and complemented targets
+are rejected. Removed root task fields `detectors`, `postselection`, `outcomes`,
+`error_checks` and `decoded_error` report circuit-spelling migration hints before
+ideal/recovery module loading. Declare selection with `DETECTOR`/`POSTSELECT`,
+or classical errors with `OBSERVABLE_INCLUDE` and the task's `error_observables`.
+The nested `ideal_state.postselection` target-projection field remains supported.
+
 Declare external function names in `ParseOptions::controllers`. Parsing captures
 their ordered inputs and output slots and never invokes a function. External
 functions can read detectors and earlier registers, while built-in XOR/NOT and

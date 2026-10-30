@@ -645,6 +645,13 @@ impl Builder<'_> {
             | "E" => self.noise(&name, &args, &targets, text, repeat)?,
             "DETECTOR" => {
                 let coordinates = self.coordinates(&args, text, repeat)?;
+                if targets.iter().any(|target| !target.starts_with("rec[")) {
+                    return Err(self.fail(
+                        text,
+                        repeat,
+                        "DETECTOR targets must be measurement records rec[...] without ! complements",
+                    ));
+                }
                 let expression = self.parity(&targets, ReferenceSet::Records, text, repeat)?;
                 let index = self.circuit.detectors.len();
                 self.circuit.detectors.push(expression.clone());
@@ -659,12 +666,23 @@ impl Builder<'_> {
                 )?;
             }
             "POSTSELECT" => {
-                self.no_args(&args, text, repeat)?;
-                if targets.is_empty() {
+                if !args.is_empty() {
                     return Err(self.fail(
                         text,
                         repeat,
-                        "POSTSELECT requires detector or register targets",
+                        "POSTSELECT has no numeric arguments; write !det[...] or !ctrl[...] to select a one",
+                    ));
+                }
+                if targets.is_empty()
+                    || targets.iter().any(|target| {
+                        let target = target.strip_prefix('!').unwrap_or(target);
+                        !(target.starts_with("det[") || target.starts_with("ctrl["))
+                    })
+                {
+                    return Err(self.fail(
+                        text,
+                        repeat,
+                        "POSTSELECT targets must be det[...] or ctrl[...], optionally complemented with !",
                     ));
                 }
                 for target in targets {
@@ -697,6 +715,16 @@ impl Builder<'_> {
                             "observable index must be a nonnegative platform-sized integer",
                         )
                     })?;
+                if targets
+                    .iter()
+                    .any(|target| !(target.starts_with("rec[") || target.starts_with("ctrl[")))
+                {
+                    return Err(self.fail(
+                        text,
+                        repeat,
+                        "OBSERVABLE_INCLUDE targets must be non-complemented rec[...] or ctrl[...] references; ! complements and det[...] are not allowed",
+                    ));
+                }
                 let expression = self.parity(&targets, ReferenceSet::All, text, repeat)?;
                 self.circuit
                     .observables
@@ -807,6 +835,20 @@ impl Builder<'_> {
             return Err(self.fail(text, repeat, "CONTROL has more than one output arrow"));
         }
         let builtin = function == "XOR" || function == "NOT";
+        if !builtin
+            && targets[..arrow].iter().any(|target| {
+                target
+                    .strip_prefix('!')
+                    .unwrap_or(target)
+                    .starts_with("rec[")
+            })
+        {
+            return Err(self.fail(
+                text,
+                repeat,
+                "external CONTROL inputs must be det[...] or ctrl[...]; use DETECTOR for a record parity, or a built-in CONTROL[XOR]/CONTROL[NOT] for raw records",
+            ));
+        }
         let allowed = if builtin {
             ReferenceSet::All
         } else {

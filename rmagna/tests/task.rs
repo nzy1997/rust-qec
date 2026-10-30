@@ -251,14 +251,29 @@ fn target_metadata_preserves_declarations_but_rejects_classical_execution() {
                 assert!(expression.terms.is_empty());
             }
         }
-        for text in [
-            "M 0\nDETECTOR rec[-1]",
-            "M 0\nOBSERVABLE_INCLUDE(4) rec[-1] rec[-1]",
-            "DETECTOR\nOBSERVABLE_INCLUDE(4) det[0]\nI 0",
-            "DETECTOR\nOBSERVABLE_INCLUDE(4) !det[0] !det[0]\nI 0",
-            "REPEAT 2 {\nDETECTOR\nOBSERVABLE_INCLUDE(4) det[-1]\n}\nI 0",
-            "DETECTOR\nPOSTSELECT det[0]\nI 0",
-            "CONTROL[XOR](0) -> ctrl[0]\nDETECTOR\nI 0",
+        for (text, diagnostic) in [
+            ("M 0\nDETECTOR rec[-1]", "noiseless unitary"),
+            (
+                "M 0\nOBSERVABLE_INCLUDE(4) rec[-1] rec[-1]",
+                "noiseless unitary",
+            ),
+            (
+                "DETECTOR\nOBSERVABLE_INCLUDE(4) det[0]\nI 0",
+                "OBSERVABLE_INCLUDE targets",
+            ),
+            (
+                "DETECTOR\nOBSERVABLE_INCLUDE(4) !det[0] !det[0]\nI 0",
+                "OBSERVABLE_INCLUDE targets",
+            ),
+            (
+                "REPEAT 2 {\nDETECTOR\nOBSERVABLE_INCLUDE(4) det[-1]\n}\nI 0",
+                "OBSERVABLE_INCLUDE targets",
+            ),
+            ("DETECTOR\nPOSTSELECT det[0]\nI 0", "noiseless unitary"),
+            (
+                "CONTROL[XOR](0) -> ctrl[0]\nDETECTOR\nI 0",
+                "noiseless unitary",
+            ),
         ] {
             files.put("ideal.magna", text);
             let error = spec
@@ -266,10 +281,7 @@ fn target_metadata_preserves_declarations_but_rejects_classical_execution() {
                 .unwrap_err();
             assert_eq!(error.field, "ideal_state", "{text}: {error}");
             assert!(error.message.contains("ideal.magna:"), "{text}: {error}");
-            assert!(
-                error.message.contains("noiseless unitary"),
-                "{text}: {error}"
-            );
+            assert!(error.message.contains(diagnostic), "{text}: {error}");
         }
     }
 }
