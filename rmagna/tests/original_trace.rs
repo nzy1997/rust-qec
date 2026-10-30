@@ -1180,3 +1180,63 @@ fn original_trace_raw_path_pair_and_query_limits_are_typed_and_reusable() {
     assert!(q.distribution.value(&bits(1, 0), &a).is_err());
     assert_eq!(q.distribution.total(&a).unwrap(), ExactScalar::one());
 }
+
+#[test]
+fn original_trace_admits_query_name_bytes_before_copying_error_identities() {
+    let a = ScalarArithmetic::default();
+    let o = OriginalTraceOptions::default();
+    let trace = ir(
+        vec![0],
+        vec![],
+        zero(1),
+        vec![op(
+            "m",
+            G::Destructive {
+                wire: 0,
+                basis: ReadoutBasis::Z,
+                record: "a".into(),
+            },
+        )],
+        OriginalLimits {
+            max_metadata_bytes: 1024,
+            ..Default::default()
+        },
+    )
+    .compile_trace(CompilerStrategy::ParityCopies, &a)
+    .unwrap();
+    let view = trace
+        .with_assignment(&OriginalTraceAssignment::default(), &a)
+        .unwrap();
+    let unknown = Parity {
+        records: vec!["unknown".repeat(160)],
+        inverted: false,
+    };
+    for (keep, events) in [
+        (vec![unknown.clone()], vec![]),
+        (
+            vec![],
+            vec![Event {
+                parity: unknown,
+                value: false,
+            }],
+        ),
+    ] {
+        assert!(matches!(
+            view.probability(&keep, &events, &o, &a),
+            Err(OriginalError::ResourceLimit {
+                option: "max_metadata_bytes",
+                limit: 1024,
+                ..
+            })
+        ));
+    }
+    let q = view.probability(&[parity(&["a"])], &[], &o, &a).unwrap();
+    assert_eq!(
+        q.distribution.value(&bits(1, 0), &a).unwrap(),
+        ExactScalar::one()
+    );
+    assert_eq!(
+        q.distribution.value(&bits(1, 1), &a).unwrap(),
+        ExactScalar::zero()
+    );
+}

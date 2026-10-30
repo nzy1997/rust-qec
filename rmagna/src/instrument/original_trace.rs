@@ -27,7 +27,9 @@ pub struct OriginalTraceAssignment {
 pub struct OriginalTraceOptions<'a> {
     pub resource: PhaseResourceOptions,
     pub catalogue: Option<&'a PhaseCatalogue>,
-    /// Total named occurrences across retained parities and events.
+    /// Total named occurrences across retained parities and events. Requested
+    /// name bytes also obey OriginalLimits::max_metadata_bytes before lookup
+    /// or copying an unknown identity into an error.
     pub max_record_occurrences: usize,
 }
 impl Default for OriginalTraceOptions<'_> {
@@ -364,6 +366,17 @@ impl OriginalTraceView<'_> {
             occurrences,
         )?;
         let rows = keep.len() as u128 + events.len() as u128;
+        let name_bytes = keep
+            .iter()
+            .chain(events.iter().map(|e| &e.parity))
+            .flat_map(|p| &p.records)
+            .map(|name| 32 + name.len() as u128)
+            .sum::<u128>();
+        admit(
+            "max_metadata_bytes",
+            limits.max_metadata_bytes,
+            64 * rows + name_bytes,
+        )?;
         admit(
             "max_geometry_words",
             limits

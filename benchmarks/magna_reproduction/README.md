@@ -862,7 +862,8 @@ statistics count the real inherited ordered pairs. CCZ followed by all three
 X readouts retains two side entries and four pairs for every original mass and
 report flip. `OriginalTraceOptions` selects a supplied catalogue explicitly;
 absence or a missing key uses the existing deterministic fiber policy. No
-stabilizer simulator or Gaussian cache is introduced. Row/occurrence/physical
+stabilizer simulator or Gaussian cache is introduced. Requested name bytes are
+admitted before lookup or copying unknown identities into errors. Row/occurrence/physical
 slot/gate/path/geometry/side/pair/query limits fail before their corresponding
 allocations, leaving immutable references reusable.
 

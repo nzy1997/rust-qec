@@ -1861,7 +1861,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_entangled_trace_is_distinct_from_postselection",
-          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
+          "source_sha256": "8fdb79ff90e1031cc6703c327a6287eb84d069762bd6e3f8177490039a4c20da"
         }
       ]
     },
@@ -1874,7 +1874,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
-          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
+          "source_sha256": "8fdb79ff90e1031cc6703c327a6287eb84d069762bd6e3f8177490039a4c20da"
         }
       ]
     },
@@ -1893,7 +1893,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
-          "source_sha256": "5f3b01457e5ddd507d7a02e4efca226f13318b7446fbfa5392a6087ca6ec2681"
+          "source_sha256": "8fdb79ff90e1031cc6703c327a6287eb84d069762bd6e3f8177490039a4c20da"
         }
       ]
     },
