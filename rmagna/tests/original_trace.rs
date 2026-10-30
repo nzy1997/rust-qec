@@ -116,6 +116,16 @@ fn original_ccz_inherits_two_side_entries_and_four_pairs() {
                 .unwrap();
             let q = view.probability(&keep, &[], &o, &a).unwrap();
             assert_eq!(q.resource_expansion(), "inherited-product");
+            let prepared = view
+                .prepare_records(&keep, &[], &o, Default::default(), &a)
+                .unwrap();
+            let warm = prepared.probability(&bits(0, 0), &a).unwrap();
+            assert_eq!(prepared.statistics().ordered_pairs, 4);
+            assert_eq!(prepared.statistics().support_factorizations, 4);
+            assert_eq!(prepared.statistics().pairing_factorizations, 4);
+            assert_eq!(warm.side, q.side);
+            assert_eq!(warm.work.support_factorizations, 0);
+            assert_eq!(warm.work.pairing_factorizations, 0);
             assert_eq!(q.side.side_entries, 2);
             assert_eq!(q.distribution.statistics().pair_work, 4);
             assert!(q.distribution.statistics().retained_terms <= 4);
@@ -138,6 +148,10 @@ fn original_ccz_inherits_two_side_entries_and_four_pairs() {
                     )
                     .unwrap();
                 assert_eq!(q.distribution.value(&bits(3, word), &a).unwrap(), expected);
+                assert_eq!(
+                    warm.distribution.value(&bits(3, word), &a).unwrap(),
+                    expected
+                );
             }
         }
     }
@@ -958,6 +972,30 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                         );
                     }
                 }
+                let prepared = view
+                    .prepare_records(
+                        &[parity(&["a"])],
+                        &[Event {
+                            parity: parity(&["a", "b"]),
+                            value: false,
+                        }],
+                        &o,
+                        rmagna::records::PreparedRecordLimits::default(),
+                        &a,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    prepared.statistics().ordered_pairs,
+                    prepared.side_statistics().side_entries.pow(2)
+                );
+                assert_eq!(
+                    prepared.statistics().support_factorizations,
+                    prepared.statistics().ordered_pairs
+                );
+                assert_eq!(
+                    prepared.statistics().pairing_factorizations,
+                    prepared.statistics().ordered_pairs
+                );
                 for parity_bit in [false, true] {
                     let events = [Event {
                         parity: parity(&["a", "b"]),
@@ -965,6 +1003,13 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                     }];
                     let keep = [parity(&["a"])];
                     let probability = view.probability(&keep, &events, &o, &a).unwrap();
+                    let warm_probability = prepared
+                        .probability(&bits(1, parity_bit as usize), &a)
+                        .unwrap();
+                    assert_eq!(warm_probability.work.support_factorizations, 0);
+                    assert_eq!(warm_probability.work.pairing_factorizations, 0);
+                    assert_eq!(warm_probability.side, probability.side);
+
                     assert_eq!(
                         probability.distribution.statistics().source_entries,
                         probability.side.side_entries
@@ -983,6 +1028,11 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                                     .unwrap(),
                             )
                         };
+                        let warm_moment = prepared
+                            .output_moment(&bits(1, parity_bit as usize), &pword(2, x, z), &a)
+                            .unwrap();
+                        assert_eq!(warm_moment.work.support_factorizations, 0);
+                        assert_eq!(warm_moment.work.pairing_factorizations, 0);
                         for bit in [false, true] {
                             let expected = trial["table"]
                                 .as_array()
@@ -1003,6 +1053,22 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                                 Some(q) => q.distribution.value(&bits(1, bit as usize), &a),
                             }
                             .unwrap();
+                            assert_eq!(
+                                warm_moment
+                                    .distribution
+                                    .value(&bits(1, bit as usize), &a)
+                                    .unwrap(),
+                                expected
+                            );
+                            if moment == 0 {
+                                assert_eq!(
+                                    warm_probability
+                                        .distribution
+                                        .value(&bits(1, bit as usize), &a)
+                                        .unwrap(),
+                                    expected
+                                );
+                            }
                             assert_eq!(
                                 actual, expected,
                                 "trial={},basis={basis},strategy={strategy:?},parity={parity_bit},bit={bit},moment={moment}",
@@ -1061,6 +1127,23 @@ fn original_trace_cross_word_records_and_explicit_catalogue_selection() {
         },
     ] {
         let q = view.probability(&keep, &[], &o, &a).unwrap();
+        let plan = view
+            .prepare_records(&keep, &[], &o, Default::default(), &a)
+            .unwrap();
+        let warm = plan.probability(&bits(0, 0), &a).unwrap();
+        assert_eq!(
+            warm.distribution
+                .value(&BitVector::from_indices(65, [64]).unwrap(), &a)
+                .unwrap(),
+            ExactScalar::one()
+        );
+        assert_eq!(
+            warm.distribution
+                .value(&BitVector::zeros(65).unwrap(), &a)
+                .unwrap(),
+            ExactScalar::zero()
+        );
+        assert_eq!(warm.side, q.side);
         assert_eq!(
             q.side.resource_kind,
             rmagna::phase::PhaseResourceKind::CliffordFibers
@@ -1239,4 +1322,205 @@ fn original_trace_admits_query_name_bytes_before_copying_error_identities() {
         q.distribution.value(&bits(1, 1), &a).unwrap(),
         ExactScalar::zero()
     );
+}
+
+#[test]
+fn original_prepared_support_offsets_redundancies_and_budget_failures() {
+    use rmagna::instrument::OriginalTracePreparationLimits;
+    use rmagna::records::{CompletedRecordError, CompletedRecordSpec, PreparedRecordLimits};
+    let a = ScalarArithmetic::default();
+    let o = OriginalTraceOptions::default();
+    let instrument = ir(
+        vec![0],
+        vec![],
+        plus(1),
+        vec![
+            op(
+                "t",
+                G::Phase {
+                    wires: vec![0],
+                    turns: 1,
+                },
+            ),
+            op(
+                "m",
+                G::Destructive {
+                    wire: 0,
+                    basis: ReadoutBasis::X,
+                    record: "a".into(),
+                },
+            ),
+        ],
+        OriginalLimits::default(),
+    );
+    for strategy in strategies() {
+        let trace = instrument.compile_trace(strategy, &a).unwrap();
+        for (flip, inverted) in [(false, false), (true, false), (false, true), (true, true)] {
+            let assignment = OriginalTraceAssignment {
+                report_flips: if flip { vec!["a".into()] } else { vec![] },
+                ..Default::default()
+            };
+            let view = trace.with_assignment(&assignment, &a).unwrap();
+            let event = Event {
+                parity: Parity {
+                    inverted,
+                    ..parity(&["a"])
+                },
+                value: false,
+            };
+            let events = [event.clone(), event];
+            let plan = view
+                .prepare_records(&[], &events, &o, Default::default(), &a)
+                .unwrap();
+            assert_eq!(plan.side_statistics().quotient_rank, 1);
+            assert_eq!(plan.side_statistics().side_entries, 2);
+            assert_eq!(plan.statistics().ordered_pairs, 4);
+            assert_eq!(plan.statistics().support_factorizations, 4);
+            assert_eq!(plan.statistics().pairing_factorizations, 4);
+            let mut masses = Vec::new();
+            for bit in [false, true, false] {
+                let values = bits(2, if bit { 3 } else { 0 });
+                let q = plan.probability(&values, &a).unwrap();
+                assert_eq!(q.resource_expansion(), "inherited-product");
+                assert_eq!(q.work.support_factorizations, 0);
+                assert_eq!(q.work.pairing_factorizations, 0);
+                assert_eq!(q.work.support_plan_applications, 4);
+                assert!(q.work.pairing_plan_applications > 0);
+                let value = q.distribution.total(&a).unwrap();
+                let true_bit = bit ^ flip ^ inverted;
+                let s: i64 = if true_bit { -1 } else { 1 };
+                assert_eq!(value, a.scalar([2, s, 0, -s].map(Into::into), -2).unwrap());
+                let old = instrument
+                    .compile(
+                        &OriginalAssignment {
+                            true_values: vec![("a".into(), true_bit)],
+                            report_flips: assignment.report_flips.clone(),
+                            ..Default::default()
+                        },
+                        strategy,
+                        &a,
+                    )
+                    .unwrap();
+                assert_eq!(value, old.probability(&a).unwrap());
+                masses.push(value);
+            }
+            assert_eq!(a.add(&masses[0], &masses[1]).unwrap(), ExactScalar::one());
+            assert_eq!(masses[0], masses[2]);
+            assert_eq!(
+                plan.probability(&bits(2, 1), &a)
+                    .unwrap()
+                    .distribution
+                    .total(&a)
+                    .unwrap(),
+                ExactScalar::zero()
+            );
+            assert!(matches!(
+                plan.probability(&bits(1, 0), &a),
+                Err(OriginalError::DimensionMismatch)
+            ));
+            assert!(matches!(
+                plan.output_moment(&bits(2, 0), &pword(1, 0, 0), &a),
+                Err(OriginalError::DimensionMismatch)
+            ));
+            assert!(matches!(
+                plan.output_moment(
+                    &bits(2, 0),
+                    &PauliWord::new(bits(0, 0), bits(0, 0), 1).unwrap(),
+                    &a
+                ),
+                Err(OriginalError::Completed(
+                    CompletedRecordError::NonHermitianPauli
+                ))
+            ));
+            assert!(matches!(
+                view.prepare_records_with_limits(
+                    &[],
+                    &events,
+                    &o,
+                    OriginalTracePreparationLimits {
+                        max_source_quotient_rank: 0,
+                        ..Default::default()
+                    },
+                    &a
+                ),
+                Err(OriginalError::Unitary(
+                    rmagna::unitary::UnitaryError::ExpansionResourceLimit {
+                        option: "max_source_quotient_rank",
+                        required: 1,
+                        ..
+                    }
+                ))
+            ));
+            assert!(matches!(
+                view.prepare_records(
+                    &[],
+                    &[],
+                    &o,
+                    PreparedRecordLimits {
+                        max_reduced_pair_paths: 0,
+                        ..Default::default()
+                    },
+                    &a
+                ),
+                Err(OriginalError::Completed(
+                    CompletedRecordError::ResourceLimit {
+                        option: "max_reduced_pair_paths",
+                        ..
+                    }
+                ))
+            ));
+            assert!(matches!(
+                view.prepare_records(
+                    &[],
+                    &events,
+                    &o,
+                    PreparedRecordLimits {
+                        max_geometry_words: 0,
+                        ..Default::default()
+                    },
+                    &a
+                ),
+                Err(OriginalError::Completed(
+                    CompletedRecordError::ResourceLimit {
+                        option: "max_prepared_geometry_words",
+                        ..
+                    }
+                ))
+            ));
+            assert_eq!(
+                plan.probability(&bits(2, 0), &a)
+                    .unwrap()
+                    .distribution
+                    .total(&a)
+                    .unwrap(),
+                masses[0]
+            );
+            // Rust's bit-vector type rejects a nonbinary/out-of-width encoding.
+            assert!(BitVector::from_words(1, vec![2]).is_err());
+            let side = view.expansion(&o, &a).unwrap();
+            let row = bits(trace.physical_width(), 1);
+            let spec = CompletedRecordSpec::new(
+                trace.physical_width(),
+                &[],
+                &[row],
+                &bits(1, 0),
+                Default::default(),
+            )
+            .unwrap();
+            let physical = spec
+                .prepare(side.entries(), Default::default(), &a)
+                .unwrap();
+            assert!(matches!(
+                physical.moment(&bits(1, 0), &pword(trace.physical_width(), 1, 0), &a),
+                Err(CompletedRecordError::NonCommutingPauli {
+                    kind: "event",
+                    index: 0
+                })
+            ));
+            assert!(matches!(
+                physical.probability(&bits(2, 0), &a),
+                Err(CompletedRecordError::DimensionMismatch)
+            ));
+        }
+    }
 }

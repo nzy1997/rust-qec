@@ -1,4 +1,6 @@
 //! Explicit completed marginals of arbitrary coherent stabilizer terms.
+#[path = "prepared.rs"]
+mod prepared;
 use super::pair::{
     MassError, MassEvaluation, PairGeometry, evaluate_mass, pair_construction_work,
     pair_geometry_words, traced_record_pair,
@@ -9,6 +11,10 @@ use crate::noise::RandomSource;
 use crate::pauli::{PauliError, PauliWord};
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use crate::stabilizer::{AffineKet, StabilizerError};
+pub use prepared::{
+    PreparedCompletedRecords, PreparedRecordLimits, PreparedRecordResult, PreparedRecordStatistics,
+    PreparedRecordWork,
+};
 use std::{cmp::Ordering, fmt};
 
 /// Logical storage uses eight-byte payload/header/scratch units, excluding
@@ -150,7 +156,8 @@ fn metadata_words(width: usize, records: usize, events: usize) -> u128 {
 /// Own fixed physical parity rows/outcomes; evaluation accepts arbitrary exact
 /// coherent terms, including subnormalized and cancelling sums. No phase rank
 /// certificate is assigned to caller-supplied terms. Each evaluation constructs
-/// fresh pairs; this is not a prepared Gaussian plan or automatic runtime cache.
+/// fresh pairs. Use `prepare` for explicit retained geometry; neither route
+/// installs an automatic runtime cache.
 #[derive(Debug)]
 pub struct CompletedRecordSpec {
     width: usize,

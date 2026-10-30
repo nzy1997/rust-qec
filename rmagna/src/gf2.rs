@@ -208,8 +208,14 @@ enum RightHandSide {
     },
 }
 
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FACTORIZATION_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 impl LinearFactorization {
     pub fn new(width: usize, rows: &[BitVector]) -> Result<Self, Gf2Error> {
+        #[cfg(test)]
+        FACTORIZATION_CALLS.with(|n| n.set(n.get() + 1));
         for row in rows {
             row.check_width(width)?;
         }

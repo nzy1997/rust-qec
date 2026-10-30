@@ -1,9 +1,14 @@
 //! Static coherent records, with no fabricated complete physical assignment.
+#[path = "original_prepared.rs"]
+mod prepared;
 use super::*;
 use crate::catalogue::PhaseCatalogue;
 use crate::phase::PhaseResourceOptions;
 use crate::records::{CompletedMoment, CompletedProbability};
 use crate::unitary::{ExpansionStatistics, OwnedStabilizerExpansion, PauliInsertion};
+pub use prepared::{
+    OriginalPreparedTrace, OriginalPreparedTraceResult, OriginalTracePreparationLimits,
+};
 
 /// Ordered named XOR. Repeated names cancel; the constant is reported too.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
