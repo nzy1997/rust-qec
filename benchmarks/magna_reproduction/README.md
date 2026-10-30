@@ -121,7 +121,7 @@ plus all seven original selection-syntax methods with seven owning witnesses,
 plus the original controller binding/config-isolation method with one real-process witness.
 One further method is explicitly `partial`,
 with two required finite witnesses and a remaining native range-status gap;
-the other 311 cases
+the other 309 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -369,7 +369,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 311 cases unmapped and one partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 309 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -634,7 +634,7 @@ zero target, weight one and JSON succeeds with exact error 1/10.
 
 All nine original low-weight methods now have source-bound semantic witnesses.
 The complete ledger still has 42 verified, one partial and 309 unmapped core
-methods, requiring 45 successful Rust witnesses and strict complete-parity exit
+methods, requiring 47 successful Rust witnesses and strict complete-parity exit
 2. This does not establish native object-ABI identity, M6 completion or any
 paper-performance result.
 
