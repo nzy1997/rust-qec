@@ -224,6 +224,15 @@ impl CompletedRecordSpec {
     pub fn record_width(&self) -> usize {
         self.records
     }
+    /// XOR fixed reported offsets after the retained physical parity map.
+    /// Event outcomes are physical; callers must separately undo their offsets.
+    pub fn with_report_flips(mut self, flips: &BitVector) -> Result<Self, CompletedRecordError> {
+        if flips.width() != self.records {
+            return Err(CompletedRecordError::DimensionMismatch);
+        }
+        self.flips = flips.clone();
+        Ok(self)
+    }
     pub fn probability(
         &self,
         terms: &[AffineKet],

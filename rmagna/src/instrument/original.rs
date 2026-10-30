@@ -42,6 +42,12 @@ use std::{
     fmt,
     sync::Arc,
 };
+#[path = "original_trace.rs"]
+mod trace;
+pub use trace::{
+    OriginalRecordEvent, OriginalRecordParity, OriginalStaticTrace, OriginalTraceAssignment,
+    OriginalTraceOptions, OriginalTraceResult, OriginalTraceView,
+};
 
 pub type OriginalWire = i64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -548,11 +554,11 @@ impl OriginalInstrument {
                         control: op.id.clone(),
                         ordinal,
                     };
-                    lower.gate(g, &origin, &values)?;
+                    lower.gate(g, &origin, Some(&values))?;
                     origins.push(origin);
                 }
             } else {
-                lower.gate(&op.gate, &origin, &values)?;
+                lower.gate(&op.gate, &origin, Some(&values))?;
             }
             for &(ordinal, f) in faults.get(op.id.as_str()).into_iter().flatten() {
                 let origin = OriginalOrigin::Fault {
@@ -567,7 +573,7 @@ impl OriginalInstrument {
                             pauli: f.pauli,
                         },
                         &origin,
-                        &values,
+                        Some(&values),
                     )?;
                 }
                 origins.push(origin);
@@ -614,6 +620,7 @@ struct BranchLowering {
     slots: usize,
     gates: Vec<U>,
     fixed: Vec<(usize, bool)>,
+    record_slots: Vec<(usize, bool)>,
     environment_slots: Vec<usize>,
     environment: Vec<OriginalEnvironment>,
     limits: OriginalLimits,
@@ -625,6 +632,7 @@ impl BranchLowering {
             slots: inputs.len(),
             gates: vec![],
             fixed: vec![],
+            record_slots: vec![],
             environment_slots: vec![],
             environment: vec![],
             limits,
@@ -680,7 +688,7 @@ impl BranchLowering {
         &mut self,
         g: &OriginalGate,
         origin: &OriginalOrigin,
-        values: &BTreeMap<&str, bool>,
+        values: Option<&BTreeMap<&str, bool>>,
     ) -> Result<(), OriginalError> {
         match g {
             OriginalGate::Prepare { wire, plus } => {
@@ -721,7 +729,11 @@ impl BranchLowering {
                 if *basis == ReadoutBasis::X {
                     self.c(C::H(q))?;
                 }
-                self.fixed.push((q, values[record.as_str()]));
+                if let Some(values) = values {
+                    self.fixed.push((q, values[record.as_str()]));
+                } else {
+                    self.record_slots.push((q, false));
+                }
                 self.live.remove(wire);
             }
             OriginalGate::Measure {
@@ -742,8 +754,12 @@ impl BranchLowering {
                     })?;
                     self.basis(q, p, true)?;
                 }
-                self.fixed
-                    .push((ancilla, values[record.as_str()] ^ inverted));
+                if let Some(values) = values {
+                    self.fixed
+                        .push((ancilla, values[record.as_str()] ^ inverted));
+                } else {
+                    self.record_slots.push((ancilla, *inverted));
+                }
             }
             OriginalGate::Control => return Err(invalid("uninstantiated control", "")),
             _ => {

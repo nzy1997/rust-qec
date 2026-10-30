@@ -1,0 +1,4560 @@
+{
+  "seed": 26092381,
+  "trials": [
+    {
+      "trial": 0,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g3",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            2
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g4",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 10
+        },
+        {
+          "id": "g6",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g10",
+          "kind": "CX",
+          "qubits": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "X"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 1,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            1
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g1",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            1
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g2",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g6",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CX",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": -2
+        },
+        {
+          "id": "g10",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 1,
+          "pauli": "Y"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 2,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            0
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g1",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g3",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g6",
+          "kind": "CX",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            1
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g9",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g10",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 2,
+          "pauli": "Z"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                5,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                3,
+                0,
+                -3
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                5,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                3,
+                0,
+                -3
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 3,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "CX",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 10
+        },
+        {
+          "id": "g6",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g7",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g9",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g10",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            2,
+            1
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "X"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 4,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g2",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g4",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g6",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g7",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g9",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g10",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "CX",
+          "qubits": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "Y"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 5,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            0
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g3",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 10
+        },
+        {
+          "id": "g4",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": -2
+        },
+        {
+          "id": "g6",
+          "kind": "CX",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g10",
+          "kind": "CX",
+          "qubits": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "CX",
+          "qubits": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "Z"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 6,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g3",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            2
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g4",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            0
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g6",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g7",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g10",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "g11",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": -2
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 1,
+          "pauli": "X"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 7,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g2",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g3",
+          "kind": "CCZ",
+          "qubits": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "CX",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g6",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g10",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "Y"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                5,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                5,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                -1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            },
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -4
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 8,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g1",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g2",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "CX",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "g6",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "g7",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CX",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "g10",
+          "kind": "T",
+          "qubits": [
+            2
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "g11",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 5
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 2,
+          "pauli": "Z"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                3,
+                0,
+                0,
+                0
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 9,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            2
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g2",
+          "kind": "CX",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "CZ",
+          "qubits": [
+            2,
+            0
+          ]
+        },
+        {
+          "id": "g4",
+          "kind": "S",
+          "qubits": [
+            2
+          ],
+          "exponent": -2
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "PHASE",
+          "qubits": [
+            0,
+            2
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g6",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": -2
+        },
+        {
+          "id": "g7",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g10",
+          "kind": "CZ",
+          "qubits": [
+            1,
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 2,
+          "pauli": "X"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -3
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 10,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g1",
+          "kind": "CX",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g2",
+          "kind": "CCZ",
+          "qubits": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "g4",
+          "kind": "T",
+          "qubits": [
+            1
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "g6",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            1
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            0
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "CZ",
+          "qubits": [
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g9",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            2
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g10",
+          "kind": "H",
+          "qubits": [
+            2
+          ]
+        },
+        {
+          "id": "g11",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 0,
+          "pauli": "Y"
+        }
+      ],
+      "report_flips": [
+        "a",
+        "b",
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -3
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": 11,
+      "inputs": [
+        0,
+        1,
+        2
+      ],
+      "outputs": [
+        1,
+        0
+      ],
+      "operations": [
+        {
+          "id": "g0",
+          "kind": "PHASE",
+          "qubits": [
+            2,
+            0
+          ],
+          "exponent": -1
+        },
+        {
+          "id": "g1",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 6
+        },
+        {
+          "id": "g2",
+          "kind": "H",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g3",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            2
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g4",
+          "kind": "PHASE",
+          "qubits": [
+            1,
+            2
+          ],
+          "exponent": 3
+        },
+        {
+          "id": "m0",
+          "kind": "MP",
+          "qubits": [
+            0,
+            1
+          ],
+          "paulis": "YX",
+          "sign": 1,
+          "record": "a"
+        },
+        {
+          "id": "g5",
+          "kind": "CCZ",
+          "qubits": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "id": "g6",
+          "kind": "H",
+          "qubits": [
+            0
+          ]
+        },
+        {
+          "id": "g7",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "reset",
+          "kind": "RESET_PLUS",
+          "qubits": [
+            1
+          ]
+        },
+        {
+          "id": "g8",
+          "kind": "S",
+          "qubits": [
+            1
+          ],
+          "exponent": 2
+        },
+        {
+          "id": "g9",
+          "kind": "T",
+          "qubits": [
+            0
+          ],
+          "exponent": 1
+        },
+        {
+          "id": "g10",
+          "kind": "S",
+          "qubits": [
+            0
+          ],
+          "exponent": 10
+        },
+        {
+          "id": "g11",
+          "kind": "CX",
+          "qubits": [
+            2,
+            1
+          ]
+        },
+        {
+          "id": "m1",
+          "kind": "MX_DESTRUCT",
+          "qubits": [
+            2
+          ],
+          "record": "b"
+        }
+      ],
+      "initial": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          3,
+          6
+        ],
+        "linear": [
+          1,
+          3
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "equivalent": {
+        "width": 3,
+        "base": 5,
+        "columns": [
+          6,
+          3
+        ],
+        "linear": [
+          3,
+          1
+        ],
+        "upper": [
+          2,
+          0
+        ],
+        "power": -2,
+        "phase": 7
+      },
+      "faults": [
+        {
+          "after": "g3",
+          "qubit": 1,
+          "pauli": "Z"
+        }
+      ],
+      "report_flips": [
+        "a"
+      ],
+      "table": [
+        {
+          "true_values": [
+            0,
+            0
+          ],
+          "reported": [
+            1,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            0,
+            1
+          ],
+          "reported": [
+            1,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            0
+          ],
+          "reported": [
+            0,
+            0
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                1,
+                0,
+                -1
+              ],
+              "power": -4
+            }
+          ]
+        },
+        {
+          "true_values": [
+            1,
+            1
+          ],
+          "reported": [
+            0,
+            1
+          ],
+          "values": [
+            {
+              "coefficients": [
+                1,
+                0,
+                0,
+                0
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                0,
+                -1,
+                0,
+                1
+              ],
+              "power": -4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "original_method_source_sha256": "3dcbb502019f061474dd4beb2dede81c224d73e417f0f724158d67df0bbfcd58",
+  "scope": "All36 IR constructions observed in complete unchanged original12-trial method; exact native branch IXYZ tables; Rust also checks independent literal matrix amplitudes"
+}

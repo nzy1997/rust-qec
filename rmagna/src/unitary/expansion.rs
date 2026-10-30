@@ -242,6 +242,25 @@ impl CompiledUnitary {
         fibers: FiberOptions,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OwnedStabilizerExpansion, UnitaryError> {
+        self.stabilizer_expansion_with_resource(
+            limits,
+            PhaseResourceOptions {
+                fibers,
+                ..Default::default()
+            },
+            None,
+            arithmetic,
+        )
+    }
+    /// Select a side resource explicitly. Only the supplied catalogue is used;
+    /// absent keys follow the existing deterministic-fiber selection policy.
+    pub fn stabilizer_expansion_with_resource(
+        &self,
+        limits: ExpansionLimits,
+        options: PhaseResourceOptions,
+        catalogue: Option<&crate::catalogue::PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OwnedStabilizerExpansion, UnitaryError> {
         let paths = self.boundary.columns().len();
         let raw_paths = self.compilation.raw_path_variables.max(paths);
         admit("max_path_bits", limits.max_path_bits, raw_paths as u128)?;
@@ -281,11 +300,8 @@ impl CompiledUnitary {
         let resource = PreparedPhaseResource::new(
             &reference,
             limits.max_side_terms,
-            PhaseResourceOptions {
-                fibers,
-                ..Default::default()
-            },
-            None,
+            options,
+            catalogue,
             arithmetic,
         )?;
         let entries = resource.expand(&reference, &physical, arithmetic)?;
