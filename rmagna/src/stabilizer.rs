@@ -481,9 +481,9 @@ impl AffineKet {
 /// Support columns, quadratic cross terms and odd linear phases must agree with
 /// the reference. Queries retain unnormalized, potentially dependent paths;
 /// call `contract` when a canonical ket is needed. No phase resource is prepared.
-pub struct PreparedZProjection {
+pub(crate) struct PreparedPathProjection {
     reference: AffineKet,
-    rows: Vec<BitVector>,
+    equations: usize,
     factor: LinearFactorization,
     kernel: Vec<BitVector>,
     columns: Vec<BitVector>,
@@ -491,10 +491,12 @@ pub struct PreparedZProjection {
     polar_images: Vec<BitVector>,
 }
 
-impl PreparedZProjection {
-    pub fn new(reference: &AffineKet, rows: &[BitVector]) -> Result<Self, StabilizerError> {
-        let equations = reference.constraint_matrix(rows)?;
-        let factor = LinearFactorization::new(reference.columns.len(), &equations)?;
+impl PreparedPathProjection {
+    pub(crate) fn new(
+        reference: &AffineKet,
+        equations: &[BitVector],
+    ) -> Result<Self, StabilizerError> {
+        let factor = LinearFactorization::new(reference.columns.len(), equations)?;
         let kernel = factor.nullspace()?;
         let columns = kernel
             .iter()
@@ -505,7 +507,7 @@ impl PreparedZProjection {
             .restrict_with_images(&BitVector::zeros(reference.columns.len())?, &kernel)?;
         Ok(Self {
             reference: reference.clone(),
-            rows: rows.to_vec(),
+            equations: equations.len(),
             factor,
             kernel,
             columns,
@@ -514,52 +516,32 @@ impl PreparedZProjection {
         })
     }
 
-    /// Prepare a boundary sum on the structural image without selecting an
-    /// event outcome. The zero outcome itself need not be consistent.
-    pub(crate) fn prepare_sum(
-        &self,
-        keep: &[usize],
-    ) -> Result<PreparedAffineContraction, StabilizerError> {
-        let structure = AffineKet::new(
+    pub(crate) fn structure(&self) -> Result<AffineKet, StabilizerError> {
+        AffineKet::new(
             BitVector::zeros(self.reference.width())?,
             self.columns.clone(),
             self.phase.clone(),
             ExactScalar::one(),
-        )?
-        .retain_boundary(keep)?;
-        PreparedAffineContraction::new(&structure)
+        )
     }
-    pub(crate) fn prepare_linear_boundary(
-        &self,
-        rows: &[BitVector],
-    ) -> Result<PreparedLinearBoundary, StabilizerError> {
-        let structure = AffineKet::new(
-            BitVector::zeros(self.reference.width())?,
-            self.columns.clone(),
-            self.phase.clone(),
-            ExactScalar::one(),
-        )?;
-        PreparedLinearBoundary::new(&structure, rows)
+    pub(crate) fn reduced_paths(&self) -> usize {
+        self.kernel.len()
     }
 
     /// Apply the prepared constraints without refactoring or restricting their
     /// quadratic form. An inconsistent right-hand side returns `None`.
-    pub fn project(
+    pub(crate) fn project(
         &self,
         input: &AffineKet,
-        outcomes: &BitVector,
+        rhs: &BitVector,
     ) -> Result<Option<AffineKet>, StabilizerError> {
-        if input.width() != self.reference.width() || outcomes.width() != self.rows.len() {
+        if input.width() != self.reference.width() || rhs.width() != self.equations {
             return Err(StabilizerError::DimensionMismatch);
         }
         if !input.same_structure(&self.reference) {
             return Err(StabilizerError::IncompatibleProjection);
         }
-        let mut rhs = outcomes.clone();
-        for (i, row) in self.rows.iter().enumerate() {
-            rhs.set(i, rhs.get(i)? ^ row.dot(input.offset())?)?;
-        }
-        let Some(shift) = self.factor.solve(&rhs)? else {
+        let Some(shift) = self.factor.solve(rhs)? else {
             return Ok(None);
         };
         let delta = BitVector::from_indices(
@@ -595,6 +577,48 @@ impl PreparedZProjection {
             phase,
             input.coefficient.clone(),
         )?))
+    }
+}
+
+/// Fixed boundary rows translated into a prepared path-equation projection.
+pub struct PreparedZProjection {
+    rows: Vec<BitVector>,
+    paths: PreparedPathProjection,
+}
+impl PreparedZProjection {
+    pub fn new(reference: &AffineKet, rows: &[BitVector]) -> Result<Self, StabilizerError> {
+        let equations = reference.constraint_matrix(rows)?;
+        Ok(Self {
+            rows: rows.to_vec(),
+            paths: PreparedPathProjection::new(reference, &equations)?,
+        })
+    }
+    pub(crate) fn prepare_sum(
+        &self,
+        keep: &[usize],
+    ) -> Result<PreparedAffineContraction, StabilizerError> {
+        PreparedAffineContraction::new(&self.paths.structure()?.retain_boundary(keep)?)
+    }
+    pub(crate) fn prepare_linear_boundary(
+        &self,
+        rows: &[BitVector],
+    ) -> Result<PreparedLinearBoundary, StabilizerError> {
+        PreparedLinearBoundary::new(&self.paths.structure()?, rows)
+    }
+    /// Reuse fixed support equations for compatible offsets and even phases.
+    pub fn project(
+        &self,
+        input: &AffineKet,
+        outcomes: &BitVector,
+    ) -> Result<Option<AffineKet>, StabilizerError> {
+        if outcomes.width() != self.rows.len() || input.width() != self.paths.reference.width() {
+            return Err(StabilizerError::DimensionMismatch);
+        }
+        let mut rhs = outcomes.clone();
+        for (i, row) in self.rows.iter().enumerate() {
+            rhs.set(i, rhs.get(i)? ^ row.dot(input.offset())?)?;
+        }
+        self.paths.project(input, &rhs)
     }
 }
 

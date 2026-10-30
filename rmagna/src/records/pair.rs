@@ -46,38 +46,9 @@ pub(crate) fn traced_record_pair(
     {
         return Err(StabilizerError::DimensionMismatch);
     }
-    let equations_count = n
-        .checked_add(event_rows.len())
-        .ok_or(StabilizerError::DimensionOverflow)?;
     let joint = left.tensor(&right.conjugate(), arithmetic)?;
-    let paths = joint.columns().len();
-    let mut equations = Vec::with_capacity(equations_count);
-    let mut rhs = BitVector::zeros(equations_count)?;
-    // One n-by-p equation array. LinearFactorization compresses RHS provenance
-    // for tall systems; no n-by-2n boundary equality matrix is constructed.
-    for q in 0..n {
-        let mut equation = BitVector::zeros(paths)?;
-        for (j, column) in joint.columns().iter().enumerate() {
-            equation.set(j, column.get(q)? ^ column.get(n + q)?)?;
-        }
-        rhs.set(q, joint.offset().get(q)? ^ joint.offset().get(n + q)?)?;
-        equations.push(equation);
-    }
-    let parity = |row: &BitVector, value: &BitVector| -> Result<bool, StabilizerError> {
-        let mut bit = false;
-        for q in row.ones() {
-            bit ^= value.get(q)?;
-        }
-        Ok(bit)
-    };
-    for (k, row) in event_rows.iter().enumerate() {
-        let mut equation = BitVector::zeros(paths)?;
-        for (j, column) in joint.columns().iter().enumerate() {
-            equation.set(j, parity(row, column)?)?;
-        }
-        rhs.set(n + k, outcomes.get(k)? ^ parity(row, joint.offset())?)?;
-        equations.push(equation);
-    }
+    let equations = pair_equations(&joint, n, event_rows)?;
+    let rhs = pair_rhs(&joint, n, event_rows, outcomes)?;
     let Some(traced) = joint.constrain_paths(&equations, &rhs)? else {
         return Ok(None);
     };
@@ -87,6 +58,63 @@ pub(crate) fn traced_record_pair(
     let (mut offset, columns, phase, coefficient) = mapped.into_parts();
     offset.xor_assign(report_flips)?;
     AffineKet::new(offset, columns, phase, coefficient)?.contract(arithmetic)
+}
+
+/// Joint boundary equality and fixed event geometry in path coordinates.
+/// There is no boundary-width square equality mask.
+pub(crate) fn pair_equations(
+    joint: &AffineKet,
+    n: usize,
+    events: &[BitVector],
+) -> Result<Vec<BitVector>, StabilizerError> {
+    let count = n
+        .checked_add(events.len())
+        .ok_or(StabilizerError::DimensionOverflow)?;
+    let mut equations = Vec::with_capacity(count);
+    for q in 0..n {
+        let mut equation = BitVector::zeros(joint.columns().len())?;
+        for (j, column) in joint.columns().iter().enumerate() {
+            equation.set(j, column.get(q)? ^ column.get(n + q)?)?;
+        }
+        equations.push(equation);
+    }
+    for row in events {
+        let mut equation = BitVector::zeros(joint.columns().len())?;
+        for (j, column) in joint.columns().iter().enumerate() {
+            equation.set(j, half_parity(row, column)?)?;
+        }
+        equations.push(equation);
+    }
+    Ok(equations)
+}
+fn half_parity(row: &BitVector, value: &BitVector) -> Result<bool, StabilizerError> {
+    let mut bit = false;
+    for q in row.ones() {
+        bit ^= value.get(q)?;
+    }
+    Ok(bit)
+}
+/// Only offsets and event values change on prepared-plan evaluation.
+pub(crate) fn pair_rhs(
+    joint: &AffineKet,
+    n: usize,
+    events: &[BitVector],
+    outcomes: &BitVector,
+) -> Result<BitVector, StabilizerError> {
+    if outcomes.width() != events.len() {
+        return Err(StabilizerError::DimensionMismatch);
+    }
+    let count = n
+        .checked_add(events.len())
+        .ok_or(StabilizerError::DimensionOverflow)?;
+    let mut rhs = BitVector::zeros(count)?;
+    for q in 0..n {
+        rhs.set(q, joint.offset().get(q)? ^ joint.offset().get(n + q)?)?;
+    }
+    for (k, row) in events.iter().enumerate() {
+        rhs.set(n + k, outcomes.get(k)? ^ half_parity(row, joint.offset())?)?;
+    }
+    Ok(rhs)
 }
 
 /// Conservative eight-byte payload/header/scratch units. Existing source kets

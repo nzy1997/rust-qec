@@ -12,7 +12,8 @@ mod enumeration;
 pub use completed::{
     CompletedMoment, CompletedProbability, CompletedRecordDraw, CompletedRecordError,
     CompletedRecordLimits, CompletedRecordSpec, CompletedRecordStatistics,
-    CompletedSamplingOptions,
+    CompletedSamplingOptions, PreparedCompletedRecords, PreparedRecordLimits, PreparedRecordResult,
+    PreparedRecordStatistics, PreparedRecordWork,
 };
 pub(crate) mod pair;
 pub(crate) use enumeration::enumerate_reported_conditioned_observed;

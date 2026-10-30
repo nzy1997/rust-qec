@@ -261,6 +261,24 @@ impl CompiledUnitary {
         catalogue: Option<&crate::catalogue::PhaseCatalogue>,
         arithmetic: &ScalarArithmetic,
     ) -> Result<OwnedStabilizerExpansion, UnitaryError> {
+        self.stabilizer_expansion_with_resource_rank_limit(
+            limits,
+            options,
+            catalogue,
+            usize::MAX,
+            arithmetic,
+        )
+    }
+    /// Preparation-only source quotient admission; the existing cold route
+    /// retains its original raw-path/resource semantics.
+    pub(crate) fn stabilizer_expansion_with_resource_rank_limit(
+        &self,
+        limits: ExpansionLimits,
+        options: PhaseResourceOptions,
+        catalogue: Option<&crate::catalogue::PhaseCatalogue>,
+        max_source_quotient_rank: usize,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<OwnedStabilizerExpansion, UnitaryError> {
         let paths = self.boundary.columns().len();
         let raw_paths = self.compilation.raw_path_variables.max(paths);
         admit("max_path_bits", limits.max_path_bits, raw_paths as u128)?;
@@ -294,6 +312,13 @@ impl CompiledUnitary {
             .map(phase_part)
             .collect::<Result<Vec<_>, _>>()?;
         let reference = self.phase.restrict(&offset, &columns)?;
+        if max_source_quotient_rank != usize::MAX {
+            admit(
+                "max_source_quotient_rank",
+                max_source_quotient_rank,
+                reference.quotient()?.rank() as u128,
+            )?;
+        }
         let physical = self
             .boundary
             .retain_boundary(&(0..self.width()).collect::<Vec<_>>())?;
