@@ -329,9 +329,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 47 mapped
+`--rust-run <run.json> --complete-parity` flags documented above. The 50 mapped
 Rust witnesses for 44 verified and one partial upstream case must execute successfully,
-while the overall gate must still return nonzero because 309 core contracts remain
+while the overall gate must still return nonzero because 307 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -392,7 +392,7 @@ The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/native floating-range method is
 partial, with the numerical gap described below. The current ledger contains
 44 verified, one partial, 307 unmapped and zero architecture-specific core cases,
-backed by 47 Rust witnesses; the strict `--rust-run <run.json>
+backed by 50 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -513,7 +513,7 @@ its own SplitMix64 stream, without a Python Random trajectory claim.
 The audit requires these two witnesses alongside the prior twenty-two and the
 report-noise/postselection witness and three categorical/mandatory-tail plus three feedback/failure witnesses below.
 It has 44 verified, one partial, 307 unmapped and zero architecture-specific
-core cases, with 47 required witnesses and strict complete-parity exit 2. The
+core cases, with 50 required witnesses and strict complete-parity exit 2. The
 separate native diagnostic-status gap remains partial. No native tensor/cache
 counter ABI, full M6 completion or paper-performance result is claimed.
 
@@ -539,7 +539,7 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 47 required witnesses support 44 verified, one partial and 309
+The current 50 required witnesses support 44 verified, one partial and 307
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods and the existing partial tiny-error diagnostic-range gap
@@ -601,7 +601,7 @@ The same prepared plans subsequently succeed at adequate budgets: four noise
 patterns give error 9/50 and success 41/50, while both echo histories recover
 to zero with error zero and success one.
 
-All 47 required witnesses support 44 verified, one partial and 307 unmapped
+All 50 required witnesses support 44 verified, one partial and 307 unmapped
 core methods, with zero architecture-specific exclusions. Actual source-bound
 strict complete parity must still exit 2. The existing partial native diagnostic-status
 gap remains unverified; these checks establish no complete M6 or paper result.
@@ -668,7 +668,7 @@ are aligned with the grammar: the preparation fixture reads the final record
 instead of its identical detector alias in its observable, and module tests
 expect earlier grammar diagnostics for forbidden detector-observable inputs.
 
-All 47 required witnesses support 44 verified, one partial and 307 unmapped
+All 50 required witnesses support 44 verified, one partial and 307 unmapped
 core methods. Strict complete parity still exits 2. These finite contracts do
 not establish native object-ABI identity, full M6 or paper performance.
 
