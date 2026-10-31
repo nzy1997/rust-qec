@@ -166,6 +166,20 @@ impl BitVector {
         Ok(parity & 1 != 0)
     }
 
+    /// Keep indices below `limit`, clipping the declared width to the existing
+    /// finite input. Even `usize::MAX` never expands storage or adds padding.
+    pub fn low(&self, limit: usize) -> Result<Self, Gf2Error> {
+        let mut result = Self::zeros(self.width.min(limit))?;
+        let count = result.words.len();
+        result.words.copy_from_slice(&self.words[..count]);
+        if !result.width.is_multiple_of(64)
+            && let Some(last) = result.words.last_mut()
+        {
+            *last &= (1_u64 << (result.width % 64)) - 1;
+        }
+        Ok(result)
+    }
+
     pub fn ones(&self) -> impl Iterator<Item = usize> + '_ {
         self.words
             .iter()
@@ -182,6 +196,81 @@ impl BitVector {
                 })
             })
     }
+}
+
+/// Parities of each row against `value`, treating missing coordinates as zero.
+/// Rows may have different explicit widths. The result width is `rows.len()`;
+/// an all-zero result retains that width instead of using native Bits size ABI.
+/// This does not change the strict equal-width [`BitVector::dot`] interface.
+pub fn parities(rows: &[BitVector], value: &BitVector) -> Result<BitVector, Gf2Error> {
+    let mut result = BitVector::zeros(rows.len())?;
+    for (i, row) in rows.iter().enumerate() {
+        let parity = row
+            .words
+            .iter()
+            .zip(&value.words)
+            .fold(0, |acc, (a, b)| acc ^ (a & b).count_ones());
+        if parity & 1 != 0 {
+            result.set(i, true)?;
+        }
+    }
+    Ok(result)
+}
+
+/// XOR the selected rows of a rectangular matrix with explicit column `width`.
+/// Every row must have this width. Nonzero selector bits outside the finite row
+/// list reject; extra zero selector coordinates are harmless. Validation
+/// precedes output allocation. Empty selections produce a width-preserving zero.
+pub fn xors(
+    width: usize,
+    rows: &[BitVector],
+    selection: &BitVector,
+) -> Result<BitVector, Gf2Error> {
+    for row in rows {
+        row.check_width(width)?;
+    }
+    for index in selection.ones() {
+        if index >= rows.len() {
+            return Err(Gf2Error::IndexOutOfBounds {
+                index,
+                width: rows.len(),
+            });
+        }
+    }
+    let mut result = BitVector::zeros(width)?;
+    for index in selection.ones() {
+        result.xor_assign(&rows[index])?;
+    }
+    Ok(result)
+}
+
+/// XOR selected rows below `limit` into an existing destination. The row bound
+/// clips to the finite row list; selector bits beyond it are intentionally
+/// ignored. Selected rows may be shorter than the destination, preserving its
+/// higher coordinates, but cannot be wider. All selected widths are checked
+/// before any mutation. This operation allocates no storage and never grows
+/// either the destination or inputs, including for `usize::MAX` bounds.
+pub fn xor_rows_prefix(
+    destination: &mut BitVector,
+    rows: &[BitVector],
+    selection: &BitVector,
+    limit: usize,
+) -> Result<(), Gf2Error> {
+    let bound = limit.min(rows.len());
+    for index in selection.ones().take_while(|&i| i < bound) {
+        if rows[index].width > destination.width {
+            return Err(Gf2Error::WidthMismatch {
+                expected: destination.width,
+                actual: rows[index].width,
+            });
+        }
+    }
+    for index in selection.ones().take_while(|&i| i < bound) {
+        for (output, input) in destination.words.iter_mut().zip(&rows[index].words) {
+            *output ^= input;
+        }
+    }
+    Ok(())
 }
 
 /// One immutable factorization reused for multiple right-hand sides.
@@ -358,14 +447,20 @@ impl LinearFactorization {
     }
 }
 
-/// Transpose validated equal-width columns into packed rows.
-pub(crate) fn transpose_columns(
-    width: usize,
-    columns: &[BitVector],
-) -> Result<Vec<BitVector>, Gf2Error> {
-    let mut rows = (0..width)
-        .map(|_| BitVector::zeros(columns.len()))
-        .collect::<Result<Vec<_>, _>>()?;
+/// Transpose equal-width columns into `width` rows of width `columns.len()`.
+/// All input dimensions are validated before allocation, and both the outer
+/// row list and individual packed rows report [`Gf2Error::AllocationFailed`].
+/// This is the same kernel used internally for affine-support preparation.
+pub fn transpose_columns(width: usize, columns: &[BitVector]) -> Result<Vec<BitVector>, Gf2Error> {
+    for column in columns {
+        column.check_width(width)?;
+    }
+    let mut rows = Vec::new();
+    rows.try_reserve_exact(width)
+        .map_err(|_| Gf2Error::AllocationFailed)?;
+    for _ in 0..width {
+        rows.push(BitVector::zeros(columns.len())?);
+    }
     for (j, column) in columns.iter().enumerate() {
         for i in column.ones() {
             rows[i].set(j, true)?;
