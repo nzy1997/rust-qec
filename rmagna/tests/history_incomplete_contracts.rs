@@ -1,6 +1,6 @@
-//! Partial witnesses for the final original history-efficiency method in
+//! Exact pilot and arithmetic witnesses for the original history-efficiency method in
 //! itpyi/magna@56847478c840395735146ef1e1ccdc3d8aedc10f.
-//! The native floating-range diagnostic remains an explicit compatibility gap.
+//! The separately declared range policy is covered by history_scientific_domains.
 
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -161,7 +161,7 @@ fn original_tiny_errors_retain_exact_zero_and_positive_residuals_without_clampin
         state.summarize().unwrap()
     };
     // Literal identical native errors: exact centered residuals are zero. The
-    // native diagnostic_range_exceeded status is deliberately not emulated.
+    // declared scientific wrapper reports its separate diagnostic range status.
     let same_center = (&tiny + &tiny) / rational(2, 1);
     let same_delta = &tiny - same_center;
     assert_eq!(&same_delta * &same_delta, rational(0, 1));
