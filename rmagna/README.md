@@ -557,6 +557,37 @@ or alternate quantum algorithm. There is no fixed physical-qubit or path-bit
 cap in these types. Stored matrices and arithmetic temporaries still require
 memory; this representation choice is not a process-memory cap.
 
+Checked packed helpers retain these explicit dimensions. `BitVector::low(limit)`
+clips to `min(limit, width)` without growing storage, even for `usize::MAX`.
+`gf2::parities(rows, value)` treats missing coordinates as zero and returns one
+bit per row, including an explicit all-zero result. Existing `dot` and
+`xor_assign` still require equal widths. `gf2::xors(width, rows, selection)`
+requires rectangular rows and rejects nonzero selector bits outside the row
+list; extra zero selector coordinates are allowed. `gf2::xor_rows_prefix`
+instead ignores selections beyond the finite clipped row prefix. It accepts
+selected rows no wider than the destination and preserves higher destination
+coordinates. All selected widths are validated before any mutation.
+`gf2::transpose_columns(width, columns)` validates every input width before
+allocating its rectangular output and reuses the affine-support transpose
+kernel. Invalid dimensions and allocation failures return typed `Gf2Error`s.
+
+```rust
+use rmagna::gf2::{BitVector, xor_rows_prefix};
+let rows = [BitVector::from_indices(65, [0, 64])?];
+let mut destination = BitVector::from_indices(72, [64, 65, 71])?;
+xor_rows_prefix(&mut destination, &rows,
+    &BitVector::from_indices(1, [0])?, usize::MAX)?;
+assert_eq!(destination, BitVector::from_indices(72, [0, 65, 71])?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The original packed-kernel test target covers all 162 pinned shape/density cases,
+the actual C++ `mt19937_64` input stream, independent unpacked-byte expectations
+and Rust invalid-input/atomicity checks. The original combined GF2/quadratic
+method remains partially reproduced: complete factor certificates, seeded
+solutions and quadratic restriction assertions are still separate work. The
+unchanged C++ UBSan baseline and the safe Rust tests are distinct evidence.
+
 `quadratic::QuadraticForm` represents phases modulo four with strictly upper
 triangular cross terms. Affine restriction allows dependent basis vectors.
 Its exact Gauss sum eliminates variables instead of enumerating assignments.

@@ -634,8 +634,23 @@
     },
     {
       "id": "test_gf2_kernel.SharedGF2KernelTest.test_byte_oracles_with_undefined_behavior_sanitizer",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "All162 original packed cases in exact n/m/density order: pinned actual std::mt19937_64 seed2026100409, every input bit and per-case unconsumed checkpoint, all original prefix/zero-extended parity/selected-row XOR/clipped destination-preserving XOR/rectangular transpose assertions against independent unpacked-byte expectations. Explicit Rust widths, strict existing dot/XOR, invalid selections, padding, selected-width atomicity and finite usize::MAX boundaries. Separate unchanged original C++ UBSan baseline; no Rust sanitizer claim.",
+      "remaining_gap": "The combined original method also executes143 factor cases requiring complete right/left nullspaces, pivot provenance, seeded free coordinates and full affine solutions, plus26 affine quadratic restriction cases; these assertion sets remain unmapped by this partial entry. C++ UBSan baseline success does not supply missing Rust parity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_packed_kernels",
+          "test": "original_packed_byte_oracles_follow_pinned_stream",
+          "source_sha256": "237e50fdc315914a62faf621a62accc3db645e76ae6bda3c6e9161ae5d3f28ba"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_packed_kernels",
+          "test": "checked_packed_operations_preserve_dimensions_padding_and_atomicity",
+          "source_sha256": "237e50fdc315914a62faf621a62accc3db645e76ae6bda3c6e9161ae5d3f28ba"
+        }
+      ]
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_exact_comparisons_and_extreme_probabilities",
