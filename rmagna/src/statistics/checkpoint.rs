@@ -27,7 +27,7 @@ impl fmt::Display for CheckpointError {
     }
 }
 impl std::error::Error for CheckpointError {}
-fn error(field: &str, message: impl fmt::Display) -> CheckpointError {
+pub(super) fn error(field: &str, message: impl fmt::Display) -> CheckpointError {
     CheckpointError {
         field: field.to_owned(),
         message: message.to_string(),
@@ -154,7 +154,7 @@ fn version(schema: u32, kind: &str, expected: &str) -> Result<(), CheckpointErro
     }
     Ok(())
 }
-fn integer_text(text: &str, signed: bool) -> bool {
+pub(super) fn integer_text(text: &str, signed: bool) -> bool {
     let digits = if signed {
         text.strip_prefix('-').unwrap_or(text)
     } else {
@@ -165,7 +165,7 @@ fn integer_text(text: &str, signed: bool) -> bool {
         && (digits == "0" || !digits.starts_with('0'))
         && text != "-0"
 }
-fn count(text: &str, field: &str) -> Result<u64, CheckpointError> {
+pub(super) fn count(text: &str, field: &str) -> Result<u64, CheckpointError> {
     if !integer_text(text, false) || text.len() > 20 {
         return Err(error(field, "expected a canonical u64 decimal string"));
     }

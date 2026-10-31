@@ -2808,6 +2808,62 @@ scale changes of 10,000 square-root-two powers, disjoint partitions and explicit
 unavailable, invalid, arithmetic and count-overflow cases. Run summaries are described below;
 sampler-pilot decisions remain a separate interface.
 
+### Declared scientific diagnostic domain
+
+`statistics::ScientificEfficiency` optionally wraps these exact totals with a
+declared per-draw floating diagnostic policy. The default runtime still uses
+`HistoryEfficiency`. For example, the binary64-mantissa native domain on the
+pinned Apple ARM reference admits frexp ratio exponents down to -510:
+
+```rust
+use rmagna::field::{ExactField, FieldArithmetic};
+use rmagna::numeric::NumericOptions;
+use rmagna::statistics::{ScientificDiagnosticDomain, ScientificEfficiency,
+    ScientificEfficiencyStatus};
+
+let domain = ScientificDiagnosticDomain::new(-510)?;
+let mut state = ScientificEfficiency::new(
+    FieldArithmetic::default(), domain, NumericOptions::default())?;
+for error in [ExactField::zero(), ExactField::one()] {
+    state.push(&ExactField::one(), Some(&error), &ExactField::one(), &ExactField::one())?;
+}
+let result = state.summarize()?;
+assert_eq!(result.status, ScientificEfficiencyStatus::Available);
+assert_eq!(result.exact.kappa, Some(ExactField::one()));
+assert_eq!(result.evidence.draws, 2);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The policy separately rounds nonzero E and A to scientific binary64 mantissas,
+divides those mantissas in binary64, then tests the normalized frexp exponent
+against the inclusive floor. It deliberately differs from rounding exact E/A.
+Zero E or A contributes no nonzero-ratio evidence. Fixed-size evidence records
+completed draws, checked ratios, out-of-domain ratios, missing error metrics and
+the minimum checked exponent. No contribution, moment, ESS or likelihood is
+discarded when a diagnostic leaves this domain.
+
+Scientific status precedence is missing error, per-draw range failure,
+insufficient samples, zero acceptance, zero residual variance, then available.
+An available exact kappa also undergoes an ordinary binary64 range check on its
+already rounded scientific pair; range failure retains `kappa_scientific`.
+The embedded `exact` summary always retains the exact result and actual weight
+diagnostics. Identical errors of 2^-100001 therefore give scientific
+`diagnostic_range_exceeded` and exact `zero_residual_variance` together. This
+declared interface makes no arbitrary host-long-double or native floating
+residual/cancellation bit-identity claim.
+
+Push and disjoint merge are atomic, including invalid contributions, arithmetic
+or numeric work failures and count overflow. Merge requires identical policies;
+receiver resource budgets remain authoritative. `from_empty_exact` rejects
+nonempty aggregates because moments cannot recover per-draw provenance.
+`checkpoint_json` uses a distinct schema version 2 with a policy object,
+evidence object and the exact-only checkpoint string. Restore requires the
+caller's matching domain and independent field/numeric/JSON-byte budgets;
+legacy exact-only checkpoints are rejected. Canonical integers, object shapes,
+required fields, draw counts, missing-error flags, minimum/range consistency
+and empty states are checked. This is bounded accumulator persistence, without
+RNG/task state, observation authenticity or reconstruction of missing draws.
+
 ## Seeded task batches and partial failures
 
 `TaskEvaluator::run_batch` reuses a prepared evaluator and starts a fresh

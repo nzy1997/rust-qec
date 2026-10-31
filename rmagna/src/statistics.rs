@@ -7,8 +7,14 @@ use crate::field::{ExactField, FieldArithmetic, FieldError};
 use num_rational::BigRational;
 use std::{cmp::Ordering, fmt};
 pub(crate) mod checkpoint;
+mod diagnostic;
+mod diagnostic_checkpoint;
 mod efficiency;
 pub use checkpoint::{CheckpointError, CheckpointOptions};
+pub use diagnostic::{
+    DiagnosticDomainError, ScientificDiagnosticDomain, ScientificDomainEvidence,
+    ScientificEfficiency, ScientificEfficiencyStatus, ScientificEfficiencySummary,
+};
 pub use efficiency::{EfficiencyStatus, EfficiencySummary, HistoryEfficiency};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
