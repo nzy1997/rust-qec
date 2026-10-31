@@ -2,7 +2,7 @@
 
 mod parse;
 use crate::probability::Probability;
-pub use parse::{ParseError, ParseOptions, parse_circuit};
+pub use parse::{ParseError, ParseOptions, ParseResource, ParseResourceLimit, parse_circuit};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

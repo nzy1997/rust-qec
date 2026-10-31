@@ -105,8 +105,8 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 ### Source-bound Rust coverage ledger
 
 `coverage.json` enumerates every canonical `module.Class.test_method` from the
-pinned 57 core modules (352 cases). The current ledger has 58 verified, zero
-partial and 294 unmapped core methods, requiring 70 successful Rust witnesses.
+pinned 57 core modules (352 cases). The current ledger has 59 verified, zero
+partial and 293 unmapped core methods, requiring 71 successful Rust witnesses.
 These include all ten original static circuit-file methods, the independent
 controller binding/config-isolation method, and the complete GF2/quadratic method
 (162 packed, 143 factorization and 26 quadratic cases). Other owning mappings
@@ -319,9 +319,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 70 mapped
-Rust witnesses for 58 verified and zero partial upstream cases must execute successfully,
-while the overall gate must still return nonzero because 294 core contracts remain
+`--rust-run <run.json> --complete-parity` flags documented above. The 71 mapped
+Rust witnesses for 59 verified and zero partial upstream cases must execute successfully,
+while the overall gate must still return nonzero because 293 core contracts remain
 unmapped. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -359,7 +359,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 294 cases unmapped and zero partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 293 cases unmapped and zero partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -381,8 +381,8 @@ These tests import no upstream test module and invoke no native test-only builde
 The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/unavailable-metrics method is
 verified with the explicitly declared diagnostic policy described below. The current ledger contains
-58 verified, zero partial, 294 unmapped and zero architecture-specific core cases,
-backed by 70 Rust witnesses; the strict `--rust-run <run.json>
+59 verified, zero partial, 293 unmapped and zero architecture-specific core cases,
+backed by 71 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -443,8 +443,8 @@ All four pilot/CLI witnesses are required by the source-bound coverage gate,
 alongside the existing sixteen, the three diagnostic-domain witnesses below and the two
 capped recovery/feedback witnesses, the report-noise/postselection witness and
 the three categorical/mandatory-tail and three feedback/failure witnesses below. The ledger
-has 58 verified, zero partial, 294 unmapped and zero architecture-specific cases,
-with 70 required Rust witnesses. Strict complete parity still exits 2. These
+has 59 verified, zero partial, 293 unmapped and zero architecture-specific cases,
+with 71 required Rust witnesses. Strict complete parity still exits 2. These
 finite checks establish no full M6 or paper-performance result.
 
 ### Original incomplete-pilot and declared tiny-error diagnostic contract
@@ -505,8 +505,8 @@ its own SplitMix64 stream, without a Python Random trajectory claim.
 
 The audit requires these two witnesses alongside the prior twenty-two and the
 report-noise/postselection witness and three categorical/mandatory-tail plus three feedback/failure witnesses below.
-It has 58 verified, zero partial, 294 unmapped and zero architecture-specific
-core cases, with 70 required witnesses and strict complete-parity exit 2. The
+It has 59 verified, zero partial, 293 unmapped and zero architecture-specific
+core cases, with 71 required witnesses and strict complete-parity exit 2. The
 separate declared diagnostic-domain contract is described above. No native tensor/cache
 counter ABI, full M6 completion or paper-performance result is claimed.
 
@@ -532,7 +532,7 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 70 required witnesses support 58 verified, zero partial and 294
+The current 71 required witnesses support 59 verified, zero partial and 293
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods remain outside this mapping; no complete M6 or paper-performance claim is made.
@@ -561,7 +561,7 @@ weight four retains exactly choices [(200,0),(201,0),(202,0),(203,0)]. Its mass 
 final patterns, permitting mandatory-suffix pruning before optional prefixes can
 exhaust the cap. No native binding ABI or new enumeration algorithm is claimed.
 
-All 70 required Rust witnesses support 58 verified, zero partial and 294 unmapped
+All 71 required Rust witnesses support 59 verified, zero partial and 293 unmapped
 core cases, with zero architecture-specific exclusions. The actual source-bound
 strict gate remains incomplete and must exit 2. Other low-weight methods remain explicitly unverified;
 these finite checks establish neither complete M6 parity nor paper performance.
@@ -592,7 +592,7 @@ The same prepared plans subsequently succeed at adequate budgets: four noise
 patterns give error 9/50 and success 41/50, while both echo histories recover
 to zero with error zero and success one.
 
-All 70 required witnesses support 58 verified, zero partial and 294 unmapped
+All 71 required witnesses support 59 verified, zero partial and 293 unmapped
 core methods, with zero architecture-specific exclusions. Actual source-bound
 strict complete parity must still exit 2. The separate declared diagnostic policy is described above; these checks establish no complete M6 or paper result.
 
@@ -623,8 +623,8 @@ The literal original X_ERROR(1/10)0, M0 command with outputs[0], an owned I0
 zero target, weight one and JSON succeeds with exact error 1/10.
 
 All nine original low-weight methods now have source-bound semantic witnesses.
-The complete ledger still has 58 verified, zero partial and 294 unmapped core
-methods, requiring 70 successful Rust witnesses and strict complete-parity exit
+The complete ledger still has 59 verified, zero partial and 293 unmapped core
+methods, requiring 71 successful Rust witnesses and strict complete-parity exit
 2. This does not establish native object-ABI identity, M6 completion or any
 paper-performance result.
 
@@ -658,7 +658,7 @@ are aligned with the grammar: the preparation fixture reads the final record
 instead of its identical detector alias in its observable, and module tests
 expect earlier grammar diagnostics for forbidden detector-observable inputs.
 
-All 70 required witnesses support 58 verified, zero partial and 294 unmapped
+All 71 required witnesses support 59 verified, zero partial and 293 unmapped
 core methods. Strict complete parity still exits 2. These finite contracts do
 not establish native object-ABI identity, full M6 or paper performance.
 
@@ -690,8 +690,8 @@ cargo test --locked -p rmagna --test controller_binding_contracts --test control
 
 The unmodified original method was separately executed in ordinary and
 optimized CPython 3.12 using a freshly compiled pinned native extension.
-Including the inherited-record contract below, the ledger has 58 verified, zero partial
-and 294 unmapped core cases, with 70 required Rust witnesses and zero
+Including the inherited-record contract below, the ledger has 59 verified, zero partial
+and 293 unmapped core cases, with 71 required Rust witnesses and zero
 architecture-specific exclusions. Strict complete parity still exits 2.
 They establish neither complete M6 parity nor paper precision or performance.
 
@@ -724,8 +724,8 @@ label widths across 64-bit word boundaries, scalar errors and finite path,
 geometry, side, record, pair and event bounds. A factory-injection unit test
 requires pair/geometry rejection before any pair matrices are constructed.
 
-The ledger now has 58 verified, zero partial and 294 unmapped core cases, with
-70 required Rust witnesses and zero architecture-specific exclusions. Strict
+The ledger now has 59 verified, zero partial and 293 unmapped core cases, with
+71 required Rust witnesses and zero architecture-specific exclusions. Strict
 complete parity still exits 2. This explicit unitary expansion is not full
 NativeInstrumentIR/environment parity, arbitrary quantum output density,
 automatic runtime integration or complete single-trace caching; event queries
@@ -776,8 +776,8 @@ lifetime and continuation of caller-owned random streams after failures.
 cargo test --locked -p rmagna --test completed_records --test inherited_record_expansion
 ```
 
-The current ledger has 58 verified, zero partial and 294 unmapped core cases,
-with 70 required Rust witnesses and zero architecture-specific exclusions.
+The current ledger has 59 verified, zero partial and 293 unmapped core cases,
+with 71 required Rust witnesses and zero architecture-specific exclusions.
 Strict complete parity still exits 2. Caller-supplied expansions receive no
 phase-rank certificate. Event queries still rebuild Gaussian factorizations;
 this change does not establish prepared-query caching, original InstrumentIR,
@@ -822,8 +822,8 @@ the Bell/reset output moments and target projection. Literal exact vectors are
 independent of GF(2), Gaussian and path kernels. Both original methods separately
 pass ordinary and optimized Python using the freshly built pinned native module.
 Additional tests cover metadata admission, callbacks, lifetimes, phases, quotas,
-fault order, immutable reuse and targets. The current ledger has 58 verified,
-zero partial and 294 unmapped core cases, with 70 required Rust witnesses and
+fault order, immutable reuse and targets. The current ledger has 59 verified,
+zero partial and 293 unmapped core cases, with 71 required Rust witnesses and
 zero architecture-specific exclusions. Strict complete parity still exits 2.
 Dynamic PhaseFeedback template reuse, online causal sampling, automatic Gaussian
 caching, Python bindings, runtime integration and paper benchmarks remain
@@ -866,8 +866,8 @@ input bases, all original operations, faults/flips, a retained under a XOR b,
 and I/X/Y/Z output moments. Source-bound native tables are also checked with
 independent literal exact matrices and every output/environment amplitude.
 The three unchanged original methods passed both ordinary and optimized Python
-against a fresh pinned production extension. The ledger has58 verified,
-zero partial and294 unmapped methods, requiring70 successful Rust witnesses;
+against a fresh pinned production extension. The ledger has59 verified,
+zero partial and293 unmapped methods, requiring71 successful Rust witnesses;
 strict complete parity still exits2. Automatic Gaussian caching, optional dynamic
 feedback, online causal integration, Python bindings and paper timing/precision
 benchmarks remain separate work.
@@ -917,7 +917,7 @@ zero/cancelling sources, and reuse after quota failures.
 This is explicit per-assignment preparation. Automatic eviction/caching,
 cross-assignment decomposition reuse, runtime/Python integration, performance
 campaigns and paper reproduction remain separate work. The ledger now contains
-58 verified, zero partial and 294 unmapped core methods, with 70 required Rust
+59 verified, zero partial and 293 unmapped core methods, with 71 required Rust
 witnesses. Strict full parity remains incomplete and exits 2.
 
 ## Original static scalar network queries (#1009)
@@ -981,7 +981,7 @@ constructor instrumentation checks refusal before actual GF2 factorization;
 strict native refusals and recovery are owning regressions.
 
 These scalar primitives also support the explicit static boundary service below.
-The coverage ledger contains58 verified /0 partial /294 unmapped cases, with70
+The coverage ledger contains59 verified /0 partial /293 unmapped cases, with71
 required witnesses. Overall interface parity and paper throughput remain incomplete.
 
 ## Original direct static boundary tasks (#1010)
@@ -1051,8 +1051,8 @@ Python, with complete fixture equality and identity checks in finally on success
 and deliberate failure. Only read-only public production scalar/layout adapters
 replace build-capable testing helpers; no private testing extension is loaded.
 
-The ledger now has58 verified, zero partial and294 unmapped core cases of352,
-with70 required Rust witnesses and zero architecture-specific exclusions. Strict
+The ledger now has59 verified, zero partial and293 unmapped core cases of352,
+with71 required Rust witnesses and zero architecture-specific exclusions. Strict
 complete parity still exits2. Structured/opaque feedback, retained-label
 trace-before-resource tensors, cross-assignment Gaussian caching, Python bindings,
 full original coverage and paper benchmarks remain separate work.
@@ -1097,7 +1097,7 @@ engine state after the input-only traversal. Its 576,873 packed checks and the
 unchanged baseline's 646,357 combined checks are C++ UBSan observations; they do
 not claim Rust sanitizer execution. The complete original combined method is
 verified by these packed witnesses and the factor/quadratic witnesses below. The current ledger has
-58 verified, zero partial and 294 unmapped core cases, with 70 required successful
+59 verified, zero partial and 293 unmapped core cases, with 71 required successful
 Rust witnesses. Strict complete parity still exits 2. These correctness checks
 do not establish paper-scale runtime, throughput or memory performance.
 
@@ -1150,8 +1150,8 @@ cmp "$OUT/original_factor_inputs.json" rmagna/tests/fixtures/original_factor_inp
 
 The unchanged original C++ UBSan method checks 646,357 assertions. This remains
 separate from safe Rust boundary and mathematical checks; Rust is not described
-as C++-instrumented. The ledger has 58 verified, zero partial and 294 unmapped
-methods, with 70 required Rust witnesses. Strict complete parity still exits 2.
+as C++-instrumented. The ledger has 59 verified, zero partial and 293 unmapped
+methods, with 71 required Rust witnesses. Strict complete parity still exits 2.
 Full public-surface reproduction and paper benchmarks remain incomplete.
 
 
@@ -1161,9 +1161,9 @@ Full public-surface reproduction and paper benchmarks remain incomplete.
 from the ten static methods in pinned `test_circuit_file.CircuitFileTests`.
 Eight previously unmapped methods are promoted; the two existing measurement/CZ
 mappings and their witnesses are retained, with the exact-source witnesses added.
-The separate binding/config method also keeps its existing mapping. The four
+The separate binding/config method also keeps its existing mapping. The three
 remaining circuit-file methods (roundtrip, nonlinear/atomic control analysis,
-expansion budgets and replaced native rational views) remain unmapped.
+replaced native rational views) remain unmapped.
 
 The test header attributes the original MPL-2.0 source. Python grouped
 instructions lower to individual typed Rust operations. Resolved `BitExpr`
@@ -1190,7 +1190,24 @@ Stim must be installed, and a skip is not a successful compatibility check.
 cargo test --locked -p rmagna --test static_circuit_contracts
 ```
 
-The full source-bound execution audit must pass all 70 mapped witnesses in
+The full source-bound execution audit must pass all 71 mapped witnesses in
 ordinary and optimized ledger modes. Strict complete parity continues to exit 2
-because 294 methods remain unmapped. These finite contracts establish neither
+because 293 methods remain unmapped. These finite contracts establish neither
 complete frontend parity nor paper benchmark performance.
+
+### Exact circuit parser resource stops
+
+The complete original `test_expansion_budget_is_enforced` method is mapped to
+`parser_resource_limits::original_expansion_budget_reports_exact_instruction_and_qubit_requirements`.
+It preserves all original inputs and checks both repeat budgets, the exact sparse
+width failure and source location, an explicitly raised width, and huge empty
+repeats. The pinned production extension runs that unchanged method separately.
+
+Eight Rust tests also cover all five owned structural resource payloads, zero
+quotas, UTF-8 byte counts, operation-prefix and repeat locations, malformed input,
+platform-width multiplication/addition overflow, and counts beyond `u128`.
+Instruction admission uses arbitrary-precision complete counts before lowering;
+`usize::MAX` is a real limit, never an overflow sentinel. These boundary tests
+make no process-memory or paper-performance claim. The current ledger has
+59 verified, zero partial and 293 unmapped core methods, requiring 71 successful
+Rust witnesses; strict complete parity still exits 2.

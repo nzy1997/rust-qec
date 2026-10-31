@@ -1,6 +1,7 @@
 use super::*;
 use crate::probability::ProbabilityParser;
-use num_traits::ToPrimitive;
+use num_bigint::BigUint;
+use num_traits::{ToPrimitive, Zero};
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -28,10 +29,60 @@ impl Default for ParseOptions {
         }
     }
 }
+/// A structural quota owned by the circuit parser.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParseResource {
+    SourceBytes,
+    RepeatDepth,
+    Instructions,
+    Operations,
+    Qubits,
+}
+impl ParseResource {
+    /// The corresponding field in [`ParseOptions`].
+    pub const fn option_name(self) -> &'static str {
+        match self {
+            Self::SourceBytes => "max_source_bytes",
+            Self::RepeatDepth => "max_repeat_depth",
+            Self::Instructions => "max_instructions",
+            Self::Operations => "max_operations",
+            Self::Qubits => "max_qubits",
+        }
+    }
+}
+
+/// An owned, exact admission failure, without rounding or integer saturation.
+///
+/// `needed` is the complete expanded instruction count or source byte length
+/// for those two preflight quotas. For operations, qubits and nesting, it is
+/// the first required prefix size that the parser cannot admit. It can exceed
+/// `usize::MAX`, even when `limit` is the maximum platform value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParseResourceLimit {
+    pub option: ParseResource,
+    pub limit: usize,
+    pub needed: BigUint,
+}
+impl fmt::Display for ParseResourceLimit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} = {}; needs {}",
+            self.option.option_name(),
+            self.limit,
+            self.needed
+        )
+    }
+}
+impl std::error::Error for ParseResourceLimit {}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ParseError {
     pub location: SourceLocation,
     pub message: String,
+    /// Present for the five structural quotas; ordinary syntax errors keep
+    /// `None`. Exact probability-parser budgets retain their own diagnostics.
+    pub resource_limit: Option<Box<ParseResourceLimit>>,
 }
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -49,7 +100,13 @@ impl fmt::Display for ParseError {
         Ok(())
     }
 }
-impl std::error::Error for ParseError {}
+impl std::error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.resource_limit
+            .as_deref()
+            .map(|limit| limit as &dyn std::error::Error)
+    }
+}
 
 #[derive(Clone)]
 struct Text {
@@ -77,12 +134,19 @@ pub fn parse_circuit(source: &str, options: &ParseOptions) -> Result<Circuit, Pa
         line: 1,
         column: 1,
     };
-    let fail = |message: String| error(options, &origin, &[], message);
     if source.len() > options.max_source_bytes {
-        return Err(fail(format!(
-            "source exceeds max_source_bytes = {}",
-            options.max_source_bytes
-        )));
+        return Err(resource_error(
+            options,
+            &origin,
+            &[],
+            ParseResource::SourceBytes,
+            options.max_source_bytes,
+            BigUint::from(source.len()),
+            format!(
+                "source exceeds max_source_bytes = {}",
+                options.max_source_bytes
+            ),
+        ));
     }
     let tokens = lex(source);
     let mut position = 0;
@@ -125,7 +189,25 @@ fn error(
             repeat: repeat.to_vec(),
         },
         message: message.into(),
+        resource_limit: None,
     }
+}
+fn resource_error(
+    options: &ParseOptions,
+    text: &Text,
+    repeat: &[u64],
+    option: ParseResource,
+    limit: usize,
+    needed: BigUint,
+    message: impl Into<String>,
+) -> ParseError {
+    let mut error = error(options, text, repeat, message);
+    error.resource_limit = Some(Box::new(ParseResourceLimit {
+        option,
+        limit,
+        needed,
+    }));
+    error
 }
 fn lex(source: &str) -> Vec<Token> {
     let mut output = Vec::new();
@@ -215,10 +297,13 @@ fn nodes(
                         return Err(error(options, text, &[], "REPEAT requires '{'"));
                     }
                     if depth >= options.max_repeat_depth {
-                        return Err(error(
+                        return Err(resource_error(
                             options,
                             text,
                             &[],
+                            ParseResource::RepeatDepth,
+                            options.max_repeat_depth,
+                            BigUint::from(depth) + 1_u8,
                             format!(
                                 "repeat nesting exceeds max_repeat_depth = {}",
                                 options.max_repeat_depth
@@ -255,51 +340,52 @@ fn nodes(
     Ok(result)
 }
 fn expanded_count(nodes: &[Node], options: &ParseOptions) -> Result<usize, ParseError> {
-    let mut total = 0_usize;
+    let limit = BigUint::from(options.max_instructions);
+    let mut total = BigUint::zero();
+    let mut first_overrun = None;
     for node in nodes {
-        let (text, count) = match node {
-            Node::Instruction(text) => (text, Some(1)),
-            Node::Repeat { text, count, body } => {
-                if *count == 0 {
-                    continue;
-                }
-                let length = expanded_count(body, options)?;
-                let amount = if length == 0 || *count == 0 {
-                    Some(0)
-                } else {
-                    usize::try_from(*count)
-                        .ok()
-                        .and_then(|n| n.checked_mul(length))
-                };
-                (text, amount)
-            }
+        let text = match node {
+            Node::Instruction(text) | Node::Repeat { text, .. } => text,
         };
-        total = total
-            .checked_add(count.unwrap_or(usize::MAX))
-            .ok_or_else(|| {
-                error(
-                    options,
-                    text,
-                    &[],
-                    format!(
-                        "expanded instruction count exceeds max_instructions = {}",
-                        options.max_instructions
-                    ),
-                )
-            })?;
-        if total > options.max_instructions {
-            return Err(error(
-                options,
-                text,
-                &[],
-                format!(
-                    "expanded instruction count {total} exceeds max_instructions = {}",
-                    options.max_instructions
-                ),
-            ));
+        total += instruction_count(node);
+        if first_overrun.is_none() && total > limit {
+            first_overrun = Some(text);
         }
     }
-    Ok(total)
+    if let Some(text) = first_overrun {
+        let message = format!(
+            "expanded instruction count {total} exceeds max_instructions = {}",
+            options.max_instructions
+        );
+        return Err(resource_error(
+            options,
+            text,
+            &[],
+            ParseResource::Instructions,
+            options.max_instructions,
+            total,
+            message,
+        ));
+    }
+    // Admission against a usize limit proves this conversion representable.
+    Ok(total
+        .to_usize()
+        .expect("admitted instruction count fits usize"))
+}
+fn instruction_count(node: &Node) -> BigUint {
+    match node {
+        Node::Instruction(_) => BigUint::from(1_u8),
+        Node::Repeat { count: 0, .. } => BigUint::zero(),
+        Node::Repeat { count, body, .. } => {
+            body.iter().map(instruction_count).sum::<BigUint>() * *count
+        }
+    }
+}
+fn has_instructions(nodes: &[Node]) -> bool {
+    nodes.iter().any(|node| match node {
+        Node::Instruction(_) => true,
+        Node::Repeat { count, body, .. } => *count != 0 && has_instructions(body),
+    })
 }
 
 struct Builder<'a> {
@@ -327,9 +413,13 @@ impl Builder<'_> {
     ) -> Result<(), ParseError> {
         let id = self.circuit.operations.len();
         if id >= self.options.max_operations {
-            return Err(self.fail(
+            return Err(resource_error(
+                self.options,
                 text,
                 repeat,
+                ParseResource::Operations,
+                self.options.max_operations,
+                BigUint::from(id) + 1_u8,
                 format!(
                     "expanded operations exceed max_operations = {}",
                     self.options.max_operations
@@ -356,7 +446,7 @@ impl Builder<'_> {
                     if *count == 0 {
                         continue;
                     }
-                    if expanded_count(body, self.options)? == 0 {
+                    if !has_instructions(body) {
                         continue;
                     }
                     for iteration in 0..*count {
@@ -381,9 +471,13 @@ impl Builder<'_> {
             .parse::<usize>()
             .map_err(|_| self.fail(text, repeat, "qubit index exceeds the platform range"))?;
         if qubit >= self.options.max_qubits {
-            return Err(self.fail(
+            return Err(resource_error(
+                self.options,
                 text,
                 repeat,
+                ParseResource::Qubits,
+                self.options.max_qubits,
+                BigUint::from(qubit) + 1_u8,
                 format!(
                     "qubit index {qubit} exceeds max_qubits = {}",
                     self.options.max_qubits

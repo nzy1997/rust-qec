@@ -296,8 +296,16 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_expansion_budget_is_enforced",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All unchanged original budget inputs: twenty and sixteen expanded instructions reject at ten with typed exact option/limit/needed; sparse.magna line2 requires70001 qubits at default65536; explicitly raised width70001 succeeds; huge nested empty repeats have zero instructions. Owned Rust ParseResourceLimit replaces native ResourceLimit; ParseError retains independent diagnostic wording and source location.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "parser_resource_limits",
+          "test": "original_expansion_budget_reports_exact_instruction_and_qubit_requirements",
+          "source_sha256": "417e25e9d8a07679280a328790e5d83ea797480efa20c5ac65924aba6dd7d54f"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_lossless_roundtrip_and_resolved_repeat",

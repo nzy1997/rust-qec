@@ -962,6 +962,17 @@ Text probabilities retain the parsing limits described above. Coordinates are
 parsed as rational literals and converted to finite `f64` annotation values;
 noise probabilities remain exact rationals.
 
+`ParseError::resource_limit` contains an owned `ParseResourceLimit` for each of
+these five structural quotas. Its `option` identifies the `ParseOptions` field,
+`limit` retains the configured `usize`, and `needed` is an exact `BigUint`.
+Instruction and source-byte stops report the complete required count. Operation,
+qubit and nesting stops report the first required prefix size. Instruction counts
+are checked before lowering even when the limit is `usize::MAX`; nested counts
+can exceed `u128` without saturation. Empty and zero repeats require no expanded
+instructions. Ordinary syntax errors have no resource payload, and probability
+parser limits retain their separate diagnostics. Source locations, repeat
+coordinates and existing human-readable messages remain available.
+
 Inspect a file without simulation or decoder execution:
 
 ```sh
