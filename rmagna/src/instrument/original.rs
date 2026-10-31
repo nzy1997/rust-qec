@@ -45,9 +45,11 @@ use std::{
 #[path = "original_trace.rs"]
 mod trace;
 pub use trace::{
-    OriginalPreparedTrace, OriginalPreparedTraceResult, OriginalRecordEvent, OriginalRecordParity,
-    OriginalStaticTrace, OriginalTraceAssignment, OriginalTraceOptions,
-    OriginalTracePreparationLimits, OriginalTraceResult, OriginalTraceView,
+    OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
+    OriginalNetworkProbability, OriginalNetworkResource, OriginalPreparedTrace,
+    OriginalPreparedTraceResult, OriginalRecordEvent, OriginalRecordParity, OriginalStaticTrace,
+    OriginalTraceAssignment, OriginalTraceOptions, OriginalTracePreparationLimits,
+    OriginalTraceResult, OriginalTraceView,
 };
 
 pub type OriginalWire = i64;

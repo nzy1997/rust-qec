@@ -484,6 +484,12 @@ impl CompiledUnitary {
         self.phase.num_variables()
     }
 
+    /// Shape actually materialized by the fixed scalar-query constructors.
+    pub(crate) fn scalar_query_shape(&self) -> (usize, usize) {
+        let reference = &self.program.query_reference;
+        (reference.width(), reference.columns().len())
+    }
+
     /// A conservative computational support image, without non-Clifford phases.
     /// Summing the frozen phase legs cannot create a physical label outside
     /// this family, but interference can remove labels inside it.

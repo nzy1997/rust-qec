@@ -3,9 +3,9 @@ use rmagna::clifford::CliffordCircuit;
 use rmagna::gf2::BitVector;
 use rmagna::instrument::{
     OriginalAssignment, OriginalControl, OriginalError, OriginalFault, OriginalGate as G,
-    OriginalInstrument, OriginalLimits, OriginalOperation, OriginalPauli as P,
-    OriginalRecordEvent as Event, OriginalRecordParity as Parity, OriginalTraceAssignment,
-    OriginalTraceOptions, ReadoutBasis,
+    OriginalInstrument, OriginalLimits, OriginalNetworkOptions, OriginalOperation,
+    OriginalPauli as P, OriginalRecordEvent as Event, OriginalRecordParity as Parity,
+    OriginalTraceAssignment, OriginalTraceOptions, ReadoutBasis,
 };
 use rmagna::pauli::PauliWord;
 use rmagna::scalar::{ExactScalar, ScalarArithmetic};
@@ -972,6 +972,27 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                         );
                     }
                 }
+                let network_events = [parity(&["a"]), parity(&["a", "b"])];
+                let network_probability = trace
+                    .prepare_network_probability(
+                        &network_events,
+                        &OriginalNetworkOptions::default(),
+                        &a,
+                    )
+                    .unwrap();
+                let network_moments = [(0, 0), (1, 0), (1, 1), (0, 1)]
+                    .into_iter()
+                    .map(|(x, z)| {
+                        trace
+                            .prepare_network_moment(
+                                &pword(trace.network_width(), x, z),
+                                &network_events,
+                                &OriginalNetworkOptions::default(),
+                                &a,
+                            )
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
                 let prepared = view
                     .prepare_records(
                         &[parity(&["a"])],
@@ -1074,6 +1095,26 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                                 "trial={},basis={basis},strategy={strategy:?},parity={parity_bit},bit={bit},moment={moment}",
                                 trial["trial"]
                             );
+                            let network_outcomes =
+                                bits(2, bit as usize | ((parity_bit as usize) << 1));
+                            assert_eq!(
+                                network_moments[moment]
+                                    .evaluate(&view, &network_outcomes, &a,)
+                                    .unwrap()
+                                    .value,
+                                expected,
+                                "global network trial={},basis={basis},strategy={strategy:?},parity={parity_bit},bit={bit},moment={moment}",
+                                trial["trial"]
+                            );
+                            if moment == 0 {
+                                assert_eq!(
+                                    network_probability
+                                        .evaluate(&view, &network_outcomes, &a,)
+                                        .unwrap()
+                                        .value,
+                                    expected
+                                );
+                            }
                         }
                     }
                 }
