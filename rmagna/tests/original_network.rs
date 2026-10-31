@@ -1,14 +1,15 @@
 //! Finite original static scalar-network contracts (MPL-2.0 upstream inputs).
 //! Magna 56847478c840395735146ef1e1ccdc3d8aedc10f,
-//! tests/core/test_boundary_sampling.py. Layout/task assertions remain separate.
+//! tests/core/test_boundary_sampling.py, including the direct unused-T task.
 use rmagna::clifford::{CliffordCircuit, CliffordGate};
 use rmagna::gf2::BitVector;
 use rmagna::instrument::{
-    OriginalError, OriginalFault, OriginalGate as G, OriginalInstrument, OriginalLimits,
-    OriginalNetworkLimits, OriginalNetworkOptions, OriginalNetworkResource, OriginalOperation,
-    OriginalPauli as P, OriginalRecordParity as Parity, OriginalTraceAssignment,
-    OriginalTraceOptions, OriginalTracePreparationLimits, ReadoutBasis,
+    OriginalBoundaryOptions, OriginalBoundaryTask, OriginalError, OriginalFault, OriginalGate as G,
+    OriginalInstrument, OriginalLimits, OriginalNetworkLimits, OriginalNetworkOptions,
+    OriginalNetworkResource, OriginalOperation, OriginalPauli as P, OriginalRecordParity as Parity,
+    OriginalTraceAssignment, OriginalTraceOptions, OriginalTracePreparationLimits, ReadoutBasis,
 };
+use rmagna::noise::SplitMix64;
 use rmagna::pauli::PauliWord;
 use rmagna::phase::NativePhaseOptions;
 use rmagna::records::CompletedRecordError;
@@ -120,6 +121,40 @@ fn twenty_unused_original_t_subcircuits_trace_before_native_rank_and_terms() {
             report_flips: vec!["m4".into(), "fixed".into()],
         };
         let view = trace.with_assignment(&assignment, &a).unwrap();
+        let service = trace
+            .prepare_boundary_task(
+                &OriginalBoundaryTask::default(),
+                &OriginalBoundaryOptions {
+                    network: native(0),
+                    ..Default::default()
+                },
+                &a,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                service.layout().postselection_rank(),
+                service.layout().feedback_rank(),
+                service.layout().trace_rank()
+            ),
+            (0, 0, 21)
+        );
+        assert!(service.layout().compatible());
+        assert!(service.required_reports().is_empty());
+        let mut rng = SplitMix64::new(2);
+        let state = rng.state();
+        let draw = service.sample(&view, &mut rng, &a).unwrap();
+        assert_eq!(rng.state(), state);
+        assert_eq!(draw.mass, ExactScalar::one());
+        assert_eq!(draw.acceptance, ExactScalar::one());
+        assert!(draw.moments.is_empty());
+        assert!(draw.reports.is_empty());
+        assert_eq!(draw.final_resources.len(), 1);
+        assert!(
+            draw.final_resources
+                .iter()
+                .all(|r| (r.quotient_rank, r.constructive_terms) == (0, 1))
+        );
         for query in [
             probability.evaluate(&view, &bits(0, []), &a).unwrap(),
             identity.evaluate(&view, &bits(0, []), &a).unwrap(),

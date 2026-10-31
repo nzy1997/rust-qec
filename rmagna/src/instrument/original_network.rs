@@ -112,34 +112,7 @@ fn layout<'a>(
         .sum::<u128>()
         + 64 * events.len() as u128;
     admit("max_metadata_bytes", limits.max_metadata_bytes, bytes)?;
-    let (boundary, paths) = source.reference.scalar_query_shape();
-    let (n, w, p, e) = (
-        source.physical_width() as u128,
-        2 * boundary as u128,
-        2 * paths as u128,
-        events.len() as u128,
-    );
-    admit("max_network_joint_paths", options.limits.max_joint_paths, p)?;
-    let vectors = |count: u128, bits: u128| count.saturating_mul(bits.div_ceil(64) + 4);
-    // Account for the real packed physical-equality rows, joint boundary,
-    // path equations, retained nullspaces and contraction programs, including
-    // simultaneously live constructor temporaries. No physical-width shortcut.
-    let words = 64_u128.saturating_mul(
-        vectors(n + e, w)
-            .saturating_add(vectors(p + 1, w))
-            .saturating_add(vectors(n + e + p + 1, p))
-            .saturating_add(vectors(w + p + 1, p))
-            .saturating_add(vectors(e, n))
-            .saturating_add(n + w + p + e + occurrences + 128),
-    );
-    admit(
-        "max_network_geometry_words",
-        options
-            .limits
-            .max_geometry_words
-            .min(limits.expansion.max_geometry_words),
-        words,
-    )?;
+    let words = admit_geometry(source, events.len(), occurrences, options)?;
     let mut rows = Vec::with_capacity(events.len());
     let mut inverted = Vec::with_capacity(events.len());
     let mut report_rows = Vec::with_capacity(events.len());
@@ -167,6 +140,46 @@ fn layout<'a>(
         },
         rows,
     ))
+}
+
+/// Shared preflight for a prospective scalar family, before any constructor.
+/// Occurrences count sparse report-index storage retained by that family.
+pub(super) fn admit_geometry(
+    source: &OriginalStaticTrace,
+    event_count: usize,
+    occurrences: u128,
+    options: &OriginalNetworkOptions<'_>,
+) -> Result<u128, OriginalError> {
+    let limits = source.limits;
+    let (boundary, paths) = source.reference.scalar_query_shape();
+    let (n, w, p, e) = (
+        source.physical_width() as u128,
+        2 * boundary as u128,
+        2 * paths as u128,
+        event_count as u128,
+    );
+    admit("max_network_joint_paths", options.limits.max_joint_paths, p)?;
+    let vectors = |count: u128, bits: u128| count.saturating_mul(bits.div_ceil(64) + 4);
+    // Account for the real packed physical-equality rows, joint boundary,
+    // path equations, retained nullspaces and contraction programs, including
+    // simultaneously live constructor temporaries. No physical-width shortcut.
+    let words = 64_u128.saturating_mul(
+        vectors(n + e, w)
+            .saturating_add(vectors(p + 1, w))
+            .saturating_add(vectors(n + e + p + 1, p))
+            .saturating_add(vectors(w + p + 1, p))
+            .saturating_add(vectors(e, n))
+            .saturating_add(n + w + p + e + occurrences + 128),
+    );
+    admit(
+        "max_network_geometry_words",
+        options
+            .limits
+            .max_geometry_words
+            .min(limits.expansion.max_geometry_words),
+        words,
+    )?;
+    Ok(words)
 }
 
 /// Fixed reported-event layout with an actual retained global-query kernel.

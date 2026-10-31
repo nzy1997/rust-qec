@@ -2,10 +2,10 @@
 use rmagna::clifford::CliffordCircuit;
 use rmagna::gf2::BitVector;
 use rmagna::instrument::{
-    OriginalAssignment, OriginalControl, OriginalError, OriginalFault, OriginalGate as G,
-    OriginalInstrument, OriginalLimits, OriginalNetworkOptions, OriginalOperation,
-    OriginalPauli as P, OriginalRecordEvent as Event, OriginalRecordParity as Parity,
-    OriginalTraceAssignment, OriginalTraceOptions, ReadoutBasis,
+    OriginalAssignment, OriginalBoundaryOptions, OriginalBoundaryTask, OriginalControl,
+    OriginalError, OriginalFault, OriginalGate as G, OriginalInstrument, OriginalLimits,
+    OriginalNetworkOptions, OriginalOperation, OriginalPauli as P, OriginalRecordEvent as Event,
+    OriginalRecordParity as Parity, OriginalTraceAssignment, OriginalTraceOptions, ReadoutBasis,
 };
 use rmagna::pauli::PauliWord;
 use rmagna::scalar::{ExactScalar, ScalarArithmetic};
@@ -1018,6 +1018,46 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                     prepared.statistics().ordered_pairs
                 );
                 for parity_bit in [false, true] {
+                    let boundary_draws = [false, true].map(|bit| {
+                        let task = OriginalBoundaryTask {
+                            postselection: vec![
+                                Event {
+                                    parity: parity(&["a"]),
+                                    value: bit,
+                                },
+                                Event {
+                                    parity: parity(&["a", "b"]),
+                                    value: parity_bit,
+                                },
+                            ],
+                            observables: [(0, 0), (1, 0), (1, 1), (0, 1)]
+                                .into_iter()
+                                .map(|(x, z)| pword(2, x, z))
+                                .collect(),
+                        };
+                        let service = trace
+                            .prepare_boundary_task(&task, &OriginalBoundaryOptions::default(), &a)
+                            .unwrap();
+                        assert_eq!(
+                            (
+                                service.layout().postselection_rank(),
+                                service.layout().feedback_rank(),
+                                service.layout().trace_rank()
+                            ),
+                            (2, 0, 0)
+                        );
+                        assert!(service.layout().compatible());
+                        assert!(service.required_reports().is_empty());
+                        let mut rng = rmagna::noise::SplitMix64::new(26092381);
+                        let state = rng.state();
+                        let draw = service.sample(&view, &mut rng, &a).unwrap();
+                        assert_eq!(rng.state(), state);
+                        assert!(draw.reports.is_empty());
+                        assert_eq!(draw.mass, ExactScalar::one());
+                        assert_eq!(draw.moments.len(), 4);
+                        assert_eq!(draw.final_resources.len(), 6);
+                        draw
+                    });
                     let events = [Event {
                         parity: parity(&["a", "b"]),
                         value: parity_bit,
@@ -1095,6 +1135,14 @@ fn original_seeded_static_instruments_all_trials_events_moments_and_input_bases(
                                 "trial={},basis={basis},strategy={strategy:?},parity={parity_bit},bit={bit},moment={moment}",
                                 trial["trial"]
                             );
+                            assert_eq!(
+                                boundary_draws[bit as usize].moments[moment], expected,
+                                "static boundary trial={},basis={basis},strategy={strategy:?},parity={parity_bit},bit={bit},moment={moment}",
+                                trial["trial"]
+                            );
+                            if moment == 0 {
+                                assert_eq!(boundary_draws[bit as usize].acceptance, expected);
+                            }
                             let network_outcomes =
                                 bits(2, bit as usize | ((parity_bit as usize) << 1));
                             assert_eq!(
