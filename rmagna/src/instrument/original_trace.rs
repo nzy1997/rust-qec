@@ -1,4 +1,6 @@
 //! Static coherent records, with no fabricated complete physical assignment.
+#[path = "original_boundary.rs"]
+mod boundary;
 #[path = "original_network.rs"]
 mod network;
 #[path = "original_prepared.rs"]
@@ -8,6 +10,10 @@ use crate::catalogue::PhaseCatalogue;
 use crate::phase::PhaseResourceOptions;
 use crate::records::{CompletedMoment, CompletedProbability};
 use crate::unitary::{ExpansionStatistics, OwnedStabilizerExpansion, PauliInsertion};
+pub use boundary::{
+    OriginalBoundaryDraw, OriginalBoundaryLimits, OriginalBoundaryOptions, OriginalBoundaryQuery,
+    OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask, OriginalRecordLayout,
+};
 pub use network::{
     OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
     OriginalNetworkProbability, OriginalNetworkResource,

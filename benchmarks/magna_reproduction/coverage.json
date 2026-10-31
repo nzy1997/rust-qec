@@ -109,8 +109,16 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_scalar_residual_and_zero_postselection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original scalar residual method: T|+> destructive-X record a, exact acceptance(2+sqrt2)/4 at explicit builtin native rank2/two terms, incompatible duplicate(0,1) acceptancezero, and actual rankzero resource rejection. Both compilers and immutable report-flip replacement/restoration; unconditional massone, empty required reports and panicking zero-word RNG, actual final-query rank/term diagnostics, no-catalogue native refusal without fallback. Fresh pinned production native executes the unchanged method and an actual public T/readout RNG-state probe in both Python modes.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_boundary",
+          "test": "original_scalar_residual_and_zero_postselection_use_actual_final_resources",
+          "source_sha256": "698667bc9003be33eccd72f015911baaa8c6346710f4f2581f9ff3a21ea1072f"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_undeclared_callback_and_invalid_family_fail",
@@ -119,13 +127,29 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_unused_t_subcircuits_trace_before_resource_budget",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original twenty unused T/H/destructive-Z plus deterministic readout method: exact native rank0/one-term acceptanceone with original Y fault after t3 and report flips m4/fixed; direct task trace rank21 and all actual final-resource receipts(0,1). Both compilers; actual unchanged caller RNG state, empty required reports, exact unconditional massone. Explicit coherent-side rankzero still rejects required20, assignment restoration and typed error recovery remain. Fresh pinned production native executes the complete original method under normal/optimized Python. No automatic cache, structured/opaque feedback, retained-label tensor, bindings or paper-throughput claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_network",
+          "test": "twenty_unused_original_t_subcircuits_trace_before_native_rank_and_terms",
+          "source_sha256": "1da5591f149bc2ed3125afc6d65276a5cfae8b418843abe77aeb47b3d7e55833"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_virtual_record_coordinates_and_redundant_postselection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original virtual-coordinate method: four records a/b/c/unused, dependent aXORbXORc rows with rank tuple(1,0,3), compatibility and all16 distinct transform images; duplicate parity RHS(0,1) incompatible. Standalone admitted linear layout and integrated direct service under BOTH compiler strategies, all16 forward/inverse words, including deterministic unused records. Fresh pinned production native executes this original method through a read-only public BoundarySampler coordinate adapter; no private testing extension or callback/caching claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_boundary",
+          "test": "original_virtual_record_coordinates_and_redundant_postselection",
+          "source_sha256": "698667bc9003be33eccd72f015911baaa8c6346710f4f2581f9ff3a21ea1072f"
+        }
+      ]
     },
     {
       "id": "test_capped_affine.CappedAffineTests.test_biased_t_full_support",
@@ -1861,7 +1885,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_entangled_trace_is_distinct_from_postselection",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         }
       ]
     },
@@ -1874,7 +1898,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         }
       ]
     },
@@ -1893,7 +1917,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         }
       ]
     },
@@ -1906,25 +1930,25 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_prepared_support_offsets_redundancies_and_budget_failures",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_trace_cross_word_records_and_explicit_catalogue_selection",
-          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
+          "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
         }
       ]
     },

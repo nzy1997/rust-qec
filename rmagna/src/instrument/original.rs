@@ -45,9 +45,11 @@ use std::{
 #[path = "original_trace.rs"]
 mod trace;
 pub use trace::{
-    OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
-    OriginalNetworkProbability, OriginalNetworkResource, OriginalPreparedTrace,
-    OriginalPreparedTraceResult, OriginalRecordEvent, OriginalRecordParity, OriginalStaticTrace,
+    OriginalBoundaryDraw, OriginalBoundaryLimits, OriginalBoundaryOptions, OriginalBoundaryQuery,
+    OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask, OriginalNetworkLimits,
+    OriginalNetworkMoment, OriginalNetworkOptions, OriginalNetworkProbability,
+    OriginalNetworkResource, OriginalPreparedTrace, OriginalPreparedTraceResult,
+    OriginalRecordEvent, OriginalRecordLayout, OriginalRecordParity, OriginalStaticTrace,
     OriginalTraceAssignment, OriginalTraceOptions, OriginalTracePreparationLimits,
     OriginalTraceResult, OriginalTraceView,
 };

@@ -330,7 +330,7 @@ justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
 `--rust-run <run.json> --complete-parity` flags documented above. The 52 mapped
-Rust witnesses for 45 verified and one partial upstream case must execute successfully,
+Rust witnesses for 48 verified and one partial upstream case must execute successfully,
 while the overall gate must still return nonzero because 306 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
@@ -391,7 +391,7 @@ These tests import no upstream test module and invoke no native test-only builde
 The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/native floating-range method is
 partial, with the numerical gap described below. The current ledger contains
-45 verified, one partial, 306 unmapped and zero architecture-specific core cases,
+48 verified, one partial, 303 unmapped and zero architecture-specific core cases,
 backed by 52 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
@@ -453,8 +453,8 @@ All four pilot/CLI witnesses are required by the source-bound coverage gate,
 alongside the existing sixteen, the two partial witnesses below and the two
 capped recovery/feedback witnesses, the report-noise/postselection witness and
 the three categorical/mandatory-tail and three feedback/failure witnesses below. The ledger
-has 45 verified, one partial, 306 unmapped and zero architecture-specific cases,
-with 52 required Rust witnesses. Strict complete parity still exits 2. These
+has 48 verified, one partial, 303 unmapped and zero architecture-specific cases,
+with 55 required Rust witnesses. Strict complete parity still exits 2. These
 finite checks establish no full M6 or paper-performance result.
 
 ### Partial original incomplete-pilot and tiny-error contract
@@ -512,8 +512,8 @@ its own SplitMix64 stream, without a Python Random trajectory claim.
 
 The audit requires these two witnesses alongside the prior twenty-two and the
 report-noise/postselection witness and three categorical/mandatory-tail plus three feedback/failure witnesses below.
-It has 45 verified, one partial, 306 unmapped and zero architecture-specific
-core cases, with 52 required witnesses and strict complete-parity exit 2. The
+It has 48 verified, one partial, 303 unmapped and zero architecture-specific
+core cases, with 55 required witnesses and strict complete-parity exit 2. The
 separate native diagnostic-status gap remains partial. No native tensor/cache
 counter ABI, full M6 completion or paper-performance result is claimed.
 
@@ -539,7 +539,7 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 52 required witnesses support 45 verified, one partial and 306
+The current 55 required witnesses support 48 verified, one partial and 306
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods and the existing partial tiny-error diagnostic-range gap
@@ -569,7 +569,7 @@ weight four retains exactly choices [(200,0),(201,0),(202,0),(203,0)]. Its mass 
 final patterns, permitting mandatory-suffix pruning before optional prefixes can
 exhaust the cap. No native binding ABI or new enumeration algorithm is claimed.
 
-All 52 required Rust witnesses support 45 verified, one partial and 306 unmapped
+All 55 required Rust witnesses support 48 verified, one partial and 303 unmapped
 core cases, with zero architecture-specific exclusions. The actual source-bound
 strict gate remains incomplete and must exit 2. Other low-weight methods and the
 existing partial tiny-error diagnostic-range gap remain explicitly unverified;
@@ -601,7 +601,7 @@ The same prepared plans subsequently succeed at adequate budgets: four noise
 patterns give error 9/50 and success 41/50, while both echo histories recover
 to zero with error zero and success one.
 
-All 52 required witnesses support 45 verified, one partial and 306 unmapped
+All 55 required witnesses support 48 verified, one partial and 303 unmapped
 core methods, with zero architecture-specific exclusions. Actual source-bound
 strict complete parity must still exit 2. The existing partial native diagnostic-status
 gap remains unverified; these checks establish no complete M6 or paper result.
@@ -633,8 +633,8 @@ The literal original X_ERROR(1/10)0, M0 command with outputs[0], an owned I0
 zero target, weight one and JSON succeeds with exact error 1/10.
 
 All nine original low-weight methods now have source-bound semantic witnesses.
-The complete ledger still has 45 verified, one partial and 306 unmapped core
-methods, requiring 52 successful Rust witnesses and strict complete-parity exit
+The complete ledger still has 48 verified, one partial and 303 unmapped core
+methods, requiring 55 successful Rust witnesses and strict complete-parity exit
 2. This does not establish native object-ABI identity, M6 completion or any
 paper-performance result.
 
@@ -668,7 +668,7 @@ are aligned with the grammar: the preparation fixture reads the final record
 instead of its identical detector alias in its observable, and module tests
 expect earlier grammar diagnostics for forbidden detector-observable inputs.
 
-All 52 required witnesses support 45 verified, one partial and 306 unmapped
+All 55 required witnesses support 48 verified, one partial and 303 unmapped
 core methods. Strict complete parity still exits 2. These finite contracts do
 not establish native object-ABI identity, full M6 or paper performance.
 
@@ -700,8 +700,8 @@ cargo test --locked -p rmagna --test controller_binding_contracts --test control
 
 The unmodified original method was separately executed in ordinary and
 optimized CPython 3.12 using a freshly compiled pinned native extension.
-Including the inherited-record contract below, the ledger has 45 verified, one partial
-and 306 unmapped core cases, with 52 required Rust witnesses and zero
+Including the inherited-record contract below, the ledger has 48 verified, one partial
+and 303 unmapped core cases, with 55 required Rust witnesses and zero
 architecture-specific exclusions. Strict complete parity still exits 2.
 They establish neither complete M6 parity nor paper precision or performance.
 
@@ -734,8 +734,8 @@ label widths across 64-bit word boundaries, scalar errors and finite path,
 geometry, side, record, pair and event bounds. A factory-injection unit test
 requires pair/geometry rejection before any pair matrices are constructed.
 
-The ledger now has 45 verified, one partial and 306 unmapped core cases, with
-52 required Rust witnesses and zero architecture-specific exclusions. Strict
+The ledger now has 48 verified, one partial and 303 unmapped core cases, with
+55 required Rust witnesses and zero architecture-specific exclusions. Strict
 complete parity still exits 2. This explicit unitary expansion is not full
 NativeInstrumentIR/environment parity, arbitrary quantum output density,
 automatic runtime integration or complete single-trace caching; event queries
@@ -786,8 +786,8 @@ lifetime and continuation of caller-owned random streams after failures.
 cargo test --locked -p rmagna --test completed_records --test inherited_record_expansion
 ```
 
-The current ledger has 45 verified, one partial and 306 unmapped core cases,
-with 52 required Rust witnesses and zero architecture-specific exclusions.
+The current ledger has 48 verified, one partial and 303 unmapped core cases,
+with 55 required Rust witnesses and zero architecture-specific exclusions.
 Strict complete parity still exits 2. Caller-supplied expansions receive no
 phase-rank certificate. Event queries still rebuild Gaussian factorizations;
 this change does not establish prepared-query caching, original InstrumentIR,
@@ -832,8 +832,8 @@ the Bell/reset output moments and target projection. Literal exact vectors are
 independent of GF(2), Gaussian and path kernels. Both original methods separately
 pass ordinary and optimized Python using the freshly built pinned native module.
 Additional tests cover metadata admission, callbacks, lifetimes, phases, quotas,
-fault order, immutable reuse and targets. The current ledger has 45 verified,
-one partial and 306 unmapped core cases, with 52 required Rust witnesses and
+fault order, immutable reuse and targets. The current ledger has 48 verified,
+one partial and 303 unmapped core cases, with 55 required Rust witnesses and
 zero architecture-specific exclusions. Strict complete parity still exits 2.
 Dynamic PhaseFeedback template reuse, online causal sampling, automatic Gaussian
 caching, Python bindings, runtime integration and paper benchmarks remain
@@ -876,8 +876,8 @@ input bases, all original operations, faults/flips, a retained under a XOR b,
 and I/X/Y/Z output moments. Source-bound native tables are also checked with
 independent literal exact matrices and every output/environment amplitude.
 The three unchanged original methods passed both ordinary and optimized Python
-against a fresh pinned production extension. The ledger has45 verified,
-one partial and306 unmapped methods, requiring52 successful Rust witnesses;
+against a fresh pinned production extension. The ledger has48 verified,
+one partial and303 unmapped methods, requiring55 successful Rust witnesses;
 strict complete parity still exits2. Automatic Gaussian caching, optional dynamic
 feedback, online causal integration, Python bindings and paper timing/precision
 benchmarks remain separate work.
@@ -927,7 +927,7 @@ zero/cancelling sources, and reuse after quota failures.
 This is explicit per-assignment preparation. Automatic eviction/caching,
 cross-assignment decomposition reuse, runtime/Python integration, performance
 campaigns and paper reproduction remain separate work. The ledger now contains
-45 verified, one partial and 306 unmapped core methods, with 52 required Rust
+48 verified, one partial and 303 unmapped core methods, with 55 required Rust
 witnesses. Strict full parity remains incomplete and exits 2.
 
 ## Original static scalar network queries (#1009)
@@ -990,8 +990,79 @@ constructor instrumentation checks refusal before actual GF2 factorization;
 65/129-bit output order, a 4097-wire storage refusal, vacuum, contradictory events,
 strict native refusals and recovery are owning regressions.
 
-This delivers scalar queries and explicit prepared-family reuse. Virtual-record
-layout ranks, boundary task sampling and RNG-consumption assertions remain #1010;
-the original unused-T sampler method is therefore still unmapped. The coverage
-ledger remains 45 verified / 1 partial / 306 unmapped, with 52 required witnesses.
-This change establishes neither complete interface parity nor paper throughput.
+These scalar primitives also support the explicit static boundary service below.
+The coverage ledger contains48 verified /1 partial /303 unmapped cases, with55
+required witnesses. Overall interface parity and paper throughput remain incomplete.
+
+## Original direct static boundary tasks (#1010)
+
+`OriginalStaticTrace::prepare_boundary_task` retains an `OriginalBoundaryTask`
+with ordered reported-record postselection events and Hermitian physical-output
+Pauli observables. Its service evaluates the actual global scalar queries against
+compatible immutable `OriginalTraceView` assignments. `mass` is unconditional;
+`acceptance` and the ordered signed `moments` include postselection. No implicit
+normalization, coherent-side expansion, callback or assignment cache is used.
+
+`OriginalRecordLayout` provides an admitted invertible change of the complete
+reported-record space. Its independent postselection basis precedes a deterministic
+trace complement. `transform()`, `inverse_transform()`, `to_virtual()` and
+`to_records()` expose the actual maps; `postselection_values()` includes arbitrary
+inverted-parity offsets. Dependent equations retain their RHS compatibility check.
+Static feedback rank is zero. Classification does not inspect whether a record
+is random: the original unused deterministic readout still contributes to trace
+rank21 alongside the twenty unused T readouts. Four records with one independent
+postselection row have rank tuple(1,0,3) and16 distinct coordinate images.
+
+The direct `sample(view, rng, arithmetic)` adapter requires no sampled reports,
+returns an empty reports map and consumes zero caller random words on success or
+error. It computes exact joint masses rather than generating a trajectory.
+Panicking random sources and unchanged SplitMix64 state exercise this contract;
+the fresh original production reference also preserves Python Random state on
+an actual T/readout task. Source controls must be rejected by `compile_trace`
+before any callback is invoked.
+
+`OriginalBoundaryOptions::network` preserves explicit catalogue/native selection
+and the independent scalar query's physical path/event/storage caps. The original
+T/readout requires an explicitly supplied builtin database for native rank2 and
+two terms; native rank0 refuses that postselection. The unused-T task admits
+rank0/one term after physical tracing. `final_resources` contains only actual
+evaluated families. Incompatible redundant postselection returns exactzero
+conditional values with only the real unconditional query receipt. An inconsistent
+closed Gaussian returns its existing zero-work receipt(rank0,terms0), rather than
+claiming a one-term expansion that was not evaluated.
+
+`OriginalBoundaryLimits` separately admits records, original postselection rows,
+named occurrences, observables, prospective query count, metadata, layout packed
+words and aggregate task geometry before allocation. Prospective query admission
+reserves mass, acceptance for nonempty postselection and each observable, including
+families that incompatibility can later skip. Layout storage includes the full
+coordinate transform/inverse and GF2 provenance. Task admission uses the same
+real packed physical-equality geometry as the scalar kernels; that storage remains
+quadratic in physical width. These are conservative upper estimates, not measured
+RSS or substitutes for the explicit phase-resource limits. Real GF2-entry controls
+prove refusal before either the layout or global-query constructor. Every new cap
+has refusal/recovery controls, including exact word limits and65/129-bit boundaries.
+
+```sh
+cargo test --locked -p rmagna --test original_boundary
+cargo test --locked -p rmagna --test original_network
+cargo test --locked -p rmagna --test original_trace
+```
+
+All three original static BoundarySampling methods are mapped only after their
+complete original assertions execute: virtual coordinates/redundancy, scalar
+residual/zero postselection, and unused-T trace-before-resource. Both Rust compiler
+strategies preserve them. All12 original static scenarios additionally compare
+every sector and ordered I/X/Y/Z task moment with unchanged native tables, literal
+exact matrices and complete branches under both equivalent complex input bases;
+all1536 boundary amplitude checks remain. Fresh production native executes those
+three original methods and four unchanged SingleTrace methods in normal/optimized
+Python, with complete fixture equality and identity checks in finally on success
+and deliberate failure. Only read-only public production scalar/layout adapters
+replace build-capable testing helpers; no private testing extension is loaded.
+
+The ledger now has48 verified, one partial and303 unmapped core cases of352,
+with55 required Rust witnesses and zero architecture-specific exclusions. Strict
+complete parity still exits2. Structured/opaque feedback, retained-label
+trace-before-resource tensors, cross-assignment Gaussian caching, Python bindings,
+full original coverage and paper benchmarks remain separate work.
