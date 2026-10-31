@@ -121,7 +121,7 @@ plus all seven original selection-syntax methods with seven owning witnesses,
 plus the original controller binding/config-isolation method with one real-process witness.
 One further method is explicitly `partial`,
 with two required finite witnesses and a remaining native range-status gap;
-the other 306 cases
+the other 303 cases
 remain explicitly `unmapped`. A mapping describes a manually reviewed semantic contract,
 not a claim that a similarly named Rust test proves every native assertion.
 The three RM15 example-fixture tests are listed separately with their source
@@ -329,9 +329,9 @@ Python tuple base has no representation in unsigned Rust words and does not
 justify a tuple compatibility API.
 
 Run the source-frozen coverage gate with real binary evidence using the current
-`--rust-run <run.json> --complete-parity` flags documented above. The 52 mapped
+`--rust-run <run.json> --complete-parity` flags documented above. The 55 mapped
 Rust witnesses for 48 verified and one partial upstream case must execute successfully,
-while the overall gate must still return nonzero because 306 core contracts remain
+while the overall gate must still return nonzero because 303 core contracts remain
 unmapped and the partial method has an unresolved compatibility gap. These finite
 primitive witnesses establish neither full interface parity nor paper precision
 or performance.
@@ -369,7 +369,7 @@ queries at widths 3,4,65,129 check dimension separation and owned immutability.
 Rust's quotient coordinate convention and immutable preparations replace the
 native mutable eight-entry cache; these witnesses do not assert native tuple ABI,
 cache hits or evictions. Only the singleton identity gauge is compared directly.
-The five assertion-specific ledger mappings, together with the other verified contracts, leave 306 cases unmapped and one partial, so the
+The five assertion-specific ledger mappings, together with the other verified contracts, leave 303 cases unmapped and one partial, so the
 actual source-bound `--rust-run <run.json> --complete-parity` audit must retain its
 nonzero incomplete result. These finite contracts establish no paper precision
 or performance result.
@@ -392,7 +392,7 @@ The progress contract below adds one mapping and the pilot/CLI contracts add
 three more. The separate incomplete-pilot/native floating-range method is
 partial, with the numerical gap described below. The current ledger contains
 48 verified, one partial, 303 unmapped and zero architecture-specific core cases,
-backed by 52 Rust witnesses; the strict `--rust-run <run.json>
+backed by 55 Rust witnesses; the strict `--rust-run <run.json>
 --complete-parity` gate must still exit 2 for incomplete parity. These mappings
 establish finite arithmetic contracts, without changing runtime statistics,
 claiming native floating-range behavior or reproducing paper performance.
@@ -539,7 +539,7 @@ retain the [0,1] full bounds for an empty mandatory-error sector, distinguish
 missing metrics from defined zero error, and preserve an observable-only error
 2^-1200 exactly and scientifically when its ordinary float is null.
 
-The current 55 required witnesses support 48 verified, one partial and 306
+The current 55 required witnesses support 48 verified, one partial and 303
 unmapped core methods, with zero architecture-specific exclusions. The actual
 source-bound strict coverage audit must still exit 2. The other original
 low-weight methods and the existing partial tiny-error diagnostic-range gap
