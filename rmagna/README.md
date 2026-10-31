@@ -557,6 +557,36 @@ or alternate quantum algorithm. There is no fixed physical-qubit or path-bit
 cap in these types. Stored matrices and arithmetic temporaries still require
 memory; this representation choice is not a process-memory cap.
 
+`LinearFactorization::new_with_certificates(width, rows, max_certificate_words)`
+explicitly retains full row certificates, including for tall systems. Its quota
+counts `rows.len() * ceil(rows.len() / 64)` retained packed `u64` certificate
+words. It excludes the reduced matrix, vector metadata and temporary reduction
+storage. Width and quota rejection happen before reduction/allocation. The
+read-only `row_certificates()` and `left_kernel()` return `None` for a compressed
+default factorization; the explicit constructor guarantees full certificates.
+`solve_seeded(rhs, seed)` preserves every non-pivot coordinate from the seed,
+using the existing lowest-column pivots. The original Magna highest-coordinate
+convention is translated by reversing variable coordinates in the conformance
+witness, without changing existing callers.
+
+```rust
+use rmagna::gf2::{BitVector, LinearFactorization};
+let rows = [BitVector::from_indices(2, [0, 1])?];
+let factor = LinearFactorization::new_with_certificates(2, &rows, 1)?;
+let rhs = BitVector::from_indices(1, [0])?;
+let seed = BitVector::from_indices(2, [1])?;
+assert_eq!(factor.solve_seeded(&rhs, &seed)?.unwrap(), seed);
+assert_eq!(factor.row_certificates().unwrap().len(), 1);
+assert!(factor.left_kernel().unwrap().is_empty());
+# Ok::<(), rmagna::gf2::Gf2Error>(())
+```
+
+`QuadraticForm::restrict_without_constant(shift, basis)` explicitly removes only
+the constant produced by affine restriction. All resulting linear and cross
+coefficients are identical to `restrict`; phase-preserving restriction and exact
+Gauss-sum defaults remain unchanged. Discarding that constant intentionally
+discards a global phase and must be an explicit caller choice.
+
 Checked packed helpers retain these explicit dimensions. `BitVector::low(limit)`
 clips to `min(limit, width)` without growing storage, even for `usize::MAX`.
 `gf2::parities(rows, value)` treats missing coordinates as zero and returns one

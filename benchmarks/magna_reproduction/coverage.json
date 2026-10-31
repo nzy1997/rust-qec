@@ -634,21 +634,32 @@
     },
     {
       "id": "test_gf2_kernel.SharedGF2KernelTest.test_byte_oracles_with_undefined_behavior_sanitizer",
-      "status": "partial",
-      "contract": "All162 original packed cases in exact n/m/density order: pinned actual std::mt19937_64 seed2026100409, every input bit and per-case unconsumed checkpoint, all original prefix/zero-extended parity/selected-row XOR/clipped destination-preserving XOR/rectangular transpose assertions against independent unpacked-byte expectations. Explicit Rust widths, strict existing dot/XOR, invalid selections, padding, selected-width atomicity and finite usize::MAX boundaries. Separate unchanged original C++ UBSan baseline; no Rust sanitizer claim.",
-      "remaining_gap": "The combined original method also executes143 factor cases requiring complete right/left nullspaces, pivot provenance, seeded free coordinates and full affine solutions, plus26 affine quadratic restriction cases; these assertion sets remain unmapped by this partial entry. C++ UBSan baseline success does not supply missing Rust parity.",
+      "status": "verified",
+      "contract": "Complete original combined method: all162 packed,143 factor and26 quadratic cases; actual pinned mt19937_64 seed2026100409,708504-draw packed boundary,1000450 total outputs and wrapping word-FNV64 fingerprint9751379586251010270. Independent unpacked-byte oracles verify every original prefix/parity/XOR/transpose assertion, complete right/left kernels and dimensions/independence, actual production row certificates, consistency/contradictions, seeded free coordinates, exhaustive small affine solution sets, affine quadratic substitution, omit-only-result-constant and all eighth-root phases. Explicit reversible variable-coordinate adapter preserves native highest pivots without changing Rust lowest-pivot defaults. Checked certificate-word N/N-1 quota/width precedence, compressed defaults, input atomicity, padding, empty/tall/packed boundaries and unchanged phase defaults. Separate unchanged C++ UBSan baseline; no Rust sanitizer or performance claim.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "original_packed_kernels",
           "test": "original_packed_byte_oracles_follow_pinned_stream",
-          "source_sha256": "237e50fdc315914a62faf621a62accc3db645e76ae6bda3c6e9161ae5d3f28ba"
+          "source_sha256": "52722503a9deaf757b02176a114f0b11be01b2f0ad0cfdc8fe74d305c853a75e"
         },
         {
           "package": "rmagna",
           "target": "original_packed_kernels",
           "test": "checked_packed_operations_preserve_dimensions_padding_and_atomicity",
-          "source_sha256": "237e50fdc315914a62faf621a62accc3db645e76ae6bda3c6e9161ae5d3f28ba"
+          "source_sha256": "52722503a9deaf757b02176a114f0b11be01b2f0ad0cfdc8fe74d305c853a75e"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_factor_kernels",
+          "test": "complete_original_factor_and_quadratic_contracts_follow_exact_stream",
+          "source_sha256": "c12937d59e7d183863fa3499dfd882acd17168f7e05425d16a29694323f3bf7d"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_factor_kernels",
+          "test": "certificate_quotas_seeded_defaults_and_quadratic_omission_have_checked_boundaries",
+          "source_sha256": "c12937d59e7d183863fa3499dfd882acd17168f7e05425d16a29694323f3bf7d"
         }
       ]
     },
