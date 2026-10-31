@@ -232,23 +232,47 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_builtin_not_arity_and_future_inputs_are_rejected",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All five unchanged original NOT inputs reject: missing input, two inputs, two outputs, argument(1), and uninitialized self input. Rust ParseError corresponds to native CircuitSyntaxError.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "builtin_not_arity_and_future_inputs_are_rejected",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_builtin_not_is_affine_versioned_and_requires_no_binding",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original detector/NOT/two-repeat/inverted-record source: format magna-0.1, no external decisions or history route, versions0,1,2,0 and affine constants1,0,1,0 over record0. Existing immutable FileTask APIs provide deterministic rmagna-provenance-v1 fingerprints and JSON-roundtrippable inspection; no Python hash-byte or dataclass ABI claim. Reserved NOT callback registration returns typed InvalidBinding without installing a binding.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "builtin_not_is_affine_versioned_and_requires_no_binding",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_correlated_chain_and_conditional_channels",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original guarded E(0.1) X0 Y1 / ELSE(2/9) Z1 / independent X_ERROR(0.001) source: shared chain0 alternatives0,1; version0 ctrl0 resolves to record0, exact Pauli factors, no independent guard and exact conditional mass1/10+(9/10)*(2/9)=3/10. Resolved Rust guards replace native versioned Target references.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "correlated_chain_and_conditional_channels",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_cz_allows_classical_endpoint_in_either_position",
       "status": "verified",
-      "contract": "Parse M followed by CZ with the classical record in the second input position. Canonicalize it to Z on qubit 1 controlled by measurement record 0; the typed Rust gate/control assertion is the semantic counterpart of the native canonical target tuple.",
+      "contract": "Complete original M0/CZ1-rec[-1] source resolves to Z on qubit1 controlled by record0; typed Rust gate/control is the counterpart of the canonical native record/qubit target tuple. All existing reviewed mappings are retained.",
       "rust_tests": [
         {
           "package": "rmagna",
@@ -261,6 +285,12 @@
           "target": "native_coverage_witness",
           "test": "classical_second_cz_endpoint_keeps_the_original_record_and_quantum_wire",
           "source_sha256": "8a73a3eee8bc6fff977f55883122dfdc3e51bcb3fdfec8724cdab6d2be273a52"
+        },
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "cz_allows_classical_endpoint_in_either_position",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
         }
       ]
     },
@@ -277,13 +307,19 @@
     {
       "id": "test_circuit_file.CircuitFileTests.test_measurement_record_counts_products_and_exact_probability",
       "status": "verified",
-      "contract": "Parse MXX/MPP/MRX/MY with six distinct measurement records, exact 1/100 and 1/30 report-flip probabilities, inverted products and final detector record indices 5 and 2. The Rust assertion set also checks reset/inversion flags and observable record 4.",
+      "contract": "Complete original R/MXX(0.01)/MPP(1/30)/MRX/MY/detector/observable source, including reset prefix: six distinct records; exact 1/100 and 1/30, MPP records1,2 and inverted X0*X1, detector records5,2. Typed Rust lowering splits original grouped instructions while retaining their ordered products and record IDs. Existing reviewed witnesses are retained.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "circuit",
           "test": "measurement_products_inversion_and_report_flips_preserve_distinct_records",
           "source_sha256": "2367970f9fbc20dc32ede17f0a68a6a7e757ed5b5cdea270c4e548c5ceb82d56"
+        },
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "measurement_record_counts_products_and_exact_probability",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
         }
       ]
     },
@@ -294,28 +330,68 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_s_and_t_are_distinct_and_aliases_are_canonical",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All ten original instructions retained: canonical S,T,S_DAG,T_DAG,CX,CCX,CCZ,CS_DAG,CH,M names in order. Rust Gate variants and Measure operations replace Python instruction-name strings.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "s_and_t_are_distinct_and_aliases_are_canonical",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_source_located_rejections",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All nineteen unchanged original invalid input strings preserve source bad.magna and actionable reason through an explicit native-to-Rust wording table: earlier record, uninitialized register, output arity, missing controller, empty noise, channel sum, target groups, probability range, forbidden arguments, duplicate wires, Pauli/quantum targets, correlated adjacency, unsupported IF, unclosed/missing/unmatched braces, inverted quantum target. Original mismatched correlated guard additionally rejects. Rust diagnostic wording is independent.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "source_located_rejections",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_stim_subset_matches_record_count",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original R/H/CNOT/S/MXX/MPP/three-repeat-MR/detector source compared with installed Stim1.15.0 and unchanged pinned native method with zero skips. Portable checked-in reference retains literal source and actual Stim counts6 measurements,3 qubits; Rust parses that same source and compares both counts. No Cargo-time Python dependency or broader Stim-compatibility claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "stim_subset_matches_record_count",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_two_qubit_classical_controls_are_versioned_and_validate_targets",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original M/XOR/record and inverted-ctrl CCZ groups/ctrl CCX source: format0.1, lossless source, four qubits; all-quantum CCZ/CCX format0.1. Additional explicit lowered controls bind version0 to record0 and its complement. All eight original invalid classical endpoint, repeated-qubit, multiple-classical and inverted-quantum target inputs reject.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "two_qubit_classical_controls_are_versioned_and_validate_targets",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_xor_cancellation_constants_and_inversion",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original literal M/XOR(1)/inverted-control/CX source: repeated record cancels, first constant is one, inverted write and final controlled-X expression are zero; one record, no external decision or history route. Rust resolved BitExpr replaces original SSA Target expression lookup.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "static_circuit_contracts",
+          "test": "xor_cancellation_constants_and_inversion",
+          "source_sha256": "e454d17aa6d72f14010964b79f250232e35489bda369449460c9ddbd08f1de8c"
+        }
+      ]
     },
     {
       "id": "test_conditional_noise.ConditionalNoiseTests.test_declared_constant_guards_and_channel_endpoints",

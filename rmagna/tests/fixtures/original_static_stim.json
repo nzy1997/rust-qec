@@ -1,0 +1,7 @@
+{
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "stim_version": "1.15.0",
+  "source": "R 0 1 2\nH 0\nCNOT 0 1\nS 1\nMXX(0.01) 0 1\nMPP X0*X1 Z2\nREPEAT 3 {\nMR 0\nDETECTOR rec[-1] rec[-2]\n}\n",
+  "num_measurements": 6,
+  "num_qubits": 3
+}
