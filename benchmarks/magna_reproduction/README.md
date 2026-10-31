@@ -929,3 +929,69 @@ cross-assignment decomposition reuse, runtime/Python integration, performance
 campaigns and paper reproduction remain separate work. The ledger now contains
 45 verified, one partial and 306 unmapped core methods, with 52 required Rust
 witnesses. Strict full parity remains incomplete and exits 2.
+
+## Original static scalar network queries (#1009)
+
+`OriginalStaticTrace::prepare_network_probability` and `prepare_network_moment`
+close the physical trace and event geometry before selecting a final phase
+resource. Evaluate an explicit retained family against immutable
+`OriginalTraceView` assignments. Fault/report replacements use the original
+insertion program; reported event outcomes remain separate ordered inputs.
+The result is a scalar `NetworkValue` with its actual retained query-resource
+quotient rank and term count. Preparation does not construct a coherent side
+expansion or attach a side-entry certificate. Existing side and completed-record
+APIs retain their own semantics.
+
+The complete original twenty unused T/H/destructive-Z subcircuits plus the
+unused deterministic record return exact probability one with native rank zero
+and one term, including the original Y fault after t3 and flips m4/fixed. The
+explicit side route still rejects that source at source quotient rank zero.
+All twelve original static fixtures compare this scalar route with literal
+matrices, complete branches and side/prepared-record traces under both initial
+bases and compilers, every original event sector and output I/X/Y/Z moment.
+
+Select the resource policy explicitly with `OriginalNetworkOptions::resource`.
+`Catalogue` follows the existing certified-catalogue/fiber policy; `Native`
+retains native selection and returns its failures directly. No catalogue is
+implicit. For the original T/readout two-term contract, supply
+`catalogue::builtin_phase_catalogue()` explicitly with native rank two and term
+budget two. Selecting no catalogue requires a four-term Walsh certificate for
+that same scalar; a two-term native budget is rejected rather than silently
+switching to fibers. Empty events on the unused-T fixture need no catalogue:
+
+```rust
+let mut native = rmagna::phase::NativePhaseOptions::default();
+native.selection.max_quotient_rank = 0;
+let options = rmagna::instrument::OriginalNetworkOptions {
+    resource: rmagna::instrument::OriginalNetworkResource::Native(native),
+    max_terms: 1,
+    ..Default::default()
+};
+let query = trace.prepare_network_probability(&[], &options, &arithmetic)?;
+let view = trace.with_assignment(&assignment, &arithmetic)?;
+let result = query.evaluate(&view, &rmagna::gf2::BitVector::zeros(0)?, &arithmetic)?;
+assert_eq!((result.quotient_rank, result.terms), (0, 1));
+```
+
+Moment words use declared outputs first, then all named records in `records()`
+order, with width `network_width()`. Other physical lifetimes carry identity.
+Words must be Hermitian and commute with each event. Original record inversions
+and assignment report flips change Z/Y signs, including joint complex
+output/record correlations. Probability and signed moment families remain
+distinct types.
+
+`OriginalNetworkLimits` bounds event rows, actual joint reference paths and a
+conservative packed-word estimate before the global-query constructors. Existing
+metadata, path and event limits remain effective. The current scalar kernels
+materialize packed physical-equality rows: their storage is quadratic in physical
+width, explicitly admitted rather than described as path-linear. `geometry_words()`
+reports the admitted upper estimate, not measured allocation or RSS. Source-bound
+constructor instrumentation checks refusal before actual GF2 factorization;
+65/129-bit output order, a 4097-wire storage refusal, vacuum, contradictory events,
+strict native refusals and recovery are owning regressions.
+
+This delivers scalar queries and explicit prepared-family reuse. Virtual-record
+layout ranks, boundary task sampling and RNG-consumption assertions remain #1010;
+the original unused-T sampler method is therefore still unmapped. The coverage
+ledger remains 45 verified / 1 partial / 306 unmapped, with 52 required witnesses.
+This change establishes neither complete interface parity nor paper throughput.

@@ -1,4 +1,6 @@
 //! Static coherent records, with no fabricated complete physical assignment.
+#[path = "original_network.rs"]
+mod network;
 #[path = "original_prepared.rs"]
 mod prepared;
 use super::*;
@@ -6,6 +8,10 @@ use crate::catalogue::PhaseCatalogue;
 use crate::phase::PhaseResourceOptions;
 use crate::records::{CompletedMoment, CompletedProbability};
 use crate::unitary::{ExpansionStatistics, OwnedStabilizerExpansion, PauliInsertion};
+pub use network::{
+    OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
+    OriginalNetworkProbability, OriginalNetworkResource,
+};
 pub use prepared::{
     OriginalPreparedTrace, OriginalPreparedTraceResult, OriginalTracePreparationLimits,
 };
@@ -194,6 +200,14 @@ impl OriginalInstrument {
     }
 }
 impl OriginalStaticTrace {
+    fn record_coordinate(&self, name: &str) -> Result<(usize, usize, bool), OriginalError> {
+        let &index = self
+            .record_indices
+            .get(name)
+            .ok_or_else(|| invalid("unknown record parity", name))?;
+        let (slot, inverted) = self.record_slots[index];
+        Ok((index, slot, inverted))
+    }
     pub fn outputs(&self) -> &[OriginalWire] {
         &self.outputs
     }
@@ -326,12 +340,7 @@ impl OriginalTraceView<'_> {
         let mut row = BitVector::zeros(self.unitary.width())?;
         let mut flip = parity.inverted;
         for name in &parity.records {
-            let &j = self
-                .source
-                .record_indices
-                .get(name)
-                .ok_or_else(|| invalid("unknown record parity", name))?;
-            let (slot, inverted) = self.source.record_slots[j];
+            let (j, slot, inverted) = self.source.record_coordinate(name)?;
             row.set(slot, !row.get(slot)?)?;
             flip ^= self.flips[j] ^ inverted;
         }

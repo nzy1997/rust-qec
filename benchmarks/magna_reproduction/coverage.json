@@ -1861,7 +1861,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_entangled_trace_is_distinct_from_postselection",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         }
       ]
     },
@@ -1874,7 +1874,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         }
       ]
     },
@@ -1893,7 +1893,7 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         }
       ]
     },
@@ -1906,25 +1906,25 @@
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_prepared_support_offsets_redundancies_and_budget_failures",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_seeded_static_instruments_all_trials_events_moments_and_input_bases",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_ccz_inherits_two_side_entries_and_four_pairs",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         },
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_trace_cross_word_records_and_explicit_catalogue_selection",
-          "source_sha256": "f73c9dc65419bc6bf57fcac95e4dfd153593090d7658a6fc1cc6a3014af4e03b"
+          "source_sha256": "956ed713264fccde0ccd5cb71aa30dd08bf0526c2c1c84243263c24458921c03"
         }
       ]
     },
