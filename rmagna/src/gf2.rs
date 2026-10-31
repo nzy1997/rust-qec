@@ -8,6 +8,7 @@ pub enum Gf2Error {
     IndexOutOfBounds { index: usize, width: usize },
     InvalidWordCount,
     NonzeroPadding,
+    CertificateWordLimit { required: usize, limit: usize },
     AllocationFailed,
 }
 
@@ -26,6 +27,10 @@ impl fmt::Display for Gf2Error {
             Self::NonzeroPadding => write!(
                 f,
                 "packed binary vector has nonzero bits beyond its declared width"
+            ),
+            Self::CertificateWordLimit { required, limit } => write!(
+                f,
+                "full row certificates require {required} packed words; limit is {limit}"
             ),
             Self::AllocationFailed => write!(f, "unable to allocate packed binary vector storage"),
         }
@@ -303,13 +308,44 @@ thread_local! {
 }
 impl LinearFactorization {
     pub fn new(width: usize, rows: &[BitVector]) -> Result<Self, Gf2Error> {
+        let compressed = rows.len() > 64 && rows.len() > width.saturating_mul(2);
+        Self::factor(width, rows, compressed)
+    }
+
+    /// Retain every row's reduction certificate, including the complete left
+    /// kernel, even for tall systems. The quota counts retained packed `u64`
+    /// certificate words: `rows.len() * ceil(rows.len() / 64)`. It excludes the
+    /// input/reduced matrix, vector metadata and temporary reduction storage.
+    /// Width and quota errors precede reduction or allocation. [`Self::new`]
+    /// keeps its existing compressed behavior and does not require this quota.
+    pub fn new_with_certificates(
+        width: usize,
+        rows: &[BitVector],
+        max_certificate_words: usize,
+    ) -> Result<Self, Gf2Error> {
+        for row in rows {
+            row.check_width(width)?;
+        }
+        let required = rows
+            .len()
+            .checked_mul(rows.len().div_ceil(64))
+            .ok_or(Gf2Error::AllocationFailed)?;
+        if required > max_certificate_words {
+            return Err(Gf2Error::CertificateWordLimit {
+                required,
+                limit: max_certificate_words,
+            });
+        }
+        Self::factor(width, rows, false)
+    }
+
+    fn factor(width: usize, rows: &[BitVector], compressed: bool) -> Result<Self, Gf2Error> {
         #[cfg(test)]
         FACTORIZATION_CALLS.with(|n| n.set(n.get() + 1));
         for row in rows {
             row.check_width(width)?;
         }
         let mut reduced = rows.to_vec();
-        let compressed = rows.len() > 64 && rows.len() > width.saturating_mul(2);
         let mut provenance = if compressed {
             None
         } else {
@@ -388,6 +424,47 @@ impl LinearFactorization {
     }
     pub fn row_space_basis(&self) -> &[BitVector] {
         &self.rows[..self.rank()]
+    }
+
+    /// Certificates for all reduced rows in order: XOR the selected original
+    /// equations to recover that row. The first `rank()` rows correspond to
+    /// [`Self::row_space_basis`]; the rest certify zero rows. Returns `None`
+    /// when the default constructor selected compressed provenance.
+    pub fn row_certificates(&self) -> Option<&[BitVector]> {
+        match &self.rhs {
+            RightHandSide::Dense(rows) => Some(rows),
+            RightHandSide::Independent { .. } => None,
+        }
+    }
+
+    /// A complete independent left kernel when full certificates are retained.
+    /// Use [`Self::new_with_certificates`] to require this for a tall system.
+    pub fn left_kernel(&self) -> Option<&[BitVector]> {
+        self.row_certificates().map(|rows| &rows[self.rank()..])
+    }
+
+    /// Solve with every non-pivot coordinate fixed to its value in `seed`.
+    /// Pivots keep the default lowest-column convention. Both input widths are
+    /// validated before solving; inconsistency returns `None`. The factor,
+    /// right-hand side and seed are never mutated.
+    pub fn solve_seeded(
+        &self,
+        rhs: &BitVector,
+        seed: &BitVector,
+    ) -> Result<Option<BitVector>, Gf2Error> {
+        rhs.check_width(self.num_equations())?;
+        seed.check_width(self.width)?;
+        let Some(particular) = self.solve(rhs)? else {
+            return Ok(None);
+        };
+        let mut solution = seed.clone();
+        for (row, &pivot) in self.rows.iter().zip(&self.pivots) {
+            solution.set(
+                pivot,
+                particular.get(pivot)? ^ row.dot(seed)? ^ seed.get(pivot)?,
+            )?;
+        }
+        Ok(Some(solution))
     }
 
     pub fn solve(&self, rhs: &BitVector) -> Result<Option<BitVector>, Gf2Error> {

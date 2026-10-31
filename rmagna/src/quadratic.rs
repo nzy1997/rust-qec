@@ -136,6 +136,20 @@ impl QuadraticForm {
         Ok(self.restrict_with_images(shift, basis)?.0)
     }
 
+    /// Substitute the same affine map as [`Self::restrict`], then explicitly
+    /// discard only the resulting constant. Linear and cross terms are
+    /// unchanged. This opts out of a global phase; [`Self::restrict`] and exact
+    /// Gauss sums retain their existing phase-preserving defaults.
+    pub fn restrict_without_constant(
+        &self,
+        shift: &BitVector,
+        basis: &[BitVector],
+    ) -> Result<Self, QuadraticError> {
+        let mut restricted = self.restrict(shift, basis)?;
+        restricted.constant = 0;
+        Ok(restricted)
+    }
+
     pub(crate) fn restrict_with_images(
         &self,
         shift: &BitVector,
