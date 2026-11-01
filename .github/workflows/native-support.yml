@@ -66,6 +66,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
+      # Keep the complete workspace matrix within hosted-runner disk capacity.
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
       NATIVE_CELL: ${{ matrix.cell_prefix }}-${{ matrix.toolchain == 'stable' && 'stable' || 'msrv' }}
       EXPECTED_RUNNER_OS: ${{ matrix.runner_os }}
       EXPECTED_RUNNER_ARCH: ${{ matrix.runner_arch }}
