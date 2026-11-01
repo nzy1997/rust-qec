@@ -1,5 +1,7 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
+mod conditional;
 mod original;
+pub use conditional::{ConditionalLawError, ConditionalSiteLaw};
 pub use original::{
     OriginalNoiseAction, OriginalNoiseAnchor, OriginalNoiseCategory, OriginalNoiseChannel,
     OriginalNoiseError, OriginalNoiseOptions, original_noise_categories,
