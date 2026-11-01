@@ -309,8 +309,16 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_lossless_roundtrip_and_resolved_repeat",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original commented circuit and all original observations: exact source bytes, three records/two qubits, control versions0/1/2 on register7, later input equal to prior write, repeat0/1 at source line7, final affine parity rec0 XOR rec1 XOR rec2, distinct operation IDs, JSON-roundtrippable owned inspection, identical saved bytes and equal captured FileTask fingerprints after reload. Rust resolves inputs into owned BitExpr values and lowers grouped gates; independent rmagna-provenance-v1 encoding replaces native object/hash ABI. Inspection/fingerprints survive source deletion and releasing the original source owners.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "circuit_roundtrip_contracts",
+          "test": "lossless_roundtrip_and_resolved_repeat",
+          "source_sha256": "dc5615a5d194f99c9f6a3bb36caac88d8085826114b11103e0e2178fcf764c10"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_measurement_record_counts_products_and_exact_probability",
