@@ -2398,7 +2398,7 @@
           "package": "rmagna",
           "target": "weighted_noise_contracts",
           "test": "deterministic_nonuniform_and_importance",
-          "source_sha256": "f00cf4def654e7207c31d3acd0b991cdcf3d5bee7cd6a96860ee0fd4431c7eff"
+          "source_sha256": "bb4cd4520854d3fb54987210a171b899937899b1b92288dbb29832a7ea648f6b"
         }
       ]
     },
@@ -2414,8 +2414,16 @@
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_unit_scale_and_effective_deterministic_endpoints",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original unit-scale/effective-endpoint finite contract: base zero X0, forced Z1 and report m0 probability1/5, plus explicit effective physical rates0,1/7,1 at every source site. Both compilers compare physical and configured scale1 complete draws and SplitMix64 states after each of40 seed26 draws per ensemble. Effective0/1 each retain the seed17 physical versus scale100 draw and exact stream-state equality, literal empty/all-selected choices, unit likelihood and zero entropy. Parsed original categories retain exact rates, source/operation addresses and physical X/Z/report actions; nonendpoint scale100 refuses rather than clips. Explicit parsed rates and typed source/record addresses replace native physical_rate/string IDs; no Python RNG trajectory or API-ABI identity claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "weighted_noise_contracts",
+          "test": "unit_scale_and_effective_deterministic_endpoints",
+          "source_sha256": "bb4cd4520854d3fb54987210a171b899937899b1b92288dbb29832a7ea648f6b"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_zero_and_identity",
