@@ -214,8 +214,16 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_atomic_outputs_and_nonlinear_parity_information",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original M0/1/2, XOR, detector, atomic two-output actual controller, XOR and CH source. No parsing/preparation callbacks; nonlinear causal route and exactly two required parities rec0 XOR rec1 and rec2. Register0/version0 captured before overwrite to version1, distinct call0/bit0 and call0/bit1 decision atoms, final XOR contains both outputs. Public causal execution of the same registered echo callback from explicit computational q2=1/q0=q1=0 state invokes it exactly once with original inputs/outputs0/1 under both compiler and fixed/cold causal strategies; exact history mass1 and resolved decisions/final parity checked. Owned resolved expressions replace Python target lookup and the Rust callback captures its observation log, while the original unused config dictionary has no separately claimed Rust config API; no Python object ABI claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "atomic_controller_contracts",
+          "test": "atomic_outputs_and_nonlinear_parity_information",
+          "source_sha256": "9b0792f8c9c5db9b01581ac0c138b291480685162bc8bc8f0135ce3329e012f6"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_bindings_are_versioned_and_config_isolated",
