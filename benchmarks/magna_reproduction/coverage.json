@@ -349,8 +349,16 @@
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_native_rationals_and_replaced_views",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original five exact rational literals1e-200,.125,+0.1250,1_000/100_000 and the original30-digit numerator/denominator, with literal independent BigRational expected values. Original M0/NOT circuit retains immutable source, parsed format0.1 and both compiler access; its truncated operations reject with no-parsed-form diagnostic. Owned RegisterVersion(0,0) expression replacement explicitly supplies zero without fallback or mutation of parsed analysis. CircuitView retains an owned original-source snapshot but any operation/analysis replacement invalidates parsed compiler/export access, including identical data and later reversal. Rust resolved BitExpr/register versions and guarded inspection views replace native dataclass/object ABI; no public programmatic InstrumentIR compiler claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "circuit_views",
+          "test": "native_rationals_and_replaced_views",
+          "source_sha256": "ce9ef97f0dc6f429f204664ad779e596a56b69169a5e33b0aed088069e04f384"
+        }
+      ]
     },
     {
       "id": "test_circuit_file.CircuitFileTests.test_s_and_t_are_distinct_and_aliases_are_canonical",
