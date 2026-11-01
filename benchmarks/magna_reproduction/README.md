@@ -1162,8 +1162,9 @@ Full public-surface reproduction and paper benchmarks remain incomplete.
 from the ten static methods in pinned `test_circuit_file.CircuitFileTests`.
 Eight previously unmapped methods are promoted; the two existing measurement/CZ
 mappings and their witnesses are retained, with the exact-source witnesses added.
-The separate binding/config method also keeps its existing mapping. The remaining circuit-file method (replaced native rational views) remains
-unmapped. The complete atomic-control method is mapped separately below.
+The separate binding/config method keeps its existing mapping. The complete
+atomic-control and native rational/replaced-view methods are mapped separately
+below.
 
 The test header attributes the original MPL-2.0 source. Python grouped
 instructions lower to individual typed Rust operations. Resolved `BitExpr`
