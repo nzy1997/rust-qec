@@ -2417,8 +2417,16 @@
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_weights",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original invalid-weights method: two declared channels and occurrence one reject all original vectors(1),(1,1),(-1,2), with typed count/sum/negative-weight errors. Owned ConditionalSiteLaw validates and retains explicit unit-sum channel weights independently of occurrence, including zero and one; canonical NoiseModel construction accepts an optional shared exact effective rate and existing denominator budgets. Additional owning regressions cover zero/empty/raw-zero-denominator/below-unit inputs, valid zero weights, owned source vectors, zero/one-law overrides at0,1/7,1 and zero-law second-channel activation at1/3, exact common-scale likelihoods, deterministic scale100 endpoints and recovery after rejected construction. Rust channel indices/probabilities and SplitMix64 replace native action/object/RNG ABI; action provenance remains the caller catalog, with no general instrument compiler claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "conditional_noise_laws",
+          "test": "native_invalid_weights",
+          "source_sha256": "ae4846f4e6f0be20c55f1313645077820cc30b1a43eb3a703a14a2f7c64c0248"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_unit_scale_and_effective_deterministic_endpoints",
