@@ -2018,13 +2018,19 @@
     {
       "id": "test_single_trace.SingleTraceTests.test_entangled_trace_and_postselection_are_distinct",
       "status": "verified",
-      "contract": "Complete original T0,CX01,destructive-X1 with plus0/zero1 input: total trace one; all X/Y/Z output moments zero without conditioning; both reported-event sectors sum to zero and X/Y conditional moments are nonzero, under both compilers. Fresh unchanged original method executed both Python modes. No prepared Gaussian cache or runtime route claim.",
+      "contract": "Complete original plus0/zero1, T0,CX01,destructive-X1/output0 trace versus event selection: unit total, zero unconditional X/Y/Z, both sectors cancel and X/Y sectors are nonzero under both compilers. Retain original_trace and immutable public affine reported-condition views; independently assert half-sector masses and signed sqrt(2)/4 Hermitian X/Y, cold and prepared families, original acceptance, fault/report-flip semantics, contradictory/dependent predicates and shared query caches. Unnormalized event view only; ordinary reported probability excludes selection. No stochastic trajectory, general InstrumentIR compiler or paper-result claim.",
       "rust_tests": [
         {
           "package": "rmagna",
           "target": "original_trace",
           "test": "original_entangled_trace_is_distinct_from_postselection",
           "source_sha256": "f0f98c05161944869858fc3d50e43f24494c304f3f66318dcd6f84e2f47d51ed"
+        },
+        {
+          "package": "rmagna",
+          "target": "reported_condition_views",
+          "test": "native_entangled_trace_and_postselection_are_distinct",
+          "source_sha256": "26e06057fe763ac0ea3e5a75312938390ff6e701f0fadb49bf554ec8ce3131f4"
         }
       ]
     },

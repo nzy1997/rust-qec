@@ -493,6 +493,41 @@ impl CompiledInstrument {
         branch.sites = Arc::new(sites);
         Ok(branch)
     }
+    /// Clone this instrument with additional reported-record parity predicates.
+    ///
+    /// The view appends to existing acceptance conditions, like source
+    /// `POSTSELECT`. Acceptance, density and Pauli moments are unnormalized event
+    /// masses; no division by the event probability or state collapse occurs.
+    /// Ordinary reported probabilities, support and sampling still exclude
+    /// selection predicates. Fault choices and report flips keep their usual
+    /// meaning. The original instrument is unchanged, and query caches and their
+    /// preparation policies and limits remain shared between views.
+    ///
+    /// Each pair requires the expression to equal the supplied Boolean, including
+    /// its constant term. Unknown records and external decisions are rejected;
+    /// dependent or contradictory predicates are valid exact event queries.
+    ///
+    /// ```
+    /// use rmagna::circuit::{BitAtom, BitExpr, ParseOptions, parse_circuit};
+    /// use rmagna::instrument::{CompileOptions, compile_affine};
+    /// use rmagna::scalar::ScalarArithmetic;
+    /// let a = ScalarArithmetic::default();
+    /// let source = parse_circuit("H 0\nM 0", &ParseOptions::default())?;
+    /// let original = compile_affine(&source, &CompileOptions::default(), &a)?;
+    /// let event = original.with_reported_conditions(&[
+    ///     (BitExpr::atom(BitAtom::Record(0)), false),
+    /// ])?;
+    /// assert_eq!(event.acceptance(&[], 64, &a)?.value, a.omega(0, -2)?);
+    /// assert_eq!(original.acceptance(&[], 64, &a)?.value, a.omega(0, 0)?);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn with_reported_conditions(
+        &self,
+        conditions: &[(BitExpr, bool)],
+    ) -> Result<Self, InstrumentError> {
+        self.conditioned(conditions)
+    }
+
     pub(crate) fn conditioned(
         &self,
         conditions: &[(BitExpr, bool)],
