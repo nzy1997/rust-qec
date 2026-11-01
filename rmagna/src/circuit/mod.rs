@@ -1,9 +1,11 @@
 //! Magna text circuits with exact probabilities and causal classical expressions.
 
 mod parse;
+mod view;
 use crate::probability::Probability;
 pub use parse::{ParseError, ParseOptions, ParseResource, ParseResourceLimit, parse_circuit};
 use std::collections::{BTreeMap, BTreeSet};
+pub use view::{CircuitView, CircuitViewError, ControlAnalysis, RegisterVersion};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BitAtom {
