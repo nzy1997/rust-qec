@@ -2391,8 +2391,16 @@
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_deterministic_nonuniform_and_importance",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original nonuniform weighted-noise finite contract: physical event1/3, conditional X/Z weights0/1, common proposal scale2,40seed14 draws and both observed outcomes under both compiler strategies. Canonical XYZ retains zero X/Y plus Z1/3 at physical qubit4 and the exact original typed source anchor; no measurements/report actions. Every draw checks exact physical/proposal mass1/3,2/3 or2/3,1/3 and likelihood1/2 or2, selected Z action/source and zero-channel exclusion. Counterfactual X/Y remain addressable with zero physical/proposal probability. Rust SplitMix64 and typed operation/source addresses are independent substitutes, not Python Random trajectory or native string-ID ABI claims.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "weighted_noise_contracts",
+          "test": "deterministic_nonuniform_and_importance",
+          "source_sha256": "f00cf4def654e7207c31d3acd0b991cdcf3d5bee7cd6a96860ee0fd4431c7eff"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_scales_and_scaled_support",
