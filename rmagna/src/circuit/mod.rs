@@ -1,9 +1,13 @@
 //! Magna text circuits with exact probabilities and causal classical expressions.
 
 mod parse;
+mod program;
 mod view;
 use crate::probability::Probability;
 pub use parse::{ParseError, ParseOptions, ParseResource, ParseResourceLimit, parse_circuit};
+pub use program::{
+    OperationProgram, OperationProgramError, OperationProgramErrorKind, OperationProgramOptions,
+};
 use std::collections::{BTreeMap, BTreeSet};
 pub use view::{CircuitView, CircuitViewError, ControlAnalysis, RegisterVersion};
 
@@ -102,6 +106,19 @@ impl Gate {
             | Self::Ch => 2,
             _ => 1,
         }
+    }
+    pub(crate) fn coherently_controlled(self) -> Option<Self> {
+        Some(match self {
+            Self::X => Self::Cx,
+            Self::Y => Self::Cy,
+            Self::Z => Self::Cz,
+            Self::S => Self::Cs,
+            Self::Sdag => Self::CsDag,
+            Self::H => Self::Ch,
+            Self::Cx => Self::Ccx,
+            Self::Cz => Self::Ccz,
+            _ => return None,
+        })
     }
     pub fn name(&self) -> &'static str {
         match self {

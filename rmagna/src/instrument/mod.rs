@@ -283,6 +283,29 @@ pub fn compile_affine_stabilizer(
     lower::compile(circuit, input, options, arithmetic, false)
 }
 
+/// Compile validated owned operations with an all-zero physical input.
+/// The program has no parsed-source or external-callback provenance.
+pub fn compile_operation_program(
+    program: &crate::circuit::OperationProgram,
+    options: &CompileOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<CompiledInstrument, InstrumentError> {
+    compile_affine(&program.compilation_input(), options, arithmetic)
+}
+
+/// Compile owned operations with a checked normalized stabilizer input.
+/// Dimensions, normalization and all coherent compilation budgets are checked
+/// by the same lowering as `compile_affine_stabilizer`. The program and input
+/// remain unchanged after either success or failure.
+pub fn compile_operation_program_stabilizer(
+    program: &crate::circuit::OperationProgram,
+    input: &AffineKet,
+    options: &CompileOptions,
+    arithmetic: &ScalarArithmetic,
+) -> Result<CompiledInstrument, InstrumentError> {
+    compile_affine_stabilizer(&program.compilation_input(), input, options, arithmetic)
+}
+
 pub(crate) fn zero_input(
     width: usize,
     options: &CompileOptions,

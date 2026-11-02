@@ -1,5 +1,55 @@
 # rmagna
 
+## Owned affine operation programs
+
+`circuit::OperationProgram` owns typed `Operation` values with an explicit physical
+width. `new(width, operations)` uses default construction limits;
+`with_options(width, operations, options)` checks operation, record and qubit
+quotas. Construction rejects malformed arities, repeated or out-of-range targets,
+invalid measurement products, nonsequential record/detector indices, forward
+record reads and nonfinite detector coordinates. Failures identify the zero-based
+operation and carry an `OperationProgramErrorKind`.
+
+The supported slice includes unitary gates, earlier-record affine feedback for
+the existing coherent controlled-gate set, resets, Pauli-product measurements
+with an explicit exact report-flip probability, detector/selection/observable
+parities and unconditional noncorrelated noise. Each noise operation describes
+one category on one or two distinct targets, with the required explicit
+probability count and exact residual identity. Duplicate observable indices
+XOR-accumulate. Constant and zero parities retain their ordinary meaning.
+Builtin XOR/NOT `Control` nodes validate every input/output record read, their
+resolved affine output and consecutive per-register versions. XOR's optional
+boolean constant is retained in the owned output expression. External `Control`
+nodes, decision atoms, guarded/correlated noise, inappropriate
+noise products and annotations are rejected explicitly.
+
+`instrument::compile_operation_program` starts from physical zero;
+`compile_operation_program_stabilizer` accepts an explicitly normalized
+`AffineKet` in physical wire order. Both use the existing checked affine compiler
+and either `CompileOptions::compiler_strategy`. Coherent width, path, gate and
+noise-site limits remain separate from construction limits. Programs and inputs
+remain reusable after a compilation failure.
+
+```rust
+use rmagna::circuit::{Gate, Operation, OperationProgram};
+use rmagna::instrument::{CompileOptions, compile_operation_program};
+use rmagna::scalar::ScalarArithmetic;
+
+let program = OperationProgram::new(1, vec![Operation::Unitary {
+    gate: Gate::H, qubits: vec![0], control: None,
+}])?;
+let compiled = compile_operation_program(&program, &CompileOptions::default(),
+    &ScalarArithmetic::default())?;
+assert_eq!(compiled.num_qubits(), 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Owned programs expose no parsed source, source locations, text serialization or
+public `Circuit` conversion. Edited `CircuitView` values still cannot supply a
+parsed compiler input. Existing parsed-source entry points retain their behavior.
+This static input does not complete the native dynamic `InstrumentIR`, callback
+or Python binding interfaces; original-method coverage is unchanged.
+
 ## Completed coherent record marginals
 
 `records::CompletedRecordSpec` owns ordered physical record/event parity rows
