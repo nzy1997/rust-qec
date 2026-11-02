@@ -1,12 +1,18 @@
 //! Exact independent categorical noise and reproducible prescribed assignments.
 mod conditional;
 mod original;
+mod sequential;
 pub use conditional::{ConditionalLawError, ConditionalSiteLaw};
 pub use original::{
     OriginalNoiseAction, OriginalNoiseAnchor, OriginalNoiseCategory, OriginalNoiseChannel,
     OriginalNoiseError, OriginalNoiseOptions, original_noise_categories,
 };
 pub(crate) use original::{correlated_channel, pauli_channels};
+pub use sequential::{
+    ChannelSelection, RandRangeSource, SequentialDrawError, SequentialNoiseDraw,
+    SequentialNoiseError, SequentialNoiseOptions, SequentialNoiseSampler, SequentialNoiseSite,
+    WordRangeError, WordRangeSource,
+};
 
 use crate::instrument::{CompiledInstrument, FaultSelection};
 use crate::probability::Probability;

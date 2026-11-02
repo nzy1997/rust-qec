@@ -5,6 +5,14 @@ an independent Rust backend is compared with them. It inventories 31 packaged
 tasks, 57 upstream test modules and every deposited paper file. It does not
 implement a simulator or claim reproduction of the paper's precision curves.
 
+## Current coverage
+
+The source-bound ledger currently has 73 verified and 279 unmapped original
+methods, with zero partial or architecture-specific exclusions. It requires
+86 distinct Rust witnesses from 88 declarations across 38 targets. Strict
+complete parity intentionally exits 2. The detailed per-change sections below
+retain their historical inventory snapshots; `coverage.json` is authoritative.
+
 The capped-support witness generator captures complete small observation sets,
 not Monte Carlo precision estimates. Regenerate into a new path and compare the
 result with `rmagna/tests/data/capped-support-reference.json`:
@@ -1535,7 +1543,8 @@ with native Python Random trajectories or object/keyword ABI is claimed.
 
 Only these two complete methods are newly mapped. All five finite original
 `WeightedNoiseTests` methods are now mapped; the separate original
-`NativeNoiseStreamTests` programmatic randrange-stream contract remains unmapped.
+`NativeNoiseStreamTests` range protocol is covered separately by the sequential
+noise-stream witness below.
 The source-bound ledger requires82 unique Rust witnesses from84 declarations
 and36 targets:69 verified, zero partial and283 unmapped original methods.
 Strict complete parity still exits2. General programmatic IR, broader M6 and
@@ -1559,7 +1568,7 @@ capture writes a fresh directory containing the scenario families, receipt and
 upstream license. The latter reads only the literal `dense` and `exact` oracle
 definitions, without importing the original test module or its build-capable
 loader. Existing mathematical fixtures and coverage mappings are unchanged:
-the current ledger retains 72 verified and 280 unmapped original methods,
+at the admission-only change the ledger retained 72 verified and 280 unmapped methods,
 with 85 unique Rust witnesses from 87 declarations across 37 targets.
 
 The native-core fixture retains its original producer hash and numerical values.
@@ -1575,3 +1584,42 @@ Run the admission regressions without native extensions:
 python3 -B -m unittest discover -s benchmarks/magna_reproduction -p test_witness_paths.py
 python3 -O -B -m unittest discover -s benchmarks/magna_reproduction -p test_witness_paths.py
 ```
+
+## Original sequential noise stream
+
+`original_noise_stream_vectors.py` captures the complete original
+`NativeNoiseStreamTests.test_original_randrange_stream_and_exact_weights`
+method using the pinned production native extension. It extracts the
+unmodified class AST rather than importing the upstream test module, whose
+unrelated imports can access a build-capable test helper. All 960 original
+finite assertions run: 480 fault/flip/exact-weight comparisons and 480 full
+native/reference Python random-state comparisons. The capture independently
+checks all 3,076 ordered range requests/results and each draw's tape position.
+
+Build the pinned production extension first, then use fresh destinations
+outside upstream and Rust input trees:
+
+```sh
+python3 -I -B benchmarks/magna_reproduction/original_noise_stream_vectors.py \
+  --upstream /path/to/magna --out /tmp/original-noise-stream.json \
+  --receipt /tmp/original-noise-stream-host.json
+python3 -I -O -B benchmarks/magna_reproduction/original_noise_stream_vectors.py \
+  --upstream /path/to/magna --out /tmp/original-noise-stream-O.json \
+  --receipt /tmp/original-noise-stream-O-host.json
+cmp /tmp/original-noise-stream.json /tmp/original-noise-stream-O.json
+```
+
+The portable fixture retains source identities and the original test source;
+the separate host receipt binds the producer, native binary and fixture bytes.
+Destination admission precedes reference loading. Source and native hashes are
+checked even if capture or an original assertion fails. Offline corruption
+controls exercise a wrong oracle with the correct range protocol, existing
+files/links/aliases, and changed inputs on failed captures in ordinary and
+optimized Python. Rust replays the provided range tape; it makes no Python RNG
+implementation claim. Neither dynamic instruments nor paper experiments are
+completed by this finite protocol.
+
+The complete original finite stream method is mapped to
+`sequential_noise::original_randrange_stream_and_exact_weights`. The current
+ledger totals are 73 verified, 279 unmapped, 86 unique Rust witnesses,
+88 declarations and 38 targets. Strict complete parity continues to exit 2.

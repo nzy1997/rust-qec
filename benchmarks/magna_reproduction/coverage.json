@@ -2440,8 +2440,16 @@
     },
     {
       "id": "test_weighted_noise.NativeNoiseStreamTests.test_original_randrange_stream_and_exact_weights",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original finite sequential range contract: five original sites (I/Y weights1/3,2/3; readoutm0; rate2^-140; zero and one), four physical/proposal configurations and120draws each. Pinned native generation executes960 original finite assertions, comparing every fault/flip/exact-weight tuple and every full native/reference Python Random state. Portable Rust replay reproduces all480 choices/actions/masses/likelihoods and all3076 ordered arbitrary-precision range requests/results with per-draw tape positions. Occurring I is distinct from no occurrence; uniform and explicit weighted protocols retain deterministic endpoint requests. Rust accepts a caller-owned range stream, with independent bounded word adapter; no Python Random implementation or source-label ABI claim. Dynamic instruments and paper experiments remain incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "sequential_noise",
+          "test": "original_randrange_stream_and_exact_weights",
+          "source_sha256": "e1636d9908afbf1d313d64dad5f4d1dd261f27ddeb9e7d0d569d8d2cd75ab666"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_deterministic_nonuniform_and_importance",

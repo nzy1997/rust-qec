@@ -5300,3 +5300,35 @@ paper-scale timing campaigns remain separate work.
 An additional native-calibrated coordinate case keeps an original signature row
 whose reduced representative differs after independence elimination. It checks
 the resulting section, catalogue key, exact Walsh coefficients and transport.
+
+## Sequential rational noise
+
+`noise::SequentialNoiseSampler` exposes an explicit occurrence-then-channel
+protocol over an injectable `RandRangeSource`. `SequentialNoiseSite` owns a
+validated `ConditionalSiteLaw`; `None` weights select a uniform channel with
+one range request, while explicit weights retain sequential conditional
+requests. Deterministic `randrange(1)` requests count toward the per-draw
+budget. An occurring identity-labelled channel is `Some(channel)`, even when
+its caller-owned action is empty; non-occurrence is `None`.
+
+Construction reuses canonical effective physical-rate and common-scale
+importance support validation. A draw returns exact physical/proposal masses,
+likelihood and range-call count. Site, total-channel, denominator and per-draw
+range budgets are explicit, callback failures propagate, and every returned
+integer must be below the requested exclusive bound. Conditional weights remain
+validated at inactive occurrence endpoints.
+
+`WordRangeSource` adapts the existing word source with bounded rejection
+sampling. Its word budget is cumulative for the adapter lifetime; bound one
+consumes zero words while retaining the sampler's range request. The existing
+`NoiseSampler` word trajectories retain their public behavior. The new adapter
+has its own documented word protocol and does not implement Python `Random`.
+
+The original finite stream fixture covers five sites, four configurations,
+480 draws and 3,076 ordered range requests/results. It includes the original
+I/Y weights, readout action, `2^-140` rate and deterministic endpoints. The
+fixture's caller catalog reconstructs every original fault/flip tuple and
+exact weight. See `tests/fixtures/original_noise_stream.NOTICE.md` for source
+attribution and the distinction between Python state evidence and Rust tape
+replay. Dynamic instruments and paper experiment reproduction remain separate
+work.
