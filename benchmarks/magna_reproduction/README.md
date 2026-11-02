@@ -105,8 +105,8 @@ Keep accepted probability, accepted error mass and conditional error distinct.
 ### Source-bound Rust coverage ledger
 
 `coverage.json` enumerates every canonical `module.Class.test_method` from the
-pinned 57 core modules (352 cases). The current ledger has 65 verified, zero
-partial and 287 unmapped core methods, requiring 78 successful Rust witnesses.
+pinned 57 core modules (352 cases). The current ledger has 69 verified, zero
+partial and 283 unmapped core methods, requiring 82 successful Rust witnesses.
 These include all ten original static circuit-file methods, the complete roundtrip and
 expansion-budget contracts, the independent
 controller binding/config-isolation method, and the complete GF2/quadratic method
