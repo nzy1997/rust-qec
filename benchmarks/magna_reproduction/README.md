@@ -1498,3 +1498,45 @@ The two new complete methods bring the source-bound ledger to 67 verified,
 zero partial and 285 unmapped methods, requiring 80 unique Rust witnesses from
 82 declarations and 35 targets. Strict complete parity still exits 2. Other
 numerical failures, general programmatic IR and paper benchmarks remain separate.
+
+
+### Original residual identity and invalid weighted-noise scales
+
+`weighted_noise_validation::zero_and_identity` retains the complete original
+seed3 exclusive vectors(0,1) and(0,0). Native label1 becomes Rust alternative1;
+native label-1 becomes the explicit identity slot and no selected fault.
+Canonical categories are identity followed by the original alternatives:
+(0,0,1) and(1,0,0). Both draws have exact unit physical/proposal mass and
+likelihood, zero entropy and unchanged shared Rust SplitMix64 state3.
+Exclusive all-zero masses leave residual identity one; they are distinct from
+conditional all-zero weights, which correctly fail the unit-sum requirement.
+All four literal uniform quarter intervals additionally cover the exact
+nontrivial law with exclusive masses1/4,1/2 and residual identity1/4. Assertions
+retain every choice, mass and entropy count without statistical tolerance.
+
+`weighted_noise_validation::invalid_scales_and_scaled_support` preserves all
+original tokens0,-1,True,nan,inf,1/0. Direct rational/scale checks use typed
+errors, while the public CLI `--noise-proposal-scale` reports structured JSON
+argument failures for dynamic text. Unsupported `--proposal-rate` rejects as
+the Rust configuration counterpart of native `proposal_rate`; no Python
+keyword binding is added. Original integer scales3 and4 at occurrence1/3
+reject with `NoiseError::ScaledProbability { site: 0 }`, including the exact
+support-losing boundary. The original conditional law accepts scale2, then a
+genuine `NoiseModel::from_conditional_laws(..., Some(1/2), ...)` rate replacement
+rejects scale2. Original occurrence1/3, weights(1) and model remain unchanged.
+A valid public CLI scale2 control confirms the ordinary configuration works.
+
+Run `cargo test --locked -p rmagna --test weighted_noise_validation`. Both
+unchanged original methods are separately executed with a fresh verified
+production extension and the identified existing read-only test oracle, without
+the original build-capable loader or reference writes. Rust uses explicit
+identity/fault indices, exact typed models and structured CLI errors; no equality
+with native Python Random trajectories or object/keyword ABI is claimed.
+
+Only these two complete methods are newly mapped. All five finite original
+`WeightedNoiseTests` methods are now mapped; the separate original
+`NativeNoiseStreamTests` programmatic randrange-stream contract remains unmapped.
+The source-bound ledger requires82 unique Rust witnesses from84 declarations
+and36 targets:69 verified, zero partial and283 unmapped original methods.
+Strict complete parity still exits2. General programmatic IR, broader M6 and
+paper-result reproduction remain separate.
