@@ -773,8 +773,16 @@
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_exact_comparisons_and_extreme_probabilities",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original finite method: both irrational scalar signs, probability 2^-2048 on zero bits and its complement on one bits each consume exactly 2048 one-bit callbacks, with zero-call deterministic endpoints. Independent Rust checks also reject a 2047-bit cap, stop at one bit for half probability, and preserve the caller-owned stream. Fresh pinned native execution checked all original assertions and ordered bit requests in normal and optimized Python; full sampler and paper parity remain incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_bit_bernoulli",
+          "test": "original_2048_bit_calls_endpoints_and_one_bit_stopping",
+          "source_sha256": "d7ddb6a6377f5ef939c9ff280eb25b79aee9098d00f49a3baf6c73e2065ad424"
+        }
+      ]
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_many_record_phase_resources_cancel_without_decomposition",

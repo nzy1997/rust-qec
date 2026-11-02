@@ -5332,3 +5332,54 @@ exact weight. See `tests/fixtures/original_noise_stream.NOTICE.md` for source
 attribution and the distinction between Python state evidence and Rust tape
 replay. Dynamic instruments and paper experiment reproduction remain separate
 work.
+
+## Exact Bernoulli draws from a one-bit stream
+
+`records::bernoulli_ratio_bits` refines the exact numerator/total ratio using one
+caller-owned Boolean callback per bit. It returns `BitDraw { selected,
+entropy_bits }`; `max_entropy_bits` bounds callback invocations. The existing
+`bernoulli_ratio` continues consuming whole `RandomSource` words and returning
+`BinaryDraw::entropy_words`. Both entry points share the same exact interval
+comparisons, with distinct public units and precision-limit errors.
+
+```rust
+use rmagna::records::{BitSamplingError, bernoulli_ratio_bits};
+use rmagna::scalar::{ExactScalar, ScalarArithmetic};
+let arithmetic = ScalarArithmetic::default();
+let one = ExactScalar::one();
+let tiny = arithmetic.scalar([1.into(), 0.into(), 0.into(), 0.into()], -2048)?;
+let mut calls = 0;
+let draw = bernoulli_ratio_bits(&tiny, &one, &mut || {
+    calls += 1;
+    false
+}, 2048, &arithmetic)?;
+assert!(draw.selected);
+assert_eq!(draw.entropy_bits, 2048);
+assert_eq!(calls, 2048);
+assert_eq!(bernoulli_ratio_bits(&tiny, &one, &mut || false, 2047, &arithmetic),
+    Err(BitSamplingError::EntropyLimit { limit: 2047 }));
+let endpoint = bernoulli_ratio_bits(&one, &one,
+    &mut || panic!("endpoint consumed random bits"), 0, &arithmetic)?;
+assert!(endpoint.selected);
+assert_eq!(endpoint.entropy_bits, 0);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Mass validation precedes entropy; exact endpoints consume no bits after
+arithmetic admission. Scalar failures during refinement can consume the actual
+completed prefix, and the callback state remains caller-owned. Bit-limit errors
+name a random-bit budget; other failures retain their exact `SamplingError`
+through `BitSamplingError::Sampling`. No floating-point embedding is used.
+
+The attributed original comparison/extreme-probability method checks both
+irrational signs, exactly 2,048 calls for the two tiny/complement cases and zero
+endpoint calls. Additional tests check 5,586 exact dyadic stopping positions,
+one-bit half-probability stops, irrational/nonunit ratios, continued caller
+streams, quota boundaries and actual early/late scalar-error consumption. A
+frozen 80-case pre-refactor word fixture checks existing word results and
+caller counts independently of the shared implementation. Its capture hashes
+identify the original run; semantic expected values remain portable.
+
+Exact probability statements require independent unbiased callback bits. These finite
+witnesses complete only the attributed original method; full sampler and paper
+reproduction remain incomplete.
