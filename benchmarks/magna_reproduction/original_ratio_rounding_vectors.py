@@ -22,6 +22,7 @@ import sys
 import sysconfig
 
 import reference
+import witness_paths
 
 
 COMMIT = "56847478c840395735146ef1e1ccdc3d8aedc10f"
@@ -223,17 +224,12 @@ def capture(upstream, helper, helper_record):
 
 
 def admit_destinations(outputs, upstream, helper, helper_record):
-    lexical = [Path(p).absolute() for p in outputs]
-    require(all(not p.exists() and not p.is_symlink() for p in lexical),
-            "witness and receipt destinations must be fresh, including existing links")
-    resolved = [p.resolve() for p in lexical]
-    require(len(set(resolved)) == len(resolved), "witness and receipt destinations must be distinct")
+    resolved = witness_paths.admit_destinations(outputs, upstream)
     record = json.loads(Path(helper_record).read_text(encoding="utf-8"))
-    roots = [Path(upstream).resolve(), Path(__file__).resolve().parents[2] / "rmagna",
-             Path(record["source_root"]).resolve(), Path(helper).resolve().parent]
-    require(all(not p.is_relative_to(root) for p in resolved for root in roots),
-            "witness destinations must be outside upstream, helper and Rust source-input trees")
-    return resolved
+    return witness_paths.admit_destinations(
+        resolved, upstream,
+        protected_roots=(record["source_root"], Path(helper).resolve().parent),
+    )
 
 
 def main():

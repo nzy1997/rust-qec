@@ -1222,7 +1222,7 @@
           "package": "rmagna",
           "target": "native_core",
           "test": "original_malformed_roles_are_rust_constructor_errors_or_unsigned_unrepresentable",
-          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+          "source_sha256": "61248fe97ecfd31c31ded23c9d29b67a226c34487311131340a41797a70d2b7d"
         }
       ]
     },
@@ -1235,7 +1235,7 @@
           "package": "rmagna",
           "target": "native_core",
           "test": "original_overlap_gauss_cancellation_and_300_bit_scalar_contracts",
-          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+          "source_sha256": "61248fe97ecfd31c31ded23c9d29b67a226c34487311131340a41797a70d2b7d"
         }
       ]
     },
@@ -1248,7 +1248,7 @@
           "package": "rmagna",
           "target": "native_core",
           "test": "original_packed_width_boundaries_preserve_dependent_column_amplitudes",
-          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+          "source_sha256": "61248fe97ecfd31c31ded23c9d29b67a226c34487311131340a41797a70d2b7d"
         }
       ]
     },
@@ -1261,7 +1261,7 @@
           "package": "rmagna",
           "target": "native_core",
           "test": "original_random_contractions_preserve_every_dense_amplitude_and_norm",
-          "source_sha256": "3e0bb9504d4c1c995e27c4063a7b13f7fe1123420c77790d280b8193b6737bd5"
+          "source_sha256": "61248fe97ecfd31c31ded23c9d29b67a226c34487311131340a41797a70d2b7d"
         }
       ]
     },

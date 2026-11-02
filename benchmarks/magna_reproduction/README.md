@@ -1540,3 +1540,38 @@ The source-bound ledger requires82 unique Rust witnesses from84 declarations
 and36 targets:69 verified, zero partial and283 unmapped original methods.
 Strict complete parity still exits2. General programmatic IR, broader M6 and
 paper-result reproduction remain separate.
+
+## Witness output admission
+
+Witness and receipt destinations must be fresh and distinct after resolving
+parent-directory aliases. Existing files, directories and symlinks, including
+broken symlinks, are refused before native capture. Destinations inside the
+resolved upstream or Rust input tree are also refused. The ratio generator
+additionally protects the admitted helper's source tree and binary directory.
+Destination parents must already exist; a symlink to an ordinary output parent
+is allowed when its resolved destination remains outside every input tree.
+
+The shared contract covers `original_ratio_rounding_vectors.py`,
+`original_noise_reference.py`, `native_core_contract_reference.py` and
+`native_core_reference.py`. The historical noise and core-contract entrypoints
+retain their original numerical loops. Noise writes one JSON file; core-contract
+capture writes a fresh directory containing the scenario families, receipt and
+upstream license. The latter reads only the literal `dense` and `exact` oracle
+definitions, without importing the original test module or its build-capable
+loader. Existing mathematical fixtures and coverage mappings are unchanged:
+the current ledger retains 72 verified and 280 unmapped original methods,
+with 85 unique Rust witnesses from 87 declarations across 37 targets.
+
+The native-core fixture retains its original producer hash and numerical values.
+`rmagna/tests/fixtures/native_core_producer.py.source` is the authenticated,
+data-only snapshot of that historical producer, rather than an executable
+entrypoint. Rust verifies its original identity, and a Python regression compares
+every numerical function's AST with the current generator. This keeps fixture
+provenance intact when CLI destination admission changes.
+
+Run the admission regressions without native extensions:
+
+```sh
+python3 -B -m unittest discover -s benchmarks/magna_reproduction -p test_witness_paths.py
+python3 -O -B -m unittest discover -s benchmarks/magna_reproduction -p test_witness_paths.py
+```

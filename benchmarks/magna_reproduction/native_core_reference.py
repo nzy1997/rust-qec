@@ -16,6 +16,12 @@ import sys
 from pathlib import Path
 
 
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+from witness_paths import admit_destinations
+
+
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -183,6 +189,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     try:
+        args.out, = admit_destinations([args.out], args.upstream)
         value = capture(args.upstream.resolve(), args.manifest.resolve())
         with args.out.open("x", encoding="utf-8") as output:
             json.dump(value, output, indent=2, allow_nan=False)

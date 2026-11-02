@@ -39,9 +39,7 @@ fn fixture() -> Value {
     );
     assert_eq!(
         value["producer_sha256"],
-        sha(include_bytes!(
-            "../../benchmarks/magna_reproduction/native_core_reference.py"
-        ))
+        sha(include_bytes!("fixtures/native_core_producer.py.source"))
     );
     assert_eq!(
         value["seeds"],
