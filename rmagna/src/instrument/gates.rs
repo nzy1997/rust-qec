@@ -92,15 +92,5 @@ pub(super) fn lower(gate: Gate, qubits: &[usize]) -> Vec<U> {
 }
 
 pub(super) fn controlled(gate: Gate) -> Option<Gate> {
-    Some(match gate {
-        Gate::X => Gate::Cx,
-        Gate::Y => Gate::Cy,
-        Gate::Z => Gate::Cz,
-        Gate::S => Gate::Cs,
-        Gate::Sdag => Gate::CsDag,
-        Gate::H => Gate::Ch,
-        Gate::Cx => Gate::Ccx,
-        Gate::Cz => Gate::Ccz,
-        _ => return None,
-    })
+    gate.coherently_controlled()
 }
