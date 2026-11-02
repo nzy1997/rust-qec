@@ -2434,8 +2434,16 @@
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_scales_and_scaled_support",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original finite invalid-scale contract: all dynamic tokens0,-1,True,nan,inf,1/0 reject through public CLI JSON argument failures, with typed exact rational/scale errors; unsupported --proposal-rate rejects as the configuration counterpart of the native unknown keyword. At occurrence1/3, direct exact models reject integer scales3 and4 with typed ScaledProbability(site0), rather than clip. Scale2 is valid for the original law, then rejects after actual shared effective-rate replacement by1/2, while retained original occurrence/weights and model remain unchanged. A public CLI valid-scale2 control confirms normal configuration works. No Python keyword bindings, sequential randrange-stream parity or broader M6 claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "weighted_noise_validation",
+          "test": "invalid_scales_and_scaled_support",
+          "source_sha256": "d2ea76735f2db7223f86553d5f8e37b158117ad6e62d26823fc4423d0eb1b50f"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_invalid_weights",
@@ -2465,8 +2473,16 @@
     },
     {
       "id": "test_weighted_noise.WeightedNoiseTests.test_zero_and_identity",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original seed3 exclusive vectors(0,1) and(0,0) retain labels1/-1 as Rust alternative1/no selected fault. Explicit identity-first categories(0,0,1)/(1,0,0) preserve exact unit physical/proposal mass and likelihood, zero entropy and unchanged shared SplitMix64 state3. Exclusive zero weights are distinguished from invalid zero conditional unit-sum weights. Four literal uniform quarter words independently cover residual-identity law(1/4,1/2) with exact masses and counts1,1,2, without statistical tolerances. Native Python Random trajectory/label ABI is not claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "weighted_noise_validation",
+          "test": "zero_and_identity",
+          "source_sha256": "d2ea76735f2db7223f86553d5f8e37b158117ad6e62d26823fc4423d0eb1b50f"
+        }
+      ]
     }
   ]
 }
