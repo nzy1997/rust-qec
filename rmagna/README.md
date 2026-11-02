@@ -50,6 +50,19 @@ parsed compiler input. Existing parsed-source entry points retain their behavior
 This static input does not complete the native dynamic `InstrumentIR`, callback
 or Python binding interfaces; original-method coverage is unchanged.
 
+## Original global-phase contracts
+
+The three pinned `test_trace_global_phase` methods have finite Rust translations
+in `original_trace_global_phase.rs`. All eight input phases are checked against
+native vectors and literal environment-retaining measurement/reset matrices.
+Both compiler strategies and both prepared moment modes share one immutable
+two-outcome record family, with preparation reuse checked across outcomes.
+Paired traces cancel the common phase while retaining the negative Z sign
+(native Z8 constant 4 becomes Rust Z4 constant 2) and subnormalized mass 1/4.
+Exact amplitudes separately retain the requested phase in both outputs of
+`Y|0>`. These checks cover the specified static slice; dynamic InstrumentIR and
+arbitrary tensor-query interfaces remain separate work.
+
 ## Completed coherent record marginals
 
 `records::CompletedRecordSpec` owns ordered physical record/event parity rows

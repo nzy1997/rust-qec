@@ -2217,18 +2217,42 @@
     },
     {
       "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_amplitude_compiler_preserves_the_requested_phase",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete both output amplitudes of Y|0> at all eight requested global phases under both exact compiler strategies. Exact Y=S X Sdag is applied to normalized phased inputs; literal Y matrices and the unchanged original debug amplitude compiler provide independent expected zero and omega^(phase+2) values. Trace cancellation is not substituted for amplitude phase retention.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_trace_global_phase",
+          "test": "original_amplitude_compiler_preserves_all_requested_phases",
+          "source_sha256": "77381e6afbcfdc4d0fe2a85235c9843becef33c1828e7f89ed7e0762017f6c81"
+        }
+      ]
     },
     {
       "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_common_phase_with_faults_events_reset_and_retained_labels",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete eight-phase H/T/CX/Y/MX/reset-plus/CZ contract with Y fault immediately after CX and one report flip, exact unconditional/selected/retained-label moments under both compilers and Trace/FixedFibers modes. One immutable two-outcome family proves Created/Reused preparation and stable shared caches across outcomes/repeats. Literal environment-retaining measurement/reset matrices and native eight-phase vectors include the original four masks plus two nonzero joint-Pauli controls.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_trace_global_phase",
+          "test": "original_common_phase_with_faults_events_reset_and_retained_labels",
+          "source_sha256": "77381e6afbcfdc4d0fe2a85235c9843becef33c1828e7f89ed7e0762017f6c81"
+        }
+      ]
     },
     {
       "id": "test_trace_global_phase.TraceGlobalPhaseTests.test_paired_sign_and_subnormalization_survive",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete all eight common phases of the negative paired-Z trace, explicit native Z8 constant4 to actual Rust quadratic Z4 constant2, and exact subnormalized mass1/4. Affine ket Z action and exact overlaps retain the sign while the common coefficient phase cancels; scaled signed overlaps are checked as well. Actual unchanged pinned native method and vectors run normally and with actual -O using only the identified immutable helper and overridden build-capable loader.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_trace_global_phase",
+          "test": "original_paired_sign_and_subnormalization_survive",
+          "source_sha256": "77381e6afbcfdc4d0fe2a85235c9843becef33c1828e7f89ed7e0762017f6c81"
+        }
+      ]
     },
     {
       "id": "test_unified_simulator.UnifiedTests.test_causal_callback_and_ir_rejection",
