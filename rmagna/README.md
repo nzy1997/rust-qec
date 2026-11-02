@@ -5383,3 +5383,59 @@ identify the original run; semantic expected values remain portable.
 Exact probability statements require independent unbiased callback bits. These finite
 witnesses complete only the attributed original method; full sampler and paper
 reproduction remain incomplete.
+
+## Retained original-network record probability tensors
+
+`OriginalTraceView::prepare_record_probabilities` freezes one actual assignment
+and retains ordered named parities, including dependent, duplicate and constant
+rows. Physical outputs, environments and unretained records are traced before
+resource selection. `phase_resource()` reports that actual selected resource;
+it does not describe a complete coherent-side expansion.
+
+The returned `AffineKet` amplitudes are classical probability masses. Sum the
+term amplitudes at a label; do not square them again or treat the coherent terms
+as positive mixture components. `uniform_affine` conservatively certifies just
+one actual canonical positive constant-phase term. Multiple coherent terms or
+residual variable phase cause refusal, without label enumeration or another
+resource decomposition. Its support is independent, with exact mass per label
+and exact total mass. Sampling consumes one borrowed callback bit per support
+column; independent unbiased bits give the uniform normalized support law.
+
+Retained-label counts obey `OriginalLimits::completed.max_record_rows`; scalar
+event-row budgets remain separate. Shared network limits admit raw doubled
+paths and conservative packed geometry before allocation. Report flips and
+physical faults remain fixed in the borrowed assignment view. Scalar network
+queries and explicit coherent-side expansion retain their existing APIs.
+
+```rust
+use rmagna::{clifford::CliffordCircuit, gf2::BitVector,
+    instrument::{OriginalGate, OriginalInstrument, OriginalLimits,
+        OriginalNetworkOptions, OriginalOperation, OriginalRecordParity,
+        OriginalRecordProbabilities, PreparedOriginalNetworkRecords, UniformOriginalRecords,
+        OriginalTraceAssignment, ReadoutBasis},
+    scalar::{ExactScalar, ScalarArithmetic}, unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let instrument = OriginalInstrument::new(vec![0], vec![],
+    CliffordCircuit::computational(BitVector::zeros(1)?)?,
+    vec![OriginalOperation { id: "h".into(), gate: OriginalGate::H(0) },
+        OriginalOperation { id: "m".into(), gate: OriginalGate::Destructive {
+            wire: 0, basis: ReadoutBasis::Z, record: "r".into() } }],
+    vec![], OriginalLimits::default(), &a)?;
+let trace = instrument.compile_trace(CompilerStrategy::ParityCopies, &a)?;
+let view = trace.with_assignment(&OriginalTraceAssignment::default(), &a)?;
+let rows = [OriginalRecordParity { records: vec!["r".into()], inverted: false }];
+let prepared: PreparedOriginalNetworkRecords<'_> = view.prepare_record_probabilities(&rows, &OriginalNetworkOptions::default(), &a)?;
+let probability: OriginalRecordProbabilities = prepared.evaluate(&a)?;
+let uniform: UniformOriginalRecords = probability.uniform_affine(&a)?.expect("one uniform positive term");
+assert_eq!(uniform.total_mass(), &ExactScalar::one());
+let mut calls = 0;
+let label = uniform.sample_bits(&mut || { calls += 1; false })?;
+assert_eq!(calls, 1);
+assert_eq!(label.width(), 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The attributed 129-path, 512-CNOT many-record scenario runs through the actual
+original-instrument API with both compilers and an explicit native rank-zero,
+one-term budget. Separate arbitrary-normal-form trace parity and complete
+sampler/paper reproduction remain incomplete.

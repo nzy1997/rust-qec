@@ -16,7 +16,8 @@ pub use boundary::{
 };
 pub use network::{
     OriginalNetworkLimits, OriginalNetworkMoment, OriginalNetworkOptions,
-    OriginalNetworkProbability, OriginalNetworkResource,
+    OriginalNetworkProbability, OriginalNetworkResource, OriginalRecordProbabilities,
+    PreparedOriginalNetworkRecords, UniformOriginalRecords,
 };
 pub use prepared::{
     OriginalPreparedTrace, OriginalPreparedTraceResult, OriginalTracePreparationLimits,

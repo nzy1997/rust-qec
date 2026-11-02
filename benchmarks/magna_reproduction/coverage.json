@@ -786,8 +786,16 @@
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_many_record_phase_resources_cancel_without_decomposition",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 129-path many-record scenario through OriginalInstrument and both compilers: genuine seeded512-CNOT schedule and independent final129 Boolean boundary rows, ordered retained parity with dimension1 and no variable phase, exact total1 and X/Ysqrt2/2, actual native quotient-rank0/one-term resource and original doubled-path limit128 rejection. Retained probabilities trace physical outputs, environments and unretained records before resource selection; immutable assigned queries preserve label dependencies/flips and mass amplitudes. Uniform-affine certification is conservative for a single actual positive canonical constant-phase term; unrelated arbitrary-normal-form trace, sampler and paper parity remain incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_retained_records",
+          "test": "original_many_record_trace_cancels_resources_before_retaining_probability_labels",
+          "source_sha256": "7775a0e4423bb2090da33c9e7d0e31c6d535601c023d1dc5cb0342cc064882c4"
+        }
+      ]
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_trace_before_decomposition_dense_with_output_effect",
