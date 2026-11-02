@@ -1444,3 +1444,57 @@ ledger requires 78 unique witnesses from 80 declarations and 34 targets:
 65 verified, zero partial and 287 unmapped methods. Strict complete parity
 continues to exit 2; broader single-trace, programmatic IR and paper-result
 reproduction remain separate.
+
+### Complete original scientific-ratio rounding loops
+
+`original_ratio_rounding` retains both complete original numerical methods:
+350 `Random(20260927)` rational inputs (including both scalar powers) and
+237 `Random(5641)`/midpoint input pairs with all three sign/power variants,
+giving 711 large-rational comparisons. The 27 midpoint cases retain both tie
+parities and one-integer-unit neighbors; coefficients extend to 5000 bits.
+Each Rust assertion constructs the exact rational with its full binary exponent
+before `approximate_real`, then converts the Rust [1,2) scientific mantissa to
+native [0.5,1) by exact division by two and adds one to its exponent. Expected
+mantissa bits and exponents must match exactly, including signed extreme inputs.
+
+The portable `rmagna/tests/data/original-ratio-rounding.json` contains all inputs,
+expected values, pinned commit and original test-source hashes. Host paths,
+runtime/compiler identities and production/helper/generator hashes belong to
+the separate generation receipt. The complete unchanged original native methods
+are independently executed with their build-capable dependency loader replaced
+by a forwarding proxy to the existing read-only helper. Its observed 712 calls
+and 1061 input/result pairs match the generator inventory exactly.
+
+Use the Python executable/version/ABI of an already-built matching test helper,
+with a separately built production extension in the verified pinned source:
+
+```sh
+python -B benchmarks/magna_reproduction/original_ratio_rounding_vectors.py \
+  --upstream /path/to/pinned-magna \
+  --helper /path/to/native-testing/SOURCE_DIGEST/_native_testing.cpython-312-darwin.so \
+  --helper-record /path/to/admitted-helper.json \
+  --out /path/outside-input-trees/ratios.json \
+  --receipt /path/outside-input-trees/ratios-receipt.json
+cmp /path/outside-input-trees/ratios.json rmagna/tests/data/original-ratio-rounding.json
+cargo test --locked -p rmagna --test original_ratio_rounding
+```
+
+The external helper record is a local admission of an existing binary, not a
+portable fixture or a build command. Required fields are `helper.path` and
+`helper.sha256`, `runtime.sha256` (the resolved Python executable), the exact
+`recorded_python_version`, `loader_FLAGS`, `source_cpp_hpp` (relative source paths
+mapped to objects with `sha256`), `shared_libraries` (objects with `resolved`
+and `sha256`), and `source_root` (the helper's original source tree). These must
+be obtained from the existing helper's build provenance. The generator checks
+every listed native source against the pinned manifest, recomputes the original
+loader's source/runtime digest without importing that loader, and checks the
+read-only binary identity before loading it. A record asserts build provenance;
+the generator cannot authenticate a fabricated record. It never builds a helper
+or imports `tests.support.native_testing`. Outputs must be fresh and distinct,
+outside the upstream, helper and Rust input trees, including resolved aliases.
+It rechecks sources and binary identities even after capture fails.
+
+The two new complete methods bring the source-bound ledger to 67 verified,
+zero partial and 285 unmapped methods, requiring 80 unique Rust witnesses from
+82 declarations and 35 targets. Strict complete parity still exits 2. Other
+numerical failures, general programmatic IR and paper benchmarks remain separate.

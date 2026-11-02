@@ -1466,8 +1466,16 @@
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_rational_ratios_against_python_fraction_rounding",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original Random20260927 loop:350 signed rational pairs across widths1,16,52,53,54,128,257, preserving both scalar powers in[-500000,500000]. Exact full-exponent rationals are constructed before numeric export; native-normalized mantissa bits and exponents must match every original Fraction/float/frexp expectation, without tolerance or post-export exponent application.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_ratio_rounding",
+          "test": "rational_ratios_against_python_fraction_rounding",
+          "source_sha256": "95712fb9bb6a89d5776af16876db3eff44d21ed02a96c03262be00a0e658b830"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_affine_not_selection_and_terminal_feedback",
@@ -2395,8 +2403,16 @@
     },
     {
       "id": "test_weight_fast_paths.WeightFastPathTests.test_large_rational_rounding_and_extreme_exponents",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original Random5641 loop:210 large random pairs across all seven numerator widths through5000bits and six denominator widths through3000bits, plus all27 midpoint/tie-neighbor pairs at widths54,100,1024 and both tie parities. All237pairs retain variants(1,0),(-1,-99999),(1,99999):711 exact mantissa-bit/exponent comparisons after full-exponent rational construction before export. The portable fixture is native-checked against independent Fraction/float/frexp; binary/runtime/generator identities remain in a separate receipt.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_ratio_rounding",
+          "test": "large_rational_rounding_and_extreme_exponents",
+          "source_sha256": "95712fb9bb6a89d5776af16876db3eff44d21ed02a96c03262be00a0e658b830"
+        }
+      ]
     },
     {
       "id": "test_weighted_noise.NativeNoiseStreamTests.test_original_randrange_stream_and_exact_weights",
