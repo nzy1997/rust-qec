@@ -1,0 +1,2910 @@
+{
+  "schema": "rmagna.original-trace-global-phase-witness.v1",
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "reference_manifest_sha256": "c49203a586f5a451e3183b435793df693dd486857356aed8826df5dc723e5454",
+  "source": {
+    "path": "tests/core/test_trace_global_phase.py",
+    "sha256": "0a67701884cc92965e4d3df960ccb82e5fba467045a40dc5c1f95d6db3d6562c"
+  },
+  "helper_sha256": "1e42b57e3fb4ee0ec3c4d5121cddacd4a09f4e546c5cc08962c64188f912bd5b",
+  "native_sha256": "5c788eed652ef7f1ca578e62e37b9ced58df0ac5aeaf9da879695abc998d140c",
+  "scope": "All8 phases of three exact original contracts plus two nonzero joint-Pauli controls; no dynamic/tensor API or paper/Monte Carlo/performance claim.",
+  "trials": [
+    {
+      "phase": 0,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "1",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 1,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "1"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "-1",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "-1",
+            "0",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "-1",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "-1"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "1",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "moments": [
+        {
+          "x": 0,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            },
+            {
+              "coefficients": [
+                "0",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": 0
+            }
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "unconditional": {
+            "coefficients": [
+              "0",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "0",
+                "-1",
+                "0",
+                "1"
+              ],
+              "power": -2
+            },
+            {
+              "coefficients": [
+                "0",
+                "1",
+                "0",
+                "-1"
+              ],
+              "power": -2
+            }
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "unconditional": {
+            "coefficients": [
+              "1",
+              "0",
+              "0",
+              "0"
+            ],
+            "power": 0
+          },
+          "selected": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ],
+          "retained": [
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            },
+            {
+              "coefficients": [
+                "1",
+                "0",
+                "0",
+                "0"
+              ],
+              "power": -1
+            }
+          ]
+        }
+      ],
+      "negative": {
+        "coefficients": [
+          "-1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": 0
+      },
+      "paired_constant_z8": 4,
+      "subnormalized_mass": {
+        "coefficients": [
+          "1",
+          "0",
+          "0",
+          "0"
+        ],
+        "power": -2
+      },
+      "amplitudes": [
+        {
+          "coefficients": [
+            "0",
+            "0",
+            "0",
+            "0"
+          ],
+          "power": 0
+        },
+        {
+          "coefficients": [
+            "0",
+            "1",
+            "0",
+            "0"
+          ],
+          "power": 0
+        }
+      ]
+    }
+  ]
+}
