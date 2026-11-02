@@ -7,6 +7,8 @@ use crate::noise::RandomSource;
 use crate::scalar::{ExactScalar, ScalarArithmetic, ScalarError};
 use num_bigint::BigInt;
 use std::{cmp::Ordering, fmt};
+mod bit;
+pub use bit::{BitDraw, BitSamplingError, bernoulli_ratio_bits};
 mod completed;
 mod enumeration;
 pub use completed::{
@@ -109,6 +111,8 @@ pub struct BinaryDraw {
 }
 /// Sample numerator / total by refining a uniform binary interval. All boundary
 /// comparisons are exact; irrational probabilities need no floating embedding.
+/// This interface consumes whole random words; `bernoulli_ratio_bits` instead
+/// preserves calls to a caller-owned one-bit stream.
 pub fn bernoulli_ratio(
     numerator: &ExactScalar,
     total: &ExactScalar,
@@ -116,6 +120,29 @@ pub fn bernoulli_ratio(
     max_entropy_words: usize,
     arithmetic: &ScalarArithmetic,
 ) -> Result<BinaryDraw, SamplingError> {
+    bernoulli_refine(
+        numerator,
+        total,
+        || random.next_u64(),
+        64,
+        max_entropy_words,
+        arithmetic,
+    )
+    .map(|(selected, entropy_words)| BinaryDraw {
+        selected,
+        entropy_words,
+    })
+}
+// Width is fixed to one or 64 by the public entry points. An exhausted internal
+// chunk budget is translated to the caller's explicit unit by each wrapper.
+fn bernoulli_refine(
+    numerator: &ExactScalar,
+    total: &ExactScalar,
+    mut next: impl FnMut() -> u64,
+    bits_per_chunk: u8,
+    max_chunks: usize,
+    arithmetic: &ScalarArithmetic,
+) -> Result<(bool, usize), SamplingError> {
     let remaining = arithmetic.subtract(total, numerator)?;
     if total.real_sign()? != Ordering::Greater
         || numerator.real_sign()? == Ordering::Less
@@ -124,45 +151,32 @@ pub fn bernoulli_ratio(
         return Err(SamplingError::InvalidMass);
     }
     if numerator.is_zero() {
-        return Ok(BinaryDraw {
-            selected: false,
-            entropy_words: 0,
-        });
+        return Ok((false, 0));
     }
     if remaining.is_zero() {
-        return Ok(BinaryDraw {
-            selected: true,
-            entropy_words: 0,
-        });
+        return Ok((true, 0));
     }
     let mut prefix = BigInt::from(0);
-    for consumed in 1..=max_entropy_words {
+    for consumed in 1..=max_chunks {
         let power = i64::try_from(consumed)
             .ok()
-            .and_then(|n| n.checked_mul(-64))
+            .and_then(|n| n.checked_mul(-i64::from(bits_per_chunk)))
             .ok_or(SamplingError::ExponentRange)?;
-        prefix = (prefix << 64) + BigInt::from(random.next_u64());
+        prefix = (prefix << u32::from(bits_per_chunk)) + BigInt::from(next());
         let lower = arithmetic.scalar([prefix.clone(), 0.into(), 0.into(), 0.into()], power)?;
         let lower = arithmetic.multiply(total, &lower)?;
         if arithmetic.subtract(numerator, &lower)?.real_sign()? != Ordering::Greater {
-            return Ok(BinaryDraw {
-                selected: false,
-                entropy_words: consumed,
-            });
+            return Ok((false, consumed));
         }
         let upper = arithmetic.scalar([&prefix + 1, 0.into(), 0.into(), 0.into()], power)?;
         let upper = arithmetic.multiply(total, &upper)?;
         if arithmetic.subtract(numerator, &upper)?.real_sign()? != Ordering::Less {
-            return Ok(BinaryDraw {
-                selected: true,
-                entropy_words: consumed,
-            });
+            return Ok((true, consumed));
         }
     }
-    Err(SamplingError::EntropyLimit {
-        limit: max_entropy_words,
-    })
+    Err(SamplingError::EntropyLimit { limit: max_chunks })
 }
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReportedDraw {
     pub values: Vec<bool>,

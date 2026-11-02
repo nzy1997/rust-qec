@@ -1,0 +1,731 @@
+{
+  "schema": "rmagna.word-bernoulli-before-bit-refactor.v1",
+  "scope": "Finite pre-refactor existing Rust64-bit API outcomes and exact caller word counts; original one-bit native baseline is separate.",
+  "records_source_sha256": "7f8a61642674ecafb824bad1ecb68333a7b73bff5bfd61036e2c32d4cdb670a7",
+  "scalar_source_sha256": "40264346ba1a37073b63e565065cbca400ba00224da0b3b56c7d26ee911200db",
+  "producer_source_sha256": "5d2f09640e6a10d1dc2ea2715f2780bf886d76ca04f0c3bd68b4d592939ccbe2",
+  "producer_binary_sha256": "6945d21edbad1d173e5127762b53b1c7a772da0dcc90a5724e13e3e93450e995",
+  "library_sha256": "3d6448e19bdc8fca7bde00fc08674191f39e565887de94193acb375a95200cd6",
+  "cases": [
+    {
+      "probability": "zero",
+      "word": 0,
+      "cap": 0,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 0,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 0,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 0,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 1,
+      "cap": 0,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 1,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 1,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 1,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 9223372036854775807,
+      "cap": 0,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 9223372036854775807,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 9223372036854775807,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 9223372036854775807,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 18446744073709551615,
+      "cap": 0,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 18446744073709551615,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 18446744073709551615,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "zero",
+      "word": 18446744073709551615,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 0,
+      "cap": 0,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 0,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 0,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 0,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 1,
+      "cap": 0,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 1,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 1,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 1,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 9223372036854775807,
+      "cap": 0,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 9223372036854775807,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 9223372036854775807,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 9223372036854775807,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 18446744073709551615,
+      "cap": 0,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 18446744073709551615,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 18446744073709551615,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one",
+      "word": 18446744073709551615,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 0,
+      "rng_calls": 0
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 0,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 0,
+      "cap": 1,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 0,
+      "cap": 2,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 2
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 0,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 32,
+      "rng_calls": 32
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 1,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 1,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 1,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 1,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 9223372036854775807,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 9223372036854775807,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 9223372036854775807,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 9223372036854775807,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 18446744073709551615,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 18446744073709551615,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 18446744073709551615,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "tiny_2_pow_neg2048",
+      "word": 18446744073709551615,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 0,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 0,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 0,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 0,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 1,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 1,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 1,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 1,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 9223372036854775807,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 9223372036854775807,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 9223372036854775807,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 9223372036854775807,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 18446744073709551615,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 18446744073709551615,
+      "cap": 1,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 1
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 18446744073709551615,
+      "cap": 2,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 2
+    },
+    {
+      "probability": "one_minus_tiny",
+      "word": 18446744073709551615,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 32,
+      "rng_calls": 32
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 0,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 0,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 0,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 0,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 1,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 1,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 1,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 1,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 9223372036854775807,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 9223372036854775807,
+      "cap": 1,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 9223372036854775807,
+      "cap": 2,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 9223372036854775807,
+      "cap": 32,
+      "status": "draw",
+      "selected": true,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 18446744073709551615,
+      "cap": 0,
+      "status": "entropy_limit",
+      "selected": null,
+      "entropy_words": null,
+      "rng_calls": 0
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 18446744073709551615,
+      "cap": 1,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 18446744073709551615,
+      "cap": 2,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    },
+    {
+      "probability": "sqrt2_over2",
+      "word": 18446744073709551615,
+      "cap": 32,
+      "status": "draw",
+      "selected": false,
+      "entropy_words": 1,
+      "rng_calls": 1
+    }
+  ]
+}
