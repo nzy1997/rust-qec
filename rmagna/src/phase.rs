@@ -2,11 +2,13 @@
 
 mod core;
 mod resource;
+mod tensor;
 mod transport;
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
 pub(crate) use resource::ResourcePreparation;
 pub use resource::{NativePhaseOptions, NativeRouteCounts};
 pub use resource::{PhaseResourceKind, PhaseResourceOptions, PreparedPhaseResource};
+pub use tensor::{PathTensorError, PathTraceBoundary, PathTraceOptions, PhasePathTensor};
 pub use transport::{
     NativeTransportCounts, NativeTransportMode, NativeTransportOptions, NativeTransportReceipt,
 };
