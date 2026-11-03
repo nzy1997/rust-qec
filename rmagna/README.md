@@ -5437,8 +5437,8 @@ assert_eq!(label.width(), 1);
 
 The attributed 129-path, 512-CNOT many-record scenario runs through the actual
 original-instrument API with both compilers and an explicit native rank-zero,
-one-term budget. Separate arbitrary-normal-form trace parity and complete
-sampler/paper reproduction remain incomplete.
+one-term budget. General partial Clifford-path absorption, the original circuit
+frontend and complete sampler/paper reproduction remain incomplete.
 
 
 ## Raw phase-path boundary traces
