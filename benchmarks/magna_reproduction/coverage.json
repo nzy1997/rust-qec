@@ -1628,8 +1628,34 @@
     },
     {
       "id": "test_phase_injection.PhaseInjectionTests.test_exact_native_injection",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete pinned native finite injection method: unchanged original C++ UBSan test and independent std::mt19937 input baseline; exact seed1729 32-bit stream with48306 draws/FNV13662045568938363297, all800 base plus1920 updated tensors/FNV6342693325637666586, pointwise core certificates and37760 exact complex amplitudes. Actual immutable frozen certificate/signature/section reuse and boundary transport map-pullback statistics include changed dependent labels. All n0/n1, two-T tie, seven-dependent-axis eight-to-two contraction, explicit raw coefficient-zero no-resource exit, scalar/selection errors and immutable recovery controls run through real production APIs. The portable opt-in scratch formula charges11424 before pairing at the real4096 cap, retaining the original four-term values; exact boundary11424 reaches the tie while the independent512-word model remains distinct. One-million-draw MT checkpoints are independently fixed by C++ std::mt19937. The valid nonminimal two-coordinate unit certificate is additionally exercised by the actual library-internal attempt test, with checked formula overflow. Portable scratch excludes native live tables/entries/ABI and measured Rust allocation; no complete C++ allocation parity or general paper result claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_phase_injection",
+          "test": "original_injection_full_randomized_stream_keeps_exact_amplitudes_and_frozen_resources",
+          "source_sha256": "f46699c84a74f310bc5df238b48714c334780eb7bd432354b09a230e428bda88"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_phase_injection",
+          "test": "original_injection_controls_keep_values_and_reference_scratch_precedes_tie",
+          "source_sha256": "f46699c84a74f310bc5df238b48714c334780eb7bd432354b09a230e428bda88"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_phase_injection",
+          "test": "raw_tensor_zero_exits_before_selection_and_nonzero_scalar_errors_preserve_reuse",
+          "source_sha256": "f46699c84a74f310bc5df238b48714c334780eb7bd432354b09a230e428bda88"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_phase_injection",
+          "test": "mt19937_32_matches_independent_stdlib_checkpoints_through_one_million_draws",
+          "source_sha256": "f46699c84a74f310bc5df238b48714c334780eb7bd432354b09a230e428bda88"
+        }
+      ]
     },
     {
       "id": "test_phase_quotient_optimization.PhaseQuotientOptimizationTests.test_complete_small_signatures_include_repeated_indices",

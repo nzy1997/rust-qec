@@ -1,5 +1,6 @@
 //! Raw affine/quadratic/parity path tensors and symbolic bra-boundary traces.
 use super::*;
+use crate::catalogue::PhaseCatalogue;
 use crate::pauli::PauliWord;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,6 +181,61 @@ impl PhasePathTensor {
     }
     pub fn phase(&self) -> &ParityPhase {
         &self.phase
+    }
+
+    /// Prepare an independent exact phase resource for a raw tensor.
+    /// An explicit zero coefficient returns None before resource selection
+    /// or its limits. This does not attempt to detect interference zeros.
+    pub fn prepare_resource(
+        &self,
+        max_terms: usize,
+        options: PhaseResourceOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<PreparedPhaseResource>, PathTensorError> {
+        self.prepare_with(
+            max_terms,
+            ResourcePreparation::Catalogue(options),
+            catalogue,
+            arithmetic,
+        )
+    }
+
+    /// Freeze the requested native selection and optional injection for a raw
+    /// tensor. Explicit zero exits before selection; nonzero errors propagate
+    /// without choosing an independent resource as a rescue.
+    pub fn prepare_native_resource(
+        &self,
+        max_terms: usize,
+        options: NativePhaseOptions,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<PreparedPhaseResource>, PathTensorError> {
+        self.prepare_with(
+            max_terms,
+            ResourcePreparation::Native(options),
+            catalogue,
+            arithmetic,
+        )
+    }
+
+    fn prepare_with(
+        &self,
+        max_terms: usize,
+        preparation: ResourcePreparation,
+        catalogue: Option<&PhaseCatalogue>,
+        arithmetic: &ScalarArithmetic,
+    ) -> Result<Option<PreparedPhaseResource>, PathTensorError> {
+        if self.boundary.coefficient().is_zero() {
+            return Ok(None);
+        }
+        arithmetic.multiply(self.boundary.coefficient(), &ExactScalar::one())?;
+        Ok(Some(preparation.prepare(
+            &self.phase,
+            max_terms,
+            catalogue,
+            arithmetic,
+        )?))
     }
 
     /// Trace before any phase-resource construction or path enumeration.

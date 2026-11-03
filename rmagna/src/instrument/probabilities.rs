@@ -47,7 +47,14 @@ impl QueryPreparation {
                                 "max_table_values": s.preparation.core.max_table_values,
                                 "max_work": s.preparation.core.max_work.to_string()}},
                     },
-                    "injection": options.injection.map(|i| json!({"max_work": i.max_work.to_string(), "max_geometry_words": i.max_geometry_words, "max_terms": i.max_terms})),
+                    "injection": options.injection.map(|i| {
+                        let mut value = json!({"max_work": i.max_work.to_string(),
+                            "max_geometry_words": i.max_geometry_words, "max_terms": i.max_terms});
+                        if let Some(cap) = i.max_reference_pairing_scratch_bytes {
+                            value["max_reference_pairing_scratch_bytes"] = json!(cap.to_string());
+                        }
+                        value
+                    }),
                     "transport": {
                         "mode": options.transport.mode.name(),
                         "max_terms": options.transport.limits.max_terms,

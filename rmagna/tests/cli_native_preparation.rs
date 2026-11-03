@@ -154,6 +154,7 @@ fn every_native_cli_bound_changes_the_resolved_fingerprint() {
         "--injection-max-work",
         "--injection-max-geometry-words",
         "--injection-max-terms",
+        "--injection-max-reference-pairing-scratch-bytes",
     ];
     for flag in flags {
         let report = f.json("validate", "native_injection", &[flag, "0"]);
@@ -455,4 +456,82 @@ fn native_transport_stream_identity_rejects_each_changed_setting() {
         resumed["metrics"]["estimates"],
         full["metrics"]["estimates"]
     );
+}
+
+#[test]
+fn optional_reference_scratch_roundtrips_full_width_and_reports_only_actual_charges() {
+    let f = Files::new();
+    let flag = "--injection-max-reference-pairing-scratch-bytes";
+    for mode in ["fixed", "native"] {
+        let out = f.run("validate", mode, &[flag, "0"]);
+        assert!(!out.status.success());
+        let text = format!(
+            "{} {}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(
+            text.contains(flag) && text.contains("requires native_injection"),
+            "{text}"
+        );
+    }
+    for invalid in ["-1", "340282366920938463463374607431768211456", "1.5"] {
+        let out = f.run("validate", "native_injection", &[flag, invalid]);
+        assert!(!out.status.success());
+    }
+    let absent = f.json("validate", "native_injection", &[]);
+    let mut hashes = std::collections::BTreeSet::new();
+    hashes.insert(
+        absent["fingerprints"]["options"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+    );
+    for cap in ["0", "340282366920938463463374607431768211455"] {
+        let report = f.json("validate", "native_injection", &[flag, cap]);
+        for family in [
+            "probability_preparation",
+            "density_preparation",
+            "moment_preparation",
+        ] {
+            assert_eq!(
+                report["options"]["compile"][family]["injection"]["max_reference_pairing_scratch_bytes"],
+                cap
+            );
+            assert!(
+                absent["options"]["compile"][family]["injection"]
+                    .get("max_reference_pairing_scratch_bytes")
+                    .is_none()
+            );
+        }
+        assert!(
+            hashes.insert(
+                report["fingerprints"]["options"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            )
+        );
+    }
+    // This task's support parent eliminates unretained axes and has two
+    // quotient coordinates, charging (2*8 + 4 + 2*2 + 1)*272 = 6800.
+    // The raw three-axis 11424-byte case is covered by original_phase_injection.
+    std::fs::write(f.0.join("circuit.magna"), "H 0 1 2\nT 0 1 2\nH 0 1 2\nM 0").unwrap();
+    for cap in [None, Some("4096"), Some("6800")] {
+        let extra = cap.map(|v| vec![flag, v]).unwrap_or_default();
+        let report = f.json("prepare", "native_injection", &extra);
+        let routes = &report["compilation"]["retained_caches"]["support"]["native_routes"];
+        if cap.is_none() {
+            assert_eq!(routes.as_object().unwrap().len(), 5);
+        } else {
+            assert_eq!(
+                routes["max_declared_reference_pairing_scratch_bytes"],
+                "6800"
+            );
+            assert_eq!(
+                routes["injection_budget_skips"],
+                u64::from(cap == Some("4096"))
+            );
+        }
+    }
 }
