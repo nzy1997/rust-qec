@@ -714,3 +714,52 @@ fn catalogue_mode_and_every_resource_budget_bind_configuration_without_changing_
     }
     assert_eq!(fingerprints.len(), 24);
 }
+
+#[test]
+fn reference_scratch_option_preserves_absent_fingerprints_and_distinguishes_all_query_families() {
+    use rmagna::catalogue::PhaseInjectionOptions;
+    use rmagna::phase::NativePhaseOptions;
+    // Captured from the unchanged parent library before implementing this option.
+    let absent = [
+        "3a5a0d542b32665cf2383719772f8e32e50692b171edca190e560c3ee72e9cac",
+        "206178bd2808c23b02dccb1a9d0a3bd53044fdfbd409d85abcb8a75296a43912",
+        "cbc2afa901988bb9f35f47e3c803e08735e4004162dc92bd05c71ff70580cf1b",
+    ];
+    let mut identities = std::collections::BTreeSet::new();
+    for (family, golden) in absent.into_iter().enumerate() {
+        let mut previous: Option<ContentFingerprints> = None;
+        for cap in [None, Some(0), Some(u128::MAX)] {
+            let mut env = Environment::new("H 0\nT 0\nH 0", "{}", Path::new("."));
+            let mode = QueryPreparation::Native(NativePhaseOptions {
+                injection: Some(PhaseInjectionOptions {
+                    max_reference_pairing_scratch_bytes: cap,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+            match family {
+                0 => env.evaluation.runtime.compile.probability_preparation = mode,
+                1 => env.evaluation.runtime.compile.density_preparation = mode,
+                _ => env.evaluation.runtime.compile.moment_preparation = mode,
+            }
+            let config = mode.configuration();
+            let value = config["injection"]
+                .as_object()
+                .unwrap()
+                .get("max_reference_pairing_scratch_bytes");
+            assert_eq!(value.cloned(), cap.map(|v| json!(v.to_string())));
+            let fingerprint = env.fingerprints();
+            if cap.is_none() {
+                assert_eq!(fingerprint.options, golden);
+            }
+            if let Some(ref prior) = previous {
+                let mut comparable = fingerprint.clone();
+                comparable.options = prior.options.clone();
+                assert_eq!(&comparable, prior);
+            }
+            assert!(identities.insert(fingerprint.options.clone()));
+            previous = Some(fingerprint);
+        }
+    }
+    assert_eq!(identities.len(), 9);
+}

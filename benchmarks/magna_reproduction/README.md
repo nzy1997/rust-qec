@@ -1623,3 +1623,36 @@ The complete original finite stream method is mapped to
 `sequential_noise::original_randrange_stream_and_exact_weights`. The current
 ledger totals are 73 verified, 279 unmapped, 86 unique Rust witnesses,
 88 declarations and 38 targets. Strict complete parity continues to exit 2.
+
+
+## Original phase injection and raw-resource admission
+
+The complete pinned PhaseInjectionTests.test_exact_native_injection method is
+covered by original_phase_injection. The unchanged original C++ test runs with
+UBSan; an independent C++ std::mt19937 producer fixes the seed1729 32-bit stream,
+48306 draws and all 2720 tensor inputs. Rust reconstructs every selected core
+pointwise and checks 37760 exact amplitudes across 800 base tensors and 1920
+updates. Prepared boundary expansions also check actual shared-map pullbacks;
+certificate, signature-axis and section storage remain frozen across updates.
+
+Controls include n0/n1, the two-T tie, seven dependent axes contracting eight
+terms to two, an explicit coefficient-zero raw tensor before resource selection,
+scalar/selection failures and recovery. A library unit test calls the real
+internal attempt on a valid nonminimal two-coordinate constant/unit certificate;
+no fabricated certificate or mock selector is used. Twelve independent C++
+MT19937 checkpoints extend through one million draws.
+
+The optional reference scratch-byte cap applies the portable formula described
+in rmagna/README.md before pairing and the term-count tie. The original 4096-byte
+control has a necessary 11424-byte charge and retains the four-term resource.
+The exact 11424 boundary reaches the tie; the previous 512 logical-word cap is
+kept as its own accounting model. This finite formula excludes C++ live tables,
+entries and ABI overhead and does not measure Rust allocation. The CLI reports
+the charge of the actual selected query, whose quotient may be smaller than the
+raw circuit. Absent settings retain previous JSON shapes and all three prior
+query-family fingerprints; explicit zero and full-u128 caps remain distinct.
+
+Only this complete original method is newly mapped: 77 verified,
+275 unmapped, 93 unique Rust witnesses from 95 declarations across
+42 targets. The strict complete-parity audit must still exit 2; general
+upstream parity and paper-result reproduction remain incomplete.

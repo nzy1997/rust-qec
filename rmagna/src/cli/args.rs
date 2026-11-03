@@ -71,6 +71,9 @@ Native selection limits (require native or native_injection in a query family):
   --injection-max-work N               Optional candidate work (default 67108864)
   --injection-max-geometry-words N      Optional candidate words (default 8388608)
   --injection-max-terms N              Optional surviving supports (default 1048576)
+  --injection-max-reference-pairing-scratch-bytes N  Portable reference cap; absent by default
+The reference scratch model excludes native live tables/entries and ABI sizes;
+it is not a Rust allocation measurement.
 Injection limits require native_injection. Budgets count logical payload/work,
 excluding allocator overhead. Resolved settings are fingerprinted; actual routes
 are in retained diagnostics. Construction failures never silently choose fibers.

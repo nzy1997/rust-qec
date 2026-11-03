@@ -126,6 +126,7 @@ fn optional_budgets_skip_but_final_caps_and_arithmetic_remain_hard_errors() {
         max_work: receipt.work_bound,
         max_geometry_words: receipt.geometry_words as usize,
         max_terms: 8,
+        max_reference_pairing_scratch_bytes: None,
     };
     let exact =
         FrozenPhasePlan::new_with_injection(&reference, Some(&catalogue), &options, &endpoint, &a)

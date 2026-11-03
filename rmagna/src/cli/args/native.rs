@@ -45,6 +45,7 @@ pub(super) const FLAGS: &[&str] = &[
     "--injection-max-work",
     "--injection-max-geometry-words",
     "--injection-max-terms",
+    "--injection-max-reference-pairing-scratch-bytes",
 ];
 pub(super) fn configure(
     input: &mut BTreeMap<String, String>,
@@ -134,6 +135,13 @@ pub(super) fn configure(
         i.max_geometry_words =
             flags.number("--injection-max-geometry-words", i.max_geometry_words)?;
         i.max_terms = flags.number("--injection-max-terms", i.max_terms)?;
+        if flags
+            .0
+            .contains_key("--injection-max-reference-pairing-scratch-bytes")
+        {
+            i.max_reference_pairing_scratch_bytes =
+                Some(flags.number("--injection-max-reference-pairing-scratch-bytes", 0_u128)?);
+        }
         options.injection = Some(i);
     }
     Ok(options)

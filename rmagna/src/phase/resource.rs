@@ -37,12 +37,24 @@ pub struct NativeRouteCounts {
     pub walsh: usize,
     pub injected: usize,
     pub injection_budget_skips: usize,
+    /// Maximum individually declared portable scratch charge among recorded
+    /// native attempts. This is not measured or peak allocated memory.
+    pub max_declared_reference_pairing_scratch_bytes: Option<u128>,
 }
 impl NativeRouteCounts {
     pub fn record(&mut self, resource: &PreparedPhaseResource) {
         let Some(plan) = resource.native_resource() else {
             return;
         };
+        if let Some(required) = plan
+            .injection_receipt()
+            .and_then(|r| r.reference_pairing_scratch_bytes)
+        {
+            self.max_declared_reference_pairing_scratch_bytes = Some(
+                self.max_declared_reference_pairing_scratch_bytes
+                    .map_or(required, |old| old.max(required)),
+            );
+        }
         let injected = plan.injection_receipt().is_some_and(|r| r.selected);
         self.injection_budget_skips += usize::from(
             plan.injection_receipt()

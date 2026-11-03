@@ -461,8 +461,12 @@ fn costs_json(costs: ExecutionCosts) -> Value {
     json!({"compilation":row(costs.compilation),"query":row(costs.query),"decoder":row(costs.decoder),"support":row(costs.support),"timing":"inclusive_wall_seconds"})
 }
 fn native_routes_json(counts: crate::phase::NativeRouteCounts) -> Value {
-    json!({"direct":counts.direct,"product":counts.product,"walsh":counts.walsh,
-        "injected":counts.injected,"injection_budget_skips":counts.injection_budget_skips})
+    let mut value = json!({"direct":counts.direct,"product":counts.product,"walsh":counts.walsh,
+        "injected":counts.injected,"injection_budget_skips":counts.injection_budget_skips});
+    if let Some(bytes) = counts.max_declared_reference_pairing_scratch_bytes {
+        value["max_declared_reference_pairing_scratch_bytes"] = json!(bytes.to_string());
+    }
+    value
 }
 fn native_transports_json(counts: crate::phase::NativeTransportCounts) -> Value {
     json!({"prepared":counts.prepared,"budget_skipped":counts.budget_skipped})

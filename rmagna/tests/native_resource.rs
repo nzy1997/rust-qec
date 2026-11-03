@@ -154,7 +154,8 @@ fn owned_native_resources_preserve_every_route_complex_updates_and_dependent_lab
             product: 1,
             walsh: 1,
             injected: 1,
-            injection_budget_skips: 0
+            injection_budget_skips: 0,
+            max_declared_reference_pairing_scratch_bytes: None,
         }
     );
 }
@@ -196,5 +197,67 @@ fn optional_candidate_bounds_do_not_admit_an_oversized_frozen_fallback() {
             injection_budget_skips: 1,
             ..Default::default()
         }
+    );
+}
+
+#[test]
+fn route_counts_keep_the_maximum_actual_declared_charge_without_summing_memory() {
+    use rmagna::catalogue::{PhaseCatalogue, PhaseDecompositionInput};
+    let a = ScalarArithmetic::default();
+    let mut db = PhaseCatalogue::new();
+    for n in 1..=2 {
+        let table = (0usize..1 << n)
+            .map(|x| x.count_ones() as u8)
+            .collect::<Vec<_>>();
+        let entry = builtin_phase_catalogue().unwrap().get(n, &table).unwrap();
+        db.insert(
+            PhaseDecompositionInput {
+                dimension: n,
+                phase_table: table,
+                terms: entry.terms().to_vec(),
+            },
+            &Default::default(),
+            &a,
+        )
+        .unwrap();
+    }
+    let options = NativePhaseOptions {
+        injection: Some(PhaseInjectionOptions {
+            max_reference_pairing_scratch_bytes: Some(u128::MAX),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut counts = NativeRouteCounts::default();
+    for masks in [vec![1, 2, 4], (1..8).collect(), vec![1, 2, 4]] {
+        let phase = ParityPhase::new(3, 0, masks.into_iter().map(|m| (bits(3, m), 1))).unwrap();
+        let resource =
+            PreparedPhaseResource::new_native(&phase, 256, options, Some(&db), &a).unwrap();
+        let charge = resource
+            .native_resource()
+            .unwrap()
+            .injection_receipt()
+            .unwrap()
+            .reference_pairing_scratch_bytes
+            .unwrap();
+        counts.record(&resource);
+        assert_eq!(
+            counts.max_declared_reference_pairing_scratch_bytes,
+            Some(
+                if counts.product + counts.walsh + counts.injected + counts.direct == 1 {
+                    charge
+                } else {
+                    20128
+                }
+            )
+        );
+    }
+    assert_eq!(
+        counts.max_declared_reference_pairing_scratch_bytes,
+        Some(20128)
+    );
+    assert_eq!(
+        counts.product + counts.walsh + counts.injected + counts.direct,
+        3
     );
 }

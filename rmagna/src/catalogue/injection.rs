@@ -11,6 +11,11 @@ pub struct PhaseInjectionOptions {
     pub max_geometry_words: usize,
     /// Bound surviving supports, never the Cartesian product of pair branches.
     pub max_terms: usize,
+    /// Optional declared portable reference pairing scratch cap, in bytes.
+    /// Charges (8*rotations + table_values + rank*rank + 1) *
+    /// (256 + 16*ceil(rank/64)) before greedy pairing and the term-count tie.
+    /// This excludes native live tables/entries and is not Rust allocation size.
+    pub max_reference_pairing_scratch_bytes: Option<u128>,
 }
 impl Default for PhaseInjectionOptions {
     fn default() -> Self {
@@ -18,6 +23,7 @@ impl Default for PhaseInjectionOptions {
             max_work: 64 << 20,
             max_geometry_words: 8 << 20,
             max_terms: 1 << 20,
+            max_reference_pairing_scratch_bytes: None,
         }
     }
 }
@@ -36,6 +42,20 @@ pub struct PhaseInjectionReceipt {
     pub budget_skip: Option<String>,
     pub work_bound: u128,
     pub geometry_words: u128,
+    /// Declared reference-model charge when requested, eligible and representable.
+    /// An overflow refuses this optional attempt without fabricating a charge.
+    pub reference_pairing_scratch_bytes: Option<u128>,
+}
+// Portable formula from pinned native evaluate/phase.hpp. It deliberately
+// excludes C++ shared/live tables, entries and ABI-specific allocation behavior.
+fn reference_pairing_scratch(rank: u128, rotations: u128, values: u128) -> Option<u128> {
+    let words = rank / 64 + u128::from(!rank.is_multiple_of(64));
+    let objects = rotations
+        .checked_mul(8)?
+        .checked_add(values)?
+        .checked_add(rank.checked_mul(rank)?)?
+        .checked_add(1)?;
+    objects.checked_mul(256_u128.checked_add(words.checked_mul(16)?)?)
 }
 fn hard(cause: impl fmt::Display) -> CatalogueError {
     error("phase_injection.internal", cause)
@@ -258,6 +278,7 @@ pub(super) fn attempt(
         budget_skip: None,
         work_bound: 0,
         geometry_words: 0,
+        reference_pairing_scratch_bytes: None,
     };
     let rank = original.dimension();
     if rank <= 1 || original.terms().len() <= 1 {
@@ -290,6 +311,22 @@ pub(super) fn attempt(
     let t = odd.len() as u128;
     if odd.is_empty() {
         return Ok((None, receipt));
+    }
+    if let Some(cap) = options.max_reference_pairing_scratch_bytes {
+        let Some(required) = reference_pairing_scratch(r, t, values) else {
+            receipt.budget_skip =
+                Some("phase_injection.max_reference_pairing_scratch_bytes".into());
+            return Ok((None, receipt));
+        };
+        receipt.reference_pairing_scratch_bytes = Some(required);
+        if !budget(
+            &mut receipt,
+            "phase_injection.max_reference_pairing_scratch_bytes",
+            required,
+            cap,
+        ) {
+            return Ok((None, receipt));
+        }
     }
     let pairing_work = (t + 1)
         .checked_pow(3)
@@ -439,4 +476,75 @@ pub(super) fn attempt(
     receipt.constructed = true;
     receipt.selected = true;
     Ok((Some(candidate), receipt))
+}
+
+#[cfg(test)]
+mod reference_scratch_tests {
+    use super::*;
+
+    #[test]
+    fn portable_charge_is_checked_and_matches_reference_boundary_values() {
+        assert_eq!(reference_pairing_scratch(3, 3, 8), Some(11_424));
+        assert_eq!(reference_pairing_scratch(3, 7, 8), Some(20_128));
+        assert_eq!(reference_pairing_scratch(64, 0, 0), Some((4096 + 1) * 272));
+        assert_eq!(reference_pairing_scratch(65, 0, 0), Some((4225 + 1) * 288));
+        assert_eq!(reference_pairing_scratch(u128::MAX, 0, 0), None);
+        assert_eq!(reference_pairing_scratch(0, u128::MAX, 0), None);
+        assert_eq!(reference_pairing_scratch(0, 0, u128::MAX), None);
+    }
+
+    #[test]
+    fn real_attempt_keeps_valid_nonminimal_unit_certificate_before_any_pairing() {
+        let a = ScalarArithmetic::default();
+        let factors = builtin_phase_catalogue().unwrap();
+        let mut unit = PhaseCatalogue::new();
+        unit.insert(
+            PhaseDecompositionInput {
+                dimension: 2,
+                phase_table: vec![0; 4],
+                terms: vec![CliffordIndicator {
+                    coefficient: ExactScalar::one(),
+                    constraints: vec![],
+                    phase: ParityPhase::new(2, 0, []).unwrap(),
+                }],
+            },
+            &CatalogueLimits::default(),
+            &a,
+        )
+        .unwrap();
+        let certificate = unit.get(2, &[0; 4]).unwrap();
+        assert_eq!(certificate.dimension(), 2);
+        assert_eq!(certificate.terms().len(), 1);
+        let before = certificate.terms().to_vec();
+        let usage = unit.usage();
+        let options = PhaseInjectionOptions {
+            max_work: 0,
+            max_geometry_words: 0,
+            max_terms: 0,
+            max_reference_pairing_scratch_bytes: Some(0),
+        };
+        let (candidate, receipt) = attempt(
+            certificate,
+            Some(factors),
+            PhaseSelectionRoute::CertifiedCatalogue,
+            &options,
+            &CatalogueLimits::default(),
+            &a,
+        )
+        .unwrap();
+        assert!(candidate.is_none());
+        assert_eq!(receipt.odd_rotations, 0);
+        assert!(receipt.groups.is_empty());
+        assert_eq!(receipt.candidate_terms, None);
+        assert!(!receipt.constructed && !receipt.selected);
+        assert_eq!(receipt.budget_skip, None);
+        assert_eq!(receipt.reference_pairing_scratch_bytes, None);
+        assert_eq!(certificate.terms().len(), before.len());
+        for (actual, original) in certificate.terms().iter().zip(&before) {
+            assert_eq!(actual.coefficient, original.coefficient);
+            assert_eq!(actual.constraints, original.constraints);
+            assert_eq!(actual.phase, original.phase);
+        }
+        assert_eq!(unit.usage(), usage);
+    }
 }

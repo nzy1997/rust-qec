@@ -5497,3 +5497,36 @@ Original finite, generalized literal and sparse wide tests cover the actual
 API, including Y signs, noninjective maps, internal interference and single-sided
 events. The large cancellation example constructs no phase resource. These
 correctness contracts do not establish Python ABI parity or paper throughput.
+
+
+### Raw tensor resources and optional reference pairing scratch
+
+PhasePathTensor::prepare_resource freezes an independent catalogue/fiber
+resource; prepare_native_resource freezes the explicitly requested native
+selection and injection policy. An explicit zero coefficient returns None
+before scalar, selection or injection quotas. A nonzero tensor returns the real
+selected resource or its error. This shortcut does not detect interference zeros.
+
+PhaseInjectionOptions::max_reference_pairing_scratch_bytes is an optional
+u128 cap on the portable reference formula:
+
+```text
+(8 * rotations + table_values + rank * rank + 1)
+    * (256 + 16 * ceil(rank / 64))
+```
+
+Admission precedes greedy pairing and the term-count tie. The three independent
+T axes charge 11424 bytes: a 4096-byte cap retains the old four-term resource
+before pairing; 11424 admits pairing and reaches the four-term tie. The existing
+512 logical-word budget remains a separate model. Neither formula measures
+Rust allocation or includes all C++ live tables, entries or ABI overhead.
+
+The CLI flag --injection-max-reference-pairing-scratch-bytes requires a
+native_injection query preparation. Omitting it preserves the previous
+configuration, fingerprint and route-count JSON shapes. An explicit setting,
+including zero and the full u128 maximum, changes each selected query family's
+task fingerprint. Individual injection receipts report the declared charge when
+computed. File/task route diagnostics report its maximum across actually
+attempted eligible resources as the decimal string
+max_declared_reference_pairing_scratch_bytes; this is not a measured peak
+memory value. Ineligible attempts have no charge.
