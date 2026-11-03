@@ -1,7 +1,12 @@
-//! Scalar global queries that trace physical legs before selecting a resource.
+//! Global queries that trace physical legs before selecting a resource.
+#[path = "original_retained.rs"]
+mod retained;
 use super::*;
 use crate::phase::NativePhaseOptions;
 use crate::unitary::{NetworkValue, PreparedPauliMoment, PreparedProbability};
+pub use retained::{
+    OriginalRecordProbabilities, PreparedOriginalNetworkRecords, UniformOriginalRecords,
+};
 
 /// Explicit resource policy for the final scalar network, not its coherent side.
 #[derive(Clone, Copy, Debug)]
@@ -16,10 +21,11 @@ impl Default for OriginalNetworkResource {
         Self::Catalogue(PhaseResourceOptions::default())
     }
 }
-/// Admission for the actual packed scalar closure. In particular, its physical
+/// Admission for actual packed scalar or retained-label closures. In particular, its physical
 /// equality rows are quadratic in physical width; these are not thin pair plans.
 #[derive(Clone, Copy, Debug)]
 pub struct OriginalNetworkLimits {
+    /// Scalar event rows; retained probability labels use completed.max_record_rows.
     pub max_event_rows: usize,
     /// Joint reference path variables, before fixed trace/event constraints.
     pub max_joint_paths: usize,
@@ -89,16 +95,28 @@ fn layout<'a>(
     events: &[OriginalRecordParity],
     options: &OriginalNetworkOptions<'_>,
 ) -> Result<(Layout<'a>, Vec<BitVector>), OriginalError> {
-    let limits = source.limits;
-    admit(
+    labelled_layout(
+        source,
+        events,
+        options,
         "max_event_rows",
         options
             .limits
             .max_event_rows
-            .min(limits.expansion.max_event_rows)
-            .min(limits.completed.max_event_rows),
-        events.len() as u128,
-    )?;
+            .min(source.limits.expansion.max_event_rows)
+            .min(source.limits.completed.max_event_rows),
+    )
+}
+
+fn labelled_layout<'a>(
+    source: &'a OriginalStaticTrace,
+    events: &[OriginalRecordParity],
+    options: &OriginalNetworkOptions<'_>,
+    row_option: &'static str,
+    max_rows: usize,
+) -> Result<(Layout<'a>, Vec<BitVector>), OriginalError> {
+    let limits = source.limits;
+    admit(row_option, max_rows, events.len() as u128)?;
     let occurrences = events.iter().map(|e| e.records.len() as u128).sum::<u128>();
     admit(
         "max_record_occurrences",

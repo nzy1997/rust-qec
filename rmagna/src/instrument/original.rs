@@ -49,9 +49,10 @@ pub use trace::{
     OriginalBoundaryResource, OriginalBoundaryService, OriginalBoundaryTask, OriginalNetworkLimits,
     OriginalNetworkMoment, OriginalNetworkOptions, OriginalNetworkProbability,
     OriginalNetworkResource, OriginalPreparedTrace, OriginalPreparedTraceResult,
-    OriginalRecordEvent, OriginalRecordLayout, OriginalRecordParity, OriginalStaticTrace,
-    OriginalTraceAssignment, OriginalTraceOptions, OriginalTracePreparationLimits,
-    OriginalTraceResult, OriginalTraceView,
+    OriginalRecordEvent, OriginalRecordLayout, OriginalRecordParity, OriginalRecordProbabilities,
+    OriginalStaticTrace, OriginalTraceAssignment, OriginalTraceOptions,
+    OriginalTracePreparationLimits, OriginalTraceResult, OriginalTraceView,
+    PreparedOriginalNetworkRecords, UniformOriginalRecords,
 };
 
 pub type OriginalWire = i64;
