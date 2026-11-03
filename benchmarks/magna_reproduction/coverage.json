@@ -1342,12 +1342,20 @@
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_absorption_precedes_final_resource_budget",
       "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "reason": "Numerical three-to-one-path/rank-two-to-zero absorption and post-absorption rank/term/table budgets are covered by original_radical_absorption. Complete native exception/certificate contract remains unmapped: native reports initial needed two while the existing Rust streaming selector reports the first rejected direction, needed one; full native certificate dictionaries are not reproduced."
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_actual_absorption_and_decomposition_against_independent_dense_sums",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "All192 exact original seed26091484 raw tensors across n0..7 and24 trials, retained with pinned module/commit identity. Real symbolic Clifford-radical absorption preserves every complex amplitude and ordered noninjective physical label; actual native-selection resources with and without the supplied catalogue reconstruct all amplitudes and their complete pairwise coherent norms. Literal Rust path sums independently recheck the retained original inputs and numerical values. Only this complete finite numerical method is mapped; the separate exception/certificate method, Python ABI, full native certificate dictionaries, complete native heap accounting, original-IR integration and paper performance remain unmapped.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_radical_absorption",
+          "test": "original_actual_absorption_and_decomposition_against_independent_dense_sums",
+          "source_sha256": "469d4f673e5151805d11d3850007bec4032739b6fc92c81b1b038d5c7b6f55bf"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_database_exact_reconstruction_and_product_identification",
