@@ -1656,3 +1656,39 @@ Only this complete original method is newly mapped: 77 verified,
 275 unmapped, 93 unique Rust witnesses from 95 declarations across
 42 targets. The strict complete-parity audit must still exit 2; general
 upstream parity and paper-result reproduction remain incomplete.
+
+### Raw Clifford-radical absorption
+
+The production PhasePathTensor::absorb_clifford_radical API now contracts only
+directions invisible to both the physical map and actual non-Clifford quotient,
+then safely repeats after path reduction. No resource is constructed during
+absorption. Arbitrary complex scalars, quadratic/parity phases, noninjective
+labels and physical row order are retained. Width, stage, declared-work,
+logical-geometry and scalar errors leave the borrowed input unchanged.
+
+The attributed original_global_phase192.json fixture retains every actual input
+from seed26091484, n0..7 and24 trials of the pinned original primary method.
+Its module SHA256 is
+b9d596e34dd777a83ac9aa8feb81e4a246d56bd4fae9db9be663f091927d6b50.
+The fixture includes complete complex amplitudes and coherent norms. The Rust
+witness checks literal input sums, absorbed amplitudes, actual catalogue and
+no-catalogue native resources, all expanded amplitudes and every pairwise norm
+cross term. Generic384 complex-coefficient inputs provide additional fresh
+coverage; their seed2609148401 does not claim byte identity with an earlier
+private scratch prototype. Both fixtures use the upstream MPL-2.0 attribution
+and the full license in rmagna/tests/fixtures/original_many_record_input.LICENSE.
+
+Run cargo test --locked -p rmagna --test original_radical_absorption.
+Additional production tests cover joint visibility, repeated reductions, exact
+zero/empty inputs, 192 packed logical coordinates with cancelling odd axes,
+193-bit ordered physical labels, typed quota boundaries, scalar overflow and
+immutable retries. The three-path rank-two example reaches one path and a
+rank-zero one-term final resource; selecting first rejects the same rank cap.
+
+Only test_actual_absorption_and_decomposition_against_independent_dense_sums is
+newly mapped. The separate complete exception/certificate method stays unmapped:
+native reports initial needed two, while the current Rust selector reports the
+first rejected direction, needed one. Full native certificate dictionaries,
+Python ABI, complete native heap accounting, original-IR integration and paper
+performance remain separate gaps. Current scope is78 verified,274 unmapped,
+94 unique Rust witnesses from96 declarations across43 integration targets.

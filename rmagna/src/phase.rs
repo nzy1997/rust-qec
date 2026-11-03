@@ -1,9 +1,14 @@
 //! Third-hierarchy parity phases, the Clifford radical, and prepared exact sums.
 
+mod absorption;
 mod core;
 mod resource;
 mod tensor;
 mod transport;
+pub use absorption::{
+    CliffordRadicalAbsorption, RadicalAbsorptionDiagnostics, RadicalAbsorptionOptions,
+    RadicalAbsorptionStage,
+};
 pub use core::{CanonicalPhaseCore, PhaseCoreLimits};
 pub(crate) use resource::ResourcePreparation;
 pub use resource::{NativePhaseOptions, NativeRouteCounts};

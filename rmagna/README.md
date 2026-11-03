@@ -5437,7 +5437,8 @@ assert_eq!(label.width(), 1);
 
 The attributed 129-path, 512-CNOT many-record scenario runs through the actual
 original-instrument API with both compilers and an explicit native rank-zero,
-one-term budget. General partial Clifford-path absorption, the original circuit
+one-term budget. Raw tensors support partial Clifford-path absorption through
+the API below. Its original-instrument integration, the original circuit
 frontend and complete sampler/paper reproduction remain incomplete.
 
 
@@ -5489,8 +5490,9 @@ phase decomposition or path enumeration. `boundary()` and `phase()` expose the
 result for explicit existing `PreparedPhaseResource` evaluation under caller
 budgets. `contract_clifford` instead requires the entire residual phase to be
 Clifford, preserves exact global coefficients and returns `None` for an exact
-zero. A remaining odd resource returns `NotClifford`; general partial absorption
-of non-Clifford boundary tensors remains separate. Tensor amplitudes describe
+zero. A remaining odd resource returns `NotClifford`; use
+`absorb_clifford_radical` for partial absorption before explicit resource
+selection. Tensor amplitudes describe
 raw signed/complex contributions, not automatically sampling probabilities.
 
 Original finite, generalized literal and sparse wide tests cover the actual
@@ -5530,3 +5532,63 @@ computed. File/task route diagnostics report its maximum across actually
 attempted eligible resources as the decimal string
 max_declared_reference_pairing_scratch_bytes; this is not a measured peak
 memory value. Ineligible attempts have no charge.
+
+### Partial Clifford-radical absorption before resource selection
+
+`PhasePathTensor::absorb_clifford_radical` sums only paths invisible to both the
+physical labels and the actual third-derivative signature quotient. Odd parity
+axes can cancel in that signature; their linear span alone is insufficient.
+The method transforms the Clifford correction, contracts the joint kernel and
+restricts the remaining parity phase, repeating when paths shrink. It preserves
+noninjective labels, physical row order and arbitrary complex/global scalars.
+It constructs no phase table, catalogue resource or stabilizer decomposition.
+
+```rust
+use rmagna::{gf2::BitVector, phase::{ParityPhase, PhasePathTensor,
+    NativePhaseOptions}, quadratic::QuadraticForm, scalar::ScalarArithmetic,
+    stabilizer::AffineKet};
+let a = ScalarArithmetic::default();
+let b = |n, indices: &[usize]| BitVector::from_indices(n, indices.iter().copied());
+let tensor = PhasePathTensor::new(AffineKet::new(b(2, &[1])?,
+    vec![b(2, &[0])?, b(2, &[1])?, b(2, &[])?],
+    QuadraticForm::new(0, vec![0; 3],
+        vec![b(3, &[2])?, b(3, &[2])?, b(3, &[])?])?, a.omega(0, -3)?)?,
+    ParityPhase::new(3, 5, [(b(3, &[0])?, 1), (b(3, &[1])?, 1)])?)?;
+let mut caps = NativePhaseOptions::default();
+caps.selection.max_quotient_rank = 0;
+assert!(tensor.prepare_native_resource(1, caps, None, &a).is_err());
+let absorbed = tensor.absorb_clifford_radical(Default::default(), &a)?;
+assert_eq!(absorbed.tensor().phase().num_variables(), 1);
+assert_eq!(absorbed.diagnostics().clifford_contractions, 1);
+let resource = absorbed.tensor().prepare_native_resource(1, caps, None, &a)?.unwrap();
+assert_eq!(resource.quotient_rank(), 0);
+assert_eq!(resource.num_terms(), 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The owned result exposes `tensor()`, `into_tensor()` and `diagnostics()`.
+Diagnostics record executed quotient analyses, joint factorizations and Clifford
+contractions, plus each contraction's input/output path counts, signature rank
+and hidden dimension. Internal algebra row operations are not counted. A safe
+fixed point is not a minimum-rank certificate.
+
+`RadicalAbsorptionOptions` bounds physical/path widths, actual contraction
+stages, cumulative declared work and conservative peak logical geometry. A
+zero-stage budget permits fixed-point analysis, which still consumes work.
+Geometry and work are admitted before the initial tensor copy and each analysis;
+geometry includes quadratic matrices, row provenance, term copies and stage
+history. These formulas exclude scalar limbs and allocator overhead and are
+not measured heap or timing claims. Scalar arithmetic has its separate bit and
+exponent checks. Errors return no partial result and leave the input reusable.
+Resource-selection limits are applied only when the caller subsequently asks
+for a resource; remaining odd phases are kept explicit.
+
+`original_radical_absorption` tests the exact 192 original primary inputs,
+384 fresh deterministic complex-coefficient cases, both catalogue/no-catalogue
+resources and full pairwise coherent norms. The generic inputs are additional
+coverage, without claiming identity to an earlier scratch prototype. The
+separate native exception/certificate method remains unmapped: native rejects
+the initial rank-zero cap with needed two, while Rust's streaming selector
+rejects the first independent direction with needed one. Full native certificate
+dictionaries, Python ABI, complete native heap accounting, original-IR
+integration and paper performance remain separate gaps.
