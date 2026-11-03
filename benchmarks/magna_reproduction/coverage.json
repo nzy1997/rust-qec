@@ -1359,8 +1359,16 @@
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_database_exact_reconstruction_and_product_identification",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Exact unchanged pinned fifteen-entry primary phase catalogue (SHA256 81b0487232c624b202c1ecd53123980ec29ada377599395c0c18f92d98ccac76) is parsed and every original certificate reconstructed through public Rust APIs. Original unit coefficient one changed to two and duplicate first entry reject, with atomic empty/existing receiver recovery and unchanged input. Genuine certified-catalogue/positive-T-product native routes for n1..6 preserve all126 literal omega^(3+popcount(y))*sqrt(2)^(-n) complex amplitudes and all ordered-pair coherent norms one; valid queries repeat after refusals. This maps the complete finite numerical/admission method, without claiming Python ABI or full native memory-policy parity.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_raw_phase_admission",
+          "test": "original_database_exact_reconstruction_and_product_identification",
+          "source_sha256": "fb243442eb3916ab76d66931565c235635e83f534198e7b1f254a0106d854a7c"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_environment_surrogate_preserves_python_conversion_exception",
@@ -1374,8 +1382,16 @@
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_malformed_dimensions_and_zero_phase_conventions",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Exact original n2/mask4 rejects as NonzeroPadding at the real public packed-vector input constructor, and the original one-coordinate upper diagonal rejects as InvalidUpperTriangle at the public quadratic constructor. Valid mask/quadratic counterparts, actual zero-phase raw-tensor absorption/selection/expansion, both exact amplitudes, immutable borrowed sources and subsequent valid queries are retained. No malformed internal certificate or Python ABI equivalence is manufactured.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_raw_phase_admission",
+          "test": "original_malformed_dimensions_and_zero_phase_conventions",
+          "source_sha256": "fb243442eb3916ab76d66931565c235635e83f534198e7b1f254a0106d854a7c"
+        }
+      ]
     },
     {
       "id": "test_native_global_phase.NativeGlobalPhaseTests.test_original_ir_exceeds_fixed_budget_and_succeeds_after_native_absorption",

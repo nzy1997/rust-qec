@@ -1,0 +1,764 @@
+{
+  "schema_version": 1,
+  "convention": "omega=e^(i*pi/4); unnormalized phase functions; stabilizer indicators with Clifford parity phases",
+  "scope": "All P3/Clifford classes in dimensions 0,1,2; pure CCZ class in dimension 3; certified four-variable 422 residual phase",
+  "provenance": "Project exact affine-fiber construction; two-T entry equals the even/odd stabilizer decomposition recorded in THEORY-PHASE-QUOTIENT-NORMAL-FORM-20260914; CCZ identity is 1-2*indicator(111). No claim of universal optimality. The 422 entry splits x0 xor x3 into even/odd affine supports; see research-notes/2026-09-14-422-resource-rank.md.",
+  "entries": [
+    {
+      "dimension": 0,
+      "core_phase_mod8": [
+        0
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 1,
+      "core_phase_mod8": [
+        0,
+        0
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 1,
+      "core_phase_mod8": [
+        0,
+        1
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        0,
+        0,
+        2
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              2,
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              2,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              2,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        0,
+        1,
+        3
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              2,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              2,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        1,
+        0,
+        3
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              2,
+              1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        1,
+        1,
+        2
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              3,
+              0
+            ]
+          ],
+          "clifford_parities": [
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              3,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 2,
+      "core_phase_mod8": [
+        0,
+        1,
+        1,
+        4
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              3,
+              0
+            ]
+          ],
+          "clifford_parities": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              3,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 3,
+      "core_phase_mod8": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [],
+          "clifford_parities": []
+        },
+        {
+          "coefficient": [
+            -2,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              4,
+              1
+            ]
+          ],
+          "clifford_parities": []
+        }
+      ]
+    },
+    {
+      "dimension": 4,
+      "core_phase_mod8": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        1,
+        0,
+        5,
+        1,
+        2,
+        1,
+        2,
+        1,
+        2,
+        5,
+        2
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              9,
+              0
+            ]
+          ],
+          "clifford_parities": [
+            [
+              8,
+              1
+            ]
+          ]
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              9,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              2,
+              1
+            ],
+            [
+              4,
+              1
+            ],
+            [
+              6,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "dimension": 4,
+      "core_phase_mod8": [
+        0,
+        1,
+        0,
+        3,
+        0,
+        1,
+        0,
+        3,
+        0,
+        1,
+        0,
+        3,
+        0,
+        5,
+        0,
+        7
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": [
+            [
+              3,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              3,
+              3
+            ]
+          ]
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              4,
+              1
+            ],
+            [
+              8,
+              1
+            ],
+            [
+              12,
+              -1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              3,
+              3
+            ]
+          ]
+        }
+      ],
+      "coordinate_derivation": {
+        "source_core": [
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          5,
+          1,
+          2,
+          1,
+          2,
+          1,
+          2,
+          5,
+          2
+        ],
+        "rows": [
+          2,
+          4,
+          8,
+          3
+        ],
+        "convention": "source bits = rows dot query bits over GF(2); add query core minus pulled source phase"
+      }
+    },
+    {
+      "dimension": 4,
+      "core_phase_mod8": [
+        0,
+        1,
+        0,
+        3,
+        0,
+        1,
+        0,
+        7,
+        0,
+        1,
+        0,
+        3,
+        0,
+        5,
+        0,
+        3
+      ],
+      "terms": [
+        {
+          "coefficient": [
+            1,
+            0,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              0
+            ]
+          ],
+          "clifford_parities": [
+            [
+              3,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              3,
+              3
+            ]
+          ]
+        },
+        {
+          "coefficient": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "constraints": [
+            [
+              1,
+              1
+            ]
+          ],
+          "clifford_parities": [
+            [
+              4,
+              1
+            ],
+            [
+              10,
+              1
+            ],
+            [
+              14,
+              -1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              3,
+              3
+            ]
+          ]
+        }
+      ],
+      "coordinate_derivation": {
+        "source_core": [
+          0,
+          1,
+          0,
+          1,
+          0,
+          1,
+          0,
+          5,
+          1,
+          2,
+          1,
+          2,
+          1,
+          2,
+          5,
+          2
+        ],
+        "rows": [
+          2,
+          4,
+          10,
+          3
+        ],
+        "convention": "source bits = rows dot query bits over GF(2); add query core minus pulled source phase"
+      }
+    }
+  ]
+}

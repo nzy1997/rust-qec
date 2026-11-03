@@ -1690,5 +1690,39 @@ newly mapped. The separate complete exception/certificate method stays unmapped:
 native reports initial needed two, while the current Rust selector reports the
 first rejected direction, needed one. Full native certificate dictionaries,
 Python ABI, complete native heap accounting, original-IR integration and paper
-performance remain separate gaps. Current scope is78 verified,274 unmapped,
+performance remain separate gaps. This stage recorded78 verified,274 unmapped,
 94 unique Rust witnesses from96 declarations across43 integration targets.
+
+
+### Original raw phase admission
+
+Run `cargo test --locked -p rmagna --test original_raw_phase_admission`.
+The fixture `rmagna/tests/fixtures/original_phase_decompositions.json` preserves
+all 12426 original bytes of `core/magna/data/phase_decompositions.json` at
+commit `56847478c840395735146ef1e1ccdc3d8aedc10f`, SHA256
+`81b0487232c624b202c1ecd53123980ec29ada377599395c0c18f92d98ccac76`.
+Its adjacent NOTICE identifies the original MPL-2.0 source and bundled license.
+
+The public JSON parser certifies all fifteen original entries; the witness
+also reconstructs every certificate independently over all its assignments.
+Changing the original first unit coefficient from one to two, or appending
+the original first entry again, rejects without publishing staged entries.
+Valid catalogues remain usable after refusal. T products on one through six
+coordinates use genuine catalogue/product routes and retain every one of the
+126 literal normalized, globally phased complex amplitudes
+`omega^(3+popcount(y))*sqrt(2)^(-n)`. Every ordered pair of actual emitted
+stabilizer terms contributes to the coherent norm, which is exactly one.
+
+The second complete original method retains n2/mask4 padding refusal and the
+one-coordinate quadratic upper diagonal refusal through real typed public
+constructors. Valid counterparts, unchanged source values, raw zero-phase
+absorption/selection/expansion and successful retries are checked.
+
+Only `test_database_exact_reconstruction_and_product_identification` and
+`test_malformed_dimensions_and_zero_phase_conventions` are newly mapped.
+Current scope is80 verified,272 unmapped,96 unique Rust witnesses from98
+declarations across44 integration targets. The separate complete native
+exception/certificate method still reports needed two versus Rust's first
+rejected direction, needed one, and remains unmapped. Python ABI, complete
+native heap accounting, original-IR integration and paper performance remain
+separate gaps; the complete reproduction is still unfinished.
