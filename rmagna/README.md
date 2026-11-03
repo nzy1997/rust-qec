@@ -5439,3 +5439,61 @@ The attributed 129-path, 512-CNOT many-record scenario runs through the actual
 original-instrument API with both compilers and an explicit native rank-zero,
 one-term budget. Separate arbitrary-normal-form trace parity and complete
 sampler/paper reproduction remain incomplete.
+
+
+## Raw phase-path boundary traces
+
+`phase::PhasePathTensor::new(boundary, phase)` owns an unnormalized `AffineKet`
+and a `ParityPhase` on its logical path columns. Affine boundaries may be
+noninjective and columns dependent. `PathTraceBoundary` supplies ordered physical
+bra parities, bra-event rows/outcomes and a physical Pauli word. Its `trace`
+computes the labelled contributions to `<psi|Pi P|psi>`. This one-sided event
+meaning also applies when P does not commute with the event; it is not a claim
+of two-sided postselection. Arbitrary explicit Pauli phases and complex signed
+results are retained.
+
+```rust
+use rmagna::gf2::BitVector;
+use rmagna::pauli::PauliWord;
+use rmagna::phase::{ParityPhase, PhasePathTensor, PathTraceBoundary};
+use rmagna::quadratic::QuadraticForm;
+use rmagna::scalar::ScalarArithmetic;
+use rmagna::stabilizer::AffineKet;
+let a = ScalarArithmetic::default();
+let zero = BitVector::zeros(1)?;
+let one = BitVector::from_indices(1, [0])?;
+let boundary = AffineKet::new(zero.clone(), vec![one.clone()],
+    QuadraticForm::new(0, vec![0], vec![zero.clone()])?, a.omega(0, -1)?)?;
+let tensor = PhasePathTensor::new(boundary,
+    ParityPhase::new(1, 0, [(one.clone(), 1)])?)?;
+let word = PauliWord::new(one, zero, 0)?;
+let outcomes = BitVector::zeros(0)?;
+let traced = tensor.trace(PathTraceBoundary { retained_rows: &[],
+    event_rows: &[], outcomes: &outcomes, word: &word }, Default::default(), &a)?;
+let scalar = traced.contract_clifford(&a)?.unwrap();
+assert_eq!(scalar.coefficient(),
+    &a.scalar([0.into(), 1.into(), 0.into(), (-1).into()], -1)?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`PathTraceOptions` bounds physical bits, retained/event row counts, doubled
+logical paths before cancellation and conservative new packed/linear/index
+geometry before allocation. Phase-term storage and pullback scratch are included;
+caller-owned input, scalar limbs, allocator overhead and subsequent resource
+construction are excluded. Overflow returns `PathTensorError::DimensionOverflow`.
+Malformed row/phase/outcome/Pauli dimensions and scalar failures remain typed.
+An infeasible event returns a zero tensor with the requested label width.
+
+Trace performs symbolic pairing, GF(2) projection and phase pullback without a
+phase decomposition or path enumeration. `boundary()` and `phase()` expose the
+result for explicit existing `PreparedPhaseResource` evaluation under caller
+budgets. `contract_clifford` instead requires the entire residual phase to be
+Clifford, preserves exact global coefficients and returns `None` for an exact
+zero. A remaining odd resource returns `NotClifford`; general partial absorption
+of non-Clifford boundary tensors remains separate. Tensor amplitudes describe
+raw signed/complex contributions, not automatically sampling probabilities.
+
+Original finite, generalized literal and sparse wide tests cover the actual
+API, including Y signs, noninjective maps, internal interference and single-sided
+events. The large cancellation example constructs no phase resource. These
+correctness contracts do not establish Python ABI parity or paper throughput.

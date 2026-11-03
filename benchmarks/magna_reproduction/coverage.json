@@ -799,8 +799,16 @@
     },
     {
       "id": "test_global_sampling.GlobalSamplingTests.test_trace_before_decomposition_dense_with_output_effect",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged original raw four-path noninjective tensor scenario: all24 ordered-retained-parity, Pauli and bra-only event queries and56 label masses match the independent literal path definition. Validated unnormalized affine/quadratic/parity tensors trace physical equalities and one-sided bra events before any explicit bounded phase resource; arbitrary complex Pauli phases and signed results are preserved. Exact completely-Clifford residual contraction is separate and refuses non-Clifford residuals. Independent generic quadratic/complex and sparse wide-boundary cases, typed admission/overflow/scalar failures, immutable recovery and analytic129-path cancellation are covered. General mixed Clifford-path absorption, original circuit frontend and complete paper parity remain incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_phase_path_trace",
+          "test": "original_noninjective_trace_matches_all_retained_pauli_and_bra_event_cases",
+          "source_sha256": "897bceb458d3ceeb6d41d00582bdfd480822de07b8bd55264c67285f01c87db2"
+        }
+      ]
     },
     {
       "id": "test_history_efficiency.HistoryEfficiencyTests.test_cli_json_and_progress_streams",
