@@ -292,6 +292,106 @@ mod nested { #[test] fn inside() {} }
         with self.assertRaises(coverage.CoverageError):
             rust.source_identity(self.repo)
 
+    def library_fixture(self):
+        source = self.repo / "rmagna/src"
+        (source / "outer").mkdir(parents=True)
+        root = source / "lib.rs"
+        root.write_text('#![doc = "Synthetic library fixture"]\npub mod outer;\n')
+        (source / "outer/mod.rs").write_text('#[path = "owner.rs"]\nmod alias;\n')
+        owner = source / "outer/owner.rs"
+        owner.write_text('#[cfg(test)]\n#[path = "contracts.rs"]\nmod contracts;\n')
+        leaf = source / "outer/contracts.rs"
+        leaf.write_text('#[test]\nfn checks_contract() { assert_eq!(2 + 3, 5); }\n')
+        row = {"package": "rmagna", "target": "lib",
+               "test": "outer::alias::contracts::checks_contract", "source_sha256": rust.sha(leaf)}
+        return root, owner, leaf, row
+
+    def test_library_witness_resolves_real_external_registration_and_refuses_ambiguity(self):
+        root, owner, leaf, row = self.library_fixture()
+        self.assertEqual(rust.witness(self.repo, row), ("lib", row["test"]))
+        original = owner.read_text()
+        invalid = [
+            '// #[path = "contracts.rs"] mod contracts;\n',
+            'const TEXT: &str = "mod contracts;";\n',
+            'macro_rules! fake { () => { mod contracts; } }\nfake!();\n',
+            'mod contracts { #[test] fn checks_contract() {} }\n',
+            '#[cfg(any())] #[path = "contracts.rs"] mod contracts;\n',
+            '#[cfg_attr(test, path = "contracts.rs")] mod contracts;\n',
+            original + original,
+            '#[path = "../contracts.rs"] mod contracts;\n',
+            '#[path = "/contracts.rs"] mod contracts;\n',
+            '#[path = r"contracts.rs"] mod contracts;\n',
+            '#[path = "contracts.rs"] #[path = "contracts.rs"] mod contracts;\n',
+            '#![cfg(any())]\n' + original,
+        ]
+        for declaration in invalid:
+            with self.subTest(declaration=declaration):
+                owner.write_text(declaration)
+                with self.assertRaises(coverage.CoverageError):
+                    rust.witness(self.repo, row)
+        owner.write_text(original)
+        for name in ("wrong::alias::contracts::checks_contract", "outer::alias::wrong::checks_contract",
+                     "checks_contract", "outer::::checks_contract", "outer::alias::contracts::invented"):
+            with self.subTest(name=name), self.assertRaises(coverage.CoverageError):
+                rust.witness(self.repo, {**row, "test": name})
+        with self.assertRaises(coverage.CoverageError):
+            rust.witness(self.repo, {**row, "source_sha256": "0" * 64})
+        saved_leaf = leaf.read_text()
+        leaf.unlink()
+        leaf.symlink_to(self.test_source)
+        with self.assertRaises(coverage.CoverageError):
+            rust.witness(self.repo, row)
+        leaf.unlink()
+        leaf.write_text(saved_leaf)
+        # A non-mod.rs parent uses its stem for ordinary child modules.
+        owner.write_text('#[cfg(test)]\nmod contracts;\n')
+        (owner.parent / "owner").mkdir()
+        nested = owner.parent / "owner/contracts.rs"
+        nested.write_text(saved_leaf)
+        self.assertEqual(rust.witness(self.repo, row), ("lib", row["test"]))
+        (owner.parent / "owner/contracts").mkdir()
+        (owner.parent / "owner/contracts/mod.rs").write_text(saved_leaf)
+        with self.assertRaises(coverage.CoverageError):
+            rust.witness(self.repo, row)
+        root.write_text('#![cfg(any())]\npub mod outer;\n')
+        with self.assertRaises(coverage.CoverageError):
+            rust.witness(self.repo, row)
+
+    def test_library_qualified_execution_requires_actual_pass_and_registration_source_identity(self):
+        root, _, _, row = self.library_fixture()
+        self.ledger["cases"][0]["rust_tests"] = [row]
+        self.complete_mapping()
+        run = copy.deepcopy(self.run)
+        run["source_files"] = rust.source_identity(self.repo)
+        target = run["targets"][0]
+        target["target"] = "lib"
+        for key in ("list", "run"):
+            target[key]["stdout"] = target[key]["stdout"].replace("checks_contract", row["test"])
+        self.assertTrue(self.check(run=run)["parity_complete"])
+        for outcome in ("FAILED", "missing", "source"):
+            with self.subTest(outcome=outcome):
+                changed = copy.deepcopy(run)
+                observed = changed["targets"][0]["run"]
+                if outcome == "source":
+                    changed["source_files"]["rmagna/src/lib.rs"] = "0" * 64
+                elif outcome == "missing":
+                    observed["stdout"] = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s\n"
+                else:
+                    observed["stdout"] = f"running 1 test\ntest {row['test']} ... FAILED\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+                    observed["exit_code"] = 101
+                    observed["stderr"] = "synthetic library failure"
+                report = self.check(run=changed)
+                self.assertTrue(report["inventory_valid"])
+                self.assertFalse(report["parity_complete"])
+                self.assertEqual(report["rust_execution"]["raw"], changed)
+                key = "failed" if outcome == "FAILED" else "missing"
+                self.assertEqual(report["rust_execution"][key], [f"rmagna::lib::{row['test']}"])
+        # Changing a registration after observation invalidates an otherwise
+        # unchanged leaf witness and passing qualified libtest transcript.
+        root.write_text(root.read_text() + "// changed registration source\n")
+        self.assertTrue(self.check(run=run)["inventory_valid"])
+        self.assertFalse(self.check(run=run)["parity_complete"])
+
     def test_raw_function_identifiers_do_not_create_shorter_witnesses(self):
         for declaration, listed_name in (("r#actual_contract", "actual_contract"),
                                          ("r#match", "r#match"), ("r#fn", "r#fn"), ("r#r", "r")):

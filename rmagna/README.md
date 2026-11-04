@@ -5568,6 +5568,18 @@ scalar recovery and cumulative entropy refusal/retry. These are finite functiona
 witnesses; Python RNG/class ABI, general commutator certificates and throughput
 parity remain incomplete.
 
+
+The three private `original_contracts` library tests retain the full pinned
+`test_file_native.py` sampling scenarios. All 256 wide-distribution seeds yield
+only zero or the all-130-bit label with exact mass 1/2, one support coordinate,
+one conditional query and one consumed bit; the complete sweep replays exactly.
+All 1024 signed-marginal draws check their selected exact mass
+`(2 +/- sqrt(2))/4` as well as the original 0.035 frequency tolerance. Ten draws
+from `(1+i) + (-i)` at label one have total and label mass one and consume no
+entropy; summing individual squared coefficients would incorrectly give three.
+The fixtures stay inside the retained-mass owner's test module. Caller-owned
+SplitMix64 bits establish reproducibility without a native MT stream claim.
+
 ## Raw phase-path boundary traces
 
 `phase::PhasePathTensor::new(boundary, phase)` owns an unnormalized `AffineKet`

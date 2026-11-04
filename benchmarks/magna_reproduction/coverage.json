@@ -635,8 +635,16 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_affine_mixture_big_boundary_and_reproducibility",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 130-bit two-label law: all 256 seeds return only zero/all-130-bit words, the original 0.12 half-frequency tolerance holds, and a repeated full sweep matches every draw. Every draw has exact half label mass, unit total, one coordinate/query and one actual callback bit. Caller-owned SplitMix64 Boolean entropy makes no native MT stream identity claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original::trace::network::retained::original_contracts::affine_mixture_big_boundary_and_reproducibility",
+          "source_sha256": "10cc107e2cda2f160a9a040b523a94f855f4597a25afa4728cb7166403e185e7"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_boundary_rejects_invalid_distribution_and_shape",
@@ -655,13 +663,29 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_complex_terms_cancel_before_sampling",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original ten-seed deterministic label-one law from complex coefficients (1+i) and -i. Each draw has label/total mass one, zero support coordinates/queries and no entropy callback. Literal individual squared-coefficient masses sum to three, explicitly distinguishing the incorrect sampling law from the true linear sum one.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original::trace::network::retained::original_contracts::complex_terms_cancel_before_sampling",
+          "source_sha256": "10cc107e2cda2f160a9a040b523a94f855f4597a25afa4728cb7166403e185e7"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_exact_irrational_signed_global_marginal",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original signed irrational marginal: half plus a sqrt(2)/4 phase-signed affine term. All 1024 seeds meet the original 0.035 tolerance around (2-sqrt(2))/4; every selected exact mass is (2+/-sqrt(2))/4 with unit total, one coordinate/query and actual accounted Boolean entropy. Terms are summed as classical masses.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "lib",
+          "test": "instrument::original::trace::network::retained::original_contracts::exact_irrational_signed_global_marginal",
+          "source_sha256": "10cc107e2cda2f160a9a040b523a94f855f4597a25afa4728cb7166403e185e7"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_native_summary_matches_paired_delta_method",
