@@ -1690,13 +1690,29 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_joint_duplicate_conflicting_detector_and_task_conditions",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original duplicate-detector/echo prefix and all7 source-ordered selection suffixes, unchanged empty tasks. Both compiler strategies and ColdPrefix/FixedTemplate runtimes physically enumerate exact acceptance1/4,1/4,1/2,0,1/4,0,1/4 with covered1/omitted0 and coincident acceptance/error bounds. Repeated condition has mass1/2 rather than independent-product1/4; condition plus complement has exact zero. Conditional intervals are checked only when defined. Complete unchanged original7-case method separately passes normal/O. No new API, defaults, private-handle/Python compatibility, native RNG ABI, Monte Carlo or performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
+          "source_sha256": "fe480aaa3f74642d8dd977938d2d037d7257cefaca72c5c82a42a12576220ab4"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_mixed_affine_selector_integrates_unobserved_record",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original three-fair-record circuit with external AND observing only a,b, output c and final (a AND b) XOR c selection. Both compilers and ColdPrefix/FixedTemplate runtimes retain history mass1/4 and integrate c: every8 actual sample trials has acceptance1/2, plus all4 prescribed a,b histories. Independent exact physical enumeration has covered1/omitted0,acceptance1/2,error1/8,target3/8,conditional1/4 with coincident bounds. Native sampled_parities2 is not equated with Rust probability-query call counts. Complete unchanged original method and8 native sample trials separately pass normal/O. A private actual task requesting c confirms history mass1/8 then fails the unchanged expected1/4 history witness.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_mixed_affine_selector_integrates_unobserved_record",
+          "source_sha256": "fe480aaa3f74642d8dd977938d2d037d7257cefaca72c5c82a42a12576220ab4"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_no_future_selection_bias_and_replay_with_recovery",
@@ -1705,8 +1721,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_noncommuting_readout_truth_table_and_target",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original Z-then-X same-wire measurements, output copy of the first bit, AND postselection and accepted Z moment against the zero target. Both compiler strategies and both ColdPrefix/FixedTemplate causal runtimes use actual physical enumeration plus all4 prescribed observed histories and8 actual sample trials. Independent literal per-history masses and contributions establish two independent bits, covered1/omitted0, acceptance3/4,error1/4,target1/2,Zmoment1/4,conditional1/3. Complete unchanged original method separately passes normal/O with fresh native production. Private actual correlated-measurement and accept-all inputs compile and fail unchanged known-answer assertions after confirming their altered exact results.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_noncommuting_readout_truth_table_and_target",
+          "source_sha256": "fe480aaa3f74642d8dd977938d2d037d7257cefaca72c5c82a42a12576220ab4"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_not_and_xor_constant_use_zero_projection_template",

@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 94 verified, 1 partial and 257 unmapped
+The source-bound ledger currently has 97 verified, 1 partial and 254 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-113 distinct Rust witnesses from 115 declarations across 52 targets. Strict
+116 distinct Rust witnesses from 118 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2082,3 +2082,59 @@ remain intact, including the explicit numerical-method partial gaps.
 These exact finite identities do not establish native random-stream ABI,
 Python keyword/serialization compatibility, weighted-summary standard errors,
 Monte Carlo convergence or paper performance.
+
+## Original nonlinear postselection truth tables
+
+Run the three complete original-method witnesses:
+
+```sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+```
+
+The pinned source is tests/core/test_nonlinear_postselection.py, SHA256
+76becb6b2146a1c7bcee326b3a7daab1aac5de12390f81887175d417d07351e8.
+The owning tests retain the complete noncommuting readout, mixed affine
+selection and joint duplicate/conflicting-condition methods. Only these
+three rows are promoted; the other fourteen methods in that original module
+remain unresolved.
+
+Both compiler strategies and both ColdPrefix and FixedTemplate causal runtimes
+run the exact source circuits. The native implicit idle-wire zero target is
+represented by an explicit Rust I 0 target. Typed stateless AND returns one
+bit; echo returns its input vector. Noncommuting readout has acceptance 3/4,
+error 1/4, target success 1/2, accepted Z moment 1/4 and conditional error 1/3.
+Mixed selection keeps the third record unobserved: every sample has captured
+history mass 1/4 and acceptance 1/2, while physical enumeration gives error
+1/8, target success 3/8 and conditional error 1/4. The native count of two
+independent sampled parities is not the Rust count of probability queries.
+
+All four prescribed AND-input histories and eight actual sampling trials
+are checked for each compiler/runtime combination in the first two tests.
+The third preserves the original duplicated-detector/echo prefix and all seven
+suffixes in source order: acceptance 1/4, 1/4, 1/2, 0, 1/4, 0, 1/4.
+Every physical enumeration has covered probability 1 and omitted probability
+0, with identical lower and upper acceptance/error bounds. Conditional
+intervals are inspected only when defined.
+
+The complete unchanged three original methods separately passed in normal
+and optimized Python against fresh production native builds, with nine actual
+enumeration calls and eight sample trials per mode. Only complete unchanged
+registry/exact helper AST was extracted; original build-capable support
+modules were not imported. Changing the actual first native acceptance from
+3/4 to one is rejected by the unchanged original assertion.
+
+Three private Rust semantic controls compiled against fresh own libraries and
+failed the unchanged literal witnesses after confirming their actual altered
+results: replacing the second measurement-basis rotation correlates the two
+measurements, an always-zero final selector accepts every branch, and asking
+to observe the third record changes captured history mass to 1/8. All controls
+stay outside repository source; the tested public candidate is unchanged.
+
+This stage has 97 verified, 1 partial and 254 unmapped methods, with no
+architecture-specific core exclusions. All 116 distinct witnesses from 118
+declarations across 53 targets must run in the source-bound audit; strict
+complete parity still exits 2. Prior mappings, fixtures and generators remain
+intact, including the numerical-method partial gaps. This finite validation
+does not establish Python keyword/serialization/private-handle compatibility,
+native random trajectories, new sampling defaults, Monte Carlo convergence
+or paper performance.

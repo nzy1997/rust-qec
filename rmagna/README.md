@@ -5854,3 +5854,26 @@ after resource/scalar refusals. Existing source-first APIs retain their defaults
 This is finite original-IR functional parity. General original-IR coverage,
 native certificate serialization, Python ABI, complete heap-byte accounting and
 paper performance remain incomplete.
+
+## Original nonlinear postselection truth tables
+
+The original_nonlinear_postselection integration target retains three complete
+finite methods from the pinned original NonlinearPostselectionTests suite.
+Both compiler strategies and both ColdPrefix and FixedTemplate runtimes
+exercise physical enumeration and actual task sampling.
+
+Successive Z and X measurements on one wire remain independent: the first
+task has acceptance 3/4, error 1/4, accepted Z moment 1/4 and conditional error
+1/3. Mixed affine selection observes only the two external AND inputs and
+integrates the third record: each sample has history mass 1/4 and acceptance
+1/2, with exact aggregate error 1/8 and conditional error 1/4. All seven
+original duplicate, complement and detector selection cases remain in their
+source order. Repeating a condition has probability 1/2; conjoining it with
+its complement has probability zero.
+
+All enumerations cover probability one with zero omitted mass and coincident
+acceptance/error bounds. Conditional intervals are checked only when defined.
+Native independent-parity counts and Rust probability-query counts describe
+different work and are not compared as identical counters. Private semantic
+controls confirm that correlated measurements, accepting every branch and
+observing the integrated third record fail the same literal witnesses.
