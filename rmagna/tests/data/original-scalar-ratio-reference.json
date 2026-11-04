@@ -1,0 +1,35 @@
+{
+  "upstream_commit": "56847478c840395735146ef1e1ccdc3d8aedc10f",
+  "source": "tests/core/test_file_native.py",
+  "source_sha256": "b078965d22ae894eb7b1bb9d16000d49ae43f7ccd5727074d05802d7b572e4a1",
+  "methods": [
+    "test_scaled_scalar_ratios_preserve_underflow_and_sign",
+    "test_scaled_scalar_ratios_exact_cancellation",
+    "test_scaled_scalar_ratios_round_half_even",
+    "test_scaled_scalar_ratios_reject_nonreal_and_nonpositive_denominator"
+  ],
+  "identified_helper_source": "tests/native/python/testing_module.cpp",
+  "identified_helper_source_sha256": "87aeaf19cfcdfb7223b65a4acb43556bf8a2540f0ca6ca8acdaf5966c5b4a24e",
+  "reference_method": "600-digit Decimal, reciprocal Pell norm-one identity; independent of original subtractive cancellation and Rust rounding",
+  "pell_steps": 120,
+  "a": "36739605226386048479168512722523807381425446660493654601152167659125380106567497307303840001",
+  "b": "25978823993694297405861433020668900740517189381405908873853436042521509465531010226118837200",
+  "ratios": [
+    {
+      "label": "small/large",
+      "native_mantissa_bits": "3fe92f028832746c",
+      "native_exponent": -1000610,
+      "Rust_mantissa_bits": "3ff92f028832746c",
+      "Rust_exponent": -1000611,
+      "coefficient_native_exponent": -610
+    },
+    {
+      "label": "large/small",
+      "native_mantissa_bits": "3fe454a67a731b8b",
+      "native_exponent": 1000611,
+      "Rust_mantissa_bits": "3ff454a67a731b8b",
+      "Rust_exponent": 1000610,
+      "coefficient_native_exponent": 611
+    }
+  ]
+}

@@ -670,23 +670,55 @@
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_exact_cancellation",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original 120-step Pell recurrence, both small/large and reciprocal large/small scalar ratios with original powers +/-500000. Exact norm one, full input integers and independently checked mantissa bits/exponents are pinned. A 600-digit Decimal oracle uses the large Pell unit and reciprocal norm identity, independently of the original subtractive cancellation and Rust rounding. The complete native original method and signed Rust controls execute.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_ratios",
+          "test": "original_scaled_scalar_ratios_exact_cancellation",
+          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_preserve_underflow_and_sign",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original five scalar-ratio pairs: both signs of 9*2^-1160, original power difference -2000000, canonical zero, and positive million-scale power. Literal native mantissa/exponent tuples match the Rust scientific magnitude convention exactly. A 512-bit work cap admits the separate original powers while refusing expanded field scalars.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_ratios",
+          "test": "original_scaled_scalar_ratios_preserve_underflow_and_sign",
+          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_reject_nonreal_and_nonpositive_denominator",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original zero/negative denominator and imaginary numerator refusals. Rust additionally rejects an imaginary denominator and invalid denominators for zero numerators; valid retries preserve exact inputs. Separate typed numeric/nonpositive/exponent errors retain existing exports and defaults.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_ratios",
+          "test": "original_scaled_scalar_ratios_reject_nonreal_and_nonpositive_denominator",
+          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_scaled_scalar_ratios_round_half_even",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original three coefficient midpoint ratios ((2^53+1), (2^53+3), (2^54-1))*2^-54 divided by one, with literal native half-even mantissa bits and exponent carry. Both signs receive value assertions.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_ratios",
+          "test": "original_scaled_scalar_ratios_round_half_even",
+          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+        }
+      ]
     },
     {
       "id": "test_file_native.NativeFileRuntimeTests.test_summary_missing_metrics_single_draw_and_zero_acceptance",
