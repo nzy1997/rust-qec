@@ -1577,8 +1577,16 @@
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_depolarizing_and_nonuniform_channels_match_declared_law",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original categorical law: fifteen1/30 alternatives, nonuniform [0,1/10,1/5,0,3/10], deterministic [1,0], and an empty fault group with exact residual identities. Preserve32768 original-size draws, every original marginal/joint six-sigma+2 tolerance, zero-probability exclusions, deterministic/empty endpoints, likelihood one, and complete41=17+24 per-seed partition. An additional300 accepted-position joint oracle checks all96 count cells including zeros,64 positive joint outcomes, exact physical/proposal probabilities, ordered nonduplicated faults and exactly two entropy words. A one-word cap refuses with typed EntropyLimit and unchanged-model two-word retry recovers final alternatives. Rust SplitMix64 is independent of native MT; the complete unchanged native original runs separately with an actual returned-weight negative control.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_noise_distributions",
+          "test": "original_depolarizing_and_nonuniform_channels_match_declared_law",
+          "source_sha256": "ed6cf5add307761635dd7b73fea332dd0e874e93caf9b8fac6bf144265fc0a34"
+        }
+      ]
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_finite_noise_thresholds_and_general_conversion_in_native_module",

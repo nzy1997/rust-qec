@@ -1240,6 +1240,15 @@ Tests enumerate exact categorical intervals and all two-site importance draws,
 verify weighted acceptance, exercise rare events and rejection limits, and check
 published SplitMix64 words plus chunk/resume identity.
 
+The `original_noise_distributions` regression preserves the complete pinned
+categorical distribution contract: fifteen equiprobable depolarizing faults,
+a nonuniform law with zero alternatives, a compulsory fault and an empty group.
+It checks all 300 accepted joint interval positions with exact probabilities
+and two entropy words, plus 32,768 seeded marginal/joint draws under the original
+six-sigma tolerances. Complete draws retain the 17+24 partition, and a one-word
+entropy refusal permits an unchanged-model two-word retry. Rust SplitMix64
+entropy is independent of native MT trajectories.
+
 ## Physical reported-record sampling
 
 `records::sample_reported` draws ordered affine reported parities from exact
