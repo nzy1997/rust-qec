@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 89 verified and 263 unmapped original
+The source-bound ledger currently has 90 verified and 262 unmapped original
 methods, with zero partial or architecture-specific exclusions. It requires
-106 distinct Rust witnesses from 108 declarations across 48 targets. Strict
+107 distinct Rust witnesses from 109 declarations across 48 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1871,3 +1871,35 @@ source-bound audit must execute all mapped assertions and still exit 2 because
 overall parity is incomplete. The library witness parser also has positive
 registration and qualified-run controls and explicit refusal cases; synthetic
 transcripts in its Python tests are parser fixtures, not execution evidence.
+
+## Original identical-irrational scaled ratios
+
+The complete pinned `NoiseNumericFastpathTests` method
+`test_identical_irrational_coefficients_and_invalid_denominators` in
+`tests/core/test_noise_numeric_fastpaths.py` (SHA256 `80169c9ceed6deecd8cd81a99d6ccbd9f0aabc0aff13bdfb8f5564ccdb152855`)
+maps to `original_identical_irrational_coefficients_preserve_scaled_ratios_and_refusals`
+in `original_scalar_ratios`. Run it with:
+
+```sh
+cargo test --locked -p rmagna --test original_scalar_ratios \
+  original_identical_irrational_coefficients_preserve_scaled_ratios_and_refusals -- --exact
+```
+
+Both original pairs use `c = 3 - 2*sqrt(2)`, whose positivity and nonzero
+value follow from `9 > 8` and the conjugate norm one. The exact Rust outputs
+`(1.0, -2000000)` and `(-1.0, 100)` match the original frexp tuples
+`(0.5, -1999999)` and `(-0.5, 101)`. The test retains both original
+zero-numerator refusals for negative `c` and complex `1+i` denominators,
+with distinct typed errors. Inputs remain unchanged and sufficient-budget
+retry succeeds after an 8-bit work budget refuses. The identical 128-bit
+limit admits compact export and refuses expanded million-scale scalars.
+
+The whole unchanged original method also runs through a freshly built pinned
+core and identified native helper in normal and optimized Python, with no
+original build-capable loader import. A returned-mantissa sign mutant must
+fail the original assertions. This promotes exactly one original method;
+four existing mappings receive only the owning file hash refresh. Current
+coverage is 90 verified and 262 unmapped, with zero partial or architecture-
+specific exclusions, and 107 distinct witnesses from 109 declarations across
+48 targets. Strict complete parity still exits 2. Python ABI, numerical
+performance and paper precision curves remain outside this finite contract.

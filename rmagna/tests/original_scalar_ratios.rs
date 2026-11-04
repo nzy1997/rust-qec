@@ -298,3 +298,74 @@ fn conjugate_norm_signs_and_cancellation_match_exact_small_field_quotients() {
         Err(ScalarRatioError::NonPositiveDenominator)
     );
 }
+
+// Complete pinned NoiseNumericFastpathTests method from
+// tests/core/test_noise_numeric_fastpaths.py. The coefficient 3 - 2*sqrt(2)
+// is positive and nonzero: its conjugate is positive and their product is 1.
+#[test]
+fn original_identical_irrational_coefficients_preserve_scaled_ratios_and_refusals() {
+    let options = NumericOptions { max_work_bits: 128 };
+    let pairs = [
+        (real(3, -2, -1_000_000), real(3, -2, 1_000_000)),
+        (real(-3, 2, 50), real(3, -2, -50)),
+    ];
+    let before = pairs.clone();
+    for ((numerator, denominator), (mantissa, exponent, native_mantissa, native_exponent)) in
+        pairs.iter().zip([
+            (1.0_f64, -2_000_000, 0.5_f64, -1_999_999),
+            (-1.0, 100, -0.5, 101),
+        ])
+    {
+        let exported = approximate_scalar_ratio(numerator, denominator, options).unwrap();
+        assert_eq!(exported.mantissa.to_bits(), mantissa.to_bits());
+        assert_eq!(exported.exponent, exponent);
+        assert_eq!(
+            native(exported),
+            (native_mantissa.to_bits(), native_exponent)
+        );
+        assert!(matches!(
+            approximate_scalar_ratio(numerator, denominator, NumericOptions { max_work_bits: 8 }),
+            Err(ScalarRatioError::Numeric(NumericError::ResourceLimit { limit: 8, required }))
+                if required > 8
+        ));
+        let retried = approximate_scalar_ratio(numerator, denominator, options).unwrap();
+        assert_eq!(retried.mantissa.to_bits(), mantissa.to_bits());
+        assert_eq!(retried.exponent, exponent);
+    }
+    // Keep the work limit identical. Expanding the scalar's separate million-
+    // bit binary power refuses, while the compact ratio above succeeds.
+    for scalar in [&pairs[0].0, &pairs[0].1] {
+        assert!(matches!(
+            FieldArithmetic::new(128).from_scalar(scalar),
+            Err(FieldError::ResourceLimit { limit: 128, required }) if required > 128
+        ));
+    }
+    assert_eq!(pairs, before);
+
+    let zero = ExactScalar::zero();
+    let invalid_denominators = [
+        real(-3, 2, 0),
+        ScalarArithmetic::default()
+            .scalar([1.into(), 0.into(), 1.into(), 0.into()], 0)
+            .unwrap(),
+    ];
+    let invalid_before = invalid_denominators.clone();
+    for (denominator, expected) in invalid_denominators.iter().zip([
+        ScalarRatioError::NonPositiveDenominator,
+        ScalarRatioError::Numeric(NumericError::NonReal),
+    ]) {
+        assert_eq!(
+            approximate_scalar_ratio(&zero, denominator, options),
+            Err(expected)
+        );
+    }
+    assert_eq!(invalid_denominators, invalid_before);
+    assert_eq!(zero, ExactScalar::zero());
+    assert_eq!(
+        approximate_scalar_ratio(&zero, &pairs[0].1, options),
+        Ok(ScientificReal {
+            mantissa: 0.0,
+            exponent: 0
+        })
+    );
+}
