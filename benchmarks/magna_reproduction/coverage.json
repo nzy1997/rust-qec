@@ -1402,13 +1402,13 @@
           "package": "rmagna",
           "target": "original_absorbed_branches",
           "test": "complete_original_ir_absorbs_before_branch_budget_and_fault_restores_rank",
-          "source_sha256": "dd65e17b00b94e6c5bf0651cf21b25b60a6257e1302fef5c15458a04db7b5ae5"
+          "source_sha256": "3fd4c570e35bbf342ffe6b9719cde874e6951b289d1a13cb9c030a4b18c00418"
         },
         {
           "package": "rmagna",
           "target": "original_absorbed_branches",
           "test": "actual_temporal_fault_keeps_trace_probability_one_half",
-          "source_sha256": "dd65e17b00b94e6c5bf0651cf21b25b60a6257e1302fef5c15458a04db7b5ae5"
+          "source_sha256": "3fd4c570e35bbf342ffe6b9719cde874e6951b289d1a13cb9c030a4b18c00418"
         }
       ]
     },

@@ -5637,8 +5637,12 @@ without allocating another metadata copy. States retain declared outputs followe
 by chronological reset/discard environment legs; destructive readouts are fixed
 and contracted. Probability includes every ordered pair, including interference
 and vanishing pairs. `statistics()` distinguishes certified terms, emitted states
-and actual probability pair work. An exact zero has no resource, no states,
-`quotient_rank: None` and probability zero.
+and actual probability pair work. An explicit zero coefficient after record
+projection or radical absorption skips resource selection: its certificate has
+no resource, no states, `quotient_rank: None` and probability zero. Interference
+can also produce zero probability while retaining a resource and nonempty
+coherent states. Counts describe the actual selected resource and emitted states,
+without claiming a canonical zero representation or a minimum rank.
 
 The new options separately bound the original raw paths, projection rows,
 conservative logical geometry, post-absorption rank/terms, absorption stages/work

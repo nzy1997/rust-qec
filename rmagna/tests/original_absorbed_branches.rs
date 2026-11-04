@@ -555,3 +555,133 @@ fn actual_temporal_fault_keeps_trace_probability_one_half() {
         }
     }
 }
+
+#[test]
+fn interference_zero_retains_actual_resource_and_coherent_states() {
+    use rmagna::clifford::CliffordCircuit;
+    // This cubic Boolean phase is balanced but has full six-dimensional
+    // signature. Its zero all-X event is not an explicit zero coefficient.
+    let triples = [
+        (0, 1, 5),
+        (0, 3, 4),
+        (1, 2, 4),
+        (1, 2, 5),
+        (1, 3, 4),
+        (1, 3, 5),
+        (2, 3, 4),
+        (2, 4, 5),
+        (3, 4, 5),
+    ];
+    let a = ScalarArithmetic::default();
+    let mut physical = vec![ExactScalar::zero(); 64];
+    physical[0] = ExactScalar::one();
+    for q in 0..6 {
+        dense_gate(C::H(q), &mut physical, &a);
+    }
+    let mut operations = Vec::new();
+    for (j, &(x, y, z)) in triples.iter().enumerate() {
+        operations.push(op(&format!("ccz{j}"), G::Ccz(x as i64, y as i64, z as i64)));
+        // Literal diagonal CCZ matrix, independent of parity decomposition.
+        for (word, value) in physical.iter_mut().enumerate() {
+            if word >> x & 1 != 0 && word >> y & 1 != 0 && word >> z & 1 != 0 {
+                *value = value.negated();
+            }
+        }
+    }
+    for q in [1, 3] {
+        operations.push(op(
+            &format!("z{q}"),
+            G::Pauli {
+                wire: q as i64,
+                pauli: OriginalPauli::Z,
+            },
+        ));
+        dense_gate(C::Z(q), &mut physical, &a);
+    }
+    for q in 0..6 {
+        operations.push(op(
+            &format!("m{q}"),
+            G::Destructive {
+                wire: q as i64,
+                basis: ReadoutBasis::X,
+                record: format!("m{q}"),
+            },
+        ));
+        dense_gate(C::H(q), &mut physical, &a);
+    }
+    assert_eq!(physical[0], ExactScalar::zero());
+    let physical_norm = physical.iter().fold(ExactScalar::zero(), |total, value| {
+        a.add(&total, &a.multiply(&value.conjugate(), value).unwrap())
+            .unwrap()
+    });
+    assert_eq!(physical_norm, ExactScalar::one());
+    let input = CliffordCircuit::new(6, (0..6).map(C::H))
+        .unwrap()
+        .evolve(&CliffordCircuit::computational(bits(6, 0)).unwrap(), &a)
+        .unwrap()
+        .unwrap();
+    let ir = OriginalInstrument::new(
+        (0..6).collect(),
+        vec![],
+        input,
+        operations,
+        vec![],
+        OriginalLimits::default(),
+        &a,
+    )
+    .unwrap();
+    let assignment = OriginalAssignment {
+        true_values: (0..6).map(|q| (format!("m{q}"), false)).collect(),
+        ..Default::default()
+    };
+    for strategy in strategies() {
+        let source = ir.compile(&assignment, strategy, &a).unwrap();
+        for resource in [
+            OriginalNetworkResource::default(),
+            OriginalNetworkResource::Native(NativePhaseOptions::default()),
+        ] {
+            let valid = Options {
+                resource,
+                ..Default::default()
+            };
+            let rank_zero = Options {
+                max_quotient_rank: 0,
+                ..valid
+            };
+            assert!(matches!(
+                source.compile_after_absorption(&rank_zero, &a),
+                Err(rmagna::instrument::OriginalError::ResourceLimit {
+                    option: "branch.max_quotient_rank",
+                    required: 6,
+                    ..
+                })
+            ));
+            let certificate = source.compile_after_absorption(&valid, &a).unwrap();
+            assert!(
+                !certificate
+                    .absorption()
+                    .tensor()
+                    .boundary()
+                    .coefficient()
+                    .is_zero()
+            );
+            assert!(certificate.resource().is_some());
+            assert_eq!(certificate.statistics().quotient_rank, Some(6));
+            assert!(!certificate.states().is_empty());
+            assert_eq!(sum(certificate.states(), &bits(0, 0), &a), physical[0]);
+            assert_eq!(certificate.probability(), &ExactScalar::zero());
+            assert_eq!(
+                certificate.statistics().certified_terms,
+                certificate.resource().unwrap().num_terms()
+            );
+            assert_eq!(
+                certificate.statistics().side_entries,
+                certificate.states().len()
+            );
+            assert_eq!(
+                certificate.statistics().probability.pair_work,
+                certificate.states().len().pow(2)
+            );
+        }
+    }
+}

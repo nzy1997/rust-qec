@@ -1754,3 +1754,12 @@ targets. The strict complete-parity audit must still exit2. The separate native
 exception/certificate needed-two versus needed-one policy remains unmapped.
 General original-IR coverage, full native certificate serialization, Python ABI,
 complete heap-byte accounting and paper performance remain separate gaps.
+
+The additional six-wire balanced CCZ/Z circuit has zero all-X event amplitude
+and probability but a nonzero absorbed tensor with quotient rank six. Both
+compiler strategies and both explicit resource policies retain their actual
+resource and nonempty coherent states; the full ordered-pair norm cancels to
+zero. A rank-zero compile cap still refuses, and a valid retry succeeds.
+Only an explicit zero coefficient after projection/absorption skips resource
+selection. This additional frontend regression does not map another upstream
+method or introduce an implicit zero-detection/normalization policy.

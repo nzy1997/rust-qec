@@ -39,7 +39,8 @@ impl Default for OriginalBranchCertificateOptions<'_> {
     }
 }
 
-/// Actual selected and emitted counts. An exact zero has no selected resource.
+/// Actual selected and emitted counts. An explicit zero tensor skips selection;
+/// a zero probability from coherent cancellation can retain a resource.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OriginalBranchCertificateStatistics {
     pub quotient_rank: Option<usize>,
