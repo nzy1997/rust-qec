@@ -62,6 +62,13 @@ pub use certificate::{
     OriginalBranchCertificateStatistics,
 };
 
+#[path = "original_record_sampling.rs"]
+mod record_sampling;
+pub use record_sampling::{
+    OriginalRecordDraw, OriginalRecordDrawOptions, OriginalRecordSamplingError,
+    OriginalRecordSamplingLimits, OriginalRecordSamplingStatistics, PreparedOriginalRecordSampling,
+};
+
 pub type OriginalWire = i64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OriginalPauli {

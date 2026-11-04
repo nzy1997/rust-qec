@@ -5442,6 +5442,84 @@ the API below. Its original-instrument integration, the original circuit
 frontend and complete sampler/paper reproduction remain incomplete.
 
 
+## Exact retained-record draws on an affine support bound
+
+`OriginalRecordProbabilities::prepare_affine_sampling` prepares an immutable
+owned sampling plan for the actual retained mass terms. It canonicalizes each
+term, constructs an independent affine hull, and relabels the unchanged exact
+coefficients and quadratic phases into common coordinates. Term amplitudes are
+added as classical masses. They are never squared or sampled as a positive
+mixture, and preparation builds no additional phase resource or label truth table.
+
+`support_bound()` can include canceled labels; it is neither a minimum true
+support nor a general native commuting-axis certificate. `coordinate_terms()`
+exposes the relabeled canonical terms. `statistics()` reports actual input and
+canonical term counts and support dimension, plus conservative preparation
+geometry/work admission estimates. Record, term, path and geometry/work bounds
+precede canonicalization and factorization; the discovered dimension is checked
+before retaining the coordinate plan. Packed geometry includes headers and
+scratch but excludes existing source storage and arbitrary-precision scalar
+limbs, which have their own arithmetic limits. It does not measure process RSS.
+
+`sample_bits` queries one conditional mass per independent support coordinate,
+uses the existing exact Boolean Bernoulli refinement, and maps the chosen
+coordinates back to the original ordered reported labels. Duplicate rows and
+report inversions are preserved. Each successful draw exposes exact label and
+total masses, support dimension, actual conditional-query count and actual
+callback-bit consumption. Independent unbiased callback bits give the normalized
+law. Query, geometry and work admission precedes draw allocations and entropy;
+the total entropy cap applies across all coordinate decisions.
+
+Zero, nonreal or nonpositive totals and invalid conditional masses return typed
+errors. Entropy/scalar failure can consume a prefix of the caller's stream but
+never exceeds its bit cap or mutates the plan. A later valid retry remains
+available. Existing retained marginals, uniform certificates and runtime defaults
+keep their behavior.
+
+```rust
+use rmagna::{clifford::{CliffordCircuit, CliffordGate as C}, gf2::BitVector,
+    instrument::{OriginalGate as G, OriginalInstrument, OriginalLimits,
+        OriginalNetworkOptions, OriginalNetworkResource, OriginalOperation,
+        OriginalRecordDrawOptions, OriginalRecordParity, OriginalRecordSamplingLimits,
+        OriginalTraceAssignment, ReadoutBasis}, phase::NativePhaseOptions,
+    scalar::{ExactScalar, ScalarArithmetic}, unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let input = CliffordCircuit::new(2, [C::H(0), C::H(1)])?
+    .evolve(&CliffordCircuit::computational(BitVector::zeros(2)?)?, &a)?.unwrap();
+let ir = OriginalInstrument::new(vec![0, 1], vec![], input, vec![
+    OriginalOperation { id: "t".into(), gate: G::Phase { wires: vec![0, 1], turns: 1 } },
+    OriginalOperation { id: "a".into(), gate: G::Destructive { wire: 0, basis: ReadoutBasis::X, record: "a".into() } },
+    OriginalOperation { id: "b".into(), gate: G::Destructive { wire: 1, basis: ReadoutBasis::X, record: "b".into() } },
+], vec![], OriginalLimits::default(), &a)?;
+let trace = ir.compile_trace(CompilerStrategy::ParityCopies, &a)?;
+let view = trace.with_assignment(&OriginalTraceAssignment::default(), &a)?;
+let rows = ["a", "b"].map(|r| OriginalRecordParity { records: vec![r.into()], inverted: false });
+let mut native = NativePhaseOptions::default();
+native.selection.max_quotient_rank = 4;
+let options = OriginalNetworkOptions { resource: OriginalNetworkResource::Native(native), max_terms: 16, ..Default::default() };
+let masses = view.prepare_record_probabilities(&rows, &options, &a)?.evaluate(&a)?;
+assert_eq!(masses.terms().len(), 4);
+assert!(masses.uniform_affine(&a)?.is_none());
+let plan = masses.prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)?;
+assert_eq!(plan.support_bound().columns(), &[BitVector::from_indices(2, [0, 1])?]);
+// Fixed bits make this example deterministic. Supply unbiased bits for sampling.
+let draw = plan.sample_bits(OriginalRecordDrawOptions::default(), &mut || true, &a)?;
+assert_eq!(draw.label, BitVector::zeros(2)?);
+assert_eq!(draw.label_mass, a.scalar([2.into(), 1.into(), 0.into(), (-1).into()], -2)?);
+assert_eq!(draw.total_mass, ExactScalar::one());
+assert_eq!((draw.support_dimension, draw.conditional_queries, draw.entropy_bits), (1, 1, 1));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The complete joint-parity original-IR witness runs under both compilers and both
+explicit resource policies: Native produces four coherent mass terms and
+Catalogue two, with identical exact probabilities. Additional regressions cover
+129 dependent labels, nonpoint and complex/overlapping terms, canceled labels,
+variable phases, zero/invalid laws, uniform/deterministic cases, quota precedence,
+scalar recovery and cumulative entropy refusal/retry. These are finite functional
+witnesses; Python RNG/class ABI, general commutator certificates and throughput
+parity remain incomplete.
+
 ## Raw phase-path boundary traces
 
 `phase::PhasePathTensor::new(boundary, phase)` owns an unnormalized `AffineKet`

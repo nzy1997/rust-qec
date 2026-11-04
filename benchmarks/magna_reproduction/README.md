@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 76 verified and 276 unmapped original
+The source-bound ledger currently has 82 verified and 270 unmapped original
 methods, with zero partial or architecture-specific exclusions. It requires
-89 distinct Rust witnesses from 91 declarations across 41 targets. Strict
+99 distinct Rust witnesses from 101 declarations across 46 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1748,7 +1748,7 @@ zero certificates, output/environment chronology, reported versus true feedback,
 stored decisions without callback replay, global phases and immutable recovery
 after path, projection, geometry, stage, work, term, pair and scalar refusals.
 
-Only this whole original method is newly mapped. Current scope is81 verified,
+Only this whole original method was newly mapped at this step. Its scope was81 verified,
 271 unmapped,98 unique Rust witnesses from100 declarations across45 integration
 targets. The strict complete-parity audit must still exit2. The separate native
 exception/certificate needed-two versus needed-one policy remains unmapped.
@@ -1763,3 +1763,36 @@ zero. A rank-zero compile cap still refuses, and a valid retry succeeds.
 Only an explicit zero coefficient after projection/absorption skips resource
 selection. This additional frontend regression does not map another upstream
 method or introduce an implicit zero-detection/normalization policy.
+
+
+## Exact retained-record mass draws
+
+Run `cargo test --locked -p rmagna --test original_record_sampling`.
+The complete original `test_commuting_kernel_includes_joint_parities` now has
+an actual original-IR Rust witness under both compilers. The odd XOR phase
+followed by destructive X readouts retains exact masses `(2+sqrt2)/4` at00
+and `(2-sqrt2)/4` at11, with zero mass at01/10. Native and Catalogue policies
+produce four and two coherent mass terms respectively, with the same law.
+
+`OriginalRecordProbabilities::prepare_affine_sampling` constructs an immutable
+conservative affine support bound and relabels canonical mass terms without
+changing their coefficients/quadratics. This witness has offset0, independent
+direction3 and dimension1. Each draw makes one conditional coordinate query,
+returns only00or11, reports exact label/total masses and counts actual Boolean
+callback bits. Mass terms are summed, never squared or sampled as a positive
+mixture. No record truth table or complete side resource is constructed.
+
+Further tests cover report inversions,129 repeated rows, nonpoint terms,
+complex overlaps and canceled labels, variable phases, uniform/deterministic
+and zero/invalid laws, immutable preparation/draw quotas, scalar refusal and
+valid recovery. A two-coordinate nonuniform law proves that entropy exhaustion
+counts the actual prefix across coordinates and never overconsumes the source.
+The unchanged original method passes with a fresh production native extension
+and identified existing helper in normal and optimized Python; a genuine
+returned-mass sign mutant is rejected. Independent rational physical gates
+check all four complex amplitudes and coherent norms.
+
+Only this complete original method is newly mapped. Current scope is82 verified,
+270 unmapped,99 distinct Rust witnesses from101 declarations across46 targets.
+The strict complete-parity audit must still exit2. General native commuting-axis
+certificates, Python RNG/class ABI and throughput/paper parity remain incomplete.

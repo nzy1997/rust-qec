@@ -331,4 +331,342 @@ mod tests {
             &ExactScalar::one()
         );
     }
+
+    fn sampling_point(word: usize, coefficient: ExactScalar) -> AffineKet {
+        AffineKet::new(
+            BitVector::from_indices(1, (word != 0).then_some(0)).unwrap(),
+            vec![],
+            QuadraticForm::new(0, vec![], vec![]).unwrap(),
+            coefficient,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn sampling_keeps_complex_overlaps_and_canceled_labels_in_a_conservative_bound() {
+        use crate::instrument::{OriginalRecordDrawOptions, OriginalRecordSamplingLimits};
+        let a = ScalarArithmetic::default();
+        let quarter = a
+            .scalar([1.into(), 0.into(), 0.into(), 0.into()], -2)
+            .unwrap();
+        let half = a
+            .scalar([1.into(), 0.into(), 0.into(), 0.into()], -1)
+            .unwrap();
+        let imaginary = a
+            .scalar([0.into(), 0.into(), 1.into(), 0.into()], -3)
+            .unwrap();
+        let vector =
+            |word| BitVector::from_indices(2, (0..2).filter(|j| word >> j & 1 != 0)).unwrap();
+        let line = |offset, coefficient| {
+            AffineKet::new(
+                vector(offset),
+                vec![vector(3)],
+                QuadraticForm::new(0, vec![0], vec![BitVector::zeros(1).unwrap()]).unwrap(),
+                coefficient,
+            )
+            .unwrap()
+        };
+        let point = AffineKet::new(
+            vector(0),
+            vec![],
+            QuadraticForm::new(0, vec![], vec![]).unwrap(),
+            half,
+        )
+        .unwrap();
+        let tensor = OriginalRecordProbabilities {
+            terms: vec![
+                line(0, quarter.clone()),
+                point,
+                line(1, imaginary.clone()),
+                line(1, imaginary.negated()),
+            ],
+        };
+        let before = tensor.terms().to_vec();
+        let plan = tensor
+            .prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)
+            .unwrap();
+        assert_eq!(plan.support_bound().dimension(), 2);
+        assert_eq!(plan.coordinate_terms().len(), 4);
+        for (source, mapped) in before.iter().zip(plan.coordinate_terms()) {
+            let canonical = source.contract(&a).unwrap().unwrap();
+            assert_eq!(mapped.coefficient(), canonical.coefficient());
+            assert_eq!(mapped.phase(), canonical.phase());
+        }
+        for high in [false, true] {
+            let mut calls = 0;
+            let draw = plan
+                .sample_bits(
+                    OriginalRecordDrawOptions::default(),
+                    &mut || {
+                        calls += 1;
+                        high
+                    },
+                    &a,
+                )
+                .unwrap();
+            let word = usize::from(draw.label.get(0).unwrap())
+                | (usize::from(draw.label.get(1).unwrap()) << 1);
+            assert_eq!(word, if high { 0 } else { 3 });
+            assert_eq!(
+                draw.label_mass,
+                if high {
+                    a.subtract(&ExactScalar::one(), &quarter).unwrap()
+                } else {
+                    quarter.clone()
+                }
+            );
+            assert_eq!(
+                (draw.conditional_queries, draw.entropy_bits, calls),
+                (2, if high { 1 } else { 2 }, if high { 1 } else { 2 })
+            );
+        }
+        assert_eq!(tensor.terms(), before);
+    }
+
+    #[test]
+    fn sampling_preserves_nonconstant_mass_phases_instead_of_squaring_terms() {
+        use crate::instrument::{OriginalRecordDrawOptions, OriginalRecordSamplingLimits};
+        let a = ScalarArithmetic::default();
+        let half = a
+            .scalar([1.into(), 0.into(), 0.into(), 0.into()], -1)
+            .unwrap();
+        let quarter = a
+            .scalar([1.into(), 0.into(), 0.into(), 0.into()], -2)
+            .unwrap();
+        let tensor = OriginalRecordProbabilities {
+            terms: vec![term(half, 0, 0), term(quarter.clone(), 0, 2)],
+        };
+        assert!(tensor.uniform_affine(&a).unwrap().is_none());
+        let plan = tensor
+            .prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)
+            .unwrap();
+        assert_eq!(plan.support_bound().dimension(), 1);
+        assert!(
+            plan.coordinate_terms()
+                .iter()
+                .any(|t| t.phase().linear() == [2])
+        );
+        for high in [false, true] {
+            let draw = plan
+                .sample_bits(OriginalRecordDrawOptions::default(), &mut || high, &a)
+                .unwrap();
+            assert_eq!(draw.label.get(0).unwrap(), !high);
+            assert_eq!(
+                draw.label_mass,
+                if high {
+                    a.subtract(&ExactScalar::one(), &quarter).unwrap()
+                } else {
+                    quarter.clone()
+                }
+            );
+            assert_eq!(draw.total_mass, ExactScalar::one());
+        }
+    }
+
+    #[test]
+    fn sampling_zero_and_invalid_mass_failures_never_fabricate_a_draw() {
+        use crate::instrument::{
+            OriginalRecordDrawOptions, OriginalRecordSamplingError as E,
+            OriginalRecordSamplingLimits,
+        };
+        let a = ScalarArithmetic::default();
+        let imaginary = a.omega(2, 0).unwrap();
+        for terms in [
+            vec![],
+            vec![sampling_point(0, ExactScalar::zero())],
+            vec![sampling_point(0, ExactScalar::one().negated())],
+            vec![sampling_point(0, imaginary.clone())],
+            vec![
+                sampling_point(0, ExactScalar::one()),
+                sampling_point(0, ExactScalar::one().negated()),
+            ],
+        ] {
+            let tensor = OriginalRecordProbabilities { terms };
+            let before = tensor.terms().to_vec();
+            assert!(matches!(
+                tensor.prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a),
+                Err(E::InvalidMass)
+            ));
+            assert_eq!(tensor.terms(), before);
+        }
+        // Positive total alone does not make artificial nonphysical terms a
+        // valid law. Each conditional mass is validated before its first bit.
+        for terms in [
+            vec![
+                sampling_point(
+                    0,
+                    a.scalar([2.into(), 0.into(), 0.into(), 0.into()], 0)
+                        .unwrap(),
+                ),
+                sampling_point(1, ExactScalar::one().negated()),
+            ],
+            vec![
+                sampling_point(0, a.add(&ExactScalar::one(), &imaginary).unwrap()),
+                sampling_point(1, imaginary.negated()),
+            ],
+        ] {
+            let tensor = OriginalRecordProbabilities { terms };
+            let before = tensor.terms().to_vec();
+            let plan = tensor
+                .prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)
+                .unwrap();
+            assert_eq!(plan.total_mass(), &ExactScalar::one());
+            assert!(matches!(
+                plan.sample_bits(
+                    OriginalRecordDrawOptions::default(),
+                    &mut || panic!("invalid conditional mass consumed entropy"),
+                    &a
+                ),
+                Err(E::InvalidMass)
+            ));
+            assert_eq!(tensor.terms(), before);
+        }
+        let valid = OriginalRecordProbabilities {
+            terms: vec![sampling_point(0, ExactScalar::one())],
+        };
+        let plan = valid
+            .prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)
+            .unwrap();
+        assert_eq!(
+            plan.sample_bits(
+                OriginalRecordDrawOptions::default(),
+                &mut || panic!("point law consumed entropy"),
+                &a
+            )
+            .unwrap()
+            .label_mass,
+            ExactScalar::one()
+        );
+    }
+
+    #[test]
+    fn sampling_structural_admission_precedes_canonicalization_and_factorization() {
+        use crate::gf2::FACTORIZATION_CALLS;
+        use crate::instrument::{
+            OriginalRecordSamplingError as E, OriginalRecordSamplingLimits as L,
+        };
+        let a = ScalarArithmetic::default();
+        let half = a
+            .scalar([1.into(), 0.into(), 0.into(), 0.into()], -1)
+            .unwrap();
+        let tensor = OriginalRecordProbabilities {
+            terms: vec![term(half, 0, 0)],
+        };
+        for limits in [
+            L {
+                max_record_rows: 0,
+                ..Default::default()
+            },
+            L {
+                max_terms: 0,
+                ..Default::default()
+            },
+            L {
+                max_path_bits: 0,
+                ..Default::default()
+            },
+            L {
+                max_geometry_words: 0,
+                ..Default::default()
+            },
+            L {
+                max_work: 0,
+                ..Default::default()
+            },
+        ] {
+            FACTORIZATION_CALLS.with(|v| v.set(0));
+            assert!(matches!(
+                tensor.prepare_affine_sampling(limits, &a),
+                Err(E::ResourceLimit { .. })
+            ));
+            assert_eq!(FACTORIZATION_CALLS.with(|v| v.get()), 0);
+        }
+        let plan = tensor.prepare_affine_sampling(L::default(), &a).unwrap();
+        for limits in [
+            L {
+                max_geometry_words: plan.statistics().preparation_geometry_words as usize - 1,
+                ..Default::default()
+            },
+            L {
+                max_work: plan.statistics().preparation_work as usize - 1,
+                ..Default::default()
+            },
+        ] {
+            FACTORIZATION_CALLS.with(|v| v.set(0));
+            assert!(matches!(
+                tensor.prepare_affine_sampling(limits, &a),
+                Err(E::ResourceLimit { .. })
+            ));
+            assert_eq!(FACTORIZATION_CALLS.with(|v| v.get()), 0);
+        }
+        assert!(matches!(
+            tensor.prepare_affine_sampling(
+                L {
+                    max_support_dimension: 0,
+                    ..Default::default()
+                },
+                &a
+            ),
+            Err(E::ResourceLimit {
+                option: "max_support_dimension",
+                required: 1,
+                ..
+            })
+        ));
+        assert_eq!(
+            tensor
+                .prepare_affine_sampling(L::default(), &a)
+                .unwrap()
+                .total_mass(),
+            &ExactScalar::one()
+        );
+    }
+
+    #[test]
+    fn sampling_scalar_refusal_preserves_mass_scale_and_allows_valid_retry() {
+        use crate::instrument::{
+            OriginalRecordDrawOptions, OriginalRecordSamplingError as E,
+            OriginalRecordSamplingLimits,
+        };
+        let a = ScalarArithmetic::default();
+        let three = a
+            .scalar([3.into(), 0.into(), 0.into(), 0.into()], 0)
+            .unwrap();
+        let tensor = OriginalRecordProbabilities {
+            terms: vec![sampling_point(0, three.clone())],
+        };
+        let plan = tensor
+            .prepare_affine_sampling(OriginalRecordSamplingLimits::default(), &a)
+            .unwrap();
+        let limited = ScalarArithmetic::new(1).unwrap();
+        assert!(matches!(
+            plan.sample_bits(
+                OriginalRecordDrawOptions::default(),
+                &mut || panic!("scalar admission consumed entropy"),
+                &limited
+            ),
+            Err(E::Scalar(_))
+        ));
+        let draw = plan
+            .sample_bits(
+                OriginalRecordDrawOptions {
+                    max_conditional_queries: 0,
+                    max_entropy_bits: 0,
+                    ..Default::default()
+                },
+                &mut || panic!("scaled point law consumed entropy"),
+                &a,
+            )
+            .unwrap();
+        assert_eq!(
+            (
+                draw.label_mass,
+                draw.total_mass,
+                draw.conditional_queries,
+                draw.entropy_bits
+            ),
+            (three.clone(), three, 0, 0)
+        );
+        assert_eq!(tensor.terms()[0].coefficient(), plan.total_mass());
+    }
 }
