@@ -55,6 +55,13 @@ pub use trace::{
     PreparedOriginalNetworkRecords, UniformOriginalRecords,
 };
 
+#[path = "original_certificate.rs"]
+mod certificate;
+pub use certificate::{
+    OriginalBranchCertificate, OriginalBranchCertificateOptions,
+    OriginalBranchCertificateStatistics,
+};
+
 pub type OriginalWire = i64;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OriginalPauli {

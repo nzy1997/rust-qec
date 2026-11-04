@@ -1,7 +1,8 @@
 //! Unitary third-hierarchy circuits lowered to Clifford boundaries and phases.
 
-mod expansion;
+pub(crate) mod expansion;
 mod input;
+pub(crate) mod projected;
 pub use expansion::{
     ExpansionLimits, ExpansionStatistics, OwnedStabilizerExpansion, RecordExpansionStatistics,
     RetainedRecordDistribution,
