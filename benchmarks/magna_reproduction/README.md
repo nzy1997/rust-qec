@@ -1926,8 +1926,9 @@ A one-word entropy cap refuses with typed `EntropyLimit`; retrying the same
 model with words `[29,9]` and a two-word cap recovers final alternatives and
 exact mass 1/100. Original input category vectors remain unchanged.
 
-All 32,768 original-size marginal/joint trials retain the original
-`6*sqrt(shots*p*(1-p))+2` tolerances. Rejection sampling can consume more than
+All 32,768 original-size trials retain the original marginal tolerances
+`6*sqrt(shots*p*(1-p))+2`. The joint fault count retains the stricter original
+bound `6*sqrt(shots*0.3*0.7)` with no additive slack. Rejection sampling can consume more than
 two words for these stochastic trials; actual provider calls must match the
 reported count. The first 41 complete draws equal separate per-seed calls of
 17 and 24, including weights and entropy. Rust uses independent SplitMix64

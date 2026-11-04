@@ -104,7 +104,7 @@ fn seeded_draw(sampler: &NoiseSampler, seed: u64) -> NoiseDraw {
     draw
 }
 
-fn within_original_tolerance(count: usize, probability: f64) {
+fn within_original_marginal_tolerance(count: usize, probability: f64) {
     if probability == 0.0 {
         assert_eq!(count, 0);
     } else {
@@ -234,12 +234,16 @@ fn original_depolarizing_and_nonuniform_channels_match_declared_law() {
         joint_faults += usize::from(a != 0 && b != 0);
     }
     for (choice, &count) in first_counts.iter().enumerate() {
-        within_original_tolerance(count, if choice == 0 { 0.5 } else { 1.0 / 30.0 });
+        within_original_marginal_tolerance(count, if choice == 0 { 0.5 } else { 1.0 / 30.0 });
     }
     for (&count, &weight) in second_counts.iter().zip(&SECOND_WEIGHTS) {
-        within_original_tolerance(count, weight as f64 / 10.0);
+        within_original_marginal_tolerance(count, weight as f64 / 10.0);
     }
-    within_original_tolerance(joint_faults, 0.3);
+    let shots = SHOTS as f64;
+    assert!(
+        (joint_faults as f64 - shots * 0.3).abs() < 6.0 * (shots * 0.3 * 0.7).sqrt(),
+        "joint faults={joint_faults}, shots={SHOTS}"
+    );
     let partitioned = seeds[..17]
         .iter()
         .map(|&seed| seeded_draw(&sampler, seed))
