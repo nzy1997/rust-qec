@@ -46,7 +46,7 @@ def safe_file(root: Path, relative: str) -> Path:
     return path
 
 
-def rust_tokens(source: str) -> list[str]:
+def rust_tokens(source: str, *, strings: bool = False) -> list[str]:
     """Discard comments/literals before looking for unconditional flat tests."""
     tokens = []
     i = 0
@@ -81,12 +81,13 @@ def rust_tokens(source: str) -> list[str]:
             continue
         quoted = re.match(r'(?:b|c)?"', source[i:])
         if quoted:
+            start = i
             i += quoted.end()
             while i < len(source) and source[i] != '"':
                 i += 2 if source[i] == "\\" else 1
             require(i < len(source), "unterminated Rust string")
             i += 1
-            tokens.append("LITERAL")
+            tokens.append(source[start:i] if strings and quoted[0] == '"' else "LITERAL")
             continue
         char = re.match(r"(?:b)?'(?:\\u\{[0-9a-fA-F_]+\}|\\x[0-9a-fA-F]{2}|\\.|[^'\\\n])'", source[i:])
         if char:
@@ -155,15 +156,107 @@ def flat_tests(source: str) -> set[str]:
     return names
 
 
+def library_module(root: Path, source: Path, directory: Path, name: str) -> tuple[Path, Path]:
+    """Resolve one explicit external module; unsupported registrations refuse.
+
+    This deliberately supports only ordinary modules, cfg(test), and literal
+    relative path attributes. The full execution source identity binds every
+    registration file as well as the hashed leaf containing the test.
+    """
+    tokens = rust_tokens(source.read_text(encoding="utf-8"), strings=True)
+    delimiters = []
+    attributes = []
+    candidates = []
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        inner = tokens[i:i + 3] == ["#", "!", "["]
+        if not delimiters and (inner or tokens[i:i + 2] == ["#", "["]):
+            start = i + (3 if inner else 2)
+            end, depth = start, 1
+            while end < len(tokens) and depth:
+                depth += (tokens[end] == "[") - (tokens[end] == "]")
+                end += 1
+            require(depth == 0, "unterminated Rust module attribute")
+            attribute = tokens[start:end - 1]
+            if inner:
+                require(attribute[:1] == ["doc"], "unsupported inner Rust module attribute")
+            else:
+                attributes.append(attribute)
+            i = end
+            continue
+        if not delimiters and token == "pub":
+            i += 1
+            if tokens[i:i + 1] == ["("]:
+                end = i + 1
+                while end < len(tokens) and tokens[end] != ")":
+                    end += 1
+                require(end < len(tokens), "unterminated Rust visibility")
+                i = end + 1
+            continue
+        if not delimiters and token == "mod" and tokens[i + 1:i + 2] == [name]:
+            candidates.append((attributes, tokens[i + 2:i + 3]))
+        if not delimiters:
+            attributes = []
+        if token in {"{", "(", "["}:
+            delimiters.append(token)
+        elif token in {"}", ")", "]"}:
+            require(bool(delimiters) and delimiters.pop() == {"}": "{", ")": "(", "]": "["}[token],
+                    "unbalanced Rust module delimiters")
+        i += 1
+    require(not delimiters, "unbalanced Rust module delimiters")
+    require(len(candidates) == 1, f"missing or ambiguous Rust library module: {name}")
+    attributes, ending = candidates[0]
+    require(ending == [";"], f"unsupported inline Rust library module: {name}")
+    path = None
+    test_cfg = False
+    for attribute in attributes:
+        if attribute == ["cfg", "(", "test", ")"]:
+            require(not test_cfg, f"duplicate cfg(test) on module: {name}")
+            test_cfg = True
+        else:
+            require(len(attribute) == 3 and attribute[:2] == ["path", "="]
+                    and re.fullmatch(r'"[A-Za-z_0-9./-]+\.rs"', attribute[2]) is not None
+                    and path is None, f"unsupported Rust module attribute: {name}")
+            path = attribute[2][1:-1]
+    if path is not None:
+        # Validate the attribute independently: joining must not erase an
+        # absolute/traversing component before safe_file sees it.
+        require(all(part not in {"", ".", ".."} for part in path.split("/")),
+                f"unsafe Rust module path: {path}")
+        selected = safe_file(root, (source.parent.relative_to(root) / path).as_posix())
+        # An explicit path gives this module its file's parent directory for
+        # default children, even when the file is not named mod.rs. Ordinary
+        # foo.rs modules instead search foo/ for default children. Carry the
+        # registration context: the same physical file can be loaded either way.
+        return selected, selected.parent
+    alternatives = [directory / f"{name}.rs", directory / name / "mod.rs"]
+    present = [p for p in alternatives if p.exists() or p.is_symlink()]
+    require(len(present) == 1, f"missing or ambiguous Rust module source: {name}")
+    selected = safe_file(root, present[0].relative_to(root).as_posix())
+    return selected, selected.parent if selected.name == "mod.rs" else selected.with_suffix("")
+
+
 def witness(root: Path, value: object) -> tuple[str, str]:
     row = fields(value, {"package", "target", "test", "source_sha256"}, "Rust witness")
     require(row["package"] == "rmagna", "unsupported Rust package")
     for key in ("target", "test"):
-        require(isinstance(row[key], str) and re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", row[key]) is not None,
+        pattern = r"[A-Za-z_][A-Za-z_0-9]*"
+        if key == "test" and row["target"] == "lib":
+            pattern += r"(?:::[A-Za-z_][A-Za-z_0-9]*)+"
+        require(isinstance(row[key], str) and re.fullmatch(pattern, row[key]) is not None,
                 f"invalid or nested Rust {key}: {row[key]!r}")
-    path = safe_file(root, f"rmagna/tests/{row['target']}.rs")
+    name = row["test"]
+    if row["target"] == "lib":
+        path = safe_file(root, "rmagna/src/lib.rs")
+        directory = path.parent
+        *modules, name = name.split("::")
+        for module in modules:
+            path, directory = library_module(root, path, directory, module)
+    else:
+        path = safe_file(root, f"rmagna/tests/{row['target']}.rs")
     require(sha(path) == row["source_sha256"], f"Rust source SHA-256 mismatch: {row['target']}")
-    require(row["test"] in flat_tests(path.read_text(encoding="utf-8")),
+    require(name in flat_tests(path.read_text(encoding="utf-8")),
             f"nonexistent or unsupported Rust test: {row['target']}::{row['test']}")
     return row["target"], row["test"]
 

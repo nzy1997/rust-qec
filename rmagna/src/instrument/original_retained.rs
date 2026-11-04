@@ -1,4 +1,8 @@
 //! Retained reported-record masses after physical diagonal trace elimination.
+#[cfg(test)]
+#[path = "original_contracts.rs"]
+mod original_contracts;
+
 use super::{
     OriginalError, OriginalNetworkOptions, OriginalNetworkResource, OriginalRecordParity,
     OriginalTraceView, labelled_layout,

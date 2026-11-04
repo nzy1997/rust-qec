@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 86 verified and 266 unmapped original
+The source-bound ledger currently has 89 verified and 263 unmapped original
 methods, with zero partial or architecture-specific exclusions. It requires
-103 distinct Rust witnesses from 105 declarations across 47 targets. Strict
+106 distinct Rust witnesses from 108 declarations across 48 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -183,14 +183,23 @@ auditable producer attestation: JSON and hashes cannot authenticate that a
 process actually ran, so original compiler/run receipts require independent
 review. The synthetic run strings in unit tests are parser fixtures only.
 
-Current declaration validation deliberately accepts only explicit unconditional
-top-level `#[test]` functions with ordinary ASCII identifiers in
-`rmagna/tests/<target>.rs`. Raw identifiers (including `r#name`), non-ASCII names,
-nested, macro-generated, configured, ignored or otherwise unsupported declarations
-need an explicit validator extension before becoming coverage witnesses.
-Unsupported identifier prefixes never qualify as shorter test names. This restriction avoids
-inferring test existence from a string or comment. Source declarations establish
-existence; only matching actual execution establishes a pass.
+Integration witnesses accept explicit unconditional top-level `#[test]`
+functions with ordinary ASCII identifiers in `rmagna/tests/<target>.rs`.
+The reserved target `lib` instead uses a fully qualified test name, resolved
+from `rmagna/src/lib.rs` through explicit external module declarations. Ordinary
+module paths, `#[cfg(test)]`, and literal safe relative `#[path = "file.rs"]`
+registrations are supported; the leaf file still requires an unconditional
+flat `#[test]` function and matching SHA-256. The complete `source_files` identity
+binds all registration files. Build with `cargo test --locked -p rmagna --lib
+--no-run` and retain the actual library harness's qualified `--list` and run
+observations under target `lib`.
+
+Inline modules, macro-generated declarations, other configurations/attributes,
+ambiguous registrations, unsafe paths and symlinks refuse library witnesses.
+Raw identifiers (including `r#name`), non-ASCII names and ignored or otherwise
+unsupported tests remain unsupported. Identifier prefixes, strings and comments
+cannot invent witnesses. Source declarations establish existence; only matching
+actual execution establishes a pass.
 
 At the pinned revision the source-tree runner discovers 352 tests: 340 pass and
 12 installed-wheel tests are skipped without `MAGNA_INSTALLED_PYTHON`. Running
@@ -1830,3 +1839,35 @@ partial or architecture-specific exclusions. All 103 distinct witnesses from
 audit. Strict complete parity still exits 2. Other original file-native methods,
 Python tuple/class ABI, binary64 after scaling, defaults, performance and paper
 precision curves remain outside this finite mapping.
+
+## Original global signed-mass draws and seed replay
+
+The three complete private-native methods in pinned `test_file_native.py`
+(SHA256 `b078965d22ae894eb7b1bb9d16000d49ae43f7ccd5727074d05802d7b572e4a1`)
+map to the retained owner's private `original_contracts` library tests:
+`test_affine_mixture_big_boundary_and_reproducibility`,
+`test_exact_irrational_signed_global_marginal`, and
+`test_complex_terms_cancel_before_sampling`.
+
+Run `cargo test --locked -p rmagna --lib original_contracts` for three tests.
+The fixtures preserve all 256 wide seeds plus exact replay, all 1024 signed
+seeds with the original 0.035 frequency tolerance, and ten deterministic complex
+cancellation draws. Every draw checks exact selected/total mass, independent
+support dimension, conditional-query count, and actual callback-bit consumption.
+The complex control distinguishes the true linear total one from the incorrect
+sum of individually squared coefficients three. Raw terms remain private.
+
+The unchanged original methods are separate native-reference checks, using
+the pinned production core and identified test helper rather than the original
+build-capable loader. Returned-word mutations must fail all three methods.
+Rust uses caller-owned SplitMix64 Boolean bits; native MT stream identity,
+signed-seed ABI refusal, general input validation and paper throughput remain
+outside this finite sampling contract.
+
+This increment has 89 verified and 263 unmapped original methods, zero partial
+or architecture-specific exclusions, and 106 distinct witnesses from 108
+declarations across 47 integration targets plus the library harness. The strict
+source-bound audit must execute all mapped assertions and still exit 2 because
+overall parity is incomplete. The library witness parser also has positive
+registration and qualified-run controls and explicit refusal cases; synthetic
+transcripts in its Python tests are parser fixtures, not execution evidence.
