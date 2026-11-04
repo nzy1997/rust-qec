@@ -330,3 +330,89 @@ fn original_joint_duplicate_conflicting_detector_and_task_conditions() {
         }
     }
 }
+
+// Complete original method test_dense_noncommuting_magic_instrument_with_report_noise
+// from the same pinned module above. The exact two-dimensional branch oracle
+// sums P_y(c) T H P_z(b) T S P_x(a) T H|0> over all 16 (a,b,c,flip)
+// choices, selecting (a AND c) XOR (b XOR flip). The middle quantum bit b
+// remains integrated; the opaque controller observes only a and c.
+const DENSE_MAGIC: &str = "H 0\nT 0\nMX 0\nS 0\nT 0\nM(1/3) 0\nH 0\nT 0\nMY 0\nDETECTOR rec[-3]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nCONTROL[XOR] ctrl[0] rec[-2] -> ctrl[1]\nCONTROL[NOT] ctrl[1] -> ctrl[2]\nPOSTSELECT ctrl[2]";
+
+fn dense_field(rational_part: &str, sqrt2_part: &str) -> ExactField {
+    let arithmetic = FieldArithmetic::default();
+    let sqrt2 = raw_field(&ScalarArithmetic::default().omega(0, 1).unwrap());
+    arithmetic
+        .add(
+            &field(rational_part),
+            &arithmetic.scale(&sqrt2, &rational(sqrt2_part)).unwrap(),
+        )
+        .unwrap()
+}
+
+#[test]
+fn original_dense_noncommuting_magic_instrument_with_report_noise() {
+    let files = Files::new();
+    std::fs::write(files.0.join("y_plus.magna"), "H 0\nS 0").unwrap();
+    // Exact branch sums, independent of either compiler/runtime implementation.
+    let acceptance = dense_field("13/24", "-1/24");
+    let error = field("7/24");
+    let target = dense_field("1/4", "-1/24");
+    let conditional = dense_field("91/167", "7/167");
+    let arithmetic = FieldArithmetic::default();
+    assert_eq!(arithmetic.add(&error, &target).unwrap(), acceptance);
+    assert_eq!(
+        arithmetic.multiply(&conditional, &acceptance).unwrap(),
+        error
+    );
+    for strategy in strategies() {
+        let evaluator = evaluator(
+            &files,
+            DENSE_MAGIC,
+            r#"{"outputs":[0],"ideal_state":"y_plus.magna"}"#,
+            strategy,
+        );
+        let mut options = TaskEnumerationOptions {
+            include_patterns: true,
+            ..Default::default()
+        };
+        options.noise.max_weight = 1;
+        let result = evaluator.enumerate_physical(&options).unwrap();
+        assert_eq!(
+            result.masses.accepted, acceptance,
+            "exact dense report-noise acceptance"
+        );
+        assert_eq!(result.masses.error, error);
+        assert_eq!(result.masses.target_success, Some(target.clone()));
+        assert!(result.masses.moments.is_empty());
+        assert_eq!(result.target_normalization, Some(ExactScalar::one()));
+        assert_eq!(result.covered_probability.value(), &rational("1"));
+        assert_eq!(result.omitted_probability.value(), &rational("0"));
+        assert_eq!(result.patterns, 2);
+        assert_eq!(result.histories, 8);
+        assert_eq!(result.by_weight.len(), 2);
+        for (weight, probability) in [(0, "2/3"), (1, "1/3")] {
+            let sector = &result.by_weight[weight];
+            assert_eq!(sector.weight, weight);
+            assert_eq!(sector.probability.value(), &rational(probability));
+            assert_eq!(sector.patterns, 1);
+            assert_eq!(sector.histories, 4);
+        }
+        let patterns = result.pattern_responses.as_ref().unwrap();
+        assert_eq!(patterns.len(), 2);
+        assert_eq!(
+            patterns.iter().map(|p| p.histories).collect::<Vec<_>>(),
+            vec![4, 4]
+        );
+        assert_eq!(result.full_acceptance.lower, acceptance);
+        assert_eq!(result.full_acceptance.upper, acceptance);
+        assert_eq!(result.full_error.lower, error);
+        assert_eq!(result.full_error.upper, error);
+        assert_eq!(
+            result.conditional_error_within_enumerated_sector,
+            Some(conditional.clone())
+        );
+        let interval = result.conditional_error.as_ref().unwrap();
+        assert_eq!(interval.lower, conditional);
+        assert_eq!(interval.upper, conditional);
+    }
+}

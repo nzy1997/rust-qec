@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 97 verified, 1 partial and 254 unmapped
+The source-bound ledger currently has 98 verified, 1 partial and 253 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-116 distinct Rust witnesses from 118 declarations across 53 targets. Strict
+117 distinct Rust witnesses from 119 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2094,9 +2094,9 @@ cargo test --locked -p rmagna --test original_nonlinear_postselection
 The pinned source is tests/core/test_nonlinear_postselection.py, SHA256
 76becb6b2146a1c7bcee326b3a7daab1aac5de12390f81887175d417d07351e8.
 The owning tests retain the complete noncommuting readout, mixed affine
-selection and joint duplicate/conflicting-condition methods. Only these
-three rows are promoted; the other fourteen methods in that original module
-remain unresolved.
+selection and joint duplicate/conflicting-condition methods. These three
+rows are covered by this preceding stage. The dense instrument below adds a
+fourth complete method; thirteen methods in that original module remain unresolved.
 
 Both compiler strategies and both ColdPrefix and FixedTemplate causal runtimes
 run the exact source circuits. The native implicit idle-wire zero target is
@@ -2130,11 +2130,58 @@ measurements, an always-zero final selector accepts every branch, and asking
 to observe the third record changes captured history mass to 1/8. All controls
 stay outside repository source; the tested public candidate is unchanged.
 
-This stage has 97 verified, 1 partial and 254 unmapped methods, with no
-architecture-specific core exclusions. All 116 distinct witnesses from 118
+This stage has 98 verified, 1 partial and 253 unmapped methods, with no
+architecture-specific core exclusions. All 117 distinct witnesses from 119
 declarations across 53 targets must run in the source-bound audit; strict
 complete parity still exits 2. Prior mappings, fixtures and generators remain
 intact, including the numerical-method partial gaps. This finite validation
 does not establish Python keyword/serialization/private-handle compatibility,
 native random trajectories, new sampling defaults, Monte Carlo convergence
 or paper performance.
+
+## Original dense nonlinear readout instrument
+
+Run the complete original-method witness, then the complete four-test target:
+
+```sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_dense_noncommuting_magic_instrument_with_report_noise -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+```
+
+This extends the same pinned nonlinear suite and preserves the preceding
+three tests and helpers byte for byte. Only the complete dense original
+method is newly verified; the three existing witnesses receive the updated
+SHA256 for their extended source file. Other contracts, original module
+hashes, fixtures, generators and numerical partial gaps remain intact.
+
+For H/T/MX/S/T/M(1/3)/H/T/MY, the opaque AND observes the first and last
+readouts. XOR/NOT selection uses the middle reported bit. Wire 0 is compared
+against the ideal H then S target. Both compiler strategies and both
+ColdPrefix/FixedTemplate causal runtimes enumerate two physical noise
+assignments and eight observed histories. Coverage is one, omitted mass
+zero, physical sector probabilities are 2/3 and 1/3, and target norm is one.
+
+The independent two-dimensional amplitude
+P_y(c) T H P_z(b) T S P_x(a) T H |0> is summed over all sixteen
+(a,b,c,report-flip) choices with selection (a AND c) XOR (b XOR flip).
+Exact rational coefficients in Q(sqrt(2), i) give total norm one, accepted
+mass (13-sqrt(2))/24, error 7/24 and target success (6-sqrt(2))/24.
+Conditional error is (91+7sqrt(2))/167. The owning Rust assertions compare
+exact cyclotomic values and all lower/upper interval endpoints. A separate
+NumPy branch calculation agrees within 1e-12; that tolerance applies only
+to the numerical cross-check.
+
+The unchanged complete original method and registry helper AST also pass
+in normal and optimized Python against a fresh native production build.
+The original module top level and build-capable support loaders are not
+imported. Actual input controls replace M(1/3) by X_ERROR(1/3) then ideal M,
+with unchanged known answers: native and Rust acceptance changes to
+(5-sqrt(2))/8. The private Rust control compiles and fails the same exact
+acceptance assertion after confirming that altered result. These controls
+stay outside repository source; the public candidate remains unchanged.
+
+The ledger now has 98 verified, 1 partial and 253 unmapped methods.
+All 117 distinct witnesses from 119 declarations across 53 targets must run
+in the source-bound audit. Strict complete parity still exits 2. This finite
+validation does not claim native RNG ABI or Python object compatibility,
+Monte Carlo convergence, new defaults or paper performance.
