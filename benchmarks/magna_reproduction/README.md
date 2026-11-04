@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 82 verified and 270 unmapped original
+The source-bound ledger currently has 86 verified and 266 unmapped original
 methods, with zero partial or architecture-specific exclusions. It requires
-99 distinct Rust witnesses from 101 declarations across 46 targets. Strict
+103 distinct Rust witnesses from 105 declarations across 47 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1796,3 +1796,37 @@ Only this complete original method is newly mapped. Current scope is82 verified,
 270 unmapped,99 distinct Rust witnesses from101 declarations across46 targets.
 The strict complete-parity audit must still exit2. General native commuting-axis
 certificates, Python RNG/class ABI and throughput/paper parity remain incomplete.
+
+### Original scientific scalar-ratio contracts
+
+`original_scalar_ratios` maps exactly the four complete
+`NativeFileRuntimeTests.test_scaled_scalar_ratios_*` methods from the pinned
+`tests/core/test_file_native.py`. The original file SHA256 is
+`b078965d22ae894eb7b1bb9d16000d49ae43f7ccd5727074d05802d7b572e4a1`;
+the existing identified helper source SHA256 is
+`87aeaf19cfcdfb7223b65a4acb43556bf8a2540f0ca6ca8acdaf5966c5b4a24e`.
+The four unchanged methods also run independently through a freshly built
+identified helper in normal and optimized Python; a returned-native-mantissa
+sign mutant is rejected. The original build-capable Python loader is not used.
+
+The Rust export rounds only the coefficient ratio, then combines original binary
+powers in wide arithmetic. Literal native tuples cover both signs of the
+underflowing `9*2^-1160`, exponent difference `-2,000,000`, zero and a positive
+million-scale exponent. A 512-bit work budget admits these separate powers while
+the same cap refuses their expanded rational field representation.
+
+All three native half-even ties retain their exact expected mantissa bits.
+The 120-step Pell inputs and independently checked expected bits are pinned in
+`rmagna/tests/data/original-scalar-ratio-reference.json`. Its 600-digit Decimal
+oracle uses the large unit and reciprocal norm-one identity, avoiding the
+original subtractive-cancellation formula. Additional tests preserve negative
+numerators, reject nonreal/nonpositive denominators even for zero numerators,
+bound coefficients/intermediate work, permit immutable retries and check final
+exponent overflow and cancellation across intermediate i64 limits.
+
+Current coverage is 86 verified and 266 unmapped original methods, with zero
+partial or architecture-specific exclusions. All 103 distinct witnesses from
+105 declarations across 47 targets must actually execute in the source-bound
+audit. Strict complete parity still exits 2. Other original file-native methods,
+Python tuple/class ABI, binary64 after scaling, defaults, performance and paper
+precision curves remain outside this finite mapping.

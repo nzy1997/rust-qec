@@ -2891,6 +2891,54 @@ The finite Decimal witnesses supplement the exact midpoint and boundary tests;
 they are reference calculations rather than a proof of all possible inputs.
 File/result serialization is a separate interface.
 
+### Scalar ratios with separate binary powers
+
+`numeric::approximate_scalar_ratio(&numerator, &denominator, NumericOptions)`
+returns a `ScientificReal` for an exact real numerator and positive real
+denominator. It divides only the integer coefficient pairs, rounds the
+coefficient ratio with exact half-even boundary comparisons, and combines
+the original powers afterward in checked wide arithmetic.
+
+```rust
+use rmagna::numeric::{NumericOptions, ScientificReal, approximate_scalar_ratio};
+use rmagna::scalar::ScalarArithmetic;
+
+let a = ScalarArithmetic::new(8)?;
+let tiny = a.scalar([1, 0, 0, 0].map(Into::into), -1_000_000)?;
+let huge = a.scalar([1, 0, 0, 0].map(Into::into), 1_000_000)?;
+let value = approximate_scalar_ratio(
+    &tiny, &huge, NumericOptions { max_work_bits: 512 },
+)?;
+assert_eq!(value, ScientificReal { mantissa: 1.0, exponent: -2_000_000 });
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The work cap admits borrowed input coefficients and conservative intermediate
+integer sizes; it does not grow with these separate powers. Nonreal inputs and
+insufficient budgets return `ScalarRatioError::Numeric`, preserving the original
+`NumericError`. Zero and negative denominators return
+`NonPositiveDenominator`, including when the numerator is zero.
+`ExponentOverflow` refers to the final scientific exponent. An intermediate
+power difference beyond i64 is allowed when the coefficient exponent brings
+the final result back into range. Inputs remain immutable for valid retries.
+
+Magnitude uses the existing Rust `[1,2)` convention. Conversion to native
+`[0.5,1)` is exact: halve a nonzero mantissa and add one to its exponent using
+checked or wider arithmetic. Exact zero stays `(0.0, 0)`. This explicit export
+does not return a binary64 value after the exponent shift or change simulation,
+numeric-export defaults, Python interfaces or runtime policy.
+
+`cargo test --locked -p rmagna --test original_scalar_ratios` checks the four
+complete pinned original contracts: underflow/sign and million-scale exponents,
+120-step Pell cancellation, three half-even ties, and invalid realness/denominator
+inputs. Additional controls cover coefficient/work refusal, immutable retry,
+conjugate-norm signs and final exponent limits including rounding carry.
+Independent 600-digit Decimal references use the norm-one Pell identity and bind
+the original source and identified helper source in
+`tests/data/original-scalar-ratio-reference.json`.
+
+
+
 ## Exact history-sampler efficiency diagnostics
 
 `statistics::HistoryEfficiency` accumulates the finite-data history efficiency

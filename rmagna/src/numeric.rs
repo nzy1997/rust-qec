@@ -1,4 +1,4 @@
-//! Correctly rounded exports of exact real field values and square roots.
+//! Correctly rounded exports of exact real field values, roots and scalar ratios.
 use crate::field::ExactField;
 use num_bigint::BigInt;
 use num_traits::{One, Signed, Zero};
@@ -290,4 +290,148 @@ pub fn approximate_sqrt(
     options: NumericOptions,
 ) -> Result<RoundedReal, NumericError> {
     Real::from_field(value, options)?.export(true)
+}
+
+/// Failure to export an exact scalar ratio as a scientific real.
+///
+/// Existing field exports retain their original `NumericError` variants.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ScalarRatioError {
+    Numeric(NumericError),
+    NonPositiveDenominator,
+    ExponentOverflow,
+}
+impl From<NumericError> for ScalarRatioError {
+    fn from(error: NumericError) -> Self {
+        Self::Numeric(error)
+    }
+}
+impl fmt::Display for ScalarRatioError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Numeric(error) => write!(f, "{error}"),
+            Self::NonPositiveDenominator => {
+                write!(
+                    f,
+                    "scalar ratio export requires a positive real denominator"
+                )
+            }
+            Self::ExponentOverflow => {
+                write!(
+                    f,
+                    "scalar ratio scientific exponent exceeds the signed 64-bit range"
+                )
+            }
+        }
+    }
+}
+impl std::error::Error for ScalarRatioError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Numeric(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+impl Real {
+    fn scalar_parts(
+        value: &crate::scalar::ExactScalar,
+        options: NumericOptions,
+    ) -> Result<(&BigInt, &BigInt), NumericError> {
+        let [a, b, c, d] = value.coefficients();
+        // Borrowed signs and magnitudes avoid negating or copying an input
+        // before its coefficient budget is admitted.
+        if !c.is_zero() || b.magnitude() != d.magnitude() || (!b.is_zero() && b.sign() == d.sign())
+        {
+            return Err(NumericError::NonReal);
+        }
+        let required = u128::from(a.bits().max(b.bits()).max(1));
+        if required > u128::from(options.max_work_bits) || required > usize::MAX as u128 {
+            return Err(NumericError::ResourceLimit {
+                limit: options.max_work_bits,
+                required,
+            });
+        }
+        Ok((a, b))
+    }
+
+    fn difference(&self, x: &BigInt, y: &BigInt) -> Result<BigInt, NumericError> {
+        self.check(u128::from(x.bits().max(y.bits())) + 1)?;
+        Ok(x - y)
+    }
+}
+
+/// Export a real exact scalar numerator divided by a positive real denominator.
+///
+/// The signed mantissa is correctly rounded to nearest, ties to even, with
+/// magnitude in [1,2). Zero is exactly `{ mantissa: 0.0, exponent: 0 }`.
+/// To use the native [0.5,1) convention, halve a nonzero mantissa and add one to
+/// the exponent using checked or wider arithmetic.
+///
+/// Both coefficient vectors are validated by borrowing before any products.
+/// `max_work_bits` bounds each coefficient and conservative intermediate
+/// integer size. It does not include the magnitude of the separate binary
+/// powers: those powers are combined only after rounding the coefficient ratio.
+/// A final exponent outside i64 is a typed error; an intermediate exponent
+/// difference outside i64 can still produce a valid final result.
+///
+/// Inputs are immutable and may be retried with a larger work budget. Even a
+/// zero numerator requires a real positive denominator and admitted inputs.
+/// This returns a scientific value, without a binary64 result after scaling.
+pub fn approximate_scalar_ratio(
+    numerator: &crate::scalar::ExactScalar,
+    denominator: &crate::scalar::ExactScalar,
+    options: NumericOptions,
+) -> Result<ScientificReal, ScalarRatioError> {
+    let (a, b) = Real::scalar_parts(numerator, options)?;
+    let (c, d) = Real::scalar_parts(denominator, options)?;
+    let arithmetic = Real {
+        a: BigInt::zero(),
+        b: BigInt::zero(),
+        denominator: BigInt::one(),
+        limit: options.max_work_bits,
+    };
+    if arithmetic.sign_pair(c, d)? != Ordering::Greater {
+        return Err(ScalarRatioError::NonPositiveDenominator);
+    }
+    if numerator.is_zero() {
+        return Ok(ScientificReal {
+            mantissa: 0.0,
+            exponent: 0,
+        });
+    }
+
+    // Multiply by the coefficient denominator's conjugate. None of these
+    // bounded products or shifts includes either original scalar power.
+    let ac = arithmetic.product(a, c)?;
+    let two_bd = arithmetic.shift(&arithmetic.product(b, d)?, 1)?;
+    let mut real = arithmetic.difference(&ac, &two_bd)?;
+    let bc = arithmetic.product(b, c)?;
+    let ad = arithmetic.product(a, d)?;
+    let mut root = arithmetic.difference(&bc, &ad)?;
+    let c2 = arithmetic.product(c, c)?;
+    let two_d2 = arithmetic.shift(&arithmetic.product(d, d)?, 1)?;
+    let mut norm = arithmetic.difference(&c2, &two_d2)?;
+    // A nonzero real integer pair has nonzero norm. Normalize its sign for
+    // the existing exact boundary-comparison and half-even rounding kernel.
+    if norm.is_negative() {
+        real = -real;
+        root = -root;
+        norm = -norm;
+    }
+    let rounded = Real {
+        a: real,
+        b: root,
+        denominator: norm,
+        limit: options.max_work_bits,
+    }
+    .export(false)?
+    .scientific;
+    let exponent = i128::from(rounded.exponent) + i128::from(numerator.power())
+        - i128::from(denominator.power());
+    Ok(ScientificReal {
+        mantissa: rounded.mantissa,
+        exponent: i64::try_from(exponent).map_err(|_| ScalarRatioError::ExponentOverflow)?,
+    })
 }
