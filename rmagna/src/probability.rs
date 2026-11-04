@@ -126,6 +126,57 @@ impl OccurrenceThreshold {
             Self::Below(cutoff) => uniform_word < cutoff,
         }
     }
+    /// Draw with the finite 64-bit law using a lazily requested uniform word.
+    /// Never, always, and a zero cutoff consume no entropy. Every other cutoff
+    /// requests exactly one word and accepts it only when it is strictly below
+    /// the cutoff. This operation does not change any exact probability.
+    pub fn draw_with(&self, next_word: &mut (impl FnMut() -> u64 + ?Sized)) -> bool {
+        match *self {
+            Self::Never | Self::Below(0) => false,
+            Self::Always => true,
+            Self::Below(cutoff) => next_word() < cutoff,
+        }
+    }
+
+    /// Draw the accepted subset of up to 64 live lanes from uniform bit planes.
+    ///
+    /// Each provider call supplies the next independent bit of every lane,
+    /// starting with the most significant bit of its conceptual 64-bit word.
+    /// Only live lanes participate. At most 64 planes are requested, stopping
+    /// as soon as every live lane is determined, including when the remaining
+    /// cutoff bits are all zero. Equal words reject. Never, always, zero
+    /// cutoffs, and empty live masks request no plane.
+    ///
+    /// ```
+    /// use rmagna::probability::OccurrenceThreshold;
+    /// let half = OccurrenceThreshold::Below(1_u64 << 63);
+    /// assert!(half.draw_with(&mut || 0));
+    /// // For half, one plane decides every lane: its zero bits accept.
+    /// assert_eq!(half.draw_bits_with(0b1111, &mut || 0b1100), 0b0011);
+    /// ```
+    pub fn draw_bits_with(
+        &self,
+        live: u64,
+        next_plane: &mut (impl FnMut() -> u64 + ?Sized),
+    ) -> u64 {
+        let mut remaining = match *self {
+            Self::Never | Self::Below(0) => return 0,
+            Self::Always => return live,
+            Self::Below(cutoff) => cutoff,
+        };
+        let (mut accepted, mut pending) = (0, live);
+        while pending != 0 && remaining != 0 {
+            let bits = next_plane();
+            if remaining & (1_u64 << 63) != 0 {
+                accepted |= pending & !bits;
+                pending &= bits;
+            } else {
+                pending &= !bits;
+            }
+            remaining <<= 1;
+        }
+        accepted
+    }
 }
 
 /// A resource budget for exact text parsing, not a precision setting. Excessive

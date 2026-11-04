@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 91 verified and 261 unmapped original
-methods, with zero partial or architecture-specific exclusions. It requires
-108 distinct Rust witnesses from 110 declarations across 49 targets. Strict
+The source-bound ledger currently has 91 verified, 1 partial and 260 unmapped
+original methods, with zero architecture-specific core exclusions. It requires
+110 distinct Rust witnesses from 112 declarations across 50 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1944,3 +1944,47 @@ must execute in the strict source-bound audit, which still exits 2 because
 overall parity is incomplete. Existing fixtures, generators and mappings,
 production sampling defaults, Python/native RNG ABI and paper performance
 claims remain unchanged.
+
+## Lazy finite occurrence draws
+
+`OccurrenceThreshold::draw_with` and `draw_bits_with` provide opt-in lazy
+finite-resolution occurrence draws. Run:
+
+```sh
+cargo test --locked -p rmagna --test original_finite_occurrence
+```
+
+The two owning tests borrow every literal finite cutoff and endpoint from
+pinned `tests/native/rational_random.cpp`: third, half, zero, certain, the
+reachable 2^-64 bucket, positive but unreachable 2^-65, near-one, the wide
+64-bit denominator, and rates 1/1000 and 1/10000. Scalar equality rejects;
+zero/certain/public zero cutoffs and empty live masks never invoke a provider.
+Preparing or drawing a rounded threshold preserves the exact stored rational.
+
+All 560 original bit-plane trials retain seed 20260927 and the independently
+checked MT19937-64 engine. They perform 35,840 ordinary scalar comparisons and
+reach exactly 36,393 generated input words. Expected masks use direct scalar
+`<`; expected provider calls use shrinking scalar prefix intervals, rather
+than the implementation lane masks. The original native loop stops when
+pending lanes or remaining cutoff bits become zero. In particular, half
+needs one plane, while the wide cutoff rejects an equal prefix after 63.
+Partial masks suppress inactive lanes, and explicit no-extra-plane controls
+reject correct answers that consume unnecessary entropy.
+
+Only the finite occurrence portion of
+`NoiseNumericFastpathTests.test_finite_noise_thresholds_and_general_conversion_in_native_module`
+is mapped. Its complete pinned Python source SHA256 is
+`80169c9ceed6deecd8cd81a99d6ccbd9f0aabc0aff13bdfb8f5564ccdb152855`.
+The complete unchanged original method separately compiles and runs its
+standalone CPP probe at O2 with assertions enabled, without a native/helper
+extension rebuild. Rust still lacks this method's separate `uniform_index`
+rejection/count-one cases, 512 hardware/general exact ratio comparisons and
+FE_UPWARD fallback/rounding restoration assertions. The ledger therefore
+records this whole method as partial, with these gaps explicit.
+
+Current coverage is 91 verified, 1 partial and 260 unmapped original methods,
+with zero architecture-specific core exclusions. All 110 distinct witnesses
+from 112 declarations across 50 targets must execute; strict complete parity
+still exits 2. Every previous mapping, fixture and generator is preserved.
+These APIs do not change categorical/default sampling, add a native RNG ABI
+layer or establish benchmark/paper performance.

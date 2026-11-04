@@ -1590,8 +1590,23 @@
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_finite_noise_thresholds_and_general_conversion_in_native_module",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "partial",
+      "contract": "Complete finite occurrence portion: literal third/half/zero/certain/2^-64/positive2^-65/near-one/wide/1-in1000/1-in10000 cutoffs, strict below/equal/above scalar comparisons, exact stored probabilities unchanged and zero entropy at Never/Always/public Below(0). Opt-in lazy scalar and MSB-first masked bit-plane draws retain the native remaining-cutoff-zero stop, including half one plane and wide63 planes. Preserve all560 original transposed MT19937-64 trials,35840 scalar comparisons and36393 ordinary input-word position at seed20260927. Independently compare output with scalar strict less-than and actual provider consumption with shrinking scalar PREFIX INTERVAL endpoints, including inactive lanes, partial/empty masks, exact-boundary rejection and no-extra-plane controls. The complete unchanged original native numerical method runs separately through its standalone O2 CPP probe with active assertions and no native/helper extension rebuild.",
+      "remaining_gap": "Rust counterparts remain missing for the original uniform_index(15) incomplete modulo-bucket rejection and count-one zero-entropy assertions, all512 hardware/general exact scalar ratio comparisons and the FE_UPWARD fallback/rounding restoration assertions. This whole original method is partial, not verified; no native RNG/class ABI or paper performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_finite_occurrence",
+          "test": "original_scalar_occurrence_is_lazy_and_preserves_exact_probabilities",
+          "source_sha256": "5ae0f8e4b6da2fa6896077ce40804e34cc34b7864a70b77bd913f484460a021f"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_finite_occurrence",
+          "test": "original_packed_occurrence_matches_all_560_scalar_prefix_trials",
+          "source_sha256": "5ae0f8e4b6da2fa6896077ce40804e34cc34b7864a70b77bd913f484460a021f"
+        }
+      ]
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_identical_irrational_coefficients_and_invalid_denominators",
