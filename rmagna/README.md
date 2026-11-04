@@ -973,6 +973,17 @@ exact-rational sampling path or generate random words. Tests cover rational
 identities, canonical equality and hashing, malformed and unnormalized raw
 ratios, resource limits, tiny probabilities and threshold endpoints.
 
+`OccurrenceThreshold::draw_with` requests one supplied uniform word only for
+a nonzero finite cutoff; zero and certain endpoints consume none.
+`draw_bits_with(live, next_plane)` draws the accepted subset of 64 live lanes
+from MSB-first independent random bit planes. It stops when every live lane
+is decided, including when the remaining cutoff becomes zero: half needs
+only one plane. Empty masks request none, equal words reject, and inactive
+lanes cannot affect the result or random-word consumption. Both methods are
+explicit finite occurrence operations; stored exact probabilities and exact
+categorical sampling keep their existing behavior. The original-size packed
+regression compares all 560 trials with independent scalar interval oracles.
+
 ## Magna circuit frontend
 
 `circuit::parse_circuit(text, &ParseOptions)` parses the `magna-0.1` text format,
