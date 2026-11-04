@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 90 verified and 262 unmapped original
+The source-bound ledger currently has 91 verified and 261 unmapped original
 methods, with zero partial or architecture-specific exclusions. It requires
-107 distinct Rust witnesses from 109 declarations across 48 targets. Strict
+108 distinct Rust witnesses from 110 declarations across 49 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1903,3 +1903,44 @@ coverage is 90 verified and 262 unmapped, with zero partial or architecture-
 specific exclusions, and 107 distinct witnesses from 109 declarations across
 48 targets. Strict complete parity still exits 2. Python ABI, numerical
 performance and paper precision curves remain outside this finite contract.
+
+## Original categorical noise distribution laws
+
+`original_noise_distributions` maps the complete pinned
+`NoiseNumericFastpathTests.test_depolarizing_and_nonuniform_channels_match_declared_law`
+method in `tests/core/test_noise_numeric_fastpaths.py` (SHA256
+`80169c9ceed6deecd8cd81a99d6ccbd9f0aabc0aff13bdfb8f5564ccdb152855`). Run:
+
+```sh
+cargo test --locked -p rmagna --test original_noise_distributions -- --nocapture
+```
+
+The four original fault groups retain fifteen alternatives of probability
+1/30, `[0,1/10,1/5,0,3/10]`, `[1,0]`, and no alternatives; their residual
+identity probabilities are 1/2, 2/5, 0 and 1. A finite 30-by-10 oracle visits
+all 300 accepted integer positions and checks all 96 joint count cells,
+including forbidden alternatives, with 64 positive joint outcomes. Each actual
+draw checks ordered nonduplicated faults, exact physical/proposal joint mass,
+likelihood one, forced/empty endpoints and exactly two consumed entropy words.
+A one-word entropy cap refuses with typed `EntropyLimit`; retrying the same
+model with words `[29,9]` and a two-word cap recovers final alternatives and
+exact mass 1/100. Original input category vectors remain unchanged.
+
+All 32,768 original-size trials retain the original marginal tolerances
+`6*sqrt(shots*p*(1-p))+2`. The joint fault count retains the stricter original
+bound `6*sqrt(shots*0.3*0.7)` with no additive slack. Rejection sampling can consume more than
+two words for these stochastic trials; actual provider calls must match the
+reported count. The first 41 complete draws equal separate per-seed calls of
+17 and 24, including weights and entropy. Rust uses independent SplitMix64
+streams; the original native MT/Python Random trajectory is not an ABI claim.
+The complete unchanged original method also passes through a fresh pinned
+core and identified helper in normal and optimized Python; an actual returned-
+weight mutant is rejected, with no original build-capable loader import.
+
+Only this one complete original method is newly mapped. Current coverage is
+91 verified and 261 unmapped, with zero partial or architecture-specific core
+exclusions. All 108 distinct witnesses from 110 declarations across 49 targets
+must execute in the strict source-bound audit, which still exits 2 because
+overall parity is incomplete. Existing fixtures, generators and mappings,
+production sampling defaults, Python/native RNG ABI and paper performance
+claims remain unchanged.
