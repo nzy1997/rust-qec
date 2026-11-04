@@ -996,8 +996,16 @@
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_channel_proportions_correlations_endpoints_and_guard_policy",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete finite original source-circuit contract through actual original_noise_categories and NoiseModel::scaled_proposal: Pauli XYZ order with zero alternative, unconditional correlated1/10 and1/5 at separate source anchors, measurement report-flip record0, guarded X1/5 and zero/one endpoints. Literal physical/proposal rows at scale2 preserve exactly three tilted categories, one guard exclusion, two endpoints and exact summary. Every residual identity and alternative satisfies q*literal_expected_factor=p, including zero alternatives without0/0; independent identity factors17/14,7/4,99/98 and common fault1/2, unit factors for unchanged rows. Physical inputs and source metadata remain unchanged. This is finite channel-law parity, not native random-trajectory or keyword compatibility.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_importance_channels",
+          "test": "original_channel_proportions_correlations_endpoints_and_guard_policy",
+          "source_sha256": "4bcd0e71bd28a2e327f7296d75c654cfb0208618b356dde1490637de3086e680"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_complex_terminal_recovery_keeps_true_born_sampling",
@@ -1026,8 +1034,16 @@
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_scaled_channel_totals_preserve_full_support_or_fail",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original scaled-support boundary contract using the exact source circuits and rational scales: X and Pauli total1/5 reject5 and6; correlated total3/10 rejects10/3 and13/3; measurement1/4 rejects4 and5. Each refusal is typed ScaledProbability at model category0; admitted scale2 retries have independent literal rows and preserve physical inputs. Final noiseless-M/guardedX1/3/zero/one source remains unchanged at scale100, tilted0. Captured source sites1/2/3 are distinguished from dense model rows0/1/2; actual exclusion row0 protects the guard, while using source site1 is a meaningful typed refusal. No sampling default, random-trajectory identity or new API is claimed.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_importance_channels",
+          "test": "original_scaled_channel_totals_preserve_full_support_or_fail",
+          "source_sha256": "4bcd0e71bd28a2e327f7296d75c654cfb0208618b356dde1490637de3086e680"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_weighted_summary_uses_joint_means_and_paired_ratio_errors",

@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 91 verified, 1 partial and 260 unmapped
+The source-bound ledger currently has 93 verified, 1 partial and 258 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-110 distinct Rust witnesses from 112 declarations across 50 targets. Strict
+112 distinct Rust witnesses from 114 declarations across 51 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -1988,3 +1988,45 @@ from 112 declarations across 50 targets must execute; strict complete parity
 still exits 2. Every previous mapping, fixture and generator is preserved.
 These APIs do not change categorical/default sampling, add a native RNG ABI
 layer or establish benchmark/paper performance.
+
+## Original importance proposal channel laws
+
+Run the two complete original-method Rust witnesses:
+
+```sh
+cargo test --locked -p rmagna --test original_importance_channels
+```
+
+They retain the exact source circuits, rates and scales from pinned
+`tests/core/test_importance_sampling.py` (SHA256
+`fc24b087ed08c9dcd35a8f6befe373d6b5a23c5709749dae207f2b1a0fe75caf`).
+Actual source metadata preserves Pauli XYZ order, unconditional correlated
+probabilities 1/10 and 1/5, report-flip record zero, guard expressions and
+zero/one endpoints. At scale two, the three tilted nonidentity channel lists
+are [1/10,1/5,0], [1/5,2/5] and [1/50]; guarded and endpoint categories remain
+unchanged. Every identity and alternative satisfies an independently supplied
+exact likelihood identity. Literal identity factors are 17/14, 7/4 and 99/98,
+with common fault factor 1/2 even for a zero alternative. No 0/0 is evaluated.
+
+The support test rejects both the original boundary and boundary plus one:
+X and Pauli total 1/5 at scales 5 and 6, correlated total 3/10 at 10/3 and 13/3,
+and measurement 1/4 at 4 and 5. Errors identify model category zero. Scale-two
+retries match literal probabilities and leave physical inputs unchanged. The
+final noiseless-M/guarded-X/zero/one case stays unchanged at scale 100. Its
+source internal sites [1,2,3] differ from dense model rows [0,1,2]; excluding
+model row zero protects the guard, while reusing source site one is rejected.
+
+Both complete unchanged original Python methods separately passed with fresh
+production and identified-helper extensions in both Python modes. The needed
+`weight_factors` hook is extracted unchanged, without importing its original
+build-capable module. A mutation of the actual returned native identity
+factor is rejected by the unchanged first-method assertion.
+
+Only these two complete ledger rows are promoted. Current coverage is 93
+verified, 1 partial and 258 unmapped, with zero architecture-specific core
+exclusions. All 112 distinct witnesses from 114 declarations across 51 targets
+must execute; strict complete parity still exits 2. The numerical method
+partially mapped by `original_finite_occurrence` retains its explicit gaps.
+Existing mappings, fixtures, generators and sampling defaults are preserved;
+these finite laws do not establish native random-trajectory identity, Python
+keyword compatibility or paper performance.

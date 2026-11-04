@@ -2563,6 +2563,16 @@ Arbitrary proposal models remain supported by `NoiseSampler::importance`.
 The common-scale proposal does not implement experiment-specific mixtures or
 residual-class distributions.
 
+The `original_importance_channels` target retains two complete original
+importance-channel contracts. It checks the exact Pauli/correlated/report-flip
+source metadata and guarded exclusions, scale-two channel probabilities and
+independent rational likelihood identities, including zero alternatives.
+Boundary and above-boundary scales reject with the offending model row, and
+admitted retries leave physical inputs unchanged. Exclusions use dense model
+row ordinals; a noiseless measurement can leave a gap in captured source-site
+numbers. The original guarded and zero/one endpoint case remains unchanged at
+scale 100. These are finite channel-law checks using the existing APIs.
+
 ## Task and causal importance sampling
 
 `TaskEvaluator::new_with_sampling` and `CausalProgram::new_with_sampling` accept
