@@ -94,8 +94,16 @@
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_commuting_kernel_includes_joint_parities",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete unchanged joint-parity original IR through actual retained record queries under both compilers: initial ++, odd XOR phase on q0/q1, destructive X readouts a/b. Native four and Catalogue two coherent classical-mass terms agree with exact literal masses (2+sqrt2)/4 at00 and (2-sqrt2)/4 at11, zero at01/10. An explicit immutable affine-bound plan has offset0, independent direction3 and dimension1; each draw returns only00/11, exact label/total masses, one conditional support-coordinate query and actual Boolean callback consumption. Canonical coefficients/quadratics are relabeled unchanged and summed without squaring, ambient truth-table enumeration or a new side resource. This finite support bound is not a universal native commutator certificate or minimum true support; Python RNG/class ABI and throughput parity remain incomplete.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_record_sampling",
+          "test": "original_commuting_kernel_joint_parities_sample_exact_retained_masses",
+          "source_sha256": "b08766d54086cff00fa326d7a68ef7a1179a95664ae2211ceff1bf62a4ba576d"
+        }
+      ]
     },
     {
       "id": "test_boundary_sampling.BoundarySamplingTests.test_complex_feedback_global_queries_with_future_postselection",
