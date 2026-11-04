@@ -701,7 +701,7 @@
           "package": "rmagna",
           "target": "original_scalar_ratios",
           "test": "original_scaled_scalar_ratios_exact_cancellation",
-          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+          "source_sha256": "fac693547c223ff52725c0e53b5989827987ee33b6af0484590f948e60472f6a"
         }
       ]
     },
@@ -714,7 +714,7 @@
           "package": "rmagna",
           "target": "original_scalar_ratios",
           "test": "original_scaled_scalar_ratios_preserve_underflow_and_sign",
-          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+          "source_sha256": "fac693547c223ff52725c0e53b5989827987ee33b6af0484590f948e60472f6a"
         }
       ]
     },
@@ -727,7 +727,7 @@
           "package": "rmagna",
           "target": "original_scalar_ratios",
           "test": "original_scaled_scalar_ratios_reject_nonreal_and_nonpositive_denominator",
-          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+          "source_sha256": "fac693547c223ff52725c0e53b5989827987ee33b6af0484590f948e60472f6a"
         }
       ]
     },
@@ -740,7 +740,7 @@
           "package": "rmagna",
           "target": "original_scalar_ratios",
           "test": "original_scaled_scalar_ratios_round_half_even",
-          "source_sha256": "4c2051f7b62cba9a663e5a909a29777cc72a2af23f96007da5bcbc7527b834a1"
+          "source_sha256": "fac693547c223ff52725c0e53b5989827987ee33b6af0484590f948e60472f6a"
         }
       ]
     },
@@ -1587,8 +1587,16 @@
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_identical_irrational_coefficients_and_invalid_denominators",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original two identical-irrational coefficient ratios c=(3,-2,0,2), c/c with powers -1000000/+1000000 and -c/c with powers +50/-50; exact Rust scientific mantissa bits/exponents and equivalent literal native frexp tuples. Zero numerator still rejects negative c and complex 1+i denominators with distinct typed errors. All inputs remain immutable, an insufficient valid work budget refuses before a sufficient retry, and the same 128-bit cap refuses expanded million-scale scalars while compact export succeeds. The whole unchanged pinned original method executes through the identified native helper, with an actual returned-mantissa sign mutant and independent integer norm-one cancellation oracle.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_scalar_ratios",
+          "test": "original_identical_irrational_coefficients_preserve_scaled_ratios_and_refusals",
+          "source_sha256": "fac693547c223ff52725c0e53b5989827987ee33b6af0484590f948e60472f6a"
+        }
+      ]
     },
     {
       "id": "test_noise_numeric_fastpaths.NoiseNumericFastpathTests.test_rational_ratios_against_python_fraction_rounding",

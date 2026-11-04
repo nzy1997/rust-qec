@@ -2937,6 +2937,14 @@ Independent 600-digit Decimal references use the norm-one Pell identity and bind
 the original source and identified helper source in
 `tests/data/original-scalar-ratio-reference.json`.
 
+The same target also checks the complete original identical-irrational ratio
+method from `tests/core/test_noise_numeric_fastpaths.py`: `3 - 2*sqrt(2)`
+cancels without expanding binary powers, giving exactly `(1.0, -2000000)`
+and `(-1.0, 100)` in the Rust scientific convention. A 128-bit work limit
+admits both compact ratios and refuses the expanded million-scale inputs.
+The test also checks invalid denominators with a zero numerator, immutable
+inputs, and retry after a smaller work budget refuses.
+
 
 
 ## Exact history-sampler efficiency diagnostics
