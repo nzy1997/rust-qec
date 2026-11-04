@@ -2629,6 +2629,15 @@ zeros, scaled report flips that change guard activation, unit-scale streams and
 invalid preparation controls are covered. File/result schemas and specialized
 paper proposals are separate interfaces.
 
+The `original_importance_outcomes` target validates the complete original
+two-site postselection task at proposal scales 1/2, 1 and 2 under both compiler
+strategies. Its 24 draws use admitted categorical words and check actual
+consumption, physical probabilities, likelihoods, raw masses and weighted
+acceptance/error/target contributions before aggregation. Exact finite sums
+recover acceptance 9/10, error 9/50, target success 18/25 and conditional error
+1/5. Private ignored-weight and double-weight producer controls fail the same
+known-answer assertion; the public candidate and production APIs are unchanged.
+
 ## Exact physical noise-sector enumeration
 
 `enumeration::enumerate_noise` returns every positive-probability physical
