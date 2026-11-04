@@ -5590,5 +5590,81 @@ coverage, without claiming identity to an earlier scratch prototype. The
 separate native exception/certificate method remains unmapped: native rejects
 the initial rank-zero cap with needed two, while Rust's streaming selector
 rejects the first independent direction with needed one. Full native certificate
-dictionaries, Python ABI, complete native heap accounting, original-IR
-integration and paper performance remain separate gaps.
+dictionaries, Python ABI, complete native heap accounting, broader original-IR
+coverage and paper performance remain separate gaps.
+
+### Original branch certificates after record projection
+
+`OriginalBranch::compile_after_absorption` is an explicit alternative to the
+existing source-before-projection `expansion` and `probability` methods.
+It projects the actual collected records while retaining the compiler's full
+phase boundary, absorbs invisible Clifford paths, then selects the branch
+resource. The already collected temporal faults and stored control decisions
+are reused; no callbacks run during certificate queries.
+
+```rust
+use rmagna::{clifford::{CliffordCircuit, CliffordGate}, gf2::BitVector,
+    instrument::{OriginalAssignment, OriginalBranchCertificateOptions,
+        OriginalGate, OriginalInstrument, OriginalLimits, OriginalOperation,
+        ReadoutBasis}, scalar::{ExactScalar, ScalarArithmetic},
+    unitary::CompilerStrategy};
+let a = ScalarArithmetic::default();
+let initial = CliffordCircuit::new(1, [CliffordGate::H(0)])?
+    .evolve(&CliffordCircuit::computational(BitVector::zeros(1)?)?, &a)?.unwrap();
+let ir = OriginalInstrument::new(vec![0], vec![], initial,
+    vec![OriginalOperation { id: "read".into(), gate: OriginalGate::Destructive {
+        wire: 0, basis: ReadoutBasis::X, record: "m".into() } }],
+    vec![], OriginalLimits::default(), &a)?;
+let branch = ir.compile(&OriginalAssignment {
+    true_values: vec![("m".into(), false)], ..Default::default()
+}, CompilerStrategy::ParityCopies, &a)?;
+let mut options = OriginalBranchCertificateOptions {
+    max_quotient_rank: 0, max_terms: 1, ..Default::default()
+};
+options.completed.max_pairs = 1;
+let certificate = branch.compile_after_absorption(&options, &a)?;
+assert_eq!(certificate.probability(), &ExactScalar::one());
+assert_eq!(certificate.statistics().quotient_rank, Some(0));
+assert_eq!(certificate.statistics().certified_terms, 1);
+assert_eq!(certificate.states().len(), 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The certificate owns unnormalized coherent `states()`, its actual optional
+`resource()`, the complete `absorption()` receipt and exact `probability()`.
+Its `branch()` borrows output/environment labels, records, origins and decisions
+without allocating another metadata copy. States retain declared outputs followed
+by chronological reset/discard environment legs; destructive readouts are fixed
+and contracted. Probability includes every ordered pair, including interference
+and vanishing pairs. `statistics()` distinguishes certified terms, emitted states
+and actual probability pair work. An explicit zero coefficient after record
+projection or radical absorption skips resource selection: its certificate has
+no resource, no states, `quotient_rank: None` and probability zero. Interference
+can also produce zero probability while retaining a resource and nonempty
+coherent states. Counts describe the actual selected resource and emitted states,
+without claiming a canonical zero representation or a minimum rank.
+
+The new options separately bound the original raw paths, projection rows,
+conservative logical geometry, post-absorption rank/terms, absorption stages/work
+and completed probability pairs/geometry/work. Raw structural admission precedes
+projection and phase pullback; selected term count and pair admission precede
+retained-state allocation. Resource policy is explicit: the default keeps the
+existing independent catalogue/fiber policy, while
+`OriginalNetworkResource::Native` requests native selection/injection options.
+Selection retains its own construction and transport bounds and never rescues a
+refusal with another policy. Geometry excludes borrowed collector storage, scalar
+limbs and allocator overhead; arithmetic bounds scalar coefficients separately.
+Failures leave the branch and catalogue usable for another query.
+
+`original_absorbed_branches` constructs the pinned three-wire original IR
+through the real collector under both compiler strategies. Each outcome has
+probability one half and a rank-zero, one-term, one-pair certificate. An actual
+X fault after T2 and before Tdg2 preserves trace probability one half but restores
+branch rank two and rejects the rank-zero compile budget. Independent physical
+gates check all complex amplitudes and coherent norms. Further tests cover zero
+branches, stored feedback, chronological environments, global phase and recovery
+after resource/scalar refusals. Existing source-first APIs retain their defaults.
+
+This is finite original-IR functional parity. General original-IR coverage,
+native certificate serialization, Python ABI, complete heap-byte accounting and
+paper performance remain incomplete.

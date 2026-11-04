@@ -1720,9 +1720,46 @@ absorption/selection/expansion and successful retries are checked.
 
 Only `test_database_exact_reconstruction_and_product_identification` and
 `test_malformed_dimensions_and_zero_phase_conventions` are newly mapped.
-Current scope is80 verified,272 unmapped,96 unique Rust witnesses from98
+This stage recorded80 verified,272 unmapped,96 unique Rust witnesses from98
 declarations across44 integration targets. The separate complete native
 exception/certificate method still reports needed two versus Rust's first
 rejected direction, needed one, and remains unmapped. Python ABI, complete
 native heap accounting, original-IR integration and paper performance remain
 separate gaps; the complete reproduction is still unfinished.
+
+### Original branches after Clifford-radical absorption
+
+Run `cargo test --locked -p rmagna --test original_absorbed_branches`.
+The complete pinned original method
+`test_original_ir_exceeds_fixed_budget_and_succeeds_after_native_absorption`
+is now exercised through real original-IR collection and
+`OriginalBranch::compile_after_absorption` under both compiler strategies.
+The new certificate projects actual records and absorbs hidden Clifford paths
+before selecting its explicit branch resource. Both outcomes retain exact
+probability one half with rank zero, one certified/emitted term and one
+ordered probability pair. The existing source-before-projection route remains
+unchanged and still refuses the same restricted source expansion.
+
+An actual X fault after T2 and before Tdg2 preserves trace probability one half,
+but the new branch certificate rejects rank zero and reports rank two under
+relaxed bounds. Independent physical gates check all branch amplitudes and full
+coherent norms. Further regressions cover impossible records, zero-term/pair
+zero certificates, output/environment chronology, reported versus true feedback,
+stored decisions without callback replay, global phases and immutable recovery
+after path, projection, geometry, stage, work, term, pair and scalar refusals.
+
+Only this whole original method is newly mapped. Current scope is81 verified,
+271 unmapped,98 unique Rust witnesses from100 declarations across45 integration
+targets. The strict complete-parity audit must still exit2. The separate native
+exception/certificate needed-two versus needed-one policy remains unmapped.
+General original-IR coverage, full native certificate serialization, Python ABI,
+complete heap-byte accounting and paper performance remain separate gaps.
+
+The additional six-wire balanced CCZ/Z circuit has zero all-X event amplitude
+and probability but a nonzero absorbed tensor with quotient rank six. Both
+compiler strategies and both explicit resource policies retain their actual
+resource and nonempty coherent states; the full ordered-pair norm cancels to
+zero. A rank-zero compile cap still refuses, and a valid retry succeeds.
+Only an explicit zero coefficient after projection/absorption skips resource
+selection. This additional frontend regression does not map another upstream
+method or introduce an implicit zero-detection/normalization policy.

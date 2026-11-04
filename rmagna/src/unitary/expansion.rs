@@ -343,7 +343,11 @@ impl CompiledUnitary {
         })
     }
 }
-fn admit(option: &'static str, limit: usize, required: u128) -> Result<(), UnitaryError> {
+pub(super) fn admit(
+    option: &'static str,
+    limit: usize,
+    required: u128,
+) -> Result<(), UnitaryError> {
     if required > limit as u128 {
         Err(UnitaryError::ExpansionResourceLimit {
             option,
@@ -357,7 +361,7 @@ fn admit(option: &'static str, limit: usize, required: u128) -> Result<(), Unita
 // Saturation is conservative: u128::MAX cannot fit any usize-configured budget.
 // Include full-width factorization/provenance, quadratic matrices, transposes,
 // temporary phase axes, all retained terms, and their Vec/BitVector headers.
-fn geometry_words(width: usize, paths: usize, axes: usize, terms: u128) -> u128 {
+pub(crate) fn geometry_words(width: usize, paths: usize, axes: usize, terms: u128) -> u128 {
     let d = width.max(paths).max(axes) as u128;
     let matrix = (d + 1).saturating_mul(d.div_ceil(64) + 8);
     let ket = (paths as u128 + 1)
