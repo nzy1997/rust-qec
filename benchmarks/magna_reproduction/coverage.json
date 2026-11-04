@@ -991,8 +991,16 @@
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_all_fault_configurations_recover_exact_physical_acceptance_and_error",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original two-site postselection circuit X_ERROR1/10wire0,M0,X_ERROR1/5wire1,DETECTORrec[-1],POSTSELECTdet0, outputwire1 against zero target, through actual TaskEvaluator::sample. Every4fault configurations at scales1/2,1,2 and both ParityCopies/SharedCommutingLayer compilers (24 actual draws) use independent literal physical/proposal/likelihood tables and admitted categorical word pairs with exactly2 actual source calls. Per-draw physical probability, likelihood, raw acceptance/error/target, unit target norm/history mass/history weight and weighted accepted/error/target fields are checked before aggregates, including all rejected configurations. Proposal-weighted finite sums recover normalization1,acceptance9/10,error9/50,target18/25,conditionalerror1/5. Complete unchanged original Python method separately passes normal/O; actual returned accepted-weight mutation is rejected. Private Rust ignored-weight and double-weight controls compile against fresh own libraries and fail the SAME unmodified known-answer assertion at actual accepted16/19 changed to1 or256/361. Production and final candidate remain unchanged. No new API/default/native RNG ABI/Python compatibility/weighted-summary error/MC/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_importance_outcomes",
+          "test": "original_all_fault_configurations_recover_exact_physical_acceptance_and_error",
+          "source_sha256": "0cca074426b92b33e9748d58e238c862c1569da729c7a768d432d9eaace247bf"
+        }
+      ]
     },
     {
       "id": "test_importance_sampling.ImportanceSamplingTests.test_channel_proportions_correlations_endpoints_and_guard_policy",

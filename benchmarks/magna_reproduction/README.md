@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 93 verified, 1 partial and 258 unmapped
+The source-bound ledger currently has 94 verified, 1 partial and 257 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-112 distinct Rust witnesses from 114 declarations across 51 targets. Strict
+113 distinct Rust witnesses from 115 declarations across 52 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2030,3 +2030,55 @@ partially mapped by `original_finite_occurrence` retains its explicit gaps.
 Existing mappings, fixtures, generators and sampling defaults are preserved;
 these finite laws do not establish native random-trajectory identity, Python
 keyword compatibility or paper performance.
+
+## Original weighted task outcome identities
+
+Run the complete original-method Rust witness:
+
+```sh
+cargo test --locked -p rmagna --test original_importance_outcomes
+```
+
+The exact source circuit has X error 1/10 on wire zero, a noiseless measurement,
+X error 1/5 on wire one, a detector on the measurement and postselection on
+that detector. The task compares output wire one with the zero target.
+It retains the complete original importance method from pinned
+`tests/core/test_importance_sampling.py` (SHA256
+`fc24b087ed08c9dcd35a8f6befe373d6b5a23c5709749dae207f2b1a0fe75caf`).
+
+Both compiler strategies sample all four configurations at scales 1/2, 1
+and 2: 24 actual draws through `TaskEvaluator::sample`. Independent literal
+physical probabilities are [18/25,9/50,2/25,1/50], ordered by faults
+[(false,false),(false,true),(true,false),(true,true)]. Each proposal table and
+likelihood table is independently supplied. Exact admitted fault bucket words
+are [19,9], [9,4] and [4,3] for the three scales; each identity uses word zero.
+Every draw consumes exactly two actual source words.
+
+Per-draw checks precede every aggregate: physical probability and likelihood,
+raw postselection/error/target masses, unit target normalization and history
+factors, and weighted acceptance/error/target contributions. Rejected
+configurations retain their independently checked physical probabilities and
+likelihoods while contributing zero accepted/error/target mass. Finite sums
+weighted by proposal probabilities give normalization 1, acceptance 9/10,
+error 9/50, target success 18/25 and conditional error 1/5.
+
+The complete unchanged original Python method separately passed with the fresh
+production extension in normal and optimized modes. Its twelve prescribed
+draws per mode were observed without extra replay or importing the original
+build-capable support modules. Mutating the actual first returned accepted
+contribution to one is rejected by that unchanged method.
+
+Two private Rust controls separately compiled against fresh own libraries,
+then changed the actual first accepted producer output 16/19 to one (ignored
+weight) or 256/361 (double weight). Both failed the same unmodified known-answer
+assertion for the intended exact-value reason. Controls remain outside
+production and repository source; the final public candidate is byte-identical.
+
+Only this one complete ledger row is promoted. Current coverage is 94 verified,
+1 partial and 257 unmapped, with zero architecture-specific core exclusions.
+All 113 distinct witnesses from 115 declarations across 52 targets must execute;
+strict complete parity still exits 2. Prior mappings, fixtures and generators
+remain intact, including the explicit numerical-method partial gaps.
+These exact finite identities do not establish native random-stream ABI,
+Python keyword/serialization compatibility, weighted-summary standard errors,
+Monte Carlo convergence or paper performance.
