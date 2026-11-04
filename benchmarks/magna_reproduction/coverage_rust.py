@@ -156,7 +156,7 @@ def flat_tests(source: str) -> set[str]:
     return names
 
 
-def library_module(root: Path, source: Path, name: str) -> Path:
+def library_module(root: Path, source: Path, directory: Path, name: str) -> tuple[Path, Path]:
     """Resolve one explicit external module; unsupported registrations refuse.
 
     This deliberately supports only ordinary modules, cfg(test), and literal
@@ -224,12 +224,17 @@ def library_module(root: Path, source: Path, name: str) -> Path:
         # absolute/traversing component before safe_file sees it.
         require(all(part not in {"", ".", ".."} for part in path.split("/")),
                 f"unsafe Rust module path: {path}")
-        return safe_file(root, (source.parent.relative_to(root) / path).as_posix())
-    directory = source.parent if source.name in {"lib.rs", "mod.rs"} else source.with_suffix("")
+        selected = safe_file(root, (source.parent.relative_to(root) / path).as_posix())
+        # An explicit path gives this module its file's parent directory for
+        # default children, even when the file is not named mod.rs. Ordinary
+        # foo.rs modules instead search foo/ for default children. Carry the
+        # registration context: the same physical file can be loaded either way.
+        return selected, selected.parent
     alternatives = [directory / f"{name}.rs", directory / name / "mod.rs"]
     present = [p for p in alternatives if p.exists() or p.is_symlink()]
     require(len(present) == 1, f"missing or ambiguous Rust module source: {name}")
-    return safe_file(root, present[0].relative_to(root).as_posix())
+    selected = safe_file(root, present[0].relative_to(root).as_posix())
+    return selected, selected.parent if selected.name == "mod.rs" else selected.with_suffix("")
 
 
 def witness(root: Path, value: object) -> tuple[str, str]:
@@ -244,9 +249,10 @@ def witness(root: Path, value: object) -> tuple[str, str]:
     name = row["test"]
     if row["target"] == "lib":
         path = safe_file(root, "rmagna/src/lib.rs")
+        directory = path.parent
         *modules, name = name.split("::")
         for module in modules:
-            path = library_module(root, path, module)
+            path, directory = library_module(root, path, directory, module)
     else:
         path = safe_file(root, f"rmagna/tests/{row['target']}.rs")
     require(sha(path) == row["source_sha256"], f"Rust source SHA-256 mismatch: {row['target']}")

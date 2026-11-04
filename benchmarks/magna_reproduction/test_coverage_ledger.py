@@ -343,16 +343,27 @@ mod nested { #[test] fn inside() {} }
             rust.witness(self.repo, row)
         leaf.unlink()
         leaf.write_text(saved_leaf)
-        # A non-mod.rs parent uses its stem for ordinary child modules.
+        # rustc resolves default children of an explicit #[path] module from
+        # the file's parent, regardless of its stem or the module's alias.
         owner.write_text('#[cfg(test)]\nmod contracts;\n')
+        self.assertEqual(rust.witness(self.repo, row), ("lib", row["test"]))
         (owner.parent / "owner").mkdir()
         nested = owner.parent / "owner/contracts.rs"
         nested.write_text(saved_leaf)
+        leaf.unlink()
+        with self.assertRaises(coverage.CoverageError):
+            rust.witness(self.repo, row)
+        leaf.write_text(saved_leaf)
         self.assertEqual(rust.witness(self.repo, row), ("lib", row["test"]))
+        # Loading the same owner.rs via an ordinary declaration instead uses
+        # owner/ for default children. The directory is registration context.
+        (owner.parent / "mod.rs").write_text('mod owner;\n')
+        ordinary = {**row, "test": "outer::owner::contracts::checks_contract"}
+        self.assertEqual(rust.witness(self.repo, ordinary), ("lib", ordinary["test"]))
         (owner.parent / "owner/contracts").mkdir()
         (owner.parent / "owner/contracts/mod.rs").write_text(saved_leaf)
         with self.assertRaises(coverage.CoverageError):
-            rust.witness(self.repo, row)
+            rust.witness(self.repo, ordinary)
         root.write_text('#![cfg(any())]\npub mod outer;\n')
         with self.assertRaises(coverage.CoverageError):
             rust.witness(self.repo, row)
