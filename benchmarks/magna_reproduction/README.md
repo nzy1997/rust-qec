@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 98 verified, 1 partial and 253 unmapped
+The source-bound ledger currently has 99 verified, 1 partial and 252 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-117 distinct Rust witnesses from 119 declarations across 53 targets. Strict
+118 distinct Rust witnesses from 120 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2185,3 +2185,56 @@ All 117 distinct witnesses from 119 declarations across 53 targets must run
 in the source-bound audit. Strict complete parity still exits 2. This finite
 validation does not claim native RNG ABI or Python object compatibility,
 Monte Carlo convergence, new defaults or paper performance.
+
+## Original weighted nonlinear aggregation
+
+Run the complete original-method witness, then the complete five-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_importance_weights_rejected_draws_and_aggregate_ratio -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+This extends the same pinned nonlinear suite. The preceding four-test and
+helper source prefix remains byte-identical. Only this weighted aggregation
+method is newly verified; the four existing witnesses receive a mechanical
+source SHA256 refresh. Every other contract, fixture, generator, original
+module hash and partial numerical gap remains unchanged.
+
+Physical independent X-error rates are 1/10 and 1/5. Proposal scale two gives
+rates 1/5 and 2/5. Indexing bitmasks as a + 2*b gives multiplicities [12,3,8,2],
+physical masses [18/25,2/25,9/50,1/50], proposal masses
+[12/25,3/25,8/25,2/25] and likelihoods [3/2,2/3,9/16,1/4].
+An opaque version-one AND rejects only a=b=1; wire zero is compared with a
+zero-state target. Both compilers and both ColdPrefix/FixedTemplate causal
+runtimes take all 25 actual typed samples using deterministic words admitted
+to the exact categorical buckets. Every draw checks two consumed noise words,
+its physical mass and likelihood, controller transcript, history mass and
+weight one, target normalization one, raw acceptance/error/target success
+and the corresponding once-weighted contributions.
+
+The streaming accumulator retains both rejected draws in count 25. Exact
+means are acceptance 49/50, error 2/25 and target success 9/10. The aggregate
+conditional ratio is 4/49, different from the wrong per-draw ratio average
+3/25. Mean diagnostic weight is one and weight-only ESS is 2400/119.
+A separate Fraction truth-table oracle checks these finite sums.
+
+Before the first Rust run, the complete unchanged original method, registry
+helper and file_hooks.summary AST pass in normal and optimized Python.
+Four actual supplied NoiseDraw samples form the original 25-entry mixture,
+which the freshly compiled, identified native testing helper summarizes.
+A recorded loader returns that already-built helper; original build-capable
+Python loaders and support-module top levels are not executed. Actual native
+input controls drop the two rejected entries before summarization, producing
+23 entries and acceptance 49/46; the unchanged original assertion rejects it.
+Two private Rust variants of the final owning source compile successfully,
+then fail the unchanged count or exact mean assertion when rejected pushes
+are omitted or already weighted contributions are multiplied again. The
+controls also confirm the actual wrong count or mean before that failure.
+
+The ledger now has 99 verified, 1 partial and 252 unmapped methods.
+All 118 distinct witnesses from 120 declarations across 53 targets must run
+in the source-bound audit. Strict complete parity still exits 2. These
+deterministic finite-mixture checks do not claim native RNG trajectory or
+Python private-representation compatibility, Monte Carlo uncertainty,
+new sampling defaults or paper performance.

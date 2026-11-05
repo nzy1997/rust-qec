@@ -416,3 +416,195 @@ fn original_dense_noncommuting_magic_instrument_with_report_noise() {
         assert_eq!(interval.upper, conditional);
     }
 }
+
+// Complete original method test_importance_weights_rejected_draws_and_aggregate_ratio
+// from the same pinned MPL-2.0 module above. The deterministic 25-draw multiset
+// realizes the proposal law exactly; it makes no Monte Carlo uncertainty claim.
+const WEIGHTED_NONLINEAR: &str = "X_ERROR(1/10) 0\nX_ERROR(1/5) 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+
+struct WeightedNoiseWords {
+    words: [u64; 2],
+    used: usize,
+}
+impl rmagna::noise::RandomSource for WeightedNoiseWords {
+    fn next_u64(&mut self) -> u64 {
+        let word = *self
+            .words
+            .get(self.used)
+            .expect("unexpected extra noise or history entropy");
+        self.used += 1;
+        word
+    }
+}
+fn weighted_nonlinear_evaluator(
+    files: &Files,
+    (compiler, runtime): (CompilerStrategy, CausalStrategy),
+) -> TaskEvaluator {
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("and", "1", |bits: &[bool]| {
+            assert_eq!(bits.len(), 2);
+            Ok(vec![bits[0] & bits[1]])
+        })
+        .unwrap();
+    let parse = ParseOptions {
+        controllers: registry.names(),
+        ..Default::default()
+    };
+    let physical = parse_circuit(WEIGHTED_NONLINEAR, &parse).unwrap();
+    let task = parse_task(
+        r#"{"outputs":[0],"ideal_state":"zero.magna"}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.strategy = runtime;
+    options.runtime.compile.compiler_strategy = compiler;
+    let evaluator = TaskEvaluator::new_with_sampling(
+        &physical,
+        &modules,
+        &registry,
+        options,
+        &rmagna::noise::NoiseSampling::Importance {
+            proposal_scale: rational("2"),
+        },
+    )
+    .unwrap();
+    assert!(evaluator.sampled_history());
+    assert_eq!(
+        evaluator.execution_route(),
+        match runtime {
+            CausalStrategy::ColdPrefix => "causal_cold_prefix",
+            CausalStrategy::FixedTemplate => "causal_fixed_template",
+        }
+    );
+    evaluator
+}
+
+#[test]
+fn original_importance_weights_rejected_draws_and_aggregate_ratio() {
+    use rmagna::statistics::{ExactStatistics, HistoryEfficiency, StatisticsOptions};
+
+    let files = Files::new();
+    let arithmetic = FieldArithmetic::default();
+    // Index = a + 2*b. These are independent physical/proposal truth tables.
+    let multiplicities = [12, 3, 8, 2];
+    let physical = ["18/25", "2/25", "9/50", "1/50"];
+    let proposal = ["12/25", "3/25", "8/25", "2/25"];
+    let likelihoods = ["3/2", "2/3", "9/16", "1/4"];
+    for strategy in strategies() {
+        let evaluator = weighted_nonlinear_evaluator(&files, strategy);
+        let mut statistics = ExactStatistics::new(3, StatisticsOptions::default()).unwrap();
+        let mut efficiency = HistoryEfficiency::new(arithmetic).unwrap();
+        let mut rejected = 0;
+        let mut individual_ratios = ExactField::zero();
+        for mask in 0..4 {
+            let a = mask & 1 != 0;
+            let b = mask & 2 != 0;
+            let accepted = !(a & b);
+            let error = accepted & a;
+            let target = accepted & !a;
+            let scalar_bit = |bit| {
+                if bit {
+                    ExactScalar::one()
+                } else {
+                    ExactScalar::zero()
+                }
+            };
+            let weight = field(likelihoods[mask]);
+            assert_eq!(
+                arithmetic
+                    .divide(&field(physical[mask]), &field(proposal[mask]))
+                    .unwrap(),
+                weight
+            );
+            assert_eq!(
+                arithmetic
+                    .scale(&field(proposal[mask]), &rational("25"))
+                    .unwrap(),
+                field(&multiplicities[mask].to_string())
+            );
+            for _ in 0..multiplicities[mask] {
+                // Identity uses zero; fault words lie in the exact categorical
+                // buckets for q=1/5 and q=2/5. No native RNG ABI is assumed.
+                let mut rng = WeightedNoiseWords {
+                    words: [if a { 4 } else { 0 }, if b { 3 } else { 0 }],
+                    used: 0,
+                };
+                let draw = evaluator.sample(&mut rng).unwrap();
+                assert_eq!(rng.used, 2, "two actual noise words per draw");
+                assert_eq!(draw.noise_probability, rational(physical[mask]));
+                assert_eq!(draw.noise_likelihood_ratio, rational(likelihoods[mask]));
+                assert_eq!(draw.history_mass, ExactScalar::one());
+                assert_eq!(draw.history_proposal_mass, None);
+                assert_eq!(draw.history_weight, ExactField::one());
+                assert_eq!(draw.target_normalization, Some(ExactScalar::one()));
+                assert!(draw.sampled_records.is_empty());
+                assert_eq!(draw.controller_calls.len(), 1);
+                let call = &draw.controller_calls[0];
+                assert_eq!(call.name, "and");
+                assert_eq!(call.call, 0);
+                assert_eq!(call.inputs, vec![a, b]);
+                assert_eq!(call.outputs, vec![a & b]);
+                assert_eq!(draw.raw_acceptance, scalar_bit(accepted));
+                assert_eq!(draw.raw_error, scalar_bit(error));
+                assert_eq!(draw.raw_target_success, Some(scalar_bit(target)));
+                assert!(draw.raw_moments.is_empty());
+                assert!(draw.moments.is_empty());
+                let weighted_bit = |bit| {
+                    if bit {
+                        weight.clone()
+                    } else {
+                        ExactField::zero()
+                    }
+                };
+                assert_eq!(draw.accepted, weighted_bit(accepted));
+                assert_eq!(draw.error, weighted_bit(error));
+                assert_eq!(draw.target_success, Some(weighted_bit(target)));
+                rejected += usize::from(draw.accepted.is_zero());
+                if !draw.accepted.is_zero() {
+                    individual_ratios = arithmetic
+                        .add(
+                            &individual_ratios,
+                            &arithmetic.divide(&draw.error, &draw.accepted).unwrap(),
+                        )
+                        .unwrap();
+                }
+                let contributions = vec![
+                    draw.accepted.clone(),
+                    draw.error.clone(),
+                    draw.target_success.clone().unwrap(),
+                ];
+                // Contributions already contain the likelihood. The separate
+                // weight is a diagnostic and must not multiply them again.
+                statistics.push(&contributions, &weight).unwrap();
+                efficiency
+                    .push(&draw.accepted, Some(&draw.error), &weight, &weight)
+                    .unwrap();
+            }
+        }
+        let summary = statistics.summarize().unwrap().unwrap();
+        assert_eq!(summary.count, 25, "all draws include both rejected samples");
+        assert_eq!(rejected, 2);
+        assert_eq!(
+            summary.means,
+            vec![field("49/50"), field("2/25"), field("9/10")],
+            "exact means apply the likelihood once"
+        );
+        assert_eq!(summary.mean_weight, field("1"));
+        assert_eq!(summary.effective_sample_size, field("2400/119"));
+        let ratio = statistics.paired_ratio(1, 0).unwrap().unwrap().ratio;
+        assert_eq!(ratio, field("4/49"), "ratio of aggregate weighted masses");
+        let naive_mean = arithmetic
+            .scale(&individual_ratios, &rational("1/25"))
+            .unwrap();
+        assert_eq!(naive_mean, field("3/25"));
+        assert_ne!(ratio, naive_mean);
+        let diagnostic = efficiency.summarize().unwrap();
+        assert_eq!(diagnostic.completed, 25);
+        assert_eq!(diagnostic.mean_weight, Some(field("1")));
+        assert_eq!(diagnostic.effective_sample_size, field("2400/119"));
+    }
+}
