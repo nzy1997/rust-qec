@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 99 verified, 1 partial and 252 unmapped
+The source-bound ledger currently has 100 verified, 1 partial and 251 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-118 distinct Rust witnesses from 120 declarations across 53 targets. Strict
+119 distinct Rust witnesses from 121 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2238,3 +2238,57 @@ in the source-bound audit. Strict complete parity still exits 2. These
 deterministic finite-mixture checks do not claim native RNG trajectory or
 Python private-representation compatibility, Monte Carlo uncertainty,
 new sampling defaults or paper performance.
+
+## Original full-history controller readout
+
+Run the complete original-method witness, then the complete six-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_full_history_final_readout_and_explicit_state -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+This appends the one pinned full-history method while preserving the preceding
+five-test/helper source prefix byte for byte. Only this original-method row is
+newly verified; the five earlier witnesses receive mechanical source SHA256
+refreshes. Every other contract, status, module hash, fixture, generator and
+partial numerical gap remains unchanged. All earlier per-change inventories
+retain their historical values.
+
+The physical sequence initializes ctrl[0] to one, then executes X/MR, X/MR
+and X/M(1) on wire zero, declaring each reported outcome as a detector. The
+opaque version-one decode callback reads detector 0, detector 1, the last
+detector and the old ctrl[0], computes (a AND b) XOR final XOR prior, and writes
+the same decision register. Postselection accepts zero; the task explicitly
+requests an empty output list. The first two reports are true because MR
+resets the state after each report. The last report is false because M(1)
+flips the report of the final true measurement.
+
+Both compiler strategies and both ColdPrefix/FixedTemplate causal runtimes
+assert preparation performs no callback. Each then takes three actual draws,
+with one opaque invocation per draw: inputs [true,true,false,true], output
+false, exact acceptance one and error zero, unit raw acceptance/history mass,
+zero raw error, unit history weight and physical-noise probability/likelihood.
+There is no ideal target, target normalization, requested record or moment.
+The captured side-effect list is exactly three copies of the input vector,
+showing the prior decision was read before its overwrite.
+
+The complete unchanged original method also passes normal and optimized
+Python via an actual fresh-native production run with three shots. The
+identified testing helper is freshly built but is not imported or used for
+this method. Original test-module and build-capable support top levels do
+not execute. An independent deterministic binary-state oracle checks both
+reset models. Actual native input controls replace only the first MR by M,
+observe acceptance zero and fail the unchanged original acceptance assertion.
+The matching private final-source Rust variant compiles successfully and
+fails the same exact acceptance assertion (exit 101) after confirming zero.
+That known-answer assertion precedes transcript assertions, so the control
+demonstrates the intended acceptance failure.
+
+The ledger now has 100 verified, 1 partial and 251 unmapped methods.
+All 119 distinct witnesses from 121 declarations across 53 targets must run
+in the source-bound audit. Strict complete parity still exits 2. The separate
+report-flip method stays unmapped: this deliverable does not normalize or
+promote its explicit-argument noise-category metadata. These finite checks
+make no native RNG trajectory, private Python representation, new-default,
+Monte Carlo uncertainty or paper-performance claim.

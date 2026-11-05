@@ -608,3 +608,96 @@ fn original_importance_weights_rejected_draws_and_aggregate_ratio() {
         assert_eq!(diagnostic.effective_sample_size, field("2400/119"));
     }
 }
+
+// Complete original method test_full_history_final_readout_and_explicit_state
+// from the same pinned MPL-2.0 module above. Each callback reads the reported
+// detector history and the old decision before overwriting that same register.
+const FULL_HISTORY: &str = "CONTROL[XOR](1) -> ctrl[0]\nX 0\nMR 0\nDETECTOR rec[-1]\nX 0\nMR 0\nDETECTOR rec[-1]\nX 0\nM(1) 0\nDETECTOR rec[-1]\nCONTROL[decode] det[0] det[1] det[-1] ctrl[0] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+
+type FullHistoryCalls = std::sync::Arc<std::sync::Mutex<Vec<Vec<bool>>>>;
+
+fn full_history_evaluator(
+    (compiler, runtime): (CompilerStrategy, CausalStrategy),
+    calls: FullHistoryCalls,
+) -> TaskEvaluator {
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("decode", "1", move |bits: &[bool]| {
+            assert_eq!(bits.len(), 4);
+            calls.lock().unwrap().push(bits.to_vec());
+            Ok(vec![(bits[0] & bits[1]) ^ bits[2] ^ bits[3]])
+        })
+        .unwrap();
+    let parse = ParseOptions {
+        controllers: registry.names(),
+        ..Default::default()
+    };
+    let physical = parse_circuit(FULL_HISTORY, &parse).unwrap();
+    let task = parse_task(
+        r#"{"outputs":[]}"#,
+        &std::env::temp_dir(),
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.strategy = runtime;
+    options.runtime.compile.compiler_strategy = compiler;
+    let evaluator = TaskEvaluator::new(&physical, &modules, &registry, options).unwrap();
+    assert!(evaluator.sampled_history());
+    assert_eq!(
+        evaluator.execution_route(),
+        match runtime {
+            CausalStrategy::ColdPrefix => "causal_cold_prefix",
+            CausalStrategy::FixedTemplate => "causal_fixed_template",
+        }
+    );
+    evaluator
+}
+
+#[test]
+fn original_full_history_final_readout_and_explicit_state() {
+    for strategy in strategies() {
+        let calls = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let evaluator = full_history_evaluator(strategy, std::sync::Arc::clone(&calls));
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "preparation must not invoke the opaque callback"
+        );
+        for (index, seed) in (0..3).enumerate() {
+            let draw = evaluator.sample(&mut SplitMix64::new(seed)).unwrap();
+            // Keep the known-answer acceptance assertion before transcript
+            // checks: the private first-MR-to-M control must fail here.
+            assert_eq!(draw.accepted, field("1"), "full-history exact acceptance");
+            assert_eq!(draw.error, field("0"));
+            assert_eq!(draw.raw_acceptance, ExactScalar::one());
+            assert_eq!(draw.raw_error, ExactScalar::zero());
+            assert_eq!(draw.history_mass, ExactScalar::one());
+            assert_eq!(draw.history_proposal_mass, None);
+            assert_eq!(draw.history_weight, ExactField::one());
+            assert_eq!(draw.noise_probability, rational("1"));
+            assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+            assert_eq!(draw.target_success, None);
+            assert_eq!(draw.raw_target_success, None);
+            assert_eq!(draw.target_normalization, None);
+            assert!(draw.sampled_records.is_empty());
+            assert!(draw.moments.is_empty());
+            assert!(draw.raw_moments.is_empty());
+            assert_eq!(draw.controller_calls.len(), 1);
+            let call = &draw.controller_calls[0];
+            assert_eq!(call.name, "decode");
+            assert_eq!(call.inputs, vec![true, true, false, true]);
+            assert_eq!(call.outputs, vec![false]);
+            assert_eq!(
+                calls.lock().unwrap().len(),
+                index + 1,
+                "one actual callback invocation per draw"
+            );
+        }
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec![vec![true, true, false, true]; 3],
+            "reported history and prior value are read before overwrite"
+        );
+    }
+}
