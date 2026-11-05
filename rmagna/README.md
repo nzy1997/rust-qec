@@ -5927,3 +5927,17 @@ side-effect list contains precisely those three input vectors.
 The private first-MR-to-M circuit preserves the first report but omits its
 quantum reset. Its next X therefore changes the second report and accepted
 mass becomes zero, which fails the unchanged exact acceptance assertion.
+
+## Original report flips and true output
+
+The nonlinear target also verifies the complete original report-flip method.
+Preparing both qubits in one and flipping only the first measurement report
+produces records [false,true], accepted mass one and joint error one against
+a zero-state target on output zero. The true output remains one. The mixed
+AND/XOR selector has the same accepted and error masses. Both compilers and
+both causal runtimes exercise these programs.
+
+Original source declarations expose one report-flip category. The resolved
+compiler instrument retains two internal sites because the argumentless
+ideal measurement also has an implicit zero-rate site. The existing original
+category API preserves this distinction without changing compiler behavior.

@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 100 verified, 1 partial and 251 unmapped
+The source-bound ledger currently has 101 verified, 1 partial and 250 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-119 distinct Rust witnesses from 121 declarations across 53 targets. Strict
+120 distinct Rust witnesses from 122 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2292,3 +2292,55 @@ report-flip method stays unmapped: this deliverable does not normalize or
 promote its explicit-argument noise-category metadata. These finite checks
 make no native RNG trajectory, private Python representation, new-default,
 Monte Carlo uncertainty or paper-performance claim.
+
+## Original report flips and true output
+
+Run the complete original-method witness, then the complete seven-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_report_flips_select_reported_bits_and_preserve_true_output -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Only this complete original method is newly verified. The preceding 703-line
+six-test/helper prefix stays byte-identical; the six earlier witnesses receive
+mechanical source SHA256 refreshes. Every other status, contract, fixture,
+generator and partial numerical gap remains unchanged. Earlier per-change
+inventories retain their historical values.
+
+The original circuit prepares wires zero and one in one, reports the first
+measurement with probability-one classical inversion, and measures the second
+ideally. Two detectors feed the opaque AND controller and zero postselection.
+Both compiler strategies and both ColdPrefix/FixedTemplate causal runtimes
+sample that program and its original mixed AND/XOR selector. Requested records
+are [false,true]. Acceptance and joint error are one, target success is zero
+against a unit zero-state target on output zero, and history mass/weight and
+physical-noise probability/likelihood are one. Every draw has one opaque AND
+transcript with those inputs and output false; unused moments are empty.
+
+The public original_noise_categories API reports exactly one original category:
+ReportFlip on record zero, probability one and identity probability zero.
+Separate actual causal resolution exposes two internal compiler sites, including
+the implicit zero-rate site for the argumentless measurement. The original
+expected category count of one is preserved. No filtering, renumbering or
+normalization changes production behavior.
+
+The complete unchanged original method and its used registry helper pass normal
+and optimized Python through fresh production-native compile/sample and mixed
+run calls. Production and identified helper modules are freshly built; this
+method never imports or uses the testing helper. Original module/support top
+levels do not execute. An independent two-qubit binary-state oracle distinguishes
+classical report inversion from physical X while preserving both reported bits.
+The actual native input counterexample replaces only M(1)0 with X_ERROR(1)0
+followed by ideal M0. Reports and acceptance remain unchanged, but joint error
+becomes zero and the unchanged original tuple assertion fails. A matching
+private final-source Rust variant compiles successfully and fails the unchanged
+exact joint-error assertion (exit101) after confirming reports, acceptance and
+zero error. The public candidate remains unchanged.
+
+Coverage is now 101 verified, 1 partial and 250 unmapped methods, with zero
+architecture-specific exclusions. All 120 distinct witnesses from 122 declarations
+across 53 targets must be covered by source-bound execution audits. Strict
+complete parity intentionally exits2. These finite contracts make no private
+Python representation, native RNG trajectory, new-default or paper-performance
+claim.
