@@ -2130,8 +2130,8 @@ measurements, an always-zero final selector accepts every branch, and asking
 to observe the third record changes captured history mass to 1/8. All controls
 stay outside repository source; the tested public candidate is unchanged.
 
-This stage has 98 verified, 1 partial and 253 unmapped methods, with no
-architecture-specific core exclusions. All 117 distinct witnesses from 119
+This stage has 97 verified, 1 partial and 254 unmapped methods, with no
+architecture-specific core exclusions. All 116 distinct witnesses from 118
 declarations across 53 targets must run in the source-bound audit; strict
 complete parity still exits 2. Prior mappings, fixtures and generators remain
 intact, including the numerical-method partial gaps. This finite validation
