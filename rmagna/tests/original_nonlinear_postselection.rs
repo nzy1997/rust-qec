@@ -701,3 +701,109 @@ fn original_full_history_final_readout_and_explicit_state() {
         );
     }
 }
+
+// Complete original method test_report_flips_select_reported_bits_and_preserve_true_output
+// from the same pinned MPL-2.0 module above. Readout noise changes a report,
+// while the measured output retains its true quantum state.
+const REPORT_FLIP: &str = "X 0 1\nM(1) 0\nM 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+const REPORT_FLIP_TASK: &str =
+    r#"{"outputs":[0],"sample_records":[0,1],"ideal_state":"zero.magna"}"#;
+
+fn report_flip_categories(text: &str, (compiler, runtime): (CompilerStrategy, CausalStrategy)) {
+    use rmagna::noise::{OriginalNoiseAction, OriginalNoiseOptions, original_noise_categories};
+    use rmagna::runtime::{CausalProgram, RuntimeOptions};
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("and", "1", |bits: &[bool]| Ok(vec![bits[0] & bits[1]]))
+        .unwrap();
+    let physical = parse_circuit(
+        text,
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let categories =
+        original_noise_categories(&physical, &OriginalNoiseOptions::default()).unwrap();
+    assert_eq!(categories.len(), 1, "one original declared report category");
+    let category = &categories[0];
+    assert_eq!(category.identity_probability.value(), &rational("0"));
+    assert_eq!(category.channels.len(), 1);
+    assert_eq!(category.channels[0].probability.value(), &rational("1"));
+    assert_eq!(
+        category.channels[0].action,
+        OriginalNoiseAction::ReportFlip { record: 0 }
+    );
+    assert!(category.guard.is_none());
+    let options = RuntimeOptions {
+        strategy: runtime,
+        compile: rmagna::instrument::CompileOptions {
+            compiler_strategy: compiler,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let arithmetic = ScalarArithmetic::default();
+    let program = CausalProgram::new(&physical, &registry, options, &arithmetic).unwrap();
+    let resolved = program
+        .resolve(&[], &mut SplitMix64::new(1), &arithmetic)
+        .unwrap();
+    let sites = resolved.instrument().noise_sites();
+    assert_eq!(
+        sites.len(),
+        2,
+        "implicit ideal measurement remains an internal site"
+    );
+    assert_eq!(category.internal_site, 0);
+    assert_eq!(
+        sites[category.internal_site].identity_probability(),
+        &category.identity_probability
+    );
+    assert_eq!(sites[category.internal_site].alternatives().len(), 1);
+    assert_eq!(
+        sites[category.internal_site].alternatives()[0].probability(),
+        &category.channels[0].probability
+    );
+    assert_eq!(sites[1].identity_probability().value(), &rational("1"));
+}
+
+#[test]
+fn original_report_flips_select_reported_bits_and_preserve_true_output() {
+    let files = Files::new();
+    let mixed = REPORT_FLIP.replace(
+        "POSTSELECT ctrl[0]",
+        "CONTROL[XOR] ctrl[0] rec[-2] -> ctrl[1]\nPOSTSELECT ctrl[1]",
+    );
+    for strategy in strategies() {
+        for text in [REPORT_FLIP, mixed.as_str()] {
+            let evaluator = evaluator(&files, text, REPORT_FLIP_TASK, strategy);
+            let draw = evaluator.sample(&mut SplitMix64::new(1)).unwrap();
+            assert_eq!(draw.sampled_records, vec![false, true]);
+            assert_eq!(draw.accepted, field("1"));
+            // The physical-error control preserves reports and acceptance;
+            // this known-answer assertion must detect its changed true output.
+            assert_eq!(draw.error, field("1"), "report-flip exact joint error");
+            assert_eq!(draw.raw_acceptance, ExactScalar::one());
+            assert_eq!(draw.raw_error, ExactScalar::one());
+            assert_eq!(draw.target_success, Some(field("0")));
+            assert_eq!(draw.raw_target_success, Some(ExactScalar::zero()));
+            assert_eq!(draw.target_normalization, Some(ExactScalar::one()));
+            assert_eq!(draw.history_mass, ExactScalar::one());
+            assert_eq!(draw.history_proposal_mass, None);
+            assert_eq!(draw.history_weight, ExactField::one());
+            assert_eq!(draw.noise_probability, rational("1"));
+            assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+            assert!(draw.moments.is_empty());
+            assert!(draw.raw_moments.is_empty());
+            assert_eq!(draw.controller_calls.len(), 1);
+            let call = &draw.controller_calls[0];
+            assert_eq!(call.name, "and");
+            assert_eq!(call.inputs, vec![false, true]);
+            assert_eq!(call.outputs, vec![false]);
+            // Original declaration metadata and resolved compiler sites expose
+            // different counts; neither count is normalized to the other.
+            report_flip_categories(text, strategy);
+        }
+    }
+}

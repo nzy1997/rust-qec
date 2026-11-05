@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1695,7 +1695,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1708,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1721,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1734,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1752,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
         }
       ]
     },
@@ -1768,8 +1768,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_report_flips_select_reported_bits_and_preserve_true_output",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original report-flip method and used registry helper. Physical X prepares wires0/1 true; M(1)0 changes only its reported bit, M1 is ideal, two detectors feed version1 opaque AND and zero postselection. Both compilers and both causal runtimes sample the original and mixed AND/XOR selector programs with outputs0, records0/1 and a unit zero-state target. Reports[false,true], A1/E1, targetsuccess0/norm1, rawA1/rawE1, historymass1/proposalmassNone/weight1, noiseP1/likelihood1 and one AND transcript inputs[false,true]/outputfalse. Existing public original_noise_categories yields exactly one ReportFlip(record0) channel with P1/identity0; actual resolved compiler instrument retains two sites, including implicit zero-rate M1. Original expected category_count1 remains unchanged. Whole original method plus registry AST pass normal/O against fresh production native compile/sample and mixed run; identified helper freshly built but unused. Actual input replacing only M(1)0 with physical X_ERROR(1)0 then idealM keeps reports/A but gives E0 and fails unchanged original joint-error tuple. Independent two-qubit state/report/target oracle confirms both models. Matching private final-source Rust input compiles0/test101 at the unchanged jointE1 assertion after reports/A/E0 preconditions. Historical failed external prototype count2vs1 actual session records are retained as DATA, not replayed. Old703line6test/helper prefix byte-identical and six witness source hashes mechanically refreshed. No production API/default change, metadata normalization, private Python/native RNG identity, complete parity or paper performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
+          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_selection_distinct_from_each_error_definition",
