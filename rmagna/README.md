@@ -5877,3 +5877,23 @@ Native independent-parity counts and Rust probability-query counts describe
 different work and are not compared as identical counters. Private semantic
 controls confirm that correlated measurements, accepting every branch and
 observing the integrated third record fail the same literal witnesses.
+
+## Original dense nonlinear readout instrument
+
+The same original_nonlinear_postselection target also covers the complete
+dense instrument with three noncommuting readouts, T gates, an opaque
+two-input AND and classical measurement report noise. Both compilers and
+both ColdPrefix/FixedTemplate runtimes enumerate the complete weight-one
+physical sector: two noise assignments, eight histories, covered probability
+one, omitted probability zero, and sector probabilities 2/3 and 1/3.
+
+Independent exact two-dimensional branch sums in Q(sqrt(2), i) normalize to
+one and give accepted mass (13-sqrt(2))/24, error 7/24, target success
+(6-sqrt(2))/24 and conditional error (91+7sqrt(2))/167. The wire-zero target
+is H followed by S and has norm one. All acceptance, error and conditional
+bounds collapse to these exact values. The controller observes only the
+first and last readouts; the middle quantum result remains integrated.
+
+A classical report flip preserves the projected state. Replacing it by a
+physical X error before ideal measurement changes acceptance to
+(5-sqrt(2))/8 and fails the unchanged exact witness in a private control.
