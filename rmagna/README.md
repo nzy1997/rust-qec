@@ -5913,3 +5913,17 @@ Exact streaming means are acceptance 49/50, error 2/25 and target success
 per-draw conditional errors instead gives 3/25. Mean diagnostic weight is one
 and weight-only ESS is 2400/119. The deterministic mixture verifies finite
 algebraic contracts without a Monte Carlo uncertainty or convergence claim.
+
+## Original full-history controller readout
+
+The same original_nonlinear_postselection target covers the original empty-output
+task with two measure-and-reset operations, a final flipped measurement report
+and an explicitly supplied prior decision. Both compilers and both causal
+runtimes prepare without invoking the opaque callback, then take three actual
+draws. Each callback reads [true,true,false,true] and returns false before
+overwriting its decision register; accepted mass is exactly one. The captured
+side-effect list contains precisely those three input vectors.
+
+The private first-MR-to-M circuit preserves the first report but omits its
+quantum reset. Its next X therefore changes the second report and accepted
+mass becomes zero, which fails the unchanged exact acceptance assertion.

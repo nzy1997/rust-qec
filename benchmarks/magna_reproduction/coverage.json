@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
         }
       ]
     },
@@ -1688,8 +1688,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_full_history_final_readout_and_explicit_state",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original full-history final-readout and explicit-state method. Initial builtin XOR1 sets ctrl0 true; X/MR/detector, X/MR/detector, X/M1/detector on wire0 retain reported records while resetting quantum state. Opaque decode version1 reads detector0,detector1,lastdetector and priorctrl0 before overwriting ctrl0; returns(a AND b) XOR final XOR prior, then postselectzero. Explicit empty outputs task. Both compiler strategies and both ColdPrefix/FixedTemplate causal runtimes assert preparation invokes no callback, then take3actualdraws each. Everydraw has A1 E0/rawA1rawE0,historymass1/proposalmassNone/historyweight1,noiseP1/LL1,no target/normalization/unusedrecords/moments; exactlyoneopaque transcriptinputs[true,true,false,true]outputfalse. Captured sideeffectlist is precisely the3inputvectors, proving olddecision read before overwrite. Complete unchanged original method ONLY separately passes normal/O actualpublicproductionrunshots3, ownfreshnativeproduction6CPP/helper6CPP builds O3DNDEBUG; testinghelperbuiltbutnotimported. Actualinputnegative firstMR0->M0 givesA0 and unchangedoriginalAassert fails1 eachmode. Independent binary-state reset/report/prior oracle validates both models. Private final-source Rust negative onlyfirstMR->M compiles0 thenfilteredtest101 at unchanged exactA1assert after confirmingactualA0, before transcript assertions. Existing5test/helper prefix byte-identical; only old5witnessSHArefresh. No neighboring report-flip category metadata promotion or normalization, productionAPI/default/dependency/nativeRNG/privatePython/serialization/performanceclaim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_full_history_final_readout_and_explicit_state",
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_importance_weights_rejected_draws_and_aggregate_ratio",
@@ -1700,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
         }
       ]
     },
@@ -1713,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
         }
       ]
     },
@@ -1726,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
         }
       ]
     },
@@ -1744,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+          "source_sha256": "faa25ce00b6db43177e90d85e45e051032968993fd961e6c54401b53a204c752"
         }
       ]
     },
