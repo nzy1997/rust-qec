@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "ff968d003b4b394346750924ce0d764131336de3a716a09a26474e8ae8f4f373"
+          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
         }
       ]
     },
@@ -1693,8 +1693,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_importance_weights_rejected_draws_and_aggregate_ratio",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original importance-weighted nonlinear aggregation: independent physical X rates1/10,1/5, opaque version1 AND, first output against zero target, proposal scale2. Both compilers and both ColdPrefix/FixedTemplate causal runtimes take actual25typed samples with mask multiplicities[12,3,8,2], P[18/25,2/25,9/50,1/50], Q[12/25,3/25,8/25,2/25], likelihoods[3/2,2/3,9/16,1/4]. Every draw checks physical mass/likelihood, two consumed noise words, controller transcript, history mass/weight1, targetnorm1, raw and once-weighted acceptance/error/target. Exact streaming count25 includes2rejected: A49/50,E2/25,T9/10,conditional4/49 versus wrong mean of individual ratios3/25,meanweight1,weightESS2400/119. Complete unchanged original method/registry/summary AST pass normal/O using4fresh native supplied NoiseDraw samples and the fresh identified native helper to summarize25scientific vectors. Recorded loader returns already-built helper; original build-capable loaders/support-module top levels not executed. Native input omission25to23 fails unchanged original acceptance assertion. Two final-source external Rust controls compile then fail unchanged count or exact mean assertions after confirming actual wrong count23 or doubled-likelihood mean. Independent Fraction oracle validates finite sums. Old four-test/helper prefix byte-identical; only four old witness Source hashes refreshed. No newAPI/default, native RNG/Python-private ABI, serialization, MonteCarlo uncertainty or paper performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
+          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_joint_duplicate_conflicting_detector_and_task_conditions",
@@ -1705,7 +1713,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "ff968d003b4b394346750924ce0d764131336de3a716a09a26474e8ae8f4f373"
+          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
         }
       ]
     },
@@ -1718,7 +1726,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "ff968d003b4b394346750924ce0d764131336de3a716a09a26474e8ae8f4f373"
+          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
         }
       ]
     },
@@ -1736,7 +1744,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "ff968d003b4b394346750924ce0d764131336de3a716a09a26474e8ae8f4f373"
+          "source_sha256": "217d05c578f3e7212339c1a86a686b17def417907f89f63c1b7a86cc04b0791b"
         }
       ]
     },

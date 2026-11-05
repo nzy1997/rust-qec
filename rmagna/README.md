@@ -5897,3 +5897,19 @@ first and last readouts; the middle quantum result remains integrated.
 A classical report flip preserves the projected state. Replacing it by a
 physical X error before ideal measurement changes acceptance to
 (5-sqrt(2))/8 and fails the unchanged exact witness in a private control.
+
+## Original weighted nonlinear aggregation
+
+The original_nonlinear_postselection target also checks importance sampling
+with physical X-error rates 1/10 and 1/5, proposal scale two, an opaque AND
+controller and a zero-state target on the first output. Across both compilers
+and both causal runtimes, the exact 25-draw proposal mixture includes two
+rejected samples. Each draw checks its actual noise likelihood, physical
+mass, two consumed noise words, controller transcript, raw contributions and
+once-weighted contributions.
+
+Exact streaming means are acceptance 49/50, error 2/25 and target success
+9/10. Conditional error is the ratio of aggregate masses, 4/49; averaging
+per-draw conditional errors instead gives 3/25. Mean diagnostic weight is one
+and weight-only ESS is 2400/119. The deterministic mixture verifies finite
+algebraic contracts without a Monte Carlo uncertainty or convergence claim.
