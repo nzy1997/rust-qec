@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 102 verified, 1 partial and 249 unmapped
+The source-bound ledger currently has 103 verified, 1 partial and 248 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-121 distinct Rust witnesses from 123 declarations across 53 targets. Strict
+122 distinct Rust witnesses from 124 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2398,3 +2398,52 @@ zero architecture-specific exclusions. Source-bound execution audits require
 parity intentionally exits2. These finite contracts make no private Python ABI,
 native RNG trajectory, new-default, Monte Carlo precision or paper-performance
 claim.
+
+## Original selection independent of error definitions
+
+Run the complete original-method witness and the complete nine-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_selection_distinct_from_each_error_definition -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Only this complete original method is newly verified. The preceding 875-line,
+35,499-byte eight-test/helper prefix remains byte-identical; eight earlier
+witness rows receive mechanical owning-file SHA256 refreshes. Other statuses,
+contracts, fixtures, generators and historical per-change counts are retained.
+
+Two separately measured H-prepared bits feed an opaque AND controller and
+zero-postselection. A conditional X copies the first bit to output qubit two.
+The classical task echoes the first detector into a separate decision for
+observable zero; the quantum task uses output two and a unit-norm zero.magna
+target. Both compiler strategies and ColdPrefix/FixedTemplate runtimes give
+accepted mass 3/4, joint error 1/4 and conditional error 1/3. Only the quantum
+target has target-success mass 1/2 and normalization one. The classical task
+has neither target field. One physical pattern and four joint histories cover
+probability one without omitted mass.
+
+Before Rust, the complete unchanged original method and both registry/exact
+helpers pass normal and optimized Python through fresh production native code.
+Each mode makes three public parses, including the unchanged I 0 ideal-state
+parse, and two complete enumerate_errors calls with accepted mass 3/4 and
+joint error 1/4. The identified helper is built fresh but never imported or
+used. Original test/support top levels and build-capable loaders are not run.
+An independent fair-bit/basis-state oracle enumerates four assignments for
+three models, including the wrong-error counterexample.
+
+The native counterexample changes only the classical evaluation input's
+OBSERVABLE_INCLUDE decision from ctrl[1] to the selected ctrl[0]. Acceptance
+stays 3/4, but the accepted zero-selection decision has error mass zero and
+fails the unchanged original joint-quarter assertion. The private final-source
+Rust counterexample preserves the original circuit constants and known
+assertions, changes only that evaluation input, compiles successfully, confirms
+actual accepted mass 3/4 and error zero, and fails the same exact error assertion
+(exit101). Public Source is unchanged by either control.
+
+Coverage is now 103 verified, 1 partial and 248 unmapped original methods,
+with zero architecture-specific exclusions. Source-bound audits require actual
+execution of 122 distinct witnesses from 124 declarations across 53 targets.
+Strict complete parity intentionally exits2. These finite contracts make no
+private Python representation/ABI, native RNG trajectory, new-default,
+Monte Carlo precision or paper-performance claim.

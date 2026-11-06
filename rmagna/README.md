@@ -5957,3 +5957,18 @@ joint histories covering probability one without omitted mass. Target success
 and normalization are absent. The external missing-selection control retains
 the original parsed-version checks and changes only the repeated evaluation
 input; actual accepted mass one fails the unchanged exact quarter assertion.
+
+## Original selection independent of error definitions
+
+The nonlinear target adapts the complete original selection/error-definition
+method. Both a decoded first-record observable and a unit-norm ideal-zero
+quantum target retain the same nonlinear AND postselection. Both compiler
+strategies and both causal runtimes give accepted mass 3/4, joint error 1/4
+and conditional error 1/3. The target task alone has target-success mass 1/2
+and normalization one. One physical pattern and four joint histories cover
+probability one with no omitted mass.
+
+The private counterexample changes only the evaluated classical observable
+from its echoed first record to the selection decision. Acceptance remains
+3/4 while joint error becomes zero, so the unchanged exact quarter-error
+assertion rejects it. Original circuit constants and earlier tests are retained.

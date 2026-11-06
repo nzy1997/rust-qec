@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1695,7 +1695,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1708,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1721,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1734,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1752,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
@@ -1775,14 +1775,22 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_selection_distinct_from_each_error_definition",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original selection/error-definition method plus both complete used registry/exact helpers. Two measured fair bits drive opaque AND zero-postselection; a conditional X on output2 follows the first bit. Classical first-record ECHO/observable0 and unit-norm ideal-zero output2 tasks each have exact accepted3/4, joint error1/4 and conditional1/3 under both compiler and causal strategies. Only the quantum target has success1/2 and normalization1; classical target fields are absent. One physical pattern/four joint histories cover probability1 with omitted0. Complete unchanged original and both helpers pass normal/O through fresh production native3parses/2complete enumerations including original I0 ideal parse; each task A3/4E1/4. Identified helper freshly built but UNUSED; original top-level/build support not imported. Native classical evaluation-input OBS ctrl1->ctrl0 keeps A3/4 but gives E0 and fails unchanged original joint-quarter assertion. Independent fair-bit/basis-state oracle covers three models/four assignments. Matching private final-source Rust control changes only classical evaluation input, retains original constants and known assertions, compiles0, confirms A3/4E0 and fails101 at same quarter error assertion. Old875line35499B eight-test/helper prefix byte-identical; eight mechanical owning hashes refreshed. No production/default/API/private ABI/RNG/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_selection_distinct_from_each_error_definition",
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_validation_format_version_and_module_boundaries",
@@ -1798,7 +1806,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
         }
       ]
     },

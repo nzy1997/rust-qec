@@ -873,3 +873,31 @@ fn original_versions_overwrites_repeat_and_explicit_prior_decisions() {
         }
     }
 }
+
+// Complete original test_selection_distinct_from_each_error_definition from
+// the pinned nonlinear postselection module identified above.
+const SELECTION_ERROR_PREFIX: &str = "H 0 1\nM 0 1\nCX rec[-2] 2\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nCONTROL[and] det[-2] det[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+const SELECTION_ERROR_DECODED: &str =
+    "\nDETECTOR rec[-2]\nCONTROL[echo] det[-1] -> ctrl[1]\nOBSERVABLE_INCLUDE(0) ctrl[1]";
+const SELECTION_CLASSICAL_ERROR_TASK: &str = r#"{"error_observables":[0]}"#;
+const SELECTION_TARGET_ERROR_TASK: &str = r#"{"outputs":[2],"ideal_state":"zero.magna"}"#;
+
+#[test]
+fn original_selection_distinct_from_each_error_definition() {
+    let files = Files::new();
+    let classical = format!("{SELECTION_ERROR_PREFIX}{SELECTION_ERROR_DECODED}");
+    for strategy in strategies() {
+        let classical_evaluator =
+            evaluator(&files, &classical, SELECTION_CLASSICAL_ERROR_TASK, strategy);
+        let classical_result = exact(&classical_evaluator);
+        assert_totals(&classical_result, "3/4", "1/4", None, &[], Some("1/3"));
+        let target_evaluator = evaluator(
+            &files,
+            SELECTION_ERROR_PREFIX,
+            SELECTION_TARGET_ERROR_TASK,
+            strategy,
+        );
+        let target_result = exact(&target_evaluator);
+        assert_totals(&target_result, "3/4", "1/4", Some("1/2"), &[], Some("1/3"));
+    }
+}
