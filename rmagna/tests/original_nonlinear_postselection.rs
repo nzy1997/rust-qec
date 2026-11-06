@@ -1244,3 +1244,109 @@ fn original_validation_format_version_and_module_boundaries() {
         assert!(statistics.moments.is_empty());
     }
 }
+
+// Complete original test_affine_not_selection_and_terminal_feedback from the
+// same pinned MPL-2.0 module. Reported bits select zero; recovery uses true state.
+const AFFINE_NOT_PHYSICAL: &str = "M(1) 0\nCONTROL[NOT] rec[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+const AFFINE_NOT_RECOVERY: &str = "M 0\nCONTROL[NOT] rec[-1] -> ctrl[0]\nCX ctrl[0] 0";
+
+struct NoAffineNotEntropy;
+impl rmagna::noise::RandomSource for NoAffineNotEntropy {
+    fn next_u64(&mut self) -> u64 {
+        panic!("deterministic affine NOT selection/recovery must not request entropy")
+    }
+}
+
+#[test]
+fn original_affine_not_selection_and_terminal_feedback() {
+    use rmagna::circuit::{BitAtom, BitExpr, Gate, Operation, RegisterVersion};
+
+    let files = Files::new();
+    std::fs::write(files.0.join("affine_one.magna"), "X 0").unwrap();
+    std::fs::write(files.0.join("affine_recovery.magna"), AFFINE_NOT_RECOVERY).unwrap();
+    let parse = ParseOptions::default();
+    let physical = parse_circuit(AFFINE_NOT_PHYSICAL, &parse).unwrap();
+    let task = parse_task(
+        r#"{"outputs":[0],"ideal_state":"affine_one.magna","recovery":"affine_recovery.magna"}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    for (compiler, runtime) in strategies() {
+        let mut options = EvaluationOptions::default();
+        options.runtime.strategy = runtime;
+        options.runtime.compile.compiler_strategy = compiler;
+        let evaluator =
+            TaskEvaluator::new(&physical, &modules, &ControllerRegistry::default(), options)
+                .unwrap();
+        assert!(!evaluator.sampled_history());
+        assert_eq!(evaluator.execution_route(), "linear_affine");
+        let draw = evaluator.sample(&mut NoAffineNotEntropy).unwrap();
+        assert_eq!(draw.accepted, field("1"), "original affine NOT acceptance");
+        assert_eq!(draw.error, field("0"), "original affine NOT recovery error");
+        assert_eq!(draw.target_success, Some(field("1")));
+        assert_eq!(draw.target_normalization, Some(ExactScalar::one()));
+        assert_eq!(draw.raw_acceptance, ExactScalar::one());
+        assert_eq!(draw.raw_error, ExactScalar::zero());
+        assert_eq!(draw.raw_target_success, Some(ExactScalar::one()));
+        assert_eq!(draw.history_mass, ExactScalar::one());
+        assert_eq!(draw.history_proposal_mass, None);
+        assert_eq!(draw.history_weight, field("1"));
+        assert_eq!(draw.noise_probability, rational("1"));
+        assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+        assert!(draw.moments.is_empty());
+        assert!(draw.raw_moments.is_empty());
+        assert!(draw.sampled_records.is_empty());
+        assert!(
+            draw.controller_calls.is_empty(),
+            "neither physical nor recovery stages call an external controller"
+        );
+
+        let mut enumeration = TaskEnumerationOptions::default();
+        // M(1) has a forced nonidentity report flip: include its weight-one sector.
+        enumeration.noise.max_weight = 1;
+        let result = evaluator.enumerate_physical(&enumeration).unwrap();
+        assert_eq!(result.covered_probability.value(), &rational("1"));
+        assert_eq!(result.omitted_probability.value(), &rational("0"));
+        assert_eq!(result.masses.accepted, field("1"));
+        assert_eq!(result.masses.error, field("0"));
+        assert_eq!(result.masses.target_success, Some(field("1")));
+        assert_eq!(result.target_normalization, Some(ExactScalar::one()));
+        assert!(result.masses.moments.is_empty());
+        assert_eq!(result.full_acceptance.lower, field("1"));
+        assert_eq!(result.full_acceptance.upper, field("1"));
+        assert_eq!(result.full_error.lower, field("0"));
+        assert_eq!(result.full_error.upper, field("0"));
+        assert_eq!(
+            result.conditional_error_within_enumerated_sector,
+            Some(field("0"))
+        );
+        let conditional = result.conditional_error.as_ref().unwrap();
+        assert_eq!(conditional.lower, field("0"));
+        assert_eq!(conditional.upper, field("0"));
+    }
+
+    // Public canonical expressions establish affine NOT without private templates.
+    // Known-answer execution assertions above also diagnose external fixture controls.
+    let complement = BitExpr::atom(BitAtom::Record(0)).inverted();
+    for circuit in [&physical, modules.recovery().unwrap()] {
+        assert_eq!(circuit.external_calls(), 0);
+        assert!(!circuit.needs_history_sampling());
+        assert_eq!(
+            circuit
+                .control_analysis()
+                .expression(RegisterVersion::new(0, 0)),
+            Some(&complement)
+        );
+    }
+    assert!(matches!(
+        &physical.operations().last().unwrap().operation,
+        Operation::Postselect { expression } if expression == &complement
+    ));
+    assert!(matches!(
+        &modules.recovery().unwrap().operations().last().unwrap().operation,
+        Operation::Unitary { gate: Gate::X, qubits, control: Some(condition) }
+            if qubits == &[0] && condition == &complement
+    ));
+}
