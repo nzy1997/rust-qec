@@ -6003,3 +6003,15 @@ controller, and a rejecting entropy source confirms deterministic sampling.
 Public canonical expressions establish the affine path without a private Python
 template representation. The original native helper constructor runs unchanged
 against a fresh identified extension in the reference validation.
+
+## Original postselection history and recovery replay
+
+Three fresh 32-draw Rust streams preserve physical records, exact history masses,
+callback observations and final seeded RNG state when final postselection is
+inserted. Selected draws replay completely under both compilers and both causal
+strategies. All three source-level callbacks run on every draw, including rejected
+ones:384 draws and 1,152 actual invocations. Target infidelity includes terminal
+feedback on the declared output and a fresh recovery auxiliary. The pinned native
+reference observes one physical and one recovery invocation per draw; Rust checks
+two physical and one recovery invocation. Language RNG trajectories and callback
+trace counts are not claimed identical.

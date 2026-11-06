@@ -1350,3 +1350,255 @@ fn original_affine_not_selection_and_terminal_feedback() {
             if qubits == &[0] && condition == &complement
     ));
 }
+
+// Complete original test_no_future_selection_bias_and_replay_with_recovery from
+// the same pinned MPL-2.0 module. Rust retains every source-level callback.
+const HISTORY_REPLAY_PREFIX: &str =
+    "H 0 1\nM(1/4) 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCH ctrl[0] 1\n";
+const HISTORY_REPLAY_SUFFIX: &str = "M 1\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[1]\n";
+const HISTORY_REPLAY_RECOVERY: &str =
+    "H 1\nM 1\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nCH ctrl[0] 0";
+
+struct OriginalReplayStream {
+    draws: Vec<TaskEvaluation>,
+    observations: Vec<Vec<bool>>,
+    final_rng_state: u64,
+}
+
+fn original_history_replay_stream(
+    files: &Files,
+    selection: &str,
+    (compiler, runtime): (CompilerStrategy, CausalStrategy),
+) -> OriginalReplayStream {
+    use std::sync::{Arc, Mutex};
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let observed = Arc::clone(&seen);
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", move |bits: &[bool]| {
+            assert_eq!(bits.len(), 1, "original one-bit echo input");
+            observed.lock().unwrap().push(bits.to_vec());
+            Ok(bits.to_vec())
+        })
+        .unwrap();
+    let parse = ParseOptions {
+        controllers: registry.names(),
+        ..Default::default()
+    };
+    let prefix = HISTORY_REPLAY_PREFIX;
+    let physical = parse_circuit(
+        &format!("{prefix}{selection}{HISTORY_REPLAY_SUFFIX}"),
+        &parse,
+    )
+    .unwrap();
+    let task = parse_task(
+        r#"{"outputs":[1],"sample_records":[0,1],"ideal_state":"history_zero.magna","recovery":"history_recovery.magna"}"#,
+        &files.0,
+        &TaskOptions::default(),
+    )
+    .unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.strategy = runtime;
+    options.runtime.compile.compiler_strategy = compiler;
+    let evaluator = TaskEvaluator::new(&physical, &modules, &registry, options).unwrap();
+    assert!(
+        seen.lock().unwrap().is_empty(),
+        "preparation invokes no callback"
+    );
+    assert!(evaluator.sampled_history());
+    assert_eq!(
+        evaluator.execution_route(),
+        match runtime {
+            CausalStrategy::ColdPrefix => "causal_cold_prefix",
+            CausalStrategy::FixedTemplate => "causal_fixed_template",
+        }
+    );
+    let mut rng = SplitMix64::new(71);
+    let draws = (0..32)
+        .map(|_| evaluator.sample(&mut rng).unwrap())
+        .collect::<Vec<_>>();
+    let observations = seen.lock().unwrap().clone();
+    assert_eq!(
+        observations.len(),
+        96,
+        "all three callbacks on all 32 draws"
+    );
+    let mut actual_trace = Vec::new();
+    for draw in &draws {
+        assert_eq!(draw.sampled_records.len(), 2);
+        assert_eq!(
+            draw.controller_calls.len(),
+            3,
+            "recovery also runs on rejection"
+        );
+        for (index, call) in draw.controller_calls.iter().enumerate() {
+            assert_eq!(call.name, "echo");
+            assert_eq!(call.call, index);
+            assert_eq!(call.inputs.len(), 1);
+            assert_eq!(call.outputs, call.inputs);
+            actual_trace.push(call.inputs.clone());
+        }
+        assert_eq!(
+            draw.controller_calls[0].inputs,
+            vec![draw.sampled_records[0]]
+        );
+        assert_eq!(
+            draw.controller_calls[1].inputs,
+            vec![draw.sampled_records[1]]
+        );
+    }
+    assert_eq!(
+        actual_trace, observations,
+        "public composed trace matches actual callbacks"
+    );
+    OriginalReplayStream {
+        draws,
+        observations,
+        final_rng_state: rng.state(),
+    }
+}
+
+fn assert_original_history_replay_draw(draw: &TaskEvaluation, selected: bool) {
+    let first = draw.sampled_records[0];
+    let second = draw.sampled_records[1];
+    let recovery = draw.controller_calls[2].inputs[0];
+    assert!(
+        !first || !second,
+        "controlled H makes the second physical bit zero"
+    );
+    let accepted = !selected || !first;
+    let mass = if first { "1/4" } else { "1/8" };
+    let half_mass = if first { "1/8" } else { "1/16" };
+    let error = if !accepted {
+        "0"
+    } else if recovery {
+        "1/2"
+    } else if second {
+        "1"
+    } else {
+        "0"
+    };
+    let target = if !accepted {
+        "0"
+    } else if recovery {
+        "1/2"
+    } else if second {
+        "0"
+    } else {
+        "1"
+    };
+    assert_eq!(draw.accepted, field(if accepted { "1" } else { "0" }));
+    assert_eq!(draw.error, field(error));
+    assert_eq!(draw.target_success, Some(field(target)));
+    assert_eq!(draw.target_normalization, Some(ExactScalar::one()));
+    assert_eq!(raw_field(&draw.history_mass), field(mass));
+    assert_eq!(draw.history_proposal_mass, None);
+    assert_eq!(draw.history_weight, field("1"));
+    assert!(draw.noise_probability == rational("1/4") || draw.noise_probability == rational("3/4"));
+    assert_eq!(draw.noise_likelihood_ratio, rational("1"));
+    assert_eq!(
+        raw_field(&draw.raw_acceptance),
+        field(if accepted { mass } else { "0" })
+    );
+    let raw_error = if !accepted {
+        "0"
+    } else if recovery {
+        half_mass
+    } else if second {
+        mass
+    } else {
+        "0"
+    };
+    let raw_target = if !accepted {
+        "0"
+    } else if recovery {
+        half_mass
+    } else if second {
+        "0"
+    } else {
+        mass
+    };
+    assert_eq!(raw_field(&draw.raw_error), field(raw_error));
+    assert_eq!(
+        raw_field(draw.raw_target_success.as_ref().unwrap()),
+        field(raw_target)
+    );
+    assert!(draw.moments.is_empty());
+    assert!(draw.raw_moments.is_empty());
+}
+
+#[test]
+fn original_no_future_selection_bias_and_replay_with_recovery() {
+    let files = Files::new();
+    std::fs::write(files.0.join("history_zero.magna"), "").unwrap();
+    std::fs::write(
+        files.0.join("history_recovery.magna"),
+        HISTORY_REPLAY_RECOVERY,
+    )
+    .unwrap();
+    let selected_condition = "POSTSELECT ctrl[0]\n";
+    let mut actual_draws = 0;
+    let mut actual_callbacks = 0;
+    for strategy in strategies() {
+        let original = original_history_replay_stream(&files, "", strategy);
+        let selected = original_history_replay_stream(&files, selected_condition, strategy);
+        let replay = original_history_replay_stream(&files, selected_condition, strategy);
+        assert_eq!(
+            selected.observations, original.observations,
+            "original no-future-selection callback preservation"
+        );
+        assert_eq!(
+            selected.observations, replay.observations,
+            "original same-seed callback replay"
+        );
+        assert!(
+            selected.draws == replay.draws,
+            "original full selected-draw replay"
+        );
+        assert_eq!(
+            original.final_rng_state, selected.final_rng_state,
+            "selection preserves final RNG state"
+        );
+        assert_eq!(
+            selected.final_rng_state, replay.final_rng_state,
+            "same-seed final RNG replay"
+        );
+        let mut saw_accept = false;
+        let mut saw_reject = false;
+        for (before, after) in original.draws.iter().zip(&selected.draws) {
+            assert_eq!(
+                before.sampled_records, after.sampled_records,
+                "original physical record preservation"
+            );
+            assert_eq!(
+                before.history_mass, after.history_mass,
+                "original exact history preservation"
+            );
+            assert_eq!(
+                after.accepted,
+                field(if after.sampled_records[0] { "0" } else { "1" }),
+                "original no-future-selection acceptance"
+            );
+            assert_eq!(before.noise_probability, after.noise_probability);
+            saw_accept |= after.accepted == field("1");
+            saw_reject |= after.accepted == field("0");
+        }
+        assert!(
+            saw_accept && saw_reject,
+            "retain both accepted and rejected draws"
+        );
+        for (stream, is_selected) in [(&original, false), (&selected, true), (&replay, true)] {
+            assert_eq!(stream.draws.len(), 32);
+            assert_eq!(stream.observations.len(), 96);
+            for draw in &stream.draws {
+                assert_original_history_replay_draw(draw, is_selected);
+            }
+            actual_draws += stream.draws.len();
+            actual_callbacks += stream.observations.len();
+        }
+    }
+    assert_eq!(actual_draws, 384);
+    assert_eq!(actual_callbacks, 1152);
+}
