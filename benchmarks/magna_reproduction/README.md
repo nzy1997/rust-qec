@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 104 verified, 1 partial and 247 unmapped
+The source-bound ledger currently has 105 verified, 1 partial and 246 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-126 distinct Rust witnesses from 128 declarations across 53 targets. Strict
+127 distinct Rust witnesses from 129 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2494,3 +2494,51 @@ with zero architecture-specific exclusions. The source-bound audit requires
 complete parity intentionally exits 2. These finite contracts make no new
 production API/default, callback retry policy, quantum backend dependency,
 private Python ABI, native RNG trajectory or paper-performance claim.
+
+## Original postselection syntax and module boundaries
+
+Run the complete focused witness and fourteen-test owning target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_validation_format_version_and_module_boundaries -- --exact --nocapture
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Only the complete original validation/format/module-boundary method is newly
+verified. All four invalid syntax forms are rejected. Text roundtrip retains all
+public circuit metadata, located operations, resolved control analysis and readout
+declaration flags. Rust compares these public values instead of adopting Python's
+private fingerprint representation. Target and recovery errors identify their
+module roles and the noiseless-unitary and trace-preservation restrictions.
+
+The same selected circuit is valid as a physical circuit without an error
+definition. Exact enumeration and a completed batch give acceptance one for both
+compiler strategies and both causal-runtime settings. The builtin XOR selector
+correctly uses the linear affine route; it needs no sampled controller history.
+The batch leaves error and conditional error undefined and moments empty.
+
+Before Rust, the complete unchanged original method passes normal and optimized
+Python against freshly built production native code: nine public parse attempts
+include four expected syntax errors, and two public compile attempts reject the
+invalid module roles. Its original fingerprint assertion is unchanged. No class
+helper, original test/support top level or build-capable loader is executed. The
+identified helper is built fresh and unused. Two independent exact zero-bit and
+selection-instrument models and all 86 Python tests pass in both modes.
+
+Two external final-source controls compile successfully and fail unchanged
+rejection assertions (exit 101). One substitutes valid argument-free syntax for
+only the invalid POSTSELECT(0) fixture. The other substitutes the valid unitary
+I 0 for only the invalid selected-module fixture. Both retain the public source
+and the prior 1,133-line, 46,207-byte thirteen-test/helper prefix. Thirteen earlier
+owning-file witness hashes across ten original cases receive mechanical refreshes.
+
+Coverage is now 105 verified, 1 partial and 246 unmapped original methods,
+with zero architecture-specific exclusions. The source-bound audit requires
+127 distinct Rust witnesses from 129 declarations across 53 targets. Strict
+complete parity intentionally exits 2. The issue's legacy --run-rust,
+--require-complete and --rust-timeout flags are absent from the current audit CLI.
+The equivalent supported audit consumes captured full Rust execution using
+--upstream, --ledger, --rust-run and --complete-parity, with --out for evidence.
+Every mapped witness actually executes; this is still incomplete compatibility.
+No production API/default, private fingerprint ABI, native RNG or paper-scale
+performance claim is introduced.

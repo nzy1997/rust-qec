@@ -1131,3 +1131,116 @@ fn original_batch_non_boolean_python_return_fails_with_valid_calibration() {
         }
     }
 }
+
+// Complete original method test_validation_format_version_and_module_boundaries
+// from the pinned MPL-2.0 nonlinear module above. Compare public Rust circuit
+// semantics rather than adopting Python's private fingerprint representation.
+#[test]
+fn original_validation_format_version_and_module_boundaries() {
+    use rmagna::task::{RunStatus, TaskRunOptions};
+
+    let parse = ParseOptions::default();
+    for invalid in [
+        "POSTSELECT ctrl[0]",
+        "CONTROL[XOR](0) -> ctrl[0]\nPOSTSELECT(0) ctrl[0]",
+        "CONTROL[XOR](0) -> ctrl[0]\nPOSTSELECT(1) ctrl[0]",
+        "CONTROL[XOR](0) -> ctrl[0]\nPOSTSELECT(2) ctrl[0]",
+    ] {
+        assert!(
+            parse_circuit(invalid, &parse).is_err(),
+            "original invalid postselection syntax must be rejected: {invalid}"
+        );
+    }
+    let selected = "CONTROL[XOR](0) -> ctrl[0]\nPOSTSELECT ctrl[0]";
+    let circuit = parse_circuit(selected, &parse).unwrap();
+    assert_eq!(circuit.format_version(), "magna-0.1");
+    let roundtrip = parse_circuit(circuit.to_text(), &parse).unwrap();
+    assert_eq!(roundtrip.operations(), circuit.operations());
+    assert_eq!(roundtrip.num_qubits(), circuit.num_qubits());
+    assert_eq!(roundtrip.num_records(), circuit.num_records());
+    assert_eq!(roundtrip.num_instructions(), circuit.num_instructions());
+    assert_eq!(roundtrip.detectors(), circuit.detectors());
+    assert_eq!(roundtrip.observables(), circuit.observables());
+    assert_eq!(roundtrip.external_calls(), circuit.external_calls());
+    assert_eq!(
+        roundtrip.needs_history_sampling(),
+        circuit.needs_history_sampling()
+    );
+    assert_eq!(roundtrip.control_analysis(), circuit.control_analysis());
+    assert_eq!(roundtrip.format_version(), circuit.format_version());
+    assert_eq!(roundtrip.to_text(), circuit.to_text());
+    for op in circuit.operations() {
+        assert_eq!(
+            roundtrip.readout_noise_declared(op.id),
+            circuit.readout_noise_declared(op.id)
+        );
+    }
+    assert!(!circuit.needs_history_sampling());
+    assert_eq!(circuit.external_calls(), 0);
+
+    let files = Files::new();
+    std::fs::write(files.0.join("selected.magna"), selected).unwrap();
+    let unitary = parse_circuit("I 0", &parse).unwrap();
+    for (task_text, role, restriction) in [
+        (
+            r#"{"outputs":[0],"ideal_state":"selected.magna"}"#,
+            "ideal_state",
+            "noiseless unitary",
+        ),
+        (
+            r#"{"outputs":[0],"ideal_state":"zero.magna","recovery":"selected.magna"}"#,
+            "recovery",
+            "preserve trace",
+        ),
+    ] {
+        let task = parse_task(task_text, &files.0, &TaskOptions::default()).unwrap();
+        let loaded = task.load_modules(&unitary, &parse);
+        assert!(loaded.is_err(), "original module role rejection: {role}");
+        let message = loaded.unwrap_err().to_string();
+        assert!(message.contains(role), "module role diagnostic: {message}");
+        assert!(
+            message.contains(restriction),
+            "module restriction diagnostic: {message}"
+        );
+    }
+
+    let task = parse_task("{}", &files.0, &TaskOptions::default()).unwrap();
+    let modules = task.load_modules(&circuit, &parse).unwrap();
+    for (compiler, runtime) in strategies() {
+        let mut options = EvaluationOptions::default();
+        options.runtime.strategy = runtime;
+        options.runtime.compile.compiler_strategy = compiler;
+        let evaluator =
+            TaskEvaluator::new(&circuit, &modules, &ControllerRegistry::default(), options)
+                .unwrap();
+        // The zero-valued builtin XOR is affine under either runtime setting.
+        assert!(!evaluator.sampled_history());
+        assert_eq!(evaluator.execution_route(), "linear_affine");
+        let mut enumeration = TaskEnumerationOptions::default();
+        enumeration.noise.max_weight = 0;
+        let result = evaluator.enumerate_physical(&enumeration).unwrap();
+        assert_eq!(result.masses.accepted, field("1"));
+        assert_eq!(result.masses.error, field("0"));
+        assert_eq!(result.masses.target_success, None);
+        assert!(result.masses.moments.is_empty());
+        assert_eq!(result.target_normalization, None);
+        assert_eq!(result.covered_probability.value(), &rational("1"));
+        assert_eq!(result.omitted_probability.value(), &rational("0"));
+        assert_eq!(result.full_acceptance.lower, field("1"));
+        assert_eq!(result.full_acceptance.upper, field("1"));
+        assert_eq!(result.conditional_error_within_enumerated_sector, None);
+        let batch = evaluator.run_batch(&TaskRunOptions::default()).unwrap();
+        assert_eq!(batch.status, RunStatus::Complete);
+        assert_eq!(batch.requested, 1);
+        assert_eq!(batch.completed, 1);
+        assert_eq!(batch.failed, 0);
+        assert_eq!(batch.not_attempted, 0);
+        assert!(batch.failures.is_empty());
+        assert!(batch.partial_statistics.is_none());
+        let statistics = batch.statistics.as_ref().unwrap();
+        assert_eq!(statistics.accepted, field("1"));
+        assert_eq!(statistics.error, None, "no error definition is supplied");
+        assert_eq!(statistics.conditional_error, None);
+        assert!(statistics.moments.is_empty());
+    }
+}
