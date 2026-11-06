@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 106 verified, 1 partial and 245 unmapped
+The source-bound ledger currently has 107 verified, 1 partial and 244 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-128 distinct Rust witnesses from 130 declarations across 53 targets. Strict
+129 distinct Rust witnesses from 131 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2589,3 +2589,56 @@ intentionally exits 2. The obsolete issue audit flags are not claimed to work.
 These finite checks establish no private Python template ABI, native RNG
 trajectory identity, new simulator API/default, full compatibility or paper-scale
 performance result.
+
+## Original postselection history preservation and recovery replay
+
+Run the complete-method witness and sixteen-test owning target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_no_future_selection_bias_and_replay_with_recovery -- --exact --nocapture
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Each compiler/runtime pair prepares independent unselected, selected and same-seed
+selected replay evaluators and 32-draw SplitMix64 streams. Preparation invokes no
+callback. Across four configurations,384 actual draws retain all 1,152 source-level
+callback invocations, including terminal recovery on rejected draws. Inserting
+postselection preserves complete physical records, exact history masses, callback
+observations and final public RNG state. Selected and replayed TaskEvaluation
+vectors are wholly equal. Acceptance is one minus the first reported bit and both
+accepted and rejected draws occur.
+
+A finite bit model and an independent 8 x 8 rational density-matrix instrument check
+the entire history. Recovery local wire zero maps to physical output one; its
+local wire one is a fresh auxiliary. The quantum history mass is 1/8 or 1/4 and
+target infidelity may be 1/2. The witness checks normalized and raw masses, unit
+target normalization/history weights/noise likelihood and the actual physical
+noise probability. No moment is requested.
+
+Before first Rust, the complete unchanged original method (including its nested
+draws closure) passes normal and optimized Python against fresh six-unit native
+production code. Each mode records seven public parses, three compiles and 96
+samples in three 32-draw streams. Actual native counters and Python observations
+record 192 callbacks (64 per stream), one physical plus one recovery invocation
+per draw. Rust explicitly checks two physical plus one recovery source-level
+invocation; equality of these cross-language counts is not claimed. The separately
+identified six-unit helper is freshly built and unused. No original test/support
+top level or build-capable loader executes. Both exact models and all 86 Python
+tooling tests pass in both modes before Rust. No native RNG identity is claimed.
+
+Both external final-source controls compile successfully and exit 101 at unchanged
+known-answer assertions. Omitting the condition from both selected fixtures
+confirms acceptance one before failing the accepted-bit oracle. Inverting only
+selected quantum feedback confirms history/callback divergence before failing
+the preservation comparison. Public Source and the prior 1,352-line 56,615-byte
+fifteen-test prefix are unchanged. Fifteen prior owning-file hashes across twelve
+original cases receive mechanical refreshes only.
+
+Coverage is 107 verified, 1 partial and 244 unmapped complete original methods,
+with zero architecture-specific exclusions. All 129 distinct witnesses from 131
+declarations across 53 targets must actually execute in the captured Source-bound
+full run. Strict complete-parity auditing intentionally exits 2 while unrelated
+methods remain unmapped. The issue legacy audit flags remain unsupported; the
+supported actual full-capture interface is used. These finite checks establish
+no new API/default/sampling law, private template ABI, full compatibility or
+paper-scale performance result.

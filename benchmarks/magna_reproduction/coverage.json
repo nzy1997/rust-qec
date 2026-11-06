@@ -1667,7 +1667,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_affine_not_selection_and_terminal_feedback",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1680,7 +1680,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1703,7 +1703,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1716,7 +1716,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1729,7 +1729,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1742,14 +1742,22 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_no_future_selection_bias_and_replay_with_recovery",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original no-future-selection bias and same-seed recovery replay method including its nested draws closure. Each two compiler by two causal-runtime configuration prepares three fresh SplitMix64 seed71 streams (unselected, selected, replay),32 draws each:384 actual Rust draws and1152 actual callbacks, with no preparation callback. All three source-level callbacks execute for rejected draws. Physical records, exact history masses, actual callback observations and final public RNG states remain unchanged by selection; selected/replay TaskEvaluation vectors are completely equal. Acceptance is one minus first reported bit and both outcomes occur. Exact per-history normalized/raw acceptance,error,target,unit normalization/history weights/noise likelihood, physical noise probability and empty moments are checked. Recovery local wire0 maps to physical output1 and local wire1 to fresh auxiliary2, allowing half-valued target infidelity. Quantum history mass is1/8 when first reportedbit0,1/4 when1. Before first Rust, the unchanged pinned native original method passes normal/O with7parse3compile96samples and three32-draw streams each mode; actual native counters and Python observations are192 calls,64 perstream, one physical plus one recovery perdraw. The Rust issue explicitly requires two physical plus one recovery source-level callback perdraw; these callback counts and language RNG trajectories are not claimed identical. Fresh production6CPP and identifiedhelper6CPP O3DNDEBUG are built; helper is unused and not imported. No original test/support/buildloader top level or old product executes. Two independent exact finite-bit and8x8 rational density models validate output-local recovery including fresh auxiliary and both fixture controls; all86 tooling Python tests pass each mode. Native successful runs are retained, first failed observer assumption is preserved and corrected forward, no successful setup/Source-snapshot/science replay for bookkeeping. External final-source controls compile0/test101 at unchanged known-answer assertions: omit selection from both selected fixtures (actualA1 before accepted-bit failure); invert only selected quantum feedback (actual history/callback divergence before preservation failure). Public Source and old1352line56615byte fifteen-test prefix stay unchanged by controls. Fifteen earlier witness SHA refreshes across twelve original cases are mechanical. No new API/default/samplinglaw/privateABI/native RNG or callback trace identity/fullcompatibility/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_no_future_selection_bias_and_replay_with_recovery",
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_noncommuting_readout_truth_table_and_target",
@@ -1760,7 +1768,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1783,7 +1791,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1796,7 +1804,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_selection_distinct_from_each_error_definition",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1809,7 +1817,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_validation_format_version_and_module_boundaries",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1822,7 +1830,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
@@ -1835,25 +1843,25 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_invalid_callback_widths_fail_without_statistics",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_callback_failure_after_rejection_is_not_filtered",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_zero_acceptance_completes_rejected_draws",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_non_boolean_python_return_fails_with_valid_calibration",
-          "source_sha256": "1a37330f766436c49c4b4bb316f8ec5f19c199eac87b218a2d3c92d004f111f0"
+          "source_sha256": "2a80b60e7e0d2d03d3ebb82f405c2c3acf0fccb53b9515eb744f0e9693ef5811"
         }
       ]
     },
