@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 105 verified, 1 partial and 246 unmapped
+The source-bound ledger currently has 106 verified, 1 partial and 245 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-127 distinct Rust witnesses from 129 declarations across 53 targets. Strict
+128 distinct Rust witnesses from 130 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2542,3 +2542,50 @@ The equivalent supported audit consumes captured full Rust execution using
 Every mapped witness actually executes; this is still incomplete compatibility.
 No production API/default, private fingerprint ABI, native RNG or paper-scale
 performance claim is introduced.
+
+## Original affine NOT selection and terminal recovery
+
+Run the focused complete-method witness and fifteen-test owning target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_affine_not_selection_and_terminal_feedback -- --exact --nocapture
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+The physical true zero is reported as one by M(1). NOT yields zero, so the
+zero-value selection accepts. Recovery measures true zero, complements it and
+conditionally applies X, matching the X0 target. Exact acceptance, error and
+target success are one, zero and one, with unit normalization and history/noise
+weights. Both compiler strategies and both causal-runtime option configurations
+use the linear affine route with no composed callback trace. A random source
+that panics on every requested word verifies deterministic sampling. Enumeration
+includes the forced weight-one report flip, covering probability one without
+omitted mass. Public canonical expressions establish affine NOT in both stages.
+
+Before Rust, the complete unchanged pinned original method, the complete
+file_hooks.feedback_template function and entire FeedbackTemplate class pass
+normal and optimized Python against fresh production and identified-helper
+extensions, each built from six translation units. The original constructor
+actually calls the fresh helper once per mode and inspects its real empty
+nonlinear-selection mapping. Each mode observes three public parses, one compile,
+one sample and zero physical/recovery callback counts. No original test/support
+top level or build-capable loader executes. Two independent exact bit-table and
+Born-instrument models and all 86 Python tooling tests pass in both modes.
+
+Two external final-source controls compile successfully and fail unchanged
+known-answer assertions (exit 101). Inverting only the evaluated physical
+selection first confirms acceptance zero, then fails the expected-one assertion.
+Replacing only recovery controlled X with identity first confirms acceptance and
+error one, then fails the expected-zero error assertion. Public Source and the
+prior 1,246-line, 51,494-byte fourteen-test prefix stay unchanged by controls.
+Fourteen prior owning-file hashes across eleven original cases are refreshed.
+Standalone controls bind CARGO_MANIFEST_DIR to the existing owning-crate worker.
+
+Coverage is now 106 verified, 1 partial and 245 unmapped original methods,
+with zero architecture-specific exclusions. All 128 distinct mapped witnesses
+from 130 declarations across 53 targets must actually execute. The supported
+source-bound audit consumes the full captured Rust run; strict complete parity
+intentionally exits 2. The obsolete issue audit flags are not claimed to work.
+These finite checks establish no private Python template ABI, native RNG
+trajectory identity, new simulator API/default, full compatibility or paper-scale
+performance result.

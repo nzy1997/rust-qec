@@ -5992,3 +5992,14 @@ unitary target and forbidden in trace-preserving terminal recovery. The builtin
 zero-valued XOR selector has exact acceptance one under both compiler and runtime
 configurations; its actual execution route is `linear_affine`. No error definition
 is supplied. Private Python fingerprint bytes are outside this Rust contract.
+
+## Original affine NOT selection and terminal recovery
+
+The complete original affine NOT method verifies a forced reported-bit flip,
+zero-value selection and terminal recovery feedback. Both compiler strategies
+and both runtime settings give exact acceptance one, error zero and normalized
+target success one on the linear affine route. Neither stage calls an external
+controller, and a rejecting entropy source confirms deterministic sampling.
+Public canonical expressions establish the affine path without a private Python
+template representation. The original native helper constructor runs unchanged
+against a fresh identified extension in the reference validation.
