@@ -5982,3 +5982,13 @@ exception stops the batch after one failed attempt and retains its message;
 invalid callback widths fail without statistics. The existing Python decoder
 worker rejects the original integer 2 while a valid 0 completes with acceptance
 one. Its manifest reports that the native quantum backend is unavailable.
+
+## Original postselection syntax and module boundaries
+
+The complete original validation method rejects four invalid postselection forms,
+retains format version `magna-0.1`, and preserves public circuit semantics on text
+roundtrip. Selection is valid in the physical circuit, forbidden in a noiseless
+unitary target and forbidden in trace-preserving terminal recovery. The builtin
+zero-valued XOR selector has exact acceptance one under both compiler and runtime
+configurations; its actual execution route is `linear_affine`. No error definition
+is supplied. Private Python fingerprint bytes are outside this Rust contract.

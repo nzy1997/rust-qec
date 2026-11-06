@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1695,7 +1695,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1708,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1721,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1734,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1752,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1775,7 +1775,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1788,14 +1788,22 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_selection_distinct_from_each_error_definition",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_validation_format_version_and_module_boundaries",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original validation/format/module-boundary method, with no class helper. Reject all four original invalid forms: undeclared ctrl0 and POSTSELECT arguments0/1/2. Valid builtin XOR0 plus argument-free POSTSELECT reports magna-0.1; text roundtrip preserves all public circuit metadata, located operations, resolved control analysis, readout declaration flags and retained text. Target diagnostics identify ideal_state and noiseless unitary restriction; recovery diagnostics identify recovery and preserve-trace restriction. The same physical selection has exact acceptance1 under both compiler and causal-runtime configurations; its builtin affine selector correctly uses linear_affine with no sampled history and no error definition. Exact enumeration and completed batch have no target/moments; batch error and conditional error remain undefined. Before Rust, the complete unchanged original method passes normal/O against fresh production native code with9publicparse attempts (4expected syntax failures) and2expected compile-role failures per mode, original fingerprint assertion unchanged. Identified helper built fresh but unused; no original test/support top-level or build-capable loader executes. Two independent zero-bit/instrument models and all86Python tests pass both modes before Rust. Two external final-source controls compile0/test101 at unchanged assertions: replace only invalid POSTSELECT(0) fixture with valid argument-free syntax; replace only invalid selected module fixture with I0. Public Source and old1133line46207byte thirteen-test/helper prefix remain unchanged by controls. Thirteen earlier owning witness hashes across10cases are mechanically refreshed. Private Python fingerprint ABI, production API/defaults, native RNG parity, full compatibility and performance are outside scope.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_validation_format_version_and_module_boundaries",
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_versions_overwrites_repeat_and_explicit_prior_decisions",
@@ -1806,7 +1814,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
@@ -1819,25 +1827,25 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_invalid_callback_widths_fail_without_statistics",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_callback_failure_after_rejection_is_not_filtered",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_zero_acceptance_completes_rejected_draws",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         },
         {
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_batch_non_boolean_python_return_fails_with_valid_calibration",
-          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+          "source_sha256": "86f29ebb02c47a8b2ba7bff80634c313a19c9b087efcd95be2fd28ca0ceb0289"
         }
       ]
     },
