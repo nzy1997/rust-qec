@@ -807,3 +807,69 @@ fn original_report_flips_select_reported_bits_and_preserve_true_output() {
         }
     }
 }
+
+// Complete original method test_versions_overwrites_repeat_and_explicit_prior_decisions
+// from the same pinned MPL-2.0 module above. Selections retain the version read
+// at their source position, including across repeated blocks and later writes.
+const VERSIONED_REPEAT: &str = "CONTROL[XOR](0) -> ctrl[0]\nREPEAT 2 {\nR 0\nH 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]\n}\nCONTROL[XOR](1) -> ctrl[0]";
+const VERSIONED_PRIOR: &str = "H 0 1\nM 0 1\nDETECTOR rec[-2]\nCONTROL[echo] det[-1] -> ctrl[0]\nDETECTOR rec[-1]\nCONTROL[and] ctrl[0] det[-1] -> ctrl[0]\nCONTROL[NOT] ctrl[0] -> ctrl[1]\nPOSTSELECT ctrl[1]\nCONTROL[XOR](0) -> ctrl[0]";
+const VERSIONED_TASK: &str = r#"{"outputs":[]}"#;
+
+fn assert_original_versioned_selections() {
+    use rmagna::circuit::{BitExpr, Operation, RegisterVersion};
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("echo", "1", |bits: &[bool]| Ok(bits.to_vec()))
+        .unwrap();
+    let circuit = parse_circuit(
+        VERSIONED_REPEAT,
+        &ParseOptions {
+            controllers: registry.names(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let analysis = circuit.control_analysis();
+    let selections = circuit
+        .operations()
+        .iter()
+        .filter_map(|operation| match &operation.operation {
+            Operation::Postselect { expression } => Some(expression),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(selections.len(), 2);
+    assert_eq!(
+        Some(selections[0]),
+        analysis.expression(RegisterVersion::new(0, 1))
+    );
+    assert_eq!(
+        Some(selections[1]),
+        analysis.expression(RegisterVersion::new(0, 2))
+    );
+    assert_ne!(selections[0], selections[1]);
+    assert_eq!(analysis.expressions().len(), 4);
+    assert_eq!(
+        analysis.expression(RegisterVersion::new(0, 0)),
+        Some(&BitExpr::default())
+    );
+    assert_eq!(
+        analysis.expression(RegisterVersion::new(0, 3)),
+        Some(&BitExpr::default().inverted())
+    );
+}
+
+#[test]
+fn original_versions_overwrites_repeat_and_explicit_prior_decisions() {
+    // These original parsed-version checks are independent of evaluation input,
+    // so the missing-selection control cannot bypass or alter them.
+    assert_original_versioned_selections();
+    let files = Files::new();
+    for strategy in strategies() {
+        for text in [VERSIONED_REPEAT, VERSIONED_PRIOR] {
+            let evaluator = evaluator(&files, text, VERSIONED_TASK, strategy);
+            let result = exact(&evaluator);
+            assert_totals(&result, "1/4", "0", None, &[], None);
+        }
+    }
+}

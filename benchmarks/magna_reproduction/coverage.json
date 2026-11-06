@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1695,7 +1695,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1708,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1721,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1734,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1752,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1775,7 +1775,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "b42f3bd2dde7bc0c7733ca737b2d1eafdda13d63ca3f92cc05fdbba52528daa6"
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
         }
       ]
     },
@@ -1791,8 +1791,16 @@
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_versions_overwrites_repeat_and_explicit_prior_decisions",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original decision-version method plus both used registry/exact helpers. Repeated zero initialization, two reset/H/Z/echo/postselection iterations and final true overwrite preserve distinct public control_analysis register-zero versions1/2 at the selections, with initialv0false/finalv3true. Both compiler and causal strategies exactly enumerate original repeat and explicit-prior AND/NOT overwrite circuits with outputs[]. Each has A1/4,E0, no target success/norm, undefined within-sector conditional error, probability1/omitted0/one noise pattern/four joint histories. Whole original method and both helper AST definitions pass normal/O against fresh native parse and two complete enumerate_errors calls; original target versions[1,2] and both A1/4 unchanged. Untargeted native error remains null, not normalized to the Rust zero-error-mass convention. Identified helper built fresh but unused; original test/support top levels never run. Native missing-repeat-selection input changes only the evaluation parse after original version assertions; actualA1 fails unchanged original1/4 assertion. Independent fair-bit/version oracle covers three models and four assignments each. Matching private final-source Rust input changes only repeat evaluation while original parsed checks remain intact; compile0/test101 at unchanged quarter assertion after actualA1 precondition. Old809line7test/helper prefix byte-identical; seven prior owning-file hashes mechanically refreshed. No production API/default change, private representation/RNG identity, complete parity or paper performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
+          "source_sha256": "346e4084888b15055ee50e2ac44e2bb9ca937967cd79ad69258151ca32f5e2f2"
+        }
+      ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_zero_acceptance_and_callback_failure_are_not_filtered",

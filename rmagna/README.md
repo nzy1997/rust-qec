@@ -5941,3 +5941,19 @@ Original source declarations expose one report-flip category. The resolved
 compiler instrument retains two internal sites because the argumentless
 ideal measurement also has an implicit zero-rate site. The existing original
 category API preserves this distinction without changing compiler behavior.
+
+## Original decision versions across repeats and overwrites
+
+The nonlinear target verifies the complete original decision-version method.
+Repeated reset/H/measurement/echo blocks retain register-zero versions one and
+two at their own postselections. The public control analysis contains both
+distinct expressions, the initial false version zero and final true version
+three. A later write cannot change an earlier selected expression.
+
+Both compilers and both causal runtimes enumerate that repeated circuit and
+the original explicit-prior AND/NOT circuit against an empty-output task.
+Each has accepted mass 1/4, error mass zero, one physical pattern and four
+joint histories covering probability one without omitted mass. Target success
+and normalization are absent. The external missing-selection control retains
+the original parsed-version checks and changes only the repeated evaluation
+input; actual accepted mass one fails the unchanged exact quarter assertion.
