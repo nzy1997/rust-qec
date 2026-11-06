@@ -1672,7 +1672,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_dense_noncommuting_magic_instrument_with_report_noise",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1695,7 +1695,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_full_history_final_readout_and_explicit_state",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1708,7 +1708,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_importance_weights_rejected_draws_and_aggregate_ratio",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1721,7 +1721,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_joint_duplicate_conflicting_detector_and_task_conditions",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1734,7 +1734,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_mixed_affine_selector_integrates_unobserved_record",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1752,7 +1752,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_noncommuting_readout_truth_table_and_target",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1775,7 +1775,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_report_flips_select_reported_bits_and_preserve_true_output",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1788,7 +1788,7 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_selection_distinct_from_each_error_definition",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
@@ -1806,14 +1806,40 @@
           "package": "rmagna",
           "target": "original_nonlinear_postselection",
           "test": "original_versions_overwrites_repeat_and_explicit_prior_decisions",
-          "source_sha256": "18b0abcd9f887fc923f05e1e9cb20ef2c18cce4f94a271406ab156076d1a5635"
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
         }
       ]
     },
     {
       "id": "test_nonlinear_postselection.NonlinearPostselectionTests.test_zero_acceptance_and_callback_failure_are_not_filtered",
-      "status": "unmapped",
-      "reason": "No reviewed Rust assertion mapping has been recorded for this exact source-bound case."
+      "status": "verified",
+      "contract": "Complete original zero-acceptance/callback-failure method and complete used registry helper, with the authenticated literal ZERO_TARGET fixture path. Four owning batch witnesses each cover both compiler and causal strategies. Five rejected zero-target draws complete with acceptance/error0, absent conditional error, empty moments, mean diagnostic weight1 and ESS5. A later selector callback still executes after rejection, fails exactly once, preserves selector unavailable and stops a two-draw batch with completed0/failed1/not-attempted1 and no complete or partial statistics. Empty and two-bit typed callback outputs each fail one attempt. Original Python tuple2 crosses the existing decoder worker, reports native_backend unavailable and fails; tuple0 on the same bridge calibrates complete acceptance1. The complete unchanged original method, registry and literal pinned target assignment pass normal/O with fresh production native5publicparses/5runs per mode; identified helper built fresh but unused. Independent three deterministic models and all86Python tests pass both modes before Rust. Two private final-source controls compile0/test101: omit only the evaluated zero selection, confirming acceptance1 before unchanged zero-acceptance assertion; replace only tuple2 with tuple0, confirming complete acceptance1 before unchanged failure-verdict assertion. Public Source and old903line36896byte nine-test/helper prefix remain unchanged by controls; nine prior owning hashes are mechanically refreshed. No production API/default/retry/backend dependency/private ABI/native RNG/full-parity/performance claim.",
+      "rust_tests": [
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_batch_invalid_callback_widths_fail_without_statistics",
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_batch_callback_failure_after_rejection_is_not_filtered",
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_batch_zero_acceptance_completes_rejected_draws",
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+        },
+        {
+          "package": "rmagna",
+          "target": "original_nonlinear_postselection",
+          "test": "original_batch_non_boolean_python_return_fails_with_valid_calibration",
+          "source_sha256": "2ccae9ff8d03dd9306cd7bf816f67eaa797d395a08486e0ca327e0439fdac309"
+        }
+      ]
     },
     {
       "id": "test_packed_noise.PackedNoiseTests.test_guarded_sites_share_a_group_but_wait_for_their_causal_instruction",

@@ -901,3 +901,233 @@ fn original_selection_distinct_from_each_error_definition() {
         assert_totals(&target_result, "3/4", "1/4", Some("1/2"), &[], Some("1/3"));
     }
 }
+
+// Complete original method test_zero_acceptance_and_callback_failure_are_not_filtered
+// and its complete registry helper, from the pinned MPL-2.0 source above.
+// The Python-only invalid integer crosses the existing decoder worker; the
+// deterministic circuit, seeded batch and exact statistics execute in Rust.
+const BATCH_REJECTED: &str =
+    "X 0\nM 0\nDETECTOR rec[-1]\nCONTROL[echo] det[-1] -> ctrl[0]\nPOSTSELECT ctrl[0]";
+const PYTHON_BAD_RETURN: &str = "def decode(bits, config):\n    return (2,)\n";
+const PYTHON_VALID_RETURN: &str = "def decode(bits, config):\n    return (0,)\n";
+
+fn batch_evaluator(
+    files: &Files,
+    text: &str,
+    task: &str,
+    registry: &ControllerRegistry,
+    (compiler, runtime): (CompilerStrategy, CausalStrategy),
+) -> TaskEvaluator {
+    let parse = ParseOptions {
+        controllers: registry.names(),
+        ..Default::default()
+    };
+    let physical = parse_circuit(text, &parse).unwrap();
+    let task = parse_task(task, &files.0, &TaskOptions::default()).unwrap();
+    let modules = task.load_modules(&physical, &parse).unwrap();
+    let mut options = EvaluationOptions::default();
+    options.runtime.strategy = runtime;
+    options.runtime.compile.compiler_strategy = compiler;
+    let evaluator = TaskEvaluator::new(&physical, &modules, registry, options).unwrap();
+    assert!(evaluator.sampled_history());
+    assert_eq!(
+        evaluator.execution_route(),
+        match runtime {
+            CausalStrategy::ColdPrefix => "causal_cold_prefix",
+            CausalStrategy::FixedTemplate => "causal_fixed_template",
+        }
+    );
+    evaluator
+}
+fn batch_registry() -> ControllerRegistry {
+    let mut registry = ControllerRegistry::default();
+    registry
+        .register("and", "1", |bits: &[bool]| Ok(vec![bits[0] & bits[1]]))
+        .unwrap();
+    registry
+        .register("echo", "1", |bits: &[bool]| Ok(bits.to_vec()))
+        .unwrap();
+    registry
+}
+fn assert_batch_failed(result: &rmagna::task::TaskRunResult, requested: u64) {
+    assert_eq!(
+        result.status,
+        rmagna::task::RunStatus::Failed,
+        "original callback failure verdict"
+    );
+    assert_eq!(result.requested, requested);
+    assert_eq!(result.completed, 0);
+    assert_eq!(result.failed, 1);
+    assert_eq!(result.not_attempted, requested - 1);
+    assert!(result.statistics.is_none());
+    assert!(result.partial_statistics.is_none());
+    assert_eq!(result.failures.len(), 1);
+    assert_eq!(result.failures[0].shot, Some(0));
+    assert_eq!(result.failures[0].phase, rmagna::task::RunPhase::Sampling);
+    assert!(!result.failures[0].message.is_empty());
+    assert_eq!(result.completed_network_compilations, 0);
+    assert_eq!(result.completed_history_groups, 0);
+}
+
+#[test]
+fn original_batch_zero_acceptance_completes_rejected_draws() {
+    use rmagna::task::{RunStatus, TaskRunOptions};
+    let files = Files::new();
+    for strategy in strategies() {
+        let evaluator = batch_evaluator(
+            &files,
+            BATCH_REJECTED,
+            r#"{"outputs":[0],"ideal_state":"zero.magna"}"#,
+            &batch_registry(),
+            strategy,
+        );
+        let result = evaluator
+            .run_batch(&TaskRunOptions {
+                shots: 5,
+                seed: 1049,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(result.status, RunStatus::Complete);
+        assert_eq!(result.requested, 5);
+        assert_eq!(result.completed, 5);
+        assert_eq!(result.failed, 0);
+        assert_eq!(result.not_attempted, 0);
+        assert!(result.failures.is_empty());
+        assert!(result.partial_statistics.is_none());
+        let statistics = result.statistics.as_ref().unwrap();
+        assert_eq!(statistics.completed, 5);
+        assert_eq!(
+            statistics.accepted,
+            field("0"),
+            "original zero-acceptance assertion"
+        );
+        assert_eq!(statistics.error, Some(field("0")));
+        assert_eq!(statistics.conditional_error, None);
+        assert!(statistics.moments.is_empty());
+        assert_eq!(statistics.mean_weight, field("1"));
+        assert_eq!(statistics.effective_sample_size, field("5"));
+    }
+}
+
+#[test]
+fn original_batch_callback_failure_after_rejection_is_not_filtered() {
+    use rmagna::task::TaskRunOptions;
+    use std::sync::Arc;
+    let files = Files::new();
+    let text = format!("{BATCH_REJECTED}\nCONTROL[fail] ctrl[0] -> ctrl[1]\nPOSTSELECT ctrl[1]");
+    for strategy in strategies() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let called = Arc::clone(&calls);
+        let mut registry = batch_registry();
+        registry
+            .register("fail", "1", move |bits: &[bool]| {
+                assert_eq!(bits, &[true], "the preceding selector already rejects");
+                called.fetch_add(1, Ordering::SeqCst);
+                Err("selector unavailable".into())
+            })
+            .unwrap();
+        let evaluator = batch_evaluator(&files, &text, "{}", &registry, strategy);
+        let result = evaluator
+            .run_batch(&TaskRunOptions {
+                shots: 2,
+                seed: 1049,
+                ..Default::default()
+            })
+            .unwrap();
+        assert_batch_failed(&result, 2);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(result.failures[0].message.contains("selector unavailable"));
+    }
+}
+
+#[test]
+fn original_batch_invalid_callback_widths_fail_without_statistics() {
+    use rmagna::task::TaskRunOptions;
+    use std::sync::Arc;
+    let files = Files::new();
+    for strategy in strategies() {
+        for values in [vec![], vec![false, true]] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let called = Arc::clone(&calls);
+            let mut registry = ControllerRegistry::default();
+            registry
+                .register("bad", "1", move |bits: &[bool]| {
+                    assert!(bits.is_empty());
+                    called.fetch_add(1, Ordering::SeqCst);
+                    Ok(values.clone())
+                })
+                .unwrap();
+            let evaluator = batch_evaluator(
+                &files,
+                "CONTROL[bad] -> ctrl[0]\nPOSTSELECT ctrl[0]",
+                "{}",
+                &registry,
+                strategy,
+            );
+            let result = evaluator.run_batch(&TaskRunOptions::default()).unwrap();
+            assert_batch_failed(&result, 1);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+        }
+    }
+}
+
+#[test]
+fn original_batch_non_boolean_python_return_fails_with_valid_calibration() {
+    use rmagna::runtime::process::{ControllerProcess, ProcessOptions};
+    use rmagna::task::{RunStatus, TaskRunOptions};
+    use std::process::Command;
+    for strategy in strategies() {
+        for (module, malformed) in [(PYTHON_BAD_RETURN, true), (PYTHON_VALID_RETURN, false)] {
+            let files = Files::new();
+            std::fs::write(files.0.join("plugin.py"), module).unwrap();
+            std::fs::write(
+                files.0.join("controllers.json"),
+                r#"{"schema_version":1,"bindings":{"bad":{"import":"plugin:decode","version":"1","config":{}}}}"#,
+            )
+            .unwrap();
+            let mut command = Command::new("python3");
+            command.args(["-I", "-B", "-u"]);
+            command.arg(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/python/decoder_worker.py"
+            ));
+            command
+                .arg("--controllers")
+                .arg(files.0.join("controllers.json"));
+            command.arg("--module-root").arg(&files.0);
+            let worker = ControllerProcess::spawn(command, ProcessOptions::default()).unwrap();
+            assert_eq!(worker.manifest()["native_backend"], "unavailable");
+            let mut registry = ControllerRegistry::default();
+            worker.register_all(&mut registry).unwrap();
+            let evaluator = batch_evaluator(
+                &files,
+                "CONTROL[bad] -> ctrl[0]\nPOSTSELECT ctrl[0]",
+                "{}",
+                &registry,
+                strategy,
+            );
+            let result = evaluator.run_batch(&TaskRunOptions::default()).unwrap();
+            if malformed {
+                assert_batch_failed(&result, 1);
+                assert!(result.failures[0].message.contains("non-bit value"));
+            } else {
+                assert_eq!(result.status, RunStatus::Complete);
+                assert_eq!(result.requested, 1);
+                assert_eq!(result.completed, 1);
+                assert_eq!(result.failed, 0);
+                assert_eq!(result.not_attempted, 0);
+                assert!(result.failures.is_empty());
+                assert!(result.partial_statistics.is_none());
+                let statistics = result.statistics.as_ref().unwrap();
+                assert_eq!(statistics.completed, 1);
+                assert_eq!(statistics.accepted, field("1"));
+                assert_eq!(statistics.error, None);
+                assert_eq!(statistics.conditional_error, None);
+                assert!(statistics.moments.is_empty());
+                assert_eq!(statistics.mean_weight, field("1"));
+                assert_eq!(statistics.effective_sample_size, field("1"));
+            }
+        }
+    }
+}

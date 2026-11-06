@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 103 verified, 1 partial and 248 unmapped
+The source-bound ledger currently has 104 verified, 1 partial and 247 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-122 distinct Rust witnesses from 124 declarations across 53 targets. Strict
+126 distinct Rust witnesses from 128 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2447,3 +2447,50 @@ execution of 122 distinct witnesses from 124 declarations across 53 targets.
 Strict complete parity intentionally exits2. These finite contracts make no
 private Python representation/ABI, native RNG trajectory, new-default,
 Monte Carlo precision or paper-performance claim.
+
+## Original rejected draws and callback failures
+
+Run the four focused batch witnesses and complete thirteen-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_batch_ -- --nocapture
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Only the complete original zero-acceptance/callback-failure method is newly
+verified. All four witnesses cover both compiler strategies and both causal
+runtimes. The prior 903-line, 36,896-byte nine-test/helper prefix is retained;
+nine earlier owning-file hashes receive mechanical refreshes.
+
+Five rejected zero-target draws complete with acceptance and joint error zero,
+no conditional error, empty moments, mean diagnostic weight one and ESS five.
+A callback following an already rejected selector executes exactly once and
+fails the first of two requested draws: completed zero, failed one, not attempted
+one. Its message is retained without complete or partial statistics. Typed
+callbacks returning zero or two outputs fail one attempted draw. The original
+Python tuple (2,) crosses the existing decoder worker and fails; a valid (0,)
+through the same bridge completes with acceptance one. The worker manifest
+reports native_backend unavailable; circuit simulation and statistics use Rust.
+
+Before Rust, the complete unchanged pinned original method and registry helper
+pass normal and optimized Python with five actual public parses and five runs
+per mode. The literal ZERO_TARGET path assignment and its pinned zero fixture
+are retained without executing support/test top levels or build-capable loaders.
+Production native code and the identified helper are built fresh; the helper is
+unused. Three independent deterministic accounting/boundary models and all 86
+Python tests pass in both modes.
+
+Two external final-source controls compile successfully and fail their unchanged
+known-answer assertions (exit 101). Omitting only the evaluated zero selection
+first confirms acceptance one, then fails the zero-acceptance assertion. Changing
+only the malformed tuple from 2 to 0 first confirms a complete acceptance-one
+batch, then fails the callback-failure verdict. The standalone controls bind
+CARGO_MANIFEST_DIR to the owning crate's existing decoder worker. Public Source
+is unchanged by both controls.
+
+Coverage is now 104 verified, 1 partial and 247 unmapped original methods,
+with zero architecture-specific exclusions. The source-bound audit requires
+126 distinct Rust witnesses from 128 declarations across 53 targets. Strict
+complete parity intentionally exits 2. These finite contracts make no new
+production API/default, callback retry policy, quantum backend dependency,
+private Python ABI, native RNG trajectory or paper-performance claim.

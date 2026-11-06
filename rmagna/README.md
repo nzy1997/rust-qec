@@ -5972,3 +5972,13 @@ The private counterexample changes only the evaluated classical observable
 from its echoed first record to the selection decision. Acceptance remains
 3/4 while joint error becomes zero, so the unchanged exact quarter-error
 assertion rejects it. Original circuit constants and earlier tests are retained.
+
+## Original rejected draws and callback failures
+
+Four batch witnesses adapt the complete original method across both compiler
+strategies and causal runtimes. Five rejected draws still complete with zero
+joint contributions, mean diagnostic weight one and ESS five. A later callback
+exception stops the batch after one failed attempt and retains its message;
+invalid callback widths fail without statistics. The existing Python decoder
+worker rejects the original integer 2 while a valid 0 completes with acceptance
+one. Its manifest reports that the native quantum backend is unavailable.
