@@ -7,9 +7,9 @@ implement a simulator or claim reproduction of the paper's precision curves.
 
 ## Current coverage
 
-The source-bound ledger currently has 101 verified, 1 partial and 250 unmapped
+The source-bound ledger currently has 102 verified, 1 partial and 249 unmapped
 original methods, with zero architecture-specific core exclusions. It requires
-120 distinct Rust witnesses from 122 declarations across 53 targets. Strict
+121 distinct Rust witnesses from 123 declarations across 53 targets. Strict
 complete parity intentionally exits 2. The detailed per-change sections below
 retain their historical inventory snapshots; `coverage.json` is authoritative.
 
@@ -2343,4 +2343,58 @@ architecture-specific exclusions. All 120 distinct witnesses from 122 declaratio
 across 53 targets must be covered by source-bound execution audits. Strict
 complete parity intentionally exits2. These finite contracts make no private
 Python representation, native RNG trajectory, new-default or paper-performance
+claim.
+
+## Original decision versions across repeats and overwrites
+
+Run the complete original-method witness and then the complete eight-test target:
+
+~~~sh
+cargo test --locked -p rmagna --test original_nonlinear_postselection original_versions_overwrites_repeat_and_explicit_prior_decisions -- --exact
+cargo test --locked -p rmagna --test original_nonlinear_postselection
+~~~
+
+Only this complete original method is newly verified. The preceding 809-line
+seven-test/helper prefix stays byte-identical; seven prior witnesses receive
+mechanical owning-file SHA256 refreshes. Other statuses, contracts, fixtures,
+generators and partial numerical gaps remain unchanged. Earlier per-change
+sections retain their historical counts.
+
+The repeated circuit initializes ctrl[0] to false, then writes separate echo
+decisions in two reset/H/measurement iterations. Its two selected expressions
+equal public control_analysis values for `RegisterVersion::new(0, 1)` and `RegisterVersion::new(0, 2)`, and
+are distinct. Version zero is false and the final version three is true.
+The original explicit-prior circuit reads the earlier echo decision before an
+AND overwrites ctrl[0]; its inverted selection also survives the final write.
+
+Both compiler strategies and both ColdPrefix/FixedTemplate runtimes enumerate
+both original circuits. Accepted mass is exactly 1/4 and error mass zero.
+An explicit empty-output task has no target-success or target-normalization
+value; the within-sector conditional error is undefined. One physical pattern
+and four joint histories cover probability one, with no omitted physical mass.
+
+Before Rust, the complete unchanged original method and both used registry
+and exact helpers pass normal and optimized Python through fresh production
+native parsing and two complete enumerate_errors calls per mode. The original
+parsed targets retain versions [1,2], and both native accepted masses are 1/4.
+The original untargeted native error field is recorded as null; Rust follows
+its existing empty-output zero-error-mass convention. This is not a private
+Python representation identity claim. The identified helper is freshly built
+but never imported or used, and original test/support top levels do not run.
+
+A native negative input removes only the per-iteration postselection at the
+repeated evaluation parse boundary, after the untouched original version
+assertions. Actual acceptance one fails the original quarter assertion.
+An independent fair-bit/version-snapshot oracle enumerates all four assignments
+for both correct circuits and the missing-selection model. The final-source
+private Rust control similarly changes only repeated evaluation input, leaving
+the complete original parsed checks intact; it compiles successfully, confirms
+accepted mass one and fails the unchanged exact quarter assertion (exit101).
+The public candidate is unchanged by the control.
+
+Coverage is now 102 verified, 1 partial and 249 unmapped original methods, with
+zero architecture-specific exclusions. Source-bound execution audits require
+121 distinct witnesses from 123 declarations across 53 targets. Strict complete
+parity intentionally exits2. These finite contracts make no private Python ABI,
+native RNG trajectory, new-default, Monte Carlo precision or paper-performance
 claim.
